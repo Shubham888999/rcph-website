@@ -1,0 +1,128 @@
+/* Reset defaults */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  line-height: 1.6;
+}
+
+header {
+  background-color: #8b0000;
+  color: white;
+  padding: 30px 20px;
+  text-align: center;
+}
+
+nav ul {
+  list-style: none;
+  margin-top: 15px;
+}
+
+nav ul li {
+  display: inline-block;
+  margin: 0 15px;
+}
+
+nav ul li a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+nav ul li a:hover {
+  color: #ffd700;
+}
+
+main {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+section {
+  margin-bottom: 50px;
+}
+
+footer {
+  background-color: #222;
+  color: white;
+  text-align: center;
+  padding: 15px 10px;
+  position: fixed;
+  width: 100%;
+  bottom: 0;
+}
+
+/* Special styling for About section */
+.about-section {
+  background: linear-gradient(135deg, #8b0000 30%, #a80000 70%);
+  color: #f0d28c;
+  padding: 50px 30px;
+  text-align: left;
+  border-radius: 10px;
+  margin: 40px auto;
+  max-width: 800px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}
+
+.about-section h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+  color: #ffdd77;
+}
+
+.about-section p {
+  font-size: 17px;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+.legacy-banner {
+  background: linear-gradient(135deg, #a30000, #5c0000);
+  text-align: center;
+  padding: 30px 20px;
+  color: #f0c554;
+  letter-spacing: 5px;
+  font-size: 22px;
+  font-weight: bold;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+#contact i {
+  color: #8b0000;
+  margin-right: 10px;
+  font-size: 18px;
+}
+
+#contact a {
+  color: #333;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+#contact a:hover {
+  text-decoration: underline;
+  color: #8b0000;
+}
+
+#calendar {
+  max-width: 900px;
+  margin: 50px auto;
+  padding: 20px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+}
+
+#calendar h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
