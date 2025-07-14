@@ -5,33 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Rotaract Club of Pune Heritage</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- Font Awesome CDN for icons -->
+  <!-- FONT -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <!-- FullCalendar CSS -->
+    <!-- Calendar CSS -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
 
-<!-- FullCalendar JS -->
+<!-- Calendar JS -->
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 
 </head>
 <body>
-  <header>
-    <section class="legacy-banner">
-        <h2>A LEGACY OF 11 YEARS AND COUNTING...!</h2>
-    </section>
-    <h1>Rotaract Club of Pune Heritage</h1>
-    <nav>
-      <ul>
-        <li><a href="#home">Home</a></li>
-        <li><a href="#about">About</a></li>
-        <li><a href="#projects">Projects</a></li>
-        <li><a href="#events">Events</a></li>
-        <li><a href="#gallery">Gallery</a></li>
-        <li><a href="#join">Join Us</a></li>
-        <li><a href="#contact">Contact</a></li>
-      </ul>
-    </nav>
+<header>
+    <div class="navbar">
+      <h1>Rotaract Club of Pune Heritage</h1>
+      <nav>
+        <ul>
+          <li><a href="#home">Home</a></li>
+          <li><a href="#about">About</a></li>
+          <li><a href="#projects">Projects</a></li>
+          <li><a href="#events">Events</a></li>
+          <li><a href="#calendar">Upcoming Events</a></li>
+          <li><a href="#gallery">Gallery</a></li>
+          <li><a href="#join">Join Us</a></li>
+          <li><a href="#bod">Board of Directors</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
   </header>
+
+  <!-- Hero Section -->
+  <section class="hero-banner">
+    <div class="hero-content">
+      <h1>Rotaract Club of Pune Heritage</h1>
+    </div>
+  </section>
 
   <main>
     <section id="home">
@@ -54,17 +62,68 @@
     <section id="events">
       <h2>Upcoming Events</h2>
       <p>Stay tuned for our mega event in August and a leadership retreat in October!</p>
+
+      <div class="past-events">
+        <h3>Fun events organised in previous years:–</h3>
+        <ul>
+          <li>Filter donation drive</li>
+          <li>Sports RYLA</li>
+          <li>Republic Day Peace rides</li>
+          <li>Playground Development Initiative</li>
+          <li>Food Kit Donation drive</li>
+          <li>Vishwa Marathi Ekankika Spardha</li>
+          <li>Spooky Boogie (Halloween event)</li>
+          <li>Spin & Cult (Pottery event)</li>
+          <li>Dandiya workshop</li>
+        </ul>
+      </div>
     </section>
 
     <section id="calendar">
-        <h2>Club Calendar</h2>
-        <div id="rcph-calendar"></div>
+      <h2>Club Calendar</h2>
+      <div id="rcph-calendar"></div>
     </section>
 
-    <section id="gallery">
-      <h2>Gallery</h2>
-      <p>Photos coming soon! 🖼️</p>
-    </section>
+<section id="gallery" class="gallery-section">
+  <h2>Gallery</h2>
+
+  <div class="carousel-container">
+    <div class="carousel-track" id="carouselTrack">
+      <img src="images/IMG-20250713-WA0028.jpg" alt="Event Photo 1">
+      <img src="images/IMG-20250713-WA0031.jpg" alt="Event Photo 2">
+      <img src="images/IMG-20250713-WA0032.jpg" alt="Event Photo 3">
+      <img src="images/IMG-20250713-WA0033.jpg" alt="Event Photo 4">
+    </div>
+  </div>
+</section>
+
+    <section id="bod" class="bod-section">
+  <h2>Board of Directors 2025–2026</h2>
+  <div class="bod-container">
+
+    <!-- One BOD card -->
+    <div class="bod-card">
+      <img src="images/president.jpg" alt="President Photo">
+      <h3>Rtr. Aneesh Ladkat</h3>
+      <p>President</p>
+      <a href="https://www.instagram.com/ladkat_aneesshx" target="_blank">
+        <i class="fab fa-instagram"></i>
+      </a>
+    </div>
+
+    <div class="bod-card">
+      <img src="images/secretary.jpg" alt="Secretary Photo">
+      <h3>Rtr. Nikita Palshikar</h3>
+      <p>Secretary</p>
+      <a href="https://www.instagram.com/nikita_palshikar.23" target="_blank">
+        <i class="fab fa-instagram"></i>
+      </a>
+    </div>
+
+    <!-- Add more BODs below in the same format -->
+    
+  </div>
+</section>
 
     <section id="join">
       <h2>Join Us</h2>
@@ -72,15 +131,9 @@
     </section>
 
     <section id="contact">
-        <h2>Contact Us</h2>
-        <p>
-        <i class="fab fa-instagram"></i>
-        <a href="https://www.instagram.com/rc_pune_heritage" target="_blank">@rc_pune_heritage</a>
-        </p>
-        <p>
-            <i class="fas fa-envelope"></i>
-            <a href="mailto:rcpuneheritage3131@gmail.com">rcpuneheritage3131@gmail.com</a>
-        </p>
+      <h2>Contact Us</h2>
+      <p><i class="fab fa-instagram"></i> <a href="https://instagram.com/rc_pune_heritage" target="_blank">@rc_pune_heritage</a></p>
+      <p><i class="fas fa-envelope"></i> <a href="mailto:rcpuneheritage3131@gmail.com">rcpuneheritage3131@gmail.com</a></p>
     </section>
   </main>
 
@@ -89,5 +142,16 @@
   </footer>
 
   <script src="script.js"></script>
+<div id="eventModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn">&times;</span>
+    <h3 id="eventTitle">Event Title</h3>
+    <p id="eventDescription">Description will appear here.</p>
+    <p><strong>Date:</strong> <span id="eventDate"></span></p>
+    <p><strong>Time:</strong> <span id="eventTime"></span></p>
+    <p><strong>Venue:</strong> <span id="eventVenue"></span></p>
+  </div>
+</div>
+
 </body>
 </html>
