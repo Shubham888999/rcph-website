@@ -1,11 +1,11 @@
 /* → COLOR PALETTE ← */
 :root {
-  --color-bg:       #ffffff;   /* page background */
-  --color-text:     #333333;   /* primary text */
-  --color-card:     #f9f9f9;   /* card & section bg */
-  --color-border:   #e0e0e0;   /* subtle borders */
-  --color-accent:   #c0392b;   /* deep red */
-  --color-accent-l: #e74c3c;   /* lighter red on hover */
+  --color-bg:       #ffffff;
+  --color-text:     #333333;
+  --color-card:     #f9f9f9;
+  --color-border:   #e0e0e0;
+  --color-accent:   #c0392b;
+  --color-accent-l: #e74c3c;
 }
 
 /* Reset & Base */
@@ -33,12 +33,9 @@ body {
 }
 .logo-strip .logo-image {
   height: 60px;
-  object-fit: contain;
   transition: transform .3s ease;
 }
-.logo-strip .logo-image:hover {
-  transform: scale(1.1);
-}
+.logo-strip .logo-image:hover { transform: scale(1.1); }
 
 /* Header & Navbar */
 header {
@@ -46,7 +43,6 @@ header {
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 .navbar ul {
   display: flex;
@@ -86,19 +82,16 @@ header {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;       /* vertically center */
+  justify-content: center;
   align-items: center;
   text-align: center;
-  min-height: 100vh;              /* adjust to taste */
+  min-height: 100vh;
   background:
     linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
     url('images/group.jpg') top/cover no-repeat;
   padding: 0 20px;
 }
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
+.hero-content { position: relative; z-index: 1; }
 .hero-content h1 {
   font-family: 'Montserrat', sans-serif;
   font-weight: 900;
@@ -117,7 +110,7 @@ header {
   text-transform: uppercase;
 }
 
-/* Main Wrapper */
+/* Content Wrapper */
 .content-wrapper {
   max-width: 1100px;
   margin: 0 auto;
@@ -126,13 +119,13 @@ header {
 }
 section { margin-bottom: 60px; }
 
-/* Boxed Sections (About / Projects / Events / Join / Contact) */
+/* Boxed Sections */
 .section-box {
   background: var(--color-card);
   border: none;
   box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.05),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    0 4px 12px rgba(0,0,0,0.05),
+    inset 0 0 0 1px rgba(0,0,0,0.08);
   border-radius: 12px;
   padding: 30px 25px;
   max-width: 900px;
@@ -142,8 +135,8 @@ section { margin-bottom: 60px; }
 .section-box:hover {
   transform: translateY(-4px);
   box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.1),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    0 8px 20px rgba(0,0,0,0.1),
+    inset 0 0 0 1px rgba(0,0,0,0.08);
 }
 .section-box h2 {
   font-family: 'Montserrat', sans-serif;
@@ -209,21 +202,13 @@ section { margin-bottom: 60px; }
   transition: background .2s;
 }
 .fc-button:hover,
-.fc-button:focus {
-  background: var(--color-accent-l);
-}
-.fc-button-active {
-  background: #e74c3c;
-}
-.fc-daygrid-day-frame {
-  transition: background .2s;
-}
+.fc-button:focus { background: var(--color-accent-l); }
+.fc-button-active { background: #e74c3c; }
+.fc-daygrid-day-frame { transition: background .2s; }
 .fc-daygrid-day:hover .fc-daygrid-day-frame {
   background: rgba(192,57,43,0.1);
 }
-.fc-day-today {
-  background: rgba(192,57,43,0.15);
-}
+.fc-day-today { background: rgba(192,57,43,0.15); }
 .fc-event {
   background: var(--color-accent);
   border: none;
@@ -233,9 +218,7 @@ section { margin-bottom: 60px; }
   font-size: .75rem;
   transition: transform .2s;
 }
-.fc-event:hover {
-  transform: scale(1.05);
-}
+.fc-event:hover { transform: scale(1.05); }
 
 /* Modal */
 .modal {
@@ -261,7 +244,7 @@ section { margin-bottom: 60px; }
   color: var(--color-accent);
 }
 
-/* Gallery Carousel */
+/* Carousel */
 .carousel-container {
   overflow: hidden;
   width: 100%;
@@ -282,9 +265,7 @@ section { margin-bottom: 60px; }
   box-shadow: 0 4px 16px rgba(0,0,0,0.1);
   transition: transform .3s;
 }
-.carousel-track img:hover {
-  transform: scale(1.05);
-}
+.carousel-track img:hover { transform: scale(1.05); }
 
 /* Board & Contact Cards */
 .bod-container,
@@ -299,8 +280,8 @@ section { margin-bottom: 60px; }
   background: #fff;
   border: none;
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.05),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    0 2px 8px rgba(0,0,0,0.05),
+    inset 0 0 0 1px rgba(0,0,0,0.08);
   border-radius: 10px;
   padding: 20px;
   max-width: 240px;
@@ -311,8 +292,8 @@ section { margin-bottom: 60px; }
 .contact-card:hover {
   transform: translateY(-3px);
   box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.1),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    0 6px 16px rgba(0,0,0,0.1),
+    inset 0 0 0 1px rgba(0,0,0,0.08);
 }
 .bod-card img,
 .contact-card img {
@@ -321,7 +302,7 @@ section { margin-bottom: 60px; }
   margin-bottom: 15px;
 }
 
-/* Red/White Link Overrides */
+/* Links */
 #join a,
 .contact-card a,
 #contact p a[href^="mailto"],

@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Rotaract Club of Pune Heritage</title>
 
-  <!-- Google Fonts: Montserrat (headings) + Inter (body) -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet" />
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
   <!-- FullCalendar CSS -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
-  <!-- Custom Styles -->
+
+  <!-- Your Custom Styles -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -30,8 +32,7 @@
         <li><a href="#home">Home</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#projects">Projects</a></li>
-        <li><a href="#events">Events</a></li>
-        <li><a href="#calendar">Upcoming Events</a></li>
+        <li><a href="#calendar">Calendar</a></li>
         <li><a href="#gallery">Gallery</a></li>
         <li><a href="#join">Join Us</a></li>
         <li><a href="#bod">Board of Directors</a></li>
@@ -49,9 +50,8 @@
   </section>
 
   <main class="content-wrapper">
-
     <!-- About -->
-    <section id="about" class="about-section section-box">
+    <section id="about" class="section-box">
       <h2>About Rotaract Club of Pune Heritage</h2>
       <p>Chartered in 2015, the Rotaract Club of Pune Heritage was sponsored by the Rotary Club of Pune Heritage, RID 3131.</p>
       <p>Our Charter President, Rtr. Parth Jaokar, exemplified leadership by serving as the District Rotaract Representative (DRR) of RI District 3131 for the Rotary Year 2021-22.</p>
@@ -61,37 +61,26 @@
     <!-- Projects -->
     <section id="projects" class="section-box">
       <h2>Our Projects</h2>
-      <p>We have organized blood donation camps, river cleanups, and educational workshops for underprivileged children.</p>
-    </section>
-
-    <!-- Events -->
-    <section id="events" class="section-box">
-      <h2>Upcoming Events</h2>
-      <p>Watch out for our August mega event & October leadership retreat.</p>
-      <h3>Past Events:</h3>
       <ul>
-        <li>Filter donation drive</li>
-        <li>Spooky Boogie (Halloween)</li>
-        <li>Republic Day Peace rides</li>
-        <li>Dandiya workshop</li>
+        <li><strong>Mahadaan Drive:</strong> Collected 30 bags of clothes, 151 kg of foodgrains, and ₹21,362 cash to benefit two local societies.</li>
+        <li><strong>Night School Visit:</strong> Hosted stationery distributions and interactive sessions with underprivileged children—first of many warm, encouraging evenings.</li>
+        <li><strong>Pyaas 2.0 Sherbet Drive:</strong> Served chilled sherbet to police officers and pedestrians under the May sun, bringing refreshment and smiles to every hand reached.</li>
+        <li><strong>The Ice Breaker Meetup:</strong> Sparked new friendships with fun games and conversations—prospective members left as friends, excited for what’s next.</li>
       </ul>
     </section>
 
-    <!-- Calendar -->
-    <section id="calendar" class="section-box">
-      <h2>Club Calendar</h2>
-      <div id="rcph-calendar"></div>
-    </section>
+    <!-- Calendar (pulled in from calendar.html) -->
+    <div data-include="fragments/calendar.html"></div>
 
     <!-- Gallery -->
     <section id="gallery" class="section-box">
       <h2>Gallery</h2>
       <div class="carousel-container">
         <div class="carousel-track" id="carouselTrack">
-          <img src="images/IMG-20250713-WA0028.jpg" alt="Event1" />
-          <img src="images/IMG-20250713-WA0031.jpg" alt="Event2" />
-          <img src="images/IMG-20250713-WA0032.jpg" alt="Event3" />
-          <img src="images/IMG-20250713-WA0033.jpg" alt="Event4" />
+          <img src="images/IMG-20250713-WA0028.jpg" alt="Event 1" />
+          <img src="images/IMG-20250713-WA0031.jpg" alt="Event 2" />
+          <img src="images/IMG-20250713-WA0032.jpg" alt="Event 3" />
+          <img src="images/IMG-20250713-WA0033.jpg" alt="Event 4" />
         </div>
       </div>
     </section>
@@ -130,14 +119,13 @@
         </div>
         <div class="contact-card">
           <h3>Club Service Director</h3>
-          <p>Rtr. Avani</p>
+          <p>Rtr. Avani Joshi</p>
           <p><a href="tel:+917972296371">+91 79722 96371</a></p>
         </div>
       </div>
       <p><i class="fas fa-envelope"></i> <a href="mailto:rcph3131@gmail.com">rcph3131@gmail.com</a></p>
       <p><i class="fab fa-instagram"></i> <a href="https://instagram.com/rcph3131">@rcph3131</a></p>
     </section>
-
   </main>
 
   <!-- Event Modal -->
@@ -154,7 +142,7 @@
 
   <!-- FullCalendar JS -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-  <!-- Custom JS -->
+  <!-- Custom JS (includes our HTML‐include loader + calendar init) -->
   <script src="script.js"></script>
 </body>
 </html>
