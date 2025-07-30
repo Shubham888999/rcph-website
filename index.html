@@ -4,154 +4,157 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Rotaract Club of Pune Heritage</title>
+
+  <!-- Google Fonts: Montserrat (headings) + Inter (body) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700;900&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- FullCalendar CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
+  <!-- Custom Styles -->
   <link rel="stylesheet" href="style.css" />
-  <!-- FONT -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <!-- Calendar CSS -->
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
-
-<!-- Calendar JS -->
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-
 </head>
 <body>
-<header>
-    <div class="navbar">
-      <h1>Rotaract Club of Pune Heritage</h1>
-      <nav>
-        <ul>
-          <li><a href="#home">Home</a></li>
-          <li><a href="#about">About</a></li>
-          <li><a href="#projects">Projects</a></li>
-          <li><a href="#events">Events</a></li>
-          <li><a href="#calendar">Upcoming Events</a></li>
-          <li><a href="#gallery">Gallery</a></li>
-          <li><a href="#join">Join Us</a></li>
-          <li><a href="#bod">Board of Directors</a></li>
-          <li><a href="#contact">Contact</a></li>
-        </ul>
-      </nav>
-    </div>
+  <!-- Logo Strip -->
+  <div class="logo-strip">
+    <img src="images/logo1.png" alt="AURA Logo" class="logo-image" />
+    <img src="images/logo2.png" alt="Rotaract 3131" class="logo-image" />
+    <img src="images/logo3.png" alt="RCPH" class="logo-image" />
+  </div>
+
+  <!-- Navbar -->
+  <header>
+    <nav class="navbar">
+      <ul>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#events">Events</a></li>
+        <li><a href="#calendar">Upcoming Events</a></li>
+        <li><a href="#gallery">Gallery</a></li>
+        <li><a href="#join">Join Us</a></li>
+        <li><a href="#bod">Board of Directors</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
   </header>
 
   <!-- Hero Section -->
-  <section class="hero-banner">
+  <section id="home" class="hero-banner">
     <div class="hero-content">
       <h1>Rotaract Club of Pune Heritage</h1>
+      <p class="theme-text">CREATE.CONNECT.CONTRIBUTE</p>
     </div>
   </section>
 
-  <main>
-    <section id="home">
-      <h2>Welcome to RCPH!</h2>
-      <p>We serve, we lead, we grow together.</p>
-    </section>
+  <main class="content-wrapper">
 
-    <section id="about" class="about-section">
+    <!-- About -->
+    <section id="about" class="about-section section-box">
       <h2>About Rotaract Club of Pune Heritage</h2>
-      <p>Chartered in 2015, the Rotaract Club of Pune Heritage was sponsored and established by the Rotary Club of Pune Heritage, RID 3131.</p>
+      <p>Chartered in 2015, the Rotaract Club of Pune Heritage was sponsored by the Rotary Club of Pune Heritage, RID 3131.</p>
       <p>Our Charter President, Rtr. Parth Jaokar, exemplified leadership by serving as the District Rotaract Representative (DRR) of RI District 3131 for the Rotary Year 2021-22.</p>
       <p>Since inception, the club has been known for its strong leadership, impactful service, and vibrant fellowship.</p>
     </section>
 
-    <section id="projects">
+    <!-- Projects -->
+    <section id="projects" class="section-box">
       <h2>Our Projects</h2>
       <p>We have organized blood donation camps, river cleanups, and educational workshops for underprivileged children.</p>
     </section>
 
-    <section id="events">
+    <!-- Events -->
+    <section id="events" class="section-box">
       <h2>Upcoming Events</h2>
-      <p>Stay tuned for our mega event in August and a leadership retreat in October!</p>
-
-      <div class="past-events">
-        <h3>Fun events organised in previous years:–</h3>
-        <ul>
-          <li>Filter donation drive</li>
-          <li>Sports RYLA</li>
-          <li>Republic Day Peace rides</li>
-          <li>Playground Development Initiative</li>
-          <li>Food Kit Donation drive</li>
-          <li>Vishwa Marathi Ekankika Spardha</li>
-          <li>Spooky Boogie (Halloween event)</li>
-          <li>Spin & Cult (Pottery event)</li>
-          <li>Dandiya workshop</li>
-        </ul>
-      </div>
+      <p>Watch out for our August mega event & October leadership retreat.</p>
+      <h3>Past Events:</h3>
+      <ul>
+        <li>Filter donation drive</li>
+        <li>Spooky Boogie (Halloween)</li>
+        <li>Republic Day Peace rides</li>
+        <li>Dandiya workshop</li>
+      </ul>
     </section>
 
-    <section id="calendar">
+    <!-- Calendar -->
+    <section id="calendar" class="section-box">
       <h2>Club Calendar</h2>
       <div id="rcph-calendar"></div>
     </section>
 
-<section id="gallery" class="gallery-section">
-  <h2>Gallery</h2>
+    <!-- Gallery -->
+    <section id="gallery" class="section-box">
+      <h2>Gallery</h2>
+      <div class="carousel-container">
+        <div class="carousel-track" id="carouselTrack">
+          <img src="images/IMG-20250713-WA0028.jpg" alt="Event1" />
+          <img src="images/IMG-20250713-WA0031.jpg" alt="Event2" />
+          <img src="images/IMG-20250713-WA0032.jpg" alt="Event3" />
+          <img src="images/IMG-20250713-WA0033.jpg" alt="Event4" />
+        </div>
+      </div>
+    </section>
 
-  <div class="carousel-container">
-    <div class="carousel-track" id="carouselTrack">
-      <img src="images/IMG-20250713-WA0028.jpg" alt="Event Photo 1">
-      <img src="images/IMG-20250713-WA0031.jpg" alt="Event Photo 2">
-      <img src="images/IMG-20250713-WA0032.jpg" alt="Event Photo 3">
-      <img src="images/IMG-20250713-WA0033.jpg" alt="Event Photo 4">
-    </div>
-  </div>
-</section>
+    <!-- Board of Directors -->
+    <section id="bod" class="section-box">
+      <h2>Board of Directors 2025–2026</h2>
+      <div class="bod-container">
+        <div class="bod-card">
+          <img src="images/president.jpg" alt="President" />
+          <h3>Rtr. Aneesh Ladkat</h3>
+          <p>President</p>
+        </div>
+        <div class="bod-card">
+          <img src="images/secretary.jpg" alt="Secretary" />
+          <h3>Rtr. Nikita Palshikar</h3>
+          <p>Secretary</p>
+        </div>
+      </div>
+    </section>
 
-    <section id="bod" class="bod-section">
-  <h2>Board of Directors 2025–2026</h2>
-  <div class="bod-container">
-
-    <!-- One BOD card -->
-    <div class="bod-card">
-      <img src="images/president.jpg" alt="President Photo">
-      <h3>Rtr. Aneesh Ladkat</h3>
-      <p>President</p>
-      <a href="https://www.instagram.com/ladkat_aneesshx" target="_blank">
-        <i class="fab fa-instagram"></i>
-      </a>
-    </div>
-
-    <div class="bod-card">
-      <img src="images/secretary.jpg" alt="Secretary Photo">
-      <h3>Rtr. Nikita Palshikar</h3>
-      <p>Secretary</p>
-      <a href="https://www.instagram.com/nikita_palshikar.23" target="_blank">
-        <i class="fab fa-instagram"></i>
-      </a>
-    </div>
-
-    <!-- Add more BODs below in the same format -->
-    
-  </div>
-</section>
-
-    <section id="join">
+    <!-- Join Us -->
+    <section id="join" class="section-box">
       <h2>Join Us</h2>
       <p>Want to become a member? <a href="https://forms.gle/" target="_blank">Fill out this form</a>.</p>
     </section>
 
-    <section id="contact">
+    <!-- Contact Us -->
+    <section id="contact" class="section-box">
       <h2>Contact Us</h2>
-      <p><i class="fab fa-instagram"></i> <a href="https://instagram.com/rc_pune_heritage" target="_blank">@rc_pune_heritage</a></p>
-      <p><i class="fas fa-envelope"></i> <a href="mailto:rcpuneheritage3131@gmail.com">rcpuneheritage3131@gmail.com</a></p>
+      <div class="contact-cards">
+        <div class="contact-card">
+          <h3>President</h3>
+          <p>Rtr. Aneesh Ladkat</p>
+          <p><a href="tel:+919175935956">+91 91759 35956</a></p>
+        </div>
+        <div class="contact-card">
+          <h3>Club Service Director</h3>
+          <p>Rtr. Avani</p>
+          <p><a href="tel:+917972296371">+91 79722 96371</a></p>
+        </div>
+      </div>
+      <p><i class="fas fa-envelope"></i> <a href="mailto:rcph3131@gmail.com">rcph3131@gmail.com</a></p>
+      <p><i class="fab fa-instagram"></i> <a href="https://instagram.com/rcph3131">@rcph3131</a></p>
     </section>
+
   </main>
 
-  <footer>
-    <p>© 2025 Rotaract Club of Pune Heritage</p>
-  </footer>
-
-  <script src="script.js"></script>
-<div id="eventModal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn">&times;</span>
-    <h3 id="eventTitle">Event Title</h3>
-    <p id="eventDescription">Description will appear here.</p>
-    <p><strong>Date:</strong> <span id="eventDate"></span></p>
-    <p><strong>Time:</strong> <span id="eventTime"></span></p>
-    <p><strong>Venue:</strong> <span id="eventVenue"></span></p>
+  <!-- Event Modal -->
+  <div id="eventModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h3 id="eventTitle">Event Title</h3>
+      <p id="eventDescription">Description will appear here.</p>
+      <p><strong>Date:</strong> <span id="eventDate"></span></p>
+      <p><strong>Time:</strong> <span id="eventTime"></span></p>
+      <p><strong>Venue:</strong> <span id="eventVenue"></span></p>
+    </div>
   </div>
-</div>
 
+  <!-- FullCalendar JS -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <!-- Custom JS -->
+  <script src="script.js"></script>
 </body>
 </html>

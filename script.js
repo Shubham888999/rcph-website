@@ -1,8 +1,8 @@
 console.log("Welcome to RCPH Website");
 
 document.addEventListener('DOMContentLoaded', function () {
+  // FullCalendar setup
   const calendarEl = document.getElementById('rcph-calendar');
-
   const calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: 'dayGridMonth',
     height: 'auto',
@@ -23,14 +23,15 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     ],
     eventClick: function (info) {
-      // Fill modal with event info
+      // Populate and show modal
       document.getElementById('eventTitle').textContent = info.event.title;
-      document.getElementById('eventDescription').textContent = info.event.extendedProps.description || 'No description provided.';
+      document.getElementById('eventDescription').textContent =
+        info.event.extendedProps.description || 'No description provided.';
       document.getElementById('eventDate').textContent = info.event.start.toDateString();
-      document.getElementById('eventTime').textContent = info.event.extendedProps.time || 'To be announced';
-      document.getElementById('eventVenue').textContent = info.event.extendedProps.venue || 'TBA';
-
-      // Show modal
+      document.getElementById('eventTime').textContent =
+        info.event.extendedProps.time || 'To be announced';
+      document.getElementById('eventVenue').textContent =
+        info.event.extendedProps.venue || 'TBA';
       document.getElementById('eventModal').style.display = 'block';
     },
     headerToolbar: {
@@ -39,48 +40,40 @@ document.addEventListener('DOMContentLoaded', function () {
       right: 'dayGridMonth,listMonth'
     }
   });
-
   calendar.render();
 
-  // Modal close button
-  document.querySelector('.close-btn').onclick = function () {
+  // Modal close handlers
+  document.querySelector('.close-btn').onclick = () => {
     document.getElementById('eventModal').style.display = 'none';
   };
-
-  // Close modal on outside click
-  window.onclick = function (e) {
+  window.onclick = e => {
     if (e.target === document.getElementById('eventModal')) {
       document.getElementById('eventModal').style.display = 'none';
     }
   };
+
+  // Start gallery auto-scroll
+  autoScrollGallery();
 });
 
 function scrollGallery(direction) {
   const track = document.getElementById('carouselTrack');
-  const scrollAmount = 320; // image width + gap
-
-  if (direction === 'left') {
-    track.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
-  } else {
-    track.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-  }
+  const scrollAmount = 320;
+  track.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
 }
 
 function autoScrollGallery() {
-  const track = document.getElementById("carouselTrack");
-  let scrollSpeed = 1; // pixels per frame
-
+  const track = document.getElementById('carouselTrack');
+  const scrollSpeed = 1;
   function scrollStep() {
-    if (track.scrollLeft + track.clientWidth >= track.scrollWidth) {
-      track.scrollLeft = 0; // loop back
-    } else {
-      track.scrollLeft += scrollSpeed;
+    if (track.scrollWidth > track.clientWidth) {
+      if (track.scrollLeft + track.clientWidth >= track.scrollWidth) {
+        track.scrollLeft = 0;
+      } else {
+        track.scrollLeft += scrollSpeed;
+      }
     }
     requestAnimationFrame(scrollStep);
   }
-
   scrollStep();
 }
-
-// Start scrolling on page load
-window.addEventListener("DOMContentLoaded", autoScrollGallery);
