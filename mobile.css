@@ -1,6 +1,6 @@
 /* Mobile Overrides for Rotaract Club Website */
 
-/* Navbar: Convert to hamburger menu */
+/* Navbar: Hamburger */
 .mobile-nav-toggle {
   display: block;
   background: var(--color-accent);
@@ -24,24 +24,31 @@
 .navbar .nav-links.active {
   display: flex;
 }
-
 .navbar .nav-links li {
   padding: 12px 0;
   border-bottom: 1px solid rgba(255,255,255,0.2);
 }
-
 .navbar .nav-links a {
   font-size: 1.1rem;
 }
 
 /* Logo Strip */
 .logo-strip {
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
 }
 .logo-strip .logo-image {
-  height: 45px;
+  max-width: 80px;
+  height: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.logo-strip .logo-large {
+  transform: scale(1.5);
 }
 
 /* Hero */
@@ -52,7 +59,7 @@
   font-size: 1rem;
 }
 
-/* General Section Styling */
+/* Content */
 .content-wrapper {
   padding: 20px 12px;
 }
@@ -64,15 +71,21 @@
 }
 
 /* Cards */
-.bod-container,
-.contact-cards {
-  flex-direction: column;
-  gap: 20px;
-}
-.bod-card,
-.contact-card {
-  max-width: 100%;
-  margin: 0 auto;
+@media (max-width: 768px) {
+  .bod-container,
+  .contact-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .bod-card,
+  .contact-card {
+    flex: 1 1 calc(50% - 20px); /* 2 cards per row with gap */
+    max-width: 180px;
+    min-width: 140px;
+  }
 }
 
 /* Gallery */
@@ -99,8 +112,9 @@
   font-size: 0.9rem;
 }
 
-/* Join Us / Contact Links */
-#join p, #contact p {
+/* Join / Contact */
+#join p,
+#contact p {
   font-size: 0.95rem;
   line-height: 1.5;
 }

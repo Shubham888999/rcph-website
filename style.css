@@ -1,11 +1,11 @@
 /* → COLOR PALETTE ← */
 :root {
-  --color-bg:       #121212;   /* Deep charcoal background */
-  --color-text:     #f0f0f0;   /* Light text for contrast */
-  --color-card:     #1e1e1e;   /* Slightly lighter card background */
-  --color-border:   #2e2e2e;   /* Subtle border for dark theme */
-  --color-accent:   #60C3C4;   /* Aqua Blue */
-  --color-accent-l: #F4B43A;   /* Golden Yellow */
+  --color-bg:       #121212;
+  --color-text:     #f0f0f0;
+  --color-card:     #1e1e1e;
+  --color-border:   #2e2e2e;
+  --color-accent:   #60C3C4;
+  --color-accent-l: #F4B43A;
 }
 
 /* Reset & Base */
@@ -23,19 +23,25 @@ body {
 
 /* Logo Strip */
 .logo-strip {
-  background: #fff;
   display: flex;
   justify-content: center;
   align-items: center;
+  flex-wrap: wrap;
   gap: 30px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-border);
+  background-color: #ffffff;
+  padding: 20px 0;
 }
 .logo-strip .logo-image {
   height: 60px;
-  transition: transform .3s ease;
+  object-fit: contain;
 }
-.logo-strip .logo-image:hover { transform: scale(1.1); }
+.logo-strip .logo-image:hover {
+  transform: scale(1.1);
+}
+.logo-strip .logo-large {
+  transform: scale(1.5);
+  transform-origin: center;
+}
 
 /* Header & Navbar */
 header {
@@ -91,7 +97,10 @@ header {
     url('images/group.jpg') top/cover no-repeat;
   padding: 0 20px;
 }
-.hero-content { position: relative; z-index: 1; }
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
 .hero-content h1 {
   font-family: 'Montserrat', sans-serif;
   font-weight: 900;
@@ -220,6 +229,25 @@ section { margin-bottom: 60px; }
 }
 .fc-event:hover { transform: scale(1.05); }
 
+.fc-col-header-cell-cushion {
+  color: var(--color-accent);
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  text-transform: uppercase;
+}
+.fc-list-event td {
+  color: #111 !important;
+}
+.fc-list-day-text,
+.fc-list-day-side-text {
+  color: var(--color-accent) !important;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+}
+.fc-event-dot {
+  background-color: #1E88E5;
+}
+
 /* Modal */
 .modal {
   display: none;
@@ -267,7 +295,7 @@ section { margin-bottom: 60px; }
 }
 .carousel-track img:hover { transform: scale(1.05); }
 
-/* Board & Contact Cards */
+/* Cards */
 .bod-container,
 .contact-cards {
   display: flex;
@@ -278,7 +306,7 @@ section { margin-bottom: 60px; }
 .bod-card,
 .contact-card {
   background: #fff;
-  color: #111; /* Sets base text color */
+  color: #111;
   border: none;
   box-shadow:
     0 2px 8px rgba(0,0,0,0.05),
@@ -291,7 +319,7 @@ section { margin-bottom: 60px; }
 }
 .bod-card *,
 .contact-card * {
-  color: #111 !important;  /* Force text color */
+  color: #111 !important;
 }
 .bod-card:hover,
 .contact-card:hover {
@@ -321,33 +349,4 @@ section { margin-bottom: 60px; }
 #contact p a[href^="mailto"]:hover,
 #contact p a[href*="instagram"]:hover {
   color: #111;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .hero-content h1 { font-size: 2.5rem; }
-  .carousel-track img { height: 150px; }
-  .logo-strip .logo-image { height: 50px; }
-}
-.fc-col-header-cell-cushion {
-  color: var(--color-accent);
-  font-weight: 600;
-  font-family: 'Montserrat', sans-serif;
-  text-transform: uppercase;
-}
-.fc-list-event td {
-  color: #111 !important; /* Make text dark for readability */
-}
-
-/* Fix for List View - Day Headers (like "August 9, 2025") */
-.fc-list-day-text,
-.fc-list-day-side-text {
-  color: var(--color-accent) !important;
-  font-weight: 600;
-  font-family: 'Montserrat', sans-serif;
-}
-
-/* Optional: Style the dot color in list view (next to event titles) */
-.fc-event-dot {
-  background-color: #1E88E5; /* or var(--color-accent-l) for golden */
 }
