@@ -22,8 +22,12 @@ function initCalendar() {
     initialView: 'dayGridMonth',
     height: 'auto',
     events: [
-      { title: 'Induction Ceremony', start: '2025-08-09', description: 'Induction of new Rotaract members.', time:'5:00 PM', venue:'MIT Auditorium' },
-      { title: 'Tree Plantation Drive', start: '2025-08-15', description:'Join us at Taljai Forest…', time:'7:00 AM', venue:'Taljai Forest' }
+      { title: 'The Blood Donation Camp', start: '2025-07-01', description: 'Blood Donation Drive conducted in collaboration with Rotary Club of Pune Heritage', time:'9:00 AM', venue:'TBA' },
+      { title: 'Charge Handover Ceremony', start: '2025-07-07', description:'We would be honoured to have your presence as we mark this important transition and begin a new chapter for RC Pune Heritage', time:'6:45 PM', venue:'Inari Bistro' },
+      { title: 'Ice Breaker', start: '2025-07-12', description:'From fun games to meaningful conversations', time:'4:00 PM', venue:'Tathawade baug' },
+      { title: 'Energy Within', start: '2025-07-20', description:'An expert session on Pranic Healing - a no-touch technique that uses life energy (prana) to cleanse and balance the body', time:'10:30 AM', venue:'Chandrakant Darode School' },
+      { title: 'GBM Meeting 1', start: '2025-07-18', description:'General Body Meeting 1', time:'7:45 PM', venue:'Inari Bistro' }
+
     ],
     headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,listMonth' },
     eventClick: info => {
