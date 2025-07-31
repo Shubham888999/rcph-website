@@ -26,7 +26,16 @@ function initCalendar() {
       { title: 'Charge Handover Ceremony', start: '2025-07-07', description:'We would be honoured to have your presence as we mark this important transition and begin a new chapter for RC Pune Heritage', time:'6:45 PM', venue:'Inari Bistro' },
       { title: 'Ice Breaker', start: '2025-07-12', description:'From fun games to meaningful conversations', time:'4:00 PM', venue:'Tathawade baug' },
       { title: 'Energy Within', start: '2025-07-20', description:'An expert session on Pranic Healing - a no-touch technique that uses life energy (prana) to cleanse and balance the body', time:'10:30 AM', venue:'Chandrakant Darode School' },
-      { title: 'GBM Meeting 1', start: '2025-07-18', description:'General Body Meeting 1', time:'7:45 PM', venue:'Inari Bistro' }
+      { title: 'GBM Meeting 1', start: '2025-07-18', description:'General Body Meeting 1', time:'7:45 PM', venue:'Inari Bistro' },
+      { title: 'Potluck Lunch (CSD)', start: '2025-08-03', description:'A fun bonding lunch with installation planning' },
+      { title: 'Paw Trait (CMD)', start: '2025-08-04', end: '2025-08-10', description:'Feeding nutritious food to stray dogs' },
+      { title: 'Bappa Making', start: '2025-08-23', description:'Learning the skills to make bappa along with fun' },
+      { title: 'Samyati 3 (ISD)', start: '2025-08-29', end: '2025-09-01', description:'Details announcing soon' },
+      { title: 'Sevasarthi (CMD)', start: '2025-09-14' },
+      { title: 'Monsoon Run (CSD) ', start: '2025-09-28' },
+      { title: 'Food/ Cultural Exchange (ISD)', start: '2025-09-30', description:'Details announcing soon' },
+      { title: 'Diwali Dhamaka (CSD)', start: '2025-10-17' },
+      { title: 'Diwali Daan (ISD & CMD)', start: '2025-10-19' }
 
     ],
     headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,listMonth' },
