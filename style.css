@@ -329,3 +329,25 @@ section { margin-bottom: 60px; }
   .carousel-track img { height: 150px; }
   .logo-strip .logo-image { height: 50px; }
 }
+.fc-col-header-cell-cushion {
+  color: var(--color-accent);
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  text-transform: uppercase;
+}
+.fc-list-event td {
+  color: #111 !important; /* Make text dark for readability */
+}
+
+/* Fix for List View - Day Headers (like "August 9, 2025") */
+.fc-list-day-text,
+.fc-list-day-side-text {
+  color: var(--color-accent) !important;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Optional: Style the dot color in list view (next to event titles) */
+.fc-event-dot {
+  background-color: #1E88E5; /* or var(--color-accent-l) for golden */
+}
