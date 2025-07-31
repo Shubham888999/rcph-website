@@ -14,8 +14,9 @@
   <!-- FullCalendar CSS -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
 
-  <!-- Your Custom Styles -->
+  <!-- Custom CSS -->
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="mobile.css" media="only screen and (max-width: 768px)" />
 </head>
 <body>
   <!-- Logo Strip -->
@@ -25,10 +26,13 @@
     <img src="images/logo3.png" alt="RCPH" class="logo-image" />
   </div>
 
-  <!-- Navbar -->
+  <!-- Header -->
   <header>
+    <div class="mobile-nav-toggle">
+      <i class="fas fa-bars"></i>
+    </div>
     <nav class="navbar">
-      <ul>
+      <ul class="nav-links">
         <li><a href="#home">Home</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#projects">Projects</a></li>
@@ -69,7 +73,7 @@
       </ul>
     </section>
 
-    <!-- Calendar (pulled in from calendar.html) -->
+    <!-- Calendar -->
     <section id="calendar" class="section-box">
       <h2>Event Calendar</h2>
       <div id="rcph-calendar"></div>
@@ -111,7 +115,7 @@
       <p>Want to become a member? <a href="https://forms.gle/" target="_blank">Fill out this form</a>.</p>
     </section>
 
-    <!-- Contact Us -->
+    <!-- Contact -->
     <section id="contact" class="section-box">
       <h2>Contact Us</h2>
       <div class="contact-cards">
@@ -131,7 +135,7 @@
     </section>
   </main>
 
-  <!-- Event Modal -->
+  <!-- Modal -->
   <div id="eventModal" class="modal">
     <div class="modal-content">
       <span class="close-btn">&times;</span>
@@ -143,9 +147,17 @@
     </div>
   </div>
 
-  <!-- FullCalendar JS -->
+  <!-- FullCalendar + Custom Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-  <!-- Custom JS (includes our HTML‐include loader + calendar init) -->
   <script src="script.js"></script>
+
+  <!-- Hamburger Toggle Script -->
+  <script>
+    const toggle = document.querySelector('.mobile-nav-toggle');
+    const navLinks = document.querySelector('.nav-links');
+    toggle.addEventListener('click', () => {
+      navLinks.classList.toggle('active');
+    });
+  </script>
 </body>
 </html>

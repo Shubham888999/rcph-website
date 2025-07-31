@@ -1,0 +1,106 @@
+/* Mobile Overrides for Rotaract Club Website */
+
+/* Navbar: Convert to hamburger menu */
+.mobile-nav-toggle {
+  display: block;
+  background: var(--color-accent);
+  padding: 12px 20px;
+  font-size: 1.5rem;
+  color: white;
+  cursor: pointer;
+  text-align: right;
+}
+
+.navbar .nav-links {
+  display: none;
+  flex-direction: column;
+  background-color: var(--color-accent);
+  width: 100%;
+  text-align: center;
+  padding: 0;
+  margin: 0;
+}
+
+.navbar .nav-links.active {
+  display: flex;
+}
+
+.navbar .nav-links li {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+.navbar .nav-links a {
+  font-size: 1.1rem;
+}
+
+/* Logo Strip */
+.logo-strip {
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0;
+}
+.logo-strip .logo-image {
+  height: 45px;
+}
+
+/* Hero */
+.hero-content h1 {
+  font-size: 2rem;
+}
+.theme-text {
+  font-size: 1rem;
+}
+
+/* General Section Styling */
+.content-wrapper {
+  padding: 20px 12px;
+}
+.section-box {
+  padding: 20px 16px;
+}
+.section-box h2 {
+  font-size: 1.5rem;
+}
+
+/* Cards */
+.bod-container,
+.contact-cards {
+  flex-direction: column;
+  gap: 20px;
+}
+.bod-card,
+.contact-card {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* Gallery */
+.carousel-track img {
+  height: 140px;
+}
+
+/* Calendar */
+#rcph-calendar {
+  padding: 10px;
+  font-size: 0.85rem;
+}
+.fc-toolbar-title {
+  font-size: 1.2rem;
+}
+.fc-daygrid-day-number {
+  font-size: 0.75rem;
+}
+
+/* Modal */
+.modal-content {
+  width: 90%;
+  padding: 20px;
+  font-size: 0.9rem;
+}
+
+/* Join Us / Contact Links */
+#join p, #contact p {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
