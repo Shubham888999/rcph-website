@@ -158,6 +158,35 @@
     toggle.addEventListener('click', () => {
       navLinks.classList.toggle('active');
     });
+
+      window.addEventListener('load', () => {
+    const popup = document.getElementById('eventPopup');
+    const closeBtn = document.getElementById('closePopup');
+
+    // Show it with a delay
+    setTimeout(() => {
+      popup.style.display = 'flex';
+    }, 1000);
+
+    // Close when user clicks close
+    closeBtn.addEventListener('click', () => {
+      popup.style.display = 'none';
+    });
+  });
   </script>
+
+<!-- Event Popup Modal -->
+<div id="eventPopup" class="popup-overlay">
+  <div class="popup-box">
+    <h2>🚨 Next Event: Ice Breaker!</h2>
+    <p><strong>Description:</strong> Spark new friendships with fun games and conversations!</p>
+    <p><strong>Date:</strong> August 10, 2025</p>
+    <p><strong>Time:</strong> 7:00 PM</p>
+    <p><strong>Venue:</strong> Inari Bistro</p>
+    <button id="closePopup" class="popup-close-btn">Close</button>
+  </div>
+</div>  
+    
+
 </body>
 </html>
