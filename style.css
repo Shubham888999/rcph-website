@@ -1,11 +1,11 @@
 /* → COLOR PALETTE ← */
 :root {
-  --color-bg:       #ffffff;
-  --color-text:     #333333;
-  --color-card:     #f9f9f9;
-  --color-border:   #e0e0e0;
-  --color-accent:   #c0392b;
-  --color-accent-l: #e74c3c;
+  --color-bg:       #121212;   /* Deep charcoal background */
+  --color-text:     #f0f0f0;   /* Light text for contrast */
+  --color-card:     #1e1e1e;   /* Slightly lighter card background */
+  --color-border:   #2e2e2e;   /* Subtle border for dark theme */
+  --color-accent:   #60C3C4;   /* Aqua Blue */
+  --color-accent-l: #F4B43A;   /* Golden Yellow */
 }
 
 /* Reset & Base */
@@ -278,6 +278,7 @@ section { margin-bottom: 60px; }
 .bod-card,
 .contact-card {
   background: #fff;
+  color: #111; /* Sets base text color */
   border: none;
   box-shadow:
     0 2px 8px rgba(0,0,0,0.05),
@@ -287,6 +288,10 @@ section { margin-bottom: 60px; }
   max-width: 240px;
   text-align: center;
   transition: transform .3s ease, box-shadow .3s ease;
+}
+.bod-card *,
+.contact-card * {
+  color: #111 !important;  /* Force text color */
 }
 .bod-card:hover,
 .contact-card:hover {
@@ -307,7 +312,7 @@ section { margin-bottom: 60px; }
 .contact-card a,
 #contact p a[href^="mailto"],
 #contact p a[href*="instagram"] {
-  color: var(--color-accent);
+  color: #ffffff;
   font-weight: 600;
   transition: color .2s;
 }
@@ -315,7 +320,7 @@ section { margin-bottom: 60px; }
 .contact-card a:hover,
 #contact p a[href^="mailto"]:hover,
 #contact p a[href*="instagram"]:hover {
-  color: var(--color-accent-l);
+  color: #111;
 }
 
 /* Responsive */
