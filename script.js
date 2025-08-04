@@ -62,11 +62,30 @@ function initCalendar() {
 function autoScrollGallery() {
   const track = document.getElementById('carouselTrack');
   if (!track) return;
-  const speed = 1;
-  (function loop() {
-    if (track.scrollWidth > track.clientWidth) {
-      track.scrollLeft = (track.scrollLeft + speed) % track.scrollWidth;
+
+  const scrollSpeed = 0.5;
+
+  // Clone images once
+  if (!track.classList.contains('cloned')) {
+    const clones = [...track.children].map(child => child.cloneNode(true));
+    clones.forEach(clone => track.appendChild(clone));
+    track.classList.add('cloned');
+  }
+
+  let isScrolling = true;
+
+  function scroll() {
+    if (!isScrolling) return;
+
+    track.scrollLeft += scrollSpeed;
+
+    // Reset to beginning when halfway (original content ends)
+    if (track.scrollLeft >= track.scrollWidth / 2) {
+      track.scrollLeft = 0;
     }
-    requestAnimationFrame(loop);
-  })();
+
+    requestAnimationFrame(scroll);
+  }
+
+  scroll(); // Start the loop
 }

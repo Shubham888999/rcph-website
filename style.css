@@ -278,13 +278,12 @@
     width: 100%;
     margin: 20px 0;
   }
-  .carousel-track {
-    display: flex;
-    gap: 20px;
-    overflow-x: auto;
-    scroll-behavior: smooth;
-    padding: 10px;
-  }
+.carousel-track {
+  display: flex;
+  overflow-x: hidden; /* <-- this is important for seamless loop */
+  gap: 20px;
+  scroll-behavior: auto;
+}
   .carousel-track::-webkit-scrollbar { display: none; }
   .carousel-track img {
     height: 200px;
