@@ -118,3 +118,34 @@
   font-size: 0.95rem;
   line-height: 1.5;
 }
+
+@media (max-width: 768px) {
+  .join-btn a,
+  a.join-btn {
+    display: block;
+    width: 100%;
+    margin: 1em 0;
+    text-align: center;
+  }
+}
+.mobile-join-btn {
+  display: inline-block;
+  background-color: #f4a621;
+  color: black;
+  font-weight: bold;
+  padding: 8px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  z-index: 999;
+  font-size: 14px;
+}
+
+.mobile-join-btn:hover {
+  background-color: #e59400;
+}
+header {
+  position: relative;
+}
