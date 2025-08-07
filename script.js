@@ -1,5 +1,5 @@
 window.addEventListener('DOMContentLoaded', () => {
-  // HTML includes
+  // 1) Include HTML fragments
   document.querySelectorAll('[data-include]').forEach(async el => {
     const url = el.getAttribute('data-include');
     const resp = await fetch(url);
@@ -8,7 +8,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // After the fragments load, initialize calendar & gallery
+  // 2) Give fragments a moment to load, then kick off calendar & gallery
   setTimeout(() => {
     initCalendar();
     autoScrollGallery();
@@ -18,40 +18,81 @@ window.addEventListener('DOMContentLoaded', () => {
 function initCalendar() {
   const calEl = document.getElementById('rcph-calendar');
   if (!calEl) return;
+
+  // Map each avenue to a color
+  const avenueColors = {
+    ISD: '#1abc9c',  // International Service Director
+    CMD: '#3498db',  // Community Service Director
+    CSD: '#9b59b6',  // Club Service Director
+    PDD: '#e74c3c',   // Professional Development Director
+    GBM: '#995a03ff', 
+    BOD: '#995a03ff' 
+  };
+
+  // Initialize FullCalendar
   const calendar = new FullCalendar.Calendar(calEl, {
     initialView: 'dayGridMonth',
     height: 'auto',
-    events: [
-      { title: 'The Blood Donation Camp', start: '2025-07-01', description: 'Blood Donation Drive conducted in collaboration with Rotary Club of Pune Heritage' },
-      { title: 'Charge Handover Ceremony', start: '2025-07-07', description:'We would be honoured to have your presence as we mark this important transition and begin a new chapter for RC Pune Heritage' },
-      { title: 'Ice Breaker', start: '2025-07-12', description:'From fun games to meaningful conversations' },
-      { title: 'Energy Within', start: '2025-07-20', description:'An expert session on Pranic Healing - a no-touch technique that uses life energy (prana) to cleanse and balance the body' },
-      { title: 'GBM Meeting 1', start: '2025-07-18', description:'General Body Meeting 1' },
-      { title: 'Potluck Lunch (CSD)', start: '2025-08-03', description:'A fun bonding lunch with installation planning' },
-      { title: 'Paw Trait (CMD)', start: '2025-08-04', end: '2025-08-10', description:'Feeding nutritious food to stray dogs' },
-      { title: 'Work In Progress', start: '2025-08-08', description:'No slides. No scripts. Just real stories about what we do, why we do it, and where we’re headed.Each person shares their journey and answers 2 fun career questions on the spot!' },
-      { title: 'Bappa Making', start: '2025-08-23', description:'Learning the skills to make bappa along with fun' },
-      { title: 'Samyati 3 (ISD)', start: '2025-08-29', end: '2025-09-01', description:'Details announcing soon' },
-      { title: 'Sevasarthi (CMD)', start: '2025-09-14' },
-      { title: 'Monsoon Run (CSD) ', start: '2025-09-28' },
-      { title: 'Food/ Cultural Exchange (ISD)', start: '2025-09-30', description:'Details announcing soon' },
-      { title: 'Diwali Dhamaka (CSD)', start: '2025-10-17' },
-      { title: 'Diwali Daan (ISD & CMD)', start: '2025-10-19' }
 
+    // Your events, now with an "avenue" field (string or array)
+    events: [
+      { title: 'The Blood Donation Camp', start: '2025-07-01', description: 'Blood Donation Drive…', avenue: 'CMD' },
+      { title: 'Charge Handover Ceremony', start: '2025-07-07', description: '…mark this transition…', avenue: 'CSD' },
+      { title: 'Ice Breaker', start: '2025-07-12', description: 'Fun games & conversations', avenue: 'CSD' },
+      { title: 'Energy Within', start: '2025-07-20', description: 'Pranic Healing session', avenue: 'PDD' },
+      { title: 'GBM Meeting 1', start: '2025-07-18', description: 'General Body Meeting 1', avenue: 'GBM' },
+      { title: 'Potluck Lunch (CSD)', start: '2025-08-03', description: 'Bonding lunch', avenue: 'CSD' },
+      { title: 'Paw Trait (CMD)', start: '2025-08-04', end: '2025-08-10', description: 'Feeding stray dogs', avenue: 'CMD' },
+      { title: 'Work In Progress', start: '2025-08-08', description: 'Real stories…', avenue: 'PDD' },
+      { title: 'Bappa Making', start: '2025-08-23', description: 'Learn to make bappa', avenue: 'CSD' },
+      { title: 'Samyati 3 (ISD)', start: '2025-08-29', end: '2025-09-01', description: 'Details soon', avenue: 'ISD' },
+      { title: 'Sevasarthi (CMD)', start: '2025-09-14', avenue: 'CMD' },
+      { title: 'Monsoon Run (CSD)', start: '2025-09-28', avenue: 'CSD' },
+      { title: 'Food/Cultural Exchange (ISD)', start: '2025-09-30', description: 'Details soon', avenue: 'ISD' },
+      { title: 'Diwali Dhamaka (CSD)', start: '2025-10-17', avenue: 'CSD' },
+      { title: 'Diwali Daan (ISD & CMD)', start: '2025-10-19', avenue: ['ISD','CMD'] }
     ],
-    headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,listMonth' },
+
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,listMonth'
+    },
+
+    // Color each event block
+    eventDidMount: info => {
+      const av = info.event.extendedProps.avenue;
+      const avenues = Array.isArray(av) ? av : [av];
+      const cols = avenues.map(a => avenueColors[a] || '#666');
+
+      if (cols.length === 1) {
+        // Solid color
+        info.el.style.backgroundColor = cols[0];
+        info.el.style.borderColor     = cols[0];
+      } else {
+        // Split into equal gradient slices
+        const stops = cols.map((c, i) => {
+          const start = (i   * 100 / cols.length).toFixed(2);
+          const end   = ((i+1) * 100 / cols.length).toFixed(2);
+          return `${c} ${start}% ${end}%`;
+        }).join(', ');
+        info.el.style.backgroundImage = `linear-gradient(to right, ${stops})`;
+        info.el.style.border          = '1px solid transparent';
+      }
+    },
+
+    // Show details in your modal
     eventClick: info => {
       document.getElementById('eventTitle').textContent       = info.event.title;
-      document.getElementById('eventDescription').textContent = info.event.extendedProps.description;
+      document.getElementById('eventDescription').textContent = info.event.extendedProps.description || '';
       document.getElementById('eventDate').textContent        = info.event.start.toDateString();
-      //document.getElementById('eventTime').textContent        = info.event.extendedProps.time;
-      //document.getElementById('eventVenue').textContent       = info.event.extendedProps.venue;
       document.getElementById('eventModal').style.display     = 'block';
     }
   });
+
   calendar.render();
 
-  // Modal close
+  // Modal close handlers
   document.querySelector('.close-btn').onclick = () => {
     document.getElementById('eventModal').style.display = 'none';
   };
@@ -67,22 +108,20 @@ function autoScrollGallery() {
 
   const scrollSpeed = 0.5;
 
-  // Clone track items once to allow seamless looping
+  // Clone once for seamless loop
   if (!track.classList.contains('cloned')) {
-    const clones = Array.from(track.children).map(node => node.cloneNode(true));
-    clones.forEach(c => track.appendChild(c));
+    Array.from(track.children).forEach(child => {
+      track.appendChild(child.cloneNode(true));
+    });
     track.classList.add('cloned');
   }
 
+  // Continuous scroll loop
   function scroll() {
-    // advance the scroll position of the container
     container.scrollLeft += scrollSpeed;
-
-    // when we've scrolled half the (now doubled) width, reset
     if (container.scrollLeft >= track.scrollWidth / 2) {
       container.scrollLeft = 0;
     }
-
     requestAnimationFrame(scroll);
   }
 
