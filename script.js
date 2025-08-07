@@ -61,32 +61,30 @@ function initCalendar() {
 }
 
 function autoScrollGallery() {
-  const track = document.getElementById('carouselTrack');
-  if (!track) return;
+  const container = document.querySelector('.carousel-container');
+  const track     = document.getElementById('carouselTrack');
+  if (!container || !track) return;
 
   const scrollSpeed = 0.5;
 
-  // Clone images once
+  // Clone track items once to allow seamless looping
   if (!track.classList.contains('cloned')) {
-    const clones = [...track.children].map(child => child.cloneNode(true));
-    clones.forEach(clone => track.appendChild(clone));
+    const clones = Array.from(track.children).map(node => node.cloneNode(true));
+    clones.forEach(c => track.appendChild(c));
     track.classList.add('cloned');
   }
 
-  let isScrolling = true;
-
   function scroll() {
-    if (!isScrolling) return;
+    // advance the scroll position of the container
+    container.scrollLeft += scrollSpeed;
 
-    track.scrollLeft += scrollSpeed;
-
-    // Reset to beginning when halfway (original content ends)
-    if (track.scrollLeft >= track.scrollWidth / 2) {
-      track.scrollLeft = 0;
+    // when we've scrolled half the (now doubled) width, reset
+    if (container.scrollLeft >= track.scrollWidth / 2) {
+      container.scrollLeft = 0;
     }
 
     requestAnimationFrame(scroll);
   }
 
-  scroll(); // Start the loop
+  scroll();
 }
