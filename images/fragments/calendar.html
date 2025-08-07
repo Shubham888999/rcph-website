@@ -1,7 +1,19 @@
-<section id="calendar" class="section-box">
-  <h2>Club Calendar</h2>
+<section id="calendar" class="section-box hideable-section">
+  <h2>Event Calendar</h2>
 
-  <!-- FullCalendar will render into this div -->
-  <div id="rcph-calendar"></div>
+  <div class="calendar-wrapper">
+    <!-- 1) The calendar itself -->
+    <div id="rcph-calendar"></div>
 
+    <!-- 2. Our new legend -->
+    <aside class="calendar-legend">
+      <h3>Legend</h3>
+      <div class="legend-item"><span class="legend-swatch" style="background:#1abc9c"></span> ISD</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#3498db"></span> CMD</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#9b59b6"></span> CSD</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#e74c3c"></span> PDD</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#995a03"></span> GBM</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#995a03"></span> BOD</div>
+    </aside>
+  </div>
 </section>

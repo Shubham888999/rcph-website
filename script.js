@@ -25,8 +25,7 @@ function initCalendar() {
     CMD: '#3498db',  // Community Service Director
     CSD: '#9b59b6',  // Club Service Director
     PDD: '#e74c3c',   // Professional Development Director
-    GBM: '#995a03ff', 
-    BOD: '#995a03ff' 
+    GBM: '#995a03ff'
   };
 
   // Initialize FullCalendar
