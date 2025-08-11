@@ -21,16 +21,13 @@
   margin: 0;
 }
 
-.navbar .nav-links.active {
-  display: flex;
-}
+.navbar .nav-links.active { display: flex; }
+
 .navbar .nav-links li {
   padding: 12px 0;
   border-bottom: 1px solid rgba(255,255,255,0.2);
 }
-.navbar .nav-links a {
-  font-size: 1.1rem;
-}
+.navbar .nav-links a { font-size: 1.1rem; }
 
 /* Logo Strip */
 .logo-strip {
@@ -47,30 +44,18 @@
   object-fit: contain;
   flex-shrink: 0;
 }
-.logo-strip .logo-large {
-  transform: scale(1.5);
-}
+.logo-strip .logo-large { transform: scale(1.5); }
 
 /* Hero */
-.hero-content h1 {
-  font-size: 2rem;
-}
-.theme-text {
-  font-size: 1rem;
-}
+.hero-content h1 { font-size: 2rem; }
+.theme-text { font-size: 1rem; }
 
 /* Content */
-.content-wrapper {
-  padding: 20px 12px;
-}
-.section-box {
-  padding: 20px 16px;
-}
-.section-box h2 {
-  font-size: 1.5rem;
-}
+.content-wrapper { padding: 20px 12px; }
+.section-box { padding: 20px 16px; }
+.section-box h2 { font-size: 1.5rem; }
 
-/* Cards */
+/* Cards layout */
 @media (max-width: 768px) {
   .bod-container,
   .contact-cards {
@@ -79,7 +64,6 @@
     justify-content: center;
     gap: 16px;
   }
-
   .bod-card,
   .contact-card {
     flex: 1 1 calc(50% - 20px); /* 2 cards per row with gap */
@@ -89,21 +73,12 @@
 }
 
 /* Gallery */
-.carousel-track img {
-  height: 140px;
-}
+.carousel-track img { height: 140px; }
 
 /* Calendar */
-#rcph-calendar {
-  padding: 10px;
-  font-size: 0.85rem;
-}
-.fc-toolbar-title {
-  font-size: 1.2rem;
-}
-.fc-daygrid-day-number {
-  font-size: 0.75rem;
-}
+#rcph-calendar { padding: 10px; font-size: 0.85rem; }
+.fc-toolbar-title { font-size: 1.2rem; }
+.fc-daygrid-day-number { font-size: 0.75rem; }
 
 /* Modal */
 .modal-content {
@@ -112,12 +87,9 @@
   font-size: 0.9rem;
 }
 
-/* Join / Contact */
+/* Join / Contact copy */
 #join p,
-#contact p {
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
+#contact p { font-size: 0.95rem; line-height: 1.5; }
 
 @media (max-width: 768px) {
   .join-btn a,
@@ -128,6 +100,8 @@
     text-align: center;
   }
 }
+
+/* Sticky mobile Join button */
 .mobile-join-btn {
   display: inline-block;
   background-color: #f4a621;
@@ -142,10 +116,50 @@
   z-index: 999;
   font-size: 14px;
 }
+.mobile-join-btn:hover { background-color: #e59400; }
 
-.mobile-join-btn:hover {
-  background-color: #e59400;
-}
-header {
-  position: relative;
+header { position: relative; }
+
+/* === BOD back-face fixes (mobile) === */
+@media (max-width: 768px) {
+  /* Keep the back neatly packed */
+  .bod-card-back {
+    padding: 12px !important;
+    font-size: 0.95rem !important;
+    line-height: 1.35 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important; /* keeps insta link visible */
+  }
+
+  /* Text block on the back */
+  .bod-card-back .bod-description {
+    flex: 1 1 auto;
+    margin-bottom: 10px;
+    overflow: auto;                 /* scroll if copy is long */
+    -webkit-overflow-scrolling: touch;
+  }
+  .bod-card-back .bod-description p {
+    font-size: 0.85rem !important;
+    line-height: 1.35 !important;
+    margin: 0 0 8px !important;
+    word-break: break-word;
+  }
+
+  /* Compact the insta pill */
+  .insta-link {
+    font-size: 0.85rem !important;
+    padding: 6px 12px !important;
+    gap: 6px !important;
+  }
+
+  /* Small tweaks for the front so the whole card feels balanced */
+  .bod-card-front { padding: 12px !important; }
+  .bod-card-front img {
+    height: 160px !important;
+    max-width: 180px !important;
+    margin-bottom: 10px !important;
+  }
+  .bod-card-front h3 { font-size: 0.95rem !important; }
+  .bod-card-front p  { font-size: 0.85rem !important; }
 }

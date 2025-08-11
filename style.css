@@ -770,6 +770,7 @@ a.join-btn:hover {
     display: flex;
   }
 
+
   .mobile-nav-toggle {
     display: block;
   }
@@ -1021,4 +1022,9 @@ a.join-btn:hover {
   .projects-grid {
     grid-template-columns: 1fr;
   }
+}
+#district-council .bod-container,
+#searic-council .bod-container {
+  grid-template-columns: 1fr;    /* switch to a single column */
+  justify-items: center;         /* center the card in that column */
 }

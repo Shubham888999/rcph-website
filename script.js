@@ -3,15 +3,14 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-include]').forEach(async el => {
     const url = el.getAttribute('data-include');
     const resp = await fetch(url);
-    if (resp.ok) {
-      el.outerHTML = await resp.text();
-    }
+    if (resp.ok) el.outerHTML = await resp.text();
   });
 
-  // 2) Give fragments a moment to load, then kick off calendar & gallery
+  // 2) Give fragments a moment to load, then kick off calendar & gallery & flip cards
   setTimeout(() => {
     initCalendar();
     autoScrollGallery();
+    initFlipCards();
   }, 100);
 });
 
@@ -24,16 +23,13 @@ function initCalendar() {
     ISD: '#1abc9c',  // International Service Director
     CMD: '#3498db',  // Community Service Director
     CSD: '#9b59b6',  // Club Service Director
-    PDD: '#e74c3c',   // Professional Development Director
-    GBM: '#995a03ff'
+    PDD: '#e74c3c',  // Professional Development Director
+    GBM: '#995a03ff' // GBM
   };
 
-  // Initialize FullCalendar
   const calendar = new FullCalendar.Calendar(calEl, {
     initialView: 'dayGridMonth',
     height: 'auto',
-
-    // Your events, now with an "avenue" field (string or array)
     events: [
       { title: 'The Blood Donation Camp', start: '2025-07-01', description: 'Blood Donation Drive…', avenue: 'CMD' },
       { title: 'Charge Handover Ceremony', start: '2025-07-07', description: '…mark this transition…', avenue: 'CSD' },
@@ -51,36 +47,25 @@ function initCalendar() {
       { title: 'Diwali Dhamaka (CSD)', start: '2025-10-17', avenue: 'CSD' },
       { title: 'Diwali Daan (ISD & CMD)', start: '2025-10-19', avenue: ['ISD','CMD'] }
     ],
-
-    headerToolbar: {
-      left: 'prev,next today',
-      center: 'title',
-      right: 'dayGridMonth,listMonth'
-    },
-
-    // Color each event block
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
     eventDidMount: info => {
       const av = info.event.extendedProps.avenue;
       const avenues = Array.isArray(av) ? av : [av];
       const cols = avenues.map(a => avenueColors[a] || '#666');
 
       if (cols.length === 1) {
-        // Solid color
         info.el.style.backgroundColor = cols[0];
         info.el.style.borderColor     = cols[0];
       } else {
-        // Split into equal gradient slices
         const stops = cols.map((c, i) => {
-          const start = (i   * 100 / cols.length).toFixed(2);
-          const end   = ((i+1) * 100 / cols.length).toFixed(2);
+          const start = (i * 100 / cols.length).toFixed(2);
+          const end   = ((i + 1) * 100 / cols.length).toFixed(2);
           return `${c} ${start}% ${end}%`;
         }).join(', ');
         info.el.style.backgroundImage = `linear-gradient(to right, ${stops})`;
-        info.el.style.border          = '1px solid transparent';
+        info.el.style.border = '1px solid transparent';
       }
     },
-
-    // Show details in your modal
     eventClick: info => {
       document.getElementById('eventTitle').textContent       = info.event.title;
       document.getElementById('eventDescription').textContent = info.event.extendedProps.description || '';
@@ -107,7 +92,6 @@ function autoScrollGallery() {
 
   const scrollSpeed = 0.5;
 
-  // Clone once for seamless loop
   if (!track.classList.contains('cloned')) {
     Array.from(track.children).forEach(child => {
       track.appendChild(child.cloneNode(true));
@@ -115,7 +99,6 @@ function autoScrollGallery() {
     track.classList.add('cloned');
   }
 
-  // Continuous scroll loop
   function scroll() {
     container.scrollLeft += scrollSpeed;
     if (container.scrollLeft >= track.scrollWidth / 2) {
@@ -123,6 +106,32 @@ function autoScrollGallery() {
     }
     requestAnimationFrame(scroll);
   }
-
   scroll();
+}
+
+// ---- Card flip: tap to open, tap again to close ----
+function initFlipCards() {
+  const inners = document.querySelectorAll('.bod-card .bod-card-inner');
+
+  function handleFlip(e) {
+    // Let anchor taps work (e.g., Instagram link)
+    if (e.target.closest('a')) return;
+
+    const card = e.currentTarget.closest('.bod-card');
+    if (!card) return;
+
+    // If this one is open, close it; otherwise close others and open it
+    if (card.classList.contains('flipped')) {
+      card.classList.remove('flipped');
+    } else {
+      document.querySelectorAll('.bod-card.flipped').forEach(c => c.classList.remove('flipped'));
+      card.classList.add('flipped');
+    }
+  }
+
+  inners.forEach(inner => {
+    inner.addEventListener('click', handleFlip, { passive: true });
+    inner.addEventListener('touchend', handleFlip, { passive: true });
+    inner.addEventListener('pointerup', handleFlip, { passive: true });
+  });
 }
