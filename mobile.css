@@ -1,34 +1,5 @@
 /* Mobile Overrides for Rotaract Club Website */
 
-/* Navbar: Hamburger */
-.mobile-nav-toggle {
-  display: block;
-  background: var(--color-accent);
-  padding: 12px 20px;
-  font-size: 1.5rem;
-  color: white;
-  cursor: pointer;
-  text-align: right;
-}
-
-.navbar .nav-links {
-  display: none;
-  flex-direction: column;
-  background-color: var(--color-accent);
-  width: 100%;
-  text-align: center;
-  padding: 0;
-  margin: 0;
-}
-
-.navbar .nav-links.active { display: flex; }
-
-.navbar .nav-links li {
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-.navbar .nav-links a { font-size: 1.1rem; }
-
 /* Logo Strip */
 .logo-strip {
   flex-direction: row;
@@ -162,4 +133,41 @@ header { position: relative; }
   }
   .bod-card-front h3 { font-size: 0.95rem !important; }
   .bod-card-front p  { font-size: 0.85rem !important; }
+}
+
+@media (max-width: 768px) {
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 60px;   /* just below navbar */
+    right: 0;
+    background-color: #121212;  /* dark background for visibility */
+    padding: 16px;
+    width: 200px;
+    border-radius: 8px;
+    z-index: 2000; /* ensures it sits above hero banner */
+  }
+
+  .nav-links.active {
+    display: flex; /* toggled by JS */
+  }
+
+  .nav-links li {
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .nav-links a {
+    color: #fff;  /* always white for contrast */
+    font-size: 1.1rem;
+  }
+
+  .mobile-nav-toggle {
+    display: block;
+    cursor: pointer;
+    color: #fff;
+    font-size: 1.5rem;
+    z-index: 2100;
+  }
 }

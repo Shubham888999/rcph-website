@@ -750,31 +750,6 @@ a.join-btn:hover {
   font-size: 24px;
   cursor: pointer;
 }
-
-/* Responsive */
-@media screen and (max-width: 768px) {
-  .nav-links {
-    display: none;
-    flex-direction: column;
-    position: absolute;
-    top: 60px;
-    right: 10px;
-    background-color: #fff;
-    border: 1px solid #ccc;
-    padding: 16px;
-    width: 200px;
-    z-index: 1000;
-  }
-
-  .nav-links.active {
-    display: flex;
-  }
-
-
-  .mobile-nav-toggle {
-    display: block;
-  }
-}
 .navbar {
   position: sticky;
   top: 0;
@@ -1027,4 +1002,43 @@ a.join-btn:hover {
 #searic-council .bod-container {
   grid-template-columns: 1fr;    /* switch to a single column */
   justify-items: center;         /* center the card in that column */
+}
+
+/* --- Mobile navbar fixes (force override desktop) --- */
+@media (max-width: 768px) {
+  /* show hamburger */
+  .mobile-nav-toggle {
+    display: block !important;
+    font-size: 24px;
+    cursor: pointer;
+    color: #fff;
+  }
+
+  /* hide the desktop links by default */
+  .navbar .nav-links {
+    display: none !important;              /* override .navbar ul { display:flex } */
+    position: absolute;
+    top: 60px;
+    right: 10px;
+    flex-direction: column;
+    gap: 12px;
+    width: 220px;
+    padding: 14px;
+    background: #121212;
+    border: 1px solid #2e2e2e;
+    border-radius: 10px;
+    z-index: 2000;
+  }
+
+  /* show when toggled */
+  .navbar .nav-links.active {
+    display: flex !important;
+  }
+
+  /* mobile dropdown link styles */
+  .navbar .nav-links a {
+    color: #fff;
+    text-decoration: none;
+    font-size: 1.05rem;
+  }
 }
