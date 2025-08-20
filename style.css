@@ -1042,3 +1042,25 @@ a.join-btn:hover {
     font-size: 1.05rem;
   }
 }
+/* Normal text links */
+a {
+  color: #00bfff; /* bright sky blue for readability */
+  text-decoration: none;
+}
+
+a:hover {
+  color: #1e90ff; /* deeper blue on hover */
+  text-decoration: underline;
+}
+
+/* Buttons styled as links */
+a.button-link {
+  color: #ffffff !important; /* white text for contrast */
+  font-weight: bold;
+  text-decoration: none;
+}
+
+a.button-link:hover {
+  color: #f9f9f9 !important;
+  text-decoration: none;
+}
