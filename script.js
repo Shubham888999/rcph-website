@@ -20,28 +20,49 @@ function initCalendar() {
 
   // Map each avenue to a color
   const avenueColors = {
-    ISD: '#1abc9c',  // International Service Director
-    CMD: '#3498db',  // Community Service Director
-    CSD: '#9b59b6',  // Club Service Director
-    PDD: '#e74c3c',  // Professional Development Director
-    GBM: '#995a03ff' // GBM
-  };
+  ISD:  '#1abc9c',  // Teal – International Service Director
+  CMD:  '#3498db',  // Blue – Community Service Director
+  CSD:  '#9b59b6',  // Purple – Club Service Director
+  PDD:  '#e74c3c',  // Red – Professional Development Director
+  RRRO: '#27ae60',  // Green – Rotary Rotaract Relations Officer
+  PRO:  '#f1c40f',  // Yellow/Gold – Public Relations Officer
+  GBM:  '#d35400',  // Orange/Bronze – GBM
+  DEI:  '#95a5a6'   // Cool Grey – Diversity, Equity & Inclusion
+};
+const avenueNames = {
+  ISD: 'International Service Avenue',
+  CMD: 'Community Service Avenue',
+  CSD: 'Club Service Avenue',
+  PDD: 'Professional Development Avenue',
+  RRRO:'Rotary Rotaract Relations Avenue',
+  PRO: 'Public Relations Avenue',
+  GBM: 'General Body Meeting',
+  DEI: 'Diversity, Equity & Inclusion Avenue'
+};  
 
   const calendar = new FullCalendar.Calendar(calEl, {
     initialView: 'dayGridMonth',
     height: 'auto',
     events: [
-      { title: 'The Blood Donation Camp', start: '2025-07-01', description: 'Blood Donation Drive…', avenue: 'CMD' },
-      { title: 'Charge Handover Ceremony', start: '2025-07-07', description: '…mark this transition…', avenue: 'CSD' },
-      { title: 'Ice Breaker', start: '2025-07-12', description: 'Fun games & conversations', avenue: 'CSD' },
-      { title: 'Energy Within', start: '2025-07-20', description: 'Pranic Healing session', avenue: 'PDD' },
-      { title: 'GBM Meeting 1', start: '2025-07-18', description: 'General Body Meeting 1', avenue: 'GBM' },
-      { title: 'Potluck Lunch (CSD)', start: '2025-08-03', description: 'From chatpatte snacks to delightful desserts - we indulged in it all!This CSD event was an absolute treat, bringing us closer with every bite and every laugh.', avenue: 'CSD' },
-      //{ title: 'Paw Trait (CMD)', start: '2025-08-04', end: '2025-08-10', description: 'Feeding stray dogs', avenue: 'CMD' },
-      { title: 'Work In Progress', start: '2025-08-08', description: 'No slides. No scripts. Just real stories about what we do, why we do it, and where we’re headed.Each person shares their journey and answers 2 fun career questions on the spot!', avenue: 'PDD' },
-      { title: 'Bappa Making', start: '2025-08-23', description: 'Learn to make bappa', avenue: 'CSD' },
-      { title: 'Samyati 3 (ISD)', start: '2025-08-29', end: '2025-09-01', description: 'Details soon', avenue: 'ISD' },
-      { title: 'Project EduReach (CMD)', start: '2025-08-15', description: 'We distributed 50 exclusive learning coupons to 10th Std SSC students.Each coupon contains a unique code that allows students to download an app on a single device and get access to: 1. Chapter explanations (English, Marathi & Semi-English) 2. Question banks 3. Practice papers This small initiative will help students prepare effectively for their board exams.', avenue: 'CMD' },
+      { title: 'The Blood Donation Camp', start: '2025-07-01', description: 'RCPH conducted a Blood Donation Camp on July 1st ie. Day 1 of RIY 25-26! It was a powerful act of compassion. To start the year with such an important move was incredibly great.', avenue: ['CMD','RRRO'] },
+      { title: 'Charge Handover Ceremony (GBM 1)', start: '2025-07-07', description: ' ', avenue: 'GBM' },
+      { title: 'Ice Breaker', start: '2025-07-12', description: 'An engaging ice breaker session was held for all prospective members where everyone interacted freely, shared their thoughts, and bonded well. The lively atmosphere made the session a great start for building connections.', avenue: 'CSD' },
+      { title: 'GBM 2', start: '2025-07-18', description: 'Passing of Bylaws and Master Budget', avenue: 'GBM' },
+      { title: 'Healing Within', start: '2025-07-20', description: 'Rotaract Club of Pune Mideast, with Rotaract Clubs Pune SCOP, Pune Heritage, and Alumni, organized an expert PD session on Pranic Healing by Mr. Vijay Khanke. The session addressed stress, anxiety, depression, failure, and stage fear, with live demonstrations and practical healing exercises. It was an insightful and engaging experience for all.', avenue: 'PDD' },
+      { title: 'The Silent Bond', start: '2025-07-20', description: 'The Silent Bond a heartwarming initiative at Saahas for Animals, where care goes beyond words and love takes many forms. The motive of the event was to spend time with animals, play with them, do everyday things which workers or volunteers at Saahas do, and have fun and learn!! It was more than just volunteering! A space for Collaboration, Compassion, and Collective action.', avenue: 'CMD' },
+      { title: 'GBM 3', start: '2025-07-26', description: 'Planning Assembly', avenue: 'GBM' },
+      { title: 'Potluck Lunch', start: '2025-08-03', description: 'A delightful potluck was organized where members brought in different cuisines and homemade dishes. It was a perfect blend of good food, creativity, and camaraderie.', avenue: 'CSD' },
+      { title: 'GBM 4', start: '2025-08-04', description: 'Installation Ceremony Preparation', avenue: 'GBM' },
+      { title: 'Paw Trait', start: '2025-08-04', end: '2025-08-10', description: 'Pawtrait was an initiative by the Rotaract Club of Pune Heritage to feed stray animals and capture these moments of kindness, which were shared on Instagram to spread the message of compassion and responsibility towards animals.', avenue: ['CMD','PRO'] },
+      { title: 'Work In Progress', start: '2025-08-08', description: 'The Work in Progress session was an amazing success! We got to hear inspiring stories and future dreams from everyone. Honest conversations over coffee made the evening special. Connections grew stronger with every shared experience.', avenue: 'PDD' },
+      { title: 'GBM 5', start: '2025-08-15', description: 'Installation Rehearsals', avenue: 'GBM' },
+      { title: 'Installation Ceremony', start: '2025-08-17', description: 'The official installation of RCPH was conducted smoothly with well-planned arrangements. All members were elected, and the ceremony carried an enthusiastic and celebratory spirit.', avenue: 'CSD' },
+      { title: 'GBM 6', start: '2025-08-25', description: 'Samyati 3.0 Preparation', avenue: 'GBM' },
+      { title: 'Samyati 3 (ISD)', start: '2025-08-29', end: '2025-09-01', description: 'Samyati 3.0 was a vibrant 3-day celebration filled with cultural experiences, engaging activities, and heartfelt hospitality. From soulful aartis and spiritual visits to interactive games and tasty food. Delegates enjoyed the true essence of Pune’s culture, camaraderie, and unforgettable vibes, making Samyati 3.0 a memorable success.', avenue: 'ISD' },
+      { title: 'IceBreakers For Delegates', start: '2025-08-29', description: 'This special ice breaker gave participants of Samyati and ISD a chance to bond over culture, food, and conversations. It was filled with fun interactions and lots of laughter.', avenue: 'CSD' },
+      { title: 'Flip the Bottle', start: '2025-08-29', description: 'A collaborative DEI and CSD activity where participants flip the bottle to engage with questions, answer truths or do light challenges that promote sharing and cultural exchange in fun but meaningful way.', avenue: ['DEI','CSD'] },
+      { title: 'Project EduReach (CMD)', start: '2025-08-15', description: 'The Rotaract Club of Pune Heritage undertook the distribution of 50 exclusive e-learning kits to 10th Std SSC students. This initiative was designed to provide the necessary academic support and to motivate students as they prepare for their board examinations, ensuring they have better access to learning resources and encouragement to achieve success.', avenue: ['CMD','RRRO'] },
+      { title: 'Heritage Walk', start: '2025-08-30', description: 'Pune Heritage Walk took the participants through the city’s iconic Ganpati mandals. Discovered the history of Ganeshotsav and its role in India’s freedom movement. Explored the 5 Manache Ganpati. Experienced the blend of faith, culture, and history in Pune’s heart.', avenue: 'PDD' },
       { title: 'Monsoon Run (CSD)', start: '2025-09-28', avenue: 'CSD' },
       { title: 'Food/Cultural Exchange (ISD)', start: '2025-09-30', description: 'Details soon', avenue: 'ISD' },
       { title: 'Diwali Dhamaka (CSD)', start: '2025-10-17', avenue: 'CSD' },
@@ -52,6 +73,11 @@ function initCalendar() {
       const av = info.event.extendedProps.avenue;
       const avenues = Array.isArray(av) ? av : [av];
       const cols = avenues.map(a => avenueColors[a] || '#666');
+
+      const fullNames = avenues
+      .map(a => avenueNames[a] || a)
+      .join(', ');
+      info.el.title = `${info.event.title} — ${fullNames}`;
 
       if (cols.length === 1) {
         info.el.style.backgroundColor = cols[0];

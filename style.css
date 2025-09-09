@@ -1064,3 +1064,50 @@ a.button-link:hover {
   color: #f9f9f9 !important;
   text-decoration: none;
 }
+
+.legend-item abbr {
+  text-decoration: none;   /* remove dotted underline on some browsers */
+  cursor: help;            /* indicates there’s a tooltip */
+  color: inherit;
+}
+
+.legend-hint {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #171717;                 /* darker than legend card */
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #cfd3d6;                       /* soft, readable on dark */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.legend-hint i { opacity: 0.85; }
+
+.legend-info {
+  background: var(--color-card);
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  margin-top: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* centers question mark horizontally */
+}
+
+.legend-info .info-icon {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  background: #444;
+  color: #fff;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
