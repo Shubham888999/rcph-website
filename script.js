@@ -161,3 +161,75 @@ function initFlipCards() {
     inner.addEventListener('pointerup', handleFlip, { passive: true });
   });
 }
+setTimeout(() => {
+  initCalendar();
+  autoScrollGallery();
+  initFlipCards();
+  initHighlightCarousel();  // ← add this line
+}, 100);
+function initHighlightCarousel() {
+  const root = document.querySelector('.highlight-carousel');
+  if (!root) return;
+
+  const track = root.querySelector('.highlight-track');
+  const slides = Array.from(root.querySelectorAll('.highlight-slide'));
+  const prev  = root.querySelector('.hc-prev');
+  const next  = root.querySelector('.hc-next');
+  const dotsC = root.querySelector('.highlight-dots');
+
+  let index = 0;
+  let timer;
+
+  function goTo(i) {
+    index = (i + slides.length) % slides.length;
+    track.style.transform = `translateX(-${index * 100}%)`;
+    updateDots();
+  }
+
+  function updateDots() {
+    dotsC.querySelectorAll('button').forEach((b, i) =>
+      b.classList.toggle('is-active', i === index)
+    );
+  }
+
+  // Build dots
+  slides.forEach((_, i) => {
+    const b = document.createElement('button');
+    if (i === 0) b.classList.add('is-active');
+    b.setAttribute('aria-label', `Go to slide ${i + 1}`);
+    b.addEventListener('click', () => { goTo(i); resetAutoplay(); });
+    dotsC.appendChild(b);
+  });
+
+  // Nav
+  prev.addEventListener('click', () => { goTo(index - 1); resetAutoplay(); });
+  next.addEventListener('click', () => { goTo(index + 1); resetAutoplay(); });
+
+  // Autoplay
+  function start()  { timer = setInterval(() => goTo(index + 1), 5000); }
+  function stop()   { clearInterval(timer); }
+  function resetAutoplay() { stop(); start(); }
+
+  root.addEventListener('mouseenter', stop);
+  root.addEventListener('mouseleave', start);
+
+  // Swipe
+  let startX = 0;
+  root.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+  root.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) {
+      goTo(index + (dx < 0 ? 1 : -1));
+      resetAutoplay();
+    }
+  }, { passive: true });
+
+  // Keyboard
+  root.setAttribute('tabindex', '0');
+  root.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft')  { prev.click(); }
+    if (e.key === 'ArrowRight') { next.click(); }
+  });
+
+  start();
+}
