@@ -7,11 +7,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // 2) Give fragments a moment to load, then kick off calendar & gallery & flip cards
-  setTimeout(() => {
-    initCalendar();
-    autoScrollGallery();
-    initFlipCards();
-  }, 100);
+ 
 });
 
 function initCalendar() {
@@ -165,7 +161,8 @@ setTimeout(() => {
   initCalendar();
   autoScrollGallery();
   initFlipCards();
-  initHighlightCarousel();  // ← add this line
+  initHighlightCarousel();
+  initHighlightCounters();  // ← add this line
 }, 100);
 function initHighlightCarousel() {
   const root = document.querySelector('.highlight-carousel');
@@ -232,4 +229,122 @@ function initHighlightCarousel() {
   });
 
   start();
+}
+// === Highlight counters (Mahadaan 2025) ===
+// === Highlight counters (Mahadaan 2025) ===
+function initHighlightCounters() {
+  const container = document.getElementById('mahadaanCounters');
+  if (!container) return;
+
+  const cards = Array.from(container.querySelectorAll('.counter-card'))
+    .sort((a,b) => (a.dataset.order||0) - (b.dataset.order||0));
+
+  // Start when only ~15% is visible and a bit before it enters
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+
+      // quick reveal cascade
+      cards.forEach((c,i)=> setTimeout(()=> c.classList.add('revealed'), i*80));
+
+      runCounterSequence(cards).then(() => {
+        try { fireConfetti(); } catch(e) {}
+      });
+
+      io.disconnect();
+    });
+  }, { threshold: 0.50, rootMargin: '80px 0px' });
+
+  io.observe(container);
+}
+
+function scrambleCount(
+  el,
+  finalValue,
+  {
+    duration = 900,          // total duration in ms
+    scrambleMs,              // scramble phase in ms (optional)
+    prefix = '',
+    suffix = '',
+    formatComma = false,
+    jitterOverride = 0       // optional explicit jitter
+  } = {}
+) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    const _scrambleMs = typeof scrambleMs === 'number'
+      ? scrambleMs
+      : Math.min(duration * 0.30, 300); // default
+
+    const fmt = n => {
+      const str = formatComma ? Number(n).toLocaleString('en-IN') : String(n);
+      return `${prefix}${str}${suffix}`;
+    };
+
+    function frame(now) {
+      const t = now - start;
+
+      //if (t < _scrambleMs) {
+        // Respect override else scale by value (lighter shake)
+        //const jitter = jitterOverride || Math.max(2, Math.round(finalValue * 0.15));
+        //const val = Math.max(0, finalValue - Math.floor(Math.random() * jitter));
+        //el.textContent = fmt(val);
+        //requestAnimationFrame(frame);
+        //return;
+      //}
+
+      const p = Math.min(1, (t - _scrambleMs) / Math.max(1, (duration - _scrambleMs)));
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      const current = Math.max(0, Math.round(finalValue * eased));
+      el.textContent = fmt(current);
+
+      if (p < 1) requestAnimationFrame(frame);
+      else { el.textContent = fmt(finalValue); resolve(); }
+    }
+
+    // show 0 immediately so it never looks empty
+    el.textContent = fmt(0);
+    requestAnimationFrame(frame);
+  });
+}
+
+async function runCounterSequence(cards) {
+  for (const card of cards) {
+    const el = card.querySelector('.counter-value');
+    const target       = Number(el.dataset.target || 0);
+    const prefix       = el.dataset.prefix || '';
+    const suffix       = el.dataset.suffix || '';
+    const formatComma  = el.dataset.format === 'comma';
+    const duration     = Number(el.dataset.duration || 500);   // per-counter duration (ms)
+    const scrambleMs   = el.dataset.scramble ? Number(el.dataset.scramble) : undefined; // optional
+    const jitter       = Number(el.dataset.jitter || 0);       // per-counter jitter
+
+    await scrambleCount(el, target, {
+      duration,
+      scrambleMs,
+      prefix,
+      suffix,
+      formatComma,
+      jitterOverride: jitter
+    });
+
+    // tiny gap between counters
+    await new Promise(r => setTimeout(r, 30));
+  }
+}
+
+function fireConfetti() {
+  if (typeof confetti !== 'function') return;
+  const burst = (x) => confetti({
+    particleCount: 120,
+    spread: 70,
+    startVelocity: 45,
+    gravity: 0.9,
+    scalar: 0.9,
+    ticks: 200,
+    origin: { y: 0.2, x }
+  });
+  burst(0.1); // left
+  burst(0.9); // right
+  setTimeout(() => confetti({ particleCount: 60, spread: 80, origin: { x: 0.5, y: 0.2 } }), 400);
 }

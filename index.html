@@ -94,7 +94,7 @@
   <ul class="nav-links">
     <li><a href="#home">Home</a></li>
     <li><a href="about.html">About</a></li>
-    <li><a href="#projects">Projects</a></li>
+    <li><a href="#featured-projects">Projects</a></li>
     <li><a href="#calendar">Calendar</a></li>
     <li><a href="#gallery">Gallery</a></li>
     <li><a href="#join">Join Us</a></li>
@@ -131,46 +131,60 @@
 
 <section id="highlight-month" class="section-box highlight-section">
   <h2>Highlight of the Month</h2>
-      <h3>Samyati 3.0</h3>
+      <h3>Mahadaan 2025</h3>
 
-  <div class="highlight-carousel" aria-label="Highlight of the Month">
-    <button class="hc-btn hc-prev" aria-label="Previous slide">‹</button>
-
-    <div class="highlight-viewport">
-      <ul class="highlight-track">
-        <!-- Slide 1 -->
-        <li class="highlight-slide is-active">
-          <img src="images/Samyati3_1.jpg"
-               alt="Samyati 3.0 – Delegates at Shaniwar Wada">
-          <div class="highlight-caption">
-          </div>
-        </li>
-
-        <!-- Slide 2 (example) -->
-        <li class="highlight-slide">
-          <img src="images/Samyati3_2.jpg"
-               alt="City heritage walk with delegates">
-          <div class="highlight-caption">
-          </div>
-        </li>
-
-        <!-- Slide 3 (example) -->
-        <li class="highlight-slide">
-          <img src="images/Samyati3_3.jpg"
-               alt="Cultural evening and performances">
-          <div class="highlight-caption">
-          </div>
-        </li>
-      </ul>
-    </div>
-
-    <button class="hc-btn hc-next" aria-label="Next slide">›</button>
-
-    <div class="highlight-dots" aria-label="Slide indicators"></div>
+  <div class="highlight-viewport" style="margin-bottom:14px;">
+    <img src="images/mahadaan2025.jpg" alt="Mahadaan 2025 donation drive in Pune" class="highlight-hero-img">
   </div>
 
-  <p>Samyati 3.0 was a vibrant 3-day celebration filled with cultural experiences, engaging activities, and heartfelt hospitality. From soulful aartis and spiritual visits to interactive games and tasty food. Delegates enjoyed the true essence of Pune’s culture, camaraderie, and unforgettable vibes, making Samyati 3.0 a memorable success.</p>
+    <p>Thanks to the generosity of our Rotaractors and community, we contributed through two housing societies and collected:</p>
+
+<div id="mahadaanCounters" class="counter-grid">
+  <!-- Food -->
+  <div class="counter-card" data-order="1">
+    <div class="counter-title">Food Grains</div>
+    <div class="counter-value"
+         id="foodValue"
+         data-target="125"
+         data-suffix=" kg"
+         data-duration="1000"
+         data-scramble="300"
+         data-jitter="200">
+    </div>
+  </div>
+
+  <!-- Clothes -->
+  <div class="counter-card" data-order="2">
+    <div class="counter-title">Clothes</div>
+    <div class="counter-value"
+         id="clothValue"
+         data-target="74"
+         data-suffix=" bags"
+         data-duration="1000"
+         data-scramble="300"
+         data-jitter="200">
+    </div>
+  </div>
+
+  <!-- Monetary -->
+  <div class="counter-card" data-order="3">
+    <div class="counter-title">Monetary</div>
+    <div class="counter-value amount"
+         id="moneyValue"
+         data-target="24119"
+         data-prefix="₹"
+         data-format="comma"
+         data-duration="1000"
+         data-scramble="300"
+         data-jitter="200">
+    </div>
+  </div>
+</div>
+
 </section>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+
   
 <section id="featured-projects" class="section-box">
   <h2>Featured Projects</h2>
@@ -178,21 +192,18 @@
   <div class="projects-grid">
     <!-- Project 1 -->
     <div class="project-card">
-      <img src="images/mahadaan.jpeg" alt="Mahadaan 2024 donation drive in Pune by Rotaract Club of Pune Heritage" loading="lazy">
-      <h3>Mahadaan 2024</h3>
-      <p>Thanks to the generosity of our Rotaractors and community, we contributed through two housing societies and collected:</p>
-      <p>30 bags of clothes</p>
-      <p>151 kg of food grains</p>
-      <p>₹21,362 in cash donations</p>
+      <img src="images/branding101.jpg" alt="Personal Branding 101 workshop by Rotaract Club of Pune Heritage" loading="lazy">
+      <h3>Personal Branding 101</h3>
+      <p>An interactive session was organized for students and young professionals to discover their values, skills, and strengths while crafting their personal brand story. Participants also learned how to build an impactful online presence and set actionable goals, investing in the most important brand - themselves.</p>
       <ul class="project-metrics">
       </ul>
     </div>
 
     <!-- Project 2 -->
     <div class="project-card">
-      <img src="images/madhushala.png" alt="Madhushala 3.0 winemaking workshop by Rotaract Pune Heritage" loading="lazy">
-      <h3>Madhushala 3.0</h3>
-      <p>Our flagship three-day winemaking workshop.From crushing grapes to bottling, participants crafted their very own bottle of red wine, a perfect blend of learning, fun, and flavour!</p>
+      <img src="images/Samyati3-1.jpg" alt="Samyati 3.0 winemaking workshop by Rotaract Pune Heritage" loading="lazy">
+      <h3>Samyati 3.0</h3>
+      <p>Samyati 3.0 was a vibrant 3-day celebration of culture, activities, and hospitality. Delegates experienced soulful aartis, heritage walks, interactive games, and Pune’s true camaraderie, making the event a memorable success.</p>
       <ul class="project-metrics">
       </ul>
     </div>
@@ -379,7 +390,7 @@
 
 
 <!-- Event Popup Modal -->
-<div id="eventPopup" class="popup-overlay">
+<!--<div id="eventPopup" class="popup-overlay">
   <div class="popup-box">
     <h3>🚨 Next Event: MAHADAN</h3>
     <p><strong>Description:</strong> Rotaract Club of Pune Heritage are organizing our annual donation drive. </p>
@@ -388,7 +399,7 @@
     <p><strong>Venue:</strong> Amrut Kalash Society, Karve Nagar, Pune</p>
     <button id="closePopup"  class="popup-close-btn">Close</button>
   </div>
-</div>  
+</div>  -->
     
 
 

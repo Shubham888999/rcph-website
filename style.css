@@ -1215,3 +1215,67 @@ a.button-link:hover {
   outline: 2px solid var(--color-accent);
   outline-offset: 4px;
 }
+
+/* Highlight hero image (if you kept a single lead image) */
+.highlight-hero-img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;  
+  border-radius: 12px;
+  display: block;
+  box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.03);
+}
+@media (max-width: 900px) { .highlight-hero-img { height: 300px; } }
+@media (max-width: 600px) { .highlight-hero-img { height: 220px; } }
+
+/* === Mahadaan counters === */
+/* === Mahadaan counters layout === */
+#mahadaanCounters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); /* responsive */
+  gap: 18px;
+  width: 100%;
+  max-width: 1100px;         /* match your section width */
+  margin: 0 auto;            /* center inside the section */
+}
+
+/* Counter cards */
+.counter-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 22px 20px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.22), inset 0 0 0 1px rgba(255,255,255,.03);
+  min-width: 0;              /* <-- allows shrink, prevents overflow */
+  overflow: hidden;          /* safety */
+}
+
+/* Titles & values */
+.counter-title {
+  margin: 10px 0 4px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+/* Make the big number scale with viewport so it doesn't push the card wide */
+.counter-value {
+  display: block;
+  font-weight: 800;
+  line-height: 1.05;
+  font-size: clamp(1.8rem, 5.5vw, 3.4rem); /* responsive size */
+  white-space: nowrap;       /* keep digits on one line */
+}
+
+/* Optional: ensure the section box doesn’t show spillover shadows */
+.section-box { overflow: hidden; }
+
+/* Extra safety for small phones */
+@media (max-width: 360px) {
+  #mahadaanCounters {
+    grid-template-columns: 1fr;
+  }
+  .counter-value {
+    font-size: clamp(1.6rem, 7vw, 2.6rem);
+  }
+}
+
