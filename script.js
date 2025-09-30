@@ -10,6 +10,149 @@ window.addEventListener('DOMContentLoaded', () => {
  
 });
 
+// ===== Album data (each album <= 9 photos) =====
+const AW_ALBUMS = [
+  //{
+    //id: "water-filter",
+    //title: "Water Filter Donation",
+    //cover: "images/Waterfilterdonation1.jpg",
+    //photos: [
+      //"images/Waterfilterdonation1.jpg",
+      //"images/Waterfilterdonation2.jpg",
+      //"images/Waterfilterdonation3.jpg",
+      //"images/Waterfilterdonation4.jpg"
+    //]
+  //},
+  {
+    id: "edureach",
+    title: "Project EduReach",
+    cover: "images/Edureach3.jpg",
+    photos: [
+      "images/Edureach1.jpg",
+      "images/Edureach2.jpg",
+      "images/Edureach3.jpg"
+    ]
+  },
+  {
+    id: "sports-ryla",
+    title: "Sports RYLA",
+    cover: "images/sportsryla1.jpg",
+    photos: [
+      "images/sportsryla1.jpg",
+      "images/sportsryla2.jpg"
+    ]
+  },
+  {
+    id: "potluck",
+    title: "PotLuck",
+    cover: "images/potluck.jpg",
+    photos: [
+      "images/potluck.jpg",
+      "images/Potluck 1.jpg"
+    ]
+  },
+  {
+    id: "cultural-exchange",
+    title: "Cultural Exchange",
+    cover: "images/cuturalexc2.jpg",
+    photos: [
+      "images/cuturalexc1.jpg",
+      "images/cuturalexc2.jpg"
+    ]
+  },
+  {
+    id: "icebreaker",
+    title: "Ice Breaker",
+    cover: "images/icebreaker.jpg",
+    photos: [ "images/icebreaker.jpg" ]
+  },
+  {
+    id: "personal-branding",
+    title: "Personal Branding 101",
+    cover: "images/branding101.jpg",
+    photos: [ "images/branding101.jpg" ]
+  },
+  {
+    id: "club-assembly",
+    title: "Club Assembly 25-26",
+    cover: "images/Clubassembly2526.jpg",
+    photos: [ "images/Clubassembly2526.jpg" ]
+  },
+  {
+    id: "samyati-3",
+    title: "Samyati 3.0",
+    cover: "images/Samyati3-1.jpg",
+    photos: [ "images/Samyati3-1.jpg" ]
+  }
+  // Add more albums here as you go…
+];
+// ===== Build 4x4 wall =====
+function buildAlbumWall(){
+  const grid = document.getElementById('awGrid');
+  if (!grid) return;
+
+  grid.innerHTML = "";
+  AW_ALBUMS.forEach(a=>{
+    const card = document.createElement('div');
+    card.className = 'aw-card';
+    card.innerHTML = `
+      <img src="${a.cover}" alt="${a.title}" loading="lazy">
+      <div class="aw-overlay">
+        <span class="aw-title-badge">${a.title}</span>
+      </div>
+    `;
+    card.addEventListener('click', ()=> openAlbumModal(a));
+    grid.appendChild(card);
+  });
+}
+
+// ===== Modal logic =====
+const awModal  = document.getElementById('awModal');
+const awTitle  = document.getElementById('awTitle');
+const awPhotos = document.getElementById('awPhotos');
+document.getElementById('awClose').addEventListener('click', closeAlbumModal);
+awModal.addEventListener('click', e=>{ if(e.target===awModal) closeAlbumModal(); });
+
+function openAlbumModal(album){
+  awTitle.textContent = album.title;
+  awPhotos.innerHTML = "";
+  (album.photos || []).slice(0,9).forEach(src=>{
+    const p = document.createElement('div');
+    p.className = 'aw-photo';
+    p.innerHTML = `<img src="${src}" alt="${album.title}" loading="lazy">`;
+    p.addEventListener('click', ()=> openLightbox(src));
+    awPhotos.appendChild(p);
+  });
+  awModal.setAttribute('aria-hidden','false');
+  document.body.style.overflow = 'hidden';
+}
+function closeAlbumModal(){
+  awModal.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+}
+
+// ===== Simple lightbox =====
+const awLB = {
+  root:  document.getElementById('awLightbox'),
+  img:   document.getElementById('awLightImg'),
+  close: document.getElementById('awLightClose')
+};
+awLB.close.addEventListener('click', closeLightbox);
+awLB.root.addEventListener('click', e=>{ if(e.target===awLB.root) closeLightbox(); });
+document.addEventListener('keydown', e=>{
+  if (awLB.root.getAttribute('aria-hidden')==='false' && e.key==='Escape') closeLightbox();
+});
+function openLightbox(src){
+  awLB.img.src = src;
+  awLB.root.setAttribute('aria-hidden','false');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox(){
+  awLB.root.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+}
+
+
 function initCalendar() {
   const calEl = document.getElementById('rcph-calendar');
   if (!calEl) return;
@@ -112,29 +255,7 @@ const avenueNames = {
   });
 }
 
-function autoScrollGallery() {
-  const container = document.querySelector('.carousel-container');
-  const track     = document.getElementById('carouselTrack');
-  if (!container || !track) return;
 
-  const scrollSpeed = 0.5;
-
-  if (!track.classList.contains('cloned')) {
-    Array.from(track.children).forEach(child => {
-      track.appendChild(child.cloneNode(true));
-    });
-    track.classList.add('cloned');
-  }
-
-  function scroll() {
-    container.scrollLeft += scrollSpeed;
-    if (container.scrollLeft >= track.scrollWidth / 2) {
-      container.scrollLeft = 0;
-    }
-    requestAnimationFrame(scroll);
-  }
-  scroll();
-}
 
 // ---- Card flip: tap to open, tap again to close ----
 function initFlipCards() {
@@ -164,10 +285,10 @@ function initFlipCards() {
 }
 setTimeout(() => {
   initCalendar();
-  autoScrollGallery();
   initFlipCards();
   initHighlightCarousel();
-  initHighlightCounters();  // ← add this line
+  initHighlightCounters();
+  buildAlbumWall();     // ← add this line
 }, 100);
 function initHighlightCarousel() {
   const root = document.querySelector('.highlight-carousel');
