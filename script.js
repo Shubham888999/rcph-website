@@ -210,7 +210,10 @@ const avenueNames = {
       { title: 'GBM 8', start: '2025-09-28', description: 'Club Orientation', avenue: 'GBM' },
       { title: 'Cultural Exchange', start: '2025-09-29', description: 'We successfully conducted a Food & History Cultural Exchange with the Rotaract Club of UIAMS, Chandigarh, celebrating diversity and strengthening friendships. Members from both clubs shared local delicacies, heritage, and stories — a lively session that showed how traditions connect us beyond boundaries.', avenue: 'ISD' },
       { title: 'Garba-Rangratri', start: '2025-09-26', description:'We came together for a vibrant Garba Night! Members dressed in colourful traditional attire and danced to the lively beats of Garba. The evening was filled with energy, music, and togetherness, making it a beautiful celebration of culture and unforgettable memories.', avenue: 'CSD' },
-      { title: 'Diwali Daan (ISD & CMD)', start: '2025-10-19', avenue: ['ISD','CMD'] }
+      { title: 'Rendezvous', start: '2025-10-25', avenue: 'CSD' },
+      { title: 'Mental Health awareness', start: '2025-10-12', avenue: 'DEI' },
+      { title: 'Pitch-A-Ract', start: '2025-10-11', avenue: 'PDD' },
+      { title: 'Pad-Aid', start: '2025-10-04', end: '2025-10-05', avenue: ['CMD','ISD'] }
     ],
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
     eventDidMount: info => {
