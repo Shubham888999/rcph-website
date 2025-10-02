@@ -34,16 +34,6 @@ const AW_ALBUMS = [
     ]
   },
   {
-    id: "Mahadaan",
-    title: "Project EduReach",
-    cover: "images/Edureach3.jpg",
-    photos: [
-      "images/Edureach1.jpg",
-      "images/Edureach2.jpg",
-      "images/Edureach3.jpg"
-    ]
-  },
-  {
     id: "sports-ryla",
     title: "Sports RYLA",
     cover: "images/sportsryla1.jpg",
