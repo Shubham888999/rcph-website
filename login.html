@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RCPH – Sign In</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div style="max-width:420px;margin:4rem auto;padding:16px;background:#1e1e1e;border-radius:12px;">
+    <h2 style="text-align:center;margin-top:0;">Sign In</h2>
+    <input id="email" type="email" placeholder="Email"
+           style="width:100%;padding:10px;margin:.5rem 0;border-radius:8px;border:1px solid #2e2e2e;background:#101010;color:#fff;">
+    <input id="password" type="password" placeholder="Password"
+           style="width:100%;padding:10px;margin:.5rem 0;border-radius:8px;border:1px solid #2e2e2e;background:#101010;color:#fff;">
+    <button id="loginBtn" class="btn" style="width:100%;margin-top:.5rem;">Login</button>
+    <p id="authError" style="color:#ff6b6b;margin-top:10px;min-height:1.2em;"></p>
+  </div>
+
+<!-- Firebase SDKs (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- Your init (must come AFTER the SDKs) -->
+<script src="firebase-init.js"></script>
+
+  <script>
+    // If already signed in, route immediately
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) return;
+      routeByRole(user);
+    });
+
+    async function routeByRole(user){
+      try {
+        const snap = await db.collection('roles').doc(user.uid).get();
+        if (!snap.exists || !snap.data().role) {
+          // No role set -> sign out and show message
+          await auth.signOut();
+          showError("No role set for this user. Contact admin.");
+          return;
+        }
+        const role = String(snap.data().role).toLowerCase();
+        if (role === 'admin') window.location.href = 'admin.html';
+        else if (role === 'bod') window.location.href = 'bodlogin.html';
+        else {
+          await auth.signOut();
+          showError(`Unknown role "${role}". Contact admin.`);
+        }
+      } catch (e) {
+        showError(e.message || "Could not read role.");
+      }
+    }
+
+    document.getElementById('loginBtn').onclick = async () => {
+      const email = document.getElementById('email').value.trim();
+      const pass  = document.getElementById('password').value;
+      try {
+        const cred = await auth.signInWithEmailAndPassword(email, pass);
+        routeByRole(cred.user);
+      } catch (e) {
+        showError(e.message);
+      }
+    };
+
+    function showError(msg){ document.getElementById('authError').textContent = msg || ""; }
+  </script>
+</body>
+</html>

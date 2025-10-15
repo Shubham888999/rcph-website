@@ -100,6 +100,7 @@
     <li><a href="#join">Join Us</a></li>
     <li><a href="bod.html">Board of Directors</a></li>
     <li><a href="#contact">Contact</a></li>
+    <li><a href="login.html">Login</a></li>
   </ul>
 
   <div class="mobile-nav-toggle">
@@ -318,6 +319,19 @@
   </div>
 
   <!-- FullCalendar + Custom Scripts -->
+   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // Same project as admin
+  const firebaseConfig = {
+    apiKey: "AIzaSyC2Q7o_XeI-FFzO1W2K8FTyHtn84-4sINY",
+    authDomain: "rcph-admin.firebaseapp.com",
+    projectId: "rcph-admin"
+  };
+  if (window.firebase && firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+  // expose a read-only handle for script.js
+  window.dbPublic = firebase.firestore();
+</script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
   <script src="script.js"></script>
 

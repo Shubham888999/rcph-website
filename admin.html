@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>RCPH • Attendance Manager</title>
+
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="mobile.css" media="only screen and (max-width: 768px)"/>
+
+  <style>
+    /* page shell */
+    .admin-wrap{ max-width: 1200px; margin: 32px auto; padding: 0 16px; }
+    .admin-card{ background: var(--color-card,#1e1e1e); border:1px solid var(--color-border,#2e2e2e); border-radius:12px; padding:18px; box-shadow:0 8px 20px rgba(0,0,0,.18); }
+    .topbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px;}
+    .badge{ padding:2px 8px; border-radius:999px; background: var(--color-accent-l,#F4B43A); color:#111; font-weight:800; }
+    .btn{ background:var(--color-accent,#60C3C4); color:#111; border:0; padding:10px 14px; border-radius:10px; font-weight:800; cursor:pointer; }
+    .btn-outline{ background:transparent; color:var(--color-accent,#60C3C4); border:1px solid var(--color-accent,#60C3C4); }
+    .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0 6px; }
+    .toolbar input,.toolbar select{ padding:10px 12px; border-radius:10px; border:1px solid var(--color-border,#2e2e2e); background:#101010; color:#fff; }
+
+    /* grid */
+    .grid-wrap{ overflow:auto; }
+    table.att{ border-collapse:separate; border-spacing:0; min-width:100%; width:max-content;}
+    table.att th, table.att td{ padding:10px 12px; border:1px solid var(--color-border,#2e2e2e); background:#181818; }
+    table.att thead th{ position:sticky; top:0; z-index:1; background:#202020; }
+    .sticky-col{ position:sticky; left:0; z-index:2; background:#202020; }
+    .ev-head,.mem-cell{ display:flex; align-items:center; gap:8px; justify-content:center;}
+    .icon-btn{ border:1px solid var(--color-border,#2e2e2e); background:transparent; color:#ccc; width:28px; height:28px; border-radius:8px; cursor:pointer; line-height:1;}
+    .icon-btn:hover{ color:#fff; border-color:#f33; }
+
+    /* stat box inside first column */
+    .mem-left{ display:flex; align-items:center; gap:10px; }
+    .stat-box{ background:#161616; border:1px solid var(--color-border,#2e2e2e); padding:6px 8px; border-radius:8px; color:#ddd; line-height:1.2; font-size:12px; min-width:130px; }
+    .stat{ display:block; white-space:nowrap; }
+
+    /* attendance cell button with PNGs */
+    .cell-btn{
+      width:44px; height:44px; border-radius:12px; border:0; cursor:pointer;
+      display:inline-block; position:relative; background:#101010;
+      transition:transform .15s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .cell-btn:hover{ transform:scale(1.06); }
+    .cell-btn::before{
+      content:""; position:absolute; inset:8px;
+      background-repeat:no-repeat; background-position:center; background-size:contain;
+      filter: drop-shadow(0 0 4px rgba(0,0,0,.55));
+    }
+    .cell-btn.on{ background:#129a62; box-shadow:0 0 14px rgba(0,255,150,.35); }
+    .cell-btn.on::before{ background-image:url("check.png"); }
+    .cell-btn.off{ background:#b52738; box-shadow:0 0 14px rgba(255,60,70,.30); }
+    .cell-btn.off::before{ background-image:url("cross.png"); }
+
+    /* modal */
+    .adm-modal{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:9999; padding:16px}
+    .adm-modal[aria-hidden="false"]{display:flex}
+    .adm-modal__sheet{width:min(560px,96vw); background:#181818; border:1px solid var(--color-border,#2e2e2e); border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.5); padding:16px 16px 18px}
+    .adm-modal__head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+    .adm-close{background:#262626; color:#ddd; border:1px solid var(--color-border,#2e2e2e); width:36px; height:36px; border-radius:8px; cursor:pointer}
+    .adm-form{display:grid; gap:12px}
+    .adm-field{display:flex; flex-direction:column; gap:6px}
+    .adm-field input,.adm-field textarea{background:#101010; color:#fff; border:1px solid var(--color-border,#2e2e2e); border-radius:8px; padding:10px}
+    .adm-chips{display:flex; flex-wrap:wrap; gap:10px}
+    .adm-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:4px}
+  </style>
+</head>
+<body>
+  <div class="admin-wrap">
+    <div class="admin-card">
+      <div class="topbar">
+        <h2>Attendance Manager <span id="countBadge" class="badge"></span></h2>
+        <button id="signOutBtn" class="btn btn-outline">Sign out</button>
+      </div>
+
+      <div class="toolbar">
+        <input id="memberSearch" type="text" placeholder="Search member…"/>
+        <input id="eventSearch" type="text" placeholder="Search event…"/>
+        <select id="monthFilter">
+          <option value="">All months</option>
+        </select>
+        <button id="addEventBtn" class="btn btn-outline">Add Event</button>
+        <button id="addMemberBtn" class="btn btn-outline">Add Member</button>
+      </div>
+
+      <div class="grid-wrap">
+        <table class="att">
+          <thead id="attHead"></thead>
+          <tbody id="attBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Modal -->
+  <div id="admModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3 id="admModalTitle">Add</h3>
+        <button class="adm-close" id="admClose" aria-label="Close">×</button>
+      </div>
+
+      <!-- MEMBER FORM -->
+      <form id="memberForm" class="adm-form" autocomplete="off" hidden>
+        <label class="adm-field">
+          <span>Full name</span>
+          <input id="memName" type="text" placeholder="e.g., Shubham Deshpande" required>
+        </label>
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" id="memCancel">Cancel</button>
+          <button type="submit" class="btn">Add Member</button>
+        </div>
+      </form>
+
+      <!-- EVENT FORM -->
+      <form id="eventForm" class="adm-form" autocomplete="off" hidden>
+        <label class="adm-field">
+          <span>Event name</span>
+          <input id="evName" type="text" placeholder="e.g., Mahadaan 3.0" required>
+        </label>
+
+        <label class="adm-field">
+          <span>Date</span>
+          <input id="evDate" type="date" required>
+        </label>
+
+        <label class="adm-field">
+          <span>Description (public calendar only)</span>
+          <textarea id="evDesc" rows="3" placeholder="Optional…"></textarea>
+        </label>
+
+        <fieldset class="adm-field">
+          <legend>Avenues (optional)</legend>
+          <div class="adm-chips">
+            <label><input type="checkbox" value="ISD"> ISD</label>
+            <label><input type="checkbox" value="CMD"> CMD</label>
+            <label><input type="checkbox" value="CSD"> CSD</label>
+            <label><input type="checkbox" value="PDD"> PDD</label>
+            <label><input type="checkbox" value="RRRO"> RRRO</label>
+            <label><input type="checkbox" value="PRO"> PRO</label>
+            <label><input type="checkbox" value="DEI"> DEI</label>
+            <label><input type="checkbox" value="GBM"> GBM</label>
+          </div>
+        </fieldset>
+
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" id="evCancel">Cancel</button>
+          <button type="submit" class="btn">Add Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<!-- Firebase SDKs (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- Your init (must come AFTER the SDKs) -->
+<script src="firebase-init.js"></script>
+
+  <script src="admin.js"></script>
+</body>
+</html>
