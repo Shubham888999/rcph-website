@@ -25,26 +25,33 @@ const eventForm  = document.getElementById('eventForm');
 let MEMBERS = [];
 let EVENTS  = [];
 let ATT     = {}; // {memberId: {eventId: boolean}}
+let unsubMembers = null;
+let unsubEvents  = null;
+let unsubAtt     = null; 
+
 
 /* ---------- Auth guard + role check ---------- */
 auth.onAuthStateChanged(async (user) => {
-  if (!user) {
-    location.href = 'login.html';
-    return;
-  }
+  if (!user) { window.location.href = 'login.html'; return; }
+
   try {
-    const roleSnap = await db.collection('roles').doc(user.uid).get();
-    const role = roleSnap.exists ? (roleSnap.data().role || 'admin') : 'admin';
-    if (role === 'bod') {
-      location.href = 'bod.html'; // or 'bodlogin.html' if that’s your page
+    const snap = await db.collection('roles').doc(user.uid).get();
+    const role = snap.exists ? String(snap.data().role).toLowerCase() : null;
+
+    // Only redirect if we KNOW they’re not admin.
+    if (role && role !== 'admin') {
+      window.location.href = 'bodlogin.html';
       return;
     }
-    await loadData();
   } catch (e) {
-    console.error('role check failed', e);
-    location.href = 'login.html';
+    console.warn('Role check failed; continuing to avoid loops:', e);
+    // fall through – still show the page
   }
+
+  // ✅ Immediately paint once, then attach realtime listeners
+  await startAttendancePage();
 });
+
 
 signOutBtn.addEventListener('click', async () => {
   await auth.signOut();
@@ -61,22 +68,8 @@ async function loadData(){
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }));
 
-  // month dropdown from events, displayed as "Month YYYY"
-  function monthLabel(ym) {
-    const [y, m] = ym.split('-').map(Number);
-    const d = new Date(y, m - 1, 1);
-    return d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
-  }
-  monthFilter.innerHTML = '<option value="">All months</option>';
-  Array.from(new Set(EVENTS.map(e => (e.date || '').slice(0,7))))
-    .filter(Boolean)
-    .sort()
-    .forEach(ym => {
-      const opt = document.createElement('option');
-      opt.value = ym;
-      opt.textContent = monthLabel(ym);
-      monthFilter.appendChild(opt);
-    });
+
+buildMonthFilterFromEvents();
 
   // attendance (1 doc per member)
   const attSnap = await db.collection('attendance').get();
@@ -85,6 +78,66 @@ async function loadData(){
 
   renderGrid();
 }
+
+async function startAttendancePage() {
+  // 1) One-time fetch so the grid renders immediately
+  await loadData();
+
+  // 2) Realtime listeners so the grid stays up to date
+  attachRealtimeListeners();
+}
+
+function attachRealtimeListeners() {
+  // Clean up old listeners if they exist
+  if (unsubMembers) { unsubMembers(); unsubMembers = null; }
+  if (unsubEvents)  { unsubEvents();  unsubEvents  = null; }
+  if (unsubAtt)     { unsubAtt();     unsubAtt     = null; }
+
+  // Members
+  unsubMembers = db.collection('members').orderBy('name')
+    .onSnapshot((snap) => {
+      MEMBERS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderGrid(); // you already rebuild from MEMBERS/EVENTS/ATT
+    });
+
+  // Events (also rebuild the month filter when events change)
+  unsubEvents = db.collection('events').orderBy('date', 'desc')
+    .onSnapshot((snap) => {
+      EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      buildMonthFilterFromEvents();
+      renderGrid();
+    });
+
+  // (Optional) attendance live updates across devices.
+  // If you only edit attendance from this page, you can skip this to reduce chatter.
+  unsubAtt = db.collection('attendance')
+    .onSnapshot((snap) => {
+      const next = {};
+      snap.forEach(d => { next[d.id] = d.data() || {}; });
+      ATT = next;
+      renderGrid();
+    });
+}
+
+// Small helper used by both loadData() and realtime event updates
+function buildMonthFilterFromEvents() {
+  function monthLabel(ym) {
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
+    return d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  }
+  monthFilter.innerHTML = '<option value="">All months</option>';
+  Array.from(new Set(EVENTS.map(e => (e.date || '').slice(0, 7))))
+    .filter(Boolean)
+    .sort()
+    .forEach(ym => {
+      const opt = document.createElement('option');
+      opt.value = ym;
+      opt.textContent = monthLabel(ym);
+      monthFilter.appendChild(opt);
+    });
+}
+
 
 /* ---------- Render grid ---------- */
 function renderGrid(){
@@ -268,3 +321,4 @@ eventForm.addEventListener('submit', async (e) => {
     await loadData();
   }catch(err){ alert('Failed to add event: ' + err.message); }
 });
+

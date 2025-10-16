@@ -1419,51 +1419,49 @@ table.att{ min-width: 100%; width: max-content; } /* already present */
 .btn-outline{background:transparent;border:1px solid var(--color-accent);color:var(--color-accent)}
 .btn:disabled{opacity:.6;cursor:not-allowed}
 
+/* Attendance cells */
+/* Attendance toggle buttons */
 .cell-btn {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;         /* a touch rounder looks cleaner */
+  width: 46px;
+  height: 46px;
   border: none;
-  background: #1a1a1a;
+  border-radius: 12px;
   cursor: pointer;
-  overflow: hidden;            /* <-- clips the PNG to the rounded shape */
-  transition: transform .2s ease, box-shadow .25s ease, background .25s ease;
+  position: relative;
+  background: #222;
+  box-shadow: 0 0 8px rgba(0,0,0,.4);
+  transition: background 0.25s, box-shadow 0.25s, transform 0.15s;
 }
 
+/* active states */
+.cell-btn.on {
+  background: #0fa45a;
+  box-shadow: 0 0 10px rgba(0,255,120,0.4);
+}
+
+.cell-btn.off {
+  background: #c23333;
+  box-shadow: 0 0 10px rgba(255,80,80,0.35);
+}
+
+/* icon overlay */
 .cell-btn::before {
   content: "";
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 92%;                  /* was ~78%; try 90–94% to taste */
-  height: 92%;
-  transform: translate(-50%, -50%);
-  background-size: contain;
+  inset: 20%;
   background-repeat: no-repeat;
   background-position: center;
-  border-radius: inherit;      /* <-- keeps corners aligned with the button */
-  image-rendering: crisp-edges;
+  background-size: 90%;
+  border-radius: inherit;
+  pointer-events: none;
+  filter: drop-shadow(0 0 1px rgba(0,0,0,.25));
 }
 
-/* on */
-.cell-btn.on  { background:#0f9960; box-shadow:0 0 14px rgba(0,255,140,.35); }
-.cell-btn.on::before  { background-image:url("/check.png"); }
+/* icon images */
+.cell-btn.on::before {
+  background-image: url("images/check.png");
+}
 
-/* off */
-.cell-btn.off { background:#b52738; box-shadow:0 0 14px rgba(255,60,70,.28); }
-.cell-btn.off::before { background-image:url("/cross.png"); }
-
-.upload-list { display: grid; gap: 10px; margin-top: 12px; }
-.up-item { background:#111; border:1px solid var(--color-border); border-radius:10px; padding:10px; }
-.up-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-.up-name { font-size:.95rem; color:#e6e6e6; word-break: break-all; }
-.up-status { font-size:.85rem; color:#aab0b5; }
-
-.up-bar { width:100%; height:8px; background:#222; border-radius:6px; overflow:hidden; margin-top:8px; }
-.up-fill { height:100%; width:0%; background:var(--color-accent); transition:width .15s linear; }
-
-.overall-wrap { margin-top:12px; }
-.overall-label { font-size:.95rem; color:#cfd3d6; margin-bottom:6px; }
-.overall-bar { width:100%; height:10px; background:#222; border-radius:6px; overflow:hidden; }
-.overall-bar #overallFill { height:100%; width:0%; background:linear-gradient(90deg,#4fd1c5,#2bb3b0); transition:width .15s linear; }
+.cell-btn.off::before {
+  background-image: url("images/cross.png");
+}

@@ -56,7 +56,7 @@
   <div class="bod-wrap">
     <div class="card">
       <div class="titlebar">
-        <h2>BOD – Event Manager</h2>
+        <h2>BOD - Event Manager</h2>
         <div style="display:flex; gap:8px; align-items:center">
           <span class="pill" id="whoami">Signed in</span>
           <button id="signOutBtn" class="btn btn-outline"><i class="fa-solid fa-arrow-right-from-bracket"></i>&nbsp; Sign out</button>
@@ -86,28 +86,32 @@
           </label>
         </div>
 
+        <div style="display:grid; gap:12px; grid-template-columns: 1fr 160px 140px;">
+  <label>
+    <span>Conducted by (your name)</span>
+    <input id="conductedBy" type="text" placeholder="e.g., Rtr. ABC XYZ" required />
+  </label>
+
+  <label>
+    <span>Event date</span>
+    <input id="eventDate" type="date" required />
+  </label>
+
+  <label>
+    <span>Event time (optional)</span>
+    <input id="eventTime" type="time" />
+  </label>
+</div>
+
         <label>
           <span>Description</span>
           <textarea id="evDesc" placeholder="Short description for avenue reporting…" required></textarea>
         </label>
 
-<div class="uploader">
-  <div><strong>Images</strong> (you can select multiple)</div>
-  <input id="evImages" type="file" accept="image/*" multiple/>
-  <div id="thumbs" class="thumbs"></div>            <!-- preview thumbnails -->
-  <div id="uploadList" class="upload-list"></div>    <!-- per-file rows -->
-
-  <!-- Overall progress -->
-  <div id="overallWrap" class="overall-wrap" hidden>
-    <div class="overall-label">Uploading… <span id="overallPct">0%</span></div>
-    <div class="overall-bar"><div id="overallFill"></div></div>
-  </div>
-
-  <div class="note">
-    On submit: files upload to Google Drive.
-    Links are stored in Firestore (collection <code>bodEvents</code>).
-  </div>
-</div>
+<label>
+  <span>Drive folder (paste full URL or folder name)</span>
+  <input id="driveFolder" type="text" placeholder="https://drive.google.com/drive/folders/…"/>
+</label>
 
 
         <div class="actions">
@@ -127,7 +131,7 @@
       <div class="filterbar">
         <label class="pill">
           <span>Avenue</span>
-          <select id="filterAvenue" style="background:transparent;border:0;color:#fff">
+          <select id="filterAvenue" style="background:transparent;border:0;color:#1564b2">
             <option value="">All</option>
             <option>ISD</option>
             <option>CMD</option>
@@ -151,9 +155,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-  <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxpHJM5WRdNOHy7y1j1Ucwc7B9kd_-4zgfAOuQ__sjwER1G9HmZ1_zOpfoF0TItbKi/exec';
-    // --- SAME PROJECT CONFIG ---
+  <script>    // --- SAME PROJECT CONFIG ---
     const firebaseConfig = {
       apiKey: "AIzaSyC2Q7o_XeI-FFzO1W2K8FTyHtn84-4sINY",
       authDomain: "rcph-admin.firebaseapp.com",
@@ -164,228 +166,13 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxpHJM5WRdNOHy
       measurementId: "G-H6GVC7VZ88"
     };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db   = firebase.firestore();
-
-    const whoami = document.getElementById('whoami');
-    const statusEl = document.getElementById('status');
-
-    // --------- Auth guard ----------
-    auth.onAuthStateChanged(async user => {
-      if (!user) { location.href = 'login.html'; return; }
-      // Optional: only BOD can stay here
-      try {
-        const r = await db.collection('roles').doc(user.uid).get();
-        if (!r.exists || (r.data().role||'').toLowerCase() !== 'bod') {
-          location.href = 'admin.html';
-          return;
-        }
-        whoami.textContent = `Signed in as ${user.email || 'BOD'}`;
-      } catch {
-        whoami.textContent = `Signed in`;
-      }
-      // Load list
-      loadItems();
-    });
-
-    document.getElementById('signOutBtn').onclick = async () => {
-      await auth.signOut();
-      location.href = 'login.html';
-    };
-
-    // --------- Thumbs preview ----------
-const fileInput = document.getElementById('evImages');
-const thumbs    = document.getElementById('thumbs');
-
-fileInput.addEventListener('change', () => {
-  thumbs.innerHTML = '';
-  [...(fileInput.files || [])].forEach(f => {
-    const url = URL.createObjectURL(f);
-    const div = document.createElement('div');
-    div.className = 'thumb';
-    div.innerHTML = `<img src="${url}" alt="">`;
-    thumbs.appendChild(div);
-  });
-});
-
-function uploadFileToDrive({ avenue, eventName, file, onProgress }) {
-  return new Promise((resolve, reject) => {
-    const form = new FormData();
-    form.append('avenue', avenue);
-    form.append('eventName', eventName);
-    form.append('file0', file, file.name);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', APPS_SCRIPT_URL, true);
-
-    xhr.upload.onprogress = (evt) => {
-      if (evt.lengthComputable && onProgress) {
-        const pct = Math.round((evt.loaded / evt.total) * 100);
-        onProgress(pct, evt.loaded, evt.total);
-      }
-    };
-xhr.onerror = () => reject(new Error('Network error (request was blocked by the browser)'));
-
-xhr.onload = () => {
-  if (xhr.status !== 200) {
-    // Show the exact HTTP status & response body
-    return reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText || '(empty response)'}`));
-  }
-  try {
-    const json = JSON.parse(xhr.responseText || '{}');
-    if (json.error) return reject(new Error(json.error));
-    const url =
-      (json.files && json.files[0] &&
-       (json.files[0].webViewLink || json.files[0].webContentLink)) || '';
-    resolve(url);
-  } catch (e) {
-    reject(new Error('Invalid server response'));
-  }
-};
-    xhr.send(form);
-  });
-}
-
-
-    // --------- Submit ----------
-document.getElementById('bodEventForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const name   = document.getElementById('evName').value.trim();
-  const desc   = document.getElementById('evDesc').value.trim();
-  const avenue = document.getElementById('evAvenue').value;
-  const files  = [...(fileInput.files || [])];
-
-  if (!name || !desc || !avenue) { statusEl.textContent = 'Please fill all fields.'; return; }
-
-  statusEl.textContent = 'Starting upload…';
-
-  const uploadList  = document.getElementById('uploadList');
-  const overallWrap = document.getElementById('overallWrap');
-  const overallPct  = document.getElementById('overallPct');
-  const overallFill = document.getElementById('overallFill');
-
-  uploadList.innerHTML = '';
-  overallWrap.hidden = files.length === 0;
-  overallPct.textContent = '0%';
-  overallFill.style.width = '0%';
-
-  let totalBytes = files.reduce((s,f)=>s+f.size, 0);
-  let sentBytes  = 0;
-
-  // create per-file rows
-  const rows = files.map(f => {
-    const row = document.createElement('div');
-    row.className = 'up-item';
-    row.innerHTML = `
-      <div class="up-name">${f.name}</div>
-      <div style="text-align:right"><span class="up-pct">0%</span></div>
-      <div class="up-bar"><div class="up-fill"></div></div>
-    `;
-    uploadList.appendChild(row);
-    return {
-      file: f,
-      pctEl:  row.querySelector('.up-pct'),
-      fillEl: row.querySelector('.up-fill'),
-      lastBytes: 0
-    };
-  });
-
-  async function uploadOne(r) {
-    return uploadFileToDrive({
-      avenue,
-      eventName: name,
-      file: r.file,
-      onProgress: (pct, loaded, total) => {
-        r.pctEl.textContent = `${pct}%`;
-        r.fillEl.style.width = `${pct}%`;
-        // update overall incrementally
-        const delta = loaded - r.lastBytes;
-        r.lastBytes = loaded;
-        sentBytes += delta;
-        const overall = totalBytes ? Math.round((sentBytes / totalBytes) * 100) : 100;
-        overallPct.textContent = `${overall}%`;
-        overallFill.style.width = `${overall}%`;
-      }
-    });
-  }
-
-  let imageUrls = [];
-  try {
-    // run sequentially to keep folder naming consistent per event
-    for (const r of rows) {
-      const url = await uploadOne(r);
-      imageUrls.push(url);
-    }
-  } catch (err) {
-    statusEl.textContent = 'Upload failed: ' + err.message;
-    return;
-  }
-
-  // Save to Firestore (separate collection, no impact on main calendar)
-  const doc = {
-    name,
-    description: desc,
-    avenue,
-    imageUrls,
-    createdBy: user.uid,
-    createdByEmail: user.email || '',
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-  };
-
-  try {
-    await db.collection('bodEvents').add(doc);
-    statusEl.textContent = 'Saved!';
-    e.target.reset();
-    document.getElementById('thumbs').innerHTML = '';
-    uploadList.innerHTML = '';
-    overallWrap.hidden = true;
-    loadItems();
-  } catch (err) {
-    statusEl.textContent = 'Save failed: ' + err.message;
-  }
-});
-
-
-
-    // --------- List & filter ----------
-    const filterAvenue = document.getElementById('filterAvenue');
-    const itemsEl = document.getElementById('items');
-    const countPill = document.getElementById('countPill');
-    filterAvenue.addEventListener('change', loadItems);
-
-    async function loadItems(){
-      let q = db.collection('bodEvents').orderBy('createdAt','desc');
-      const av = filterAvenue.value;
-      if (av) q = q.where('venueFix','==','x'); // placeholder no-op when we don’t want extra indexes
-      // Workaround without composite index: fetch all and filter on client
-      const snap = await db.collection('bodEvents').orderBy('createdAt','desc').get();
-      const all = snap.docs.map(d => ({id:d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.() || null}));
-      const rows = av ? all.filter(x => x.avenue === av) : all;
-
-      itemsEl.innerHTML = '';
-      rows.forEach(r => {
-        const d = r.createdAt ? r.createdAt.toLocaleString() : '';
-        const card = document.createElement('div');
-        card.className = 'item';
-        card.innerHTML = `
-          <div class="pill" style="margin-bottom:6px">${r.avenue}</div>
-          <h4>${escapeHtml(r.name)}</h4>
-          <div style="opacity:.8; font-size:.9rem; margin-bottom:6px">${d}</div>
-          <div>${escapeHtml(r.description)}</div>
-          ${r.imageUrls?.length ? `<div class="imgs">${r.imageUrls.map(u=>`<a href="${u}" target="_blank" rel="noopener"><img src="${u}"></a>`).join('')}</div>` : ''}
-        `;
-        itemsEl.appendChild(card);
-      });
-      countPill.textContent = `${rows.length} item${rows.length===1?'':'s'}`;
-    }
-
-    function escapeHtml(s=''){
-      return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
   </script>
+<script src="bodlogin.js?v=2"></script>
+<script>
+  (function(){
+    const d = document.getElementById('eventDate');
+    if (d && !d.value) d.value = new Date().toISOString().slice(0,10);
+  })();
+</script>
 </body>
 </html>
