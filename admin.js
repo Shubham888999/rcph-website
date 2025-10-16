@@ -21,6 +21,55 @@ const admModal   = document.getElementById('admModal');
 const admTitle   = document.getElementById('admModalTitle');
 const memberForm = document.getElementById('memberForm');
 const eventForm  = document.getElementById('eventForm');
+const finesBadge = document.getElementById('finesBadge');
+const fineForm   = document.getElementById('fineForm');
+const fineMember = document.getElementById('fineMember');
+const fineReason = document.getElementById('fineReason');
+const fineEvent  = document.getElementById('fineEvent');
+const fineDate   = document.getElementById('fineDate');
+const finesBody  = document.getElementById('finesBody');
+const fineAmount = document.getElementById('fineAmount');
+const exportXlsxBtn = document.getElementById('exportXlsxBtn');
+
+const bodCountBadge    = document.getElementById('bodCountBadge');
+const bodMemName       = document.getElementById('bodMemName');
+const bodMemPos        = document.getElementById('bodMemPos');
+const bodAddMemberBtn  = document.getElementById('bodAddMemberBtn');
+const bodMeetName      = document.getElementById('bodMeetName');
+const bodMeetDate      = document.getElementById('bodMeetDate');
+const bodAddMeetingBtn = document.getElementById('bodAddMeetingBtn');
+const bodHead          = document.getElementById('bodHead');
+const bodBody          = document.getElementById('bodBody');
+const exportBodXlsxBtn = document.getElementById('exportBodXlsxBtn');
+
+const treBadge           = document.getElementById('treBadge');
+const treName            = document.getElementById('treName');
+const treType            = document.getElementById('treType');
+const treAmount          = document.getElementById('treAmount');
+const treDate            = document.getElementById('treDate');
+const treAddBtn          = document.getElementById('treAddBtn');
+const treBody            = document.getElementById('treBody');
+const exportTreXlsxBtn   = document.getElementById('exportTreXlsxBtn');
+
+let BODM = [];      // [{id, name, position}]
+let BODMEET = [];   // [{id, name, date}]
+let BODATT = {};    // { bodMemberId: { meetingId: boolean } }
+let FINES = [];
+let unsubFines = null;
+let unsubBodM  = null;
+let unsubBodMt = null;
+let unsubBodAt = null;
+
+// Treasurer state
+let TREAS = []; // [{id, name, type, amount, date, createdAt, createdBy}]
+let unsubTre = null;
+
+/* Helper: map memberId -> name for dropdown rendering */
+function membersMap() {
+  const map = {};
+  MEMBERS.forEach(m => map[m.id] = m.name || '');
+  return map;
+}
 
 let MEMBERS = [];
 let EVENTS  = [];
@@ -67,6 +116,82 @@ async function loadData(){
 
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +
+    MEMBERS.map(m => `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`).join('');
+
+    if (bodHead && bodBody) {
+    const [bmSnap, mtSnap, baSnap] = await Promise.all([
+      db.collection('bodMembers').orderBy('name').get(),
+      db.collection('bodMeetings').orderBy('date','desc').get(),
+      db.collection('bodAttendance').get()
+    ]);
+
+    BODM    = bmSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    BODMEET = mtSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    BODATT = {};
+    baSnap.forEach(d => { BODATT[d.id] = d.data() || {}; });
+
+    renderBodGrid();
+  }
+
+    if (fineMember) {
+  fineMember.innerHTML =
+    '<option value="" disabled selected>Member…</option>' +
+    MEMBERS.map(m =>
+      `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`
+    ).join('');
+}
+
+// Default date = today
+if (fineDate && !fineDate.value) {
+  fineDate.value = new Date().toISOString().slice(0,10);
+}
+
+// Fines initial load
+if (unsubFines) { unsubFines(); unsubFines = null; }
+if (finesBody) {
+  unsubFines = db.collection('fines').orderBy('date', 'desc')
+    .onSnapshot((snap) => {
+      FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderFines();
+    });
+}
+
+    if (unsubBodM)  { unsubBodM();  unsubBodM  = null; }
+  if (unsubBodMt) { unsubBodMt(); unsubBodMt = null; }
+  if (unsubBodAt) { unsubBodAt(); unsubBodAt = null; }
+
+    if (bodHead && bodBody) {
+    unsubBodM = db.collection('bodMembers').orderBy('name')
+      .onSnapshot(snap => {
+        BODM = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderBodGrid();
+      });
+
+    unsubBodMt = db.collection('bodMeetings').orderBy('date','desc')
+      .onSnapshot(snap => {
+        BODMEET = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderBodGrid();
+      });
+
+    unsubBodAt = db.collection('bodAttendance')
+      .onSnapshot(snap => {
+        const next = {};
+        snap.forEach(d => { next[d.id] = d.data() || {}; });
+        BODATT = next;
+        renderBodGrid();
+      });
+  }
+
+  // Default date = today
+  if (fineDate && !fineDate.value) {
+    fineDate.value = new Date().toISOString().slice(0,10);
+  }
+
+  const fSnap = await db.collection('fines').orderBy('date','desc').get();
+  FINES = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderFines();
 
 
 buildMonthFilterFromEvents();
@@ -77,6 +202,13 @@ buildMonthFilterFromEvents();
   attSnap.forEach(d => { ATT[d.id] = d.data() || {}; });
 
   renderGrid();
+
+  if (treBody) {
+  if (treDate && !treDate.value) treDate.value = new Date().toISOString().slice(0,10);
+  const tSnap = await db.collection('treasury').orderBy('date','desc').get();
+  TREAS = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderTreasurer();
+}
 }
 
 async function startAttendancePage() {
@@ -92,6 +224,12 @@ function attachRealtimeListeners() {
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
   if (unsubEvents)  { unsubEvents();  unsubEvents  = null; }
   if (unsubAtt)     { unsubAtt();     unsubAtt     = null; }
+  if (unsubFines) { unsubFines(); unsubFines = null; }
+  
+  unsubFines = db.collection('fines').orderBy('date', 'desc')
+    .onSnapshot((snap) => {
+      FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderFines();});
 
   // Members
   unsubMembers = db.collection('members').orderBy('name')
@@ -117,6 +255,17 @@ function attachRealtimeListeners() {
       ATT = next;
       renderGrid();
     });
+
+    // Treasurer realtime
+if (unsubTre) { unsubTre(); unsubTre = null; }
+if (treBody) {
+  unsubTre = db.collection('treasury').orderBy('date','desc')
+    .onSnapshot(snap => {
+      TREAS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderTreasurer();
+    });
+}
+
 }
 
 // Small helper used by both loadData() and realtime event updates
@@ -213,6 +362,233 @@ function renderGrid(){
   countBadge.textContent = `${members.length} members · ${events.length} events`;
 }
 
+function renderBodGrid(){
+  if (!bodHead || !bodBody) return;
+
+  // Header: first sticky col shows "Name / Position", then meeting columns
+  const headRow = document.createElement('tr');
+  headRow.innerHTML =
+    `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
+    BODMEET.map(mt => `
+      <th title="${mt.date || ''}">
+        <div class="ev-head">
+          <span>${mt.name || ''}</span>
+          <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
+        </div>
+      </th>
+    `).join('');
+  bodHead.innerHTML = '';
+  bodHead.appendChild(headRow);
+
+  // Body: each row is a BOD member (name + position + cells + % stat)
+  bodBody.innerHTML = '';
+  const total = BODMEET.length;
+
+  BODM.forEach(m => {
+    const tr = document.createElement('tr');
+    const att = BODATT[m.id] || {};
+
+    // count present across ALL visible meetings
+    let present = 0;
+    BODMEET.forEach(mt => { if (att[mt.id]) present++; });
+    const pct = total ? Math.round((present / total) * 100) : 0;
+
+    tr.innerHTML =
+      `
+      <td class="sticky-col">
+        <div class="mem-left">
+          <div class="stat-box" title="Across visible BOD meetings">
+            <span class="stat">All: ${present}/${total} · ${pct}%</span>
+          </div>
+          <div class="mem-cell">
+            <span>${(m.name || '')}</span>
+            <small style="opacity:.7; display:block">${(m.position || '')}</small>
+            <button class="icon-btn" title="Remove BOD" data-del-bod-member="${m.id}">🗑</button>
+          </div>
+        </div>
+      </td>
+      ` +
+      BODMEET.map(mt => {
+        const on = !!att[mt.id];
+        return `
+          <td data-bod-m="${m.id}" data-bod-meet="${mt.id}">
+            <button class="cell-btn ${on ? 'on' : 'off'}" aria-label="${on?'Present':'Absent'}"></button>
+          </td>`;
+      }).join('');
+
+    bodBody.appendChild(tr);
+  });
+
+  if (bodCountBadge) bodCountBadge.textContent = `${BODM.length} BOD · ${BODMEET.length} meetings`;
+}
+
+
+// Add BOD member
+if (bodAddMemberBtn) {
+  bodAddMemberBtn.addEventListener('click', async () => {
+    const name = (bodMemName?.value || '').trim();
+    const position = (bodMemPos?.value || '').trim();
+    if (!name) return;
+    try {
+      await db.collection('bodMembers').add({ name, position });
+      if (bodMemName) bodMemName.value = '';
+      if (bodMemPos)  bodMemPos.value  = '';
+    } catch (err) { alert('Failed to add BOD: ' + err.message); }
+  });
+}
+
+// Add BOD meeting
+if (bodAddMeetingBtn) {
+  bodAddMeetingBtn.addEventListener('click', async () => {
+    const name = (bodMeetName?.value || '').trim();
+    const date = (bodMeetDate?.value || '');
+    if (!name || !date) return;
+    try {
+      await db.collection('bodMeetings').add({ name, date });
+      if (bodMeetName) bodMeetName.value = '';
+      // keep date if you run multiple adds; comment out next line if you want sticky date
+      // if (bodMeetDate) bodMeetDate.value = '';
+    } catch (err) { alert('Failed to add meeting: ' + err.message); }
+  });
+}
+// Toggle BOD attendance & delete actions
+document.addEventListener('click', async (e) => {
+  // Delete BOD member
+  const delBodMem = e.target.closest('button[data-del-bod-member]');
+  if (delBodMem) {
+    const id = delBodMem.dataset.delBodMember;
+    const m  = BODM.find(x => x.id === id);
+    if (!confirm(`Remove BOD "${m?.name || id}"? This also deletes their BOD attendance.`)) return;
+    try {
+      await db.collection('bodMembers').doc(id).delete();
+      await db.collection('bodAttendance').doc(id).delete();
+    } catch (err) { alert('Failed to remove BOD: ' + err.message); }
+    return;
+  }
+
+  // Delete BOD meeting
+  const delBodMeet = e.target.closest('button[data-del-bod-meeting]');
+  if (delBodMeet) {
+    const id = delBodMeet.dataset.delBodMeeting;
+    const mt = BODMEET.find(x => x.id === id);
+    if (!confirm(`Delete meeting "${mt?.name || id}"? This removes it from all BOD attendance.`)) return;
+    try {
+      await db.collection('bodMeetings').doc(id).delete();
+      // remove this field from all bodAttendance docs
+      const snap = await db.collection('bodAttendance').get();
+      const batch = db.batch();
+      snap.forEach(doc => batch.update(doc.ref, { [id]: firebase.firestore.FieldValue.delete() }));
+      await batch.commit();
+    } catch (err) { alert('Failed to delete meeting: ' + err.message); }
+    return;
+  }
+
+  // Toggle BOD attendance
+  const btn = e.target.closest('td[data-bod-m][data-bod-meet] .cell-btn');
+  if (btn) {
+    const td = btn.closest('td');
+    const bodMemberId = td.dataset.bodM;
+    const meetingId   = td.dataset.bodMeet;
+
+    const isOn = btn.classList.toggle('on');
+    btn.classList.toggle('off', !isOn);
+    btn.setAttribute('aria-label', isOn ? 'Present' : 'Absent');
+
+    const ref = db.collection('bodAttendance').doc(bodMemberId);
+    await ref.set({ [meetingId]: isOn }, { merge: true });
+    BODATT[bodMemberId] = BODATT[bodMemberId] || {};
+    BODATT[bodMemberId][meetingId] = isOn;
+  }
+});
+
+
+
+
+function renderFines(){
+  if (!finesBody) return;
+  const mnames = membersMap();
+
+  let total = 0;
+  finesBody.innerHTML = FINES.map(f => {
+    const reasonLabel = (f.reason === 'missing_badge') ? 'Missing badge'
+                      : (f.reason === 'late') ? 'Late to event/meeting'
+                      : (f.reason || '');
+    const memberName = f.memberName || mnames[f.memberId] || f.memberId;
+    const dateStr    = (f.date || '').slice(0,10);
+    const amt        = Number(f.amount || 0);
+    total += Number.isFinite(amt) ? amt : 0;
+
+    return `
+      <tr>
+        <td>${(memberName || '').replace(/</g,'&lt;')}</td>
+        <td>₹ ${amt.toLocaleString()}</td>
+        <td>${reasonLabel}</td>
+        <td>${(f.eventName || '').replace(/</g,'&lt;')}</td>
+        <td>${dateStr}</td>
+        <td>
+          <button class="icon-btn" title="Delete fine" data-del-fine="${f.id}">🗑</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (finesBadge) finesBadge.textContent = `${FINES.length} records · ₹ ${total.toLocaleString()}`;
+}
+
+// Create fine
+if (fineForm) {
+  fineForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const memberId = fineMember.value;
+    const reason   = fineReason.value;
+    const eventName= fineEvent.value.trim();
+    const date     = fineDate.value;
+    const amount   = Number((fineAmount && fineAmount.value) || 0);
+
+    if (!memberId || !reason || !eventName || !date) return;
+    if (!Number.isFinite(amount) || amount < 0) { alert('Enter a valid amount (₹)'); return; }
+
+
+    // Resolve member name for convenience
+    const m = MEMBERS.find(x => x.id === memberId);
+    const memberName = m ? (m.name || '') : '';
+
+    const payload = {
+      memberId,
+      memberName,       // denormalized for simpler listings
+      reason,           // 'missing_badge' | 'late'
+      eventName,
+      date,
+      amount,             // 'YYYY-MM-DD'
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: (auth.currentUser && auth.currentUser.uid) || null
+    };
+
+    try {
+      await db.collection('fines').add(payload);
+      fineForm.reset();
+      // keep today as default after reset
+      fineDate.value = new Date().toISOString().slice(0,10);
+    } catch (err) {
+      alert('Failed to add fine: ' + err.message);
+    }
+  });
+}
+
+// Delete fine
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-del-fine]');
+  if (!btn) return;
+  const id = btn.dataset.delFine;
+  if (!confirm('Delete this fine record?')) return;
+  try {
+    await db.collection('fines').doc(id).delete();
+  } catch (err) {
+    alert('Failed to delete fine: ' + err.message);
+  }
+});
+
+
 /* ---------- Deletes & toggles ---------- */
 attHead.addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-del-event]');
@@ -238,6 +614,125 @@ attBody.addEventListener('click', async (e) => {
   ATT[memberId] = ATT[memberId] || {};
   ATT[memberId][eventId] = isOn;
 });
+
+/* ---------- Treasurer: render, add, delete, export ---------- */
+function renderTreasurer(){
+  if (!treBody) return;
+
+  let inc = 0, exp = 0;
+  treBody.innerHTML = (TREAS || []).map(t => {
+    const amt = Number(t.amount || 0);
+    if (t.type === 'income') inc += amt;
+    else if (t.type === 'expense') exp += amt;
+
+    const dateStr = (t.date || '').slice(0,10);
+    const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
+    return `
+      <tr>
+        <td>${(t.name || '').replace(/</g,'&lt;')}</td>
+        <td>${typeLabel}</td>
+        <td>₹ ${amt.toLocaleString()}</td>
+        <td>${dateStr}</td>
+        <td><button class="icon-btn" title="Delete entry" data-del-tre="${t.id}">🗑</button></td>
+      </tr>`;
+  }).join('');
+
+  const net = inc - exp;
+  if (treBadge) {
+    treBadge.textContent =
+      `${TREAS.length} records · ₹ ${inc.toLocaleString()} income · ₹ ${exp.toLocaleString()} expense · Net ₹ ${net.toLocaleString()}`;
+  }
+}
+
+// Add entry
+if (treAddBtn) {
+  treAddBtn.addEventListener('click', async () => {
+    const name   = (treName?.value || '').trim();
+    const type   = treType?.value || '';
+    const amount = Number(treAmount?.value || 0);
+    const date   = treDate?.value || '';
+
+    if (!name || !type || !date || !Number.isFinite(amount) || amount < 0) {
+      alert('Please fill Name, Type, Amount (>=0), Date'); return;
+    }
+
+    const payload = {
+      name, type, amount, date,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: (auth.currentUser && auth.currentUser.uid) || null
+    };
+
+    try {
+      await db.collection('treasury').add(payload);
+      if (treName)   treName.value = '';
+      if (treType)   treType.value = '';
+      if (treAmount) treAmount.value = '';
+      // keep date for convenience
+    } catch (err) {
+      alert('Failed to add entry: ' + err.message);
+    }
+  });
+}
+
+// Delete entry
+document.addEventListener('click', async (e) => {
+  const delBtn = e.target.closest('button[data-del-tre]');
+  if (!delBtn) return;
+  const id = delBtn.dataset.delTre;
+  if (!confirm('Delete this entry?')) return;
+  try {
+    await db.collection('treasury').doc(id).delete();
+  } catch (err) {
+    alert('Failed to delete entry: ' + err.message);
+  }
+});
+
+// Export to Excel (Treasury)
+function exportTreasuryToExcel(){
+  if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
+
+  const header = ['Name', 'Type', 'Amount (₹)', 'Date'];
+  const rows = (TREAS || []).map(t => [
+    t.name || '',
+    t.type === 'income' ? 'Income' : 'Expense',
+    Number(t.amount || 0),
+    (t.date || '').slice(0,10)
+  ]);
+
+  // Totals for a summary sheet
+  let inc = 0, exp = 0;
+  (TREAS || []).forEach(t => {
+    const amt = Number(t.amount || 0);
+    if (t.type === 'income') inc += amt; else exp += amt;
+  });
+  const net = inc - exp;
+
+  const ws1 = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws1['!freeze'] = { xSplit: 0, ySplit: 1 };
+  ws1['!cols'] = [{wch:30},{wch:12},{wch:14},{wch:12}];
+
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['Summary'],
+    ['Total Income (₹)', inc],
+    ['Total Expense (₹)', exp],
+    ['Net (₹)', net],
+  ]);
+  ws2['!cols'] = [{wch:22},{wch:16}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, 'Treasury');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  const dateTag = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `treasury_${dateTag}.xlsx`);
+}
+
+if (exportTreXlsxBtn) {
+  exportTreXlsxBtn.addEventListener('click', exportTreasuryToExcel);
+}
+
+
+
 
 /* ---------- Delete helpers ---------- */
 async function removeMember(memberId){
@@ -321,4 +816,110 @@ eventForm.addEventListener('submit', async (e) => {
     await loadData();
   }catch(err){ alert('Failed to add event: ' + err.message); }
 });
+
+function getFilteredMembersAndEvents(){
+  const memQuery = memberSearch.value.trim().toLowerCase();
+  const evQuery  = eventSearch.value.trim().toLowerCase();
+  const monthSel = monthFilter.value; // "" or YYYY-MM
+
+  const members = MEMBERS.filter(m => (m.name || '').toLowerCase().includes(memQuery));
+
+  let events = EVENTS.filter(e => (e.name || '').toLowerCase().includes(evQuery));
+  if (monthSel) events = events.filter(e => (e.date || '').startsWith(monthSel));
+
+  return { members, events };
+}
+
+function exportAttendanceToExcel(){
+  if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
+
+  const { members, events } = getFilteredMembersAndEvents();
+
+  // Header row
+  const header = ['Member \\ Event', ...events.map(e => e.name || '')];
+
+  // Rows
+  const rows = members.map(m => {
+    const attForMember = ATT[m.id] || {};
+    const cells = events.map(e => {
+      const on = !!attForMember[e.id];
+      // Use tick/cross; you can switch to 1/0 by returning on ? 1 : 0
+      return on ? 'P' : 'A';
+    });
+    return [m.name || '', ...cells];
+  });
+
+  const aoa = [header, ...rows];
+
+  // Create workbook
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Auto column widths (simple heuristic)
+  const colWidths = header.map((h, idx) => {
+    const maxLen = Math.max(
+      String(h).length,
+      ...rows.map(r => String(r[idx] ?? '').length)
+    );
+    return { wch: Math.min(Math.max(maxLen + 2, 8), 40) };
+  });
+  ws['!cols'] = colWidths;
+
+  // Freeze header row + first col
+  ws['!freeze'] = { xSplit: 1, ySplit: 1 };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+
+  const dateTag = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  XLSX.writeFile(wb, `attendance_${dateTag}.xlsx`);
+}
+
+if (exportXlsxBtn) {
+  exportXlsxBtn.addEventListener('click', exportAttendanceToExcel);
+}
+
+function exportBodAttendanceToExcel(){
+  if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
+
+  // Header: first col label, then all meetings
+  const header = [
+    'BOD (Name / Position)',
+    ...BODMEET.map(mt => {
+      const d = (mt.date || '').slice(0,10);
+      return d ? `${mt.name || ''} (${d})` : (mt.name || '');
+    })
+  ];
+
+  // Rows: BODM order; cells are P/A
+  const rows = BODM.map(m => {
+    const att = BODATT[m.id] || {};
+    const cells = BODMEET.map(mt => (att[mt.id] ? 'P' : 'A'));
+    const namePos = `${m.name || ''}${m.position ? ' — ' + m.position : ''}`;
+    return [namePos, ...cells];
+  });
+
+  const aoa = [header, ...rows];
+
+  // Sheet + widths + freeze panes
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const colWidths = header.map((h, idx) => {
+    const maxLen = Math.max(
+      String(h).length,
+      ...rows.map(r => String(r[idx] ?? '').length)
+    );
+    return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
+  });
+  ws['!cols'] = colWidths;
+  ws['!freeze'] = { xSplit: 1, ySplit: 1 };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'BOD Attendance');
+
+  const dateTag = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `bod_attendance_${dateTag}.xlsx`);
+}
+
+if (exportBodXlsxBtn) {
+  exportBodXlsxBtn.addEventListener('click', exportBodAttendanceToExcel);
+}
 

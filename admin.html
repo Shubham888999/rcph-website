@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>RCPH • Attendance Manager</title>
 
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="stylesheet" href="mobile.css" media="only screen and (max-width: 768px)"/>
+  <link rel="stylesheet" href="style.css?v=7"/>
+  <link rel="stylesheet" href="mobile.css?v=7" media="only screen and (max-width: 768px)"/>
 
   <style>
     /* page shell */
@@ -65,8 +65,19 @@
   </style>
 </head>
 <body>
+  <nav class="admin-nav">
+  <div class="admin-nav__inner">
+    <a href="index.html">Home</a>
+    <a href="#attendance">Attendance Manager</a>
+    <a href="#bod">BOD Attendance</a>
+    <a href="#fines">Fines</a>
+    <a href="#treasurer">Treasurer Panel</a>
+    <a href="login.html">Logout</a>
+  </div>
+</nav>
   <div class="admin-wrap">
-    <div class="admin-card">
+    <div class="admin-card" id="attendance">
+      <h1 class="admin-title">Admin Panel</h1>
       <div class="topbar">
         <h2>Attendance Manager <span id="countBadge" class="badge"></span></h2>
         <button id="signOutBtn" class="btn btn-outline">Sign out</button>
@@ -80,6 +91,8 @@
         </select>
         <button id="addEventBtn" class="btn btn-outline">Add Event</button>
         <button id="addMemberBtn" class="btn btn-outline">Add Member</button>
+        <span class="flex-1"></span>
+        <button id="exportXlsxBtn" class="btn">Export to Excel</button>
       </div>
 
       <div class="grid-wrap">
@@ -89,6 +102,111 @@
         </table>
       </div>
     </div>
+
+    <!-- ========= BOD Attendance ========= -->
+<div class="admin-card" id="bod" style="margin-top:20px;">
+  <div class="topbar">
+    <h2>BOD Attendance <span id="bodCountBadge" class="badge"></span></h2>
+  </div>
+
+  <!-- BOD toolbar: add member + add meeting -->
+  <div class="toolbar">
+    <!-- Add BOD member -->
+    <input id="bodMemName" type="text" placeholder="BOD name (e.g., John Doe)" />
+    <input id="bodMemPos"  type="text" placeholder="Position (e.g., President)" />
+    <button id="bodAddMemberBtn" class="btn btn-outline">Add BOD</button>
+
+    <!-- Add BOD meeting -->
+    <input id="bodMeetName" type="text" placeholder="BOD Meeting # / Name (e.g., BOD 1)" />
+    <input id="bodMeetDate" type="date" />
+    <button id="bodAddMeetingBtn" class="btn btn-outline">Add Meeting</button>
+    <span class="flex-1"></span>
+    <button id="exportBodXlsxBtn" class="btn">Export to Excel</button>
+  </div>
+
+  <div class="grid-wrap">
+    <table class="att">
+      <thead id="bodHead"></thead>
+      <tbody id="bodBody"></tbody>
+    </table>
+  </div>
+</div>
+
+
+    <div class="admin-card" id="fines" style="margin-top:20px;">
+  <div class="topbar">
+    <h2>Sergeant-at-Arms: Fines <span id="finesBadge" class="badge"></span></h2>
+  </div>
+
+  <form id="fineForm" class="toolbar" autocomplete="off">
+    <select id="fineMember" required title="Member"></select>
+    <select id="fineReason" required title="Reason">
+      <option value="" disabled selected>Reason…</option>
+      <option value="missing_badge">Missing badge</option>
+      <option value="late">Late to event/meeting</option>
+    </select>
+    <input id="fineEvent" type="text" placeholder="Event / Meeting name" required />
+    <input id="fineDate" type="date" required />
+    <input id="fineAmount" type="number" inputmode="numeric" min="0" step="1" placeholder="Amount (₹)" required />
+    <button type="submit" class="btn">Add Fine</button>
+  </form>
+
+  <!-- ⬇️ Add this list block -->
+  <div class="grid-wrap">
+    <table class="att">
+      <thead>
+        <tr>
+          <th style="min-width:180px">Member</th>
+          <th style="min-width:120px">Amount (₹)</th> <!-- NEW -->
+          <th style="min-width:160px">Reason</th>
+          <th style="min-width:220px">Event / Meeting</th>
+          <th style="min-width:140px">Date</th>
+          <th style="min-width:110px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="finesBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========= Treasurer Panel ========= -->
+<div class="admin-card" id="treasurer" style="margin-top:20px;">
+  <div class="topbar">
+    <h2>Treasurer <span id="treBadge" class="badge"></span></h2>
+  </div>
+
+  <div class="toolbar">
+    <input id="treName" type="text" placeholder="Transaction name (e.g., T-shirt sales)" />
+    <select id="treType" title="Type">
+      <option value="" disabled selected>Type…</option>
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+    </select>
+    <input id="treAmount" type="number" inputmode="numeric" min="0" step="1" placeholder="Amount (₹)" />
+    <input id="treDate" type="date" />
+    <button id="treAddBtn" class="btn btn-outline">Add Entry</button>
+
+    <span class="flex-1"></span>
+    <button id="exportTreXlsxBtn" class="btn">Export to Excel</button>
+  </div>
+
+  <div class="grid-wrap">
+    <table class="att">
+      <thead>
+        <tr>
+          <th style="min-width:240px">Name</th>
+          <th style="min-width:120px">Type</th>
+          <th style="min-width:120px">Amount (₹)</th>
+          <th style="min-width:140px">Date</th>
+          <th style="min-width:110px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="treBody"></tbody>
+    </table>
+  </div>
+</div>
+
+
   </div>
 
   <!-- Add / Edit Modal -->
@@ -99,6 +217,8 @@
         <button class="adm-close" id="admClose" aria-label="Close">×</button>
       </div>
 
+
+      
       <!-- MEMBER FORM -->
       <form id="memberForm" class="adm-form" autocomplete="off" hidden>
         <label class="adm-field">
@@ -157,7 +277,7 @@
 
 <!-- Your init (must come AFTER the SDKs) -->
 <script src="firebase-init.js"></script>
-
-  <script src="admin.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="admin.js?v=7"></script>
 </body>
 </html>

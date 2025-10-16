@@ -18,6 +18,11 @@ const filterAvenue = document.getElementById('filterAvenue');
 const countPill    = document.getElementById('countPill');
 const statusEl     = document.getElementById('status');
 
+const drivePrev   = document.getElementById('drivePreview');
+const driveIdOut  = document.getElementById('driveIdOut');
+const driveOpenOut= document.getElementById('driveOpenOut');
+
+
 /* ---------- Auth guard ---------- */
 auth.onAuthStateChanged(async (user) => {
   if (!user) { location.href = 'login.html'; return; }
@@ -42,6 +47,24 @@ if (signOutBtn) {
     location.href = 'login.html';
   };
 }
+
+if (driveInput) {
+  const updateDrivePreview = () => {
+    const v = (driveInput.value || '').trim();
+    const m = v.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if (m) {
+      const id = m[1];
+      if (driveIdOut)  driveIdOut.textContent = id;
+      if (driveOpenOut) driveOpenOut.href = `https://drive.google.com/drive/folders/${id}`;
+      if (drivePrev) drivePrev.hidden = false;
+    } else {
+      if (drivePrev) drivePrev.hidden = true;
+    }
+  };
+  driveInput.addEventListener('input', updateDrivePreview);
+  driveInput.addEventListener('change', updateDrivePreview);
+}
+
 
 /* ---------- Submit (no uploads) ---------- */
 if (form) {

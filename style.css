@@ -1465,3 +1465,53 @@ table.att{ min-width: 100%; width: max-content; } /* already present */
 .cell-btn.off::before {
   background-image: url("images/cross.png");
 }
+.back-btn {
+  margin-top: 15px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: transparent;
+  color: #5dc6c8; /* teal accent, matches your login button */
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background-color: rgba(93, 198, 200, 0.15);
+  color: #76e0e2;
+}
+
+/* Admin big title */
+.admin-title{
+  text-align:center;
+  font-family:'Montserrat', sans-serif;
+  font-weight:900;
+  margin: 0 0 16px;
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  color: var(--color-accent);
+}
+
+/* sticky admin nav (teal like homepage) */
+.admin-nav{
+  position: sticky; top: 0; z-index: 1000;
+  background: var(--color-accent,#60C3C4);
+  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+}
+.admin-nav__inner{
+  max-width: 1200px; margin: 0 auto; padding: 10px 16px;
+  display: flex; gap: clamp(16px, 5vw, 56px); align-items: center;
+  overflow-x: auto;
+}
+.admin-nav a{
+  color: #fff; text-decoration: none; font-weight: 700;
+  white-space: nowrap; opacity: .95;
+}
+.admin-nav a:hover{ opacity: 1; text-decoration: underline; }
+
+/* smooth scroll for in-page anchors */
+html{ scroll-behavior: smooth; }
+
+.flex-1 { flex: 1 1 auto; }
