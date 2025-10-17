@@ -13,6 +13,28 @@
     <input id="password" type="password" placeholder="Password"
            style="width:100%;padding:10px;margin:.5rem 0;border-radius:8px;border:1px solid #2e2e2e;background:#101010;color:#fff;">
     <button id="loginBtn" class="btn" style="width:100%;margin-top:.5rem;">Login</button>
+    <div style="margin-top:8px; text-align:right;">
+  <button id="forgotBtn" class="btn btn-outline" style="padding:6px 10px;">Forgot password?</button>
+</div>
+
+<!-- ▼▼▼ NEW FORM LINKS SECTION -->
+<div style="margin-top:20px; padding:10px; border-top:1px solid #333;">
+  <p style="margin:8px 0 4px; font-size:14px; color:#ddd; font-weight:500;">💰 Reimbursement Form</p>
+  <a href="https://docs.google.com/forms/d/e/1FAIpQLSe5OXooAMkyD35Dl0KtRElDmwi1MMXd-ANHHJ4Z8ozp6NziZg/viewform?usp=header"
+     target="_blank"
+     style="display:inline-block; color:#6be0dc; font-size:13px; text-decoration:underline;">
+    Open Google Form
+  </a>
+
+  <p style="margin:16px 0 4px; font-size:14px; color:#ddd; font-weight:500;">⚠️ Fine Repayment</p>
+  <a href="https://docs.google.com/forms/d/e/1FAIpQLSc-KbmpxbB1k6KoML3HNh5oVrqDSzU_WZExhAF6wwGgnKoxEg/viewform?usp=header"
+     target="_blank"
+     style="display:inline-block; color:#6be0dc; font-size:13px; text-decoration:underline;">
+    Open Google Form
+  </a>
+</div>
+<!-- ▲▲▲ END NEW FORM LINKS SECTION -->
+
     <p id="authError" style="color:#ff6b6b;margin-top:10px;min-height:1.2em;"></p>
 
     <!-- ▼▼▼ ADD THIS: panel chooser (hidden by default; shown for admins) -->
@@ -100,6 +122,17 @@ auth.onAuthStateChanged(async (user) => {
         showError(e.message);
       }
     };
+
+    document.getElementById('forgotBtn').onclick = async () => {
+  const email = document.getElementById('email').value.trim();
+  if (!email) { showError('Enter your email first.'); return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showError('Reset link sent. Check your inbox.');
+  } catch (e) {
+    showError(e.message || 'Could not send reset email.');
+  }
+};
 
     function showError(msg){ document.getElementById('authError').textContent = msg || ""; }
   </script>
