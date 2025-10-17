@@ -13,9 +13,33 @@
     <input id="password" type="password" placeholder="Password"
            style="width:100%;padding:10px;margin:.5rem 0;border-radius:8px;border:1px solid #2e2e2e;background:#101010;color:#fff;">
     <button id="loginBtn" class="btn" style="width:100%;margin-top:.5rem;">Login</button>
+
+    <button id="googleBtn" class="btn" style="width:100%;margin-top:.5rem;">
+  Continue with Google
+</button>
     <div style="margin-top:8px; text-align:right;">
   <button id="forgotBtn" class="btn btn-outline" style="padding:6px 10px;">Forgot password?</button>
 </div>
+
+<!-- Add under the "Forgot password?" button -->
+<div id="otpBox" style="margin-top:14px; border-top:1px solid #333; padding-top:12px; display:none;">
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input id="otpEmail" type="email" placeholder="Email for OTP"
+      style="flex:2; padding:10px; border-radius:8px; border:1px solid #2e2e2e; background:#101010; color:#fff;">
+    <button id="otpSend" class="btn btn-outline">Get code</button>
+  </div>
+
+  <div id="otpStep2" style="display:none; margin-top:10px;">
+    <input id="otpCode" type="text" placeholder="Enter 6-digit code"
+      style="width:160px; padding:10px; margin-right:8px; border-radius:8px; border:1px solid #2e2e2e; background:#101010; color:#fff;">
+    <input id="otpNewPass" type="password" placeholder="New password"
+      style="width:220px; padding:10px; margin-right:8px; border-radius:8px; border:1px solid #2e2e2e; background:#101010; color:#fff;">
+    <button id="otpConfirm" class="btn">Set password</button>
+  </div>
+
+  <p id="otpMsg" style="color:#ccc; margin-top:8px;"></p>
+</div>
+
 
 <!-- ▼▼▼ NEW FORM LINKS SECTION -->
 <div style="margin-top:20px; padding:10px; border-top:1px solid #333;">
@@ -55,6 +79,48 @@
 
   <!-- Your init (must come AFTER the SDKs) -->
   <script src="firebase-init.js"></script>
+  <script>
+  // Show OTP box instead of the default link flow (optional: toggle via a small text link)
+  document.getElementById('forgotBtn').onclick = () => {
+    document.getElementById('otpBox').style.display = 'block';
+  };
+
+  async function callFn(name, data) {
+    const fn = firebase.app().functions ? firebase.functions() : firebase.app().functions();
+    return fn.httpsCallable(name)(data).then(r => r.data);
+  }
+
+  const otpSend = document.getElementById('otpSend');
+  const otpConfirm = document.getElementById('otpConfirm');
+  const otpMsg = document.getElementById('otpMsg');
+
+  otpSend.onclick = async () => {
+    const email = document.getElementById('otpEmail').value.trim();
+    if (!email) { otpMsg.textContent = 'Enter your email.'; return; }
+    otpMsg.textContent = 'Sending code…';
+    try {
+      await callFn('requestPasswordOtp', { email });
+      otpMsg.textContent = 'Code sent! Check your inbox.';
+      document.getElementById('otpStep2').style.display = 'block';
+    } catch (e) {
+      otpMsg.textContent = e.message || 'Failed to send code.';
+    }
+  };
+
+  otpConfirm.onclick = async () => {
+    const email = document.getElementById('otpEmail').value.trim();
+    const otp   = document.getElementById('otpCode').value.trim();
+    const newPw = document.getElementById('otpNewPass').value;
+    if (!email || !otp || !newPw) { otpMsg.textContent = 'Fill all fields.'; return; }
+    otpMsg.textContent = 'Verifying…';
+    try {
+      await callFn('resetPasswordWithOtp', { email, otp, newPassword: newPw });
+      otpMsg.textContent = 'Password updated! You can login now.';
+    } catch (e) {
+      otpMsg.textContent = e.message || 'Failed to reset.';
+    }
+  };
+</script>
 
   <!-- ▼▼▼ REPLACE your <script> with this one -->
   <script>
@@ -123,6 +189,19 @@ auth.onAuthStateChanged(async (user) => {
       }
     };
 
+document.getElementById('googleBtn').onclick = async () => {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      // Optional: force account picker each time:
+      // provider.setCustomParameters({ prompt: 'select_account' });
+
+      const cred = await auth.signInWithPopup(provider);
+      await afterGoogleSignIn(cred.user); // see next section
+    } catch (e) {
+      document.getElementById('authError').textContent = e.message || 'Google sign-in failed.';
+    }
+  };
+    
     document.getElementById('forgotBtn').onclick = async () => {
   const email = document.getElementById('email').value.trim();
   if (!email) { showError('Enter your email first.'); return; }
