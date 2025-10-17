@@ -14,39 +14,77 @@
            style="width:100%;padding:10px;margin:.5rem 0;border-radius:8px;border:1px solid #2e2e2e;background:#101010;color:#fff;">
     <button id="loginBtn" class="btn" style="width:100%;margin-top:.5rem;">Login</button>
     <p id="authError" style="color:#ff6b6b;margin-top:10px;min-height:1.2em;"></p>
+
+    <!-- ▼▼▼ ADD THIS: panel chooser (hidden by default; shown for admins) -->
+    <div id="panelChooser" style="display:none;max-width:420px;margin:1rem 0 0;padding:12px;border:1px solid #2e2e2e;border-radius:12px;background:#161616">
+      <p style="margin:.25rem 0 1rem 0">Where do you want to go?</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="admin.html" class="btn" style="flex:1;text-align:center">Admin Panel</a>
+        <a href="bodlogin.html" class="btn btn-outline" style="flex:1;text-align:center">BOD Panel</a>
+      </div>
+    </div>
+    <!-- ▲▲▲ END chooser -->
   </div>
 
-<!-- Firebase SDKs (CDN) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- Firebase SDKs (CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-<!-- Your init (must come AFTER the SDKs) -->
-<script src="firebase-init.js"></script>
+  <!-- Your init (must come AFTER the SDKs) -->
+  <script src="firebase-init.js"></script>
 
+  <!-- ▼▼▼ REPLACE your <script> with this one -->
   <script>
-    // If already signed in, route immediately
-    auth.onAuthStateChanged(async (user) => {
-      if (!user) return;
-      routeByRole(user);
-    });
+    // use the instances from firebase-init.js
+    const auth = window.auth;
+    const db   = window.db;
 
+    // already signed in? route
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return; // no one signed in yet — stay on login screen
+  // Wait until login button explicitly triggers route
+});
     async function routeByRole(user){
       try {
         const snap = await db.collection('roles').doc(user.uid).get();
         if (!snap.exists || !snap.data().role) {
-          // No role set -> sign out and show message
           await auth.signOut();
           showError("No role set for this user. Contact admin.");
           return;
         }
-        const role = String(snap.data().role).toLowerCase();
-        if (role === 'admin') window.location.href = 'admin.html';
-        else if (role === 'bod') window.location.href = 'bodlogin.html';
-        else {
-          await auth.signOut();
-          showError(`Unknown role "${role}". Contact admin.`);
+
+        const role = String(snap.data().role || '').toLowerCase();
+
+        // Optional: respect deep link like ?dest=admin or ?dest=bod
+        const destParam = new URLSearchParams(location.search).get('dest');
+        if (destParam === 'admin') { location.href = 'admin.html'; return; }
+        if (destParam === 'bod')   { location.href = 'bodlogin.html'; return; }
+
+        // Optional: remember choice
+        const preferred = localStorage.getItem('preferredPanel');
+        if (role === 'admin' && (preferred === 'admin' || preferred === 'bod')) {
+          location.href = preferred === 'admin' ? 'admin.html' : 'bodlogin.html';
+          return;
         }
+
+        if (role === 'admin') {
+          // show chooser for admins instead of auto-redirect
+          document.getElementById('panelChooser').style.display = 'block';
+
+          // If you want "remember my choice", you can add a checkbox and set localStorage here.
+          // Example: localStorage.setItem('preferredPanel', 'admin' or 'bod') when clicking a link.
+          return;
+        }
+
+        if (role === 'bod') {
+          location.href = 'bodlogin.html';
+          return;
+        }
+
+        // Unknown role
+        await auth.signOut();
+        showError(`Unknown role "${role}". Contact admin.`);
       } catch (e) {
         showError(e.message || "Could not read role.");
       }
@@ -65,5 +103,6 @@
 
     function showError(msg){ document.getElementById('authError').textContent = msg || ""; }
   </script>
+  <!-- ▲▲▲ END script -->
 </body>
 </html>

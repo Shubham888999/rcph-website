@@ -67,10 +67,11 @@ auth.onAuthStateChanged(async (user) => {
 
   try {
     const r = await db.collection('roles').doc(user.uid).get();
-    if (!r.exists || String(r.data().role || '').toLowerCase() !== 'bod') {
-      location.href = 'admin.html';
-      return;
-    }
+    const role = r.exists ? String(r.data().role || '').toLowerCase() : '';
+if (role !== 'bod' && role !== 'admin') {   // only kick out if neither
+  location.href = 'login.html';
+  return;
+}
     if (whoami) whoami.textContent = `Signed in as ${user.email || 'BOD'}`;
   } catch {
     if (whoami) whoami.textContent = 'Signed in';
