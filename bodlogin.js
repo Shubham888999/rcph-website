@@ -191,100 +191,44 @@ async function loadItems() {
     id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.() || null
   }));
 
-  buildMonthFilter(all);
-
-  // filters
-  let rows = all;
-  const av = (filterAvenue?.value || '');
-  const ym = (filterMonth?.value   || '');
-  const mine = !!(filterMine?.checked);
-  const q   = (filterSearch?.value || '').trim().toLowerCase();
-
-  if (av) rows = rows.filter(x => (x.avenue || '') === av);
-  if (ym) rows = rows.filter(x => (x.eventDate || '').startsWith(ym));
-  if (mine && user) rows = rows.filter(x => (x.createdBy || '') === user.uid);
-  if (q) {
-    rows = rows.filter(x => (x.name||'').toLowerCase().includes(q) || (x.description||'').toLowerCase().includes(q));
-  }
-
-  FILTERED_SUBS = rows.slice();
-
-  // render
-  itemsEl.innerHTML = '';
-  if (!rows.length){
-    itemsEl.innerHTML = `<div class="item" style="text-align:center; opacity:.8">No submissions found.</div>`;
-  }
-
-  rows.forEach(r => {
-    const createdStr = r.createdAt ? r.createdAt.toLocaleString() : '';
-    const driveLink = r.driveFolderId
-      ? `https://drive.google.com/drive/folders/${r.driveFolderId}`
-      : (r.driveFolder || '');
-    const driveHtml = driveLink ? `<div class="drive-preview" style="margin-top:6px">
-      <a class="pill" href="${driveLink}" target="_blank" rel="noopener">Open Drive folder</a>
-    </div>` : '';
-
-    const niceEventDate = r.eventDate ? new Date(`${r.eventDate}T00:00:00`).toLocaleDateString() : '';
-    const niceEventTime = r.eventTime ? ` • ${r.eventTime}` : '';
-    const byLine        = r.conductedBy ? ` • by ${escapeHtml(r.conductedBy)}` : '';
-    const metaLine = (niceEventDate || r.eventTime || r.conductedBy)
-      ? `<div style="opacity:.85;margin:4px 0">${niceEventDate}${niceEventTime}${byLine}</div>`
-      : '';
-
-    const canDelete = (user && (user.uid === r.createdBy)) || false; // admin can also delete per rules; leave client-side conservative
-
-    const card = document.createElement('div');
-    card.className = 'item';
-    card.innerHTML = `
-      <div style="display:flex; align-items:center; gap:8px; justify-content:space-between">
-        <div class="pill">${escapeHtml(r.avenue || '')}</div>
-        <div style="display:flex; gap:8px; align-items:center">
-          <span class="badge" title="Created">${createdStr || ''}</span>
-          ${canDelete ? `<button class="btn btn-outline" data-del="${r.id}"><i class="fa-regular fa-trash-can"></i></button>` : ''}
-        </div>
-      </div>
-      <h4 style="margin:6px 0 4px">${escapeHtml(r.name || '')}</h4>
-      ${metaLine}
-      <div style="opacity:.9">${escapeHtml(r.description || '')}</div>
-      ${driveHtml}
-    `;
-    itemsEl.appendChild(card);
-  });
-
-  if (countPill) countPill.textContent = `${rows.length} item${rows.length === 1 ? '' : 's'}`;
-  updateBodKpis(rows);  
-}
-
-
-// Simple HTML escaper (keep this if you don't already have one)
+// Keep just one escapeHtml
 function escapeHtml(s = '') {
   return s.replace(/[&<>"']/g, m => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[m]));
 }
 
-
-function escapeHtml(s=''){
-  return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
+// ---- Month filter builder (top-level) ----
 function buildMonthFilter(items){
   if (!filterMonth) return;
   const months = new Set();
 
+  items.forEach(e => {
+    const dStr = e.eventDate || '';
+    if (dStr && dStr.length >= 7) months.add(dStr.slice(0,7)); // YYYY-MM
+  });
+
+  const sorted = Array.from(months).sort().reverse();
+  const current = filterMonth.value;
+  filterMonth.innerHTML = `<option value="">All</option>` + sorted.map(ym => {
+    const [y,m] = ym.split('-').map(Number);
+    const label = new Date(y, m - 1).toLocaleString(undefined, { month:'long', year:'numeric' });
+    return `<option value="${ym}">${label}</option>`;
+  }).join('');
+
+  if (current && sorted.includes(current)) filterMonth.value = current;
+}
+
+// ---- KPI painter (top-level) ----
 function updateBodKpis(rows = []) {
-  // Totals
+  // totals
   const total = rows.length;
 
-  // This month (YYYY-MM)
+  // this month (YYYY-MM)
   const ymNow = new Date().toISOString().slice(0, 7);
   const thisMonth = rows.filter(r => (r.eventDate || '').startsWith(ymNow)).length;
 
-  // Per-avenue counts
+  // by avenue
   const ORDER = ['ISD','CMD','CSD','PDD','RRRO','PRO','DEI','GBM'];
   const aveCounts = Object.fromEntries(ORDER.map(a => [a, 0]));
   rows.forEach(r => {
@@ -292,19 +236,16 @@ function updateBodKpis(rows = []) {
     if (aveCounts[a] !== undefined) aveCounts[a]++;
   });
 
-  // Top conductors
+  // top conductors
   const who = {};
   rows.forEach(r => {
     const c = (r.conductedBy || '').trim();
     if (c) who[c] = (who[c] || 0) + 1;
   });
-  const top = Object.entries(who)
-    .sort((a,b) => b[1] - a[1])
-    .slice(0,3)
-    .map(([name, n]) => `${name} (${n})`)
-    .join(', ') || '—';
+  const top = Object.entries(who).sort((a,b) => b[1] - a[1]).slice(0,3)
+               .map(([name, n]) => `${name} (${n})`).join(', ') || '—';
 
-  // Paint
+  // paint
   const elTotal = document.getElementById('kpiTotal');
   const elMonth = document.getElementById('kpiThisMonth');
   const elTop   = document.getElementById('kpiTopConductors');
@@ -315,13 +256,14 @@ function updateBodKpis(rows = []) {
   if (elTop)   elTop.textContent   = top;
 
   if (elAve) {
-    elAve.innerHTML = ORDER.map(a => {
-      return `<span class="pill" style="background:#132224;border-color:#24494d;color:#d7f3f5">
-        ${a} <strong style="margin-left:4px">${aveCounts[a]}</strong>
-      </span>`;
-    }).join('');
+    elAve.innerHTML = ORDER.map(a =>
+      `<span class="pill" style="background:#132224;border-color:#24494d;color:#d7f3f5">
+         ${a} <strong style="margin-left:4px">${aveCounts[a]}</strong>
+       </span>`
+    ).join('');
   }
 }
+
 
 
   items.forEach(e => {
