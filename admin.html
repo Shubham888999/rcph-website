@@ -62,6 +62,48 @@
     .adm-field input,.adm-field textarea{background:#101010; color:#fff; border:1px solid var(--color-border,#2e2e2e); border-radius:8px; padding:10px}
     .adm-chips{display:flex; flex-wrap:wrap; gap:10px}
     .adm-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:4px}
+
+    .kpi {
+  background:#151515; border:1px solid var(--color-border,#2e2e2e);
+  border-radius:10px; padding:10px 12px; min-width:140px
+}
+.kpi-label { font-size:12px; color:#9aa; margin-bottom:6px }
+.kpi-value { font-size:20px; font-weight:800 }
+
+.admin-nav{
+  position: sticky; top: 0; z-index: 1000;
+  background: rgba(20,20,20,.85);
+  backdrop-filter: saturate(120%) blur(6px);
+  border-bottom: 1px solid var(--color-border,#2e2e2e);
+}
+.admin-nav__inner{
+  max-width: 1200px; margin: 0 auto; padding: 10px 16px;
+  display:flex; gap:22px; align-items:center; flex-wrap:wrap;
+}
+.admin-nav__inner a{
+  color:#e8f7f7; text-decoration:none; font-weight:600; padding:6px 8px; border-radius:8px;
+}
+.admin-nav__inner a:hover{ background:#0e3f41; }
+
+.chart-wrap{
+  height: 220px;               /* control actual chart height */
+  background: #121212;         /* dark so it blends with theme */
+  border: 1px solid var(--color-border,#2e2e2e);
+  border-radius: 10px;
+  padding: 8px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+}
+.chart-wrap > canvas{
+  width: 100% !important;
+  height: 100% !important;     /* fill wrapper height */
+  display: block;              /* removes inline gaps */
+  background: transparent;
+}
+
+
+
+
   </style>
 </head>
 <body>
@@ -94,6 +136,15 @@
         <span class="flex-1"></span>
         <button id="exportXlsxBtn" class="btn">Export to Excel</button>
       </div>
+      
+      <div class="toolbar" id="attKPIs" style="gap:14px; align-items:flex-end">
+  <div class="kpi"><div class="kpi-label">Avg attendance</div><div class="kpi-value" id="attAvg">–</div></div>
+  <div class="kpi"><div class="kpi-label">Events (filtered)</div><div class="kpi-value" id="attEvtCount">–</div></div>
+  <div class="kpi"><div class="kpi-label">Top attendees</div><div class="kpi-value" id="attTop">–</div></div>
+</div>
+<div class="chart-wrap">
+  <canvas id="attChart"></canvas>
+</div>
 
       <div class="grid-wrap">
         <table class="att">
@@ -110,19 +161,28 @@
   </div>
 
   <!-- BOD toolbar: add member + add meeting -->
-  <div class="toolbar">
-    <!-- Add BOD member -->
-    <input id="bodMemName" type="text" placeholder="BOD name (e.g., John Doe)" />
-    <input id="bodMemPos"  type="text" placeholder="Position (e.g., President)" />
-    <button id="bodAddMemberBtn" class="btn btn-outline">Add BOD</button>
-
-    <!-- Add BOD meeting -->
+<!-- BOD toolbar: inputs only -->
+<div class="toolbar">
+  <!-- Add BOD meeting -->
+  <input id="bodMeetDate" type="date" />
     <input id="bodMeetName" type="text" placeholder="BOD Meeting # / Name (e.g., BOD 1)" />
-    <input id="bodMeetDate" type="date" />
     <button id="bodAddMeetingBtn" class="btn btn-outline">Add Meeting</button>
-    <span class="flex-1"></span>
-    <button id="exportBodXlsxBtn" class="btn">Export to Excel</button>
-  </div>
+  <!-- Add BOD member -->
+  <input id="bodMemName" type="text" placeholder="BOD name (e.g., John Doe)" />
+  <input id="bodMemPos"  type="text" placeholder="Position (e.g., President)" />
+  <button id="bodAddMemberBtn" class="btn btn-outline">Add BOD</button>
+  <span class="flex-1"></span>
+  <button id="exportBodXlsxBtn" class="btn">Export to Excel</button>
+</div>
+
+<!-- KPIs + chart on their own row -->
+<div class="toolbar" id="bodKPIs" style="gap:14px; align-items:flex-end">
+  <div class="kpi"><div class="kpi-label">Avg BOD %</div><div class="kpi-value" id="bodAvg">–</div></div>
+  <div class="kpi"><div class="kpi-label">Meetings</div><div class="kpi-value" id="bodMeetCount">–</div></div>
+</div>
+<div class="chart-wrap">
+  <canvas id="bodChart"></canvas>
+</div>
 
   <div class="grid-wrap">
     <table class="att">
@@ -137,6 +197,11 @@
   <div class="topbar">
     <h2>Sergeant-at-Arms: Fines <span id="finesBadge" class="badge"></span></h2>
   </div>
+  <div class="toolbar" id="finesKPIs" style="gap:14px; align-items:flex-end">
+  <div class="kpi"><div class="kpi-label">Total fines</div><div class="kpi-value" id="finesTotal">–</div></div>
+  <div class="kpi"><div class="kpi-label">This month</div><div class="kpi-value" id="finesMonth">–</div></div>
+</div>
+
 
   <form id="fineForm" class="toolbar" autocomplete="off">
     <select id="fineMember" required title="Member"></select>
@@ -176,6 +241,15 @@
   </div>
 
   <div class="toolbar">
+    <div class="toolbar" id="treKPIs" style="gap:14px; align-items:flex-end">
+  <div class="kpi"><div class="kpi-label">Income</div><div class="kpi-value" id="treInc">–</div></div>
+  <div class="kpi"><div class="kpi-label">Expense</div><div class="kpi-value" id="treExp">–</div></div>
+  <div class="kpi"><div class="kpi-label">Net</div><div class="kpi-value" id="treNet">–</div></div>
+</div>
+<div class="chart-wrap">
+  <canvas id="treBalanceChart"></canvas>
+</div>
+
     <input id="treName" type="text" placeholder="Transaction name (e.g., T-shirt sales)" />
     <select id="treType" title="Type">
       <option value="" disabled selected>Type…</option>
@@ -278,6 +352,27 @@
 <!-- Your init (must come AFTER the SDKs) -->
 <script src="firebase-init.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+  (function loadChartJS(){
+    var sources = [
+      'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+      'libs/chart.umd.min.js'  // optional local fallback
+    ];
+    var i = 0;
+    function next(){
+      if (window.Chart || i>=sources.length) return;
+      var s = document.createElement('script');
+      s.src = sources[i++]; s.async = true;
+      s.onload = function(){ console.log('Chart.js loaded from', s.src); };
+      s.onerror = function(){ console.warn('Chart.js failed', s.src); next(); };
+      document.head.appendChild(s);
+    }
+    next();
+  })();
+</script>
+
   <script src="admin.js?v=7"></script>
 </body>
 </html>

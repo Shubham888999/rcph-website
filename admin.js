@@ -78,6 +78,17 @@ let unsubMembers = null;
 let unsubEvents  = null;
 let unsubAtt     = null; 
 
+const _charts = {};
+function drawChart(key, ctx, cfg){
+  if (!window.Chart || !ctx) return; // graceful no-chart fallback
+  if (_charts[key]) { _charts[key].destroy(); }
+  _charts[key] = new Chart(ctx, cfg);
+}
+
+// Small utils
+const fmt = n => Number(n).toLocaleString();
+const yyyymm = d => d.slice(0,7);
+
 
 /* ---------- Auth guard + role check ---------- */
 auth.onAuthStateChanged(async (user) => {
@@ -116,7 +127,6 @@ async function loadData(){
 
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-    fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +
     MEMBERS.map(m => `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`).join('');
 
     if (bodHead && bodBody) {
@@ -360,7 +370,47 @@ function renderGrid(){
   });
 
   countBadge.textContent = `${members.length} members · ${events.length} events`;
+  renderAttendanceInsights();
 }
+
+function renderAttendanceInsights(){
+  // KPIs
+  const { members, events } = getFilteredMembersAndEvents();
+  const mCount = members.length, eCount = events.length;
+  document.getElementById('attEvtCount').textContent = eCount || '0';
+
+  // present counts per event + avg %
+  let totalSlots = mCount * eCount;
+  let totalPresent = 0;
+  const perEventPresent = events.map(ev => {
+    let c = 0;
+    members.forEach(m => { if ((ATT[m.id]||{})[ev.id]) c++; });
+    totalPresent += c;
+    return c;
+  });
+  const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
+  document.getElementById('attAvg').textContent = `${avg}%`;
+
+  // top attendees (3)
+  const perMemberPresent = members.map(m => {
+    let c=0; events.forEach(ev => { if ((ATT[m.id]||{})[ev.id]) c++; });
+    return { name: m.name || '', c };
+  }).sort((a,b)=>b.c-a.c).slice(0,3);
+  document.getElementById('attTop').textContent =
+    perMemberPresent.length ? perMemberPresent.map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ') : '–';
+
+  // chart: x=events; y=present count
+  const ctx = document.getElementById('attChart');
+  drawChart('att', ctx, {
+    type:'bar',
+    data:{
+      labels: events.map(e => e.name || ''),
+      datasets:[{ label:'Present', data: perEventPresent }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+
 
 function renderBodGrid(){
   if (!bodHead || !bodBody) return;
@@ -420,6 +470,28 @@ function renderBodGrid(){
   });
 
   if (bodCountBadge) bodCountBadge.textContent = `${BODM.length} BOD · ${BODMEET.length} meetings`;
+  renderBodInsights();
+}
+
+function renderBodInsights(){
+  const mCount = BODM.length, meetCount = BODMEET.length;
+  document.getElementById('bodMeetCount').textContent = meetCount || '0';
+
+  // compute global avg across all visible meetings
+  let totalSlots = mCount * meetCount, totalPresent = 0;
+  const perMeetingPresent = BODMEET.map(mt => {
+    let c=0; BODM.forEach(m => { if ((BODATT[m.id]||{})[mt.id]) c++; });
+    totalPresent += c; return c;
+  });
+  const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
+  document.getElementById('bodAvg').textContent = `${avg}%`;
+
+  const ctx = document.getElementById('bodChart');
+  drawChart('bod', ctx, {
+    type:'bar',
+    data:{ labels: BODMEET.map(mt=>mt.name||''), datasets:[{label:'Present', data:perMeetingPresent}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
 }
 
 
@@ -533,7 +605,52 @@ function renderFines(){
   }).join('');
 
   if (finesBadge) finesBadge.textContent = `${FINES.length} records · ₹ ${total.toLocaleString()}`;
+  renderFinesInsights();
 }
+
+function renderFinesInsights(){
+  // Totals
+  let total = 0, monthTotal = 0;
+  const nowYM = new Date().toISOString().slice(0,7);
+
+  // By reason for doughnut
+  const reasonTotals = { missing_badge:0, late:0, other:0 };
+  // By month for bars
+  const byMonth = {}; // { 'YYYY-MM': amt }
+
+  (FINES||[]).forEach(f=>{
+    const amt = Number(f.amount || 0);
+    total += amt;
+    const ym = (f.date||'').slice(0,7);
+    if (ym === nowYM) monthTotal += amt;
+    if (!byMonth[ym]) byMonth[ym]=0; byMonth[ym]+=amt;
+
+    if (f.reason === 'missing_badge') reasonTotals.missing_badge += amt;
+    else if (f.reason === 'late')     reasonTotals.late += amt;
+    else                              reasonTotals.other += amt;
+  });
+
+  document.getElementById('finesTotal').textContent = `₹ ${fmt(total)}`;
+  document.getElementById('finesMonth').textContent = `₹ ${fmt(monthTotal)}`;
+
+  // Reason doughnut
+  drawChart('finesReason', document.getElementById('finesByReasonChart'), {
+    type:'doughnut',
+    data:{ labels:['Missing badge','Late','Other'], datasets:[{ data:[
+      reasonTotals.missing_badge, reasonTotals.late, reasonTotals.other
+    ]}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+  });
+
+  // Month bars (sorted by month)
+  const months = Object.keys(byMonth).filter(Boolean).sort();
+  drawChart('finesMonth', document.getElementById('finesByMonthChart'), {
+    type:'bar',
+    data:{ labels: months, datasets:[{ label:'₹', data: months.map(m=>byMonth[m]) }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+
 
 // Create fine
 if (fineForm) {
@@ -641,8 +758,41 @@ function renderTreasurer(){
   if (treBadge) {
     treBadge.textContent =
       `${TREAS.length} records · ₹ ${inc.toLocaleString()} income · ₹ ${exp.toLocaleString()} expense · Net ₹ ${net.toLocaleString()}`;
+      renderTreasurerInsights();
+
   }
 }
+
+function renderTreasurerInsights(){
+  // KPIs
+  let inc=0, exp=0;
+  (TREAS||[]).forEach(t => {
+    const a = Number(t.amount||0);
+    if (t.type==='income') inc+=a; else if (t.type==='expense') exp+=a;
+  });
+  const net = inc - exp;
+  document.getElementById('treInc').textContent = `₹ ${fmt(inc)}`;
+  document.getElementById('treExp').textContent = `₹ ${fmt(exp)}`;
+  document.getElementById('treNet').textContent = `₹ ${fmt(net)}`;
+
+  // Cumulative balance line
+  const rows = [...(TREAS||[])].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  let running = 0;
+  const labels = [], data = [];
+  rows.forEach(r => {
+    const a = Number(r.amount||0);
+    running += (r.type==='income') ? a : -a;
+    labels.push((r.date||'').slice(5)); // MM-DD
+    data.push(running);
+  });
+
+  drawChart('tre', document.getElementById('treBalanceChart'), {
+    type:'line',
+    data:{ labels, datasets:[{ label:'Balance (₹)', data, tension:.25, fill:false }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+
 
 // Add entry
 if (treAddBtn) {

@@ -23,6 +23,16 @@ const driveIdOut  = document.getElementById('driveIdOut');
 const driveOpenOut= document.getElementById('driveOpenOut');
 const filterMonth = document.getElementById('filterMonth');
 
+const filterMine   = document.getElementById('filterMine');
+const filterSearch = document.getElementById('filterSearch');
+const toastEl      = document.getElementById('toast');
+function toast(msg, ms=1800){
+  if(!toastEl) return;
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), ms);
+}
+
 const exportSubsBtn = document.getElementById('exportSubsBtn');
 if (exportSubsBtn) {
   // Keep disabled until XLSX is present
@@ -43,6 +53,12 @@ let FILTERED_SUBS = [];
 
 if (filterAvenue) filterAvenue.addEventListener('change', loadItems);
 if (filterMonth)  filterMonth.addEventListener('change', loadItems);
+if (filterMine)   filterMine.addEventListener('change', loadItems);
+if (filterSearch) filterSearch.addEventListener('input', () => {
+  // small debounce
+  clearTimeout(window.__bodSearchT);
+  window.__bodSearchT = setTimeout(loadItems, 150);
+});
 
 
 /* ---------- Auth guard ---------- */
@@ -127,17 +143,28 @@ const doc = {
   createdByEmail: user.email || '',
   createdAt: firebase.firestore.FieldValue.serverTimestamp(),
 };
-    try {
-      await db.collection('bodEvents').add(doc);
-      if (statusEl) statusEl.textContent = 'Saved!';
-      form.reset();
-      loadItems();
-    } catch (err) {
-      console.error(err);
-      if (statusEl) statusEl.textContent = 'Save failed: ' + err.message;
-    }
+try {
+  // prevent double submit
+  const submitBtn = form.querySelector('button[type=submit]');
+  submitBtn?.setAttribute('disabled','disabled');
+
+  await db.collection('bodEvents').add(doc);
+
+  localStorage.removeItem(DRAFT_KEY);
+  form.reset();
+  toast('Saved!');
+  loadItems();
+} catch (err) {
+  console.error(err);
+  if (statusEl) statusEl.textContent = 'Save failed: ' + err.message;
+  toast('Save failed', 2000);
+} finally {
+  form.querySelector('button[type=submit]')?.removeAttribute('disabled');
+}
+
   });
 }
+
 
 if (exportSubsBtn) {
   exportSubsBtn.addEventListener('click', exportSubsToExcel);
@@ -145,44 +172,56 @@ if (exportSubsBtn) {
 
 // Render the BOD submissions list
 async function loadItems() {
-  // DOM (local refs are fine)
   const itemsEl   = document.getElementById('items');
   const countPill = document.getElementById('countPill');
+  const user      = auth.currentUser;
+
+  // skeletons
+  itemsEl.innerHTML = '';
+  for (let i=0;i<3;i++){
+    const sk = document.createElement('div');
+    sk.className = 'skeleton';
+    itemsEl.appendChild(sk);
+  }
 
   // Fetch newest first
   const snap = await db.collection('bodEvents').orderBy('createdAt', 'desc').get();
   const all = snap.docs.map(d => ({
-    id: d.id,
-    ...d.data(),
-    createdAt: d.data().createdAt?.toDate?.() || null
+    id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.() || null
   }));
 
-  // Build the month dropdown from data
   buildMonthFilter(all);
 
-  // Client-side avenue filter (no composite index needed)
-  const av = (filterAvenue?.value || '');
-  const ym = (filterMonth?.value || '');
-
-  // Apply filters
+  // filters
   let rows = all;
+  const av = (filterAvenue?.value || '');
+  const ym = (filterMonth?.value   || '');
+  const mine = !!(filterMine?.checked);
+  const q   = (filterSearch?.value || '').trim().toLowerCase();
+
   if (av) rows = rows.filter(x => (x.avenue || '') === av);
   if (ym) rows = rows.filter(x => (x.eventDate || '').startsWith(ym));
+  if (mine && user) rows = rows.filter(x => (x.createdBy || '') === user.uid);
+  if (q) {
+    rows = rows.filter(x => (x.name||'').toLowerCase().includes(q) || (x.description||'').toLowerCase().includes(q));
+  }
 
-  // ✅ keep a copy of what's currently shown (for Excel export)
   FILTERED_SUBS = rows.slice();
 
-  // Render
+  // render
   itemsEl.innerHTML = '';
+  if (!rows.length){
+    itemsEl.innerHTML = `<div class="item" style="text-align:center; opacity:.8">No submissions found.</div>`;
+  }
+
   rows.forEach(r => {
     const createdStr = r.createdAt ? r.createdAt.toLocaleString() : '';
-
     const driveLink = r.driveFolderId
       ? `https://drive.google.com/drive/folders/${r.driveFolderId}`
       : (r.driveFolder || '');
-    const driveHtml = driveLink
-      ? `<div style="margin-top:6px"><a href="${driveLink}" target="_blank" rel="noopener">Open Drive folder</a></div>`
-      : '';
+    const driveHtml = driveLink ? `<div class="drive-preview" style="margin-top:6px">
+      <a class="pill" href="${driveLink}" target="_blank" rel="noopener">Open Drive folder</a>
+    </div>` : '';
 
     const niceEventDate = r.eventDate ? new Date(`${r.eventDate}T00:00:00`).toLocaleDateString() : '';
     const niceEventTime = r.eventTime ? ` • ${r.eventTime}` : '';
@@ -191,21 +230,30 @@ async function loadItems() {
       ? `<div style="opacity:.85;margin:4px 0">${niceEventDate}${niceEventTime}${byLine}</div>`
       : '';
 
+    const canDelete = (user && (user.uid === r.createdBy)) || false; // admin can also delete per rules; leave client-side conservative
+
     const card = document.createElement('div');
     card.className = 'item';
     card.innerHTML = `
-      <div class="pill" style="margin-bottom:6px">${escapeHtml(r.avenue || '')}</div>
-      <h4>${escapeHtml(r.name || '')}</h4>
-      <div style="opacity:.8; font-size:.9rem; margin-bottom:6px">${createdStr}</div>
+      <div style="display:flex; align-items:center; gap:8px; justify-content:space-between">
+        <div class="pill">${escapeHtml(r.avenue || '')}</div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <span class="badge" title="Created">${createdStr || ''}</span>
+          ${canDelete ? `<button class="btn btn-outline" data-del="${r.id}"><i class="fa-regular fa-trash-can"></i></button>` : ''}
+        </div>
+      </div>
+      <h4 style="margin:6px 0 4px">${escapeHtml(r.name || '')}</h4>
       ${metaLine}
-      <div>${escapeHtml(r.description || '')}</div>
+      <div style="opacity:.9">${escapeHtml(r.description || '')}</div>
       ${driveHtml}
     `;
     itemsEl.appendChild(card);
   });
 
   if (countPill) countPill.textContent = `${rows.length} item${rows.length === 1 ? '' : 's'}`;
+  updateBodKpis(rows);  
 }
+
 
 // Simple HTML escaper (keep this if you don't already have one)
 function escapeHtml(s = '') {
@@ -226,6 +274,54 @@ function escapeHtml(s=''){
 function buildMonthFilter(items){
   if (!filterMonth) return;
   const months = new Set();
+
+function updateBodKpis(rows = []) {
+  // Totals
+  const total = rows.length;
+
+  // This month (YYYY-MM)
+  const ymNow = new Date().toISOString().slice(0, 7);
+  const thisMonth = rows.filter(r => (r.eventDate || '').startsWith(ymNow)).length;
+
+  // Per-avenue counts
+  const ORDER = ['ISD','CMD','CSD','PDD','RRRO','PRO','DEI','GBM'];
+  const aveCounts = Object.fromEntries(ORDER.map(a => [a, 0]));
+  rows.forEach(r => {
+    const a = (r.avenue || '').toUpperCase();
+    if (aveCounts[a] !== undefined) aveCounts[a]++;
+  });
+
+  // Top conductors
+  const who = {};
+  rows.forEach(r => {
+    const c = (r.conductedBy || '').trim();
+    if (c) who[c] = (who[c] || 0) + 1;
+  });
+  const top = Object.entries(who)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0,3)
+    .map(([name, n]) => `${name} (${n})`)
+    .join(', ') || '—';
+
+  // Paint
+  const elTotal = document.getElementById('kpiTotal');
+  const elMonth = document.getElementById('kpiThisMonth');
+  const elTop   = document.getElementById('kpiTopConductors');
+  const elAve   = document.getElementById('kpiAvenues');
+
+  if (elTotal) elTotal.textContent = String(total);
+  if (elMonth) elMonth.textContent = String(thisMonth);
+  if (elTop)   elTop.textContent   = top;
+
+  if (elAve) {
+    elAve.innerHTML = ORDER.map(a => {
+      return `<span class="pill" style="background:#132224;border-color:#24494d;color:#d7f3f5">
+        ${a} <strong style="margin-left:4px">${aveCounts[a]}</strong>
+      </span>`;
+    }).join('');
+  }
+}
+
 
   items.forEach(e => {
     const dStr = e.eventDate || '';
@@ -303,3 +399,17 @@ function exportSubsToExcel(){
   const stamp = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `bod_submissions_${av}_${ym}_${stamp}.xlsx`);
 }
+
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-del]');
+  if(!btn) return;
+  const id = btn.getAttribute('data-del');
+  if (!confirm('Delete this submission?')) return;
+  try{
+    await db.collection('bodEvents').doc(id).delete();
+    toast('Deleted');
+    loadItems();
+  }catch(err){
+    toast('Delete failed'); console.error(err);
+  }
+});
