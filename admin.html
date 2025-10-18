@@ -101,6 +101,24 @@
   background: transparent;
 }
 
+/* === third state for NA === */
+.cell-btn.na{
+  background:#3a3a3a; box-shadow:0 0 14px rgba(180,180,180,.20);
+}
+.cell-btn.na::before{
+  content:"";
+  position:absolute; inset:8px;
+  background-image:url("NA_Button.png");
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:contain;
+  filter: drop-shadow(0 0 4px rgba(0,0,0,.45));
+}
+
+/* small line under header text for dates */
+.ev-head small{
+  display:block; opacity:.75; font-size:12px; line-height:1.1;
+}
 
 
 
@@ -237,8 +255,14 @@
 <!-- ========= Treasurer Panel ========= -->
 <div class="admin-card" id="treasurer" style="margin-top:20px;">
   <div class="topbar">
-    <h2>Treasurer <span id="treBadge" class="badge"></span></h2>
+    <h2>Treasurer Panel <span id="treBadge" class="badge"></span></h2>
   </div>
+  <p class="muted -mt-1">
+  Bills Drive:&nbsp;
+  <a href="https://your-drive-link-here" target="_blank" rel="noopener" class="link-pill">
+    Open shared folder
+  </a>
+</p>
 
   <div class="toolbar">
     <div class="toolbar" id="treKPIs" style="gap:14px; align-items:flex-end">
@@ -254,6 +278,17 @@
       <option value="expense">Expense</option>
     </select>
     <input id="treAmount" type="number" inputmode="numeric" min="0" step="1" placeholder="Amount (₹)" />
+<select id="treAvenue" class="input">
+  <option value="">Select avenue…</option>
+  <option value="CMD">CMD</option>
+  <option value="PDD">PDD</option>
+  <option value="CSD">CSD</option>  
+  <option value="ISD">ISD</option>
+  <option value="PR">PR</option>
+  <option value="GBM">GBM</option>
+  <option value="Other">Other</option>
+</select>
+
     <input id="treDate" type="date" />
     <button id="treAddBtn" class="btn btn-outline">Add Entry</button>
 
@@ -268,6 +303,7 @@
           <th style="min-width:240px">Name</th>
           <th style="min-width:120px">Type</th>
           <th style="min-width:120px">Amount (₹)</th>
+          <th>Avenue</th>
           <th style="min-width:140px">Date</th>
           <th style="min-width:110px">Actions</th>
         </tr>

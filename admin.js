@@ -50,6 +50,7 @@ const treDate            = document.getElementById('treDate');
 const treAddBtn          = document.getElementById('treAddBtn');
 const treBody            = document.getElementById('treBody');
 const exportTreXlsxBtn   = document.getElementById('exportTreXlsxBtn');
+const treAvenue = document.getElementById('treAvenue');
 
 let BODM = [];      // [{id, name, position}]
 let BODMEET = [];   // [{id, name, date}]
@@ -171,7 +172,6 @@ if (finesBody) {
     if (unsubBodM)  { unsubBodM();  unsubBodM  = null; }
   if (unsubBodMt) { unsubBodMt(); unsubBodMt = null; }
   if (unsubBodAt) { unsubBodAt(); unsubBodAt = null; }
-
     if (bodHead && bodBody) {
     unsubBodM = db.collection('bodMembers').orderBy('name')
       .onSnapshot(snap => {
@@ -311,16 +311,17 @@ function renderGrid(){
 
   // header
   const headRow = document.createElement('tr');
-  headRow.innerHTML =
-    `<th class="sticky-col">Member \\ Event</th>` +
-    events.map(e => `
-      <th title="${e.date || ''}">
-        <div class="ev-head">
-          <span>${e.name || ''}</span>
-          <button class="icon-btn" title="Delete event" data-del-event="${e.id}">🗑</button>
-        </div>
-      </th>
-    `).join('');
+headRow.innerHTML =
+  `<th class="sticky-col">Member \\ Event</th>` +
+  events.map(e => `
+    <th title="${e.date || ''}">
+      <div class="ev-head">
+        <span>${e.name || ''}</span>
+        <small>${(e.date || '').slice(0,10)}</small>    <!-- NEW -->
+        <button class="icon-btn" title="Delete event" data-del-event="${e.id}">🗑</button>
+      </div>
+    </th>
+  `).join('');
   attHead.innerHTML = '';
   attHead.appendChild(headRow);
 
@@ -330,18 +331,22 @@ function renderGrid(){
     const tr = document.createElement('tr');
     const attForMember = ATT[m.id] || {};
 
-    const total   = events.length;
-    const present = events.filter(e => !!attForMember[e.id]).length;
+const values  = events.map(e => attForMember[e.id]);
+const considered = values.filter(v => v !== 'NA');  // ignore NA
+const total   = considered.length;
+const present = considered.filter(v => v === true).length;
     const pct     = total ? Math.round((present/total)*100) : 0;
 
     // GBM-specific percentage
-    const gbmIds = events.filter(e => {
-      const a = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
-      return a.includes('GBM');
-    }).map(e => e.id);
-    const gbmTotal   = gbmIds.length;
-    const gbmPresent = gbmIds.filter(id => !!attForMember[id]).length;
-    const gbmPct     = gbmTotal ? Math.round((gbmPresent/gbmTotal)*100) : 0;
+const gbmIds = events.filter(e => {
+  const a = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
+  return a.includes('GBM');
+}).map(e => e.id);
+const gbmValues   = gbmIds.map(id => attForMember[id]);
+const gbmConsider = gbmValues.filter(v => v !== 'NA');     // exclude NA
+const gbmTotal    = gbmConsider.length;
+const gbmPresent  = gbmConsider.filter(v => v === true).length;
+const gbmPct      = gbmTotal ? Math.round((gbmPresent/gbmTotal)*100) : 0;
 
     tr.innerHTML =
       `
@@ -359,11 +364,16 @@ function renderGrid(){
       </td>
       ` +
       events.map(e => {
-        const on = !!attForMember[e.id];
-        return `
-          <td data-m="${m.id}" data-e="${e.id}">
-            <button class="cell-btn ${on ? 'on' : 'off'}" aria-label="${on?'Present':'Absent'}"></button>
-          </td>`;
+const v = attForMember[e.id]; // true | false | 'NA' | undefined
+let cls = 'off', aria = 'Absent';
+if (v === true) { cls = 'on'; aria = 'Present'; }
+else if (v === false) { cls = 'off'; aria = 'Absent'; }
+else if (v === 'NA') { cls = 'na'; aria = 'Not applicable'; }
+
+return `
+  <td data-m="${m.id}" data-e="${e.id}">
+    <button class="cell-btn ${cls}" aria-label="${aria}"></button>
+  </td>`;
       }).join('');
 
     attBody.appendChild(tr);
@@ -374,28 +384,35 @@ function renderGrid(){
 }
 
 function renderAttendanceInsights(){
-  // KPIs
   const { members, events } = getFilteredMembersAndEvents();
   const mCount = members.length, eCount = events.length;
+
   document.getElementById('attEvtCount').textContent = eCount || '0';
 
-  // present counts per event + avg %
-  let totalSlots = mCount * eCount;
-  let totalPresent = 0;
+  // per-event present (only 'true'), and compute global avg ignoring 'NA'
+  let totalSlots = 0, totalPresent = 0;
+
   const perEventPresent = events.map(ev => {
-    let c = 0;
-    members.forEach(m => { if ((ATT[m.id]||{})[ev.id]) c++; });
+    let c = 0, considered = 0;
+    members.forEach(m => {
+      const v = (ATT[m.id] || {})[ev.id];  // true | false | 'NA' | undefined
+      if (v !== 'NA') { considered++; if (v === true) c++; }
+    });
+    totalSlots += considered;
     totalPresent += c;
     return c;
   });
+
   const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
   document.getElementById('attAvg').textContent = `${avg}%`;
 
-  // top attendees (3)
+  // top attendees (by present count on considered events only)
   const perMemberPresent = members.map(m => {
-    let c=0; events.forEach(ev => { if ((ATT[m.id]||{})[ev.id]) c++; });
+    let c = 0;
+    events.forEach(ev => { if ((ATT[m.id]||{})[ev.id] === true) c++; });
     return { name: m.name || '', c };
   }).sort((a,b)=>b.c-a.c).slice(0,3);
+
   document.getElementById('attTop').textContent =
     perMemberPresent.length ? perMemberPresent.map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ') : '–';
 
@@ -412,21 +429,23 @@ function renderAttendanceInsights(){
 }
 
 
+
 function renderBodGrid(){
   if (!bodHead || !bodBody) return;
 
   // Header: first sticky col shows "Name / Position", then meeting columns
   const headRow = document.createElement('tr');
-  headRow.innerHTML =
-    `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
-    BODMEET.map(mt => `
-      <th title="${mt.date || ''}">
-        <div class="ev-head">
-          <span>${mt.name || ''}</span>
-          <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
-        </div>
-      </th>
-    `).join('');
+headRow.innerHTML =
+  `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
+  BODMEET.map(mt => `
+    <th title="${mt.date || ''}">
+      <div class="ev-head">
+        <span>${mt.name || ''}</span>
+        <small>${(mt.date || '').slice(0,10)}</small>   <!-- NEW -->
+        <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
+      </div>
+    </th>
+  `).join('');
   bodHead.innerHTML = '';
   bodHead.appendChild(headRow);
 
@@ -439,9 +458,12 @@ function renderBodGrid(){
     const att = BODATT[m.id] || {};
 
     // count present across ALL visible meetings
-    let present = 0;
-    BODMEET.forEach(mt => { if (att[mt.id]) present++; });
-    const pct = total ? Math.round((present / total) * 100) : 0;
+let present = 0, considered = 0;
+BODMEET.forEach(mt => {
+  const v = att[mt.id];
+  if (v !== 'NA') { considered++; if (v === true) present++; }
+});
+const pct = considered ? Math.round((present / considered) * 100) : 0;
 
     tr.innerHTML =
       `
@@ -459,11 +481,17 @@ function renderBodGrid(){
       </td>
       ` +
       BODMEET.map(mt => {
-        const on = !!att[mt.id];
-        return `
-          <td data-bod-m="${m.id}" data-bod-meet="${mt.id}">
-            <button class="cell-btn ${on ? 'on' : 'off'}" aria-label="${on?'Present':'Absent'}"></button>
-          </td>`;
+const v = att[mt.id]; // true | false | 'NA' | undefined
+let cls = 'off', aria = 'Absent';
+if (v === true) { cls = 'on'; aria = 'Present'; }
+else if (v === false) { cls = 'off'; aria = 'Absent'; }
+else if (v === 'NA') { cls = 'na'; aria = 'Not applicable'; }
+
+return `
+  <td data-bod-m="${m.id}" data-bod-meet="${mt.id}">
+    <button class="cell-btn ${cls}" aria-label="${aria}"></button>
+  </td>`;
+
       }).join('');
 
     bodBody.appendChild(tr);
@@ -477,12 +505,19 @@ function renderBodInsights(){
   const mCount = BODM.length, meetCount = BODMEET.length;
   document.getElementById('bodMeetCount').textContent = meetCount || '0';
 
-  // compute global avg across all visible meetings
-  let totalSlots = mCount * meetCount, totalPresent = 0;
+  let totalSlots = 0, totalPresent = 0;
+
   const perMeetingPresent = BODMEET.map(mt => {
-    let c=0; BODM.forEach(m => { if ((BODATT[m.id]||{})[mt.id]) c++; });
-    totalPresent += c; return c;
+    let c = 0, considered = 0;
+    BODM.forEach(m => {
+      const v = (BODATT[m.id] || {})[mt.id];
+      if (v !== 'NA') { considered++; if (v === true) c++; }
+    });
+    totalSlots += considered;
+    totalPresent += c;
+    return c;
   });
+
   const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
   document.getElementById('bodAvg').textContent = `${avg}%`;
 
@@ -556,21 +591,29 @@ document.addEventListener('click', async (e) => {
   }
 
   // Toggle BOD attendance
-  const btn = e.target.closest('td[data-bod-m][data-bod-meet] .cell-btn');
-  if (btn) {
-    const td = btn.closest('td');
-    const bodMemberId = td.dataset.bodM;
-    const meetingId   = td.dataset.bodMeet;
+// Toggle BOD attendance
+const btn = e.target.closest('td[data-bod-m][data-bod-meet] .cell-btn');
+if (btn) {
+  const td = btn.closest('td');
+  const bodMemberId = td.dataset.bodM;
+  const meetingId   = td.dataset.bodMeet;
 
-    const isOn = btn.classList.toggle('on');
-    btn.classList.toggle('off', !isOn);
-    btn.setAttribute('aria-label', isOn ? 'Present' : 'Absent');
+  const cur = ((BODATT[bodMemberId] || {})[meetingId]); // true | false | 'NA' | undefined
+  let next;
+  if (cur === true) next = false;
+  else if (cur === false) next = 'NA';
+  else next = true;
 
-    const ref = db.collection('bodAttendance').doc(bodMemberId);
-    await ref.set({ [meetingId]: isOn }, { merge: true });
-    BODATT[bodMemberId] = BODATT[bodMemberId] || {};
-    BODATT[bodMemberId][meetingId] = isOn;
-  }
+  btn.classList.remove('on','off','na');
+  if (next === true) { btn.classList.add('on');  btn.setAttribute('aria-label','Present'); }
+  else if (next === false){ btn.classList.add('off'); btn.setAttribute('aria-label','Absent'); }
+  else { btn.classList.add('na'); btn.setAttribute('aria-label','Not applicable'); }
+
+  const ref = db.collection('bodAttendance').doc(bodMemberId);
+  await ref.set({ [meetingId]: next }, { merge: true });
+  BODATT[bodMemberId] = BODATT[bodMemberId] || {};
+  BODATT[bodMemberId][meetingId] = next;
+}
 });
 
 
@@ -718,18 +761,31 @@ attBody.addEventListener('click', async (e) => {
 
   const btn = e.target.closest('.cell-btn');
   if (!btn) return;
+
   const td = btn.closest('td');
   const memberId = td.dataset.m;
   const eventId  = td.dataset.e;
 
-  const isOn = btn.classList.toggle('on');
-  btn.classList.toggle('off', !isOn);
-  btn.setAttribute('aria-label', isOn ? 'Present' : 'Absent');
+  // current value in our in-memory map
+  const cur = (ATT[memberId] || {})[eventId];  // true | false | 'NA' | undefined
 
+  // next state: true -> false -> 'NA' -> true …
+  let next;
+  if (cur === true) next = false;
+  else if (cur === false) next = 'NA';
+  else next = true;
+
+  // update classes for UI
+  btn.classList.remove('on','off','na');
+  if (next === true) { btn.classList.add('on');  btn.setAttribute('aria-label','Present'); }
+  else if (next === false){ btn.classList.add('off'); btn.setAttribute('aria-label','Absent'); }
+  else { btn.classList.add('na'); btn.setAttribute('aria-label','Not applicable'); }
+
+  // write back
   const ref = db.collection('attendance').doc(memberId);
-  await ref.set({ [eventId]: isOn }, { merge: true });
+  await ref.set({ [eventId]: next }, { merge: true });
   ATT[memberId] = ATT[memberId] || {};
-  ATT[memberId][eventId] = isOn;
+  ATT[memberId][eventId] = next;
 });
 
 /* ---------- Treasurer: render, add, delete, export ---------- */
@@ -737,22 +793,23 @@ function renderTreasurer(){
   if (!treBody) return;
 
   let inc = 0, exp = 0;
-  treBody.innerHTML = (TREAS || []).map(t => {
-    const amt = Number(t.amount || 0);
-    if (t.type === 'income') inc += amt;
-    else if (t.type === 'expense') exp += amt;
+treBody.innerHTML = (TREAS || []).map(t => {
+  const amt = Number(t.amount || 0);
+  if (t.type === 'income') inc += amt;
+  else if (t.type === 'expense') exp += amt;
 
-    const dateStr = (t.date || '').slice(0,10);
-    const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
-    return `
-      <tr>
-        <td>${(t.name || '').replace(/</g,'&lt;')}</td>
-        <td>${typeLabel}</td>
-        <td>₹ ${amt.toLocaleString()}</td>
-        <td>${dateStr}</td>
-        <td><button class="icon-btn" title="Delete entry" data-del-tre="${t.id}">🗑</button></td>
-      </tr>`;
-  }).join('');
+  const dateStr = (t.date || '').slice(0,10);
+  const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
+  return `
+    <tr>
+      <td>${(t.name || '').replace(/</g,'&lt;')}</td>
+      <td>${typeLabel}</td>
+      <td>₹ ${amt.toLocaleString()}</td>
+      <td>${(t.avenue || '-').replace(/</g,'&lt;')}</td>   <!-- NEW -->
+      <td>${dateStr}</td>
+      <td><button class="icon-btn" title="Delete entry" data-del-tre="${t.id}">🗑</button></td>
+    </tr>`;
+}).join('');
 
   const net = inc - exp;
   if (treBadge) {
@@ -801,6 +858,7 @@ if (treAddBtn) {
     const type   = treType?.value || '';
     const amount = Number(treAmount?.value || 0);
     const date   = treDate?.value || '';
+    const avenue = treAvenue?.value || '';   // <-- NEW
 
     if (!name || !type || !date || !Number.isFinite(amount) || amount < 0) {
       alert('Please fill Name, Type, Amount (>=0), Date'); return;
@@ -808,6 +866,7 @@ if (treAddBtn) {
 
     const payload = {
       name, type, amount, date,
+      avenue,                                  // <-- NEW (save it)
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: (auth.currentUser && auth.currentUser.uid) || null
     };
@@ -817,12 +876,12 @@ if (treAddBtn) {
       if (treName)   treName.value = '';
       if (treType)   treType.value = '';
       if (treAmount) treAmount.value = '';
-      // keep date for convenience
     } catch (err) {
       alert('Failed to add entry: ' + err.message);
     }
   });
 }
+
 
 // Delete entry
 document.addEventListener('click', async (e) => {
@@ -841,13 +900,14 @@ document.addEventListener('click', async (e) => {
 function exportTreasuryToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
 
-  const header = ['Name', 'Type', 'Amount (₹)', 'Date'];
-  const rows = (TREAS || []).map(t => [
-    t.name || '',
-    t.type === 'income' ? 'Income' : 'Expense',
-    Number(t.amount || 0),
-    (t.date || '').slice(0,10)
-  ]);
+  const header = ['Name', 'Type', 'Amount (₹)', 'Avenue', 'Date'];
+const rows = (TREAS || []).map(t => [
+  t.name || '',
+  t.type === 'income' ? 'Income' : 'Expense',
+  Number(t.amount || 0),
+  t.avenue || '',                                 // + Avenue
+  (t.date || '').slice(0,10)
+]);
 
   // Totals for a summary sheet
   let inc = 0, exp = 0;
@@ -859,7 +919,7 @@ function exportTreasuryToExcel(){
 
   const ws1 = XLSX.utils.aoa_to_sheet([header, ...rows]);
   ws1['!freeze'] = { xSplit: 0, ySplit: 1 };
-  ws1['!cols'] = [{wch:30},{wch:12},{wch:14},{wch:12}];
+  ws1['!cols'] = [{wch:30},{wch:12},{wch:14},{wch:12},{wch:12}];
 
   const ws2 = XLSX.utils.aoa_to_sheet([
     ['Summary'],
@@ -985,44 +1045,44 @@ function exportAttendanceToExcel(){
 
   const { members, events } = getFilteredMembersAndEvents();
 
-  // Header row
-  const header = ['Member \\ Event', ...events.map(e => e.name || '')];
+  const header = ['Member \\ Event', ...events.map(e => {
+    const d = (e.date||'').slice(0,10);
+    return d ? `${e.name||''} (${d})` : (e.name||'');
+  })];
 
-  // Rows
   const rows = members.map(m => {
     const attForMember = ATT[m.id] || {};
     const cells = events.map(e => {
-      const on = !!attForMember[e.id];
-      // Use tick/cross; you can switch to 1/0 by returning on ? 1 : 0
-      return on ? 'P' : 'A';
+      const v = attForMember[e.id];        // true | false | 'NA' | undefined
+      if (v === true)  return 'P';
+      if (v === false) return 'A';
+      if (v === 'NA')  return 'NA';
+      return ''; // blank if unset
     });
     return [m.name || '', ...cells];
   });
 
-  const aoa = [header, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
 
-  // Create workbook
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-  // Auto column widths (simple heuristic)
+  // column widths
   const colWidths = header.map((h, idx) => {
     const maxLen = Math.max(
       String(h).length,
       ...rows.map(r => String(r[idx] ?? '').length)
     );
-    return { wch: Math.min(Math.max(maxLen + 2, 8), 40) };
+    return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
   });
   ws['!cols'] = colWidths;
 
-  // Freeze header row + first col
   ws['!freeze'] = { xSplit: 1, ySplit: 1 };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
 
-  const dateTag = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  const dateTag = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `attendance_${dateTag}.xlsx`);
 }
+
 
 if (exportXlsxBtn) {
   exportXlsxBtn.addEventListener('click', exportAttendanceToExcel);
@@ -1041,12 +1101,19 @@ function exportBodAttendanceToExcel(){
   ];
 
   // Rows: BODM order; cells are P/A
-  const rows = BODM.map(m => {
-    const att = BODATT[m.id] || {};
-    const cells = BODMEET.map(mt => (att[mt.id] ? 'P' : 'A'));
-    const namePos = `${m.name || ''}${m.position ? ' — ' + m.position : ''}`;
-    return [namePos, ...cells];
+const rows = BODM.map(m => {
+  const att = BODATT[m.id] || {};
+  const cells = BODMEET.map(mt => {
+    const v = att[mt.id];
+    if (v === true)  return 'P';
+    if (v === false) return 'A';
+    if (v === 'NA')  return 'NA';
+    return '';
   });
+  const namePos = `${m.name || ''}${m.position ? ' — ' + m.position : ''}`;
+  return [namePos, ...cells];
+});
+
 
   const aoa = [header, ...rows];
 
