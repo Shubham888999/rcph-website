@@ -151,6 +151,24 @@
       document.getElementById('authError').textContent = e.message || 'Could not read role.';
     }
   }
+
+  document.getElementById('loginBtn').onclick = async () => {
+    const email = document.getElementById('email').value.trim();
+    const pass  = document.getElementById('password').value;
+
+    if (!email || !pass) {
+      document.getElementById('authError').textContent = 'Enter email and password.';
+      return;
+    }
+
+    try {
+      const cred = await auth.signInWithEmailAndPassword(email, pass);
+      await routeByRole(cred.user);
+    } catch (e) {
+      document.getElementById('authError').textContent =
+        e.message || 'Login failed.';
+    }
+  };
 </script>
 
   <!-- ▲▲▲ END script -->

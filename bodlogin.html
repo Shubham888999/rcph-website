@@ -356,6 +356,81 @@ input[type="time"]::-moz-placeholder {
     }
     next();
   })();
+
+/* ---------- Month dropdown builder ---------- */
+function buildMonthFilter(all) {
+  if (!filterMonth) return;
+
+  // Remember selection so we don’t reset user’s choice
+  const selected = filterMonth.value || "";
+
+  // Build a unique list of YYYY-MM values from eventDate (YYYY-MM-DD)
+  const months = Array.from(
+    new Set(
+      all
+        .map(r => (r.eventDate || "").slice(0, 7))
+        .filter(Boolean)
+    )
+  ).sort().reverse(); // newest first
+
+  // Rebuild options
+  filterMonth.innerHTML = `<option value="">All</option>` +
+    months.map(m => `<option value="${m}">${m}</option>`).join("");
+
+  // Restore prior selection if still available
+  if (selected && [...filterMonth.options].some(o => o.value === selected)) {
+    filterMonth.value = selected;
+  }
+}
+
+/* ---------- KPI cards ---------- */
+function updateBodKpis(rows) {
+  // DOM nodes (exist in bodlogin.html)
+  const kpiTotal = document.getElementById('kpiTotal');
+  const kpiThis  = document.getElementById('kpiThisMonth');
+  const kpiTop   = document.getElementById('kpiTopConductors');
+  const kpiAvs   = document.getElementById('kpiAvenues');
+
+  // Total (respecting current filters)
+  if (kpiTotal) kpiTotal.textContent = String(rows.length);
+
+  // “This month” = items whose eventDate is in the current YYYY-MM
+  const nowYM = new Date().toISOString().slice(0, 7);
+  const thisMonthCount = rows.filter(r => (r.eventDate || '').startsWith(nowYM)).length;
+  if (kpiThis) kpiThis.textContent = String(thisMonthCount);
+
+  // Top conductors (by “conductedBy”)
+  const tally = {};
+  rows.forEach(r => {
+    const who = (r.conductedBy || '').trim();
+    if (!who) return;
+    tally[who] = (tally[who] || 0) + 1;
+  });
+  const top = Object.entries(tally)
+    .sort((a,b) => b[1]-a[1])
+    .slice(0, 3)
+    .map(([name, n]) => `${name} (${n})`)
+    .join(', ') || '—';
+  if (kpiTop) kpiTop.textContent = top;
+
+  // By avenue chips
+  if (kpiAvs) {
+    const avTallies = {};
+    rows.forEach(r => {
+      const av = (r.avenue || '').toUpperCase();
+      if (!av) return;
+      avTallies[av] = (avTallies[av] || 0) + 1;
+    });
+    const chips = Object.entries(avTallies)
+      .sort((a,b)=> b[1]-a[1])
+      .map(([av, n]) =>
+        `<span class="pill" title="${n}">${av}: <strong>${n}</strong></span>`
+      ).join('') || '<span class="pill">—</span>';
+    kpiAvs.innerHTML = chips;
+  }
+}
+
+
 </script>
 
 <script src="bodlogin.js?v=2"></script>

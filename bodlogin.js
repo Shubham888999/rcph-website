@@ -171,117 +171,109 @@ if (exportSubsBtn) {
   exportSubsBtn.addEventListener('click', exportSubsToExcel);
 }
 
+// ---- HTML escape helper (prevents XSS; keeps plain text plain) ----
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str ?? '');
+  return div.innerHTML;
+}
+
 // Render the BOD submissions list
 async function loadItems() {
   const itemsEl   = document.getElementById('items');
   const countPill = document.getElementById('countPill');
   const user      = auth.currentUser;
 
-  // skeletons
+  // show skeletons
   itemsEl.innerHTML = '';
-  for (let i=0;i<3;i++){
+  for (let i = 0; i < 3; i++) {
     const sk = document.createElement('div');
     sk.className = 'skeleton';
     itemsEl.appendChild(sk);
   }
 
-  // Fetch newest first
-  const snap = await db.collection('bodEvents').orderBy('createdAt', 'desc').get();
-  const all = snap.docs.map(d => ({
-    id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.() || null
-  }));
+  try {
+    // 1) get newest first
+    const snap = await db.collection('bodEvents')
+      .orderBy('createdAt', 'desc')
+      .get();
 
-// Keep just one escapeHtml
-function escapeHtml(s = '') {
-  return s.replace(/[&<>"']/g, m => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[m]));
-}
+    const all = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate?.() || null
+    }));
 
-// ---- Month filter builder (top-level) ----
-function buildMonthFilter(items){
-  if (!filterMonth) return;
-  const months = new Set();
+    // 2) rebuild month dropdown from ALL rows
+    buildMonthFilter(all);
 
-  items.forEach(e => {
-    const dStr = e.eventDate || '';
-    if (dStr && dStr.length >= 7) months.add(dStr.slice(0,7)); // YYYY-MM
-  });
+    // 3) apply filters to get visible rows
+    const avFilter = (filterAvenue?.value || '').toUpperCase();
+    const ymFilter = (filterMonth?.value || '');        // YYYY-MM or ''
+    const mineOnly = !!(filterMine?.checked);
+    const q = (filterSearch?.value || '').trim().toLowerCase();
 
-  const sorted = Array.from(months).sort().reverse();
-  const current = filterMonth.value;
-  filterMonth.innerHTML = `<option value="">All</option>` + sorted.map(ym => {
-    const [y,m] = ym.split('-').map(Number);
-    const label = new Date(y, m - 1).toLocaleString(undefined, { month:'long', year:'numeric' });
-    return `<option value="${ym}">${label}</option>`;
-  }).join('');
+    let rows = all.filter(r => {
+      if (avFilter && (r.avenue || '').toUpperCase() !== avFilter) return false;
+      if (ymFilter && !(r.eventDate || '').startsWith(ymFilter))   return false;
+      if (mineOnly && user && r.createdBy !== user.uid)            return false;
 
-  if (current && sorted.includes(current)) filterMonth.value = current;
-}
+      if (q) {
+        const hay = [
+          r.name, r.description, r.avenue,
+          r.conductedBy, r.createdByEmail
+        ].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
 
-// ---- KPI painter (top-level) ----
-function updateBodKpis(rows = []) {
-  // totals
-  const total = rows.length;
+    // 4) save filtered for Excel export; update KPI from filtered rows
+    FILTERED_SUBS = rows;
+    updateBodKpis(rows);
 
-  // this month (YYYY-MM)
-  const ymNow = new Date().toISOString().slice(0, 7);
-  const thisMonth = rows.filter(r => (r.eventDate || '').startsWith(ymNow)).length;
+    // 5) paint list
+    itemsEl.innerHTML = rows.map(r => {
+      const createdStr = r.createdAt
+        ? new Date(r.createdAt).toLocaleString()
+        : '';
+      const driveUrl = r.driveFolderId
+        ? `https://drive.google.com/drive/folders/${r.driveFolderId}`
+        : (r.driveFolder || '');
 
-  // by avenue
-  const ORDER = ['ISD','CMD','CSD','PDD','RRRO','PRO','DEI','GBM'];
-  const aveCounts = Object.fromEntries(ORDER.map(a => [a, 0]));
-  rows.forEach(r => {
-    const a = (r.avenue || '').toUpperCase();
-    if (aveCounts[a] !== undefined) aveCounts[a]++;
-  });
+      return `
+        <div class="card">
+          <div class="card__header">
+            <span class="chip">${(r.avenue || '').toUpperCase()}</span>
+            <span class="timepill">${createdStr}</span>
+            <button class="iconbtn" data-del="${r.id}" title="Delete">
+              🗑️
+            </button>
+          </div>
+          <div class="card__title">${escapeHtml(r.name || '')}</div>
+          <div class="card__meta">
+            ${escapeHtml(r.eventDate || '')}
+            ${r.eventTime ? ' • ' + escapeHtml(r.eventTime) : ''}
+            ${r.conductedBy ? ' • by ' + escapeHtml(r.conductedBy) : ''}
+          </div>
+          <div class="card__body">${escapeHtml(r.description || '')}</div>
+          ${driveUrl ? `
+            <a class="btn btn-outline" href="${driveUrl}" target="_blank">Open Drive folder</a>
+          ` : ''}
+        </div>
+      `;
+    }).join('') || '<p style="opacity:.7">No submissions match your filters.</p>';
 
-  // top conductors
-  const who = {};
-  rows.forEach(r => {
-    const c = (r.conductedBy || '').trim();
-    if (c) who[c] = (who[c] || 0) + 1;
-  });
-  const top = Object.entries(who).sort((a,b) => b[1] - a[1]).slice(0,3)
-               .map(([name, n]) => `${name} (${n})`).join(', ') || '—';
-
-  // paint
-  const elTotal = document.getElementById('kpiTotal');
-  const elMonth = document.getElementById('kpiThisMonth');
-  const elTop   = document.getElementById('kpiTopConductors');
-  const elAve   = document.getElementById('kpiAvenues');
-
-  if (elTotal) elTotal.textContent = String(total);
-  if (elMonth) elMonth.textContent = String(thisMonth);
-  if (elTop)   elTop.textContent   = top;
-
-  if (elAve) {
-    elAve.innerHTML = ORDER.map(a =>
-      `<span class="pill" style="background:#132224;border-color:#24494d;color:#d7f3f5">
-         ${a} <strong style="margin-left:4px">${aveCounts[a]}</strong>
-       </span>`
-    ).join('');
+    if (countPill) countPill.textContent =
+      `${rows.length} ${rows.length === 1 ? 'item' : 'items'}`;
+  } catch (err) {
+    console.error(err);
+    itemsEl.innerHTML =
+      `<p style="color:#ff6b6b">Failed to load submissions: ${err.message}</p>`;
+    if (countPill) countPill.textContent = '0 items';
   }
 }
 
-
-
-  items.forEach(e => {
-    const dStr = e.eventDate || '';
-    if (dStr && dStr.length >= 7) months.add(dStr.slice(0,7)); // YYYY-MM
-  });
-
-  const sorted = Array.from(months).sort().reverse();
-  const current = filterMonth.value;
-  filterMonth.innerHTML = `<option value="">All</option>` +
-    sorted.map(ym => {
-      const [y,m] = ym.split('-').map(Number);
-      const label = new Date(y, m-1).toLocaleString(undefined, { month:'long', year:'numeric' });
-      return `<option value="${ym}">${label}</option>`;
-    }).join('');
-
-  if (current && sorted.includes(current)) filterMonth.value = current;
-}
 
 function exportSubsToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
@@ -343,16 +335,29 @@ function exportSubsToExcel(){
   XLSX.writeFile(wb, `bod_submissions_${av}_${ym}_${stamp}.xlsx`);
 }
 
-document.addEventListener('click', async (e)=>{
-  const btn = e.target.closest('button[data-del]');
-  if(!btn) return;
-  const id = btn.getAttribute('data-del');
-  if (!confirm('Delete this submission?')) return;
-  try{
+// Single, clean delete handler for BOD events
+document.addEventListener('click', async (e) => {
+  const delBtn = e.target.closest('.iconbtn[data-del]');
+  if (!delBtn) return;
+
+  const id = delBtn.getAttribute('data-del');
+  if (!id) return;
+
+  // simple confirm (or keep your popup UI if you prefer)
+  if (!confirm('Delete this submission? This cannot be undone.')) return;
+
+  try {
     await db.collection('bodEvents').doc(id).delete();
-    toast('Deleted');
-    loadItems();
-  }catch(err){
-    toast('Delete failed'); console.error(err);
+    // nice removal animation if you have .fade-out CSS, otherwise just remove
+    delBtn.closest('.card')?.classList.add('fade-out');
+    setTimeout(() => delBtn.closest('.card')?.remove(), 200);
+    toast('Deleted successfully');
+  } catch (err) {
+    // Show a helpful message when rules block the delete
+    const msg = (err && err.code === 'permission-denied')
+      ? 'You can only delete your own events, or you must be an admin.'
+      : (err?.message || 'Delete failed');
+    toast(msg, 2500);
+    console.error(err);
   }
 });

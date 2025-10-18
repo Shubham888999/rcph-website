@@ -1515,3 +1515,155 @@ table.att{ min-width: 100%; width: max-content; } /* already present */
 html{ scroll-behavior: smooth; }
 
 .flex-1 { flex: 1 1 auto; }
+
+/* ===== BOD Submissions – polished cards ===== */
+
+/* Container grid for the list */
+#items {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  max-width: 950px;
+  margin: 8px auto 32px;
+}
+
+/* 2-up grid on wider screens */
+@media (min-width: 920px) {
+  #items { grid-template-columns: 1fr ; }
+}
+
+/* KPI row spacing (if you want them to breathe a bit more) */
+.kpi-row, .kpis, .kpi-box { margin-bottom: 10px; }
+
+/* Card */
+.card{
+  background:#151515;
+  border:1px solid #2a2a2a;
+  border-radius:14px;
+  padding:16px 16px 14px;
+  box-shadow:0 6px 18px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.03);
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 10px 28px rgba(0,0,0,.24), inset 0 0 0 1px rgba(255,255,255,.04);
+  border-color:#343434;
+}
+
+/* Header line with tag + date + delete button */
+.card__header{
+  display:flex; align-items:center; gap:10px; margin-bottom:8px;
+}
+.card__header .spacer{ flex:1; }
+
+/* Avenue tag */
+.chip{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:4px 9px; border-radius:999px; font-size:.72rem; letter-spacing:.04em;
+  text-transform:uppercase; background:#0f0f0f; color:#cfd3d6; border:1px solid #2b2b2b;
+}
+
+/* Created-at pill */
+.timepill{
+  margin-left:auto; font-size:.78rem; color:#aeb3b7; background:#0f0f0f;
+  border:1px solid #2b2b2b; padding:4px 8px; border-radius:8px;
+}
+
+/* Delete icon button */
+.iconbtn{
+  margin-left:6px; border:0; background:transparent; cursor:pointer;
+  width:34px; height:34px; border-radius:8px; display:grid; place-items:center;
+  color:#d66; transition:background .15s ease, transform .1s ease;
+}
+.iconbtn:hover{ background:#221; }
+.iconbtn:active{ transform:scale(.96); }
+
+/* Title / meta */
+.card__title{
+  font-weight:800; font-size:1.02rem; color:#f2f4f6; margin:2px 0 2px;
+}
+.card__meta{
+  font-size:.9rem; color:#b9bec3; margin-bottom:8px;
+}
+
+/* Body text – clamp to 6 lines by default, can expand */
+.card__body{
+  color:#e5e7ea; line-height:1.55; white-space:pre-wrap;
+  display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden;
+  position:relative;
+}
+.card__body.is-open{ -webkit-line-clamp:unset; overflow:visible; }
+
+/* “Show more” link */
+.card__more{
+  display:inline-block; margin-top:8px; font-weight:600; font-size:.9rem;
+}
+
+/* Drive button already uses .btn / .btn-outline; just tighten */
+.card .btn{ margin-top:10px; }
+
+.card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.iconbtn {
+  border: none;
+  background: transparent;
+  color: #ff6666;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: color .2s;
+}
+.iconbtn:hover { color: #ff3333; }
+/* Subtle loading skeletons */
+.skeleton{
+  height:160px; border-radius:14px;
+  background: linear-gradient(90deg,#1a1a1a 0%,#222 50%,#1a1a1a 100%);
+  background-size:200% 100%; animation:sk 1.1s infinite linear;
+  border:1px solid #2a2a2a;
+}
+@keyframes sk { to { background-position: -200% 0; } }
+
+/* Modern trash button */
+.iconbtn {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #f87171;
+  cursor: pointer;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s ease;
+}
+
+.iconbtn:hover {
+  background: rgba(255, 0, 0, 0.1);
+  color: #ff4d4d;
+  transform: scale(1.05);
+}
+
+/* Fade-out animation on delete */
+@keyframes fadeOut {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+.fade-out {
+  animation: fadeOut 0.35s ease forwards;
+}
+.card .btn-outline {
+  display: inline-block;
+  margin-top: 12px;
+  position: relative;
+  z-index: 2;
+}
+
+.card__body {
+  margin-bottom: 12px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
