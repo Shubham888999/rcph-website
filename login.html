@@ -122,36 +122,47 @@
     }
   };
 
-  async function routeByRole(user) {
-    try {
-      const snap = await db.collection('roles').doc(user.uid).get();
-      if (!snap.exists || !snap.data().role) {
-        await auth.signOut();
-        document.getElementById('authError').textContent = 'No role set for this user. Contact admin.';
-        return;
-      }
-      const role = String(snap.data().role || '').toLowerCase();
+async function routeByRole(user) {
+  const err = (m) => document.getElementById('authError').textContent = m || '';
 
-      const dest = new URLSearchParams(location.search).get('dest');
-      if (dest === 'admin') { location.href = 'admin.html'; return; }
-      if (dest === 'bod')   { location.href = 'bodlogin.html'; return; }
-
-      const preferred = localStorage.getItem('preferredPanel');
-      if (role === 'admin' && (preferred === 'admin' || preferred === 'bod')) {
-        location.href = preferred === 'admin' ? 'admin.html' : 'bodlogin.html';
-        return;
-      }
-
-      if (role === 'admin') { document.getElementById('panelChooser').style.display = 'block'; return; }
-      if (role === 'bod')   { location.href = 'bodlogin.html'; return; }
-
+  try {
+    const snap = await db.collection('roles').doc(user.uid).get();
+    if (!snap.exists || !snap.data().role) {
       await auth.signOut();
-      document.getElementById('authError').textContent = `Unknown role "${role}". Contact admin.`;
-    } catch (e) {
-      document.getElementById('authError').textContent = e.message || 'Could not read role.';
+      err('No role set for this user. Contact admin.');
+      return;
     }
-  }
 
+    const role = String(snap.data().role || '').toLowerCase();
+
+    // optional deep links first
+    const dest = new URLSearchParams(location.search).get('dest');
+    if (dest === 'admin') { location.href = 'admin.html'; return; }
+    if (dest === 'bod')   { location.href = 'bodlogin.html'; return; }
+
+    // Admin experience for both 'admin' and 'president'
+    if (role === 'admin' || role === 'president') {
+      // show chooser (or redirect straight to admin.html if you prefer)
+      document.getElementById('panelChooser').style.display = 'block';
+
+      // (optional) honor remembered choice
+      const preferred = localStorage.getItem('preferredPanel');
+      if (preferred === 'admin') { location.href = 'admin.html'; return; }
+      if (preferred === 'bod')   { location.href = 'bodlogin.html'; return; }
+      return;
+    }
+
+    if (role === 'bod') {
+      location.href = 'bodlogin.html';
+      return;
+    }
+
+    await auth.signOut();
+    err(`Unknown role "${role}". Contact admin.`);
+  } catch (e) {
+    err(e.message || 'Could not read role.');
+  }
+}
   document.getElementById('loginBtn').onclick = async () => {
     const email = document.getElementById('email').value.trim();
     const pass  = document.getElementById('password').value;

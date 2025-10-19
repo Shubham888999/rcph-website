@@ -52,6 +52,18 @@ const treBody            = document.getElementById('treBody');
 const exportTreXlsxBtn   = document.getElementById('exportTreXlsxBtn');
 const treAvenue = document.getElementById('treAvenue');
 
+const lockAttendanceBtn = document.getElementById('lockAttendanceBtn');
+const lockAttendanceState = document.getElementById('lockAttendanceState');
+
+const lockBodAttBtn = document.getElementById('lockBodAttBtn');
+const lockBodAttState = document.getElementById('lockBodAttState');
+
+const lockFinesBtn = document.getElementById('lockFinesBtn');
+const lockFinesState = document.getElementById('lockFinesState');
+
+const lockTreasuryBtn = document.getElementById('lockTreasuryBtn');
+const lockTreasuryState = document.getElementById('lockTreasuryState');
+
 const goBodBtn = document.getElementById('goBodBtn');
 
 let BODM = [];      // [{id, name, position}]
@@ -92,7 +104,7 @@ function drawChart(key, ctx, cfg){
 const fmt = n => Number(n).toLocaleString();
 const yyyymm = d => d.slice(0,7);
 
-
+let IS_PRESIDENT = false;
 /* ---------- Auth guard + role check ---------- */
 auth.onAuthStateChanged(async (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
@@ -100,6 +112,7 @@ auth.onAuthStateChanged(async (user) => {
   try {
     const snap = await db.collection('roles').doc(user.uid).get();
     const role = snap.exists ? String(snap.data().role).toLowerCase() : null;
+    IS_PRESIDENT = (role === 'president');
 
     // Only redirect if we KNOW they’re not admin.
     if (role && role !== 'admin') {
@@ -114,6 +127,53 @@ auth.onAuthStateChanged(async (user) => {
   // ✅ Immediately paint once, then attach realtime listeners
   await startAttendancePage();
 });
+
+function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
+  db.collection('locks').doc(panelKey).onSnapshot(snap => {
+    const locked = snap.exists && !!snap.data().locked;
+    if (badgeEl) badgeEl.textContent = locked ? 'Locked' : 'Unlocked';
+    if (btnEl) {
+      btnEl.disabled = !IS_PRESIDENT;           // only president can click
+      btnEl.textContent = locked ? '🔓' : '🔒';  // flip icon
+    }
+    onLockedChange?.(locked);
+  });
+}
+
+// Hook them up:
+watchLock('attendance',   lockAttendanceBtn,   lockAttendanceState,   (locked) => {
+  // disable attendance UI when locked (buttons/inputs)
+  document.querySelectorAll('#attBody .cell-btn, #addMemberBtn, #addEventBtn')
+    .forEach(el => el.disabled = locked);
+});
+
+watchLock('bodAttendance', lockBodAttBtn, lockBodAttState, (locked) => {
+  document.querySelectorAll('#bodBody .cell-btn, #bodAddMemberBtn, #bodAddMeetingBtn')
+    .forEach(el => el.disabled = locked);
+});
+
+watchLock('fines',        lockFinesBtn,       lockFinesState, (locked) => {
+  document.querySelectorAll('#fineForm input, #fineForm select, #fineForm button')
+    .forEach(el => el.disabled = locked);
+});
+
+watchLock('treasury',     lockTreasuryBtn,    lockTreasuryState, (locked) => {
+  document.querySelectorAll('#treForm input, #treForm select, #treForm button')
+    .forEach(el => el.disabled = locked);
+});
+
+async function toggleLock(panelKey) {
+  if (!IS_PRESIDENT) return; // safety
+  const ref = db.collection('locks').doc(panelKey);
+  const snap = await ref.get();
+  const cur = snap.exists && !!snap.data().locked;
+  await ref.set({ locked: !cur }, { merge: true });
+}
+
+if (lockAttendanceBtn) lockAttendanceBtn.onclick = () => toggleLock('attendance');
+if (lockBodAttBtn)     lockBodAttBtn.onclick     = () => toggleLock('bodAttendance');
+if (lockFinesBtn)      lockFinesBtn.onclick      = () => toggleLock('fines');
+if (lockTreasuryBtn)   lockTreasuryBtn.onclick   = () => toggleLock('treasury');
 
 
 signOutBtn.addEventListener('click', async () => {

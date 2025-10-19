@@ -27,6 +27,41 @@ const filterMine   = document.getElementById('filterMine');
 const filterSearch = document.getElementById('filterSearch');
 const toastEl      = document.getElementById('toast');
 
+let IS_PRESIDENT = false;
+
+// Lock UI helpers
+const lockBodEventsBtn   = document.getElementById('lockBodEventsBtn');
+const lockBodEventsState = document.getElementById('lockBodEventsState');
+
+function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
+  return db.collection('locks').doc(panelKey).onSnapshot(snap => {
+    const locked = snap.exists && !!snap.data().locked;
+    if (badgeEl) badgeEl.textContent = locked ? 'Locked' : 'Unlocked';
+    if (btnEl) {
+      btnEl.disabled   = !IS_PRESIDENT;
+      btnEl.textContent = locked ? '🔓' : '🔒';
+      btnEl.setAttribute('aria-label', locked ? 'Unlock' : 'Lock');
+      btnEl.title = locked ? 'Unlock' : 'Lock';
+    }
+    onLockedChange?.(locked);
+  });
+}
+
+async function toggleLock(panelKey) {
+  if (!IS_PRESIDENT) return;
+  const ref = db.collection('locks').doc(panelKey);
+  const snap = await ref.get();
+  const cur = snap.exists && !!snap.data().locked;
+
+  // optimistic UI
+  lockBodEventsState.textContent = cur ? 'Unlocked' : 'Locked';
+  lockBodEventsBtn.textContent   = cur ? '🔒' : '🔓';
+
+  await ref.set({ locked: !cur }, { merge: true });
+}
+if (lockBodEventsBtn) lockBodEventsBtn.onclick = () => toggleLock('bodEvents');
+
+
 const goAdminBtn = document.getElementById('goAdminBtn');
 function toast(msg, ms=1800){
   if(!toastEl) return;
@@ -70,19 +105,33 @@ auth.onAuthStateChanged(async (user) => {
   try {
     const r = await db.collection('roles').doc(user.uid).get();
     const role = r.exists ? String(r.data().role || '').toLowerCase() : '';
-    if (role === 'admin') {
-  if (goAdminBtn) {
-    goAdminBtn.style.display = 'inline-block';
-    goAdminBtn.onclick = () => { location.href = 'admin.html'; };
-  }
-} else {
-  // BODs should NOT see a link to admin
-  if (goAdminBtn) goAdminBtn.style.display = 'none';
-}
-if (role !== 'bod' && role !== 'admin') {   // only kick out if neither
-  location.href = 'login.html';
-  return;
-}
+
+    // set role flags safely here
+    IS_PRESIDENT = (role === 'president');
+
+    // show/hide “Admin Panel” button
+    if (role === 'admin' || role === 'president') {
+      if (goAdminBtn) {
+        goAdminBtn.style.display = 'inline-block';
+        goAdminBtn.onclick = () => { location.href = 'admin.html'; };
+      }
+    } else {
+      if (goAdminBtn) goAdminBtn.style.display = 'none';
+    }
+
+    // kick non-bod/non-admin users
+    if (role !== 'bod' && role !== 'admin' && role !== 'president') {
+      location.href = 'login.html';
+      return;
+    }
+
+    // start the lock watcher *after* we know IS_PRESIDENT
+    watchLock('bodEvents', lockBodEventsBtn, lockBodEventsState, (locked) => {
+      document
+        .querySelectorAll('#bodEventForm input, #bodEventForm select, #bodEventForm textarea, #bodEventForm button[type=submit]')
+        .forEach(el => el.disabled = locked);
+    });
+
     if (whoami) whoami.textContent = `Signed in as ${user.email || 'BOD'}`;
   } catch {
     if (whoami) whoami.textContent = 'Signed in';
@@ -90,6 +139,7 @@ if (role !== 'bod' && role !== 'admin') {   // only kick out if neither
 
   loadItems();
 });
+
 
 if (signOutBtn) {
   signOutBtn.onclick = async () => {
