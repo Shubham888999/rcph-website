@@ -26,6 +26,8 @@ const filterMonth = document.getElementById('filterMonth');
 const filterMine   = document.getElementById('filterMine');
 const filterSearch = document.getElementById('filterSearch');
 const toastEl      = document.getElementById('toast');
+
+const goAdminBtn = document.getElementById('goAdminBtn');
 function toast(msg, ms=1800){
   if(!toastEl) return;
   toastEl.textContent = msg;
@@ -68,6 +70,15 @@ auth.onAuthStateChanged(async (user) => {
   try {
     const r = await db.collection('roles').doc(user.uid).get();
     const role = r.exists ? String(r.data().role || '').toLowerCase() : '';
+    if (role === 'admin') {
+  if (goAdminBtn) {
+    goAdminBtn.style.display = 'inline-block';
+    goAdminBtn.onclick = () => { location.href = 'admin.html'; };
+  }
+} else {
+  // BODs should NOT see a link to admin
+  if (goAdminBtn) goAdminBtn.style.display = 'none';
+}
 if (role !== 'bod' && role !== 'admin') {   // only kick out if neither
   location.href = 'login.html';
   return;

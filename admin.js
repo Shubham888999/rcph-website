@@ -52,6 +52,8 @@ const treBody            = document.getElementById('treBody');
 const exportTreXlsxBtn   = document.getElementById('exportTreXlsxBtn');
 const treAvenue = document.getElementById('treAvenue');
 
+const goBodBtn = document.getElementById('goBodBtn');
+
 let BODM = [];      // [{id, name, position}]
 let BODMEET = [];   // [{id, name, date}]
 let BODATT = {};    // { bodMemberId: { meetingId: boolean } }
@@ -118,7 +120,12 @@ signOutBtn.addEventListener('click', async () => {
   await auth.signOut();
   location.href = 'login.html';
 });
-
+if (goBodBtn) {
+  goBodBtn.addEventListener('click', () => {
+    // Admins can freely go to BOD panel
+    location.href = 'bodlogin.html';
+  });
+}
 /* ---------- Data load ---------- */
 async function loadData(){
   const [mSnap, eSnap] = await Promise.all([
@@ -317,7 +324,8 @@ headRow.innerHTML =
     <th title="${e.date || ''}">
       <div class="ev-head">
         <span>${e.name || ''}</span>
-        <small>${(e.date || '').slice(0,10)}</small>    <!-- NEW -->
+        <small>${(e.date || '').slice(0,10)}</small>
+        <button class="icon-btn" title="Rename event" data-edit-event="${e.id}">✏️</button>
         <button class="icon-btn" title="Delete event" data-del-event="${e.id}">🗑</button>
       </div>
     </th>
@@ -358,6 +366,7 @@ const gbmPct      = gbmTotal ? Math.round((gbmPresent/gbmTotal)*100) : 0;
           </div>
           <div class="mem-cell">
             <span>${m.name || ''}</span>
+            <button class="icon-btn" title="Rename member" data-edit-member="${m.id}">✏️</button>
             <button class="icon-btn" title="Delete member" data-del-member="${m.id}">🗑</button>
           </div>
         </div>
@@ -404,6 +413,7 @@ function renderAttendanceInsights(){
   });
 
   const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
+
   document.getElementById('attAvg').textContent = `${avg}%`;
 
   // top attendees (by present count on considered events only)
@@ -442,6 +452,7 @@ headRow.innerHTML =
       <div class="ev-head">
         <span>${mt.name || ''}</span>
         <small>${(mt.date || '').slice(0,10)}</small>   <!-- NEW -->
+        <button class="icon-btn" title="Rename meeting" data-edit-bod-meeting="${mt.id}">✏️</button>
         <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
       </div>
     </th>
@@ -475,6 +486,7 @@ const pct = considered ? Math.round((present / considered) * 100) : 0;
           <div class="mem-cell">
             <span>${(m.name || '')}</span>
             <small style="opacity:.7; display:block">${(m.position || '')}</small>
+            <button class="icon-btn" title="Edit name/position" data-edit-bod-member="${m.id}">✏️</button>
             <button class="icon-btn" title="Remove BOD" data-del-bod-member="${m.id}">🗑</button>
           </div>
         </div>
@@ -558,6 +570,52 @@ if (bodAddMeetingBtn) {
     } catch (err) { alert('Failed to add meeting: ' + err.message); }
   });
 }
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-edit-bod-member]');
+  if (!btn) return;
+
+  const id = btn.dataset.editBodMember;
+  const cur = BODM.find(x => x.id === id) || {};
+  const newName = window.prompt('Edit BOD name:', cur.name || '');
+  if (newName == null) return; // cancelled
+  const newPos  = window.prompt('Edit position:', cur.position || '');
+  if (newPos == null) return; // cancelled
+
+  const name = newName.trim();
+  const position = (newPos || '').trim();
+  if (!name) return;
+
+  try {
+    await db.collection('bodMembers').doc(id).update({ name, position });
+    // optional immediate UI feedback (realtime listeners will also refresh)
+    const i = BODM.findIndex(x => x.id === id);
+    if (i >= 0) { BODM[i].name = name; BODM[i].position = position; }
+    renderBodGrid();
+  } catch (err) {
+    alert('Failed to update BOD: ' + err.message);
+  }
+});
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-edit-bod-meeting]');
+  if (!btn) return;
+
+  const id = btn.dataset.editBodMeeting;
+  const cur = BODMEET.find(x => x.id === id) || {};
+  const next = window.prompt('Edit meeting name:', cur.name || '');
+  if (!next || next.trim() === cur.name?.trim()) return;
+
+  try {
+    await db.collection('bodMeetings').doc(id).update({ name: next.trim() });
+    // optional immediate UI feedback
+    const i = BODMEET.findIndex(x => x.id === id);
+    if (i >= 0) BODMEET[i].name = next.trim();
+    renderBodGrid();
+  } catch (err) {
+    alert('Failed to update meeting: ' + err.message);
+  }
+});
+
 // Toggle BOD attendance & delete actions
 document.addEventListener('click', async (e) => {
   // Delete BOD member
@@ -745,6 +803,45 @@ document.addEventListener('click', async (e) => {
     await db.collection('fines').doc(id).delete();
   } catch (err) {
     alert('Failed to delete fine: ' + err.message);
+  }
+});
+
+// Rename MEMBER
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-edit-member]');
+  if (!btn) return;
+  const memberId = btn.dataset.editMember;
+  const current = (MEMBERS.find(x => x.id === memberId)?.name) || '';
+  const next = window.prompt('Enter new member name:', current);
+  if (!next || next.trim() === current.trim()) return;
+
+  try {
+    await db.collection('members').doc(memberId).update({ name: next.trim() });
+    // Update local cache for instant UI feedback (optional; realtime will also refresh)
+    const i = MEMBERS.findIndex(x => x.id === memberId);
+    if (i >= 0) MEMBERS[i].name = next.trim();
+    renderGrid();
+  } catch (err) {
+    alert('Rename failed: ' + err.message);
+  }
+});
+
+// Rename EVENT
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-edit-event]');
+  if (!btn) return;
+  const eventId = btn.dataset.editEvent;
+  const current = (EVENTS.find(x => x.id === eventId)?.name) || '';
+  const next = window.prompt('Enter new event name:', current);
+  if (!next || next.trim() === current.trim()) return;
+
+  try {
+    await db.collection('events').doc(eventId).update({ name: next.trim() });
+    const i = EVENTS.findIndex(x => x.id === eventId);
+    if (i >= 0) EVENTS[i].name = next.trim();
+    renderGrid();
+  } catch (err) {
+    alert('Rename failed: ' + err.message);
   }
 });
 
