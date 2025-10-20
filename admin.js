@@ -115,7 +115,7 @@ auth.onAuthStateChanged(async (user) => {
     IS_PRESIDENT = (role === 'president');
 
     // Only redirect if we KNOW they’re not admin.
-    if (role && role !== 'admin') {
+    if (role && role !== 'admin' && role !== 'president') {
       window.location.href = 'bodlogin.html';
       return;
     }
