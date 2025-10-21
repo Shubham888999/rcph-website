@@ -21,7 +21,6 @@
   <button id="forgotBtn" class="btn btn-outline" style="padding:6px 10px;">Forgot password?</button>
 </div>
 
-<!-- Add under the "Forgot password?" button -->
 <div id="otpBox" style="margin-top:14px; border-top:1px solid #333; padding-top:12px; display:none;">
   <div style="display:flex; gap:8px; align-items:center;">
     <input id="otpEmail" type="email" placeholder="Email for OTP"
@@ -40,8 +39,6 @@
   <p id="otpMsg" style="color:#ccc; margin-top:8px;"></p>
 </div>
 
-
-<!-- ▼▼▼ NEW FORM LINKS SECTION -->
 <div style="margin-top:20px; padding:10px; border-top:1px solid #333;">
   <p style="margin:8px 0 4px; font-size:14px; color:#ddd; font-weight:500;">💰 Reimbursement Form</p>
   <a href="https://docs.google.com/forms/d/e/1FAIpQLSe5OXooAMkyD35Dl0KtRElDmwi1MMXd-ANHHJ4Z8ozp6NziZg/viewform?usp=header"
@@ -57,11 +54,10 @@
     Open Google Form
   </a>
 </div>
-<!-- ▲▲▲ END NEW FORM LINKS SECTION -->
 
     <p id="authError" style="color:#ff6b6b;margin-top:10px;min-height:1.2em;"></p>
 
-    <!-- ▼▼▼ ADD THIS: panel chooser (hidden by default; shown for admins) -->
+    <!-- Panel chooser (hidden by default; shown for admins) -->
     <div id="panelChooser" style="display:none;max-width:420px;margin:1rem 0 0;padding:12px;border:1px solid #2e2e2e;border-radius:12px;background:#161616">
       <p style="margin:.25rem 0 1rem 0">Where do you want to go?</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -69,24 +65,17 @@
         <a href="bodlogin.html" class="btn btn-outline" style="flex:1;text-align:center">BOD Panel</a>
       </div>
     </div>
-    <!-- ▲▲▲ END chooser -->
+    <!-- END chooser -->
   </div>
 
-  <!-- Firebase SDKs (CDN) -->
  <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
-<!-- Your init (must come AFTER the SDKs) -->
 <script src="firebase-init.js"></script>
-
 <script>
-  // REQUIRES firebase-init.js already loaded (uses window.auth, window.db)
   const auth = window.auth;
   const db   = window.db;
-
-  // 1) Complete any pending redirect result FIRST
   (async function completeRedirectIfAny() {
     try {
       const result = await auth.getRedirectResult();
@@ -99,12 +88,10 @@
     }
   })();
 
-  // 2) Google sign-in: Popup first, fallback to Redirect
   document.getElementById('googleBtn').onclick = async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
 
     try {
-      // Try popup
       const res = await auth.signInWithPopup(provider);
       await routeByRole(res.user);
     } catch (e) {
@@ -134,18 +121,12 @@ async function routeByRole(user) {
     }
 
     const role = String(snap.data().role || '').toLowerCase();
-
-    // optional deep links first
     const dest = new URLSearchParams(location.search).get('dest');
     if (dest === 'admin') { location.href = 'admin.html'; return; }
     if (dest === 'bod')   { location.href = 'bodlogin.html'; return; }
 
-    // Admin experience for both 'admin' and 'president'
     if (role === 'admin' || role === 'president') {
-      // show chooser (or redirect straight to admin.html if you prefer)
       document.getElementById('panelChooser').style.display = 'block';
-
-      // (optional) honor remembered choice
       const preferred = localStorage.getItem('preferredPanel');
       if (preferred === 'admin') { location.href = 'admin.html'; return; }
       if (preferred === 'bod')   { location.href = 'bodlogin.html'; return; }
@@ -156,6 +137,11 @@ async function routeByRole(user) {
       location.href = 'bodlogin.html';
       return;
     }
+    if (role === 'dzr') {
+  location.href = 'dzrvisit.html';
+  return;
+}
+
 
     await auth.signOut();
     err(`Unknown role "${role}". Contact admin.`);
@@ -181,7 +167,5 @@ async function routeByRole(user) {
     }
   };
 </script>
-
-  <!-- ▲▲▲ END script -->
 </body>
 </html>
