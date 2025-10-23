@@ -47,17 +47,131 @@
 <div class="dzr-topbar">
   <h1 class="dzr-title">DZR Visit Dashboard</h1>
   <div class="nav-tabs">
-    <a href="#att">Attendance</a>
-    <a href="#bod-att">BOD Attendance</a>
     <a href="#showcase">Showcase</a>
   </div>
   <span class="pill">View-only</span>
   <button id="dzrSignOut" class="pill" style="margin-left:8px;">Sign out</button>
 </div>
 
+<!-- Greeting editor + banner -->
+<!-- Greeting (simple paragraph) -->
+<section class="dzr-card" id="greetCard">
+  <h2 class="panel-title">Greeting</h2>
+  <p class="panel-sub" style="font-size:16px;margin:6px 0 0;">
+    Welcome, DZR Visit Panel! Here’s the complete summary and functioning of our club.
+  </p>
+</section>
+
+
+    <!-- Showcase panels (Drive + PPT) -->
+    <section id="showcase" class="dzr-card">
+      <h2 class="panel-title">Showcase Panels</h2>
+      <p class="panel-sub">Jump to a department to view document folders and embedded presentations.</p>
+
+      <div class="nav-tabs" style="margin-bottom:6px;">
+        <a href="#p-president">President</a>
+        <a href="#p-secretary">Secretary</a>
+        <a href="#p-treasurer">Treasurer</a>
+        <a href="#p-vp">VP</a>
+        <a href="#p-ipp">IPP</a>
+        <a href="#p-pdd">PDD</a>
+        <a href="#p-csd">CSD</a>
+        <a href="#p-isd">ISD</a>
+        <a href="#p-cmd">CMD</a>
+        <a href="#p-pro">PRO</a>
+        <a href="#p-dei">DEI</a>
+        <a href="#p-sports">Sports Rep</a>
+        <a href="#p-rrro">RRRO</a>
+      </div>
+
+      <!-- One block per panel. Replace the href/src with your Drive links -->
+<details id="p-president" class="dzr-card">
+  <summary class="panel-title">President</summary>
+  <div>
+    <p class="panel-sub">
+      Documents: <a class="drive-link" href="YOUR_PRESIDENT_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+    </p>
+    <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_PRESIDENT_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+  </div>
+</details>
+
+      <details id="p-secretary" class="dzr-card">
+        <summary class="panel-title">Secretary</summary>
+        <div>
+        <p class="panel-sub">
+          Documents: <a class="drive-link" href="YOUR_SECRETARY_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+        </p>
+        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_SECRETARY_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+      </div>
+      </details>
+
+      <details id="p-treasurer" class="dzr-card">
+        <summary class="panel-title">Treasurer</summary>
+        <div>
+        <p class="panel-sub">
+          Documents: <a class="drive-link" href="YOUR_TREASURER_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+        </p>
+        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_TREASURER_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+          <div class="dzr-card">
+    <h3 class="panel-title" style="margin:0 0 8px;">Finance overview (view-only)</h3>
+    <div class="kpis">
+      <div class="kpi"><h3>Total Income</h3><div id="dzrTreInc" class="val">₹ 0</div></div>
+      <div class="kpi"><h3>Total Expense</h3><div id="dzrTreExp" class="val">₹ 0</div></div>
+      <div class="kpi"><h3>Net</h3><div id="dzrTreNet" class="val">₹ 0</div></div>
+    </div>
+
+    <div class="grid-wrap">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Amount (₹)</th>
+            <th>Avenue</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="dzrTreBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+      </div>
+      </details>
+
+      <details id="p-vp" class="dzr-card">
+        <summary class="panel-title">Vice President</summary>
+        <div>
+        <p class="panel-sub">
+          Documents: <a class="drive-link" href="YOUR_VP_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+        </p>
+        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_VP_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+      </div>
+      </details>
+
+      <details id="p-ipp" class="dzr-card">
+        <summary class="panel-title">IPP</summary>
+        <div>
+        <p class="panel-sub">
+          Documents: <a class="drive-link" href="YOUR_IPP_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+        </p>
+        <!-- no PPT here per your note -->
+      </div>
+      </details>
+
+      <!-- SAA (Sergeant-at-Arms) -->
+<details id="p-saa" class="dzr-card">
+  <summary class="panel-title">SAA</summary>
+  <p class="panel-sub">
+    <a href="#saa-att" style="color:#8fe9e7;text-decoration:underline;">Members attendance</a> •
+    <a href="#saa-bod" style="color:#8fe9e7;text-decoration:underline;">BOD attendance</a> •
+    <a href="#saa-fines" style="color:#8fe9e7;text-decoration:underline;">Fines</a>
+  </p>
+
+  <!-- ▼ Attendance (Members) -->
+  <details id="saa-att" class="dzr-card">
+    <summary class="panel-title">Attendance (Members)</summary>
     <!-- Attendance (view-only) -->
-    <section id="att" class="dzr-card">
-      <h2 class="panel-title">Attendance (Members)</h2>
       <p class="panel-sub">Filter by member(s) and event(s). Read Only Access.</p>
 
       <div class="toolbar">
@@ -86,11 +200,13 @@
           <tbody id="dzrAttBody"></tbody>
         </table>
       </div>
-    </section>
 
-    <!-- BOD Attendance (view-only) -->
-    <section id="bod-att" class="dzr-card">
-      <h2 class="panel-title">BOD Attendance</h2>
+
+  </details>
+
+  <!-- ▼ BOD Attendance -->
+  <details id="saa-bod" class="dzr-card">
+    <summary class="panel-title">BOD Attendance</summary>
       <p class="panel-sub">Filter by BOD member(s) and meeting(s). Read-only Access.</p>
 
       <div class="toolbar">
@@ -115,135 +231,115 @@
           <tbody id="dzrBodBody"></tbody>
         </table>
       </div>
-    </section>
+  </details>
+  <!-- ▼ Fines (view-only) -->
+ <details id="saa-fines" class="dzr-card">
+    <summary class="panel-title">Fines</summary>
+    <div class="kpis">
+      <div class="kpi"><h3>Total fines</h3><div id="dzrFinesCount" class="val">0</div></div>
+      <div class="kpi"><h3>Collected (this month)</h3><div id="dzrFinesMonth" class="val">₹ 0</div></div>
+      <div class="kpi"><h3>Collected (all time)</h3><div id="dzrFinesTotal" class="val">₹ 0</div></div>
+    </div>
 
-    <!-- Showcase panels (Drive + PPT) -->
-    <section id="showcase" class="dzr-card">
-      <h2 class="panel-title">Showcase Panels</h2>
-      <p class="panel-sub">Jump to a department to view document folders and embedded presentations.</p>
+    <div class="grid-wrap">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Amount (₹)</th>
+            <th>Reason</th>
+            <th>Event</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="dzrFinesBody"></tbody>
+      </table>
+    </div>
+  </details>
+</details>
 
-      <div class="nav-tabs" style="margin-bottom:6px;">
-        <a href="#p-president">President</a>
-        <a href="#p-secretary">Secretary</a>
-        <a href="#p-treasurer">Treasurer</a>
-        <a href="#p-vp">VP</a>
-        <a href="#p-ipp">IPP</a>
-        <a href="#p-pdd">PDD</a>
-        <a href="#p-csd">CSD</a>
-        <a href="#p-isd">ISD</a>
-        <a href="#p-cmd">CMD</a>
-        <a href="#p-pro">PRO</a>
-        <a href="#p-dei">DEI</a>
-        <a href="#p-sports">Sports Rep</a>
-        <a href="#p-rrro">RRRO</a>
-      </div>
-
-      <!-- One block per panel. Replace the href/src with your Drive links -->
-      <div id="p-president" class="dzr-card">
-        <h3 class="panel-title">President</h3>
-        <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_PRESIDENT_FOLDER_LINK" target="_blank">Open Drive Folder</a>
-        </p>
-        <!-- IPP / documents-only panels can omit iframes. Keep iframe in others: -->
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_PRESIDENT_PPT_FILE_ID/preview" allow="autoplay"></iframe>
-      </div>
-
-      <div id="p-secretary" class="dzr-card">
-        <h3 class="panel-title">Secretary</h3>
-        <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_SECRETARY_FOLDER_LINK" target="_blank">Open Drive Folder</a>
-        </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_SECRETARY_PPT_FILE_ID/preview" allow="autoplay"></iframe>
-      </div>
-
-      <div id="p-treasurer" class="dzr-card">
-        <h3 class="panel-title">Treasurer</h3>
-        <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_TREASURER_FOLDER_LINK" target="_blank">Open Drive Folder</a>
-        </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_TREASURER_PPT_FILE_ID/preview" allow="autoplay"></iframe>
-      </div>
-
-      <div id="p-vp" class="dzr-card">
-        <h3 class="panel-title">Vice President</h3>
-        <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_VP_FOLDER_LINK" target="_blank">Open Drive Folder</a>
-        </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_VP_PPT_FILE_ID/preview" allow="autoplay"></iframe>
-      </div>
-
-      <div id="p-ipp" class="dzr-card">
-        <h3 class="panel-title">IPP</h3>
-        <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_IPP_FOLDER_LINK" target="_blank">Open Drive Folder</a>
-        </p>
-        <!-- no PPT here per your note -->
-      </div>
 
       <!-- Avenues (examples) -->
-      <div id="p-cmd" class="dzr-card">
-        <h3 class="panel-title">CMD</h3>
+      <details id="p-cmd" class="dzr-card">
+        <summary class="panel-title">CMD</summary>
+        <div>
         <p class="panel-sub">
           Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1ipASvE2Ofo0ooB95vkfijzVdvMsxhD9W?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1jYXyKya6yPY8SDqOybm3oK_34fLjUw9u/edit?usp=drive_link&ouid=104366023356332266457&rtpof=true&sd=true/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
-      <div id="p-pdd" class="dzr-card">
-        <h3 class="panel-title">PDD</h3>
+      <details id="p-pdd" class="dzr-card">
+        <summary class="panel-title">PDD</summary>
+        <div>
         <p class="panel-sub">
           Documents: <a class="drive-link" href="YOUR_PDD_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_PDD_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
-      <div id="p-csd" class="dzr-card">
-        <h3 class="panel-title">CSD</h3>
-        <p class="panel-sub">
+      <details id="p-csd" class="dzr-card">
+        <summary class="panel-title">CSD</summary>
+        <div>
+        <p> class="panel-sub">
           Documents: <a class="drive-link" href="YOUR_CSD_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_CSD_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
-      <div id="p-isd" class="dzr-card">
-        <h3 class="panel-title">ISD</h3>
+
+      <details id="p-isd" class="dzr-card">
+        <summary class="panel-title">ISD</summary>
+        <div>
         <p class="panel-sub">
           Documents: <a class="drive-link" href="YOUR_ISD_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_ISD_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
-      <div id="p-pro" class="dzr-card">
-        <h3 class="panel-title">PRO</h3>
+      <details id="p-pro" class="dzr-card">
+        <summary class="panel-title">PRO</summary>
+        <div>
         <p class="panel-sub">
           Documents: <a class="drive-link" href="YOUR_PRO_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_PRO_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
-      <div id="p-dei" class="dzr-card">
-        <h3 class="panel-title">DEI</h3>
+      <details id="p-dei" class="dzr-card">
+        <summary class="panel-title">DEI</summary>
+        <div>
         <p class="panel-sub">
           Documents: <a class="drive-link" href="YOUR_DEI_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_DEI_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
-      <div id="p-sports" class="dzr-card">
-        <h3 class="panel-title">Sports Representative</h3>
+      <details id="p-sports" class="dzr-card">
+        <summary class="panel-title">Sports Representative</summary>
+        <div>
         <p class="panel-sub">
           Documents: <a class="drive-link" href="YOUR_SPORTS_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_SPORTS_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
-      <div id="p-rrro" class="dzr-card">
-        <h3 class="panel-title">RRRO</h3>
+      <details id="p-rrro" class="dzr-card">
+        <summary class="panel-title">RRRO</summary>
+        <div>
         <p class="panel-sub">
           Documents: <a class="drive-link" href="YOUR_RRRO_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_RRRO_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
+      </details>
 
     </section>
   </div>

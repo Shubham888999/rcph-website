@@ -38,6 +38,20 @@ const meetCount = document.getElementById('dzrMeetCount');
 const bodAvg    = document.getElementById('dzrBodAvg');
 const bodTop    = document.getElementById('dzrBodTop');
 
+const finesBody   = document.getElementById('dzrFinesBody');
+const finesTotal  = document.getElementById('dzrFinesTotal');
+const finesMonth  = document.getElementById('dzrFinesMonth');
+const finesCount  = document.getElementById('dzrFinesCount');
+
+const treBody   = document.getElementById('dzrTreBody');
+const treIncEl  = document.getElementById('dzrTreInc');
+const treExpEl  = document.getElementById('dzrTreExp');
+const treNetEl  = document.getElementById('dzrTreNet');
+
+let TREAS = [];
+
+
+let FINES = [];
 let MEMBERS=[], EVENTS=[], ATT={};
 let BODM=[], BODMEET=[], BODATT={};
 
@@ -49,10 +63,13 @@ auth.onAuthStateChanged(async (user) => {
 });
 
 async function start(){
-  await Promise.all([loadAttendance(), loadBOD()]);
-  attachListeners();
-  renderAttendance();
-  renderBOD();
+await Promise.all([loadAttendance(), loadBOD(), loadFinesOnce(), loadTreasuryOnce()]);
+attachListeners();
+attachFinesListener();
+attachTreasuryListener();
+renderAttendance();
+renderBOD();
+renderTreasury();
 }
 
 /* ---------- Attendance (members/events) ---------- */
@@ -228,6 +245,111 @@ return `<td>${cell}</td>`;
   const best = top.sort((a,b)=>b.c-a.c).slice(0,3).map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ');
   bodTop.textContent = best || '—';
 }
+// ▼▼▼ Dynamic arrow toggle for details panels ▼▼▼
+document.querySelectorAll('details').forEach(det => {
+  const summary = det.querySelector('summary');
+  if (!summary) return;
+
+  // Add a span arrow at the end of the summary
+  const arrow = document.createElement('span');
+  arrow.textContent = '▼';
+  arrow.style.float = 'right';
+  arrow.style.transition = 'transform 0.2s';
+  summary.appendChild(arrow);
+
+  // Listen to toggle event to update arrow direction
+  det.addEventListener('toggle', () => {
+    arrow.textContent = det.open ? '▲' : '▼';
+  });
+});
+
+async function loadFinesOnce() {
+  const snap = await db.collection('fines').orderBy('date','desc').get();
+  FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderFinesView();
+}
+
+function attachFinesListener() {
+  db.collection('fines').orderBy('date','desc')
+    .onSnapshot(snap => {
+      FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderFinesView();
+    });
+}
+
+function renderFinesView(){
+  if (!finesBody) return;
+
+  let total = 0, monthTotal = 0;
+  const nowYM = new Date().toISOString().slice(0,7);
+
+  const rows = FINES.map(f => {
+    const amt = Number(f.amount || 0) || 0;
+    total += amt;
+    if ((f.date||'').slice(0,7) === nowYM) monthTotal += amt;
+
+    const reasonLabel =
+      f.reason === 'missing_badge' ? 'Missing badge' :
+      f.reason === 'late' ? 'Late to event/meeting' :
+      (f.reason || '');
+
+    return `
+      <tr>
+        <td>${(f.memberName || '').replace(/</g,'&lt;')}</td>
+        <td>₹ ${amt.toLocaleString()}</td>
+        <td>${reasonLabel}</td>
+        <td>${(f.eventName || '').replace(/</g,'&lt;')}</td>
+        <td>${(f.date||'').slice(0,10)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  finesBody.innerHTML = rows || `<tr><td colspan="5" style="opacity:.7">No fines yet.</td></tr>`;
+  if (finesTotal) finesTotal.textContent = `₹ ${total.toLocaleString()}`;
+  if (finesMonth) finesMonth.textContent = `₹ ${monthTotal.toLocaleString()}`;
+  if (finesCount) finesCount.textContent = `${FINES.length}`;
+}
+
+async function loadTreasuryOnce(){
+  const tSnap = await db.collection('treasury').orderBy('date','desc').get();
+  TREAS = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+function attachTreasuryListener(){
+  db.collection('treasury').orderBy('date','desc')
+    .onSnapshot(snap => {
+      TREAS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderTreasury();
+    });
+}
+
+function renderTreasury(){
+  if (!treBody) return;
+
+  // KPIs
+  let inc = 0, exp = 0;
+  (TREAS || []).forEach(t => {
+    const a = Number(t.amount || 0);
+    if (t.type === 'income') inc += a;
+    else if (t.type === 'expense') exp += a;
+  });
+  const net = inc - exp;
+  if (treIncEl) treIncEl.textContent = `₹ ${inc.toLocaleString()}`;
+  if (treExpEl) treExpEl.textContent = `₹ ${exp.toLocaleString()}`;
+  if (treNetEl) treNetEl.textContent = `₹ ${net.toLocaleString()}`;
+
+  // Table
+  treBody.innerHTML = (TREAS || []).map(t => `
+    <tr>
+      <td>${(t.name || '').replace(/</g,'&lt;')}</td>
+      <td>${t.type === 'income' ? 'Income' : 'Expense'}</td>
+      <td>₹ ${(Number(t.amount || 0)).toLocaleString()}</td>
+      <td>${(t.avenue || '-').replace(/</g,'&lt;')}</td>
+      <td>${(t.date || '').slice(0,10)}</td>
+    </tr>
+  `).join('');
+}
+
 
 /* ---------- Interactions ---------- */
 function attachListeners(){
