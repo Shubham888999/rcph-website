@@ -176,16 +176,18 @@ if (form) {
 
     const name        = evName.value.trim();
     const description = evDesc.value.trim();
-    const avenue      = evAvenue.value;
+    const avenues = Array.from(evAvenue.selectedOptions).map(o => o.value);
     const driveFolder = (driveInput?.value || '').trim();   // may be blank
     const conductedBy = (document.getElementById('conductedBy')?.value || '').trim();
-    const eventDate   = (document.getElementById('eventDate')?.value || '').trim(); // YYYY-MM-DD
-    const eventTime   = (document.getElementById('eventTime')?.value || '').trim(); // HH:MM or ""
+const eventStart  = (document.getElementById('eventStart')?.value || '').trim();
+const eventEnd    = (document.getElementById('eventEnd')?.value || '').trim();
+const eventTime   = (document.getElementById('eventTime')?.value || '').trim();
 
-    if (!name || !description || !avenue || !eventDate || !conductedBy) {
-      if (statusEl) statusEl.textContent = 'Please fill all required fields.';
-      return;
-    }
+if (!name || !description || !avenues.length || !eventStart || !eventEnd || !conductedBy)
+ {
+  if (statusEl) statusEl.textContent = 'Please fill all required fields (pick at least one avenue).';
+  return;
+}
 
     // If a full Drive URL was pasted, keep both url and id
     let driveFolderId = '';
@@ -195,10 +197,11 @@ if (form) {
 const doc = {
   name,
   description,
-  avenue,
-  conductedBy,           // NEW
-  eventDate,             // NEW (YYYY-MM-DD)
-  eventTime,             // NEW (HH:MM, optional)
+  avenue: avenues,
+  conductedBy,
+  eventStart,
+  eventEnd,
+  eventTime,
   driveFolder,
   driveFolderId,
   createdBy: user.uid,
@@ -275,8 +278,12 @@ async function loadItems() {
     const q = (filterSearch?.value || '').trim().toLowerCase();
 
     let rows = all.filter(r => {
-      if (avFilter && (r.avenue || '').toUpperCase() !== avFilter) return false;
-      if (ymFilter && !(r.eventDate || '').startsWith(ymFilter))   return false;
+if (avFilter) {
+  const avs = Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []);
+  const has = avs.map(x => String(x).toUpperCase()).includes(avFilter);
+  if (!has) return false;
+}
+      if (ymFilter && !(r.eventStart || '').startsWith(ymFilter)) return false;
       if (mineOnly && user && r.createdBy !== user.uid)            return false;
 
       if (q) {
@@ -301,22 +308,23 @@ async function loadItems() {
       const driveUrl = r.driveFolderId
         ? `https://drive.google.com/drive/folders/${r.driveFolderId}`
         : (r.driveFolder || '');
-
+const chips = (Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []))
+  .map(av => `<span class="pill">${String(av).toUpperCase()}</span>`)
+  .join(' ');
       return `
         <div class="card">
-          <div class="card__header">
-            <span class="chip">${(r.avenue || '').toUpperCase()}</span>
-            <span class="timepill">${createdStr}</span>
-            <button class="iconbtn" data-del="${r.id}" title="Delete">
-              🗑️
-            </button>
-          </div>
+<div class="card__header">
+  <span class="chipset">${chips}</span>
+  <span class="timepill">${createdStr}</span>
+  <button class="iconbtn" data-del="${r.id}" title="Delete">🗑️</button>
+</div>
           <div class="card__title">${escapeHtml(r.name || '')}</div>
-          <div class="card__meta">
-            ${escapeHtml(r.eventDate || '')}
-            ${r.eventTime ? ' • ' + escapeHtml(r.eventTime) : ''}
-            ${r.conductedBy ? ' • by ' + escapeHtml(r.conductedBy) : ''}
-          </div>
+<div class="card__meta">
+  ${r.eventStart ? escapeHtml(r.eventStart) : ''}
+  ${r.eventEnd ? ' → ' + escapeHtml(r.eventEnd) : ''}
+  ${r.eventTime ? ' • ' + escapeHtml(r.eventTime) : ''}
+  ${r.conductedBy ? ' • by ' + escapeHtml(r.conductedBy) : ''}
+</div>
           <div class="card__body">${escapeHtml(r.description || '')}</div>
           ${driveUrl ? `
             <a class="btn btn-outline" href="${driveUrl}" target="_blank">Open Drive folder</a>
@@ -339,35 +347,28 @@ async function loadItems() {
 function exportSubsToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
 
-  // Choose the dataset: use the filtered view; fallback to all if empty.
+  // Use the currently filtered items (populated in loadItems)
   const data = (FILTERED_SUBS && FILTERED_SUBS.length) ? FILTERED_SUBS : [];
 
-  // Header
   const header = [
-    'Event Name',
-    'Avenue',
-    'Conducted By',
-    'Event Date',
-    'Event Time',
-    'Created At',
-    'Description',
-    'Drive Folder Link',
-    'Drive Folder ID',
-    'Created By (email)'
+    'Event Name','Avenues','Conducted By','Start Date','End Date','Time',
+    'Created','Description','Drive Link','Drive Folder ID','Created By'
   ];
 
-  // Rows
   const rows = data.map(r => {
     const createdStr = r.createdAt ? new Date(r.createdAt).toLocaleString() : '';
-    const driveLink = r.driveFolderId
+    const driveLink  = r.driveFolderId
       ? `https://drive.google.com/drive/folders/${r.driveFolderId}`
       : (r.driveFolder || '');
 
+    const avJoined = Array.isArray(r.avenue) ? r.avenue.join(', ') : (r.avenue || '');
+
     return [
       r.name || '',
-      r.avenue || '',
+      avJoined,
       r.conductedBy || '',
-      r.eventDate || '',
+      r.eventStart || '',
+      r.eventEnd || '',
       r.eventTime || '',
       createdStr,
       r.description || '',
@@ -379,22 +380,21 @@ function exportSubsToExcel(){
 
   const aoa = [header, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-  // Friendly column widths + freeze header row
   ws['!cols'] = [
-    {wch:28},{wch:8},{wch:20},{wch:12},{wch:8},{wch:18},{wch:40},{wch:36},{wch:20},{wch:24}
+    {wch:28},{wch:12},{wch:20},{wch:12},{wch:12},{wch:8},
+    {wch:18},{wch:40},{wch:36},{wch:24},{wch:26}
   ];
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'BOD Submissions');
 
-  // Name file with active filters if any
   const av = (filterAvenue?.value || 'all');
-  const ym = (filterMonth?.value || 'all'); // YYYY-MM
+  const ym = (filterMonth?.value  || 'all'); // YYYY-MM
   const stamp = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `bod_submissions_${av}_${ym}_${stamp}.xlsx`);
 }
+
 
 // Single, clean delete handler for BOD events
 document.addEventListener('click', async (e) => {

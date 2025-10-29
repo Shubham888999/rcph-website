@@ -176,70 +176,70 @@ input[type="time"]::-moz-placeholder {
   </div>
 </div>
 
-      <form id="bodEventForm" class="fm" autocomplete="off">
-        <div style="display:grid; gap:12px; grid-template-columns: 1fr 220px;">
-          <label>
-            <span>Event name</span>
-            <input id="evName" type="text" placeholder="e.g., Pad-Aid Drive" required/>
-          </label>
+<form id="bodEventForm" class="fm">
 
-          <label>
-            <span>Avenue</span>
-            <select id="evAvenue" required>
-              <option value="" disabled selected>Select avenue…</option>
-              <option>ISD</option>
-              <option>CMD</option>
-              <option>CSD</option>
-              <option>PDD</option>
-              <option>RRRO</option>
-              <option>PRO</option>
-              <option>DEI</option>
-              <option>GBM</option>
-            </select>
-          </label>
-        </div>
+  <!-- Row 1: name + conducted by + avenues -->
+  <div style="display:grid; gap:12px; grid-template-columns: 1fr 1fr 220px;">
+    <label>
+      <span>Event name</span>
+      <input id="evName" type="text" placeholder="e.g., Pad-Aid Drive" required />
+    </label>
 
-        <div style="display:grid; gap:12px; grid-template-columns: 1fr 160px 140px;">
+    <label>
+      <span>Conducted by (your name)</span>
+      <input id="conductedBy" type="text" placeholder="e.g., Rtr. ABC XYZ" required />
+    </label>
+
+    <label>
+      <span>Avenues (pick multiple)</span>
+      <select id="evAvenue" multiple size="8" style="min-height:160px;">
+        <option>ISD</option><option>CMD</option><option>CSD</option><option>PDD</option>
+        <option>RRRO</option><option>PRO</option><option>DEI</option><option>GBM</option>
+      </select>
+      <small class="note">Tip: Ctrl/Cmd-click (or long-press on mobile) to select multiple.</small>
+    </label>
+  </div>
+
+  <!-- Row 2: dates + time -->
+  <div style="display:grid; gap:12px; grid-template-columns: 160px 160px 140px;">
+    <label>
+      <span>Start date</span>
+      <input id="eventStart" type="date" required />
+    </label>
+    <label>
+      <span>End date</span>
+      <input id="eventEnd" type="date" required />
+    </label>
+    <label>
+      <span>Event time (optional)</span>
+      <input id="eventTime" type="time" />
+    </label>
+  </div>
+
   <label>
-    <span>Conducted by (your name)</span>
-    <input id="conductedBy" type="text" placeholder="e.g., Rtr. ABC XYZ" required />
+    <span>Description</span>
+    <textarea id="evDesc" placeholder="Short description for avenue reporting…" required></textarea>
   </label>
 
   <label>
-    <span>Event date</span>
-    <input id="eventDate" type="date" required />
+    <span>Drive folder (paste full URL or folder name)</span>
+    <input id="driveFolder" type="text" placeholder="https://drive.google.com/drive/folders/…" />
   </label>
 
-  <label>
-    <span>Event time (optional)</span>
-    <input id="eventTime" type="time" />
-  </label>
-</div>
+  <!-- Live preview for pasted URL -->
+  <div id="drivePreview" class="drive-preview" hidden>
+    <span class="pill">Folder ID: <code id="driveIdOut"></code></span>
+    <a id="driveOpenOut" class="pill" href="#" target="_blank" rel="noopener">Open folder</a>
+  </div>
 
-        <label>
-          <span>Description</span>
-          <textarea id="evDesc" placeholder="Short description for avenue reporting…" required></textarea>
-        </label>
+  <div class="actions">
+    <button type="reset" class="btn btn-outline">Clear</button>
+    <button type="submit" class="btn">Submit</button>
+  </div>
 
-<label>
-  <span>Drive folder (paste full URL or folder name)</span>
-  <input id="driveFolder" type="text" placeholder="https://drive.google.com/drive/folders/…"/>
-</label>
+  <div id="status" class="note"></div>
+</form>
 
-<!-- Live preview for pasted URL -->
-<div id="drivePreview" class="drive-preview" hidden>
-  <span class="pill">Folder ID: <code id="driveIdOut"></code></span>
-  <a id="driveOpenOut" class="pill" href="#" target="_blank" rel="noopener">Open folder</a>
-</div>
-
-
-        <div class="actions">
-          <button type="reset" class="btn btn-outline">Clear</button>
-          <button type="submit" class="btn">Submit</button>
-        </div>
-
-        <div id="status" class="note"></div>
-      </form>
     </div>
 
     <div class="card" style="margin-top:18px">
@@ -371,7 +371,7 @@ function buildMonthFilter(all) {
   const months = Array.from(
     new Set(
       all
-        .map(r => (r.eventDate || "").slice(0, 7))
+        .map(r => (r.eventStart || "").slice(0, 7))
         .filter(Boolean)
     )
   ).sort().reverse(); // newest first
@@ -399,7 +399,7 @@ function updateBodKpis(rows) {
 
   // “This month” = items whose eventDate is in the current YYYY-MM
   const nowYM = new Date().toISOString().slice(0, 7);
-  const thisMonthCount = rows.filter(r => (r.eventDate || '').startsWith(nowYM)).length;
+  const thisMonthCount = rows.filter(r => (r.eventStart || '').startsWith(nowYM)).length;
   if (kpiThis) kpiThis.textContent = String(thisMonthCount);
 
   // Top conductors (by “conductedBy”)
@@ -417,20 +417,21 @@ function updateBodKpis(rows) {
   if (kpiTop) kpiTop.textContent = top;
 
   // By avenue chips
-  if (kpiAvs) {
-    const avTallies = {};
-    rows.forEach(r => {
-      const av = (r.avenue || '').toUpperCase();
-      if (!av) return;
-      avTallies[av] = (avTallies[av] || 0) + 1;
+if (kpiAvs) {
+  const avTallies = {};
+  rows.forEach(r => {
+    const list = Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []);
+    list.forEach(av => {
+      const key = String(av).toUpperCase();
+      avTallies[key] = (avTallies[key] || 0) + 1;
     });
-    const chips = Object.entries(avTallies)
-      .sort((a,b)=> b[1]-a[1])
-      .map(([av, n]) =>
-        `<span class="pill" title="${n}">${av}: <strong>${n}</strong></span>`
-      ).join('') || '<span class="pill">—</span>';
-    kpiAvs.innerHTML = chips;
-  }
+  });
+  const chips = Object.entries(avTallies)
+    .sort((a,b)=> b[1]-a[1])
+    .map(([av, n]) => `<span class="pill" title="${n}">${av}: <strong>${n}</strong></span>`)
+    .join('') || '<span class="pill">—</span>';
+  kpiAvs.innerHTML = chips;
+}
 }
 
 
