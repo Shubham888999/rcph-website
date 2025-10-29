@@ -215,7 +215,7 @@ try {
 
   await db.collection('bodEvents').add(doc);
 
-  localStorage.removeItem(DRAFT_KEY);
+  //localStorage.removeItem(DRAFT_KEY);
   form.reset();
   toast('Saved!');
   loadItems();
