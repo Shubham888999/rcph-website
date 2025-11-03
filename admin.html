@@ -145,12 +145,26 @@
         <button id="signOutBtn" class="btn btn-outline">Sign out</button>
       </div>
       </div>
-      <div class="toolbar">
+<div class="toolbar">
         <input id="memberSearch" type="text" placeholder="Search member…"/>
         <input id="eventSearch" type="text" placeholder="Search event…"/>
         <select id="monthFilter">
           <option value="">All months</option>
         </select>
+        
+        <select id="avenueFilter">
+          <option value="">All avenues</option>
+          <option value="ISD">ISD</option>
+          <option value="CMD">CMD</option>
+          <option value="CSD">CSD</option>
+          <option value="PDD">PDD</option>
+          <option value="RRRO">RRRO</option>
+          <option value="PRO">PRO</option>
+          <option value="DEI">DEI</option>
+          <option value="GBM">GBM</option>
+          <option value="_NONE_">No Avenue</option>
+        </select>
+        
         <button id="addEventBtn" class="btn btn-outline">Add Event</button>
         <button id="addMemberBtn" class="btn btn-outline">Add Member</button>
         <span class="flex-1"></span>
@@ -317,18 +331,181 @@
 
 
   </div>
-
-  <!-- Add / Edit Modal -->
-  <div id="admModal" class="adm-modal" aria-hidden="true">
+    <div id="addMemberModal" class="adm-modal" aria-hidden="true">
     <div class="adm-modal__sheet">
       <div class="adm-modal__head">
-        <h3 id="admModalTitle">Add</h3>
-        <button class="adm-close" id="admClose" aria-label="Close">×</button>
+        <h3>Add Member</h3>
+        <button class="adm-close" data-close="addMemberModal" aria-label="Close">×</button>
       </div>
+      <form id="addMemberForm" class="adm-form" autocomplete="off">
+        <label class="adm-field">
+          <span>Full name</span>
+          <input id="addMemName" type="text" placeholder="e.g., Shubham Deshpande" required>
+        </label>
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="addMemberModal">Cancel</button>
+          <button type="submit" class="btn">Add Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
+  <div id="editMemberModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3>Edit Member</h3>
+        <button class="adm-close" data-close="editMemberModal" aria-label="Close">×</button>
+      </div>
+      <form id="editMemberForm" class="adm-form" autocomplete="off">
+        <input type="hidden" id="editMemId">
+        <label class="adm-field">
+          <span>Full name</span>
+          <input id="editMemName" type="text" placeholder="e.g., Shubham Deshpande" required>
+        </label>
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="editMemberModal">Cancel</button>
+          <button type="submit" class="btn">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="addEventModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3>Add Event</h3>
+        <button class="adm-close" data-close="addEventModal" aria-label="Close">×</button>
+      </div>
+      <form id="addEventForm" class="adm-form" autocomplete="off">
+        <label class="adm-field">
+          <span>Event name</span>
+          <input id="addEvName" type="text" placeholder="e.g., Mahadaan 3.0" required>
+        </label>
+        <label class="adm-field">
+          <span>Date</span>
+          <input id="addEvDate" type="date" required>
+        </label>
+        <label class="adm-field">
+          <span>Description (public calendar only)</span>
+          <textarea id="addEvDesc" rows="3" placeholder="Optional…"></textarea>
+        </label>
+        <fieldset class="adm-field">
+          <legend>Avenues (optional)</legend>
+          <div class="adm-chips">
+            <label><input type="checkbox" value="ISD"> ISD</label>
+            <label><input type="checkbox" value="CMD"> CMD</label>
+            <label><input type="checkbox" value="CSD"> CSD</label>
+            <label><input type="checkbox" value="PDD"> PDD</label>
+            <label><input type="checkbox" value="RRRO"> RRRO</label>
+            <label><input type="checkbox" value="PRO"> PRO</label>
+            <label><input type="checkbox" value="DEI"> DEI</label>
+            <label><input type="checkbox" value="GBM"> GBM</label>
+          </div>
+        </fieldset>
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="addEventModal">Cancel</button>
+          <button type="submit" class="btn">Add Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<div id="editEventModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3>Edit Event</h3>
+        <button class="adm-close" data-close="editEventModal" aria-label="Close">×</button>
+      </div>
+      <form id="editEventForm" class="adm-form" autocomplete="off">
+        <input type="hidden" id="editEvId">
+        
+        <label class="adm-field">
+          <span>Event name</span>
+          <input id="editEvName" type="text" placeholder="e.g., Mahadaan 3.0" required>
+        </label>
+        
+        <label class="adm-field">
+          <span>Date</span>
+          <input id="editEvDate" type="date" required>
+        </label>
+        
+        <label class="adm-field">
+          <span>Description (public calendar only)</span>
+          <textarea id="editEvDesc" rows="3" placeholder="Optional…"></textarea>
+        </label>
+        
+        <fieldset class="adm-field" id="editEvAvenues">
+          <legend>Avenues (optional)</legend>
+          <div class="adm-chips">
+            <label><input type="checkbox" value="ISD"> ISD</label>
+            <label><input type="checkbox" value="CMD"> CMD</label>
+            <label><input type="checkbox" value="CSD"> CSD</label>
+            <label><input type="checkbox" value="PDD"> PDD</label>
+            <label><input type="checkbox" value="RRRO"> RRRO</label>
+            <label><input type="checkbox" value="PRO"> PRO</label>
+            <label><input type="checkbox" value="DEI"> DEI</label>
+            <label><input type="checkbox" value="GBM"> GBM</label>
+          </div>
+        </fieldset>
+        
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="editEventModal">Cancel</button>
+          <button type="submit" class="btn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="editBodMemberModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3>Edit BOD Member</h3>
+        <button class="adm-close" data-close="editBodMemberModal" aria-label="Close">×</button>
+      </div>
+      <form id="editBodMemberForm" class="adm-form" autocomplete="off">
+        <input type="hidden" id="editBodMemId">
+        <label class="adm-field">
+          <span>Full name</span>
+          <input id="editBodMemName" type="text" placeholder="e.g., ABC XYZ" required>
+        </label>
+        <label class="adm-field">
+          <span>Position</span>
+          <input id="editBodMemPos" type="text" placeholder="e.g., President">
+        </label>
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="editBodMemberModal">Cancel</button>
+          <button type="submit" class="btn">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="editBodMeetingModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3>Edit BOD Meeting</h3>
+        <button class="adm-close" data-close="editBodMeetingModal" aria-label="Close">×</button>
+      </div>
+      <form id="editBodMeetingForm" class="adm-form" autocomplete="off">
+        <input type="hidden" id="editBodMeetId">
+        <label class="adm-field">
+          <span>Meeting name</span>
+          <input id="editBodMeetName" type="text" placeholder="e.g., BOD 1" required>
+        </label>
+        <label class="adm-field">
+          <span>Date</span>
+          <input id="editBodMeetDate" type="date" required>
+        </label>
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="editBodMeetingModal">Cancel</button>
+          <button type="submit" class="btn">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
       
-      <!-- MEMBER FORM -->
+<!--       MEMBER FORM 
       <form id="memberForm" class="adm-form" autocomplete="off" hidden>
         <label class="adm-field">
           <span>Full name</span>
@@ -340,7 +517,6 @@
         </div>
       </form>
 
-      <!-- EVENT FORM -->
       <form id="eventForm" class="adm-form" autocomplete="off" hidden>
         <label class="adm-field">
           <span>Event name</span>
@@ -376,8 +552,41 @@
           <button type="submit" class="btn">Add Event</button>
         </div>
       </form>
-    </div>
+
+<form id="bodMemberForm" class="adm-form" autocomplete="off" hidden>
+  <input type="hidden" id="editBodMemberId">
+  <label class="adm-field">
+    <span>Full name</span>
+    <input id="bodEditName" type="text" placeholder="e.g., ABC XYZ" required>
+  </label>
+  <label class="adm-field">
+    <span>Position</span>
+    <input id="bodEditPos" type="text" placeholder="e.g., President">
+  </label>
+  <div class="adm-actions">
+    <button type="button" class="btn btn-outline" id="bodMemCancel">Cancel</button>
+    <button type="submit" class="btn" id="bodMemSaveBtn">Save changes</button>
   </div>
+</form>
+
+<form id="bodMeetingForm" class="adm-form" autocomplete="off" hidden>
+  <input type="hidden" id="editBodMeetingId">
+  <label class="adm-field">
+    <span>Meeting name</span>
+    <input id="bodMeetEditName" type="text" placeholder="e.g., BOD 1" required>
+  </label>
+  <label class="adm-field">
+    <span>Date</span>
+    <input id="bodMeetEditDate" type="date" required>
+  </label>
+  <div class="adm-actions">
+    <button type="button" class="btn btn-outline" id="bodMeetCancel">Cancel</button>
+    <button type="submit" class="btn" id="bodMeetSaveBtn">Save changes</button>
+  </div>
+</form>
+
+    </div>
+  </div> -->
 
 <!-- Firebase SDKs (CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>

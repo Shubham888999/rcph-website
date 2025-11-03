@@ -22,7 +22,7 @@
 .overall-bar { height: 10px; background:#222; border-radius: 6px; overflow: hidden; }
 .overall-bar > div { height:100%; width:0%; background: #27ae60; transition: width .15s linear; box-shadow: 0 0 8px rgba(39,174,96,.5) inset; }
 
-    .bod-wrap{max-width: 980px; margin: 28px auto; padding: 0 16px;}
+    .bod-wrap{max-width: 1300px; margin: 28px auto; padding: 0 16px;}
     .card{background: var(--color-card); border:1px solid var(--color-border); border-radius: 12px; padding: 18px;}
     .titlebar{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px}
     .titlebar h2{margin:0}
@@ -146,7 +146,161 @@ input[type="time"]::-moz-placeholder {
   align-items: center;
   justify-content: center;
 }
+/* Add these new rules inside the <style> tag */
+.form-grid-row {
+  display: grid;
+  gap: 16px;
+  align-items: start; /* Aligns items to the top */
+}
+/* For Name + Conducted By */
+.row-split-2-1 {
+  grid-template-columns: 2fr 1fr;
+}
+/* For Dates + Time */
+.row-split-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+/* For Description + Avenues */
+.row-split-tall {
+  grid-template-columns: 2fr 1fr;
+}
+/* This is the key: make the textarea and select the same height */
+.row-split-tall textarea,
+.row-split-tall select {
+  height: 180px;
+}
+.fm textarea {
+  resize: vertical; /* a-lready present, but good to confirm */
+}
 
+/* On mobile, stack everything into a single column */
+@media (max-width: 768px) {
+  .row-split-2-1,
+  .row-split-3,
+  .row-split-tall {
+    grid-template-columns: 1fr;
+  }
+  
+  .row-split-tall textarea,
+  .row-split-tall select {
+    height: auto; /* Reset height */
+  }
+  .row-split-tall select {
+     min-height: 160px; /* Use min-height on mobile */
+  }
+}
+
+/* Add these new rules to your <style> block */
+    .kpi-grid {
+      display: grid;
+      /* This flexible grid replaces the rigid inline style */
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 10px 0 6px;
+    }
+    .kpi-card {
+      background:#121212;
+      border:1px solid var(--color-border);
+      border-radius:10px;
+      padding:10px 12px;
+      min-height: 70px; /* Ensures all cards are same height */
+    }
+    .kpi-label {
+      opacity:.8;
+      font-size:.9rem;
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-weight:800;
+      font-size:1.35rem;
+    }
+    
+    /* Fix for Top Conductors card */
+    #kpiTopConductors {
+      font-weight: 700;
+      font-size: 1.1rem; /* Slightly smaller to fit more */
+      white-space: normal; /* Allows the name to wrap to a new line */
+      line-height: 1.3;
+      word-break: break-word; /* Breaks long names if needed */
+    }
+    
+    /* Fix for Avenue chips card */
+    .kpi-card.avenue-card .kpi-label {
+       margin-bottom: 8px;
+    }
+    #kpiAvenues {
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+    .adm-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px}
+    .adm-modal[aria-hidden="false"]{display:flex}
+    .adm-modal__sheet{width:min(680px,96vw);max-height:90vh;overflow-y:auto;background:#181818;border:1px solid var(--color-border);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:16px 16px 18px}
+    .adm-modal__head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .adm-modal__head h3{margin:0;color:#fff}
+    .adm-close{background:#262626;color:#ddd;border:1px solid var(--color-border);width:36px;height:36px;border-radius:8px;cursor:pointer}
+    .adm-form{display:grid;gap:12px}
+    .adm-field{display:flex;flex-direction:column;gap:6px}
+    .adm-field input,.adm-field textarea, .adm-field select{background:#101010;color:#fff;border:1px solid var(--color-border);border-radius:8px;padding:10px}
+    .adm-field select[multiple] { height: 160px; }
+    .adm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px}
+    .adm-field textarea { min-height: 120px; resize: vertical; }
+.card__image {
+      width: 25%;
+      height: 180px; /* <-- Made smaller */
+      object-fit: cover;
+      border-radius: 10px;
+      background: #101010;
+      border: 1px solid var(--color-border);
+      margin-bottom: 12px;
+      cursor: pointer; /* <-- Add pointer */
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .card__image:hover {
+      border-color: var(--color-accent);
+    }
+    .iconbtn[data-edit] {
+      color: #71c6f8; /* blue */
+      font-size: 1.1rem;
+    }
+    .iconbtn[data-edit]:hover {
+      background: rgba(0, 120, 255, 0.1);
+      color: #89d1fb;
+    }
+    /* === NEW IMAGE LIGHTBOX STYLES === */
+    .lightbox-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+    }
+    .lightbox-modal[aria-hidden="false"] {
+      display: flex;
+    }
+    .lightbox-modal img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    }
+    .lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border: 0;
+      background: rgba(0,0,0,.5);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -178,30 +332,18 @@ input[type="time"]::-moz-placeholder {
 
 <form id="bodEventForm" class="fm">
 
-  <!-- Row 1: name + conducted by + avenues -->
-  <div style="display:grid; gap:12px; grid-template-columns: 1fr 1fr 220px;">
+  <div class="form-grid-row row-split-2-1">
     <label>
       <span>Event name</span>
       <input id="evName" type="text" placeholder="e.g., Pad-Aid Drive" required />
     </label>
-
     <label>
       <span>Conducted by (your name)</span>
       <input id="conductedBy" type="text" placeholder="e.g., Rtr. ABC XYZ" required />
     </label>
-
-    <label>
-      <span>Avenues (pick atleast one)</span>
-      <select id="evAvenue" multiple size="8" style="min-height:160px;">
-        <option>ISD</option><option>CMD</option><option>CSD</option><option>PDD</option>
-        <option>RRRO</option><option>PRO</option><option>DEI</option><option>GBM</option>
-      </select>
-      <small class="note">Tip: Ctrl/Cmd-click (or long-press on mobile) to select multiple.</small>
-    </label>
   </div>
 
-  <!-- Row 2: dates + time -->
-  <div style="display:grid; gap:12px; grid-template-columns: 160px 160px 140px;">
+  <div class="form-grid-row row-split-3">
     <label>
       <span>Start date</span>
       <input id="eventStart" type="date" required />
@@ -215,15 +357,30 @@ input[type="time"]::-moz-placeholder {
       <input id="eventTime" type="time" />
     </label>
   </div>
-
-  <label>
-    <span>Description</span>
-    <textarea id="evDesc" placeholder="Short description for avenue reporting…" required></textarea>
-  </label>
+  
+  <div class="form-grid-row row-split-tall">
+    <label>
+      <span>Description</span>
+      <textarea id="evDesc" placeholder="Short description for avenue reporting…" required></textarea>
+    </label>
+    <label>
+      <span>Avenues (pick atleast one)</span>
+      <select id="evAvenue" multiple size="8">
+        <option>ISD</option><option>CMD</option><option>CSD</option><option>PDD</option>
+        <option>RRRO</option><option>PRO</option><option>DEI</option><option>GBM</option>
+      </select>
+      <small class="note">Tip: Ctrl/Cmd-click (or long-press on mobile) to select multiple.</small>
+    </label>
+  </div>
 
   <label>
     <span>Drive folder (paste full URL or folder name)</span>
     <input id="driveFolder" type="text" placeholder="https://drive.google.com/drive/folders/…" />
+  </label>
+
+  <label>
+    <span>Preview Image Link (paste full URL)</span>
+    <input id="previewLink" type="text" placeholder="e.g., Google Drive, Imgur, etc." />
   </label>
 
   <!-- Live preview for pasted URL -->
@@ -248,27 +405,26 @@ input[type="time"]::-moz-placeholder {
       </div>
 
 <!-- KPI SUMMARY -->
-<div class="kpis" style="display:grid; grid-template-columns: repeat(3, 180px) 1fr; gap:10px; margin:10px 0 6px;">
-  <div class="kpi-card" style="background:#121212;border:1px solid var(--color-border);border-radius:10px;padding:10px 12px;">
-    <div class="kpi-label" style="opacity:.8;font-size:.9rem">Total events</div>
-    <div id="kpiTotal" class="kpi-value" style="font-weight:800;font-size:1.35rem">0</div>
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Total events</div>
+    <div id="kpiTotal" class="kpi-value">0</div>
   </div>
 
-  <div class="kpi-card" style="background:#121212;border:1px solid var(--color-border);border-radius:10px;padding:10px 12px;">
-    <div class="kpi-label" style="opacity:.8;font-size:.9rem">This month</div>
-    <div id="kpiThisMonth" class="kpi-value" style="font-weight:800;font-size:1.35rem">0</div>
+  <div class="kpi-card">
+    <div class="kpi-label">This month</div>
+    <div id="kpiThisMonth" class="kpi-value">0</div>
   </div>
 
-  <div class="kpi-card" style="background:#121212;border:1px solid var(--color-border);border-radius:10px;padding:10px 12px;">
-    <div class="kpi-label" style="opacity:.8;font-size:.9rem">Top conductors</div>
-    <div id="kpiTopConductors" class="kpi-value" style="font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+  <div class="kpi-card">
+    <div class="kpi-label">Top conductors</div>
+    <div id="kpiTopConductors" class="kpi-value">—</div>
   </div>
 
-  <div class="kpi-card" style="background:#121212;border:1px solid var(--color-border);border-radius:10px;padding:10px 12px;">
-    <div class="kpi-label" style="opacity:.8;font-size:.9rem;margin-bottom:6px">By avenue</div>
-    <div id="kpiAvenues" class="avenue-chips" style="display:flex; flex-wrap:wrap; gap:6px;">
-      <!-- chips injected by JS -->
-    </div>
+  <div class="kpi-card avenue-card">
+    <div class="kpi-label">By avenue</div>
+    <div id="kpiAvenues" class="avenue-chips">
+      </div>
   </div>
 </div>
 
@@ -411,7 +567,7 @@ function updateBodKpis(rows) {
   });
   const top = Object.entries(tally)
     .sort((a,b) => b[1]-a[1])
-    .slice(0, 3)
+    .slice(0, 2)
     .map(([name, n]) => `${name} (${n})`)
     .join(', ') || '—';
   if (kpiTop) kpiTop.textContent = top;
@@ -437,6 +593,83 @@ if (kpiAvs) {
 
 </script>
 
+
+<div id="toast" class="toast">Saved!</div>
+
+</div>
+
+  <div id="editSubModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3>Edit Submission</h3>
+        <button class="adm-close" data-close="editSubModal" aria-label="Close">×</button>
+      </div>
+      <form id="editSubForm" class="adm-form" autocomplete="off">
+        <input type="hidden" id="editSubId">
+        
+        <div class="form-grid-row row-split-2-1">
+          <label class="adm-field">
+            <span>Event name</span>
+            <input id="editEvName" type="text" required>
+          </label>
+          <label class="adm-field">
+            <span>Conducted by (your name)</span>
+            <input id="editConductedBy" type="text" required>
+          </label>
+        </div>
+        
+        <div class="form-grid-row row-split-3">
+          <label class="adm-field">
+            <span>Start date</span>
+            <input id="editEventStart" type="date" required />
+          </label>
+          <label class="adm-field">
+            <span>End date</span>
+            <input id="editEventEnd" type="date" required />
+          </label>
+          <label class="adm-field">
+            <span>Event time (optional)</span>
+            <input id="editEventTime" type="time" />
+          </label>
+        </div>
+
+        <div class="form-grid-row row-split-tall">
+          <label class="adm-field">
+            <span>Description</span>
+            <textarea id="editEvDesc" rows="6" required></textarea>
+          </label>
+          <label class="adm-field">
+            <span>Avenues (pick atleast one)</span>
+            <select id="editEvAvenue" multiple required>
+              <option>ISD</option><option>CMD</option><option>CSD</option><option>PDD</option>
+              <option>RRRO</option><option>PRO</option><option>DEI</option><option>GBM</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="adm-field">
+          <span>Drive folder (paste full URL or folder name)</span>
+          <input id="editDriveFolder" type="text">
+        </label>
+        
+        <label class="adm-field">
+          <span>Preview Image Link (paste full URL)</span>
+          <input id="editPreviewLink" type="text">
+        </label>
+        
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="editSubModal">Cancel</button>
+          <button type="submit" class="btn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Saved!</div>
+  <div id="imageLightbox" class="lightbox-modal" aria-hidden="true">
+    <button class="lightbox-close" data-close-lightbox>×</button>
+    <img id="lightboxImage" src="" alt="Event Preview">
+  </div>
 <script src="bodlogin.js?v=2"></script>
 <script>
   (function(){
@@ -444,7 +677,5 @@ if (kpiAvs) {
     if (d && !d.value) d.value = new Date().toISOString().slice(0,10);
   })();
 </script>
-<div id="toast" class="toast">Saved!</div>
-
 </body>
 </html>

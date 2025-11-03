@@ -246,6 +246,7 @@ return `<td>${cell}</td>`;
   bodTop.textContent = best || '—';
 }
 // ▼▼▼ Dynamic arrow toggle for details panels ▼▼▼
+// ▼▼▼ Dynamic arrow toggle for details panels ▼▼▼
 document.querySelectorAll('details').forEach(det => {
   const summary = det.querySelector('summary');
   if (!summary) return;
@@ -260,6 +261,15 @@ document.querySelectorAll('details').forEach(det => {
   // Listen to toggle event to update arrow direction
   det.addEventListener('toggle', () => {
     arrow.textContent = det.open ? '▲' : '▼';
+
+    // NEW: Scroll-to-panel logic
+    // Only apply to panels inside our new grid
+    if (det.open && det.closest('.panel-grid')) {
+      // Use a short timeout to let the DOM reflow after the grid-column changes
+      setTimeout(() => {
+        det.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50); // 50ms delay
+    }
   });
 });
 

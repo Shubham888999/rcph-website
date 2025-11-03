@@ -1523,8 +1523,6 @@ html{ scroll-behavior: smooth; }
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
-  max-width: 950px;
-  margin: 8px auto 32px;
 }
 
 /* 2-up grid on wider screens */
@@ -1565,7 +1563,7 @@ html{ scroll-behavior: smooth; }
 
 /* Created-at pill */
 .timepill{
-  margin-left:auto; font-size:.78rem; color:#aeb3b7; background:#0f0f0f;
+  margin-left:0; font-size:.78rem; color:#aeb3b7; background:#0f0f0f;
   border:1px solid #2b2b2b; padding:4px 8px; border-radius:8px;
 }
 

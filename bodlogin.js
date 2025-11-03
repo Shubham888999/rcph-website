@@ -1,6 +1,33 @@
 // bodlogin.js — upload-free (stores Drive folder/link only)
+// Helper to convert GDrive links to direct image URLs
+// Helper to convert GDrive links to direct image URLs
+function getGdriveImageUrl(url) {
+  if (!url) return '';
+  let fileId = null;
+  
+  // Regex for /file/d/FILE_ID/
+  let match1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (match1) {
+    fileId = match1[1];
+  } else {
+    // Regex for /open?id=FILE_ID
+    let match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match2) {
+      fileId = match2[1];
+    }
+  }
+  
+  // If it's a GDrive link, return the THUMBNAIL format
+  if (fileId) {
+    // This is far more reliable than /uc as it always returns an image
+    return `https://drive.google.com/thumbnail?id=${fileId}`;
+  }
+  
+  // Otherwise, assume it's a direct link (e.g., Imgur, etc.)
+  return url;
+}
 
-// Using compat SDK loaded in the HTML:
+// bodlogin.js — upload-free (stores Drive folder/link only)
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
@@ -26,6 +53,8 @@ const filterMonth = document.getElementById('filterMonth');
 const filterMine   = document.getElementById('filterMine');
 const filterSearch = document.getElementById('filterSearch');
 const toastEl      = document.getElementById('toast');
+const imageLightbox = document.getElementById('imageLightbox'); // NEW
+const lightboxImage = document.getElementById('lightboxImage'); // NEW
 
 let IS_PRESIDENT = false;
 
@@ -182,9 +211,9 @@ if (form) {
 const eventStart  = (document.getElementById('eventStart')?.value || '').trim();
 const eventEnd    = (document.getElementById('eventEnd')?.value || '').trim();
 const eventTime   = (document.getElementById('eventTime')?.value || '').trim();
+const previewLink = (document.getElementById('previewLink')?.value || '').trim(); // NEW
 
-if (!name || !description || !avenues.length || !eventStart || !eventEnd || !conductedBy)
- {
+if (!name || !description || !avenues.length || !eventStart || !eventEnd || !conductedBy) {
   if (statusEl) statusEl.textContent = 'Please fill all required fields (pick at least one avenue).';
   return;
 }
@@ -204,6 +233,7 @@ const doc = {
   eventTime,
   driveFolder,
   driveFolderId,
+  previewLink, // NEW
   createdBy: user.uid,
   createdByEmail: user.email || '',
   createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -301,6 +331,7 @@ if (avFilter) {
     updateBodKpis(rows);
 
     // 5) paint list
+// 5) paint list
     itemsEl.innerHTML = rows.map(r => {
       const createdStr = r.createdAt
         ? new Date(r.createdAt).toLocaleString()
@@ -308,23 +339,30 @@ if (avFilter) {
       const driveUrl = r.driveFolderId
         ? `https://drive.google.com/drive/folders/${r.driveFolderId}`
         : (r.driveFolder || '');
-const chips = (Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []))
-  .map(av => `<span class="pill">${String(av).toUpperCase()}</span>`)
-  .join(' ');
+
+      // NEW: Get image URL
+      const imgUrl = getGdriveImageUrl(r.previewLink);
+
+      const chips = (Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []))
+        .map(av => `<span class="pill">${String(av).toUpperCase()}</span>`)
+        .join(' ');
+      
       return `
         <div class="card">
-<div class="card__header">
-  <span class="chipset">${chips}</span>
-  <span class="timepill">${createdStr}</span>
-  <button class="iconbtn" data-del="${r.id}" title="Delete">🗑️</button>
-</div>
+${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-lightbox-src="${imgUrl}">` : ''}
+          <div class="card__header">
+            <span class="chipset">${chips}</span>
+            <span class="timepill">${createdStr}</span>
+            <button class="iconbtn" data-edit="${r.id}" title="Edit">✏️</button>
+            <button class="iconbtn" data-del="${r.id}" title="Delete">🗑️</button>
+          </div>
           <div class="card__title">${escapeHtml(r.name || '')}</div>
-<div class="card__meta">
-  ${r.eventStart ? escapeHtml(r.eventStart) : ''}
-  ${r.eventEnd ? ' → ' + escapeHtml(r.eventEnd) : ''}
-  ${r.eventTime ? ' • ' + escapeHtml(r.eventTime) : ''}
-  ${r.conductedBy ? ' • by ' + escapeHtml(r.conductedBy) : ''}
-</div>
+          <div class="card__meta">
+            ${r.eventStart ? escapeHtml(r.eventStart) : ''}
+            ${r.eventEnd ? ' → ' + escapeHtml(r.eventEnd) : ''}
+            ${r.eventTime ? ' • ' + escapeHtml(r.eventTime) : ''}
+            ${r.conductedBy ? ' • by ' + escapeHtml(r.conductedBy) : ''}
+          </div>
           <div class="card__body">${escapeHtml(r.description || '')}</div>
           ${driveUrl ? `
             <a class="btn btn-outline" href="${driveUrl}" target="_blank">Open Drive folder</a>
@@ -420,5 +458,147 @@ document.addEventListener('click', async (e) => {
       : (err?.message || 'Delete failed');
     toast(msg, 2500);
     console.error(err);
+  }
+});
+/* ---------- Edit Modal Logic ---------- */
+
+// Get modal elements
+const editModal = document.getElementById('editSubModal');
+const editForm = document.getElementById('editSubForm');
+const editSubId = document.getElementById('editSubId');
+const editEvName = document.getElementById('editEvName');
+const editConductedBy = document.getElementById('editConductedBy');
+const editEventStart = document.getElementById('editEventStart');
+const editEventEnd = document.getElementById('editEventEnd');
+const editEventTime = document.getElementById('editEventTime');
+const editEvDesc = document.getElementById('editEvDesc');
+const editEvAvenue = document.getElementById('editEvAvenue');
+const editDriveFolder = document.getElementById('editDriveFolder');
+const editPreviewLink = document.getElementById('editPreviewLink');
+
+// Helper to open/close modal
+function openModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.setAttribute('aria-hidden', 'false');
+}
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.setAttribute('aria-hidden', 'true');
+}
+
+// Universal close handler for all modals
+document.addEventListener('click', (e) => {
+  const closeBtn = e.target.closest('[data-close]');
+  if (closeBtn) {
+    closeModal(closeBtn.dataset.close);
+  }
+});
+
+// Listen for "Edit" button clicks
+document.addEventListener('click', async (e) => {
+  const editBtn = e.target.closest('button[data-edit]');
+  if (!editBtn) return;
+
+  const id = editBtn.dataset.edit;
+  // Find the data from the already-loaded list
+  const sub = FILTERED_SUBS.find(s => s.id === id);
+  if (!sub) {
+    toast('Could not find submission data.', 2000);
+    return;
+  }
+
+  // Populate the modal
+  editSubId.value = id;
+  editEvName.value = sub.name || '';
+  editConductedBy.value = sub.conductedBy || '';
+  editEventStart.value = sub.eventStart || '';
+  editEventEnd.value = sub.eventEnd || '';
+  editEventTime.value = sub.eventTime || '';
+  editEvDesc.value = sub.description || '';
+  editDriveFolder.value = sub.driveFolder || '';
+  editPreviewLink.value = sub.previewLink || ''; // The new field
+
+  // Set selected avenues
+  const subAvenues = Array.isArray(sub.avenue) ? sub.avenue : (sub.avenue ? [sub.avenue] : []);
+  Array.from(editEvAvenue.options).forEach(opt => {
+    opt.selected = subAvenues.includes(opt.value);
+  });
+
+  // Open the modal
+  openModal('editSubModal');
+});
+
+// Handle the "Save Changes" form submit
+if (editForm) {
+  editForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = editSubId.value;
+    if (!id) {
+      toast('No ID found, cannot save.', 2000);
+      return;
+    }
+
+    const submitBtn = editForm.querySelector('button[type=submit]');
+    submitBtn?.setAttribute('disabled', 'disabled');
+
+    try {
+      // Collect all data from the edit form
+      const avenues = Array.from(editEvAvenue.selectedOptions).map(o => o.value);
+      
+      const updateData = {
+        name: editEvName.value.trim(),
+        conductedBy: editConductedBy.value.trim(),
+        eventStart: editEventStart.value,
+        eventEnd: editEventEnd.value,
+        eventTime: editEventTime.value,
+        description: editEvDesc.value.trim(),
+        driveFolder: editDriveFolder.value.trim(),
+        previewLink: editPreviewLink.value.trim(), // The new field
+        avenue: avenues
+      };
+
+      // Extract Drive ID just like in the main form
+      const m = (updateData.driveFolder || '').match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      updateData.driveFolderId = m ? m[1] : '';
+
+      // Update the doc in Firestore
+      await db.collection('bodEvents').doc(id).update(updateData);
+
+      toast('Changes saved!');
+      closeModal('editSubModal');
+      loadItems(); // Refresh the list to show changes
+
+    } catch (err) {
+      toast('Error saving: ' + err.message, 2500);
+      console.error(err);
+    } finally {
+      submitBtn?.removeAttribute('disabled');
+    }
+  });
+}
+/* ---------- Image Lightbox Logic ---------- */
+
+// Open the lightbox
+document.addEventListener('click', (e) => {
+  // Check if the clicked element is an image with the data-lightbox-src attribute
+  const img = e.target.closest('img[data-lightbox-src]');
+  if (img && imageLightbox && lightboxImage) {
+    const src = img.getAttribute('data-lightbox-src');
+    lightboxImage.src = src;
+    imageLightbox.setAttribute('aria-hidden', 'false');
+  }
+});
+
+// Close the lightbox
+document.addEventListener('click', (e) => {
+  // Close if the close button or the dark overlay is clicked
+  if (e.target.closest('[data-close-lightbox]') || e.target === imageLightbox) {
+    if (imageLightbox && lightboxImage) {
+      imageLightbox.setAttribute('aria-hidden', 'true');
+      // Clear src after fade out to avoid flash
+      setTimeout(() => {
+        lightboxImage.src = '';
+      }, 300);
+    }
   }
 });

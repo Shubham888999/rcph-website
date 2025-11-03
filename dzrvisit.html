@@ -40,6 +40,34 @@
     /* PPT embeds */
     .ppt-frame{ width:100%; height:480px; border:0; border-radius:10px; background:#000; }
     @media (max-width: 700px){ .ppt-frame{ height:320px; } }
+
+.att-icon{
+      width: 18px; height: 18px; vertical-align: middle; display:inline-block;
+    }
+    /* PPT embeds */
+    .ppt-frame{ width:100%; height:480px; border:0; border-radius:10px; background:#000; }
+    @media (max-width: 700px){ .ppt-frame{ height:320px; } }
+
+    /* === NEW STYLES FOR GRID === */
+
+    .panel-grid {
+      display: grid;
+      /* This creates a responsive grid. It will fit as many 280px columns as it can */
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px; /* Spacing between closed panels */
+      margin-top: 16px;
+    }
+
+    /* Remove the default bottom margin from cards when they are in the grid */
+    .panel-grid > .dzr-card {
+      margin-bottom: 0;
+    }
+
+    /* The magic! Make an open panel span the full width */
+    .panel-grid > details[open] {
+      grid-column: 1 / -1;
+    }
+    
   </style>
 </head>
 <body>
@@ -68,29 +96,14 @@
       <h2 class="panel-title">BOD Panels</h2>
       <p class="panel-sub">Jump to an avenue to view document folders and presentations.</p>
 
-      <div class="nav-tabs" style="margin-bottom:6px;">
-        <a href="#p-president">President</a>
-        <a href="#p-secretary">Secretary</a>
-        <a href="#p-treasurer">Treasurer</a>
-        <a href="#p-vp">VP</a>
-        <a href="#p-ipp">IPP</a>
-        <a href="#p-pdd">PDD</a>
-        <a href="#p-csd">CSD</a>
-        <a href="#p-isd">ISD</a>
-        <a href="#p-cmd">CMD</a>
-        <a href="#p-pro">PRO</a>
-        <a href="#p-dei">DEI</a>
-        <a href="#p-sports">Sports Representative</a>
-        <a href="#website-dir">Website Director</a>
-        <a href="#p-rrro">RRRO</a>
-      </div>
 
+<div class="panel-grid">
       <!-- One block per panel. Replace the href/src with your Drive links -->
 <details id="p-president" class="dzr-card">
   <summary class="panel-title">President</summary>
   <div>
     <p class="panel-sub">
-      Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1gLXYLCWpwzdGvqXkkIB3pS-XTxnuEcGh?usp=drive_link" target="_blank">Open Drive Folder</a>
+      Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1gLXYLCWpwzdGvqXkkIB3pS-XTxnuEcGh?usp=drive_link/preview" target="_blank">Open Drive Folder</a>
     </p>  </div>
 </details>
 
@@ -98,19 +111,17 @@
         <summary class="panel-title">Secretary</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_SECRETARY_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/18wSpLNYEbVa-YviF6sXceUDIpQE9I3DS?usp=drive_link/preview" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_SECRETARY_PPT_FILE_ID/preview" allow="autoplay"></iframe>
-      </div>
+            </div>
       </details>
 
       <details id="p-treasurer" class="dzr-card">
         <summary class="panel-title">Treasurer</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_TREASURER_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1ek-3FlNvHrV6UNQNOtLcPD9wfyvaPmf6?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_TREASURER_PPT_FILE_ID/preview" allow="autoplay"></iframe>
           <div class="dzr-card">
     <h3 class="panel-title" style="margin:0 0 8px;">Finance overview (view-only)</h3>
     <div class="kpis">
@@ -142,9 +153,8 @@
         <summary class="panel-title">Vice President</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_VP_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1pAQEmBj5-vgezW0rmmwk_cl9nDM3p5oL?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_VP_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
       </details>
 
@@ -152,7 +162,7 @@
         <summary class="panel-title">IPP</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_IPP_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="YOUR_IPP_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <!-- no PPT here per your note -->
       </div>
@@ -161,6 +171,9 @@
       <!-- SAA (Sergeant-at-Arms) -->
 <details id="p-saa" class="dzr-card">
   <summary class="panel-title">SAA</summary>
+          <p class="panel-sub">
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1ipASvE2Ofo0ooB95vkfijzVdvMsxhD9W?usp=drive_link" target="_blank">Open Drive Folder</a>
+        </p>
   <p class="panel-sub">
     <a href="#saa-att" style="color:#8fe9e7;text-decoration:underline;">Members attendance</a> •
     <a href="#saa-bod" style="color:#8fe9e7;text-decoration:underline;">BOD attendance</a> •
@@ -263,9 +276,9 @@
         <summary class="panel-title">CMD</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1ipASvE2Ofo0ooB95vkfijzVdvMsxhD9W?usp=drive_link" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1ipASvE2Ofo0ooB95vkfijzVdvMsxhD9W?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1jYXyKya6yPY8SDqOybm3oK_34fLjUw9u/edit?usp=drive_link&ouid=104366023356332266457&rtpof=true&sd=true/preview" allow="autoplay"></iframe>
+        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1jYXyKya6yPY8SDqOybm3oK_34fLjUw9u/embed" allow="autoplay"></iframe>
       </div>
       </details>
 
@@ -273,19 +286,19 @@
         <summary class="panel-title">PDD</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_PDD_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1Xjc674mVaS32_tcjk6qwIy0bmKEq3ohc?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_PDD_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1nQV-Eo-2HqaQELmpffEABNrk7JBdnOEQ/embed" allow="autoplay"></iframe>
       </div>
       </details>
 
       <details id="p-csd" class="dzr-card">
         <summary class="panel-title">CSD</summary>
         <div>
-        <p> class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_CSD_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+        <p>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1inWE_8jY-5IeYuUwxqWESUg13y2FaLxX?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_CSD_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1cGLDyVZFb1iKet_jIit9AudlpGUm1ONz/embed" allow="autoplay"></iframe>
       </div>
       </details>
 
@@ -294,9 +307,9 @@
         <summary class="panel-title">ISD</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_ISD_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1AKs9OXl7KxJH7xBM-DTwSHTKu1ksGga7?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_ISD_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1yXZC3S9AlbvFL1QUcLHX9MiCrFnNgT9d/embed" allow="autoplay"></iframe>
       </div>
       </details>
 
@@ -304,9 +317,19 @@
         <summary class="panel-title">PRO</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_PRO_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1RyxIxEzPFXUUSKGRSeeEC1dbyJFsPlzM?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_PRO_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1yF_O0r15iNN8Fpv2Bdozfnyxc2pXGFBv/embed" allow="autoplay"></iframe>
+      </div>
+      </details>
+
+            <details id="p-editor" class="dzr-card">
+        <summary class="panel-title">Editor</summary>
+        <div>
+        <p class="panel-sub">
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1D2jJ-WhseW1FFKSHRWqkWinQld72TnMy?usp=drive_link" target="_blank">Open Drive Folder</a>
+        </p>
+        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1mzpTgchBEtPh6tfGJ8fXqwNQcpHkc3Lb/embed" allow="autoplay"></iframe>
       </div>
       </details>
 
@@ -314,7 +337,7 @@
         <summary class="panel-title">DEI</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_DEI_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="YOUR_DEI_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_DEI_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
@@ -324,9 +347,9 @@
         <summary class="panel-title">Sports Representative</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_SPORTS_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1gtf_4b1luVTT9KeQvtxgOJRWc6oPM79N?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_SPORTS_PPT_FILE_ID/preview" allow="autoplay"></iframe>
+        <iframe class="ppt-frame" src="https://docs.google.com/presentation/d/1tk95tPsSbrq6ywwuK6Sb0TZ2fmjAqvf5/embed" allow="autoplay"></iframe>
       </div>
       </details>
 
@@ -334,7 +357,7 @@
         <summary class="panel-title">Club Website Director</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_SPORTS_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="YOUR_SPORTS_FOLDER_LINK" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_SPORTS_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
@@ -344,12 +367,12 @@
         <summary class="panel-title">RRRO</summary>
         <div>
         <p class="panel-sub">
-          Documents: <a class="drive-link" href="YOUR_RRRO_FOLDER_LINK" target="_blank">Open Drive Folder</a>
+          Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1reUsO_v-bstbWclzz9nhQRNU2TRWEZOi?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
         <iframe class="ppt-frame" src="https://drive.google.com/file/d/YOUR_RRRO_PPT_FILE_ID/preview" allow="autoplay"></iframe>
       </div>
       </details>
-
+</div>
     </section>
   </div>
 
