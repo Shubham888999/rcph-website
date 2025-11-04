@@ -9,7 +9,7 @@ const signOutBtn  = document.getElementById('signOutBtn');
 const memberSearch = document.getElementById('memberSearch');
 const eventSearch  = document.getElementById('eventSearch');
 const monthFilter  = document.getElementById('monthFilter');
-const avenueFilter = document.getElementById('avenueFilter');
+const avenueFilter = document.getElementById('avenueFilter'); // Added avenue filter
 
 const addMemberBtn = document.getElementById('addMemberBtn');
 const addEventBtn  = document.getElementById('addEventBtn');
@@ -19,7 +19,6 @@ if (addEventBtn)  addEventBtn.onclick  = () => openModal('addEventModal');
 
 const attHead  = document.getElementById('attHead');
 const attBody  = document.getElementById('attBody');
-
 
 /* Modal bits */
 const finesBadge = document.getElementById('finesBadge');
@@ -85,6 +84,8 @@ const editEventModal      = document.getElementById('editEventModal');
 const editEventForm       = document.getElementById('editEventForm');
 const editEvId            = document.getElementById('editEvId');
 const editEvName          = document.getElementById('editEvName');
+const editEvDate          = document.getElementById('editEvDate'); // Added
+const editEvDesc          = document.getElementById('editEvDesc'); // Added
 
 const editBodMemberModal  = document.getElementById('editBodMemberModal');
 const editBodMemberForm   = document.getElementById('editBodMemberForm');
@@ -97,8 +98,6 @@ const editBodMeetingForm  = document.getElementById('editBodMeetingForm');
 const editBodMeetId       = document.getElementById('editBodMeetId');
 const editBodMeetName     = document.getElementById('editBodMeetName');
 const editBodMeetDate     = document.getElementById('editBodMeetDate');
-
-
 
 
 const goBodBtn = document.getElementById('goBodBtn');
@@ -432,7 +431,6 @@ function buildMonthFilterFromEvents() {
 
 
 /* ---------- Render grid ---------- */
-/* ---------- Render grid ---------- */
 function renderGrid(){
   const memQuery = memberSearch.value.trim().toLowerCase();
   const evQuery  = eventSearch.value.trim().toLowerCase();
@@ -472,7 +470,6 @@ function renderGrid(){
       const avenueString = avenues.join(', '); // "ISD, CSD" or ""
 
       // Create the HTML snippet for the avenue, only if it exists
-      // Using the accent color from your CSS to make it stand out
       const avenueHtml = avenueString
         ? `<small style="color: var(--color-accent, #60C3C4); font-weight: 600;">${avenueString}</small>`
         : '';
@@ -957,7 +954,10 @@ document.addEventListener('click', async (e) => {
 
 /* ---------- Deletes & toggles ---------- */
 
-// --- FIX: This listener now handles Event Deletes AND Event Edits ---
+// -----------------------------------------------------------------
+// ----------------- FIX 1: PREFILL THE MODAL ----------------------
+// -----------------------------------------------------------------
+// Replace the attHead listener with this:
 attHead.addEventListener('click', (e) => {
   // Handle delete event
   const delBtn = e.target.closest('button[data-del-event]');
@@ -973,8 +973,25 @@ attHead.addEventListener('click', (e) => {
     const ev = (EVENTS || []).find(x => x.id === id);
     if (!ev) return;
 
-    editEvId.value   = id;
-    editEvName.value = ev.name || '';
+    // 1. Populate basic fields
+    document.getElementById('editEvId').value = id;
+    document.getElementById('editEvName').value = ev.name || '';
+    document.getElementById('editEvDate').value = (ev.date || '').slice(0, 10);
+    document.getElementById('editEvDesc').value = ev.desc || '';
+
+    // 2. Clear all avenue checkboxes first
+    const avenueCheckboxes = document.querySelectorAll('#editEventModal input[type="checkbox"]');
+    avenueCheckboxes.forEach(cb => cb.checked = false);
+
+    // 3. Check the ones that exist on the event
+    const eventAvenues = Array.isArray(ev.avenue) ? ev.avenue : (ev.avenue ? [ev.avenue] : []);
+    eventAvenues.forEach(avenueValue => {
+      const cb = document.querySelector(`#editEventModal input[value="${avenueValue}"]`);
+      if (cb) {
+        cb.checked = true;
+      }
+    });
+
     openModal('editEventModal');
     return; // Stop further processing
   }
@@ -990,35 +1007,16 @@ attBody.addEventListener('click', async (e) => {
   }
 
   // Handle edit member
-// Handle edit event
-// Handle edit event
-  const editBtn = e.target.closest('button[data-edit-event]');
+  const editBtn = e.target.closest('button[data-edit-member]');
   if (editBtn) {
-    const id = editBtn.dataset.editEvent;
-    const ev = (EVENTS || []).find(x => x.id === id);
-    if (!ev) return;
+    const id = editBtn.dataset.editMember;
+    const m  = (MEMBERS || []).find(x => x.id === id);
+    if (!m) return;
 
-    // 1. Populate basic fields
-    document.getElementById('editEvId').value = id;
-    document.getElementById('editEvName').value = ev.name || '';
-    document.getElementById('editEvDate').value = (ev.date || '').slice(0, 10);
-    document.getElementById('editEvDesc').value = ev.desc || '';
-
-    // 2. Clear all avenue checkboxes first
-    const avenueCheckboxes = document.querySelectorAll('#editEvAvenues input[type="checkbox"]');
-    avenueCheckboxes.forEach(cb => cb.checked = false);
-
-    // 3. Check the ones that exist on the event
-    const eventAvenues = ev.avenue || []; // This should be an array
-    eventAvenues.forEach(avenueValue => {
-      const cb = document.querySelector(`#editEvAvenues input[value="${avenueValue}"]`);
-      if (cb) {
-        cb.checked = true;
-      }
-    });
-
-    openModal('editEventModal');
-    return; // Stop further processing
+    editMemId.value   = id;
+    editMemName.value = m.name || '';
+    openModal('editMemberModal');
+    return;
   }
 
   // Handle cell toggle
@@ -1245,8 +1243,8 @@ async function removeEvent(eventId){
 }
 
 /* ---------- Filters ---------- */
-[memberSearch, eventSearch, monthFilter, avenueFilter].forEach(el => { // NEW
-  el.addEventListener('input', renderGrid);
+[memberSearch, eventSearch, monthFilter, avenueFilter].forEach(el => {
+  if (el) el.addEventListener('input', renderGrid);
 });
 
 /* ---------- Modal open/close + submit ---------- */
@@ -1360,9 +1358,9 @@ if (document.getElementById('bodMemCancel'))  document.getElementById('bodMemCan
 if (document.getElementById('bodMeetCancel')) document.getElementById('bodMeetCancel').onclick = hideModal;
 
 
-document.getElementById('admClose').onclick = hideModal;
-document.getElementById('memCancel').onclick = hideModal;
-document.getElementById('evCancel').onclick  = hideModal;
+if (document.getElementById('admClose')) document.getElementById('admClose').onclick = hideModal;
+if (document.getElementById('memCancel')) document.getElementById('memCancel').onclick = hideModal;
+if (document.getElementById('evCancel'))  document.getElementById('evCancel').onclick  = hideModal;
 
 // --- FIX: ALL of the redundant edit listeners from line 1251 to 1384 were DELETED ---
 // The logic was moved into the main event listeners for:
@@ -1389,8 +1387,10 @@ if (editMemberForm) {
   });
 }
 
-// Save: edit event (name only)
-// Save: edit event (name, date, desc, avenues)
+// -----------------------------------------------------------------
+// ---------------- FIX 2: SAVE ALL EVENT CHANGES ------------------
+// -----------------------------------------------------------------
+// Replace the editEventForm listener with this:
 if (editEventForm) {
   editEventForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1401,8 +1401,8 @@ if (editEventForm) {
     const date = document.getElementById('editEvDate').value;
     const desc = (document.getElementById('editEvDesc').value || '').trim();
 
-    // 2. Read the checked avenues
-    const avenues = Array.from(document.querySelectorAll('#editEvAvenues input[type="checkbox"]:checked'))
+    // 2. Read the checked avenues from the *EDIT* modal
+    const avenues = Array.from(document.querySelectorAll('#editEventModal input[type="checkbox"]:checked'))
       .map(cb => cb.value);
 
     // 3. Validate
@@ -1416,7 +1416,7 @@ if (editEventForm) {
       name,
       date,
       desc,
-      avenue: avenues // This is the array of avenue strings
+      avenue: avenues // This saves the array of avenues
     };
 
     try {
@@ -1428,6 +1428,7 @@ if (editEventForm) {
     }
   });
 }
+
 
 // Save: edit BOD member (name + position)
 if (editBodMemberForm) {
@@ -1468,18 +1469,20 @@ if (editBodMeetingForm) {
 
 
 // ADD MEMBER FORM
-document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = document.getElementById('addMemName').value.trim();
-  if (!name) return;
+if (document.getElementById('addMemberForm')) {
+  document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('addMemName').value.trim();
+    if (!name) return;
 
-  try {
-    await db.collection('members').add({ name });
-    closeModal('addMemberModal');
-  } catch (err) {
-    alert('Failed to add member: ' + err.message);
-  }
-});
+    try {
+      await db.collection('members').add({ name });
+      closeModal('addMemberModal');
+    } catch (err) {
+      alert('Failed to add member: ' + err.message);
+    }
+  });
+}
 // Create member
 if (addMemberForm) {
   addMemberForm.addEventListener('submit', async (e) => {
@@ -1512,70 +1515,58 @@ if (addEventForm) {
 }
 
 // EDIT MEMBER FORM
-document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = document.getElementById('editMemId').value;
-  const name = document.getElementById('editMemName').value.trim();
-  if (!id || !name) return;
+if (document.getElementById('editMemberForm')) {
+  document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editMemId').value;
+    const name = document.getElementById('editMemName').value.trim();
+    if (!id || !name) return;
 
-  try {
-    await db.collection('members').doc(id).update({ name });
-    closeModal('editMemberModal');
-  } catch (err) {
-    alert('Failed to update member: ' + err.message);
-  }
-});
+    try {
+      await db.collection('members').doc(id).update({ name });
+      closeModal('editMemberModal');
+    } catch (err) {
+      alert('Failed to update member: ' + err.message);
+    }
+  });
+}
 
 
 // EDIT BOD MEMBER FORM
-document.getElementById('editBodMemberForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = document.getElementById('editBodMemId').value;
-  const name = document.getElementById('editBodMemName').value.trim();
-  const pos = document.getElementById('editBodMemPos').value.trim();
-  if (!id || !name) return;
+if (document.getElementById('editBodMemberForm')) {
+  document.getElementById('editBodMemberForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editBodMemId').value;
+    const name = document.getElementById('editBodMemName').value.trim();
+    const pos = document.getElementById('editBodMemPos').value.trim();
+    if (!id || !name) return;
 
-  try {
-    await db.collection('bodMembers').doc(id).update({ name, position: pos });
-    closeModal('editBodMemberModal');
-  } catch (err) {
-    alert('Failed to update BOD member: ' + err.message);
-  }
-});
-
-// EDIT BOD MEETING FORM
-document.getElementById('editBodMeetingForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = document.getElementById('editBodMeetId').value;
-  const name = document.getElementById('editBodMeetName').value.trim();
-  const date = document.getElementById('editBodMeetDate').value;
-  if (!id || !name || !date) return;
-
-  try {
-    await db.collection('bodMeetings').doc(id).update({ name, date });
-    closeModal('editBodMeetingModal');
-  } catch (err) {
-    alert('Failed to update meeting: ' + err.message);
-  }
-});
-
+    try {
+      await db.collection('bodMembers').doc(id).update({ name, position: pos });
+      closeModal('editBodMemberModal');
+    } catch (err) {
+      alert('Failed to update BOD member: ' + err.message);
+    }
+  });
+}
 
 // EDIT BOD MEETING FORM
-document.getElementById('editBodMeetingForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = document.getElementById('editBodMeetId').value;
-  const name = document.getElementById('editBodMeetName').value.trim();
-  const date = document.getElementById('editBodMeetDate').value;
-  if (!id || !name || !date) return;
+if (document.getElementById('editBodMeetingForm')) {
+  document.getElementById('editBodMeetingForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editBodMeetId').value;
+    const name = document.getElementById('editBodMeetName').value.trim();
+    const date = document.getElementById('editBodMeetDate').value;
+    if (!id || !name || !date) return;
 
-  try {
-    await db.collection('bodMeetings').doc(id).update({ name, date });
-    closeModal('editBodMeetingModal');
-  } catch (err) {
-    alert('Failed to update meeting: ' + err.message);
-  }
-});
-
+    try {
+      await db.collection('bodMeetings').doc(id).update({ name, date });
+      closeModal('editBodMeetingModal');
+    } catch (err) {
+      alert('Failed to update meeting: ' + err.message);
+    }
+  });
+}
 
 
 function getFilteredMembersAndEvents(){

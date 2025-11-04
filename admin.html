@@ -25,6 +25,10 @@
     table.att th, table.att td{ padding:10px 12px; border:1px solid var(--color-border,#2e2e2e); background:#181818; }
     table.att thead th{ position:sticky; top:0; z-index:1; background:#202020; }
     .sticky-col{ position:sticky; left:0; z-index:2; background:#202020; }
+  /* ▼▼▼ ADD THIS NEW RULE ▼▼▼ */
+    table.att thead th.sticky-col {
+      z-index: 3;
+    }
     .ev-head,.mem-cell{ display:flex; align-items:center; gap:8px; justify-content:center;}
     .icon-btn{ border:1px solid var(--color-border,#2e2e2e); background:transparent; color:#ccc; width:28px; height:28px; border-radius:8px; cursor:pointer; line-height:1;}
     .icon-btn:hover{ color:#fff; border-color:#f33; }
