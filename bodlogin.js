@@ -27,9 +27,23 @@ function getGdriveImageUrl(url) {
   return url;
 }
 
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result); // This is the base64 string
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 // bodlogin.js — upload-free (stores Drive folder/link only)
 const auth = firebase.auth();
 const db   = firebase.firestore();
+
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxNq8SrZI08kTb-hh9awLlgWufJeW5ReHD4eePcGxS0z6SyOKNG9YseKeNXAzUv9URD/exec"; // ⚠️ PASTE YOUR URL
+const imageUploader = document.getElementById('imageUploader');
+const loader = document.getElementById('loader');
+const loaderText = document.getElementById('loaderText');
 
 const whoami      = document.getElementById('whoami');
 const signOutBtn  = document.getElementById('signOutBtn');
@@ -196,69 +210,120 @@ if (driveInput) {
 
 
 /* ---------- Submit (no uploads) ---------- */
+// --- REPLACE THE OLD 'form.addEventListener' WITH THIS NEW ONE ---
+
 if (form) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const user = auth.currentUser;
-    if (!user) { alert('Not signed in.'); return; }
+    if (!user) return toast('You must be logged in.', 2000);
 
-    const name        = evName.value.trim();
-    const description = evDesc.value.trim();
-    const avenues = Array.from(evAvenue.selectedOptions).map(o => o.value);
-    const driveFolder = (driveInput?.value || '').trim();   // may be blank
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const files = imageUploader.files;
+
+    // --- 1. Get all text data from form ---
+    const name        = (document.getElementById('evName')?.value || '').trim();
+    const description = (document.getElementById('evDesc')?.value || '').trim();
+    const avenues     = Array.from(document.getElementById('evAvenue').selectedOptions).map(o => o.value);
     const conductedBy = (document.getElementById('conductedBy')?.value || '').trim();
-const eventStart  = (document.getElementById('eventStart')?.value || '').trim();
-const eventEnd    = (document.getElementById('eventEnd')?.value || '').trim();
-const eventTime   = (document.getElementById('eventTime')?.value || '').trim();
-const previewLink = (document.getElementById('previewLink')?.value || '').trim(); // NEW
+    const eventStart  = (document.getElementById('eventStart')?.value || '').trim();
+    const eventEnd    = (document.getElementById('eventEnd')?.value || '').trim();
+    const eventTime   = (document.getElementById('eventTime')?.value || '').trim();
 
-if (!name || !description || !avenues.length || !eventStart || !eventEnd || !conductedBy) {
-  if (statusEl) statusEl.textContent = 'Please fill all required fields (pick at least one avenue).';
-  return;
-}
+    if (!name || !description || !avenues.length || !eventStart || !eventEnd || !conductedBy) {
+      return toast('Please fill all required fields.', 2000);
+    }
+    
+    submitBtn?.setAttribute('disabled', 'disabled');
+    loader.setAttribute('aria-hidden', 'false');
 
-    // If a full Drive URL was pasted, keep both url and id
-    let driveFolderId = '';
-    const m = driveFolder.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-    if (m) driveFolderId = m[1];
+    try {
+      // --- 2. Step 1: Create the folder in Google Drive ---
+      loaderText.textContent = 'Creating event folder...';
+      
+      const folderResponse = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' }, // Use text/plain for GAS
+        body: JSON.stringify({
+          action: 'createFolder',
+          eventName: name
+        })
+      });
+      
+      const folderResult = await folderResponse.json();
+      if (folderResult.status !== 'success') {
+        throw new Error(folderResult.message || 'Failed to create folder.');
+      }
+      
+      const newFolderId = folderResult.data.folderId;
+      
+      // --- 3. Step 2: Upload files (if any) ---
+      let uploadedFileUrls = [];
+      if (files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          loaderText.textContent = `Uploading image ${i + 1} of ${files.length}...`;
+          
+          // Read the file as a base64 string
+          const fileData = await readFileAsBase64(file);
+          
+          const fileResponse = await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+              action: 'uploadFile',
+              folderId: newFolderId,
+              fileName: file.name,
+              fileData: fileData // Send the base64 string
+            })
+          });
+          
+          const fileResult = await fileResponse.json();
+          if (fileResult.status === 'success') {
+            uploadedFileUrls.push(fileResult.data.url); // Save the URL
+          }
+        }
+      }
 
-const doc = {
-  name,
-  description,
-  avenue: avenues,
-  conductedBy,
-  eventStart,
-  eventEnd,
-  eventTime,
-  driveFolder,
-  driveFolderId,
-  previewLink, // NEW
-  createdBy: user.uid,
-  createdByEmail: user.email || '',
-  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-};
-try {
-  // prevent double submit
-  const submitBtn = form.querySelector('button[type=submit]');
-  submitBtn?.setAttribute('disabled','disabled');
+      // --- 4. Step 3: Save the final record to Firebase ---
+      loaderText.textContent = 'Saving to database...';
+      
+      const doc = {
+        name,
+        description,
+        avenue: avenues,
+        conductedBy,
+        eventStart,
+        eventEnd,
+        eventTime,
+        driveFolderId: newFolderId, // Save the new Folder ID
+        previewLink: uploadedFileUrls[0] || '', // Use first image as preview
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: user.uid,
+        createdByName: user.displayName || user.email,
+        createdByNameSearch: (user.displayName || user.email).toLowerCase().split(/\s+/),
+      };
 
-  await db.collection('bodEvents').add(doc);
-
-  //localStorage.removeItem(DRAFT_KEY);
-  form.reset();
-  toast('Saved!');
-  loadItems();
-} catch (err) {
-  console.error(err);
-  if (statusEl) statusEl.textContent = 'Save failed: ' + err.message;
-  toast('Save failed', 2000);
-} finally {
-  form.querySelector('button[type=submit]')?.removeAttribute('disabled');
-}
-
+      await db.collection('bodEvents').add(doc);
+      
+      // --- 5. Done ---
+      toast('Event submitted successfully!');
+      form.reset();
+      
+    } catch (err) {
+      console.error('Submission failed:', err);
+      toast('Error: ' + err.message, 3000);
+    } finally {
+      // --- 6. Hide loader and re-enable button ---
+      submitBtn?.removeAttribute('disabled');
+      loader.setAttribute('aria-hidden', 'true');
+      loaderText.textContent = 'Working...';
+    }
   });
 }
+
+// --- END OF REPLACEMENT ---
 
 
 if (exportSubsBtn) {
