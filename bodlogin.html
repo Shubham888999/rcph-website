@@ -342,7 +342,6 @@ input[type="time"]::-moz-placeholder {
       width: 0.1px; /* Make it tiny to avoid interfering with layout */
       height: 0.1px; /* Make it tiny */
       overflow: hidden; /* Hide any overflow */
-      pointer-events: none; /* Make it not interact with mouse events */
       white-space: nowrap; /* Prevent text from wrapping */
     }
 
@@ -461,6 +460,8 @@ input[type="time"]::-moz-placeholder {
       <input id="imageUploader" type="file" multiple accept="image/png, image/jpeg, image/gif, image/webp" />
       
       <span id="file-upload-names">No files selected</span> </div>
+      <span id="selectedCountPill" class="pill" hidden>0 selected</span>
+      <div id="selectedThumbs" class="thumbs" hidden></div>
     <small class="note">Upload one or more images. The first image will be used as the preview.</small>
   </div>
 

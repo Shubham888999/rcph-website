@@ -140,6 +140,73 @@ if (filterSearch) filterSearch.addEventListener('input', () => {
   window.__bodSearchT = setTimeout(loadItems, 150);
 });
 
+// --- Image selection UI feedback ---
+const fileNamesEl       = document.getElementById('file-upload-names');
+const selectedCountPill = document.getElementById('selectedCountPill');
+const selectedThumbs    = document.getElementById('selectedThumbs');
+
+let __prevObjectUrls = [];
+
+function clearThumbs() {
+  // Revoke old object URLs to avoid leaks
+  __prevObjectUrls.forEach(u => URL.revokeObjectURL(u));
+  __prevObjectUrls = [];
+  if (selectedThumbs) selectedThumbs.innerHTML = '';
+}
+
+function renderSelection(files) {
+  if (!fileNamesEl || !selectedCountPill || !selectedThumbs) return;
+
+  const n = files.length;
+  if (n === 0) {
+    fileNamesEl.textContent = 'No files selected';
+    selectedCountPill.hidden = true;
+    selectedThumbs.hidden = true;
+    clearThumbs();
+    return;
+  }
+
+  // Label text (short + accessible)
+  if (n === 1) {
+    fileNamesEl.textContent = files[0].name;
+  } else {
+    fileNamesEl.textContent = `${n} images selected`;
+  }
+
+  // Count pill
+  selectedCountPill.textContent = `${n} selected`;
+  selectedCountPill.hidden = false;
+
+  // Tiny previews
+  clearThumbs();
+  selectedThumbs.hidden = false;
+  Array.from(files).forEach(f => {
+    const url = URL.createObjectURL(f);
+    __prevObjectUrls.push(url);
+    const wrap = document.createElement('div');
+    wrap.className = 'thumb';
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = f.name;
+    wrap.appendChild(img);
+    selectedThumbs.appendChild(wrap);
+  });
+}
+
+// Fire when the user picks files
+if (imageUploader) {
+  imageUploader.addEventListener('change', () => {
+    renderSelection(imageUploader.files || []);
+  });
+}
+
+// Clear indicators on form reset
+if (form) {
+  form.addEventListener('reset', () => {
+    // let the reset visually finish, then clear
+    setTimeout(() => renderSelection([]), 0);
+  });
+}
 
 /* ---------- Auth guard ---------- */
 auth.onAuthStateChanged(async (user) => {
