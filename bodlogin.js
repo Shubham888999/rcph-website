@@ -218,6 +218,16 @@ auth.onAuthStateChanged(async (user) => {
 
     // set role flags safely here
     IS_PRESIDENT = (role === 'president');
+    // Show DZR button only for president
+const goDZRBtn = document.getElementById('goDZRBtn');
+if (goDZRBtn) {
+    if (IS_PRESIDENT) {
+        goDZRBtn.style.display = 'inline-block';
+        goDZRBtn.onclick = () => location.href = 'dzrvisit.html';
+    } else {
+        goDZRBtn.style.display = 'none';
+    }
+}
 
     // show/hide “Admin Panel” button
     if (role === 'admin' || role === 'president') {

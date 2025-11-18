@@ -58,15 +58,23 @@
     <p id="authError" style="color:#ff6b6b;margin-top:10px;min-height:1.2em;"></p>
 
     <!-- Panel chooser (hidden by default; shown for admins) -->
-    <div id="panelChooser" style="display:none;max-width:420px;margin:1rem 0 0;padding:12px;border:1px solid #2e2e2e;border-radius:12px;background:#161616">
-      <p style="margin:.25rem 0 1rem 0">Where do you want to go?</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <a href="admin.html" class="btn" style="flex:1;text-align:center">Admin Panel</a>
-        <a href="bodlogin.html" class="btn btn-outline" style="flex:1;text-align:center">BOD Panel</a>
-      </div>
-    </div>
-    <!-- END chooser -->
+<div id="panelChooser" style="display:none;max-width:420px;margin:1rem 0 0;
+     padding:12px;border:1px solid #2e2e2e;border-radius:12px;background:#161616">
+  <p style="margin:.25rem 0 1rem 0">Where do you want to go?</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <a href="admin.html" class="btn" style="flex:1;text-align:center"
+       data-panel="admin">Admin Panel</a>
+
+    <a href="bodlogin.html" class="btn btn-outline" style="flex:1;text-align:center"
+       data-panel="bod">BOD Panel</a>
+
+    <!-- New: DZR panel, default hidden -->
+    <a href="dzrvisit.html" id="dzrPanelLink"
+       class="btn btn-outline"
+       style="flex:1;text-align:center;display:none"
+       data-panel="dzr">DZR Visit</a>
   </div>
+</div>
 
  <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -126,12 +134,26 @@ async function routeByRole(user) {
     if (dest === 'bod')   { location.href = 'bodlogin.html'; return; }
 
     if (role === 'admin' || role === 'president') {
-      document.getElementById('panelChooser').style.display = 'block';
+      const chooser = document.getElementById('panelChooser');
+      const dzrLink = document.getElementById('dzrPanelLink');
+
+      chooser.style.display = 'block';
+
+      // Only president sees DZR button
+      if (role === 'president' && dzrLink) {
+        dzrLink.style.display = 'inline-block';
+      }
+
       const preferred = localStorage.getItem('preferredPanel');
       if (preferred === 'admin') { location.href = 'admin.html'; return; }
       if (preferred === 'bod')   { location.href = 'bodlogin.html'; return; }
+      if (preferred === 'dzr' && role === 'president') {
+        location.href = 'dzrvisit.html';
+        return;
+      }
       return;
     }
+
 
     if (role === 'bod') {
       location.href = 'bodlogin.html';

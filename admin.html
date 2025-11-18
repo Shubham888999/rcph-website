@@ -144,10 +144,14 @@
       <h1 class="admin-title">Admin Panel</h1>
       <div class="topbar">
         <h2>Attendance Manager <span id="countBadge" class="badge"></span></h2>
-  <div style="display:flex; gap:8px; align-items:center;">
+<div style="display:flex; gap:8px; align-items:center;">
     <button id="goBodBtn" class="btn btn-outline">Go to BOD Panel</button>
-        <button id="signOutBtn" class="btn btn-outline">Sign out</button>
-      </div>
+
+    <!-- NEW -->
+    <button id="goDZRBtn" class="btn btn-outline" style="display:none;">Go to DZR Visit</button>
+
+    <button id="signOutBtn" class="btn btn-outline">Sign out</button>
+</div>
       </div>
 <div class="toolbar">
         <input id="memberSearch" type="text" placeholder="Search member…"/>
@@ -277,20 +281,68 @@
   <div class="topbar">
     <h2>Treasurer Panel <span id="treBadge" class="badge"></span></h2>
   </div>
-  <p class="muted -mt-1">
-  Bills Drive:&nbsp;
-  <a href="https://your-drive-link-here" target="_blank" rel="noopener" class="link-pill">
-    Open shared folder
-  </a>
-</p>
+  
+  <div class="toolbar" id="treKPIs" style="gap:14px; align-items:flex-end; margin-bottom:12px;">
+    <div class="kpi"><div class="kpi-label">Income</div><div class="kpi-value" id="treInc">–</div></div>
+    <div class="kpi"><div class="kpi-label">Expense</div><div class="kpi-value" id="treExp">–</div></div>
+    <div class="kpi"><div class="kpi-label">Net</div><div class="kpi-value" id="treNet">–</div></div>
+  </div>
+  
+  <div class="chart-wrap" style="height:180px; margin-bottom:16px;">
+    <canvas id="treBalanceChart"></canvas>
+  </div>
 
   <div class="toolbar">
-    <div class="toolbar" id="treKPIs" style="gap:14px; align-items:flex-end">
-  <div class="kpi"><div class="kpi-label">Income</div><div class="kpi-value" id="treInc">–</div></div>
-  <div class="kpi"><div class="kpi-label">Expense</div><div class="kpi-value" id="treExp">–</div></div>
-  <div class="kpi"><div class="kpi-label">Net</div><div class="kpi-value" id="treNet">–</div></div>
-</div>
+    <select id="treFilterType">
+      <option value="">All Types</option>
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+    </select>
+    
+    <select id="treFilterMonth">
+      <option value="">All Months</option>
+    </select>
 
+    <select id="treFilterAvenue">
+      <option value="">All Avenues</option>
+      <option value="ISD">ISD</option>
+      <option value="CMD">CMD</option>
+      <option value="CSD">CSD</option>
+      <option value="PDD">PDD</option>
+      <option value="RRRO">RRRO</option>
+      <option value="PRO">PRO</option>
+      <option value="DEI">DEI</option>
+      <option value="GBM">GBM</option>
+      <option value="_NONE_">No Avenue</option>
+    </select>
+
+    <span class="flex-1"></span>
+    
+    <button id="treAddBtn" class="btn">Add Transaction</button>
+    <button id="exportTreXlsxBtn" class="btn btn-outline">Export to Excel</button>
+  </div>
+
+  <div class="grid-wrap">
+    <table class="att">
+      <thead>
+        <tr>
+          <th style="min-width:200px">Name</th>
+          <th style="min-width:100px">Type</th>
+          <th style="min-width:120px">Amount (₹)</th>
+          <th style="min-width:100px">Avenue</th>
+          <th style="min-width:120px">Date</th>
+          <th style="min-width:120px">Paid By</th>
+          <th style="min-width:120px">Reimbursement</th>
+          <th style="min-width:100px">Cheque No</th>
+          <th style="min-width:80px">Bill</th>
+          <th style="min-width:110px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="treBody"></tbody>
+    </table>
+  </div>
+</div>
+<!--
     <input id="treName" type="text" placeholder="Transaction name (e.g., Installation)" />
     <select id="treType" title="Type">
       <option value="" disabled selected>Type…</option>
@@ -310,28 +362,32 @@
 </select>
 
     <input id="treDate" type="date" />
-    <button id="treAddBtn" class="btn btn-outline">Add Entry</button>
+    <button id="treAddBtn" class="btn">Add Transaction</button>
 
     <span class="flex-1"></span>
     <button id="exportTreXlsxBtn" class="btn">Export to Excel</button>
   </div>
 
-  <div class="grid-wrap">
-    <table class="att">
-      <thead>
-        <tr>
-          <th style="min-width:240px">Name</th>
-          <th style="min-width:120px">Type</th>
-          <th style="min-width:120px">Amount (₹)</th>
-          <th>Avenue</th>
-          <th style="min-width:140px">Date</th>
-          <th style="min-width:110px">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="treBody"></tbody>
-    </table>
-  </div>
+<div class="grid-wrap">
+  <table class="att">
+    <thead>
+      <tr>
+        <th style="min-width:200px">Name</th>
+        <th style="min-width:100px">Type</th>
+        <th style="min-width:120px">Amount (₹)</th>
+        <th style="min-width:100px">Avenue</th>
+        <th style="min-width:120px">Date</th>
+        <th style="min-width:120px">Paid By</th>
+        <th style="min-width:120px">Reimbursement</th>
+        <th style="min-width:100px">Cheque No</th>
+        <th style="min-width:80px">Bill</th>
+        <th style="min-width:110px">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="treBody"></tbody>
+  </table>
 </div>
+</div>-->
 
 
   </div>
@@ -508,7 +564,139 @@
     </div>
   </div>
 
+<div id="addTransModal" class="adm-modal" aria-hidden="true">
+  <div class="adm-modal__sheet">
+    <div class="adm-modal__head">
+      <h3>Add Transaction</h3>
+      <button class="adm-close" data-close="addTransModal">✕</button>
+    </div>
+    <form id="addTransForm" class="adm-form">
+      <div class="adm-field">
+        <label>Transaction Name</label>
+        <input id="transName" required/>
+      </div>
+      <div class="adm-field">
+        <label>Type</label>
+        <select id="transType" required>
+          <option value="">Select type</option>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+      </div>
+      <div class="adm-field">
+        <label>Amount (₹)</label>
+        <input id="transAmount" type="number" required/>
+      </div>
+      <div class="adm-field">
+        <label>Avenue</label>
+        <select id="transAvenue" required>
+          <option value="">Select avenue</option>
+          <option value="ISD">ISD</option>
+          <option value="CMD">CMD</option>
+          <option value="CSD">CSD</option>
+          <option value="PDD">PDD</option>
+          <option value="RRRO">RRRO</option>
+          <option value="PRO">PRO</option>
+          <option value="DEI">DEI</option>
+          <option value="GBM">GBM</option>
+          <option value="_NONE_">No Avenue</option>
+        </select>
+      </div>
+      <div class="adm-field">
+        <label>Paid By</label>
+        <input id="transPaidBy" placeholder="e.g. President"/>
+      </div>
+      <div class="adm-field">
+        <label>Reimbursement</label>
+        <input id="transReimburse" placeholder="e.g. Pending / Done"/>
+      </div>
+      <div class="adm-field">
+        <label>Cheque No</label>
+        <input id="transCheque" type="number" placeholder="000000"/>
+      </div>
+      <div class="adm-field">
+        <label>Date</label>
+        <input id="transDate" type="date" required/>
+      </div>
+      <div class="adm-field">
+  <label>Bill Image URL (Google Drive / JPG / PNG)</label>
+  <input id="transBillUrl" placeholder="https://drive.google.com/..."/>
+</div>
+      <div class="adm-field">
+        <label>Upload Bill</label>
+        <input id="transBill" type="file" accept="image/*"/>
+        <div id="transBillPreview" style="margin-top:6px;"></div>
+      </div>
+      <div class="adm-actions">
+        <button type="submit" class="btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="billLightbox" class="adm-modal" aria-hidden="true" style="z-index: 10000;">
+  <div class="adm-modal__sheet" style="max-width:90vw; background:#000; position:relative; padding:0; border:none; overflow:hidden;">
+    
+    <button class="adm-close" data-close="billLightbox" 
+            style="position:absolute; top:15px; right:15px; z-index:10; background:rgba(0,0,0,0.8); color:#fff; border:2px solid #fff; border-radius:50%; width:40px; height:40px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+      ✕
+    </button>
+
+    <img id="billLightboxImg" style="width:100%; display:block; max-height:80vh; object-fit:contain;"/>
+  </div>
+</div>  
+<div class="adm-modal" id="editTransModal" aria-hidden="true">
+  <div class="adm-modal__sheet">
+    <button class="adm-close" data-close="editTransModal">✕</button>
+    <h2>Edit Transaction</h2>
+    <form id="editTransForm" class="adm-form">
+      <input type="hidden" id="editTransId">
       
+      <label class="adm-field">
+        <span>Name</span>
+        <input id="editTransName" required>
+      </label>
+      <label class="adm-field">
+        <span>Type</span>
+        <select id="editTransType">
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+      </label>
+      <label class="adm-field">
+        <span>Amount (₹)</span>
+        <input id="editTransAmount" type="number" required>
+      </label>
+      <label class="adm-field">
+        <span>Avenue</span>
+        <input id="editTransAvenue">
+      </label>
+
+      <label class="adm-field">
+        <span>Paid By</span>
+        <input id="editTransPaidBy">
+      </label>
+      <label class="adm-field">
+        <span>Reimbursement</span>
+        <input id="editTransReimburse">
+      </label>
+      <label class="adm-field">
+        <span>Cheque No</span>
+        <input id="editTransCheque" type="number">
+      </label>
+      <label class="adm-field">
+        <span>Date</span>
+        <input id="editTransDate" type="date" required>
+      </label>
+      <label class="adm-field">
+        <span>Bill (replace)</span>
+        <input id="editTransBill" type="file" accept="image/*">
+      </label>
+      <div id="editTransBillPreview" style="margin-top:10px;"></div>
+      <button type="submit" class="btn">Save Changes</button>
+    </form>
+  </div>
+</div>
+
 <!--       MEMBER FORM 
       <form id="memberForm" class="adm-form" autocomplete="off" hidden>
         <label class="adm-field">
@@ -622,5 +810,6 @@
 </script>
 
   <script src="admin.js?v=7"></script>
+  
 </body>
 </html>

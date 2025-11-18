@@ -1,15 +1,33 @@
+/**
+ * admin.js
+ * Complete updated version with new Treasurer fields and fixes.
+ */
+
+function getGdriveImageUrl(url) {
+  if (!url) return "";
+  // Check for standard Drive share links
+  if (url.includes("drive.google.com")) {
+    const idMatch = url.match(/[-\w]{25,}/);
+    if (idMatch) {
+      // Use the thumbnail endpoint (sz=s1000 gives a 1000px image)
+      return `https://drive.google.com/thumbnail?id=${idMatch[0]}&sz=s1000`;
+    }
+  }
+  return url;
+}
+
 /* Uses global window.auth / window.db created in firebase-init.js */
 const auth = window.auth;
 const db   = window.db;
 
-/* DOM */
+/* DOM ELEMENTS */
 const countBadge  = document.getElementById('countBadge');
 const signOutBtn  = document.getElementById('signOutBtn');
 
 const memberSearch = document.getElementById('memberSearch');
 const eventSearch  = document.getElementById('eventSearch');
 const monthFilter  = document.getElementById('monthFilter');
-const avenueFilter = document.getElementById('avenueFilter'); // Added avenue filter
+const avenueFilter = document.getElementById('avenueFilter');
 
 const addMemberBtn = document.getElementById('addMemberBtn');
 const addEventBtn  = document.getElementById('addEventBtn');
@@ -42,28 +60,58 @@ const bodHead          = document.getElementById('bodHead');
 const bodBody          = document.getElementById('bodBody');
 const exportBodXlsxBtn = document.getElementById('exportBodXlsxBtn');
 
+/* TREASURER DOM ELEMENTS */
 const treBadge           = document.getElementById('treBadge');
-const treName            = document.getElementById('treName');
-const treType            = document.getElementById('treType');
-const treAmount          = document.getElementById('treAmount');
-const treDate            = document.getElementById('treDate');
-const treAddBtn          = document.getElementById('treAddBtn');
 const treBody            = document.getElementById('treBody');
 const exportTreXlsxBtn   = document.getElementById('exportTreXlsxBtn');
-const treAvenue = document.getElementById('treAvenue');
 
+// Add Transaction Inputs
+const transName      = document.getElementById("transName");
+const transType      = document.getElementById("transType");
+const transAmount    = document.getElementById("transAmount");
+const transAvenue    = document.getElementById("transAvenue");
+const transDate      = document.getElementById("transDate");
+// NEW FIELDS
+const transPaidBy    = document.getElementById("transPaidBy");
+const transReimburse = document.getElementById("transReimburse");
+const transCheque    = document.getElementById("transCheque");
+
+const transBill      = document.getElementById("transBill");
+const transBillPreview = document.getElementById("transBillPreview");
+const addTransForm   = document.getElementById("addTransForm");
+const treAddBtn      = document.getElementById('treAddBtn');
+
+// Edit Transaction Inputs
+const editTransForm   = document.getElementById("editTransForm");
+const editTransId     = document.getElementById("editTransId"); // Ensure this hidden input exists
+const editTransName   = document.getElementById("editTransName");
+const editTransType   = document.getElementById("editTransType");
+const editTransAmount = document.getElementById("editTransAmount");
+const editTransAvenue = document.getElementById("editTransAvenue");
+const editTransDate   = document.getElementById("editTransDate");
+const editTransBill   = document.getElementById("editTransBill");
+const editTransBillPreview = document.getElementById("editTransBillPreview");
+// NEW EDIT FIELDS
+const editTransPaidBy    = document.getElementById("editTransPaidBy");
+const editTransReimburse = document.getElementById("editTransReimburse");
+const editTransCheque    = document.getElementById("editTransCheque");
+
+// Lightbox
+const billLightboxImg = document.getElementById("billLightboxImg");
+
+/* LOCK BUTTONS */
 const lockAttendanceBtn = document.getElementById('lockAttendanceBtn');
 const lockAttendanceState = document.getElementById('lockAttendanceState');
-
 const lockBodAttBtn = document.getElementById('lockBodAttBtn');
 const lockBodAttState = document.getElementById('lockBodAttState');
-
 const lockFinesBtn = document.getElementById('lockFinesBtn');
 const lockFinesState = document.getElementById('lockFinesState');
-
 const lockTreasuryBtn = document.getElementById('lockTreasuryBtn');
 const lockTreasuryState = document.getElementById('lockTreasuryState');
 
+const treFilterType   = document.getElementById('treFilterType');
+const treFilterMonth  = document.getElementById('treFilterMonth');
+const treFilterAvenue = document.getElementById('treFilterAvenue');
 // ===== MODAL ELEMENTS =====
 const addMemberModal      = document.getElementById('addMemberModal');
 const addMemberForm       = document.getElementById('addMemberForm');
@@ -84,8 +132,8 @@ const editEventModal      = document.getElementById('editEventModal');
 const editEventForm       = document.getElementById('editEventForm');
 const editEvId            = document.getElementById('editEvId');
 const editEvName          = document.getElementById('editEvName');
-const editEvDate          = document.getElementById('editEvDate'); // Added
-const editEvDesc          = document.getElementById('editEvDesc'); // Added
+const editEvDate          = document.getElementById('editEvDate');
+const editEvDesc          = document.getElementById('editEvDesc');
 
 const editBodMemberModal  = document.getElementById('editBodMemberModal');
 const editBodMemberForm   = document.getElementById('editBodMemberForm');
@@ -99,8 +147,8 @@ const editBodMeetId       = document.getElementById('editBodMeetId');
 const editBodMeetName     = document.getElementById('editBodMeetName');
 const editBodMeetDate     = document.getElementById('editBodMeetDate');
 
-
 const goBodBtn = document.getElementById('goBodBtn');
+
 // Modal helpers
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
@@ -113,6 +161,9 @@ function closeModal(modalId) {
     modal.setAttribute('aria-hidden', 'true');
     const form = modal.querySelector('form');
     if (form) form.reset();
+    // Clear previews if any
+    if(modalId === 'addTransModal' && transBillPreview) transBillPreview.innerHTML = "";
+    if(modalId === 'editTransModal' && editTransBillPreview) editTransBillPreview.innerHTML = "";
   }
 }
 
@@ -123,44 +174,34 @@ document.addEventListener('click', (e) => {
     closeModal(closeBtn.dataset.close);
   }
 });
-// Edit state
 
-// Edit forms
+/* DATA STATE */
+let MEMBERS = [];
+let EVENTS  = [];
+let ATT     = {}; // {memberId: {eventId: boolean}}
 
 let BODM = [];      // [{id, name, position}]
 let BODMEET = [];   // [{id, name, date}]
 let BODATT = {};    // { bodMemberId: { meetingId: boolean } }
+
 let FINES = [];
-let unsubFines = null;
-let unsubBodM  = null;
-let unsubBodMt = null;
-let unsubBodAt = null;
+let TREAS = []; // Treasury Data
 
-// Treasurer state
-let TREAS = []; // [{id, name, type, amount, date, createdAt, createdBy}]
-let unsubTre = null;
-
-// ---- Modal controller ----
-
-
-
-/* Helper: map memberId -> name for dropdown rendering */
-function membersMap() {
-  const map = {};
-  MEMBERS.forEach(m => map[m.id] = m.name || '');
-  return map;
-}
-
-let MEMBERS = [];
-let EVENTS  = [];
-let ATT     = {}; // {memberId: {eventId: boolean}}
+/* UNSUBSCRIBE HANDLERS */
 let unsubMembers = null;
 let unsubEvents  = null;
 let unsubAtt     = null; 
+let unsubFines   = null;
+let unsubBodM    = null;
+let unsubBodMt   = null;
+let unsubBodAt   = null;
+let unsubTre     = null;
+
+let IS_PRESIDENT = false;
 
 const _charts = {};
 function drawChart(key, ctx, cfg){
-  if (!window.Chart || !ctx) return; // graceful no-chart fallback
+  if (!window.Chart || !ctx) return; 
   if (_charts[key]) { _charts[key].destroy(); }
   _charts[key] = new Chart(ctx, cfg);
 }
@@ -169,7 +210,13 @@ function drawChart(key, ctx, cfg){
 const fmt = n => Number(n).toLocaleString();
 const yyyymm = d => d.slice(0,7);
 
-let IS_PRESIDENT = false;
+/* Helper: map memberId -> name */
+function membersMap() {
+  const map = {};
+  MEMBERS.forEach(m => map[m.id] = m.name || '');
+  return map;
+}
+
 /* ---------- Auth guard + role check ---------- */
 auth.onAuthStateChanged(async (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
@@ -178,57 +225,63 @@ auth.onAuthStateChanged(async (user) => {
     const snap = await db.collection('roles').doc(user.uid).get();
     const role = snap.exists ? String(snap.data().role).toLowerCase() : null;
     IS_PRESIDENT = (role === 'president');
-
+    
+    const goDZRBtn = document.getElementById('goDZRBtn');
+    if (goDZRBtn) {
+        if (IS_PRESIDENT) {
+            goDZRBtn.style.display = 'inline-block';
+            goDZRBtn.onclick = () => location.href = 'dzrvisit.html';
+        } else {
+            goDZRBtn.style.display = 'none';
+        }
+    }
     // Only redirect if we KNOW they’re not admin.
     if (role && role !== 'admin' && role !== 'president') {
       window.location.href = 'bodlogin.html';
       return;
     }
   } catch (e) {
-    console.warn('Role check failed; continuing to avoid loops:', e);
-    // fall through – still show the page
+    console.warn('Role check failed; continuing:', e);
   }
 
-  // ✅ Immediately paint once, then attach realtime listeners
+  // Immediately paint once, then attach realtime listeners
   await startAttendancePage();
 });
 
+/* Lock Logic */
 function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
   db.collection('locks').doc(panelKey).onSnapshot(snap => {
     const locked = snap.exists && !!snap.data().locked;
     if (badgeEl) badgeEl.textContent = locked ? 'Locked' : 'Unlocked';
     if (btnEl) {
-      btnEl.disabled = !IS_PRESIDENT;           // only president can click
-      btnEl.textContent = locked ? '🔓' : '🔒';  // flip icon
+      btnEl.disabled = !IS_PRESIDENT;           
+      btnEl.textContent = locked ? '🔓' : '🔒'; 
     }
     onLockedChange?.(locked);
   });
 }
 
-// Hook them up:
-watchLock('attendance',   lockAttendanceBtn,   lockAttendanceState,   (locked) => {
-  // disable attendance UI when locked (buttons/inputs)
+// Hook up locks
+watchLock('attendance', lockAttendanceBtn, lockAttendanceState, (locked) => {
   document.querySelectorAll('#attBody .cell-btn, #addMemberBtn, #addEventBtn')
     .forEach(el => el.disabled = locked);
 });
-
 watchLock('bodAttendance', lockBodAttBtn, lockBodAttState, (locked) => {
   document.querySelectorAll('#bodBody .cell-btn, #bodAddMemberBtn, #bodAddMeetingBtn')
     .forEach(el => el.disabled = locked);
 });
-
-watchLock('fines',        lockFinesBtn,       lockFinesState, (locked) => {
+watchLock('fines', lockFinesBtn, lockFinesState, (locked) => {
   document.querySelectorAll('#fineForm input, #fineForm select, #fineForm button')
     .forEach(el => el.disabled = locked);
 });
-
-watchLock('treasury',     lockTreasuryBtn,    lockTreasuryState, (locked) => {
-  document.querySelectorAll('#treForm input, #treForm select, #treForm button')
-    .forEach(el => el.disabled = locked);
+watchLock('treasury', lockTreasuryBtn, lockTreasuryState, (locked) => {
+  // Lock treasury inputs
+  const btns = document.querySelectorAll('#treAddBtn, #treBody .icon-btn');
+  btns.forEach(b => b.disabled = locked);
 });
 
 async function toggleLock(panelKey) {
-  if (!IS_PRESIDENT) return; // safety
+  if (!IS_PRESIDENT) return; 
   const ref = db.collection('locks').doc(panelKey);
   const snap = await ref.get();
   const cur = snap.exists && !!snap.data().locked;
@@ -240,19 +293,62 @@ if (lockBodAttBtn)     lockBodAttBtn.onclick     = () => toggleLock('bodAttendan
 if (lockFinesBtn)      lockFinesBtn.onclick      = () => toggleLock('fines');
 if (lockTreasuryBtn)   lockTreasuryBtn.onclick   = () => toggleLock('treasury');
 
-
 signOutBtn.addEventListener('click', async () => {
   await auth.signOut();
   location.href = 'login.html';
 });
 if (goBodBtn) {
-  goBodBtn.addEventListener('click', () => {
-    // Admins can freely go to BOD panel
-    location.href = 'bodlogin.html';
+  goBodBtn.addEventListener('click', () => location.href = 'bodlogin.html');
+}
+
+// Helper: Filter Treasury Data based on dropdowns
+function getFilteredTreasury() {
+  const typeVal   = treFilterType.value;
+  const monthVal  = treFilterMonth.value;
+  const avenueVal = treFilterAvenue.value;
+
+  return TREAS.filter(t => {
+    // Filter Type
+    if (typeVal && t.type !== typeVal) return false;
+    
+    // Filter Month (Format: YYYY-MM)
+    if (monthVal && (t.date || '').slice(0, 7) !== monthVal) return false;
+
+    // Filter Avenue
+    if (avenueVal) {
+      if (avenueVal === '_NONE_') {
+        if (t.avenue && t.avenue !== 'No Avenue' && t.avenue !== '_NONE_') return false;
+      } else {
+        if (t.avenue !== avenueVal) return false;
+      }
+    }
+    return true;
   });
+}
+
+// Helper: Populate Month Filter dynamically
+function buildTreasuryMonthFilter() {
+  const existingVal = treFilterMonth.value;
+  treFilterMonth.innerHTML = '<option value="">All Months</option>';
+  
+  const months = new Set(TREAS.map(t => (t.date || '').slice(0, 7)));
+  Array.from(months).filter(Boolean).sort().reverse().forEach(ym => {
+    const [y, m] = ym.split('-');
+    const dateObj = new Date(y, m - 1, 1);
+    const label = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    const opt = document.createElement('option');
+    opt.value = ym;
+    opt.textContent = label;
+    treFilterMonth.appendChild(opt);
+  });
+
+  // Restore selection if still valid
+  if (existingVal) treFilterMonth.value = existingVal;
 }
 /* ---------- Data load ---------- */
 async function loadData(){
+  // Members & Events
   const [mSnap, eSnap] = await Promise.all([
     db.collection('members').orderBy('name').get(),
     db.collection('events').orderBy('date','desc').get()
@@ -260,157 +356,119 @@ async function loadData(){
 
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-    MEMBERS.map(m => `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`).join('');
+  
+  // Populate Fine Member Dropdown
+  if (fineMember) {
+    fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +
+      MEMBERS.map(m => `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`).join('');
+  }
 
-    if (bodHead && bodBody) {
+  // BOD
+  if (bodHead && bodBody) {
     const [bmSnap, mtSnap, baSnap] = await Promise.all([
       db.collection('bodMembers').orderBy('name').get(),
       db.collection('bodMeetings').orderBy('date','desc').get(),
       db.collection('bodAttendance').get()
     ]);
-
     BODM    = bmSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     BODMEET = mtSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
     BODATT = {};
     baSnap.forEach(d => { BODATT[d.id] = d.data() || {}; });
-
     renderBodGrid();
   }
 
-    if (fineMember) {
-  fineMember.innerHTML =
-    '<option value="" disabled selected>Member…</option>' +
-    MEMBERS.map(m =>
-      `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`
-    ).join('');
-}
-
-// Default date = today
-if (fineDate && !fineDate.value) {
-  fineDate.value = new Date().toISOString().slice(0,10);
-}
-
-// Fines initial load
-if (unsubFines) { unsubFines(); unsubFines = null; }
-if (finesBody) {
-  unsubFines = db.collection('fines').orderBy('date', 'desc')
-    .onSnapshot((snap) => {
-      FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderFines();
-    });
-}
-
-    if (unsubBodM)  { unsubBodM();  unsubBodM  = null; }
-  if (unsubBodMt) { unsubBodMt(); unsubBodMt = null; }
-  if (unsubBodAt) { unsubBodAt(); unsubBodAt = null; }
-    if (bodHead && bodBody) {
-    unsubBodM = db.collection('bodMembers').orderBy('name')
-      .onSnapshot(snap => {
-        BODM = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderBodGrid();
-      });
-
-    unsubBodMt = db.collection('bodMeetings').orderBy('date','desc')
-      .onSnapshot(snap => {
-        BODMEET = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderBodGrid();
-      });
-
-    unsubBodAt = db.collection('bodAttendance')
-      .onSnapshot(snap => {
-        const next = {};
-        snap.forEach(d => { next[d.id] = d.data() || {}; });
-        BODATT = next;
-        renderBodGrid();
-      });
-  }
-
-  // Default date = today
-  if (fineDate && !fineDate.value) {
-    fineDate.value = new Date().toISOString().slice(0,10);
-  }
-
+  // Fines
   const fSnap = await db.collection('fines').orderBy('date','desc').get();
   FINES = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderFines();
 
-
-buildMonthFilterFromEvents();
-
-  // attendance (1 doc per member)
+  // Attendance
+  buildMonthFilterFromEvents();
   const attSnap = await db.collection('attendance').get();
   ATT = {};
   attSnap.forEach(d => { ATT[d.id] = d.data() || {}; });
-
   renderGrid();
 
-  if (treBody) {
-  if (treDate && !treDate.value) treDate.value = new Date().toISOString().slice(0,10);
+  // Treasury
+if (treBody) {
+  if (transDate && !transDate.value) transDate.value = new Date().toISOString().slice(0,10);
   const tSnap = await db.collection('treasury').orderBy('date','desc').get();
   TREAS = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  buildTreasuryMonthFilter(); // <--- Add this
   renderTreasurer();
 }
 }
-
 async function startAttendancePage() {
-  // 1) One-time fetch so the grid renders immediately
   await loadData();
-
-  // 2) Realtime listeners so the grid stays up to date
   attachRealtimeListeners();
 }
 
 function attachRealtimeListeners() {
-  // Clean up old listeners if they exist
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
   if (unsubEvents)  { unsubEvents();  unsubEvents  = null; }
   if (unsubAtt)     { unsubAtt();     unsubAtt     = null; }
-  if (unsubFines) { unsubFines(); unsubFines = null; }
-  
-  unsubFines = db.collection('fines').orderBy('date', 'desc')
-    .onSnapshot((snap) => {
-      FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderFines();});
+  if (unsubFines)   { unsubFines();   unsubFines   = null; }
+  if (unsubBodM)    { unsubBodM();    unsubBodM    = null; }
+  if (unsubBodMt)   { unsubBodMt();   unsubBodMt   = null; }
+  if (unsubBodAt)   { unsubBodAt();   unsubBodAt   = null; }
+  if (unsubTre)     { unsubTre();     unsubTre     = null; }
+
+  // Fines
+  unsubFines = db.collection('fines').orderBy('date', 'desc').onSnapshot((snap) => {
+    FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderFines();
+  });
 
   // Members
-  unsubMembers = db.collection('members').orderBy('name')
-    .onSnapshot((snap) => {
-      MEMBERS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderGrid(); // you already rebuild from MEMBERS/EVENTS/ATT
-    });
+  unsubMembers = db.collection('members').orderBy('name').onSnapshot((snap) => {
+    MEMBERS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderGrid(); 
+  });
 
-  // Events (also rebuild the month filter when events change)
-  unsubEvents = db.collection('events').orderBy('date', 'desc')
-    .onSnapshot((snap) => {
-      EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      buildMonthFilterFromEvents();
-      renderGrid();
-    });
+  // Events
+  unsubEvents = db.collection('events').orderBy('date', 'desc').onSnapshot((snap) => {
+    EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    buildMonthFilterFromEvents();
+    renderGrid();
+  });
 
-  // (Optional) attendance live updates across devices.
-  // If you only edit attendance from this page, you can skip this to reduce chatter.
-  unsubAtt = db.collection('attendance')
-    .onSnapshot((snap) => {
+  // Attendance
+  unsubAtt = db.collection('attendance').onSnapshot((snap) => {
+    const next = {};
+    snap.forEach(d => { next[d.id] = d.data() || {}; });
+    ATT = next;
+    renderGrid();
+  });
+
+  // BOD
+  if (bodHead) {
+    unsubBodM = db.collection('bodMembers').orderBy('name').onSnapshot(snap => {
+      BODM = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderBodGrid();
+    });
+    unsubBodMt = db.collection('bodMeetings').orderBy('date','desc').onSnapshot(snap => {
+      BODMEET = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderBodGrid();
+    });
+    unsubBodAt = db.collection('bodAttendance').onSnapshot(snap => {
       const next = {};
       snap.forEach(d => { next[d.id] = d.data() || {}; });
-      ATT = next;
-      renderGrid();
+      BODATT = next;
+      renderBodGrid();
     });
+  }
 
-    // Treasurer realtime
-if (unsubTre) { unsubTre(); unsubTre = null; }
-if (treBody) {
-  unsubTre = db.collection('treasury').orderBy('date','desc')
-    .onSnapshot(snap => {
-      TREAS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderTreasurer();
-    });
+  // Treasury
+  if (treBody) {
+unsubTre = db.collection('treasury').orderBy('date','desc').onSnapshot(snap => {
+  TREAS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  buildTreasuryMonthFilter(); // <--- Add this
+  renderTreasurer();
+});
+  }
 }
 
-}
-
-// Small helper used by both loadData() and realtime event updates
 function buildMonthFilterFromEvents() {
   function monthLabel(ym) {
     const [y, m] = ym.split('-').map(Number);
@@ -429,53 +487,38 @@ function buildMonthFilterFromEvents() {
     });
 }
 
-
-/* ---------- Render grid ---------- */
+/* ---------- Render grid (Attendance) ---------- */
 function renderGrid(){
   const memQuery = memberSearch.value.trim().toLowerCase();
   const evQuery  = eventSearch.value.trim().toLowerCase();
-  const monthSel = monthFilter.value; // "" or YYYY-MM
-  const avenueSel = avenueFilter.value; // NEW
+  const monthSel = monthFilter.value; 
+  const avenueSel = avenueFilter.value; 
 
   const members = MEMBERS.filter(m => (m.name || '').toLowerCase().includes(memQuery));
-
   let events = EVENTS.filter(e => (e.name || '').toLowerCase().includes(evQuery));
+  
   if (monthSel) events = events.filter(e => (e.date || '').startsWith(monthSel));
   
-  // NEW FILTER LOGIC
   if (avenueSel) {
     events = events.filter(e => {
-      // Ensure e.avenue is always an array for consistent checking
       const eventAvenues = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
-      
-      if (avenueSel === '_NONE_') {
-        return eventAvenues.length === 0;
-      }
+      if (avenueSel === '_NONE_') return eventAvenues.length === 0;
       return eventAvenues.includes(avenueSel);
     });
   }
 
-  // header
+  // Header
   const headRow = document.createElement('tr');
   headRow.innerHTML =
     `<th class="sticky-col">Member \\ Event</th>` +
-    events.map(e => { // <-- Changed to block body to allow for variables
-
-      // --- NEW LOGIC to build the avenue label ---
-      const a = e.avenue || []; // Get avenue data (could be array, string, or null)
-      
-      // Ensure 'avenues' is always an array, handling legacy strings if they exist
+    events.map(e => { 
+      const a = e.avenue || []; 
       const avenues = Array.isArray(a) ? a : (a ? [a] : []); 
-      
-      const avenueString = avenues.join(', '); // "ISD, CSD" or ""
-
-      // Create the HTML snippet for the avenue, only if it exists
+      const avenueString = avenues.join(', ');
       const avenueHtml = avenueString
         ? `<small style="color: var(--color-accent, #60C3C4); font-weight: 600;">${avenueString}</small>`
         : '';
-      // --- END OF NEW LOGIC ---
 
-      // Return the final HTML for the header cell
       return `
         <th title="${e.date || ''}">
           <div class="ev-head">
@@ -491,27 +534,26 @@ function renderGrid(){
   attHead.innerHTML = '';
   attHead.appendChild(headRow);
 
-  // body
+  // Body
   attBody.innerHTML = '';
   members.forEach(m => {
     const tr = document.createElement('tr');
     const attForMember = ATT[m.id] || {};
 
     const values  = events.map(e => attForMember[e.id]);
-    const considered = values.filter(v => v !== 'NA');  // ignore NA
+    const considered = values.filter(v => v !== 'NA'); 
     const total   = considered.length;
     const present = considered.filter(v => v === true).length;
     const pct     = total ? Math.round((present/total)*100) : 0;
 
-    // GBM-specific percentage
+    // GBM %
     const gbmIds = events.filter(e => {
-      // This logic correctly handles if e.avenue is a string or an array
       const a = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
       return a.includes('GBM');
     }).map(e => e.id);
     
     const gbmValues   = gbmIds.map(id => attForMember[id]);
-    const gbmConsider = gbmValues.filter(v => v !== 'NA');     // exclude NA
+    const gbmConsider = gbmValues.filter(v => v !== 'NA');
     const gbmTotal    = gbmConsider.length;
     const gbmPresent  = gbmConsider.filter(v => v === true).length;
     const gbmPct      = gbmTotal ? Math.round((gbmPresent/gbmTotal)*100) : 0;
@@ -533,7 +575,7 @@ function renderGrid(){
       </td>
       ` +
       events.map(e => {
-        const v = attForMember[e.id]; // true | false | 'NA' | undefined
+        const v = attForMember[e.id]; 
         let cls = 'off', aria = 'Absent';
         if (v === true) { cls = 'on'; aria = 'Present'; }
         else if (v === false) { cls = 'off'; aria = 'Absent'; }
@@ -554,17 +596,13 @@ function renderGrid(){
 
 function renderAttendanceInsights(){
   const { members, events } = getFilteredMembersAndEvents();
-  const mCount = members.length, eCount = events.length;
+  document.getElementById('attEvtCount').textContent = events.length || '0';
 
-  document.getElementById('attEvtCount').textContent = eCount || '0';
-
-  // per-event present (only 'true'), and compute global avg ignoring 'NA'
   let totalSlots = 0, totalPresent = 0;
-
   const perEventPresent = events.map(ev => {
     let c = 0, considered = 0;
     members.forEach(m => {
-      const v = (ATT[m.id] || {})[ev.id];  // true | false | 'NA' | undefined
+      const v = (ATT[m.id] || {})[ev.id];
       if (v !== 'NA') { considered++; if (v === true) c++; }
     });
     totalSlots += considered;
@@ -573,10 +611,8 @@ function renderAttendanceInsights(){
   });
 
   const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
-
   document.getElementById('attAvg').textContent = `${avg}%`;
 
-  // top attendees (by present count on considered events only)
   const perMemberPresent = members.map(m => {
     let c = 0;
     events.forEach(ev => { if ((ATT[m.id]||{})[ev.id] === true) c++; });
@@ -586,7 +622,6 @@ function renderAttendanceInsights(){
   document.getElementById('attTop').textContent =
     perMemberPresent.length ? perMemberPresent.map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ') : '–';
 
-  // chart: x=events; y=present count
   const ctx = document.getElementById('attChart');
   drawChart('att', ctx, {
     type:'bar',
@@ -598,29 +633,26 @@ function renderAttendanceInsights(){
   });
 }
 
-
-// Add Member -> show only member form
-
+/* ---------- Render BOD Grid ---------- */
 function renderBodGrid(){
   if (!bodHead || !bodBody) return;
 
-  // Header: first sticky col shows "Name / Position", then meeting columns
   const headRow = document.createElement('tr');
-headRow.innerHTML =
-  `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
-  BODMEET.map(mt => `
-    <th title="${mt.date || ''}">
-      <div class="ev-head">
-        <span>${mt.name || ''}</span>
-        <small>${(mt.date || '').slice(0,10)}</small>   <button class="icon-btn" title="Rename meeting" data-edit-bod-meeting="${mt.id}">✏️</button>
-        <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
-      </div>
-    </th>
-  `).join('');
+  headRow.innerHTML =
+    `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
+    BODMEET.map(mt => `
+      <th title="${mt.date || ''}">
+        <div class="ev-head">
+          <span>${mt.name || ''}</span>
+          <small>${(mt.date || '').slice(0,10)}</small>   
+          <button class="icon-btn" title="Rename meeting" data-edit-bod-meeting="${mt.id}">✏️</button>
+          <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
+        </div>
+      </th>
+    `).join('');
   bodHead.innerHTML = '';
   bodHead.appendChild(headRow);
 
-  // Body: each row is a BOD member (name + position + cells + % stat)
   bodBody.innerHTML = '';
   const total = BODMEET.length;
 
@@ -628,13 +660,12 @@ headRow.innerHTML =
     const tr = document.createElement('tr');
     const att = BODATT[m.id] || {};
 
-    // count present across ALL visible meetings
-let present = 0, considered = 0;
-BODMEET.forEach(mt => {
-  const v = att[mt.id];
-  if (v !== 'NA') { considered++; if (v === true) present++; }
-});
-const pct = considered ? Math.round((present / considered) * 100) : 0;
+    let present = 0, considered = 0;
+    BODMEET.forEach(mt => {
+      const v = att[mt.id];
+      if (v !== 'NA') { considered++; if (v === true) present++; }
+    });
+    const pct = considered ? Math.round((present / considered) * 100) : 0;
 
     tr.innerHTML =
       `
@@ -653,17 +684,16 @@ const pct = considered ? Math.round((present / considered) * 100) : 0;
       </td>
       ` +
       BODMEET.map(mt => {
-const v = att[mt.id]; // true | false | 'NA' | undefined
-let cls = 'off', aria = 'Absent';
-if (v === true) { cls = 'on'; aria = 'Present'; }
-else if (v === false) { cls = 'off'; aria = 'Absent'; }
-else if (v === 'NA') { cls = 'na'; aria = 'Not applicable'; }
+        const v = att[mt.id]; 
+        let cls = 'off', aria = 'Absent';
+        if (v === true) { cls = 'on'; aria = 'Present'; }
+        else if (v === false) { cls = 'off'; aria = 'Absent'; }
+        else if (v === 'NA') { cls = 'na'; aria = 'Not applicable'; }
 
-return `
-  <td data-bod-m="${m.id}" data-bod-meet="${mt.id}">
-    <button class="cell-btn ${cls}" aria-label="${aria}"></button>
-  </td>`;
-
+        return `
+          <td data-bod-m="${m.id}" data-bod-meet="${mt.id}">
+            <button class="cell-btn ${cls}" aria-label="${aria}"></button>
+          </td>`;
       }).join('');
 
     bodBody.appendChild(tr);
@@ -674,11 +704,8 @@ return `
 }
 
 function renderBodInsights(){
-  const mCount = BODM.length, meetCount = BODMEET.length;
-  document.getElementById('bodMeetCount').textContent = meetCount || '0';
-
+  document.getElementById('bodMeetCount').textContent = BODMEET.length || '0';
   let totalSlots = 0, totalPresent = 0;
-
   const perMeetingPresent = BODMEET.map(mt => {
     let c = 0, considered = 0;
     BODM.forEach(m => {
@@ -689,7 +716,6 @@ function renderBodInsights(){
     totalPresent += c;
     return c;
   });
-
   const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
   document.getElementById('bodAvg').textContent = `${avg}%`;
 
@@ -701,8 +727,7 @@ function renderBodInsights(){
   });
 }
 
-
-// Add BOD member
+/* BOD Interactions */
 if (bodAddMemberBtn) {
   bodAddMemberBtn.addEventListener('click', async () => {
     const name = (bodMemName?.value || '').trim();
@@ -715,8 +740,6 @@ if (bodAddMemberBtn) {
     } catch (err) { alert('Failed to add BOD: ' + err.message); }
   });
 }
-
-// Add BOD meeting
 if (bodAddMeetingBtn) {
   bodAddMeetingBtn.addEventListener('click', async () => {
     const name = (bodMeetName?.value || '').trim();
@@ -725,17 +748,13 @@ if (bodAddMeetingBtn) {
     try {
       await db.collection('bodMeetings').add({ name, date });
       if (bodMeetName) bodMeetName.value = '';
-      // keep date if you run multiple adds; comment out next line if you want sticky date
-      // if (bodMeetDate) bodMeetDate.value = '';
     } catch (err) { alert('Failed to add meeting: ' + err.message); }
   });
 }
 
-
-
-// --- FIX: This listener now handles BOD deletes, edits, AND attendance toggles ---
+/* BOD Click Handler (Delete, Edit, Toggle) */
 document.addEventListener('click', async (e) => {
-  // Delete BOD member
+  // 1. Delete BOD member
   const delBodMem = e.target.closest('button[data-del-bod-member]');
   if (delBodMem) {
     const id = delBodMem.dataset.delBodMember;
@@ -748,7 +767,7 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // Delete BOD meeting
+  // 2. Delete BOD meeting
   const delBodMeet = e.target.closest('button[data-del-bod-meeting]');
   if (delBodMeet) {
     const id = delBodMeet.dataset.delBodMeeting;
@@ -756,7 +775,6 @@ document.addEventListener('click', async (e) => {
     if (!confirm(`Delete meeting "${mt?.name || id}"? This removes it from all BOD attendance.`)) return;
     try {
       await db.collection('bodMeetings').doc(id).delete();
-      // remove this field from all bodAttendance docs
       const snap = await db.collection('bodAttendance').get();
       const batch = db.batch();
       snap.forEach(doc => batch.update(doc.ref, { [id]: firebase.firestore.FieldValue.delete() }));
@@ -765,13 +783,12 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // --- ADDED: Edit BOD MEMBER ---
+  // 3. Edit BOD MEMBER
   const ebmBtn = e.target.closest('button[data-edit-bod-member]');
   if (ebmBtn) {
     const id = ebmBtn.dataset.editBodMember;
     const m  = (BODM || []).find(x => x.id === id);
     if (!m) return;
-
     editBodMemId.value   = id;
     editBodMemName.value = m.name || '';
     editBodMemPos.value  = m.position || '';
@@ -779,13 +796,12 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // --- ADDED: Edit BOD MEETING ---
+  // 4. Edit BOD MEETING
   const ebmtBtn = e.target.closest('button[data-edit-bod-meeting]');
   if (ebmtBtn) {
     const id = ebmtBtn.dataset.editBodMeeting;
     const mt = (BODMEET || []).find(x => x.id === id);
     if (!mt) return;
-
     editBodMeetId.value   = id;
     editBodMeetName.value = mt.name || '';
     editBodMeetDate.value = (mt.date || '').slice(0,10);
@@ -793,14 +809,13 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // Toggle BOD attendance
+  // 5. Toggle BOD attendance
   const btn = e.target.closest('td[data-bod-m][data-bod-meet] .cell-btn');
   if (btn) {
     const td = btn.closest('td');
     const bodMemberId = td.dataset.bodM;
     const meetingId   = td.dataset.bodMeet;
-
-    const cur = ((BODATT[bodMemberId] || {})[meetingId]); // true | false | 'NA' | undefined
+    const cur = ((BODATT[bodMemberId] || {})[meetingId]); 
     let next;
     if (cur === true) next = false;
     else if (cur === false) next = 'NA';
@@ -817,13 +832,11 @@ document.addEventListener('click', async (e) => {
     BODATT[bodMemberId][meetingId] = next;
   }
 });
-// --- END OF FIX ---
 
-
+/* ---------- Fines Logic ---------- */
 function renderFines(){
   if (!finesBody) return;
   const mnames = membersMap();
-
   let total = 0;
   finesBody.innerHTML = FINES.map(f => {
     const reasonLabel = (f.reason === 'missing_badge') ? 'Missing badge'
@@ -853,14 +866,10 @@ function renderFines(){
 }
 
 function renderFinesInsights(){
-  // Totals
   let total = 0, monthTotal = 0;
   const nowYM = new Date().toISOString().slice(0,7);
-
-  // By reason for doughnut
   const reasonTotals = { missing_badge:0, late:0, other:0 };
-  // By month for bars
-  const byMonth = {}; // { 'YYYY-MM': amt }
+  const byMonth = {}; 
 
   (FINES||[]).forEach(f=>{
     const amt = Number(f.amount || 0);
@@ -877,7 +886,6 @@ function renderFinesInsights(){
   document.getElementById('finesTotal').textContent = `₹ ${fmt(total)}`;
   document.getElementById('finesMonth').textContent = `₹ ${fmt(monthTotal)}`;
 
-  // Reason doughnut
   drawChart('finesReason', document.getElementById('finesByReasonChart'), {
     type:'doughnut',
     data:{ labels:['Missing badge','Late','Other'], datasets:[{ data:[
@@ -886,7 +894,6 @@ function renderFinesInsights(){
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
   });
 
-  // Month bars (sorted by month)
   const months = Object.keys(byMonth).filter(Boolean).sort();
   drawChart('finesMonth', document.getElementById('finesByMonthChart'), {
     type:'bar',
@@ -895,8 +902,6 @@ function renderFinesInsights(){
   });
 }
 
-
-// Create fine
 if (fineForm) {
   fineForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -909,18 +914,16 @@ if (fineForm) {
     if (!memberId || !reason || !eventName || !date) return;
     if (!Number.isFinite(amount) || amount < 0) { alert('Enter a valid amount (₹)'); return; }
 
-
-    // Resolve member name for convenience
     const m = MEMBERS.find(x => x.id === memberId);
     const memberName = m ? (m.name || '') : '';
 
     const payload = {
       memberId,
-      memberName,       // denormalized for simpler listings
-      reason,           // 'missing_badge' | 'late'
+      memberName,      
+      reason,           
       eventName,
       date,
-      amount,             // 'YYYY-MM-DD'
+      amount,             
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: (auth.currentUser && auth.currentUser.uid) || null
     };
@@ -928,224 +931,410 @@ if (fineForm) {
     try {
       await db.collection('fines').add(payload);
       fineForm.reset();
-      // keep today as default after reset
       fineDate.value = new Date().toISOString().slice(0,10);
-    } catch (err) {
-      alert('Failed to add fine: ' + err.message);
-    }
+    } catch (err) { alert('Failed to add fine: ' + err.message); }
   });
 }
 
-// Delete fine
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-del-fine]');
   if (!btn) return;
   const id = btn.dataset.delFine;
   if (!confirm('Delete this fine record?')) return;
-  try {
-    await db.collection('fines').doc(id).delete();
-  } catch (err) {
-    alert('Failed to delete fine: ' + err.message);
-  }
+  try { await db.collection('fines').doc(id).delete(); } 
+  catch (err) { alert('Failed to delete fine: ' + err.message); }
 });
 
-// Rename EVENT
-
-
-/* ---------- Deletes & toggles ---------- */
-
-// -----------------------------------------------------------------
-// ----------------- FIX 1: PREFILL THE MODAL ----------------------
-// -----------------------------------------------------------------
-// Replace the attHead listener with this:
+/* ---------- Attendance Event/Member Actions ---------- */
 attHead.addEventListener('click', (e) => {
-  // Handle delete event
+  // Delete event
   const delBtn = e.target.closest('button[data-del-event]');
   if (delBtn) {
     removeEvent(delBtn.dataset.delEvent);
-    return; // Stop further processing
+    return; 
   }
 
-  // Handle edit event
+  // Edit event
   const editBtn = e.target.closest('button[data-edit-event]');
   if (editBtn) {
     const id = editBtn.dataset.editEvent;
     const ev = (EVENTS || []).find(x => x.id === id);
     if (!ev) return;
 
-    // 1. Populate basic fields
     document.getElementById('editEvId').value = id;
     document.getElementById('editEvName').value = ev.name || '';
     document.getElementById('editEvDate').value = (ev.date || '').slice(0, 10);
     document.getElementById('editEvDesc').value = ev.desc || '';
 
-    // 2. Clear all avenue checkboxes first
     const avenueCheckboxes = document.querySelectorAll('#editEventModal input[type="checkbox"]');
     avenueCheckboxes.forEach(cb => cb.checked = false);
-
-    // 3. Check the ones that exist on the event
     const eventAvenues = Array.isArray(ev.avenue) ? ev.avenue : (ev.avenue ? [ev.avenue] : []);
     eventAvenues.forEach(avenueValue => {
       const cb = document.querySelector(`#editEventModal input[value="${avenueValue}"]`);
-      if (cb) {
-        cb.checked = true;
-      }
+      if (cb) cb.checked = true;
     });
 
     openModal('editEventModal');
-    return; // Stop further processing
   }
 });
 
-// --- FIX: This listener now handles Member Deletes, Member Edits, AND Cell Toggles ---
 attBody.addEventListener('click', async (e) => {
-  // Handle delete member
+  // Delete member
   const delBtn = e.target.closest('button[data-del-member]');
   if (delBtn) {
     removeMember(delBtn.dataset.delMember);
     return;
   }
 
-  // Handle edit member
+  // Edit member
   const editBtn = e.target.closest('button[data-edit-member]');
   if (editBtn) {
     const id = editBtn.dataset.editMember;
     const m  = (MEMBERS || []).find(x => x.id === id);
     if (!m) return;
-
     editMemId.value   = id;
     editMemName.value = m.name || '';
     openModal('editMemberModal');
     return;
   }
 
-  // Handle cell toggle
+  // Cell toggle
   const btn = e.target.closest('.cell-btn');
   if (!btn) return;
 
   const td = btn.closest('td');
   const memberId = td.dataset.m;
   const eventId  = td.dataset.e;
-
-  // current value in our in-memory map
-  const cur = (ATT[memberId] || {})[eventId];  // true | false | 'NA' | undefined
-
-  // next state: true -> false -> 'NA' -> true …
+  const cur = (ATT[memberId] || {})[eventId]; 
   let next;
   if (cur === true) next = false;
   else if (cur === false) next = 'NA';
   else next = true;
 
-  // update classes for UI
   btn.classList.remove('on','off','na');
   if (next === true) { btn.classList.add('on');  btn.setAttribute('aria-label','Present'); }
   else if (next === false){ btn.classList.add('off'); btn.setAttribute('aria-label','Absent'); }
   else { btn.classList.add('na'); btn.setAttribute('aria-label','Not applicable'); }
 
-  // write back
   const ref = db.collection('attendance').doc(memberId);
   await ref.set({ [eventId]: next }, { merge: true });
   ATT[memberId] = ATT[memberId] || {};
   ATT[memberId][eventId] = next;
 });
-// --- END OF FIX ---
 
-
-/* ---------- Treasurer: render, add, delete, export ---------- */
+/* ---------- Treasurer Logic ---------- */
+// 1. RENDER
 function renderTreasurer(){
   if (!treBody) return;
 
-  let inc = 0, exp = 0;
-treBody.innerHTML = (TREAS || []).map(t => {
-  const amt = Number(t.amount || 0);
-  if (t.type === 'income') inc += amt;
-  else if (t.type === 'expense') exp += amt;
+  const data = getFilteredTreasury(); // <--- Use filtered data
 
-  const dateStr = (t.date || '').slice(0,10);
-  const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
-  return `
+  let inc = 0, exp = 0;
+  treBody.innerHTML = data.map(t => {
+    const amt = Number(t.amount || 0);
+    if (t.type === 'income') inc += amt;
+    else if (t.type === 'expense') exp += amt;
+
+    const dateStr = (t.date || '').slice(0,10);
+    const typeLabel = t.type === 'income' ? 'Income' : 'Expense';
+    const thumbUrl = getGdriveImageUrl(t.billUrl);
+
+    return `
     <tr>
       <td>${(t.name || '').replace(/</g,'&lt;')}</td>
       <td>${typeLabel}</td>
       <td>₹ ${amt.toLocaleString()}</td>
-      <td>${(t.avenue || '-').replace(/</g,'&lt;')}</td>   <td>${dateStr}</td>
-      <td><button class="icon-btn" title="Delete entry" data-del-tre="${t.id}">🗑</button></td>
+      <td>${(t.avenue || '-').replace(/</g,'&lt;')}</td>
+      <td>${dateStr}</td>
+      <td>${(t.paidBy || '-').replace(/</g,'&lt;')}</td>
+      <td>${(t.reimburse || '-').replace(/</g,'&lt;')}</td>
+      <td>${(t.cheque || '-').replace(/</g,'&lt;')}</td>
+      <td>
+        ${
+          t.billUrl
+            ? `<img src="${thumbUrl}" 
+                    style="width:60px; height:40px; object-fit:cover; border-radius:6px; cursor:pointer; border:1px solid #333;"
+                    onclick="showBill('${t.billUrl}')"
+                    alt="Bill"
+                    onerror="this.style.display='none';this.parentElement.innerText='🔗'" 
+               />`
+            : '—'
+        }
+      </td>
+      <td>
+         <button class="icon-btn" data-edit-tre="${t.id}" title="Edit entry">✏️</button>
+         <button class="icon-btn" data-del-tre="${t.id}" title="Delete entry">🗑</button>
+      </td>
     </tr>`;
-}).join('');
+  }).join('');
 
+  // Calculate Net for the badge
   const net = inc - exp;
   if (treBadge) {
-    treBadge.textContent =
-      `${TREAS.length} records · ₹ ${inc.toLocaleString()} income · ₹ ${exp.toLocaleString()} expense · Net ₹ ${net.toLocaleString()}`;
-      renderTreasurerInsights();
-
+    treBadge.textContent = `${data.length} records · Net ₹ ${net.toLocaleString()}`;
   }
+
+  // Update KPIs and Chart with filtered data
+  renderTreasurerInsights(data);
 }
 
-function renderTreasurerInsights(){
-  // KPIs
+window.showBill = (url) => {
+  billLightboxImg.src = getGdriveImageUrl(url);
+  openModal("billLightbox");
+};
+
+function renderTreasurerInsights(data){
   let inc=0, exp=0;
-  (TREAS||[]).forEach(t => {
+  (data||[]).forEach(t => {
     const a = Number(t.amount||0);
     if (t.type==='income') inc+=a; else if (t.type==='expense') exp+=a;
   });
   const net = inc - exp;
+  
   document.getElementById('treInc').textContent = `₹ ${fmt(inc)}`;
   document.getElementById('treExp').textContent = `₹ ${fmt(exp)}`;
   document.getElementById('treNet').textContent = `₹ ${fmt(net)}`;
 
-  // Cumulative balance line
-  const rows = [...(TREAS||[])].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  // Sort by date for chart
+  const rows = [...(data||[])].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  
   let running = 0;
-  const labels = [], data = [];
+  const labels = [], chartData = [];
   rows.forEach(r => {
     const a = Number(r.amount||0);
     running += (r.type==='income') ? a : -a;
-    labels.push((r.date||'').slice(5)); // MM-DD
-    data.push(running);
+    labels.push((r.date||'').slice(5)); 
+    chartData.push(running);
   });
 
-  drawChart('tre', document.getElementById('treBalanceChart'), {
-    type:'line',
-    data:{ labels, datasets:[{ label:'Balance (₹)', data, tension:.25, fill:false }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  const ctx = document.getElementById('treBalanceChart');
+  if(ctx) {
+    drawChart('tre', ctx, {
+      type:'line',
+      data:{ labels, datasets:[{ label:'Balance (₹)', data: chartData, tension:.25, fill:false, borderColor: '#60C3C4' }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+    });
+  }
+}
+
+// Add Modal Open
+if (treAddBtn) treAddBtn.onclick = () => {
+  openModal("addTransModal");
+};
+
+// Bill Preview in Add Modal
+if (transBill) {
+  transBill.addEventListener("change", () => {
+    const file = transBill.files[0];
+    if (!file) {
+      transBillPreview.innerHTML = "";
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    transBillPreview.innerHTML = `
+      <img src="${url}" style="width:120px; border-radius:8px; cursor:pointer;" id="billThumbTemp"/>
+    `;
+    document.getElementById("billThumbTemp").onclick = () => {
+      billLightboxImg.src = url;
+      openModal("billLightbox");
+    };
   });
 }
 
+// --- UPLOAD LOGIC ---
+const TREASURY_GAS_URL = "https://script.google.com/macros/s/AKfycbxhSGPm2HFUxUhZVLS16zKPiTV4Dnmxtz0CWC_OvH9KJobLYQSrSiAr3BcSIWS3-4Qtcg/exec";
 
-// Add entry
-if (treAddBtn) {
-  treAddBtn.addEventListener('click', async () => {
-    const name   = (treName?.value || '').trim();
-    const type   = treType?.value || '';
-    const amount = Number(treAmount?.value || 0);
-    const date   = treDate?.value || '';
-    const avenue = treAvenue?.value || '';   // <-- NEW
+function readAsBase64(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result); 
+    reader.readAsDataURL(file);
+  });
+}
 
-    if (!name || !type || !date || !Number.isFinite(amount) || amount < 0) {
-      alert('Please fill Name, Type, Amount (>=0), Date'); return;
+// Find and replace the uploadBillToDrive function in admin.js
+async function uploadBillToDrive(file) {
+  if (!file) return null;
+  
+  // Convert file to base64
+  const base64 = await readAsBase64(file);
+  
+  // Prepare payload
+  const payload = JSON.stringify({
+    action: "uploadBill",
+    fileName: file.name,
+    fileData: base64
+  });
+  
+  try {
+    // "Content-Type: text/plain" is crucial for Google Apps Script CORS
+    const res = await fetch(TREASURY_GAS_URL, { 
+      method: "POST", 
+      body: payload,
+      headers: { "Content-Type": "text/plain" } 
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server responded with status: ${res.status}`);
     }
 
-    const payload = {
-      name, type, amount, date,
-      avenue,                                  // <-- NEW (save it)
+    const json = await res.json();
+    if (json.status === "success") {
+      return json.fileUrl;
+    } else {
+      throw new Error(json.message || "Script returned an error.");
+    }
+
+  } catch (err) {
+    console.error("Upload Error:", err);
+    // If it fails, we throw an error so the main Save function stops
+    throw new Error("Bill upload failed. (Check: Is the script deployed as 'Anyone'?)");
+  }
+}
+/*
+addTransForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = addTransForm.querySelector('button[type="submit"]');
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+
+  try {
+    const name = transName.value.trim();
+    const type = transType.value;
+    const amount = Number(transAmount.value);
+    const avenue = transAvenue.value;
+    
+    const paidBy = transPaidBy.value.trim();
+    const reimburse = transReimburse.value.trim();
+    const cheque = transCheque.value.trim();
+
+    const date = transDate.value;
+    const billFile = transBill.files[0];
+    let billUrl = "";
+
+    if (billFile) {
+      billUrl = await uploadBillToDrive(billFile);
+    }
+
+    await db.collection("treasury").add({
+      name, type, amount, avenue, date,
+      paidBy, reimburse, cheque, 
+      billUrl,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      createdBy: (auth.currentUser && auth.currentUser.uid) || null
+      createdBy: auth.currentUser.uid
+    });
+
+    closeModal("addTransModal");
+    alert("Transaction saved!");
+  } catch (err) {
+    console.error(err);
+    alert("Error: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
+}); */
+addTransForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const payload = {
+    name: transName.value.trim(),
+    type: transType.value,
+    amount: Number(transAmount.value),
+    avenue: transAvenue.value,
+    date: transDate.value,
+    paidBy: transPaidBy.value.trim() || "",
+    reimburse: transReimburse.value.trim() || "",
+    cheque: transCheque.value.trim() || "",
+    billUrl: document.getElementById("transBillUrl").value.trim(),   // 👈 NEW
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try {
+    await db.collection("treasury").add(payload);
+    closeModal("addTransModal");
+  } catch (err) {
+    alert("Failed to add transaction: " + err.message);
+  }
+});
+// 3. EDIT POPULATION
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-edit-tre]");
+  if (!btn) return;
+
+  const id = btn.dataset.editTre;
+  const t = TREAS.find(x => x.id === id);
+  if (!t) return;
+
+  document.getElementById("editTransId").value = id;
+  
+  // Populate fields
+  document.getElementById("editTransName").value = t.name || "";
+  document.getElementById("editTransType").value = t.type || "income";
+  document.getElementById("editTransAmount").value = t.amount || 0;
+  document.getElementById("editTransAvenue").value = t.avenue || "";
+  document.getElementById("editTransDate").value = (t.date || "").slice(0,10);
+  
+  // NEW FIELDS
+  editTransPaidBy.value = t.paidBy || "";
+  editTransReimburse.value = t.reimburse || "";
+  editTransCheque.value = t.cheque || "";
+
+  // Bill preview
+  if (t.billUrl) {
+    editTransBillPreview.innerHTML = `
+      <img src="${getGdriveImageUrl(t.billUrl)}"
+           style="width:120px; border-radius:8px; cursor:pointer;"
+           onclick="showBill('${t.billUrl}')">
+    `;
+  } else {
+    editTransBillPreview.innerHTML = "No bill uploaded";
+  }
+
+  openModal("editTransModal");
+});
+
+// 4. UPDATE TRANSACTION SUBMIT
+editTransForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = editTransForm.querySelector('button[type="submit"]');
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Updating...";
+
+  try {
+    const id = editTransId.value;
+    const payload = {
+      name: editTransName.value.trim(),
+      type: editTransType.value,
+      amount: Number(editTransAmount.value),
+      avenue: editTransAvenue.value.trim(),
+      date: editTransDate.value,
+      
+      // NEW FIELDS
+      paidBy: editTransPaidBy.value.trim(),
+      reimburse: editTransReimburse.value.trim(),
+      cheque: editTransCheque.value.trim(),
     };
 
-    try {
-      await db.collection('treasury').add(payload);
-      if (treName)   treName.value = '';
-      if (treType)   treType.value = '';
-      if (treAmount) treAmount.value = '';
-    } catch (err) {
-      alert('Failed to add entry: ' + err.message);
+    const newFile = editTransBill.files[0];
+    if (newFile) {
+      payload.billUrl = await uploadBillToDrive(newFile);
     }
-  });
-}
 
+    await db.collection("treasury").doc(id).update(payload);
+    closeModal("editTransModal");
+    alert("Transaction updated!");
+  } catch(err) {
+    alert("Error: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
+});
 
-// Delete entry
+// Delete Transaction
 document.addEventListener('click', async (e) => {
   const delBtn = e.target.closest('button[data-del-tre]');
   if (!delBtn) return;
@@ -1158,22 +1347,27 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-// Export to Excel (Treasury)
+/* ---------- Export Logic ---------- */
+// Treasury Export
 function exportTreasuryToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
 
-  const header = ['Name', 'Type', 'Amount (₹)', 'Avenue', 'Date'];
-const rows = (TREAS || []).map(t => [
-  t.name || '',
-  t.type === 'income' ? 'Income' : 'Expense',
-  Number(t.amount || 0),
-  t.avenue || '',                                 // + Avenue
-  (t.date || '').slice(0,10)
-]);
+  const data = getFilteredTreasury(); // <--- Export filtered data
 
-  // Totals for a summary sheet
+  const header = ['Name', 'Type', 'Amount (₹)', 'Avenue', 'Date', 'Paid By', 'Reimbursement', 'Cheque No'];
+  const rows = data.map(t => [
+    t.name || '',
+    t.type === 'income' ? 'Income' : 'Expense',
+    Number(t.amount || 0),
+    t.avenue || '',                                 
+    (t.date || '').slice(0,10),
+    t.paidBy || '',
+    t.reimburse || '',
+    t.cheque || ''
+  ]);
+
   let inc = 0, exp = 0;
-  (TREAS || []).forEach(t => {
+  data.forEach(t => {
     const amt = Number(t.amount || 0);
     if (t.type === 'income') inc += amt; else exp += amt;
   });
@@ -1181,51 +1375,100 @@ const rows = (TREAS || []).map(t => [
 
   const ws1 = XLSX.utils.aoa_to_sheet([header, ...rows]);
   ws1['!freeze'] = { xSplit: 0, ySplit: 1 };
-  ws1['!cols'] = [{wch:30},{wch:12},{wch:14},{wch:12},{wch:12}];
+  ws1['!cols'] = [{wch:30},{wch:12},{wch:14},{wch:12},{wch:12}, {wch:20}, {wch:20}, {wch:15}];
 
   const ws2 = XLSX.utils.aoa_to_sheet([
-    ['Summary'],
+    ['Summary (Filtered)'],
     ['Total Income (₹)', inc],
     ['Total Expense (₹)', exp],
     ['Net (₹)', net],
   ]);
-  ws2['!cols'] = [{wch:22},{wch:16}];
-
+  
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws1, 'Treasury');
   XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
 
   const dateTag = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `treasury_${dateTag}.xlsx`);
+  XLSX.writeFile(wb, `treasury_filtered_${dateTag}.xlsx`);
 }
-
 if (exportTreXlsxBtn) {
   exportTreXlsxBtn.addEventListener('click', exportTreasuryToExcel);
 }
 
+// Attendance Export
+function exportAttendanceToExcel(){
+  if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
+  const { members, events } = getFilteredMembersAndEvents();
+  const header = ['Member \\ Event', ...events.map(e => {
+    const d = (e.date||'').slice(0,10);
+    return d ? `${e.name||''} (${d})` : (e.name||'');
+  })];
+  const rows = members.map(m => {
+    const attForMember = ATT[m.id] || {};
+    const cells = events.map(e => {
+      const v = attForMember[e.id];        
+      if (v === true)  return 'P';
+      if (v === false) return 'A';
+      if (v === 'NA')  return 'NA';
+      return ''; 
+    });
+    return [m.name || '', ...cells];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!freeze'] = { xSplit: 1, ySplit: 1 };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+  const dateTag = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `attendance_${dateTag}.xlsx`);
+}
+if (exportXlsxBtn) {
+  exportXlsxBtn.addEventListener('click', exportAttendanceToExcel);
+}
 
+// BOD Export
+function exportBodAttendanceToExcel(){
+  if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
+  const header = [
+    'BOD (Name / Position)',
+    ...BODMEET.map(mt => {
+      const d = (mt.date || '').slice(0,10);
+      return d ? `${mt.name || ''} (${d})` : (mt.name || '');
+    })
+  ];
+  const rows = BODM.map(m => {
+    const att = BODATT[m.id] || {};
+    const cells = BODMEET.map(mt => {
+      const v = att[mt.id];
+      if (v === true)  return 'P';
+      if (v === false) return 'A';
+      if (v === 'NA')  return 'NA';
+      return '';
+    });
+    const namePos = `${m.name || ''}${m.position ? ' — ' + m.position : ''}`;
+    return [namePos, ...cells];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!freeze'] = { xSplit: 1, ySplit: 1 };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'BOD Attendance');
+  const dateTag = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `bod_attendance_${dateTag}.xlsx`);
+}
+if (exportBodXlsxBtn) {
+  exportBodXlsxBtn.addEventListener('click', exportBodAttendanceToExcel);
+}
 
-
-/* ---------- Delete helpers ---------- */
+/* ---------- Delete / Update Helpers ---------- */
 async function removeMember(memberId){
   const m = MEMBERS.find(x => x.id === memberId);
   if (!confirm(`Delete member "${m?.name || memberId}"? This also deletes their attendance.`)) return;
   try{
     await db.collection('members').doc(memberId).delete();
     await db.collection('attendance').doc(memberId).delete();
-    await loadData();
   }catch(err){
     alert('Failed to delete member: ' + err.message);
   }
 }
-/*function fieldBlock(inputId) {
-  const el = document.getElementById(inputId);
-  if (!el) return null;
-  // label.adm-field (or fieldset) wrapper
-  return el.closest('.adm-field') || el.closest('fieldset') || el.parentElement;
-}*/
-// Open modal to edit only the EVENT NAME (no browser prompt)
-
 
 async function removeEvent(eventId){
   const ev = EVENTS.find(x => x.id === eventId);
@@ -1236,201 +1479,48 @@ async function removeEvent(eventId){
     const batch = db.batch();
     snap.forEach(doc => batch.update(doc.ref, { [eventId]: firebase.firestore.FieldValue.delete() }));
     await batch.commit();
-    await loadData();
   }catch(err){
     alert('Failed to delete event: ' + err.message);
   }
 }
 
-/* ---------- Filters ---------- */
+/* Filters */
 [memberSearch, eventSearch, monthFilter, avenueFilter].forEach(el => {
   if (el) el.addEventListener('input', renderGrid);
 });
 
-/* ---------- Modal open/close + submit ---------- */
-/* function showModal(kind, mode = 'add', id = null) {
-  EDIT_MODE = (mode === 'edit') ? kind : null;
-  EDIT_ID   = (mode === 'edit') ? id   : null;
-
-  admModal.setAttribute('aria-hidden','false');
-
-  // Hide ALL forms first
-  memberForm.hidden    = true;
-  eventForm.hidden     = true;
-  bodMemberForm.hidden = true;
-  bodMeetingForm.hidden= true;
-
-  const setTitle = (t)=> admTitle.textContent = t;
-
-  // Member form
-  if (kind === 'member') {
-    memberForm.hidden = false;
-    
-    if (mode === 'add') {
-      setTitle('Add Member');
-      memberForm.querySelector('button[type=submit]').textContent = 'Add Member';
-      memberForm.reset();
-    } else {
-      setTitle('Edit Member');
-      memberForm.querySelector('button[type=submit]').textContent = 'Save changes';
-      const cur = MEMBERS.find(x => x.id === id) || {};
-      document.getElementById('memName').value = cur.name || '';
-    }
-  }
-  
-  // Event form
-  else if (kind === 'event') {
-    eventForm.hidden = false;
-    const dateRow = fieldBlock('evDate');
-    const descRow = fieldBlock('evDesc');
-    const chipsFs = document.querySelector('#eventForm fieldset');
-
-    if (mode === 'add') {
-      // ADD mode: show all fields
-      setTitle('Add Event');
-      if (dateRow) dateRow.style.display = '';
-      if (descRow) descRow.style.display = '';
-      if (chipsFs) chipsFs.style.display = '';
-      const submitBtn = document.querySelector('#eventForm .adm-actions button[type="submit"]');
-      if (submitBtn) submitBtn.textContent = 'Add Event';
-      eventForm.reset();
-    } else {
-      // EDIT mode: only show name field
-      setTitle('Edit Event');
-      if (dateRow) dateRow.style.display = 'none';
-      if (descRow) descRow.style.display = 'none';
-      if (chipsFs) chipsFs.style.display = 'none';
-      const submitBtn = document.querySelector('#eventForm .adm-actions button[type="submit"]');
-      if (submitBtn) submitBtn.textContent = 'Save';
-      
-      const cur = EVENTS.find(x => x.id === id) || {};
-      document.getElementById('evName').value = cur.name || '';
-    }
-  }
-  
-  // BOD Member form
-  else if (kind === 'bodMember') {
-    bodMemberForm.hidden = false;
-    setTitle('Edit BOD Member');
-    const cur = BODM.find(x => x.id === id) || {};
-    editBodMemberId.value = id;
-    bodEditName.value = cur.name || '';
-    bodEditPos.value  = cur.position || '';
-  }
-  
-  // BOD Meeting form
-  else if (kind === 'bodMeeting') {
-    bodMeetingForm.hidden = false;
-    setTitle('Edit BOD Meeting');
-    const cur = BODMEET.find(x => x.id === id) || {};
-    editBodMeetingId.value = id;
-    bodMeetEditName.value = cur.name || '';
-    bodMeetEditDate.value = (cur.date || '').slice(0,10);
-  }
-}*/
-
-/*function hideModal(){
-  admModal.setAttribute('aria-hidden','true');
-  EDIT_MODE = null; 
-  EDIT_ID = null;
-  
-  // Reset all forms
-  if (memberForm) memberForm.reset(); 
-  if (eventForm) eventForm.reset();
-  if (bodMemberForm) bodMemberForm.reset(); 
-  if (bodMeetingForm) bodMeetingForm.reset();
-  
-  // Hide all forms
-  if (memberForm) memberForm.hidden = true;
-  if (eventForm) eventForm.hidden = true;
-  if (bodMemberForm) bodMemberForm.hidden = true;
-  if (bodMeetingForm) bodMeetingForm.hidden = true;
-  
-  // Restore event form fields to visible state (for next time)
-  const dateRow = fieldBlock('evDate');
-  const descRow = fieldBlock('evDesc');
-  const chipsFs = document.querySelector('#eventForm fieldset');
-  if (dateRow) dateRow.style.display = '';
-  if (descRow) descRow.style.display = '';
-  if (chipsFs) chipsFs.style.display = '';
-}*/
-if (document.getElementById('bodMemCancel'))  document.getElementById('bodMemCancel').onclick  = hideModal;
-if (document.getElementById('bodMeetCancel')) document.getElementById('bodMeetCancel').onclick = hideModal;
-
-
-if (document.getElementById('admClose')) document.getElementById('admClose').onclick = hideModal;
-if (document.getElementById('memCancel')) document.getElementById('memCancel').onclick = hideModal;
-if (document.getElementById('evCancel'))  document.getElementById('evCancel').onclick  = hideModal;
-
-// --- FIX: ALL of the redundant edit listeners from line 1251 to 1384 were DELETED ---
-// The logic was moved into the main event listeners for:
-// 1. `attHead` (handles event delete + event edit)
-// 2. `attBody` (handles member delete + member edit + cell toggle)
-// 3. `document` (the one at line 777, now handles BOD delete, BOD edit, and BOD cell toggle)
-
-
-// Save member rename
-// Save: edit member (name)
+/* Modal Logic Helpers (Edit Forms) */
 if (editMemberForm) {
   editMemberForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id   = editMemId.value;
     const name = (editMemName.value || '').trim();
     if (!id || !name) return;
-
     try {
       await db.collection('members').doc(id).update({ name });
       closeModal('editMemberModal');
-    } catch (err) {
-      alert('Failed to save member: ' + err.message);
-    }
+    } catch (err) { alert('Failed to save member: ' + err.message); }
   });
 }
 
-// -----------------------------------------------------------------
-// ---------------- FIX 2: SAVE ALL EVENT CHANGES ------------------
-// -----------------------------------------------------------------
-// Replace the editEventForm listener with this:
 if (editEventForm) {
   editEventForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
-    // 1. Read all values from the edit form
     const id   = document.getElementById('editEvId').value;
     const name = (document.getElementById('editEvName').value || '').trim();
     const date = document.getElementById('editEvDate').value;
     const desc = (document.getElementById('editEvDesc').value || '').trim();
-
-    // 2. Read the checked avenues from the *EDIT* modal
     const avenues = Array.from(document.querySelectorAll('#editEventModal input[type="checkbox"]:checked'))
       .map(cb => cb.value);
 
-    // 3. Validate
-    if (!id || !name || !date) {
-      alert('Please provide at least an ID, Name, and Date.');
-      return;
-    }
-
-    // 4. Create the payload to save
-    const payload = {
-      name,
-      date,
-      desc,
-      avenue: avenues // This saves the array of avenues
-    };
-
+    if (!id || !name || !date) return;
     try {
-      // 5. Update the event doc in Firestore
-      await db.collection('events').doc(id).update(payload);
+      await db.collection('events').doc(id).update({ name, date, desc, avenue: avenues });
       closeModal('editEventModal');
-    } catch (err) {
-      alert('Failed to save event: ' + err.message);
-    }
+    } catch (err) { alert('Failed to save event: ' + err.message); }
   });
 }
 
-
-// Save: edit BOD member (name + position)
 if (editBodMemberForm) {
   editBodMemberForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1438,17 +1528,13 @@ if (editBodMemberForm) {
     const name = (editBodMemName.value || '').trim();
     const pos  = (editBodMemPos.value || '').trim();
     if (!id || !name) return;
-
     try {
       await db.collection('bodMembers').doc(id).update({ name, position: pos });
       closeModal('editBodMemberModal');
-    } catch (err) {
-      alert('Failed to save BOD member: ' + err.message);
-    }
+    } catch (err) { alert('Failed to save BOD member: ' + err.message); }
   });
 }
 
-// Save: edit BOD meeting (name + date)
 if (editBodMeetingForm) {
   editBodMeetingForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1456,34 +1542,13 @@ if (editBodMeetingForm) {
     const name = (editBodMeetName.value || '').trim();
     const date = editBodMeetDate.value || '';
     if (!id || !name || !date) return;
-
     try {
       await db.collection('bodMeetings').doc(id).update({ name, date });
       closeModal('editBodMeetingModal');
-    } catch (err) {
-      alert('Failed to save meeting: ' + err.message);
-    }
+    } catch (err) { alert('Failed to save meeting: ' + err.message); }
   });
 }
 
-
-
-// ADD MEMBER FORM
-if (document.getElementById('addMemberForm')) {
-  document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('addMemName').value.trim();
-    if (!name) return;
-
-    try {
-      await db.collection('members').add({ name });
-      closeModal('addMemberModal');
-    } catch (err) {
-      alert('Failed to add member: ' + err.message);
-    }
-  });
-}
-// Create member
 if (addMemberForm) {
   addMemberForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1491,207 +1556,48 @@ if (addMemberForm) {
     if (!name) return;
     await db.collection('members').add({ name });
     closeModal('addMemberModal');
-    await loadData(); // refresh grid
   });
 }
 
-// Create event (supports optional avenues via checkboxes inside the add modal)
 if (addEventForm) {
   addEventForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = (addEvName?.value || '').trim();
     const date = addEvDate?.value || '';
     const desc = (addEvDesc?.value || '').trim();
-
-    // collect avenues from the checkboxes in this modal
     const avenues = Array.from(addEventForm.querySelectorAll('fieldset input[type="checkbox"]:checked'))
       .map(c => c.value);
-
     if (!name || !date) return;
     await db.collection('events').add({ name, date, desc, avenue: avenues });
     closeModal('addEventModal');
-    await loadData();
   });
 }
-
-// EDIT MEMBER FORM
-if (document.getElementById('editMemberForm')) {
-  document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('editMemId').value;
-    const name = document.getElementById('editMemName').value.trim();
-    if (!id || !name) return;
-
-    try {
-      await db.collection('members').doc(id).update({ name });
-      closeModal('editMemberModal');
-    } catch (err) {
-      alert('Failed to update member: ' + err.message);
-    }
-  });
-}
-
-
-// EDIT BOD MEMBER FORM
-if (document.getElementById('editBodMemberForm')) {
-  document.getElementById('editBodMemberForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('editBodMemId').value;
-    const name = document.getElementById('editBodMemName').value.trim();
-    const pos = document.getElementById('editBodMemPos').value.trim();
-    if (!id || !name) return;
-
-    try {
-      await db.collection('bodMembers').doc(id).update({ name, position: pos });
-      closeModal('editBodMemberModal');
-    } catch (err) {
-      alert('Failed to update BOD member: ' + err.message);
-    }
-  });
-}
-
-// EDIT BOD MEETING FORM
-if (document.getElementById('editBodMeetingForm')) {
-  document.getElementById('editBodMeetingForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('editBodMeetId').value;
-    const name = document.getElementById('editBodMeetName').value.trim();
-    const date = document.getElementById('editBodMeetDate').value;
-    if (!id || !name || !date) return;
-
-    try {
-      await db.collection('bodMeetings').doc(id).update({ name, date });
-      closeModal('editBodMeetingModal');
-    } catch (err) {
-      alert('Failed to update meeting: ' + err.message);
-    }
-  });
-}
-
 
 function getFilteredMembersAndEvents(){
   const memQuery = memberSearch.value.trim().toLowerCase();
   const evQuery  = eventSearch.value.trim().toLowerCase();
-  const monthSel = monthFilter.value; // "" or YYYY-MM
-  const avenueSel = avenueFilter.value; // NEW
+  const monthSel = monthFilter.value; 
+  const avenueSel = avenueFilter.value; 
 
   const members = MEMBERS.filter(m => (m.name || '').toLowerCase().includes(memQuery));
-
   let events = EVENTS.filter(e => (e.name || '').toLowerCase().includes(evQuery));
   if (monthSel) events = events.filter(e => (e.date || '').startsWith(monthSel));
-
-  // NEW FILTER LOGIC
   if (avenueSel) {
     events = events.filter(e => {
-      // Ensure e.avenue is always an array for consistent checking
       const eventAvenues = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
-      
-      if (avenueSel === '_NONE_') {
-        return eventAvenues.length === 0;
-      }
+      if (avenueSel === '_NONE_') return eventAvenues.length === 0;
       return eventAvenues.includes(avenueSel);
     });
   }
-
   return { members, events };
 }
 
-function exportAttendanceToExcel(){
-  if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
+if (document.getElementById('bodMemCancel'))  document.getElementById('bodMemCancel').onclick  = () => closeModal('editBodMemberModal');
+if (document.getElementById('bodMeetCancel')) document.getElementById('bodMeetCancel').onclick = () => closeModal('editBodMeetingModal');
+if (document.getElementById('memCancel')) document.getElementById('memCancel').onclick = () => closeModal('editMemberModal');
+if (document.getElementById('evCancel'))  document.getElementById('evCancel').onclick  = () => closeModal('editEventModal');
 
-  const { members, events } = getFilteredMembersAndEvents();
-
-  const header = ['Member \\ Event', ...events.map(e => {
-    const d = (e.date||'').slice(0,10);
-    return d ? `${e.name||''} (${d})` : (e.name||'');
-  })];
-
-  const rows = members.map(m => {
-    const attForMember = ATT[m.id] || {};
-    const cells = events.map(e => {
-      const v = attForMember[e.id];        // true | false | 'NA' | undefined
-      if (v === true)  return 'P';
-      if (v === false) return 'A';
-      if (v === 'NA')  return 'NA';
-      return ''; // blank if unset
-    });
-    return [m.name || '', ...cells];
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-
-  // column widths
-  const colWidths = header.map((h, idx) => {
-    const maxLen = Math.max(
-      String(h).length,
-      ...rows.map(r => String(r[idx] ?? '').length)
-    );
-    return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
-  });
-  ws['!cols'] = colWidths;
-
-  ws['!freeze'] = { xSplit: 1, ySplit: 1 };
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
-
-  const dateTag = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `attendance_${dateTag}.xlsx`);
-}
-
-
-if (exportXlsxBtn) {
-  exportXlsxBtn.addEventListener('click', exportAttendanceToExcel);
-}
-
-function exportBodAttendanceToExcel(){
-  if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
-
-  // Header: first col label, then all meetings
-  const header = [
-    'BOD (Name / Position)',
-    ...BODMEET.map(mt => {
-      const d = (mt.date || '').slice(0,10);
-      return d ? `${mt.name || ''} (${d})` : (mt.name || '');
-    })
-  ];
-
-  // Rows: BODM order; cells are P/A
-const rows = BODM.map(m => {
-  const att = BODATT[m.id] || {};
-  const cells = BODMEET.map(mt => {
-    const v = att[mt.id];
-    if (v === true)  return 'P';
-    if (v === false) return 'A';
-    if (v === 'NA')  return 'NA';
-    return '';
-  });
-  const namePos = `${m.name || ''}${m.position ? ' — ' + m.position : ''}`;
-  return [namePos, ...cells];
-});
-
-
-  const aoa = [header, ...rows];
-
-  // Sheet + widths + freeze panes
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const colWidths = header.map((h, idx) => {
-    const maxLen = Math.max(
-      String(h).length,
-      ...rows.map(r => String(r[idx] ?? '').length)
-    );
-    return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
-  });
-  ws['!cols'] = colWidths;
-  ws['!freeze'] = { xSplit: 1, ySplit: 1 };
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'BOD Attendance');
-
-  const dateTag = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `bod_attendance_${dateTag}.xlsx`);
-}
-
-if (exportBodXlsxBtn) {
-  exportBodXlsxBtn.addEventListener('click', exportBodAttendanceToExcel);
-}
+// Treasury Filter Listeners
+if (treFilterType) treFilterType.addEventListener('change', renderTreasurer);
+if (treFilterMonth) treFilterMonth.addEventListener('change', renderTreasurer);
+if (treFilterAvenue) treFilterAvenue.addEventListener('change', renderTreasurer);

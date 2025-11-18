@@ -58,9 +58,51 @@ let BODM=[], BODMEET=[], BODATT={};
 // Auth guard: allow dzr/admin/president
 auth.onAuthStateChanged(async (user) => {
   if (!user) { location.href = 'login.html'; return; }
-  // Optional: you can block non dzr/admin/president by checking roles here.
-  start();
+
+  try {
+    const snap = await db.collection('roles').doc(user.uid).get();
+    const role = snap.exists ? String(snap.data().role || '').toLowerCase() : '';
+
+    const goAdminBtn = document.getElementById('goAdminBtn');
+    const goBodBtn   = document.getElementById('goBodBtn');
+
+    // Allow only dzr / president / admin
+    if (role === 'dzr' || role === 'president' || role === 'admin') {
+
+      // Navigation buttons: only president gets cross-panel jumps
+      if (role === 'president') {
+        if (goAdminBtn) {
+          goAdminBtn.style.display = 'inline-block';
+          goAdminBtn.onclick = () => location.href = 'admin.html';
+        }
+        if (goBodBtn) {
+          goBodBtn.style.display = 'inline-block';
+          goBodBtn.onclick = () => location.href = 'bodlogin.html';
+        }
+      } else {
+        // hide them for dzr/admin
+        if (goAdminBtn) goAdminBtn.style.display = 'none';
+        if (goBodBtn)   goBodBtn.style.display   = 'none';
+      }
+
+      // finally load the page
+      start();
+      return;
+    }
+
+    // ❌ Any other role is not allowed here
+    if (role === 'bod') {
+      location.href = 'bodlogin.html';
+    } else {
+      location.href = 'login.html';
+    }
+  } catch (e) {
+    console.warn('Role check on DZR page failed:', e);
+    location.href = 'login.html';
+  }
 });
+
+
 
 async function start(){
 await Promise.all([loadAttendance(), loadBOD(), loadFinesOnce(), loadTreasuryOnce()]);
