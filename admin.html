@@ -281,7 +281,14 @@
   <div class="topbar">
     <h2>Treasurer Panel <span id="treBadge" class="badge"></span></h2>
   </div>
-  
+        <div class="info-banner" style="margin: 20px 0;"">
+  <div class="info-banner__text">
+    <strong>View All Bills:</strong>
+    <a class="info-banner__link" href="https://drive.google.com/drive/folders/1gjWDzcV8lyDp-GBM_y6FkiZ1S_krURmE?usp=drive_link" target="_blank" rel="noopener">
+      All bills are backed up to this central drive.
+    </a>
+  </div>
+</div>
   <div class="toolbar" id="treKPIs" style="gap:14px; align-items:flex-end; margin-bottom:12px;">
     <div class="kpi"><div class="kpi-label">Income</div><div class="kpi-value" id="treInc">–</div></div>
     <div class="kpi"><div class="kpi-label">Expense</div><div class="kpi-value" id="treExp">–</div></div>
@@ -612,7 +619,7 @@
       </div>
       <div class="adm-field">
         <label>Bank Statement</label>
-        <input id="transCheque" type="number" placeholder="000000"/>
+        <input id="transCheque" type="text" />
       </div>
       <div class="adm-field">
         <label>Date</label>
@@ -622,11 +629,11 @@
   <label>Bill Image URL (Google Drive / JPG / PNG)</label>
   <input id="transBillUrl" placeholder="https://drive.google.com/..."/>
 </div>
-      <div class="adm-field">
+      <!--<div class="adm-field">
         <label>Upload Bill</label>
         <input id="transBill" type="file" accept="image/*"/>
         <div id="transBillPreview" style="margin-top:6px;"></div>
-      </div>
+      </div>-->
       <div class="adm-actions">
         <button type="submit" class="btn">Save</button>
       </div>
