@@ -1354,7 +1354,7 @@ function exportTreasuryToExcel(){
 
   const data = getFilteredTreasury(); // <--- Export filtered data
 
-  const header = ['Name', 'Type', 'Amount (₹)', 'Avenue', 'Date', 'Paid By', 'Reimbursement', 'Cheque No'];
+  const header = ['Name', 'Type', 'Amount (₹)', 'Avenue', 'Date', 'Paid By', 'Reimbursement', 'Bank Statement'];
   const rows = data.map(t => [
     t.name || '',
     t.type === 'income' ? 'Income' : 'Expense',

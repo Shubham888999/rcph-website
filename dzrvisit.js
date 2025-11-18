@@ -1,3 +1,15 @@
+function getGdriveImageUrl(url) {
+  if (!url) return "";
+  // Check for standard Drive share links
+  if (url.includes("drive.google.com")) {
+    const idMatch = url.match(/[-\w]{25,}/);
+    if (idMatch) {
+      // Use the thumbnail endpoint
+      return `https://drive.google.com/thumbnail?id=${idMatch[0]}&sz=s1000`;
+    }
+  }
+  return url;
+}
 /* global firebase */
 const auth = window.auth;
 const db   = window.db;
@@ -375,32 +387,53 @@ function attachTreasuryListener(){
     });
 }
 
-function renderTreasury(){
+function renderTreasury() {
   if (!treBody) return;
 
-  // KPIs
   let inc = 0, exp = 0;
-  (TREAS || []).forEach(t => {
-    const a = Number(t.amount || 0);
-    if (t.type === 'income') inc += a;
-    else if (t.type === 'expense') exp += a;
-  });
-  const net = inc - exp;
-  if (treIncEl) treIncEl.textContent = `₹ ${inc.toLocaleString()}`;
-  if (treExpEl) treExpEl.textContent = `₹ ${exp.toLocaleString()}`;
-  if (treNetEl) treNetEl.textContent = `₹ ${net.toLocaleString()}`;
 
-  // Table
-  treBody.innerHTML = (TREAS || []).map(t => `
-    <tr>
-      <td>${(t.name || '').replace(/</g,'&lt;')}</td>
-      <td>${t.type === 'income' ? 'Income' : 'Expense'}</td>
-      <td>₹ ${(Number(t.amount || 0)).toLocaleString()}</td>
-      <td>${(t.avenue || '-').replace(/</g,'&lt;')}</td>
-      <td>${(t.date || '').slice(0,10)}</td>
-    </tr>
-  `).join('');
+  treBody.innerHTML = TREAS.map(t => {
+    const amt = Number(t.amount || 0);
+    // Normalize type check (case insensitive)
+    const type = (t.type || "").toLowerCase();
+    if (type === "income") inc += amt;
+    else if (type === "expense") exp += amt;
+
+    const dateStr = (t.date || "").slice(0, 10);
+
+    // 1. Use the helper for the image URL
+    const thumbUrl = getGdriveImageUrl(t.billUrl);
+    
+    const billPreview = t.billUrl
+      ? `<img src="${thumbUrl}" 
+              style="width:60px; height:40px; object-fit:cover; border-radius:6px; cursor:pointer; border:1px solid #333;"
+              onclick="window.open('${t.billUrl}', '_blank')"
+              alt="Bill"
+              onerror="this.style.display='none';this.parentElement.innerText='🔗'">`
+      : "—";
+
+    return `
+      <tr>
+        <td>${(t.name || "-").replace(/</g,'&lt;')}</td>
+        <td>${t.type || "-"}</td>
+        <td>₹ ${amt.toLocaleString()}</td>
+        <td>${(t.avenue || "Other").replace(/</g,'&lt;')}</td>
+        <td>${dateStr}</td>
+        
+        <td>${(t.paidBy || "-").replace(/</g,'&lt;')}</td>
+        <td>${(t.reimburse || "-").replace(/</g,'&lt;')}</td>
+        <td>${(t.cheque || "-").replace(/</g,'&lt;')}</td>
+        
+        <td>${billPreview}</td>
+      </tr>
+    `;
+  }).join("");
+
+  if (treIncEl) treIncEl.textContent = "₹ " + inc.toLocaleString();
+  if (treExpEl) treExpEl.textContent = "₹ " + exp.toLocaleString();
+  if (treNetEl) treNetEl.textContent = "₹ " + (inc - exp).toLocaleString();
 }
+
 
 
 /* ---------- Interactions ---------- */
