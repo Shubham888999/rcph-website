@@ -316,8 +316,8 @@ function getFilteredTreasury() {
 
     // Filter Avenue
     if (avenueVal) {
-      if (avenueVal === '_NONE_') {
-        if (t.avenue && t.avenue !== 'No Avenue' && t.avenue !== '_NONE_') return false;
+      if (avenueVal === 'Other') {
+        if (t.avenue && t.avenue !== 'No Avenue' && t.avenue !== 'Other') return false;
       } else {
         if (t.avenue !== avenueVal) return false;
       }
@@ -502,7 +502,7 @@ function renderGrid(){
   if (avenueSel) {
     events = events.filter(e => {
       const eventAvenues = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
-      if (avenueSel === '_NONE_') return eventAvenues.length === 0;
+      if (avenueSel === 'Other') return eventAvenues.length === 0;
       return eventAvenues.includes(avenueSel);
     });
   }
@@ -1585,7 +1585,7 @@ function getFilteredMembersAndEvents(){
   if (avenueSel) {
     events = events.filter(e => {
       const eventAvenues = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
-      if (avenueSel === '_NONE_') return eventAvenues.length === 0;
+      if (avenueSel === 'Other') return eventAvenues.length === 0;
       return eventAvenues.includes(avenueSel);
     });
   }
