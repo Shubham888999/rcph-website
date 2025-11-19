@@ -1732,10 +1732,15 @@ html{ scroll-behavior: smooth; }
     bottom: 16px;
     left: 16px;
     padding: 10px 14px;
-    transform: scale(0.9);
+    /* CHANGE: Remove scaling that makes it too small */
+    /* transform: scale(0.9); */
+    transform: none;
+    /* NEW: Add z-index override to ensure it is always on top on mobile */
+    z-index: 100000;
+    /* NEW: Use a sticky position for the button if you want it fixed */
+    position: fixed;
   }
 }
-
 .coffee-lottie {
   width: 60px;
   height: 60px;
