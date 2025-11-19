@@ -282,12 +282,40 @@ function initFlipCards() {
     inner.addEventListener('pointerup', handleFlip, { passive: true });
   });
 }
+// === Coffee Widget Popup ===
+function initCoffeeWidget() {
+  const widget = document.getElementById('coffeeWidget');
+  const popup  = document.getElementById('coffeePopup');
+  const close  = document.getElementById('coffeeClose');
+
+  if (!widget || !popup) return;
+
+  widget.addEventListener('click', () => {
+    popup.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  });
+
+  close.addEventListener('click', () => {
+    popup.style.display = 'none';
+    document.body.style.overflow = '';
+  });
+
+  popup.addEventListener('click', (e) => {
+    if (e.target === popup) { // click outside box
+      popup.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  });
+}
+
 setTimeout(() => {
   initCalendar();
   initFlipCards();
   initHighlightCarousel();
   initHighlightCounters();
-  buildAlbumWall();     // ← add this line
+  buildAlbumWall();
+  initCoffeeLottie();   // NEW
+  initCoffeeWidget();    // ← add this line
 }, 100);
 function initHighlightCarousel() {
   const root = document.querySelector('.highlight-carousel');
@@ -472,4 +500,17 @@ function fireConfetti() {
   burst(0.1); // left
   burst(0.9); // right
   setTimeout(() => confetti({ particleCount: 60, spread: 80, origin: { x: 0.5, y: 0.2 } }), 400);
+}
+
+function initCoffeeLottie() {
+  const container = document.getElementById('coffeeLottie');
+  if (!container) return;
+
+  lottie.loadAnimation({
+    container: container,
+    renderer: 'svg',
+    loop: true,
+    autoplay: true,
+    path: 'animations/morning-coffee.json'  // your file location
+  });
 }

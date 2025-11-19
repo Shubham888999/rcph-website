@@ -120,12 +120,13 @@
   }
 
   /* Content Wrapper */
-  .content-wrapper {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 40px 20px;
-    text-align: center;
-  }
+.content-wrapper {
+  /* CHANGE: Increase max-width to match the wider section-box */
+  max-width: 1500px; /* Use the same value as the new .section-box max-width */
+  margin: 0 auto;
+  padding: 40px 20px;
+  text-align: center;
+}
   section { margin-bottom: 60px; }
 
   /* Boxed Sections */
@@ -138,7 +139,7 @@
       inset 0 0 0 1px rgba(0,0,0,0.08);
     border-radius: 12px;
     padding: 30px 25px;
-    max-width: 900px;
+    max-width: 1200px;
     margin: 40px auto;
     transition: transform .3s ease, box-shadow .3s ease;
   }
@@ -298,7 +299,7 @@
   /* Cards */
 .bod-container {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4 , 1fr);
   gap: 20px;
   justify-items: center;
   align-items: stretch;
@@ -1671,4 +1672,82 @@ html{ scroll-behavior: smooth; }
 .att-a  { background-image: url('cross.png'); }
 .att-na { background-image: url('NA_Button.png'); }
 
+/* === Coffee Widget === */
 
+.coffee-widget {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  background: #ffffff;
+  padding: 14px 18px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  z-index: 99999;
+  box-shadow: 0 4px 12px rgb(255, 255, 255);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.coffee-widget:hover {
+  transform: scale(1.05);
+  background: #ffffff;
+}
+
+.coffee-text {
+  color: var(--color-accent);
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+}
+
+.coffee-cup {
+  font-size: 1.8rem;
+  position: relative;
+}
+
+/* Steam Animation */
+.steam {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  width: 4px;
+  height: 14px;
+  background: #ffffff70;
+  border-radius: 10px;
+  transform: translateX(-50%);
+  animation: steamRise 1.6s infinite ease-in-out;
+}
+
+@keyframes steamRise {
+  0% { opacity: 0; transform: translate(-50%, 8px) scaleX(1); }
+  40% { opacity: 1; transform: translate(-50%, -2px) scaleX(0.8); }
+  100% { opacity: 0; transform: translate(-50%, -12px) scaleX(1); }
+}
+
+/* Mobile adjustments */
+@media(max-width: 768px){
+  .coffee-widget {
+    bottom: 16px;
+    left: 16px;
+    padding: 10px 14px;
+    transform: scale(0.9);
+  }
+}
+
+.coffee-lottie {
+  width: 60px;
+  height: 60px;
+  pointer-events: none; /* so clicks reach the widget */
+}
+
+@media(max-width: 768px){
+  .coffee-lottie {
+    width: 50px;
+    height: 50px;
+  }
+}
+.coffee-lottie svg {
+  background: none !important;
+}
