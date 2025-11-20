@@ -83,6 +83,16 @@ const AW_ALBUMS = [
     title: "Samyati 3.0",
     cover: "images/Samyati3-1.jpg",
     photos: [ "images/Samyati3-1.jpg" ]
+  },
+    {
+    id: "pages-of-hope",
+    title: "Pages of Hope",
+    cover: "images/poh.jpeg",
+    photos: [
+      "images/poh3.jpeg",
+      "images/poh4.jpeg",
+      "images/poh1.jpeg"
+    ]
   }
   // Add more albums here as you go…
 ];
@@ -312,7 +322,7 @@ setTimeout(() => {
   initCalendar();
   initFlipCards();
   initHighlightCarousel();
-  initHighlightCounters();
+  //initHighlightCounters();
   buildAlbumWall();
   initCoffeeLottie();   // NEW
   initCoffeeWidget();    // ← add this line
@@ -385,7 +395,7 @@ function initHighlightCarousel() {
 }
 // === Highlight counters (Mahadaan 2025) ===
 // === Highlight counters (Mahadaan 2025) ===
-
+/*
 function initHighlightCounters() {
   // Start when only ~15% is visible and a bit before it enters
   const io = new IntersectionObserver((entries) => {
@@ -404,7 +414,7 @@ function initHighlightCounters() {
   }, { threshold: 0.50, rootMargin: '80px 0px' });
 
   io.observe(container);
-} 
+} */
 
 function scrambleCount(
   el,
@@ -480,7 +490,7 @@ async function runCounterSequence(cards) {
     await new Promise(r => setTimeout(r, 30));
   }
 }
-
+/*
 function fireConfetti() {
   if (typeof confetti !== 'function') return;
   const burst = (x) => confetti({
@@ -495,7 +505,7 @@ function fireConfetti() {
   burst(0.1); // left
   burst(0.9); // right
   setTimeout(() => confetti({ particleCount: 60, spread: 80, origin: { x: 0.5, y: 0.2 } }), 400);
-}
+}*/
 
 function initCoffeeLottie() {
   const container = document.getElementById('coffeeLottie');
