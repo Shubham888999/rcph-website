@@ -385,13 +385,8 @@ function initHighlightCarousel() {
 }
 // === Highlight counters (Mahadaan 2025) ===
 // === Highlight counters (Mahadaan 2025) ===
+
 function initHighlightCounters() {
-  const container = document.getElementById('mahadaanCounters');
-  if (!container) return;
-
-  const cards = Array.from(container.querySelectorAll('.counter-card'))
-    .sort((a,b) => (a.dataset.order||0) - (b.dataset.order||0));
-
   // Start when only ~15% is visible and a bit before it enters
   const io = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -409,7 +404,7 @@ function initHighlightCounters() {
   }, { threshold: 0.50, rootMargin: '80px 0px' });
 
   io.observe(container);
-}
+} 
 
 function scrambleCount(
   el,
