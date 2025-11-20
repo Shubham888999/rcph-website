@@ -517,3 +517,4 @@ function initCoffeeLottie() {
     path: 'animations/morning-coffee.json'  // your file location
   });
 }
+
