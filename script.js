@@ -1,12 +1,5 @@
 window.addEventListener('DOMContentLoaded', () => {
   // 1) Include HTML fragments
-  document.querySelectorAll('[data-include]').forEach(async el => {
-    const url = el.getAttribute('data-include');
-    const resp = await fetch(url);
-    if (resp.ok) el.outerHTML = await resp.text();
-  });
-
-  // 2) Give fragments a moment to load, then kick off calendar & gallery & flip cards
  
 });
 
@@ -318,15 +311,20 @@ function initCoffeeWidget() {
   });
 }
 
-setTimeout(() => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runInit);
+} else {
+    runInit();
+}
+
+function runInit() {
   initCalendar();
   initFlipCards();
   initHighlightCarousel();
-  //initHighlightCounters();
   buildAlbumWall();
-  initCoffeeLottie();   // NEW
-  initCoffeeWidget();    // ← add this line
-}, 100);
+  initCoffeeLottie();
+  initCoffeeWidget();
+}
 function initHighlightCarousel() {
   const root = document.querySelector('.highlight-carousel');
   if (!root) return;
