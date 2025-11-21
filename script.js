@@ -318,12 +318,28 @@ if (document.readyState === 'loading') {
 }
 
 function runInit() {
-  initCalendar();
+  // 1. IMMEDIATE: Essential UI interactions
+  // We run these right away so buttons and sliders work immediately.
   initFlipCards();
   initHighlightCarousel();
-  buildAlbumWall();
-  initCoffeeLottie();
   initCoffeeWidget();
+
+  // 2. SHORT DELAY (500ms): Content Generation
+  // We wait half a second to let the Hero Image finish painting.
+  setTimeout(() => {
+    buildAlbumWall();
+  }, 500);
+
+  // 3. LONG DELAY (2.5 seconds): Heavy Computation & Network
+  // The Calendar (Firebase fetch) and Lottie (CPU animation) are heavy.
+  // We wait until the user has settled into the page before running these.
+  setTimeout(() => {
+    // Only load calendar if the element exists (prevents errors on pages without calendar)
+    if(document.getElementById('rcph-calendar')) {
+        initCalendar();
+    }
+    initCoffeeLottie();
+  }, 2500);
 }
 function initHighlightCarousel() {
   const root = document.querySelector('.highlight-carousel');
