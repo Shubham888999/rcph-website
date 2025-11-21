@@ -80,11 +80,11 @@ const AW_ALBUMS = [
     {
     id: "pages-of-hope",
     title: "Pages of Hope",
-    cover: "images/poh.jpeg",
+    cover: "images/poh.jpg",
     photos: [
-      "images/poh3.jpeg",
-      "images/poh4.jpeg",
-      "images/poh1.jpeg"
+      "images/poh3.jpg",
+      "images/poh4.jpg",
+      "images/poh1.jpg"
     ]
   }
   // Add more albums here as you go…
