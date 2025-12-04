@@ -524,13 +524,13 @@ function fireConfetti() {
 function initCoffeeLottie() {
   const container = document.getElementById('coffeeLottie');
   if (!container) return;
-
+  /*
   lottie.loadAnimation({
     container: container,
     renderer: 'svg',
     loop: true,
     autoplay: true,
-    path: 'animations/morning-coffee.json'  // your file location
-  });
+    path: 'animations/gif-animation-data.json'
+  }); */
 }
 

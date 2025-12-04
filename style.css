@@ -1707,7 +1707,7 @@ html{ scroll-behavior: smooth; }
   position: relative;
 }
 
-/* Steam Animation */
+/* Steam Animation 
 .steam {
   position: absolute;
   top: -14px;
@@ -1724,27 +1724,24 @@ html{ scroll-behavior: smooth; }
   0% { opacity: 0; transform: translate(-50%, 8px) scaleX(1); }
   40% { opacity: 1; transform: translate(-50%, -2px) scaleX(0.8); }
   100% { opacity: 0; transform: translate(-50%, -12px) scaleX(1); }
-}
+}*/
 
-/* Mobile adjustments */
+/* Mobile adjustments 
 @media(max-width: 768px){
   .coffee-widget {
     bottom: 16px;
     left: 16px;
     padding: 10px 14px;
-    /* CHANGE: Remove scaling that makes it too small */
-    /* transform: scale(0.9); */
+    transform: scale(0.9); 
     transform: none;
-    /* NEW: Add z-index override to ensure it is always on top on mobile */
     z-index: 100000;
-    /* NEW: Use a sticky position for the button if you want it fixed */
     position: fixed;
   }
 }
 .coffee-lottie {
   width: 60px;
   height: 60px;
-  pointer-events: none; /* so clicks reach the widget */
+  pointer-events: none; 
 }
 
 @media(max-width: 768px){
@@ -1756,4 +1753,67 @@ html{ scroll-behavior: smooth; }
 .coffee-lottie svg {
   background: none !important;
 }
+*/
+/* === Event CTA (Baking Widget – inside hero) === */
 
+.coffee-widget {
+  margin-top: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: rgb(193, 230, 240);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  transform-origin: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  color: #000000;
+}
+
+.coffee-widget:hover {
+  transform: translateY(-2px) scale(1.02);
+  background: rgb(193, 230, 240);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+}
+
+.coffee-lottie {
+  width: 52px;
+  height: 52px;
+  pointer-events: none;
+}
+
+.coffee-text-wrap {
+  text-align: left;
+}
+
+.coffee-text-main {
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.coffee-text-sub {
+  font-size: 0.85rem;
+  margin: 2px 0 0;
+  opacity: 0.9;
+}
+
+/* Mobile tweak */
+@media (max-width: 768px) {
+  .coffee-widget {
+    padding: 10px 16px;
+    margin-top: 1.25rem;
+  }
+  .coffee-lottie {
+    width: 44px;
+    height: 44px;
+  }
+  .coffee-text-main {
+    font-size: 0.95rem;
+  }
+  .coffee-text-sub {
+    font-size: 0.8rem;
+  }
+}

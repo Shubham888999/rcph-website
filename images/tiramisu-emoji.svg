@@ -1,0 +1,29 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Plate -->
+  <ellipse cx="32" cy="50" rx="22" ry="6" fill="#e0e6f5"></ellipse>
+  <ellipse cx="32" cy="48" rx="20" ry="4" fill="#f7f8ff"></ellipse>
+
+  <!-- Bottom sponge layer -->
+  <path d="M16 34h32v8c0 2.2-1.8 4-4 4H20c-2.2 0-4-1.8-4-4v-8z" fill="#f2d0a1"></path>
+
+  <!-- Coffee cream layer -->
+  <rect x="16" y="28" width="32" height="6" fill="#c08f5a"></rect>
+
+  <!-- Mascarpone layer -->
+  <rect x="16" y="22" width="32" height="6" fill="#fdf2d8"></rect>
+
+  <!-- Cocoa top -->
+  <path d="M16 18c0-1.5 1.2-2.7 2.7-2.7h26.6C47.8 15.3 49 16.5 49 18v4H16v-4z" fill="#5c3a29"></path>
+
+  <!-- Cocoa dust specks -->
+  <circle cx="23" cy="19" r="0.9" fill="#3a2318"></circle>
+  <circle cx="29" cy="17.8" r="0.9" fill="#3a2318"></circle>
+  <circle cx="35" cy="19.5" r="0.9" fill="#3a2318"></circle>
+  <circle cx="41" cy="18.2" r="0.9" fill="#3a2318"></circle>
+
+  <!-- Small mint leaf -->
+  <path d="M30 16c1.2-1.6 3-2.7 4.7-2.7 0.9 0 1.7 0.2 2.4 0.7-0.6 1.9-2 3.5-4.2 4.4-1-0.5-1.9-1.3-2.9-2.4z" fill="#6bbd6b"></path>
+
+  <!-- Tiny highlight on front edge -->
+  <path d="M18 34h28v2H18z" fill="rgba(255,255,255,0.45)"></path>
+</svg>
