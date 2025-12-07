@@ -162,14 +162,23 @@ async function fetchEventsForCalendar() {
   return snap.docs.map(d => {
     const ev = d.data();
     const avenue = ev.avenue || ev.avenues || null; // accept string or array
+    let end = null;
+    if (ev.endDate && ev.endDate !== ev.date) {
+    const dEnd = new Date(ev.endDate + 'T00:00:00'); // local midnight
+    dEnd.setDate(dEnd.getDate() + 1);                // make it exclusive
+    end = dEnd.toISOString().slice(0, 10);           // "YYYY-MM-DD"
+  }
     return {
       id: d.id,
       title: ev.name,
       start: ev.date,             // "YYYY-MM-DD"
-      end: ev.end || undefined,   // optional multi-day
+      end: ev.end || undefined,
+      end: end || undefined,    // optional multi-day
       extendedProps: {
         description: ev.description || '',
-        avenue
+        avenue,
+        startDate: ev.date,
+        endDate: ev.endDate || null
       }
       // If you add ev.color in Firestore, you can use it in eventDidMount
     };
@@ -238,12 +247,39 @@ function initCalendar() {
       }
     },
 
-    eventClick: (info) => {
-      document.getElementById('eventTitle').textContent       = info.event.title;
-      document.getElementById('eventDescription').textContent = info.event.extendedProps.description || '';
-      document.getElementById('eventDate').textContent        = info.event.start.toDateString();
-      document.getElementById('eventModal').style.display     = 'block';
-    }
+eventClick: (info) => {
+  const titleEl = document.getElementById('eventTitle');
+  const descEl  = document.getElementById('eventDescription');
+  const dateEl  = document.getElementById('eventDate');
+
+  titleEl.textContent = info.event.title;
+  descEl.textContent  = info.event.extendedProps.description || '';
+
+  const start = info.event.start;
+  const end   = info.event.end; // exclusive for multi-day
+
+  const fmt = (d) =>
+    d.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+  let label;
+
+  if (end && end.getTime() !== start.getTime()) {
+    // convert exclusive end back to inclusive for display
+    const inclusiveEnd = new Date(end);
+    inclusiveEnd.setDate(inclusiveEnd.getDate() - 1);
+    label = `${fmt(start)} – ${fmt(inclusiveEnd)}`;
+  } else {
+    label = fmt(start);
+  }
+
+  dateEl.textContent = label;
+  document.getElementById('eventModal').style.display = 'block';
+}
+
   });
 
   calendar.render();

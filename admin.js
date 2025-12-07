@@ -523,7 +523,9 @@ function renderGrid(){
         <th title="${e.date || ''}">
           <div class="ev-head">
             <span>${e.name || ''}</span>
-            ${avenueHtml}  <small>${(e.date || '').slice(0,10)}</small>
+            ${avenueHtml}  <small>
+            ${ (e.date || '').slice(0,10) }
+             ${ e.endDate ? ` → ${e.endDate.slice(0,10)}` : "" }</small>
             <button class="icon-btn" title="Rename event" data-edit-event="${e.id}">✏️</button>
             <button class="icon-btn" title="Delete event" data-del-event="${e.id}">🗑</button>
           </div>
@@ -1509,13 +1511,14 @@ if (editEventForm) {
     const id   = document.getElementById('editEvId').value;
     const name = (document.getElementById('editEvName').value || '').trim();
     const date = document.getElementById('editEvDate').value;
+    const endDate  = document.getElementById('editEvEndDate').value || '';
     const desc = (document.getElementById('editEvDesc').value || '').trim();
     const avenues = Array.from(document.querySelectorAll('#editEventModal input[type="checkbox"]:checked'))
       .map(cb => cb.value);
 
     if (!id || !name || !date) return;
     try {
-      await db.collection('events').doc(id).update({ name, date, desc, avenue: avenues });
+      await db.collection('events').doc(id).update({ name, date, endDate, desc, avenue: avenues });
       closeModal('editEventModal');
     } catch (err) { alert('Failed to save event: ' + err.message); }
   });
@@ -1564,11 +1567,12 @@ if (addEventForm) {
     e.preventDefault();
     const name = (addEvName?.value || '').trim();
     const date = addEvDate?.value || '';
+    const endDate   = addEvEndDate?.value || '';
     const desc = (addEvDesc?.value || '').trim();
     const avenues = Array.from(addEventForm.querySelectorAll('fieldset input[type="checkbox"]:checked'))
       .map(c => c.value);
     if (!name || !date) return;
-    await db.collection('events').add({ name, date, desc, avenue: avenues });
+    await db.collection('events').add({ name, date, endDate, desc, avenue: avenues });
     closeModal('addEventModal');
   });
 }
