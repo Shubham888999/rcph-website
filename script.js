@@ -347,6 +347,38 @@ function initCoffeeWidget() {
   });
 }
 
+// === Reel Widget Popup ===
+function initReelWidget() {
+  const btn   = document.getElementById('reelWidget');
+  const modal = document.getElementById('reelModal');
+  const close = document.getElementById('reelClose');
+
+  if (!btn || !modal || !close) return;
+
+  const open = () => {
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  };
+
+  const shut = () => {
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  };
+
+  btn.addEventListener('click', open);
+
+  close.addEventListener('click', shut);
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) shut();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (modal.getAttribute('aria-hidden') === 'false' && e.key === 'Escape') shut();
+  });
+}
+
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', runInit);
 } else {
@@ -359,6 +391,7 @@ function runInit() {
   initFlipCards();
   initHighlightCarousel();
   initCoffeeWidget();
+  initReelWidget();
 
   // 2. SHORT DELAY (500ms): Content Generation
   // We wait half a second to let the Hero Image finish painting.
