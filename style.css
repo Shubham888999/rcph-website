@@ -1965,8 +1965,3 @@ html{ scroll-behavior: smooth; }
       0 14px 36px rgba(0,0,0,0.45);
   }
 }
-.reel-widget:hover{
-  box-shadow:
-    0 0 28px rgba(212,175,55,0.55),
-    0 18px 46px rgba(0,0,0,0.6);
-}

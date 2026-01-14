@@ -175,12 +175,11 @@ async function fetchEventsForCalendar() {
       end: ev.end || undefined,
       end: end || undefined,    // optional multi-day
       extendedProps: {
-        description: ev.description || '',
+        description: ev.desc || ev.description || '',
         avenue,
         startDate: ev.date,
         endDate: ev.endDate || null
       }
-      // If you add ev.color in Firestore, you can use it in eventDidMount
     };
   });
 }
