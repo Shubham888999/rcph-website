@@ -1965,3 +1965,71 @@ html{ scroll-behavior: smooth; }
       0 14px 36px rgba(0,0,0,0.45);
   }
 }
+/* ===== Madhushala Theme: Hero Vines ===== */
+.hero-banner { overflow: hidden; }
+
+.hero-vine {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 240px;
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 0;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.45));
+}
+
+.hero-vine-left { left: 0; }
+.hero-vine-right { right: 0; }
+
+.hero-content { position: relative; z-index: 1; }
+
+/* Mobile: reduce vine width so it doesn't crowd text */
+@media (max-width: 768px) {
+  .hero-vine { width: 160px; opacity: 0.75; }
+}
+
+/* ===== Madhushala Popup Enhancements ===== */
+.madhushala-box .madhushala-title {
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.madhushala-cta {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 800;
+  text-decoration: none;
+  background: linear-gradient(135deg, #F4B43A, #60C3C4);
+  color: #121212 !important;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.25);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.madhushala-cta:hover {
+  transform: translateY(-1px) scale(1.02);
+  filter: brightness(1.05);
+}
+/* ===== Madhushala Navbar Button ===== */
+.madhushala-nav-btn {
+  background: linear-gradient(45deg, #7b0f1d, #b11226);
+  color: #fff !important;
+  padding: 8px 16px;
+  border-radius: 25px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(177, 18, 38, 0.4);
+}
+
+.madhushala-nav-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(177, 18, 38, 0.6);
+  background: linear-gradient(45deg, #9c1325, #d61b36);
+}
+.nav-links li:first-child {
+  margin-right: 8px;
+}

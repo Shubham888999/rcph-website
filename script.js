@@ -383,14 +383,47 @@ if (document.readyState === 'loading') {
 } else {
     runInit();
 }
+function initMadhushalaPopup() {
+  const popup = document.getElementById('madhushalaPopup');
+  const close = document.getElementById('madhushalaClose');
+  if (!popup || !close) return;
 
+  const KEY = 'madhushala4_seen';
+
+  // Show on every fresh visit OR once per browser (choose one)
+  // If you want it to show EVERY time, comment out localStorage usage.
+  //const seen = localStorage.getItem(KEY);
+  //if (seen) return;
+
+  // show a tiny bit after load so it feels smooth
+  setTimeout(() => {
+    popup.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }, 500);
+
+  const shut = () => {
+    popup.style.display = 'none';
+    document.body.style.overflow = '';
+    localStorage.setItem(KEY, '1');
+  };
+
+  close.addEventListener('click', shut);
+  popup.addEventListener('click', (e) => {
+    if (e.target === popup) shut();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (popup.style.display === 'flex' && e.key === 'Escape') shut();
+  });
+}
 function runInit() {
   // 1. IMMEDIATE: Essential UI interactions
   // We run these right away so buttons and sliders work immediately.
   initFlipCards();
   initHighlightCarousel();
   initCoffeeWidget();
-  initReelWidget();
+  initMadhushalaPopup();
+
 
   // 2. SHORT DELAY (500ms): Content Generation
   // We wait half a second to let the Hero Image finish painting.
