@@ -486,7 +486,100 @@ function buildMonthFilterFromEvents() {
       monthFilter.appendChild(opt);
     });
 }
+function getFilteredMembersAndEvents() {
+  const memQuery = memberSearch.value.trim().toLowerCase();
+  const evQuery  = eventSearch.value.trim().toLowerCase();
+  const monthSel = monthFilter.value;
+  const avenueSel = avenueFilter.value;
 
+  const members = MEMBERS.filter(m => (m.name || '').toLowerCase().includes(memQuery));
+
+  let events = EVENTS.filter(e => (e.name || '').toLowerCase().includes(evQuery));
+
+  if (monthSel) {
+    events = events.filter(e => (e.date || '').startsWith(monthSel));
+  }
+
+  if (avenueSel) {
+    events = events.filter(e => {
+      const eventAvenues = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
+      if (avenueSel === 'Other') return eventAvenues.length === 0;
+      return eventAvenues.includes(avenueSel);
+    });
+  }
+
+  return { members, events };
+}
+
+async function bulkSetAttendanceForEvent(eventId, value) {
+  const { members } = getFilteredMembersAndEvents();
+  if (!members.length) return;
+
+  const batch = db.batch();
+
+  members.forEach(m => {
+    const ref = db.collection('attendance').doc(m.id);
+    batch.set(ref, { [eventId]: value }, { merge: true });
+    ATT[m.id] = ATT[m.id] || {};
+    ATT[m.id][eventId] = value;
+  });
+
+  await batch.commit();
+  renderGrid();
+}
+
+async function bulkSetAttendanceForMember(memberId, value) {
+  const { events } = getFilteredMembersAndEvents();
+  if (!events.length) return;
+
+  const payload = {};
+  events.forEach(ev => {
+    payload[ev.id] = value;
+  });
+
+  await db.collection('attendance').doc(memberId).set(payload, { merge: true });
+
+  ATT[memberId] = ATT[memberId] || {};
+  events.forEach(ev => {
+    ATT[memberId][ev.id] = value;
+  });
+
+  renderGrid();
+}
+
+async function bulkSetBodForMeeting(meetingId, value) {
+  if (!BODM.length) return;
+
+  const batch = db.batch();
+
+  BODM.forEach(m => {
+    const ref = db.collection('bodAttendance').doc(m.id);
+    batch.set(ref, { [meetingId]: value }, { merge: true });
+    BODATT[m.id] = BODATT[m.id] || {};
+    BODATT[m.id][meetingId] = value;
+  });
+
+  await batch.commit();
+  renderBodGrid();
+}
+
+async function bulkSetBodForMember(memberId, value) {
+  if (!BODMEET.length) return;
+
+  const payload = {};
+  BODMEET.forEach(mt => {
+    payload[mt.id] = value;
+  });
+
+  await db.collection('bodAttendance').doc(memberId).set(payload, { merge: true });
+
+  BODATT[memberId] = BODATT[memberId] || {};
+  BODMEET.forEach(mt => {
+    BODATT[memberId][mt.id] = value;
+  });
+
+  renderBodGrid();
+}
 /* ---------- Render grid (Attendance) ---------- */
 function renderGrid(){
   const memQuery = memberSearch.value.trim().toLowerCase();
@@ -519,18 +612,29 @@ function renderGrid(){
         ? `<small style="color: var(--color-accent, #60C3C4); font-weight: 600;">${avenueString}</small>`
         : '';
 
-      return `
-        <th title="${e.date || ''}">
-          <div class="ev-head">
-            <span>${e.name || ''}</span>
-            ${avenueHtml}  <small>
-            ${ (e.date || '').slice(0,10) }
-             ${ e.endDate ? ` → ${e.endDate.slice(0,10)}` : "" }</small>
-            <button class="icon-btn" title="Rename event" data-edit-event="${e.id}">✏️</button>
-            <button class="icon-btn" title="Delete event" data-del-event="${e.id}">🗑</button>
-          </div>
-        </th>
-      `;
+return `
+  <th title="${e.date || ''}">
+    <div class="bulk-wrap">
+      <div class="ev-head">
+        <span>${e.name || ''}</span>
+        <button class="icon-btn" title="Rename event" data-edit-event="${e.id}">✏️</button>
+        <button class="icon-btn" title="Delete event" data-del-event="${e.id}">🗑</button>
+      </div>
+      ${avenueHtml}
+      <small>
+        ${(e.date || '').slice(0,10)}
+        ${e.endDate ? ` → ${e.endDate.slice(0,10)}` : ""}
+      </small>
+
+      <select class="bulk-select" data-bulk-event="${e.id}">
+        <option value="">All attendance</option>
+        <option value="P">✓ Present</option>
+        <option value="A">✗ Absent</option>
+        <option value="NA">NA</option>
+      </select>
+    </div>
+  </th>
+`;
     }).join('');
     
   attHead.innerHTML = '';
@@ -562,19 +666,29 @@ function renderGrid(){
 
     tr.innerHTML =
       `
-      <td class="sticky-col">
-        <div class="mem-left">
-          <div class="stat-box" title="Across visible columns">
-            <span class="stat">All: ${present}/${total} · ${pct}%</span>
-            <span class="stat">GBM: ${gbmPresent}/${gbmTotal} · ${gbmPct}%</span>
-          </div>
-          <div class="mem-cell">
-            <span>${m.name || ''}</span>
-            <button class="icon-btn" title="Rename member" data-edit-member="${m.id}">✏️</button>
-            <button class="icon-btn" title="Delete member" data-del-member="${m.id}">🗑</button>
-          </div>
-        </div>
-      </td>
+<td class="sticky-col">
+  <div class="mem-left">
+    <div class="stat-box" title="Across visible columns">
+      <span class="stat">All: ${present}/${total} · ${pct}%</span>
+      <span class="stat">GBM: ${gbmPresent}/${gbmTotal} · ${gbmPct}%</span>
+    </div>
+
+    <div class="bulk-wrap" style="align-items:flex-start;">
+      <div class="mem-cell">
+        <span>${m.name || ''}</span>
+        <button class="icon-btn" title="Rename member" data-edit-member="${m.id}">✏️</button>
+        <button class="icon-btn" title="Delete member" data-del-member="${m.id}">🗑</button>
+      </div>
+
+      <select class="bulk-select" data-bulk-member="${m.id}">
+        <option value="">All events</option>
+        <option value="P">✓ Present</option>
+        <option value="A">✗ Absent</option>
+        <option value="NA">NA</option>
+      </select>
+    </div>
+  </div>
+</td>
       ` +
       events.map(e => {
         const v = attForMember[e.id]; 
@@ -643,14 +757,24 @@ function renderBodGrid(){
   headRow.innerHTML =
     `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
     BODMEET.map(mt => `
-      <th title="${mt.date || ''}">
-        <div class="ev-head">
-          <span>${mt.name || ''}</span>
-          <small>${(mt.date || '').slice(0,10)}</small>   
-          <button class="icon-btn" title="Rename meeting" data-edit-bod-meeting="${mt.id}">✏️</button>
-          <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
-        </div>
-      </th>
+<th title="${mt.date || ''}">
+  <div class="bulk-wrap">
+    <div class="ev-head">
+      <span>${mt.name || ''}</span>
+      <button class="icon-btn" title="Rename meeting" data-edit-bod-meeting="${mt.id}">✏️</button>
+      <button class="icon-btn" title="Delete meeting" data-del-bod-meeting="${mt.id}">🗑</button>
+    </div>
+
+    <small>${(mt.date || '').slice(0,10)}</small>
+
+    <select class="bulk-select" data-bulk-bod-meeting="${mt.id}">
+      <option value="">All attendance</option>
+      <option value="P">✓ Present</option>
+      <option value="A">✗ Absent</option>
+      <option value="NA">NA</option>
+    </select>
+  </div>
+</th>
     `).join('');
   bodHead.innerHTML = '';
   bodHead.appendChild(headRow);
@@ -671,19 +795,29 @@ function renderBodGrid(){
 
     tr.innerHTML =
       `
-      <td class="sticky-col">
-        <div class="mem-left">
-          <div class="stat-box" title="Across visible BOD meetings">
-            <span class="stat">All: ${present}/${total} · ${pct}%</span>
-          </div>
-          <div class="mem-cell">
-            <span>${(m.name || '')}</span>
-            <small style="opacity:.7; display:block">${(m.position || '')}</small>
-            <button class="icon-btn" title="Edit name/position" data-edit-bod-member="${m.id}">✏️</button>
-            <button class="icon-btn" title="Remove BOD" data-del-bod-member="${m.id}">🗑</button>
-          </div>
-        </div>
-      </td>
+<td class="sticky-col">
+  <div class="mem-left">
+    <div class="stat-box" title="Across visible BOD meetings">
+      <span class="stat">All: ${present}/${total} · ${pct}%</span>
+    </div>
+
+    <div class="bulk-wrap" style="align-items:flex-start;">
+      <div class="mem-cell">
+        <span>${m.name || ''}</span>
+        <small style="opacity:.7; display:block">${m.position || ''}</small>
+        <button class="icon-btn" title="Edit name/position" data-edit-bod-member="${m.id}">✏️</button>
+        <button class="icon-btn" title="Remove BOD" data-del-bod-member="${m.id}">🗑</button>
+      </div>
+
+      <select class="bulk-select" data-bulk-bod-member="${m.id}">
+        <option value="">All meetings</option>
+        <option value="P">✓ Present</option>
+        <option value="A">✗ Absent</option>
+        <option value="NA">NA</option>
+      </select>
+    </div>
+  </div>
+</td>
       ` +
       BODMEET.map(mt => {
         const v = att[mt.id]; 
@@ -833,6 +967,39 @@ document.addEventListener('click', async (e) => {
     BODATT[bodMemberId] = BODATT[bodMemberId] || {};
     BODATT[bodMemberId][meetingId] = next;
   }
+  bodHead.addEventListener('change', async (e) => {
+  const sel = e.target.closest('select[data-bulk-bod-meeting]');
+  if (!sel || !sel.value) return;
+
+  const meetingId = sel.dataset.bulkBodMeeting;
+  const value = sel.value === 'P' ? true : sel.value === 'A' ? false : 'NA';
+
+  const label = value === true ? 'Present' : value === false ? 'Absent' : 'NA';
+  if (!confirm(`Mark all BOD members as ${label} for this meeting?`)) {
+    sel.value = '';
+    return;
+  }
+
+  await bulkSetBodForMeeting(meetingId, value);
+  sel.value = '';
+});
+
+bodBody.addEventListener('change', async (e) => {
+  const sel = e.target.closest('select[data-bulk-bod-member]');
+  if (!sel || !sel.value) return;
+
+  const memberId = sel.dataset.bulkBodMember;
+  const value = sel.value === 'P' ? true : sel.value === 'A' ? false : 'NA';
+
+  const label = value === true ? 'Present' : value === false ? 'Absent' : 'NA';
+  if (!confirm(`Mark all meetings as ${label} for this BOD member?`)) {
+    sel.value = '';
+    return;
+  }
+
+  await bulkSetBodForMember(memberId, value);
+  sel.value = '';
+});
 });
 
 /* ---------- Fines Logic ---------- */
@@ -1023,7 +1190,38 @@ attBody.addEventListener('click', async (e) => {
   ATT[memberId] = ATT[memberId] || {};
   ATT[memberId][eventId] = next;
 });
+attHead.addEventListener('change', async (e) => {
+  const sel = e.target.closest('select[data-bulk-event]');
+  if (!sel || !sel.value) return;
 
+  const eventId = sel.dataset.bulkEvent;
+  const value = sel.value === 'P' ? true : sel.value === 'A' ? false : 'NA';
+
+  const label = value === true ? 'Present' : value === false ? 'Absent' : 'NA';
+  if (!confirm(`Mark all visible members as ${label} for this event?`)) {
+    sel.value = '';
+    return;
+  }
+
+  await bulkSetAttendanceForEvent(eventId, value);
+  sel.value = '';
+});
+attBody.addEventListener('change', async (e) => {
+  const sel = e.target.closest('select[data-bulk-member]');
+  if (!sel || !sel.value) return;
+
+  const memberId = sel.dataset.bulkMember;
+  const value = sel.value === 'P' ? true : sel.value === 'A' ? false : 'NA';
+
+  const label = value === true ? 'Present' : value === false ? 'Absent' : 'NA';
+  if (!confirm(`Mark all visible events as ${label} for this member?`)) {
+    sel.value = '';
+    return;
+  }
+
+  await bulkSetAttendanceForMember(memberId, value);
+  sel.value = '';
+});
 /* ---------- Treasurer Logic ---------- */
 // 1. RENDER
 function renderTreasurer(){

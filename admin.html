@@ -121,7 +121,52 @@
 
 /* small line under header text for dates */
 .ev-head small{
-  display:block; opacity:.75; font-size:12px; line-height:1.1;
+  display:block;
+  opacity:.75;
+  font-size:12px;
+  line-height:1.1;
+}
+
+.bulk-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+}
+
+/* Bulk action dropdown button */
+.bulk-select{
+  appearance:none;
+  background:#151515;
+  color:#ddd;
+  border:1px solid var(--color-border,#2e2e2e);
+  border-radius:20px;
+  padding:6px 28px 6px 12px;
+  font-size:12px;
+  font-weight:600;
+  min-width:120px;
+  cursor:pointer;
+  transition:all .18s ease;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #aaa 50%),
+    linear-gradient(135deg, #aaa 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 9px) 50%;
+  background-size:5px 5px;
+  background-repeat:no-repeat;
+}
+
+.bulk-select:hover{
+  border-color:var(--color-accent,#60C3C4);
+  box-shadow:0 0 6px rgba(96,195,196,.35);
+  color:#fff;
+}
+
+.bulk-select:focus{
+  outline:none;
+  border-color:var(--color-accent,#60C3C4);
+  box-shadow:0 0 8px rgba(96,195,196,.45);
 }
 
 
@@ -148,7 +193,7 @@
     <button id="goBodBtn" class="btn btn-outline">Go to BOD Panel</button>
 
     <!-- NEW -->
-    <button id="goDZRBtn" class="btn btn-outline" style="display:none;">Go to DZR Visit</button>
+    <button id="goDZRBtn" class="btn btn-outline" style="display:none;">Go to DRR Visit</button>
 
     <button id="signOutBtn" class="btn btn-outline">Sign out</button>
 </div>
