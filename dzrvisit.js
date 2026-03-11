@@ -60,6 +60,14 @@ const treIncEl  = document.getElementById('dzrTreInc');
 const treExpEl  = document.getElementById('dzrTreExp');
 const treNetEl  = document.getElementById('dzrTreNet');
 
+const drrClubRankEl      = document.getElementById('drrClubRank');
+const drrMemberStrengthEl= document.getElementById('drrMemberStrength');
+const drrMaleCountEl     = document.getElementById('drrMaleCount');
+const drrFemaleCountEl   = document.getElementById('drrFemaleCount');
+const drrGenderRatioEl   = document.getElementById('drrGenderRatio');
+const drrTotalEventsEl   = document.getElementById('drrTotalEvents');
+const drrAvenueGridEl    = document.getElementById('drrAvenueGrid');
+
 let TREAS = [];
 
 
@@ -117,13 +125,21 @@ auth.onAuthStateChanged(async (user) => {
 
 
 async function start(){
-await Promise.all([loadAttendance(), loadBOD(), loadFinesOnce(), loadTreasuryOnce()]);
-attachListeners();
-attachFinesListener();
-attachTreasuryListener();
-renderAttendance();
-renderBOD();
-renderTreasury();
+  await Promise.all([
+    loadAttendance(),
+    loadBOD(),
+    loadFinesOnce(),
+    loadTreasuryOnce()
+  ]);
+
+  attachListeners();
+  attachFinesListener();
+  attachTreasuryListener();
+
+  renderClubMetrics();   // NEW
+  renderAttendance();
+  renderBOD();
+  renderTreasury();
 }
 
 /* ---------- Attendance (members/events) ---------- */
@@ -299,34 +315,123 @@ return `<td>${cell}</td>`;
   const best = top.sort((a,b)=>b.c-a.c).slice(0,3).map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ');
   bodTop.textContent = best || '—';
 }
-// ▼▼▼ Dynamic arrow toggle for details panels ▼▼▼
-// ▼▼▼ Dynamic arrow toggle for details panels ▼▼▼
+
 document.querySelectorAll('details').forEach(det => {
   const summary = det.querySelector('summary');
   if (!summary) return;
 
-  // Add a span arrow at the end of the summary
   const arrow = document.createElement('span');
   arrow.textContent = '▼';
   arrow.style.float = 'right';
   arrow.style.transition = 'transform 0.2s';
   summary.appendChild(arrow);
 
-  // Listen to toggle event to update arrow direction
   det.addEventListener('toggle', () => {
     arrow.textContent = det.open ? '▲' : '▼';
 
-    // NEW: Scroll-to-panel logic
-    // Only apply to panels inside our new grid
+
     if (det.open && det.closest('.panel-grid')) {
-      // Use a short timeout to let the DOM reflow after the grid-column changes
+  
       setTimeout(() => {
         det.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50); // 50ms delay
     }
   });
 });
+function normalizeGender(member){
+  const raw = String(
+    member.gender ||
+    member.sex ||
+    member.memberGender ||
+    ''
+  ).trim().toLowerCase();
 
+  if (raw === 'male' || raw === 'm' || raw === 'boy') return 'male';
+  if (raw === 'female' || raw === 'f' || raw === 'girl') return 'female';
+  return 'unknown';
+}
+
+function getEventAvenues(ev){
+  const raw = ev.avenues || ev.avenue || [];
+  const arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  return arr.map(x => String(x).trim()).filter(Boolean);
+}
+
+function renderClubMetrics(){
+  const CLUB_RANK = '1';
+  if (drrClubRankEl) drrClubRankEl.textContent = CLUB_RANK;
+
+  // 2) Member Strength
+  const totalMembers = MEMBERS.length;
+  if (drrMemberStrengthEl) drrMemberStrengthEl.textContent = totalMembers;
+
+  // 3) Male / Female split
+  let male = 0, female = 0, unknown = 0;
+  MEMBERS.forEach(member => {
+    const g = normalizeGender(member);
+    if (g === 'male') male++;
+    else if (g === 'female') female++;
+    else unknown++;
+  });
+
+  if (drrMaleCountEl) drrMaleCountEl.textContent = male;
+  if (drrFemaleCountEl) drrFemaleCountEl.textContent = female;
+
+  let ratioText = '—';
+  if (male > 0 && female > 0) {
+    ratioText = `${male} : ${female}`;
+  } else if (male > 0 && female === 0) {
+    ratioText = `${male} : 0`;
+  } else if (female > 0 && male === 0) {
+    ratioText = `0 : ${female}`;
+  }
+  if (drrGenderRatioEl) drrGenderRatioEl.textContent = ratioText;
+
+  // 5) Total events
+  if (drrTotalEventsEl) drrTotalEventsEl.textContent = EVENTS.length;
+
+  // 6) Avenue-wise event count
+  const avenueCounts = {
+    CMD: 0,
+    CSD: 0,
+    PDD: 0,
+    ISD: 0,
+    RRRO: 0,
+    PRO: 0,
+    DEI: 0,
+    GBM: 0,
+  };
+
+  EVENTS.forEach(ev => {
+    const avenues = getEventAvenues(ev);
+
+
+
+    avenues.forEach(av => {
+      if (Object.prototype.hasOwnProperty.call(avenueCounts, av)) {
+        avenueCounts[av]++;
+      } else {
+        avenueCounts.Other++;
+      }
+    });
+  });
+
+  if (drrAvenueGridEl) {
+    drrAvenueGridEl.innerHTML = Object.entries(avenueCounts)
+      .map(([name, count]) => `
+        <div class="avenue-chip">
+          <div class="name">${name}</div>
+          <div class="count">${count}</div>
+        </div>
+      `)
+      .join('');
+  }
+
+  // Optional: show unknown gender info as tooltip/subtext if you want later
+  if (unknown > 0 && drrGenderRatioEl) {
+    drrGenderRatioEl.title = `${unknown} member(s) have no gender value stored`;
+  }
+}
 async function loadFinesOnce() {
   const snap = await db.collection('fines').orderBy('date','desc').get();
   FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));

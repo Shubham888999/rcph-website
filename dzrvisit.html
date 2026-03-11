@@ -3,12 +3,16 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>RCPH • DZR Visit</title>
+  <title>RCPH • DRR Visit</title>
 
   <link rel="stylesheet" href="style.css"/>
   <style>
     
-    .dzr-wrap{ max-width:1200px; margin:28px auto; padding:0 16px; }
+ .dzr-wrap{
+  width:95%;
+  max-width:1700px;
+  margin:20px auto;
+}
     .dzr-topbar{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:10px; }
     .dzr-title{ margin:0; }
     .pill{ padding:6px 10px; border-radius:999px; background:#222; border:1px solid #333; font-size:13px; }
@@ -26,6 +30,37 @@
     .kpi{ background:#161616; border:1px solid #2e2e2e; border-radius:10px; padding:12px; text-align:center; }
     .kpi h3{ margin:0; font-size:13px; opacity:.8; }
     .kpi .val{ font-size:20px; font-weight:800; margin-top:4px; }
+    .kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;
+  margin-top:12px;
+}
+
+.kpi .sub{
+  margin-top:6px;
+  font-size:12px;
+  color:#aaa;
+}
+
+.avenue-chip{
+  background:#161616;
+  border:1px solid #2e2e2e;
+  border-radius:10px;
+  padding:12px;
+  text-align:center;
+}
+
+.avenue-chip .name{
+  font-size:13px;
+  opacity:.85;
+  margin-bottom:6px;
+}
+
+.avenue-chip .count{
+  font-size:20px;
+  font-weight:800;
+}
     
     /* BOD & Avenue sections */
     .nav-tabs{ display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 16px; }
@@ -48,22 +83,17 @@
     .ppt-frame{ width:100%; height:480px; border:0; border-radius:10px; background:#000; }
     @media (max-width: 700px){ .ppt-frame{ height:320px; } }
 
-    /* === NEW STYLES FOR GRID === */
-
     .panel-grid {
       display: grid;
-      /* This creates a responsive grid. It will fit as many 280px columns as it can */
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px; /* Spacing between closed panels */
+      gap: 16px;
       margin-top: 16px;
     }
 
-    /* Remove the default bottom margin from cards when they are in the grid */
     .panel-grid > .dzr-card {
       margin-bottom: 0;
     }
 
-    /* The magic! Make an open panel span the full width */
     .panel-grid > details[open] {
       grid-column: 1 / -1;
     }
@@ -73,7 +103,7 @@
 <body>
   <div class="dzr-wrap">
 <div class="dzr-topbar">
-  <h1 class="dzr-title">DZR Visit Dashboard</h1>
+  <h1 class="dzr-title">DRR Visit Dashboard</h1>
 
   <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
       <button id="goAdminBtn" class="pill" style="display:none;">Admin Panel</button>
@@ -85,24 +115,65 @@
 </div>
 
 
-<!-- Greeting editor + banner -->
-<!-- Greeting (simple paragraph) -->
 <section class="dzr-card" id="greetCard">
   <h2 class="panel-title">Welcome, District Officials! 👋</h2>
   <p class="panel-sub" style="font-size:16px;margin:6px 0 0;">
-    We’re glad to have you here for our DZR Visit. This section contains all the documents and updates showcasing our club’s activities, projects, and functioning.
+    We’re glad to have you here for our DRR Visit. This section contains all the documents and updates showcasing our club’s activities, projects, and functioning.
   </p>
 </section>
+<section class="dzr-card" id="clubMetricsCard">
+  <h2 class="panel-title">Club Snapshot & KPI Metrics</h2>
+  <p class="panel-sub">
+    A quick view of the club profile, membership split, and avenue-wise event activity.
+  </p>
 
+  <div class="kpi-grid">
+    <div class="kpi">
+      <h3>Club Rank</h3>
+      <div class="val" id="drrClubRank">—</div>
+    </div>
 
-    <!-- Showcase panels (Drive + PPT) -->
+    <div class="kpi">
+      <h3>Member Strength</h3>
+      <div class="val" id="drrMemberStrength">0</div>
+    </div>
+
+    <div class="kpi">
+      <h3>Male Members</h3>
+      <div class="val" id="drrMaleCount">0</div>
+    </div>
+
+    <div class="kpi">
+      <h3>Female Members</h3>
+      <div class="val" id="drrFemaleCount">0</div>
+    </div>
+
+    <div class="kpi">
+      <h3>Male : Female Ratio</h3>
+      <div class="val" id="drrGenderRatio">—</div>
+    </div>
+
+    <div class="kpi">
+      <h3>Total Events</h3>
+      <div class="val" id="drrTotalEvents">0</div>
+    </div>
+  </div>
+
+  <div class="dzr-card" style="margin-top:14px;">
+    <h3 class="panel-title" style="margin-bottom:10px;">Avenue-wise Event Count</h3>
+    <div class="kpi-grid" id="drrAvenueGrid">
+      <!-- populated by JS -->
+    </div>
+  </div>
+</section>
+
     <section id="showcase" class="dzr-card">
       <h2 class="panel-title">BOD Panels</h2>
       <p class="panel-sub">Jump to an avenue to view document folders and presentations.</p>
 
 
 <div class="panel-grid">
-      <!-- One block per panel. Replace the href/src with your Drive links -->
+      
 <details id="p-preRsident" class="dzr-card">
   <summary class="panel-title">1. President</summary>
   <div>
@@ -195,7 +266,6 @@
       </div>
       </details>
 
-            <!-- Avenues (examples) -->
       <details id="p-cmd" class="dzr-card">
         <summary class="panel-title">7. CMD</summary>
         <div>
@@ -278,7 +348,6 @@
       </div>
       </details>
 
-      <!-- SAA (Sergeant-at-Arms) -->
 <details id="p-saa" class="dzr-card">
   <summary class="panel-title">15. SAA</summary>
           <p class="panel-sub">
@@ -290,10 +359,9 @@
     <a href="#saa-fines" style="color:#8fe9e7;text-decoration:underline;">Fines</a>
   </p>
 
-  <!-- ▼ Attendance (Members) -->
+
   <details id="saa-att" class="dzr-card">
     <summary class="panel-title">Attendance (Members)</summary>
-    <!-- Attendance (view-only) -->
       <p class="panel-sub">Filter by member(s) and event(s). Read Only Access.</p>
 
       <div class="toolbar">
@@ -326,7 +394,6 @@
 
   </details>
 
-  <!-- ▼ BOD Attendance -->
   <details id="saa-bod" class="dzr-card">
     <summary class="panel-title">BOD Attendance</summary>
       <p class="panel-sub">Filter by BOD member(s) and meeting(s). Read-only Access.</p>
@@ -354,7 +421,6 @@
         </table>
       </div>
   </details>
-  <!-- ▼ Fines (view-only) -->
  <details id="saa-fines" class="dzr-card">
     <summary class="panel-title">Fines</summary>
     <div class="kpis">
@@ -384,7 +450,6 @@
     </section>
   </div>
 
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
