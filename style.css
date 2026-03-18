@@ -81,7 +81,7 @@ body {
     transition: width .3s;
   }
   .navbar a:hover {
-    color: #000000;
+    color: #ffffff;
   }
   .navbar a:hover::after {
     width: 100%;
@@ -423,7 +423,7 @@ body {
   .contact-card a:hover,
   #contact p a[href^="mailto"]:hover,
   #contact p a[href*="instagram"]:hover {
-    color: #111;
+    color: #d4a437;
   }
 
   .popup-overlay {
@@ -761,7 +761,7 @@ a.join-btn:hover {
 
 .nav-links li a {
   text-decoration: none;
-  color: #111;
+  color: #ffffff;
   font-weight: 500;
 }
 
@@ -2024,7 +2024,7 @@ html{ scroll-behavior: smooth; }
   border-radius: 10px;
   font-weight: 800;
   text-decoration: none;
-  background: linear-gradient(135deg, #F4B43A, #60C3C4);
+  background: linear-gradient(135deg, #F4B43A, #d4a437);
   color: #121212 !important;
   box-shadow: 0 10px 22px rgba(0,0,0,0.25);
   transition: transform 0.18s ease, filter 0.18s ease;
