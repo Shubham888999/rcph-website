@@ -1,25 +1,29 @@
   /* → COLOR PALETTE ← */
-  :root {
-    --color-bg:       #121212;
-    --color-text:     #f0f0f0;
-    --color-card:     #1e1e1e;
-    --color-border:   #2e2e2e;
-    --color-accent:   #60C3C4;
-    --color-accent-l: #F4B43A;
-  }
+:root {
+  --color-bg:       #0b0b0b;
+  --color-text:     #f5efe3;
+  --color-card:     #151515;
+  --color-border:   #2a2113;
+  --color-accent:   #d4a437;
+  --color-accent-l: #f0d58a;
+  --color-accent-dark: #8a6518;
+  --color-muted:    #c8b68c;
+}
 
   /* Reset & Base */
   *,
   *::before,
   *::after { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    font-family: 'Inter', sans-serif;
-    background: var(--color-bg);
-    color: var(--color-text);
-    line-height: 1.6;
-  }
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(212,164,55,0.08), transparent 28%),
+    linear-gradient(180deg, #050505 0%, #0b0b0b 100%);
+  color: var(--color-text);
+  line-height: 1.6;
+}
 
   /* Logo Strip */
   .logo-strip {
@@ -28,7 +32,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 30px;
-    background-color: #ffffff;
+    background-color: #000000;
     padding: 20px 0;
   }
   .logo-strip .logo-image {
@@ -73,11 +77,11 @@
     left: 0;
     width: 0;
     height: 2px;
-    background: #fff;
+    background: #111;
     transition: width .3s;
   }
   .navbar a:hover {
-    color: #fceae9;
+    color: #000000;
   }
   .navbar a:hover::after {
     width: 100%;
@@ -94,7 +98,7 @@
     min-height: 100vh;
     background:
       linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
-      url('images/group.jpg') top/cover no-repeat;
+      url('images/group.jpeg') top/cover no-repeat;
     padding: 0 20px;
   }
   .hero-content {
@@ -130,44 +134,48 @@
   section { margin-bottom: 60px; }
 
   /* Boxed Sections */
-  .section-box {
-    background: var(--color-card);
-    text-align: center;
-    border: none;
-    box-shadow:
-      0 4px 12px rgba(0,0,0,0.05),
-      inset 0 0 0 1px rgba(0,0,0,0.08);
-    border-radius: 12px;
-    padding: 30px 25px;
-    max-width: 1200px;
-    margin: 40px auto;
-    transition: transform .3s ease, box-shadow .3s ease;
-  }
-  .section-box:hover {
-    transform: translateY(-4px);
-    box-shadow:
-      0 8px 20px rgba(0,0,0,0.1),
-      inset 0 0 0 1px rgba(0,0,0,0.08);
-  }
-  .section-box h2 {
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 700;
-    font-size: 2rem;
-    margin-bottom: 20px;
-    color: var(--color-accent);
-    position: relative;
-    display: inline-block;
-  }
-  .section-box h2::after {
-    content: "";
-    position: absolute;
-    bottom: -6px;
-    left: 0;
-    width: 40%;
-    height: 3px;
-    background: var(--color-accent);
-    border-radius: 2px;
-  }
+.section-box {
+  background: linear-gradient(180deg, #151515 0%, #111111 100%);
+  text-align: center;
+  border: 1px solid rgba(212,164,55,0.18);
+  box-shadow:
+    0 10px 26px rgba(0,0,0,0.28),
+    inset 0 0 0 1px rgba(255,255,255,0.02);
+  border-radius: 16px;
+  padding: 34px 28px;
+  max-width: 1200px;
+  margin: 40px auto;
+  transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+
+.section-box:hover {
+  transform: translateY(-4px);
+  border-color: rgba(212,164,55,0.35);
+  box-shadow:
+    0 14px 34px rgba(0,0,0,0.34),
+    0 0 0 1px rgba(212,164,55,0.08) inset;
+}
+.section-box h2 {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 2rem;
+  margin-bottom: 20px;
+  color: var(--color-accent-l);
+  position: relative;
+  display: inline-block;
+  text-shadow: 0 0 18px rgba(212,164,55,0.08);
+}
+
+.section-box h2::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 42%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-l));
+  border-radius: 999px;
+}
   .section-box p,
   .section-box ul {
     color: var(--color-text);
@@ -706,15 +714,19 @@ a.join-btn:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
-  background-color: #60c3c4;
-  flex-wrap: wrap;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  padding: 10px 20px;
+  background: url('images/golden_navbar_crop.jpeg') center/cover no-repeat;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
+
 
 .nav-left {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 /* Join Us Button */
@@ -737,11 +749,19 @@ a.join-btn:hover {
   list-style: none;
   display: flex;
   gap: 18px;
+  margin: 0;
+  padding: 0;
+  margin-left: auto;   /* pushes links to right */
+  align-items: center;
+}
+
+.navbar ul {
+  justify-content: flex-end; /* not center */
 }
 
 .nav-links li a {
   text-decoration: none;
-  color: rgb(255, 255, 255);
+  color: #111;
   font-weight: 500;
 }
 
@@ -1045,24 +1065,24 @@ a.join-btn:hover {
 }
 /* Normal text links */
 a {
-  color: #00bfff; /* bright sky blue for readability */
+  color: var(--color-accent);
   text-decoration: none;
 }
 
 a:hover {
-  color: #1e90ff; /* deeper blue on hover */
+  color: var(--color-accent-l);
   text-decoration: underline;
 }
 
 /* Buttons styled as links */
 a.button-link {
-  color: #ffffff !important; /* white text for contrast */
+  color: #000000 !important; /* white text for contrast */
   font-weight: bold;
   text-decoration: none;
 }
 
 a.button-link:hover {
-  color: #f9f9f9 !important;
+  color: #000000 !important;
   text-decoration: none;
 }
 
@@ -2016,19 +2036,16 @@ html{ scroll-behavior: smooth; }
 }
 /* ===== Madhushala Navbar Button ===== */
 .madhushala-nav-btn {
-  background: linear-gradient(45deg, #7b0f1d, #b11226);
-  color: #fff !important;
-  padding: 8px 16px;
+  background: linear-gradient(135deg, #000, #333);
+  color: #f4b43a !important;
   border-radius: 25px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(177, 18, 38, 0.4);
+  padding: 6px 14px;
 }
 
 .madhushala-nav-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(177, 18, 38, 0.6);
-  background: linear-gradient(45deg, #9c1325, #d61b36);
+  background: linear-gradient(45deg, #721847, #992857);
 }
 .nav-links li:first-child {
   margin-right: 8px;
