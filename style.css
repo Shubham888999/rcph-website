@@ -63,7 +63,7 @@ body {
     gap: 30px;
   }
   .navbar a {
-    color: #fff;
+    color: #000000;
     font-family: 'Montserrat', sans-serif;
     font-weight: 600;
     text-decoration: none;
@@ -81,7 +81,7 @@ body {
     transition: width .3s;
   }
   .navbar a:hover {
-    color: #ffffff;
+    color: #000000;
   }
   .navbar a:hover::after {
     width: 100%;
@@ -761,7 +761,7 @@ a.join-btn:hover {
 
 .nav-links li a {
   text-decoration: none;
-  color: #ffffff;
+  color: #000000;
   font-weight: 500;
 }
 
@@ -1058,7 +1058,7 @@ a.join-btn:hover {
 
   /* mobile dropdown link styles */
   .navbar .nav-links a {
-    color: #fff;
+    color: #000000;
     text-decoration: none;
     font-size: 1.05rem;
   }
