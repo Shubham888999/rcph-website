@@ -580,6 +580,36 @@ async function bulkSetBodForMember(memberId, value) {
 
   renderBodGrid();
 }
+function isWRWEvent(ev) {
+  const name = String(ev.name || '').trim().toLowerCase();
+
+  const WRW_EVENT_NAMES = [
+    'clean up drive',
+    'mahadaan 11.0',
+    'rotary-rotaract round table',
+    'the luxe carry',
+    'rotaract originals',
+    'pickleball smashdown',
+    'celebrating her'
+  ];
+
+  return WRW_EVENT_NAMES.includes(name);
+}
+
+function getEventAttendanceCount(eventId, members) {
+  let present = 0;
+  let considered = 0;
+
+  members.forEach(m => {
+    const v = (ATT[m.id] || {})[eventId];
+    if (v !== 'NA') {
+      considered++;
+      if (v === true) present++;
+    }
+  });
+
+  return { present, considered };
+}
 /* ---------- Render grid (Attendance) ---------- */
 function renderGrid(){
   const memQuery = memberSearch.value.trim().toLowerCase();
@@ -611,6 +641,12 @@ function renderGrid(){
       const avenueHtml = avenueString
         ? `<small style="color: var(--color-accent, #60C3C4); font-weight: 600;">${avenueString}</small>`
         : '';
+            const wrwHtml = isWRWEvent(e)
+        ? `<div class="event-mini-tag wrw">WRW</div>`
+        : '';
+
+      const { present: eventPresent, considered: eventConsidered } = getEventAttendanceCount(e.id, members);
+      const eventCountHtml = `<div class="event-att-count">✓ ${eventPresent}/${eventConsidered}</div>`;
 
 return `
   <th title="${e.date || ''}">
@@ -620,7 +656,10 @@ return `
         <button class="icon-btn" title="Rename event" data-edit-event="${e.id}">✏️</button>
         <button class="icon-btn" title="Delete event" data-del-event="${e.id}">🗑</button>
       </div>
+
+      ${wrwHtml}
       ${avenueHtml}
+
       <small>
         ${(e.date || '').slice(0,10)}
         ${e.endDate ? ` → ${e.endDate.slice(0,10)}` : ""}
@@ -632,6 +671,8 @@ return `
         <option value="A">✗ Absent</option>
         <option value="NA">NA</option>
       </select>
+
+      ${eventCountHtml}
     </div>
   </th>
 `;

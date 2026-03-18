@@ -358,66 +358,33 @@ function getEventAvenues(ev){
 }
 
 function renderClubMetrics(){
-  const CLUB_RANK = '1';
-  if (drrClubRankEl) drrClubRankEl.textContent = CLUB_RANK;
+  const CLUB_RANK = '2';
+  const MEMBER_STRENGTH = 31;
+  const MALE = 13;
+  const FEMALE = 18;
+  const TOTAL_EVENTS = 42;
 
-  // 2) Member Strength
-  const totalMembers = MEMBERS.length;
-  if (drrMemberStrengthEl) drrMemberStrengthEl.textContent = totalMembers;
-
-  // 3) Male / Female split
-  let male = 0, female = 0, unknown = 0;
-  MEMBERS.forEach(member => {
-    const g = normalizeGender(member);
-    if (g === 'male') male++;
-    else if (g === 'female') female++;
-    else unknown++;
-  });
-
-  if (drrMaleCountEl) drrMaleCountEl.textContent = male;
-  if (drrFemaleCountEl) drrFemaleCountEl.textContent = female;
-
-  let ratioText = '—';
-  if (male > 0 && female > 0) {
-    ratioText = `${male} : ${female}`;
-  } else if (male > 0 && female === 0) {
-    ratioText = `${male} : 0`;
-  } else if (female > 0 && male === 0) {
-    ratioText = `0 : ${female}`;
-  }
-  if (drrGenderRatioEl) drrGenderRatioEl.textContent = ratioText;
-
-  // 5) Total events
-  if (drrTotalEventsEl) drrTotalEventsEl.textContent = EVENTS.length;
-
-  // 6) Avenue-wise event count
-  const avenueCounts = {
-    CMD: 0,
-    CSD: 0,
-    PDD: 0,
-    ISD: 0,
-    RRRO: 0,
-    PRO: 0,
-    DEI: 0,
-    GBM: 0,
+  const AVENUES = {
+    CMD: 6,
+    CSD: 8,
+    PDD: 5,
+    ISD: 4,
+    RRRO: 3,
+    PRO: 6,
+    DEI: 2,
+    GBM: 8
   };
 
-  EVENTS.forEach(ev => {
-    const avenues = getEventAvenues(ev);
+  if (drrClubRankEl) drrClubRankEl.textContent = CLUB_RANK;
+  if (drrMemberStrengthEl) drrMemberStrengthEl.textContent = MEMBER_STRENGTH;
+  if (drrMaleCountEl) drrMaleCountEl.textContent = MALE;
+  if (drrFemaleCountEl) drrFemaleCountEl.textContent = FEMALE;
+  if (drrGenderRatioEl) drrGenderRatioEl.textContent = `${MALE} : ${FEMALE}`;
+  if (drrTotalEventsEl) drrTotalEventsEl.textContent = TOTAL_EVENTS;
 
-
-
-    avenues.forEach(av => {
-      if (Object.prototype.hasOwnProperty.call(avenueCounts, av)) {
-        avenueCounts[av]++;
-      } else {
-        avenueCounts.Other++;
-      }
-    });
-  });
-
+  // Avenue grid
   if (drrAvenueGridEl) {
-    drrAvenueGridEl.innerHTML = Object.entries(avenueCounts)
+    drrAvenueGridEl.innerHTML = Object.entries(AVENUES)
       .map(([name, count]) => `
         <div class="avenue-chip">
           <div class="name">${name}</div>
@@ -425,11 +392,6 @@ function renderClubMetrics(){
         </div>
       `)
       .join('');
-  }
-
-  // Optional: show unknown gender info as tooltip/subtext if you want later
-  if (unknown > 0 && drrGenderRatioEl) {
-    drrGenderRatioEl.title = `${unknown} member(s) have no gender value stored`;
   }
 }
 async function loadFinesOnce() {

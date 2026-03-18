@@ -169,7 +169,37 @@
   box-shadow:0 0 8px rgba(96,195,196,.45);
 }
 
+.event-mini-tag{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:3px 8px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.3px;
+  text-transform:uppercase;
+  line-height:1;
+}
 
+.event-mini-tag.wrw{
+  background:rgba(244,180,58,.14);
+  color:#f4b43a;
+  border:1px solid rgba(244,180,58,.38);
+}
+
+.event-att-count{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+  color:#d9fbe8;
+  background:rgba(18,154,98,.14);
+  border:1px solid rgba(18,154,98,.35);
+}
 
   </style>
 </head>
@@ -188,7 +218,7 @@
     <div class="admin-card" id="attendance">
       <h1 class="admin-title">Admin Panel</h1>
       <div class="topbar">
-        <h2>Attendance Manager <s   pan id="countBadge" class="badge"></span></h2>
+        <h2>Attendance Manager <span id="countBadge" class="badge"></span></h2>
 <div style="display:flex; gap:8px; align-items:center;">
     <button id="goBodBtn" class="btn btn-outline">Go to BOD Panel</button>
 
@@ -326,7 +356,7 @@
   <div class="topbar">
     <h2>Treasurer Panel <span id="treBadge" class="badge"></span></h2>
   </div>
-        <div class="info-banner" style="margin: 20px 0;"">
+        <div class="info-banner" style="margin: 20px 0;">
   <div class="info-banner__text">
     <strong>View All Bills:</strong>
     <a class="info-banner__link" href="https://drive.google.com/drive/folders/1gjWDzcV8lyDp-GBM_y6FkiZ1S_krURmE?usp=drive_link" target="_blank" rel="noopener">
