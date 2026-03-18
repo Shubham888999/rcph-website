@@ -189,52 +189,98 @@ function renderAttendance(){
     .filter(e => !month || (e.date||'').startsWith(month))
     .filter(e => !chosenEvents.length || chosenEvents.includes(e.id));
 
-  // header
   const h = document.createElement('tr');
-  h.innerHTML = `<th class="sticky-col">Member \\ Event</th>` + events.map(e => `
-    <th title="${e.date||''}">
-      <div class="ev-head">
-        <strong>${(e.name||'')}</strong>
-        <small>${(e.date||'').slice(0,10)}</small>
-      </div>
-    </th>`).join('');
-  attHead.innerHTML = ''; attHead.appendChild(h);
+  h.innerHTML =
+    `<th class="sticky-col">Member \\ Event</th>` +
+    events.map(e => `
+      <th title="${e.date || ''}">
+        <div class="ev-head">
+          <strong>${e.name || ''}</strong>
+          <small>${(e.date || '').slice(0,10)}</small>
+        </div>
+      </th>
+    `).join('');
 
-  // body
+  attHead.innerHTML = '';
+  attHead.appendChild(h);
+
   attBody.innerHTML = '';
+
   let totalSlots = 0, totalPresent = 0;
   const topCounts = [];
+  const perEventPresent = [];
+
   members.forEach(m => {
     const att = ATT[m.id] || {};
     const tr = document.createElement('tr');
+
     const values = events.map(e => att[e.id]);
     const considered = values.filter(v => v !== 'NA');
     const total = considered.length;
     const present = considered.filter(v => v === true).length;
-    totalSlots += total; totalPresent += present;
-    topCounts.push({name:m.name||'', c:present});
+
+    totalSlots += total;
+    totalPresent += present;
+    topCounts.push({ name: m.name || '', c: present });
 
     tr.innerHTML = `
       <td class="sticky-col">
-        <div class="stat-box">
-          <span>All: ${present}/${total} · ${total?Math.round(present/total*100):0}%</span>
+        <div class="mem-left">
+          <div class="stat-box">
+            <span class="stat">All: ${present}/${total} · ${total ? Math.round((present/total)*100) : 0}%</span>
+          </div>
+          <div>${(m.name || '').replace(/</g,'&lt;')}</div>
         </div>
-        <div>${(m.name||'').replace(/</g,'&lt;')}</div>
-      </td>` + events.map(e=>{
-        const v = att[e.id]; // true | false | 'NA' | undefined
-let cell = '';
-if (v === true)  cell = `<img class="att-icon" src="check.png" alt="Present">`;
-else if (v === false) cell = `<img class="att-icon" src="cross.png" alt="Absent">`;
-else if (v === 'NA')  cell = `<img class="att-icon" src="Na_Button.png" alt="Not applicable">`;
-return `<td>${cell}</td>`;
-      }).join('');
+      </td>
+    ` + events.map(e => {
+      const v = att[e.id];
+      let cls = 'off';
+      let aria = 'Absent';
+
+      if (v === true) {
+        cls = 'on';
+        aria = 'Present';
+      } else if (v === 'NA') {
+        cls = 'na';
+        aria = 'Not applicable';
+      }
+
+      return `<td><button class="cell-btn ${cls}" aria-label="${aria}" tabindex="-1"></button></td>`;
+    }).join('');
+
     attBody.appendChild(tr);
   });
 
+  events.forEach(ev => {
+    let c = 0;
+    members.forEach(m => {
+      if ((ATT[m.id] || {})[ev.id] === true) c++;
+    });
+    perEventPresent.push(c);
+  });
+
   evtCount.textContent = events.length;
-  avgSpan.textContent  = totalSlots ? `${Math.round(totalPresent/totalSlots*100)}%` : '—';
-  const top = topCounts.sort((a,b)=>b.c-a.c).slice(0,3).map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ');
-  topSpan.textContent = top || '—';
+  avgSpan.textContent  = totalSlots ? `${Math.round((totalPresent/totalSlots)*100)}%` : '—';
+  topSpan.textContent  =
+    topCounts.sort((a,b)=>b.c-a.c).slice(0,3).map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ') || '—';
+
+  const ctx = document.getElementById('dzrAttChart');
+  if (window.Chart && ctx) {
+    if (window._dzrAttChart) window._dzrAttChart.destroy();
+    window._dzrAttChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: events.map(e => e.name || ''),
+        datasets: [{ label: 'Present', data: perEventPresent }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
 }
 
 /* ---------- BOD Attendance ---------- */
@@ -268,52 +314,100 @@ function renderBOD(){
     .filter(t => (t.name||'').toLowerCase().includes(meetQ))
     .filter(t => !chosenMeet.length || chosenMeet.includes(t.id));
 
-  // header
   const h = document.createElement('tr');
-  h.innerHTML = `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` + meetings.map(t => `
-    <th title="${t.date||''}">
-      <div class="ev-head">
-        <strong>${(t.name||'')}</strong>
-        <small>${(t.date||'').slice(0,10)}</small>
-      </div>
-    </th>`).join('');
-  bodHead.innerHTML = ''; bodHead.appendChild(h);
+  h.innerHTML =
+    `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
+    meetings.map(t => `
+      <th title="${t.date||''}">
+        <div class="ev-head">
+          <strong>${t.name||''}</strong>
+          <small>${(t.date||'').slice(0,10)}</small>
+        </div>
+      </th>
+    `).join('');
 
-  // body
+  bodHead.innerHTML = '';
+  bodHead.appendChild(h);
+
   bodBody.innerHTML = '';
-  let totalSlots=0, totalPresent=0;
-  const top = [];
-  members.forEach(m=>{
+
+  let totalSlots = 0, totalPresent = 0;
+  const topCounts = [];
+  const perMeetingPresent = [];
+
+  members.forEach(m => {
     const att = BODATT[m.id] || {};
     const values = meetings.map(t => att[t.id]);
-    const total  = values.length;
-    const present= values.filter(v => v===true).length; // NA rare here; if you use NA, filter similarly
-    totalSlots+= total; totalPresent+= present; top.push({name:m.name||'', c:present});
+    const considered = values.filter(v => v !== 'NA');
+    const total = considered.length;
+    const present = considered.filter(v => v === true).length;
 
-    const row = `
-      <td class="sticky-col">
-        <div class="stat-box">
-          <span>All: ${present}/${total} · ${total?Math.round(present/total*100):0}%</span>
-        </div>
-        <div>${(m.name||'').replace(/</g,'&lt;')}<br><small>${(m.position||'')}</small></div>
-      </td>` + meetings.map(t=>{
-        const v = att[t.id];
-let cell = '';
-if (v === true)  cell = `<img class="att-icon" src="check.png" alt="Present">`;
-else if (v === false) cell = `<img class="att-icon" src="cross.png" alt="Absent">`;
-else if (v === 'NA')  cell = `<img class="att-icon" src="Na_Button.png" alt="Not applicable">`;
-return `<td>${cell}</td>`;
+    totalSlots += total;
+    totalPresent += present;
+    topCounts.push({ name: m.name || '', c: present });
 
-      }).join('');
     const tr = document.createElement('tr');
-    tr.innerHTML = row;
+    tr.innerHTML = `
+      <td class="sticky-col">
+        <div class="mem-left">
+          <div class="stat-box">
+            <span class="stat">All: ${present}/${total} · ${total ? Math.round((present/total)*100) : 0}%</span>
+          </div>
+          <div>
+            ${(m.name || '').replace(/</g,'&lt;')}<br>
+            <small>${(m.position || '').replace(/</g,'&lt;')}</small>
+          </div>
+        </div>
+      </td>
+    ` + meetings.map(t => {
+      const v = att[t.id];
+      let cls = 'off';
+      let aria = 'Absent';
+
+      if (v === true) {
+        cls = 'on';
+        aria = 'Present';
+      } else if (v === 'NA') {
+        cls = 'na';
+        aria = 'Not applicable';
+      }
+
+      return `<td><button class="cell-btn ${cls}" aria-label="${aria}" tabindex="-1"></button></td>`;
+    }).join('');
+
     bodBody.appendChild(tr);
   });
 
+  meetings.forEach(mt => {
+    let c = 0;
+    members.forEach(m => {
+      if ((BODATT[m.id] || {})[mt.id] === true) c++;
+    });
+    perMeetingPresent.push(c);
+  });
+
   meetCount.textContent = meetings.length;
-  bodAvg.textContent    = totalSlots ? `${Math.round(totalPresent/totalSlots*100)}%` : '—';
-  const best = top.sort((a,b)=>b.c-a.c).slice(0,3).map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ');
-  bodTop.textContent = best || '—';
+  bodAvg.textContent = totalSlots ? `${Math.round((totalPresent/totalSlots)*100)}%` : '—';
+  bodTop.textContent =
+    topCounts.sort((a,b)=>b.c-a.c).slice(0,3).map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ') || '—';
+
+  const ctx = document.getElementById('dzrBodChart');
+  if (window.Chart && ctx) {
+    if (window._dzrBodChart) window._dzrBodChart.destroy();
+    window._dzrBodChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: meetings.map(t => t.name || ''),
+        datasets: [{ label: 'Present', data: perMeetingPresent }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
 }
 
 document.querySelectorAll('details').forEach(det => {

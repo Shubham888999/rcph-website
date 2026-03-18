@@ -7,7 +7,19 @@
 
   <link rel="stylesheet" href="style.css"/>
   <style>
-    
+  :root{
+  --bg-main: #0A3323;
+  --bg-card: #105666;
+  --bg-soft: #0f2f2a;
+
+  --accent: #839958;
+  --accent-light: #F7F4D5;
+  --highlight: #D3968C;
+
+  --border: rgba(247, 244, 213, 0.15);
+  --text-main: #F7F4D5;
+  --text-dim: rgba(247, 244, 213, 0.7);
+}
  .dzr-wrap{
   width:95%;
   max-width:1700px;
@@ -15,20 +27,52 @@
 }
     .dzr-topbar{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:10px; }
     .dzr-title{ margin:0; }
-    .pill{ padding:6px 10px; border-radius:999px; background:#222; border:1px solid #333; font-size:13px; }
-    .dzr-card{ background:var(--color-card,#1e1e1e); border:1px solid var(--color-border,#2e2e2e); border-radius:12px; padding:16px; box-shadow:0 8px 20px rgba(0,0,0,.18); margin-bottom:18px;}
-    .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0; }
+.pill{
+  background: var(--accent);
+  color: #0A3323;
+  border: none;
+  font-weight: 600;
+}
+.dzr-card{
+  background: linear-gradient(145deg, #105666, #0c3f46);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.35);
+}    .toolbar input,.toolbar select{
+  background: rgba(255,255,255,0.08);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
     .toolbar input,.toolbar select{ padding:10px 12px; border-radius:10px; border:1px solid var(--color-border,#2e2e2e); background:#101010; color:#fff; }
     .grid-wrap{ overflow:auto; }
     table.grid{ border-collapse:separate; border-spacing:0; min-width:100%; width:max-content; }
     table.grid th,table.grid td{ padding:10px 12px; border:1px solid var(--color-border,#2e2e2e); background:#181818; }
     table.grid thead th{ position:sticky; top:0; z-index:1; background:#202020; }
-    .sticky-col{ position:sticky; left:0; z-index:2; background:#202020; }
-    .ev-head{ display:flex; flex-direction:column; align-items:center; gap:4px; }
-    .stat-box{ background:#161616; border:1px solid var(--color-border,#2e2e2e); padding:6px 8px; border-radius:8px; color:#ddd; line-height:1.2; font-size:12px; min-width:130px; }
+.sticky-col{
+  background: #0c3f46; /* same as header */
+}    .ev-head{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+.stat-box{
+  background: linear-gradient(145deg, rgba(211,150,140,0.25), rgba(131,153,88,0.2));
+  border: 1px solid rgba(247,244,213,0.2);
+  color: var(--text-main);
+  backdrop-filter: blur(4px);
+}
     .kpis{ display:grid; grid-template-columns: repeat(3, minmax(180px,1fr)); gap:12px; margin:12px 0; }
-    .kpi{ background:#161616; border:1px solid #2e2e2e; border-radius:10px; padding:12px; text-align:center; }
-    .kpi h3{ margin:0; font-size:13px; opacity:.8; }
+.kpi{
+  background: linear-gradient(145deg, rgba(131,153,88,0.15), rgba(16,86,102,0.25));
+  border: 1px solid rgba(247, 244, 213, 0.15);
+  backdrop-filter: blur(6px);
+  border-radius: 12px;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;   /* 🔥 centers horizontally */
+  justify-content:center;
+  text-align:center;    /* 🔥 centers text */
+}
+  .kpi h3{ margin:0; font-size:13px; opacity:.8; }
     .kpi .val{ font-size:20px; font-weight:800; margin-top:4px; }
     .kpi-grid{
   display:grid;
@@ -44,11 +88,17 @@
 }
 
 .avenue-chip{
-  background:#161616;
-  border:1px solid #2e2e2e;
-  border-radius:10px;
-  padding:12px;
-  text-align:center;
+  background: linear-gradient(145deg, rgba(211,150,140,0.25), rgba(131,153,88,0.2));
+  border: 1px solid rgba(247,244,213,0.2);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  backdrop-filter: blur(6px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.avenue-chip:hover{
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.25);
 }
 
 .avenue-chip .name{
@@ -58,8 +108,9 @@
 }
 
 .avenue-chip .count{
-  font-size:20px;
+  font-size:22px;
   font-weight:800;
+  color: var(--accent-light);
 }
     
     /* BOD & Avenue sections */
@@ -67,8 +118,9 @@
     .nav-tabs a{ background:#161616; border:1px solid #2e2e2e; border-radius:999px; padding:8px 12px; color:#fff; text-decoration:none; font-weight:700; font-size:13px; }
     .panel-title{ margin:0 0 8px; display:flex; align-items:center; gap:10px; }
     .panel-sub{ margin:0 0 12px; opacity:.85; font-size:14px; }
-    .drive-link{ color:#8fe9e7; text-decoration:underline; font-weight:700; }
-
+.drive-link{
+  color: var(--accent-light);
+}
     .att-icon{
   width: 18px; height: 18px; vertical-align: middle; display:inline-block;
 }
@@ -97,7 +149,106 @@
     .panel-grid > details[open] {
       grid-column: 1 / -1;
     }
-    
+    /* ===== DRR attendance panels should visually match admin ===== */
+.chart-wrap{
+  height: 220px;
+  background: #121212;
+  border: 1px solid var(--color-border,#2e2e2e);
+  border-radius: 10px;
+  padding: 8px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+}
+.chart-wrap > canvas{
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  background: transparent;
+}
+
+.mem-left{ display:flex; align-items:center; gap:10px; }
+.stat{ display:block; white-space:nowrap; }
+
+table.att{
+  border-collapse:separate;
+  border-spacing:0;
+  min-width:100%;
+  width:max-content;
+}
+table.att th, table.att td{
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+}
+table.att thead th{
+  background: linear-gradient(145deg, #105666, #0c3f46);
+}
+.sticky-col{
+  background: #0c3f46;
+}
+table.att thead th.sticky-col{
+  z-index:3;
+}
+.sticky-col{
+  position:sticky;
+  left:0;
+  z-index:2;
+  background:#202020;
+}
+
+.ev-head{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+}
+
+.cell-btn{
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(247,244,213,0.15);
+  backdrop-filter: blur(4px);
+}
+.cell-btn::before{
+  content:"";
+  position:absolute;
+  inset:8px;
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:contain;
+  filter: drop-shadow(0 0 4px rgba(0,0,0,.55));
+}
+.cell-btn.on{
+  background:#839958;
+  box-shadow:0 0 14px rgba(131,153,88,.6);
+}
+.cell-btn.on::before{ background-image:url("check.png"); }
+
+.cell-btn.on{
+  background:#839958;
+  box-shadow:0 0 14px rgba(131,153,88,.6);
+}
+.cell-btn.off::before{ background-image:url("cross.png"); }
+
+.cell-btn.na{
+  background:#3a3a3a;
+  box-shadow:0 0 14px rgba(180,180,180,.20);
+}
+.cell-btn.na::before{ background-image:url("Na_Button.png"); }
+
+.ev-head small{
+  display:block;
+  opacity:.75;
+  font-size:12px;
+  line-height:1.1;
+}
+.panelists-list li {
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+body{
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+
   </style>
 </head>
 <body>
@@ -117,9 +268,21 @@
 
 <section class="dzr-card" id="greetCard">
   <h2 class="panel-title">Welcome, District Officials! 👋</h2>
-  <p class="panel-sub" style="font-size:16px;margin:6px 0 0;">
-    We’re glad to have you here for our DRR Visit. This section contains all the documents and updates showcasing our club’s activities, projects, and functioning.
+      <ul style="margin:8px 0 0 18px; padding:0;">
+      <li>PHF. DRR. Dwijesh Nashikkar</li>
+      <li>DGEPS. Atharva Patil</li>
+      <li>PHF. DZR. Rtr. Shreya Khatavkar</li>
+      <li>AZR. Rtr. Akshay Tangade</li>
+      <li>Rtr. Atharva Shinkar</li>
+    </ul>
+  <p class="panel-sub" style="font-size:16px;margin:6px 0 10px;">
+    Please find all our club activities, reports, and performance showcased below.
   </p>
+
+  <div style="margin-top:10px; line-height:1.6;">
+    <strong style="color:#f4b43a;"></strong>
+
+  </div>
 </section>
 <section class="dzr-card" id="clubMetricsCard">
   <h2 class="panel-title">Club Snapshot & KPI Metrics</h2>
@@ -206,7 +369,7 @@
     </div>
 
     <div class="grid-wrap">
-      <table class="grid">
+      <table class="att">
 <thead>
   <tr>
     <th>Name</th>
@@ -252,7 +415,7 @@
         <p class="panel-sub">
           Click here to view the Documents: <a class="drive-link" href="https://drive.google.com/drive/folders/1Xjc674mVaS32_tcjk6qwIy0bmKEq3ohc?usp=drive_link" target="_blank">Open Drive Folder</a>
         </p>
-        <iframe class="ppt-frame" src="https://drive.google.com/file/d/1Vrhq-h4QG7XLCr3wTT13Vbn8fIm4pQE9/preview" allow="autoplay"></iframe>
+        <iframe class="ppt-frame" src="https://drive.google.com/file/d/1mJXOwJWfhltj5yyAsbT1rxe5FaFYJK0t/preview" allow="autoplay"></iframe>
       </div>
       </details>
 
@@ -383,9 +546,9 @@
         <div class="kpi"><h3>Avg Attendance %</h3><div id="dzrAvg" class="val">—</div></div>
         <div class="kpi"><h3>Top Attendees</h3><div id="dzrTop" class="val">—</div></div>
       </div>
-
+      
       <div class="grid-wrap">
-        <table class="grid">
+        <table class="att">
           <thead id="dzrAttHead"></thead>
           <tbody id="dzrAttBody"></tbody>
         </table>
@@ -415,7 +578,7 @@
       </div>
 
       <div class="grid-wrap">
-        <table class="grid">
+        <table class="att">
           <thead id="dzrBodHead"></thead>
           <tbody id="dzrBodBody"></tbody>
         </table>
@@ -430,7 +593,7 @@
     </div>
 
     <div class="grid-wrap">
-      <table class="grid">
+      <table class="att">
         <thead>
           <tr>
             <th>Member</th>
