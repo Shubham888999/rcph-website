@@ -516,25 +516,27 @@
       padding: 12px 14px;
     }
   }
-  /* 🦋 Butterfly Base */
 .butterfly {
   position: fixed;
-  width: 120px;
-  height: 120px;
+  width: 60px;
+  height: 60px;
   pointer-events: none;
   z-index: 2;
   opacity: 0.35;
   filter: drop-shadow(0 0 10px rgba(255,255,255,0.15));
+    transform-origin: center;
+  animation: floatRight 8s ease-in-out infinite, flutter 1.5s ease-in-out infinite;
 }
-
-/* 🦋 Bottom-left butterfly */
+@keyframes flutter {
+  0%,100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.05) rotate(3deg); }
+}
 .b-left {
   bottom: 20px;
   left: 20px;
   animation: floatLeft 6s ease-in-out infinite;
 }
 
-/* 🦋 Top-right butterfly */
 .b-right {
   top: 60px;
   right: 60px;
@@ -875,7 +877,7 @@
   <div id="lemonadeRight" class="lemonade-lottie"></div>
 </div>
 <!-- Butterflies -->
-<div id="butterflyLeft" class="butterfly b-left"></div>
+<!--<div id="butterflyLeft" class="butterfly b-left"></div>-->
 <div id="butterflyRight" class="butterfly b-right"></div>
   <div class="dzr-wrap">
 <div class="dzr-topbar">
@@ -1046,7 +1048,6 @@
     </div>
   </div>
 </section>
-
     <section id="showcase" class="dzr-card">
       <h2 class="panel-title">BOD Panels</h2>
       <p class="panel-sub">Jump to an avenue to view document folders and presentations.</p>
