@@ -270,7 +270,42 @@
         </table>
       </div>
     </div>
+<!-- ========= District Event Attendance ========= -->
+<div class="admin-card" id="districtAttendance" style="margin-top:20px;">
+  <div class="topbar">
+    <h2>District Event Attendance <span id="distCountBadge" class="badge"></span></h2>
+  </div>
 
+  <div class="toolbar">
+    <input id="distMemberSearch" type="text" placeholder="Search member…"/>
+    <input id="distEventSearch" type="text" placeholder="Search district event…"/>
+
+    <select id="distMonthFilter">
+      <option value="">All months</option>
+    </select>
+
+    <button id="addDistEventBtn" class="btn btn-outline">Add District Event</button>
+    <span class="flex-1"></span>
+    <button id="exportDistXlsxBtn" class="btn">Export to Excel</button>
+  </div>
+
+  <div class="toolbar" id="distKPIs" style="gap:14px; align-items:flex-end">
+    <div class="kpi"><div class="kpi-label">Avg attendance</div><div class="kpi-value" id="distAvg">–</div></div>
+    <div class="kpi"><div class="kpi-label">Events (filtered)</div><div class="kpi-value" id="distEvtCount">–</div></div>
+    <div class="kpi"><div class="kpi-label">Top attendees</div><div class="kpi-value" id="distTop">–</div></div>
+  </div>
+
+  <div class="chart-wrap">
+    <canvas id="distChart"></canvas>
+  </div>
+
+  <div class="grid-wrap">
+    <table class="att">
+      <thead id="distHead"></thead>
+      <tbody id="distBody"></tbody>
+    </table>
+  </div>
+</div>
     <!-- ========= BOD Attendance ========= -->
 <div class="admin-card" id="bod" style="margin-top:20px;">
   <div class="topbar">
@@ -604,7 +639,41 @@
       </form>
     </div>
   </div>
+<div id="addDistEventModal" class="adm-modal" aria-hidden="true">
+  <div class="adm-modal__sheet">
+    <div class="adm-modal__head">
+      <h3>Add District Event</h3>
+      <button class="adm-close" data-close="addDistEventModal" aria-label="Close">×</button>
+    </div>
 
+    <form id="addDistEventForm" class="adm-form" autocomplete="off">
+      <label class="adm-field">
+        <span>Event name</span>
+        <input id="addDistEvName" type="text" placeholder="e.g., District Conference" required>
+      </label>
+
+      <label class="adm-field">
+        <span>Start Date</span>
+        <input id="addDistEvDate" type="date" required>
+      </label>
+
+      <label class="adm-field">
+        <span>End Date (optional)</span>
+        <input id="addDistEvEndDate" type="date">
+      </label>
+
+      <label class="adm-field">
+        <span>Description (optional)</span>
+        <textarea id="addDistEvDesc" rows="3" placeholder="Optional…"></textarea>
+      </label>
+
+      <div class="adm-actions">
+        <button type="button" class="btn btn-outline" data-close="addDistEventModal">Cancel</button>
+        <button type="submit" class="btn">Add District Event</button>
+      </div>
+    </form>
+  </div>
+</div>
   <div id="editBodMemberModal" class="adm-modal" aria-hidden="true">
     <div class="adm-modal__sheet">
       <div class="adm-modal__head">

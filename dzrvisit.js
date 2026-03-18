@@ -362,17 +362,17 @@ function renderClubMetrics(){
   const MEMBER_STRENGTH = 31;
   const MALE = 13;
   const FEMALE = 18;
-  const TOTAL_EVENTS = 42;
+  const TOTAL_EVENTS = 62;
 
   const AVENUES = {
-    CMD: 6,
-    CSD: 8,
-    PDD: 5,
-    ISD: 4,
-    RRRO: 3,
-    PRO: 6,
-    DEI: 2,
-    GBM: 8
+    CMD: 16,
+    CSD: 19,
+    PDD: 13,
+    ISD: 8,
+    RRRO: 9,
+    PRO: 1,
+    DEI: 5,
+    GBM: 17
   };
 
   if (drrClubRankEl) drrClubRankEl.textContent = CLUB_RANK;

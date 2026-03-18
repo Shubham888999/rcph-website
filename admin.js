@@ -149,6 +149,32 @@ const editBodMeetDate     = document.getElementById('editBodMeetDate');
 
 const goBodBtn = document.getElementById('goBodBtn');
 
+/* DISTRICT ATTENDANCE DOM */
+const distCountBadge   = document.getElementById('distCountBadge');
+
+const distMemberSearch = document.getElementById('distMemberSearch');
+const distEventSearch  = document.getElementById('distEventSearch');
+const distMonthFilter  = document.getElementById('distMonthFilter');
+
+const addDistEventBtn  = document.getElementById('addDistEventBtn');
+const exportDistXlsxBtn= document.getElementById('exportDistXlsxBtn');
+
+const distHead         = document.getElementById('distHead');
+const distBody         = document.getElementById('distBody');
+
+const distAvg          = document.getElementById('distAvg');
+const distEvtCount     = document.getElementById('distEvtCount');
+const distTop          = document.getElementById('distTop');
+
+const addDistEventModal= document.getElementById('addDistEventModal');
+const addDistEventForm = document.getElementById('addDistEventForm');
+const addDistEvName    = document.getElementById('addDistEvName');
+const addDistEvDate    = document.getElementById('addDistEvDate');
+const addDistEvEndDate = document.getElementById('addDistEvEndDate');
+const addDistEvDesc    = document.getElementById('addDistEvDesc');
+
+if (addDistEventBtn) addDistEventBtn.onclick = () => openModal('addDistEventModal');
+
 // Modal helpers
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
@@ -179,6 +205,9 @@ document.addEventListener('click', (e) => {
 let MEMBERS = [];
 let EVENTS  = [];
 let ATT     = {}; // {memberId: {eventId: boolean}}
+
+let DIST_EVENTS = [];
+let DIST_ATT    = {}; // { memberId: { districtEventId: true/false/"NA" } }
 
 let BODM = [];      // [{id, name, position}]
 let BODMEET = [];   // [{id, name, date}]
@@ -362,7 +391,7 @@ async function loadData(){
     fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +
       MEMBERS.map(m => `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`).join('');
   }
-
+  
   // BOD
   if (bodHead && bodBody) {
     const [bmSnap, mtSnap, baSnap] = await Promise.all([
@@ -645,8 +674,8 @@ function renderGrid(){
         ? `<div class="event-mini-tag wrw">WRW</div>`
         : '';
 
-      const { present: eventPresent, considered: eventConsidered } = getEventAttendanceCount(e.id, members);
-      const eventCountHtml = `<div class="event-att-count">✓ ${eventPresent}/${eventConsidered}</div>`;
+const { present: eventPresent } = getEventAttendanceCount(e.id, members);
+const eventCountHtml = `<div class="event-att-count">✓ ${eventPresent}</div>`;
 
 return `
   <th title="${e.date || ''}">
