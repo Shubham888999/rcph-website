@@ -553,6 +553,309 @@
   50%  { transform: translateY(25px) rotate(-6deg); }
   100% { transform: translateY(0px) rotate(0deg); }
 }
+/* KPI beach topper */
+#clubMetricsCard{
+  position: relative;
+  overflow: visible !important;
+  margin-top: 72px;
+}
+
+.kpi-beach-topper{
+  position: absolute;
+  top: -70px;
+  left: 22px;
+  right: 22px;
+  width: auto;
+  height: 70px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.kpi-beach-sand{
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 18px;
+  background: linear-gradient(180deg, #e3c37d 0%, #cfa55d 100%);
+  border-radius: 18px 18px 10px 10px;
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.14),
+    inset 0 1px 2px rgba(255,255,255,0.12);
+  border: 1px solid rgba(120, 82, 36, 0.16);
+}
+
+.kpi-beach-sand::before,
+.kpi-beach-sand::after{
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  width: 8px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(149, 105, 54, 0.25);
+}
+.kpi-beach-sand::before{ left: 18%; }
+.kpi-beach-sand::after{ right: 24%; }
+
+/* palm trees */
+.kpi-palm{
+  position: absolute;
+  bottom: 6px; /* same base line zone as umbrellas/stalls */
+  width: 42px;
+  height: 68px;
+  z-index: 2;
+  opacity: 0.95;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.18));
+}
+
+.kpi-palm-lottie{
+  width: 100%;
+  height: 100%;
+}
+
+.palm-1{ left: 12%; transform: scale(1.96); }
+.palm-2{ left: 52%; transform: translateX(-50%) scale(1.96); }
+.palm-3{ right: 12%; transform: scale(1.96); }
+
+/* umbrellas */
+.kpi-beach-umbrella{
+  position: absolute;
+  bottom: 40px;
+  z-index: 3;
+}
+
+.kpi-beach-umbrella .canopy{
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 10px;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+
+.kpi-beach-umbrella .pole{
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  width: 2px;
+  height: 16px;
+  background: #6f5230;
+  border-radius: 999px;
+}
+
+/* umbrella spread */
+.umb-1{ left: 8px; }
+.umb-1 .canopy{
+  background: repeating-linear-gradient(90deg, #ff8da1 0 5px, #ffe28b 5px 10px);
+}
+
+.umb-2{ left: 20%; }
+.umb-2 .canopy{
+  background: repeating-linear-gradient(90deg, #ffb47d 0 5px, #fff1a8 5px 10px);
+}
+
+.umb-3{ left: 31%; }
+.umb-3 .canopy{
+  background: repeating-linear-gradient(90deg, #8fe0d4 0 5px, #fff0a8 5px 10px);
+}
+
+.umb-4{ left: 43%; }
+.umb-4 .canopy{
+  background: repeating-linear-gradient(90deg, #ff9db1 0 5px, #fff1a9 5px 10px);
+}
+
+.umb-5{ right: 43%; }
+.umb-5 .canopy{
+  background: repeating-linear-gradient(90deg, #89ddd0 0 5px, #fff0a8 5px 10px);
+}
+
+.umb-6{ right: 31%; }
+.umb-6 .canopy{
+  background: repeating-linear-gradient(90deg, #ffb47d 0 5px, #fff1a8 5px 10px);
+}
+
+.umb-7{ right: 20%; }
+.umb-7 .canopy{
+  background: repeating-linear-gradient(90deg, #8fe0d4 0 5px, #fff0a8 5px 10px);
+}
+
+.umb-8{ right: 8px; }
+.umb-8 .canopy{
+  background: repeating-linear-gradient(90deg, #ff8da1 0 5px, #ffe28b 5px 10px);
+}
+
+/* stalls */
+.kpi-beach-stall{
+  position: absolute;
+  bottom: 16px;
+  width: 42px;
+  height: 24px;
+  z-index: 4;
+}
+
+.kpi-beach-stall .roof{
+  position: absolute;
+  left: 2px;
+  top: 0;
+  width: 38px;
+  height: 8px;
+  border-radius: 4px 4px 0 0;
+}
+
+.kpi-beach-stall .body{
+  position: absolute;
+  left: 6px;
+  top: 7px;
+  width: 30px;
+  height: 11px;
+  border-radius: 0 0 5px 5px;
+  background: rgba(245, 235, 208, 0.95);
+  border: 1px solid rgba(121,84,42,0.18);
+}
+
+.kpi-beach-stall .awning{
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  width: 28px;
+  height: 3px;
+}
+
+.kpi-beach-stall .leg{
+  position: absolute;
+  bottom: -5px;
+  width: 2px;
+  height: 7px;
+  background: #7a5a34;
+}
+.kpi-beach-stall .leg.l1{ left: 10px; }
+.kpi-beach-stall .leg.l2{ right: 10px; }
+
+.stall-1{ left: 60px; }
+.stall-2{ left: 27%; }
+.stall-3{ left: 50%; transform: translateX(-50%); }
+.stall-4{ right: 27%; }
+.stall-5{ right: 60px; }
+
+.stall-1 .roof,
+.stall-4 .roof{
+  background: repeating-linear-gradient(90deg, #ffcf7e 0 5px, #ff9577 5px 10px);
+}
+.stall-1 .awning,
+.stall-4 .awning{
+  background: repeating-linear-gradient(90deg, #f58e8e 0 4px, #fff0b2 4px 8px);
+}
+
+.stall-2 .roof,
+.stall-5 .roof{
+  background: repeating-linear-gradient(90deg, #ffc37b 0 5px, #7fd9d3 5px 10px);
+}
+.stall-2 .awning,
+.stall-5 .awning{
+  background: repeating-linear-gradient(90deg, #ffd97b 0 4px, #8ce3da 4px 8px);
+}
+
+.stall-3 .roof{
+  background: repeating-linear-gradient(90deg, #ffcf7e 0 5px, #ff9577 5px 10px);
+}
+.stall-3 .awning{
+  background: repeating-linear-gradient(90deg, #f58e8e 0 4px, #fff0b2 4px 8px);
+}
+
+/* beach chairs */
+.kpi-beach-chair{
+  position: absolute;
+  bottom: 16px;
+  width: 16px;
+  height: 10px;
+  border-left: 3px solid #7b5935;
+  border-bottom: 3px solid #7b5935;
+  transform: skew(-20deg) rotate(-12deg);
+  z-index: 3;
+}
+
+.kpi-beach-chair::before{
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 12px;
+  height: 7px;
+  background: linear-gradient(135deg, #ffb1a4, #ffe59d);
+  border-radius: 2px;
+}
+
+/* shells */
+.kpi-shell{
+  position: absolute;
+  bottom: 5px;
+  width: 8px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 235, 210, 0.45);
+}
+.shell-1{ left: 35%; }
+.shell-2{ left: 62%; }
+.shell-3{ right: 8%; }
+.shell-4{ left: 74%; }
+
+@media (max-width: 1100px){
+  .palm-2,
+  .stall-3,
+  .chair-2{
+    display: none;
+  }
+}
+
+@media (max-width: 900px){
+  .kpi-beach-topper{
+    top: -62px;
+    height: 62px;
+  }
+
+  .umb-3,
+  .umb-6,
+  .stall-2,
+  .stall-4,
+  .chair-1,
+  .chair-3{
+    display: none;
+  }
+
+  .kpi-palm{
+    width: 36px;
+    height: 50px;
+  }
+}
+
+@media (max-width: 640px){
+  #clubMetricsCard{
+    margin-top: 56px;
+  }
+
+  .kpi-beach-topper{
+    top: -54px;
+    left: 14px;
+    right: 14px;
+    height: 54px;
+  }
+
+  .palm-2,
+  .stall-2,
+  .stall-4,
+  .stall-5,
+  .umb-2,
+  .umb-7,
+  .chair-2,
+  .chair-3{
+    display: none;
+  }
+
+  .palm-1{ left: 16%; }
+  .palm-3{ right: 16%; }
+}
 </style>
 </head>
 <body>
@@ -607,6 +910,98 @@
   </div>
 </section>
 <section class="dzr-card" id="clubMetricsCard">
+<div class="kpi-beach-topper" aria-hidden="true">
+  <div class="kpi-beach-sand"></div>
+
+  <!-- palm trees -->
+  <div class="kpi-palm palm-1"><div id="kpiPalm1" class="kpi-palm-lottie"></div></div>
+  <div class="kpi-palm palm-2"><div id="kpiPalm2" class="kpi-palm-lottie"></div></div>
+  <div class="kpi-palm palm-3"><div id="kpiPalm3" class="kpi-palm-lottie"></div></div>
+
+  <!-- umbrellas -->
+  <div class="kpi-beach-umbrella umb-1">
+    <span class="canopy"></span>
+    <span class="pole"></span>
+  </div>
+
+  <div class="kpi-beach-umbrella umb-2">
+    <span class="canopy"></span>
+    <span class="pole"></span>
+  </div>
+
+  <div class="kpi-beach-umbrella umb-3">
+    <span class="canopy"></span>
+    <span class="pole"></span>
+  </div>
+
+  <div class="kpi-beach-umbrella umb-4">
+    <span class="canopy"></span>
+    <span class="pole"></span>
+  </div>
+
+  <div class="kpi-beach-umbrella umb-5">
+    <span class="canopy"></span>
+    <span class="pole"></span>
+  </div>
+
+  <div class="kpi-beach-umbrella umb-6">
+    <span class="canopy"></span>
+    <span class="pole"></span>
+  </div>
+
+  <div class="kpi-beach-umbrella umb-7">
+    <span class="canopy"></span>
+    <span class="pole"></span>
+  </div>
+
+
+  <!-- stalls -->
+  <div class="kpi-beach-stall stall-1">
+    <span class="roof"></span>
+    <span class="body"></span>
+    <span class="awning"></span>
+    <span class="leg l1"></span>
+    <span class="leg l2"></span>
+  </div>
+
+  <div class="kpi-beach-stall stall-2">
+    <span class="roof"></span>
+    <span class="body"></span>
+    <span class="awning"></span>
+    <span class="leg l1"></span>
+    <span class="leg l2"></span>
+  </div>
+
+  <div class="kpi-beach-stall stall-3">
+    <span class="roof"></span>
+    <span class="body"></span>
+    <span class="awning"></span>
+    <span class="leg l1"></span>
+    <span class="leg l2"></span>
+  </div>
+
+  <div class="kpi-beach-stall stall-4">
+    <span class="roof"></span>
+    <span class="body"></span>
+    <span class="awning"></span>
+    <span class="leg l1"></span>
+    <span class="leg l2"></span>
+  </div>
+
+  <div class="kpi-beach-stall stall-5">
+    <span class="roof"></span>
+    <span class="body"></span>
+    <span class="awning"></span>
+    <span class="leg l1"></span>
+    <span class="leg l2"></span>
+  </div>
+
+  <!-- shells -->
+  <span class="kpi-shell shell-1"></span>
+  <span class="kpi-shell shell-2"></span>
+  <span class="kpi-shell shell-3"></span>
+  <span class="kpi-shell shell-4"></span>
+</div>
   <h2 class="panel-title">Club KPI Metrics</h2>
   <p class="panel-sub">
     A quick view of the club profile, membership split, and avenue-wise event activity.

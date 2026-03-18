@@ -174,9 +174,32 @@ function initButterflies() {
     });
   }
 }
+function initKpiPalmTrees() {
+  if (!window.lottie) return;
+
+  const palms = [
+    { id: 'kpiPalm1', scale: 2.0 },
+    { id: 'kpiPalm2', scale: 1.95 },
+    { id: 'kpiPalm3', scale: 2.05 }
+  ];
+
+  palms.forEach(({ id }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    lottie.loadAnimation({
+      container: el,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: 'Palm Tree Leaf Animation.json'
+    });
+  });
+}
 async function start(){
   initLemonadeAnimations();
   initButterflies();
+  initKpiPalmTrees();
   await Promise.all([
     loadAttendance(),
     loadBOD(),
