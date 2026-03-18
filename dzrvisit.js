@@ -122,9 +122,61 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
+function initLemonadeAnimations() {
+  if (!window.lottie) return;
 
+  const leftEl = document.getElementById('lemonadeLeft');
+  const rightEl = document.getElementById('lemonadeRight');
 
+  if (leftEl) {
+    lottie.loadAnimation({
+      container: leftEl,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: 'Lemonade.json'
+    });
+  }
+
+  if (rightEl) {
+    lottie.loadAnimation({
+      container: rightEl,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: 'Lemonade.json'
+    });
+  }
+}
+function initButterflies() {
+  if (!window.lottie) return;
+
+  const left = document.getElementById('butterflyLeft');
+  const right = document.getElementById('butterflyRight');
+
+  if (left) {
+    lottie.loadAnimation({
+      container: left,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: 'butterfly 04.json'
+    });
+  }
+
+  if (right) {
+    lottie.loadAnimation({
+      container: right,
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: 'butterfly 04.json'
+    });
+  }
+}
 async function start(){
+  initLemonadeAnimations();
+  initButterflies();
   await Promise.all([
     loadAttendance(),
     loadBOD(),
@@ -411,27 +463,40 @@ function renderBOD(){
 }
 
 document.querySelectorAll('details').forEach(det => {
-  const summary = det.querySelector('summary');
-  if (!summary) return;
+    const summary = det.querySelector('summary');
+    if (!summary) return;
 
-  const arrow = document.createElement('span');
-  arrow.textContent = '▼';
-  arrow.style.float = 'right';
-  arrow.style.transition = 'transform 0.2s';
-  summary.appendChild(arrow);
-
-  det.addEventListener('toggle', () => {
-    arrow.textContent = det.open ? '▲' : '▼';
-
-
-    if (det.open && det.closest('.panel-grid')) {
-  
-      setTimeout(() => {
-        det.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50); // 50ms delay
+    let arrow = summary.querySelector('.details-arrow');
+    if (!arrow) {
+      arrow = document.createElement('span');
+      arrow.className = 'details-arrow';
+      arrow.textContent = det.open ? '▲' : '▼';
+      arrow.style.marginLeft = 'auto';
+      arrow.style.transition = 'transform 0.2s ease';
+      summary.appendChild(arrow);
     }
+
+    det.addEventListener('toggle', () => {
+      arrow.textContent = det.open ? '▲' : '▼';
+
+      if (det.open) {
+        const parent = det.parentElement;
+        if (parent) {
+          Array.from(parent.children).forEach(sib => {
+            if (sib !== det && sib.tagName === 'DETAILS' && sib.open) {
+              sib.open = false;
+            }
+          });
+        }
+
+        if (det.closest('.panel-grid') || det.parentElement?.tagName === 'DETAILS') {
+          setTimeout(() => {
+            det.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 60);
+        }
+      }
+    });
   });
-});
 function normalizeGender(member){
   const raw = String(
     member.gender ||
