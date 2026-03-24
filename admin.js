@@ -187,6 +187,11 @@ const mailTo         = document.getElementById('mailTo');
 const mailSubject    = document.getElementById('mailSubject');
 const mailBody       = document.getElementById('mailBody');
 
+const sendGbmMailBtn        = document.getElementById('sendGbmMailBtn');
+const sendGbmMailMenu       = document.getElementById('sendGbmMailMenu');
+const sendGbmWarningBtn     = document.getElementById('sendGbmWarningBtn');
+const sendGbmTerminationBtn = document.getElementById('sendGbmTerminationBtn');
+
 if (addDistEventBtn) addDistEventBtn.onclick = () => openModal('addDistEventModal');
 
 // Modal helpers
@@ -208,10 +213,26 @@ function closeModal(modalId) {
 }
 
 // Universal close handler for all modals
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   const closeBtn = e.target.closest('[data-close]');
   if (closeBtn) {
     closeModal(closeBtn.dataset.close);
+    return;
+  }
+
+  const delDistEventBtn = e.target.closest('button[data-del-dist-event]');
+  if (delDistEventBtn) {
+    const id = delDistEventBtn.dataset.delDistEvent;
+    const ev = DIST_EVENTS.find(x => x.id === id);
+
+    if (!confirm(`Delete district event "${ev?.name || id}"?`)) return;
+
+    try {
+      await db.collection('districtEvents').doc(id).delete();
+    } catch (err) {
+      alert('Failed to delete district event: ' + err.message);
+    }
+    return;
   }
 });
 
@@ -239,6 +260,8 @@ let unsubBodM    = null;
 let unsubBodMt   = null;
 let unsubBodAt   = null;
 let unsubTre     = null;
+let unsubDistEvents = null;
+let unsubDistAtt    = null;
 
 let IS_PRESIDENT = false;
 
@@ -431,7 +454,10 @@ async function loadData(){
   ATT = {};
   attSnap.forEach(d => { ATT[d.id] = d.data() || {}; });
   renderGrid();
-
+  // District attendance
+  if (distHead && distBody) {
+    await loadDistrictData();
+  }
   // Treasury
 if (treBody) {
   if (transDate && !transDate.value) transDate.value = new Date().toISOString().slice(0,10);
@@ -448,6 +474,8 @@ async function startAttendancePage() {
 }
 
 function attachRealtimeListeners() {
+  if (unsubDistEvents) { unsubDistEvents(); unsubDistEvents = null; }
+  if (unsubDistAtt)    { unsubDistAtt();    unsubDistAtt    = null; }
   if (unsubMembers) { unsubMembers(); unsubMembers = null; }
   if (unsubEvents)  { unsubEvents();  unsubEvents  = null; }
   if (unsubAtt)     { unsubAtt();     unsubAtt     = null; }
@@ -501,7 +529,20 @@ function attachRealtimeListeners() {
       renderBodGrid();
     });
   }
+  if (distHead && distBody) {
+    unsubDistEvents = db.collection('districtEvents').orderBy('date', 'desc').onSnapshot(snap => {
+      DIST_EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      buildDistMonthFilterFromEvents();
+      renderDistrictGrid();
+    });
 
+    unsubDistAtt = db.collection('districtAttendance').onSnapshot(snap => {
+      const next = {};
+      snap.forEach(d => { next[d.id] = d.data() || {}; });
+      DIST_ATT = next;
+      renderDistrictGrid();
+    });
+  }
   // Treasury
   if (treBody) {
 unsubTre = db.collection('treasury').orderBy('date','desc').onSnapshot(snap => {
@@ -652,6 +693,41 @@ function getEventAttendanceCount(eventId, members) {
   });
 
   return { present, considered };
+}
+function buildDistMonthFilterFromEvents() {
+  if (!distMonthFilter) return;
+
+  distMonthFilter.innerHTML = '<option value="">All months</option>';
+
+  Array.from(new Set(DIST_EVENTS.map(e => (e.date || '').slice(0, 7))))
+    .filter(Boolean)
+    .sort()
+    .forEach(ym => {
+      const [y, m] = ym.split('-').map(Number);
+      const d = new Date(y, m - 1, 1);
+
+      const opt = document.createElement('option');
+      opt.value = ym;
+      opt.textContent = d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+      distMonthFilter.appendChild(opt);
+    });
+}
+
+async function loadDistrictData() {
+  const [deSnap, daSnap] = await Promise.all([
+    db.collection('districtEvents').orderBy('date', 'desc').get(),
+    db.collection('districtAttendance').get()
+  ]);
+
+  DIST_EVENTS = deSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  DIST_ATT = {};
+  daSnap.forEach(d => {
+    DIST_ATT[d.id] = d.data() || {};
+  });
+
+  buildDistMonthFilterFromEvents();
+  renderDistrictGrid();
 }
 /* ---------- Render grid (Attendance) ---------- */
 function renderGrid(){
@@ -832,7 +908,193 @@ function renderAttendanceInsights(){
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
   });
 }
+function renderDistrictGrid() {
+  if (!distHead || !distBody) return;
 
+  const memQuery = (distMemberSearch?.value || '').trim().toLowerCase();
+  const evQuery  = (distEventSearch?.value || '').trim().toLowerCase();
+  const monthSel = distMonthFilter?.value || '';
+
+  const members = MEMBERS.filter(m =>
+    (m.name || '').toLowerCase().includes(memQuery)
+  );
+
+  let events = DIST_EVENTS.filter(e =>
+    (e.name || '').toLowerCase().includes(evQuery)
+  );
+
+  if (monthSel) {
+    events = events.filter(e => (e.date || '').startsWith(monthSel));
+  }
+
+  const headRow = document.createElement('tr');
+  headRow.innerHTML =
+    `<th class="sticky-col">Member \\ District Event</th>` +
+    events.map(e => `
+      <th title="${e.date || ''}">
+        <div class="bulk-wrap">
+          <div class="ev-head">
+            <span>${e.name || ''}</span>
+            <button class="icon-btn" title="Delete district event" data-del-dist-event="${e.id}">🗑</button>
+          </div>
+          <small>
+            ${(e.date || '').slice(0,10)}
+            ${e.endDate ? ` → ${e.endDate.slice(0,10)}` : ''}
+          </small>
+        </div>
+      </th>
+    `).join('');
+
+  distHead.innerHTML = '';
+  distHead.appendChild(headRow);
+
+  distBody.innerHTML = '';
+
+  members.forEach(m => {
+    const attForMember = DIST_ATT[m.id] || {};
+
+    const values = events.map(e => attForMember[e.id]);
+    const considered = values.filter(v => v !== 'NA');
+    const total = considered.length;
+    const present = considered.filter(v => v === true).length;
+    const pct = total ? Math.round((present / total) * 100) : 0;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `
+      <td class="sticky-col">
+        <div class="mem-left">
+          <div class="stat-box" title="Across visible district events">
+            <span class="stat">All: ${present}/${total} · ${pct}%</span>
+          </div>
+          <div class="mem-cell">
+            <span>${m.name || ''}</span>
+          </div>
+        </div>
+      </td>
+      ` +
+      events.map(e => {
+        const v = attForMember[e.id];
+        let cls = 'off';
+        let aria = 'Absent';
+
+        if (v === true) {
+          cls = 'on';
+          aria = 'Present';
+        } else if (v === 'NA') {
+          cls = 'na';
+          aria = 'Not applicable';
+        }
+
+        return `
+          <td data-dist-m="${m.id}" data-dist-e="${e.id}">
+            <button class="cell-btn ${cls}" aria-label="${aria}"></button>
+          </td>
+        `;
+      }).join('');
+
+    distBody.appendChild(tr);
+  });
+
+  if (distCountBadge) {
+    distCountBadge.textContent = `${members.length} members · ${events.length} district events`;
+  }
+
+  renderDistrictInsights(members, events);
+}
+if (distBody) {
+  distBody.addEventListener('click', async (e) => {
+    const td = e.target.closest('td[data-dist-m][data-dist-e]');
+    if (!td) return;
+
+    const memberId = td.dataset.distM;
+    const eventId  = td.dataset.distE;
+
+    const current = (DIST_ATT[memberId] || {})[eventId];
+    const next = current === true ? false : current === false ? 'NA' : true;
+
+    try {
+      await db.collection('districtAttendance').doc(memberId).set(
+        { [eventId]: next },
+        { merge: true }
+      );
+
+      DIST_ATT[memberId] = DIST_ATT[memberId] || {};
+      DIST_ATT[memberId][eventId] = next;
+
+      renderDistrictGrid();
+    } catch (err) {
+      alert('Failed to update district attendance: ' + err.message);
+    }
+  });
+}
+if (addDistEventForm) {
+  addDistEventForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = (addDistEvName?.value || '').trim();
+    const date = addDistEvDate?.value || '';
+    const endDate = addDistEvEndDate?.value || '';
+    const desc = (addDistEvDesc?.value || '').trim();
+
+    if (!name || !date) {
+      alert('Please enter district event name and start date.');
+      return;
+    }
+
+    try {
+      await db.collection('districtEvents').add({
+        name,
+        date,
+        endDate: endDate || '',
+        desc: desc || '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: auth.currentUser?.uid || null
+      });
+
+      closeModal('addDistEventModal');
+    } catch (err) {
+      alert('Failed to add district event: ' + err.message);
+    }
+  });
+}
+if (exportDistXlsxBtn) {
+  exportDistXlsxBtn.addEventListener('click', () => {
+    if (typeof XLSX === 'undefined') {
+      alert('Excel export library not loaded.');
+      return;
+    }
+
+    const members = MEMBERS.filter(m =>
+      (m.name || '').toLowerCase().includes((distMemberSearch?.value || '').trim().toLowerCase())
+    );
+
+    let events = DIST_EVENTS.filter(e =>
+      (e.name || '').toLowerCase().includes((distEventSearch?.value || '').trim().toLowerCase())
+    );
+
+    const monthSel = distMonthFilter?.value || '';
+    if (monthSel) {
+      events = events.filter(e => (e.date || '').startsWith(monthSel));
+    }
+
+    const rows = members.map(m => {
+      const row = { Member: m.name || '' };
+
+      events.forEach(ev => {
+        const v = (DIST_ATT[m.id] || {})[ev.id];
+        row[ev.name || ev.id] = v === true ? 'Present' : v === false ? 'Absent' : 'NA';
+      });
+
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'District Attendance');
+    XLSX.writeFile(wb, 'district_attendance.xlsx');
+  });
+}
 /* ---------- Render BOD Grid ---------- */
 function renderBodGrid(){
   if (!bodHead || !bodBody) return;
@@ -1085,6 +1347,7 @@ bodBody.addEventListener('change', async (e) => {
   sel.value = '';
 });
 });
+
 function escapeMailValue(value) {
   return encodeURIComponent(value || '');
 }
@@ -1097,46 +1360,111 @@ function buildMailtoUrl({ to, subject, body, from }) {
   return `mailto:${encodeURIComponent(to || '')}?subject=${escapeMailValue(subject)}&body=${escapeMailValue(fullBody)}`;
 }
 
-function buildWarningTemplate(memberName, position, stats) {
-  return `Dear ${memberName},
-
-This is to formally inform you that you have missed 3 consecutive BOD meetings.
-
-As a Board member${position ? ` serving as ${position}` : ''}, you are expected to maintain regular attendance and active participation in meetings, in line with the club bylaws and responsibilities of office.
-
-Our records currently show a consecutive absence streak of ${stats.currentStreak || 3} meeting(s). We request you to treat this as an official warning and ensure your attendance and participation in upcoming meetings.
-
-If there is any genuine reason for your absence, please communicate the same to the President at the earliest.
-
-Regards,
-President
-Rotaract Club of Pune Heritage`;
-}
-
 function buildWarningTemplate() {
-  return `Dear Member,
+  return `Dear Rtr. [Name],
 
-This is to formally inform you that you have missed 3 consecutive BOD meetings.
+Greetings from the desk of President and Sergeant At Arms,
 
-As per the club bylaws, all Board members are expected to maintain regular attendance and active participation in meetings.
+This is to formally inform you that you have been absent for three consecutive meetings of the Rotaract Club of Pune Heritage.
 
-Kindly treat this as an official warning and ensure compliance in upcoming meetings. If there is any genuine reason for your absence, please communicate the same to the President at the earliest.
+As per the club bylaws under:
+“Article X – Termination”
+a member/BOD who is not present for three consecutive General Body Meetings (GBMs) is liable to receive a formal warning from the President and Sergeant-at-Arms.
 
-Regards,
-President
+This email serves as your official warning notice.
+
+We request you to take this matter seriously and ensure your regular attendance in upcoming meetings. Consistent absence may lead to further action as per the club bylaws, including possible termination from your position.
+
+We value your presence and contributions to the club and hope to see active participation from your end moving forward.
+
+If you have any valid reasons or concerns, feel free to communicate with us.
+
+Regards,  
+Rtr. Aneesh Ladkat  
+President | RIY 2025–26  
+Rotaract Club of Pune Heritage  
+
+Rtr. Riya Chandavale  
+Sergeant-at-Arms & Public Relations Officer | RIY 2025–26  
 Rotaract Club of Pune Heritage`;
 }
 
 function buildTerminationTemplate() {
-  return `Dear Member,
-
-This is to formally inform you that due to repeated non-compliance with attendance requirements, including 3 consecutive missed BOD meetings, the club is proceeding with termination of your board role as per the applicable club bylaws.
-
-Please treat this message as an official notice of termination.
-
+  return `Dear Rtr. [Name],
+Greetings from the desk of President and Sergeant At Arms,
+This is to formally inform you that your termination from the position of [Postion Name], effective [Date], has been issued.
+This decision has been taken in accordance with the club bylaws under:
+“ANNEXURE B – BOD Termination”
+Please note that this termination is only from the Board position and does not affect your membership as a
+General Body Member of the Rotaract Club of Pune Heritage. You will continue to remain a valued part of
+the club as a member.
+Please find the official termination letter attached with this email for your reference and necessary action.
+You are requested to ensure that all pending handovers (files, data, access, and reports) are completed with the
+concerned authority before the effective date.
+We truly appreciate your contributions so far, and we would like to assure you that the club will always remain supportive
+and available for you whenever needed.
 Regards,
-President
+Rtr. Aneesh Ladkat
+President | RIY 2025–26
+Rotaract Club of Pune Heritage
+Rtr. Riya Chandavale
+Sergeant-at-Arms & Public Relations Officer | RIY 2025–26
 Rotaract Club of Pune Heritage`;
+}
+function buildGbmWarningTemplate() {
+  return `Dear Rtr. [Name],
+
+Greetings from the desk of President and Sergeant At Arms,
+
+This is to formally inform you that you have been absent for three consecutive meetings of the Rotaract Club of Pune Heritage.
+
+As per the club bylaws under:
+“Article X – Termination”
+a member/BOD who is not present for three consecutive General Body Meetings (GBMs) is liable to receive a formal warning from the President and Sergeant-at-Arms.
+
+This email serves as your official warning notice.
+
+We request you to take this matter seriously and ensure your regular attendance in upcoming meetings. Consistent absence may lead to further action as per the club bylaws, including possible termination from your position.
+
+We value your presence and contributions to the club and hope to see active participation from your end moving forward.
+
+If you have any valid reasons or concerns, feel free to communicate with us.
+
+Regards,  
+Rtr. Aneesh Ladkat  
+President | RIY 2025–26  
+Rotaract Club of Pune Heritage  
+
+Rtr. Riya Chandavale  
+Sergeant-at-Arms & Public Relations Officer | RIY 2025–26  
+Rotaract Club of Pune Heritage`;
+}
+
+function buildGbmTerminationTemplate() {
+  return `Dear Rtr. [Name],
+Greetings from the desk of President and Sergeant At Arms,
+This is to formally inform you that your termination as a General Body Member, effective [Date], has been issued.
+This decision has been taken in accordance with the club bylaws under:
+“Article X – Termination”
+which states that if a member remains absent for three consecutive General Body Meetings (GBMs) and continues to remain inactive for a period exceeding 45 days, they shall be liable for termination from the club membership.
+Despite prior communication and a formal warning issued from the President and Sergeant-at-Arms, there has been no sufficient improvement in attendance/participation.
+
+Please note that with this termination, you will no longer hold membership in the Rotaract Club of Pune Heritage.
+
+We request you to complete any pending formalities, if applicable, and return any club-related materials or responsibilities.
+
+We sincerely appreciate your association with the club and wish you the very best in your future endeavors.
+Regards,
+Rtr. Aneesh Ladkat
+President | RIY 2025–26
+Rotaract Club of Pune Heritage
+Rtr. Riya Chandavale
+Sergeant-at-Arms & Public Relations Officer | RIY 2025–26
+Rotaract Club of Pune Heritage`;
+}
+function setMailMenuOpen(isOpen) {
+  if (!sendMailMenu) return;
+  sendMailMenu.hidden = !isOpen;
 }
 
 function openBodMailModal(type) {
@@ -1154,11 +1482,12 @@ function openBodMailModal(type) {
     mailTargetChip.textContent = 'Manual recipient';
   }
 
+  if (mailFrom) mailFrom.value = '';
   if (mailTo) mailTo.value = '';
   if (mailSubject) {
     mailSubject.value = isWarning
       ? 'Attendance Warning Notice'
-      : 'Termination Notice';
+      : 'Termination of Position – [Postion Name] | RIY 25-26';
   }
 
   if (mailBody) {
@@ -1169,6 +1498,128 @@ function openBodMailModal(type) {
 
   openModal('mailModal');
 }
+function openGbmMailModal(type) {
+  const isWarning = type === 'warning';
+
+  if (mailModalTitle) {
+    mailModalTitle.textContent = isWarning ? 'Send GBM Warning Mail' : 'Send GBM Termination Mail';
+  }
+
+  if (mailTypeChip) {
+    mailTypeChip.textContent = isWarning ? 'GBM Warning' : 'GBM Termination';
+  }
+
+  if (mailTargetChip) {
+    mailTargetChip.textContent = 'Manual recipient';
+  }
+
+  if (mailFrom) mailFrom.value = '';
+  if (mailTo) mailTo.value = '';
+  if (mailSubject) {
+    mailSubject.value = isWarning
+      ? 'GBM Attendance Warning Notice'
+      : 'GBM Attendance Termination Notice';
+  }
+
+  if (mailBody) {
+    mailBody.value = isWarning
+      ? buildGbmWarningTemplate()
+      : buildGbmTerminationTemplate();
+  }
+
+  openModal('mailModal');
+}
+if (sendMailBtn && sendMailMenu) {
+  sendMailBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const shouldOpen = sendMailMenu.hidden;
+    setMailMenuOpen(shouldOpen);
+  });
+
+  sendMailMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  document.addEventListener('click', (e) => {
+    const clickedInsideMenu = e.target.closest('.mail-menu');
+    if (!clickedInsideMenu) {
+      setMailMenuOpen(false);
+    }
+  });
+}
+
+if (sendWarningBtn) {
+  sendWarningBtn.addEventListener('click', () => {
+    setMailMenuOpen(false);
+    openBodMailModal('warning');
+  });
+}
+
+if (sendTerminationBtn) {
+  sendTerminationBtn.addEventListener('click', () => {
+    setMailMenuOpen(false);
+    openBodMailModal('termination');
+  });
+}
+if (sendGbmMailBtn && sendGbmMailMenu) {
+  sendGbmMailBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const shouldOpen = sendGbmMailMenu.hidden;
+    sendGbmMailMenu.hidden = !shouldOpen;
+
+    // close BOD menu if open
+    if (sendMailMenu) sendMailMenu.hidden = true;
+  });
+
+  sendGbmMailMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  document.addEventListener('click', (e) => {
+    const clickedInsideGbmMenu = e.target.closest('#sendGbmMailBtn, #sendGbmMailMenu');
+    if (!clickedInsideGbmMenu) {
+      sendGbmMailMenu.hidden = true;
+    }
+  });
+}
+
+if (sendGbmWarningBtn) {
+  sendGbmWarningBtn.addEventListener('click', () => {
+    if (sendGbmMailMenu) sendGbmMailMenu.hidden = true;
+    openGbmMailModal('warning');
+  });
+}
+
+if (sendGbmTerminationBtn) {
+  sendGbmTerminationBtn.addEventListener('click', () => {
+    if (sendGbmMailMenu) sendGbmMailMenu.hidden = true;
+    openGbmMailModal('termination');
+  });
+}
+if (mailForm) {
+  mailForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const to = (mailTo?.value || '').trim();
+    const from = (mailFrom?.value || '').trim();
+    const subject = (mailSubject?.value || '').trim();
+    const body = (mailBody?.value || '').trim();
+
+    if (!to || !subject || !body) {
+      alert('Please fill To, Subject, and Message before opening the draft.');
+      return;
+    }
+
+    const mailtoUrl = buildMailtoUrl({ to, subject, body, from });
+    window.location.href = mailtoUrl;
+    closeModal('mailModal');
+  });
+}
+
 /* ---------- Fines Logic ---------- */
 function renderFines(){
   if (!finesBody) return;

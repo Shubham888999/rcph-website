@@ -252,6 +252,9 @@
   color: #f4b43a;
   border: 1px solid rgba(244,180,58,.35);
 }
+.mail-menu__dropdown[hidden]{
+  display: none !important;
+}
   </style>
 </head>
 <body>
@@ -301,8 +304,17 @@
         
         <button id="addEventBtn" class="btn btn-outline">Add Event</button>
         <button id="addMemberBtn" class="btn btn-outline">Add Member</button>
-        <span class="flex-1"></span>
-        <button id="exportXlsxBtn" class="btn">Export to Excel</button>
+<span class="flex-1"></span>
+
+<div class="mail-menu">
+  <button id="sendGbmMailBtn" class="btn btn-outline" type="button">Send Mail ▾</button>
+  <div id="sendGbmMailMenu" class="mail-menu__dropdown" hidden>
+    <button id="sendGbmWarningBtn" type="button" class="mail-menu__item">Send Warning</button>
+    <button id="sendGbmTerminationBtn" type="button" class="mail-menu__item">Send Termination</button>
+  </div>
+</div>
+
+<button id="exportXlsxBtn" class="btn">Export to Excel</button>
       </div>
       
       <div class="toolbar" id="attKPIs" style="gap:14px; align-items:flex-end">
