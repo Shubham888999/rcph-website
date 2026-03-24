@@ -173,6 +173,20 @@ const addDistEvDate    = document.getElementById('addDistEvDate');
 const addDistEvEndDate = document.getElementById('addDistEvEndDate');
 const addDistEvDesc    = document.getElementById('addDistEvDesc');
 
+const sendMailBtn        = document.getElementById('sendMailBtn');
+const sendMailMenu       = document.getElementById('sendMailMenu');
+const sendWarningBtn     = document.getElementById('sendWarningBtn');
+const sendTerminationBtn = document.getElementById('sendTerminationBtn');
+
+const mailModalTitle = document.getElementById('mailModalTitle');
+const mailTypeChip   = document.getElementById('mailTypeChip');
+const mailTargetChip = document.getElementById('mailTargetChip');
+const mailForm       = document.getElementById('mailForm');
+const mailFrom       = document.getElementById('mailFrom');
+const mailTo         = document.getElementById('mailTo');
+const mailSubject    = document.getElementById('mailSubject');
+const mailBody       = document.getElementById('mailBody');
+
 if (addDistEventBtn) addDistEventBtn.onclick = () => openModal('addDistEventModal');
 
 // Modal helpers
@@ -1071,7 +1085,90 @@ bodBody.addEventListener('change', async (e) => {
   sel.value = '';
 });
 });
+function escapeMailValue(value) {
+  return encodeURIComponent(value || '');
+}
 
+function buildMailtoUrl({ to, subject, body, from }) {
+  const fullBody = from
+    ? `${body}\n\nFrom: ${from}`
+    : body;
+
+  return `mailto:${encodeURIComponent(to || '')}?subject=${escapeMailValue(subject)}&body=${escapeMailValue(fullBody)}`;
+}
+
+function buildWarningTemplate(memberName, position, stats) {
+  return `Dear ${memberName},
+
+This is to formally inform you that you have missed 3 consecutive BOD meetings.
+
+As a Board member${position ? ` serving as ${position}` : ''}, you are expected to maintain regular attendance and active participation in meetings, in line with the club bylaws and responsibilities of office.
+
+Our records currently show a consecutive absence streak of ${stats.currentStreak || 3} meeting(s). We request you to treat this as an official warning and ensure your attendance and participation in upcoming meetings.
+
+If there is any genuine reason for your absence, please communicate the same to the President at the earliest.
+
+Regards,
+President
+Rotaract Club of Pune Heritage`;
+}
+
+function buildWarningTemplate() {
+  return `Dear Member,
+
+This is to formally inform you that you have missed 3 consecutive BOD meetings.
+
+As per the club bylaws, all Board members are expected to maintain regular attendance and active participation in meetings.
+
+Kindly treat this as an official warning and ensure compliance in upcoming meetings. If there is any genuine reason for your absence, please communicate the same to the President at the earliest.
+
+Regards,
+President
+Rotaract Club of Pune Heritage`;
+}
+
+function buildTerminationTemplate() {
+  return `Dear Member,
+
+This is to formally inform you that due to repeated non-compliance with attendance requirements, including 3 consecutive missed BOD meetings, the club is proceeding with termination of your board role as per the applicable club bylaws.
+
+Please treat this message as an official notice of termination.
+
+Regards,
+President
+Rotaract Club of Pune Heritage`;
+}
+
+function openBodMailModal(type) {
+  const isWarning = type === 'warning';
+
+  if (mailModalTitle) {
+    mailModalTitle.textContent = isWarning ? 'Send Warning Mail' : 'Send Termination Mail';
+  }
+
+  if (mailTypeChip) {
+    mailTypeChip.textContent = isWarning ? 'Warning' : 'Termination';
+  }
+
+  if (mailTargetChip) {
+    mailTargetChip.textContent = 'Manual recipient';
+  }
+
+  if (mailTo) mailTo.value = '';
+  if (mailSubject) {
+    mailSubject.value = isWarning
+      ? 'Attendance Warning Notice'
+      : 'Termination Notice';
+  }
+
+  if (mailBody) {
+    mailBody.value = isWarning
+      ? buildWarningTemplate()
+      : buildTerminationTemplate();
+  }
+
+  openModal('mailModal');
+}
 /* ---------- Fines Logic ---------- */
 function renderFines(){
   if (!finesBody) return;

@@ -200,7 +200,58 @@
   background:rgba(18,154,98,.14);
   border:1px solid rgba(18,154,98,.35);
 }
+.mail-menu{
+  position: relative;
+}
 
+.mail-menu__dropdown{
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 180px;
+  background: #181818;
+  border: 1px solid var(--color-border,#2e2e2e);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.28);
+  padding: 6px;
+  z-index: 50;
+  display: grid;
+  gap: 4px;
+}
+
+.mail-menu__item{
+  background: transparent;
+  color: #f1f1f1;
+  border: 0;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mail-menu__item:hover{
+  background: #0e3f41;
+}
+
+.mail-help{
+  font-size: 12px;
+  color: #b7b7b7;
+  line-height: 1.45;
+}
+
+.mail-status-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(244,180,58,.12);
+  color: #f4b43a;
+  border: 1px solid rgba(244,180,58,.35);
+}
   </style>
 </head>
 <body>
@@ -323,8 +374,17 @@
   <input id="bodMemName" type="text" placeholder="BOD name (e.g., ABC XYZ)" />
   <input id="bodMemPos"  type="text" placeholder="Position (e.g., President)" />
   <button id="bodAddMemberBtn" class="btn btn-outline">Add BOD</button>
-  <span class="flex-1"></span>
-  <button id="exportBodXlsxBtn" class="btn">Export to Excel</button>
+<span class="flex-1"></span>
+
+<div class="mail-menu">
+  <button id="sendMailBtn" class="btn btn-outline" type="button">Send Mail ▾</button>
+  <div id="sendMailMenu" class="mail-menu__dropdown" hidden>
+    <button id="sendWarningBtn" type="button" class="mail-menu__item">Send Warning</button>
+    <button id="sendTerminationBtn" type="button" class="mail-menu__item">Send Termination</button>
+  </div>
+</div>
+
+<button id="exportBodXlsxBtn" class="btn">Export to Excel</button>
 </div>
 
 <!-- KPIs + chart on their own row -->
@@ -854,7 +914,50 @@
     </form>
   </div>
 </div>
+<div id="mailModal" class="adm-modal" aria-hidden="true">
+  <div class="adm-modal__sheet" style="width:min(760px,96vw);">
+    <div class="adm-modal__head">
+      <h3 id="mailModalTitle">Send Mail</h3>
+      <button class="adm-close" data-close="mailModal" aria-label="Close">×</button>
+    </div>
 
+    <form id="mailForm" class="adm-form" autocomplete="off">
+      <div class="adm-chips">
+        <span id="mailTypeChip" class="mail-status-chip">Warning</span>
+        <span id="mailTargetChip" class="mail-status-chip">No member selected</span>
+      </div>
+
+      <label class="adm-field">
+        <span>From</span>
+        <input id="mailFrom" type="email" placeholder="president@club.com" required>
+      </label>
+
+      <label class="adm-field">
+        <span>To</span>
+        <input id="mailTo" type="email" placeholder="member@example.com" required>
+      </label>
+
+      <label class="adm-field">
+        <span>Subject</span>
+        <input id="mailSubject" type="text" required>
+      </label>
+
+      <label class="adm-field">
+        <span>Message</span>
+        <textarea id="mailBody" rows="12" required></textarea>
+      </label>
+
+      <div class="mail-help">
+        This opens your default mail app using a prefilled draft. You can review and send it manually.
+      </div>
+
+      <div class="adm-actions">
+        <button type="button" class="btn btn-outline" data-close="mailModal">Cancel</button>
+        <button type="submit" class="btn">Open Mail Draft</button>
+      </div>
+    </form>
+  </div>
+</div>
 <!--       MEMBER FORM 
       <form id="memberForm" class="adm-form" autocomplete="off" hidden>
         <label class="adm-field">

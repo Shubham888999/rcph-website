@@ -10,7 +10,6 @@
   --color-muted:    #c8b68c;
 }
 
-  /* Reset & Base */
   *,
   *::before,
   *::after { box-sizing: border-box; }
@@ -25,7 +24,6 @@ body {
   line-height: 1.6;
 }
 
-  /* Logo Strip */
   .logo-strip {
     display: flex;
     justify-content: center;
@@ -47,7 +45,6 @@ body {
     transform-origin: center;
   }
 
-  /* Header & Navbar */
   header {
     background: var(--color-accent);
     position: sticky;
@@ -87,7 +84,6 @@ body {
     width: 100%;
   }
 
-  /* Hero Banner */
   .hero-banner {
     position: relative;
     display: flex;
@@ -123,17 +119,14 @@ body {
     text-transform: uppercase;
   }
 
-  /* Content Wrapper */
 .content-wrapper {
-  /* CHANGE: Increase max-width to match the wider section-box */
-  max-width: 1500px; /* Use the same value as the new .section-box max-width */
+  max-width: 1500px; 
   margin: 0 auto;
   padding: 40px 20px;
   text-align: center;
 }
   section { margin-bottom: 60px; }
 
-  /* Boxed Sections */
 .section-box {
   background: linear-gradient(180deg, #151515 0%, #111111 100%);
   text-align: center;
@@ -195,7 +188,6 @@ body {
     color: var(--color-accent);
   }
 
-  /* FullCalendar */
   #rcph-calendar {
     max-width: 900px;
     margin: 0 auto;
@@ -258,7 +250,6 @@ body {
     background-color: #1E88E5;
   }
 
-  /* Modal */
   .modal {
     display: none;
     position: fixed;
@@ -282,7 +273,6 @@ body {
     color: var(--color-accent);
   }
 
-  /* Carousel */
   .carousel-container {
     overflow: hidden;
     width: 100%;
@@ -290,7 +280,7 @@ body {
   }
 .carousel-track {
   display: flex;
-  overflow-x: hidden; /* <-- this is important for seamless loop */
+  overflow-x: hidden;
   gap: 20px;
   scroll-behavior: auto;
 }
@@ -304,7 +294,6 @@ body {
   }
   .carousel-track img:hover { transform: scale(1.05); }
 
-  /* Cards */
 .bod-container {
   display: grid;
   grid-template-columns: repeat(4 , 1fr);
@@ -365,7 +354,7 @@ body {
 .bod-card-front img {
   width: 100%;
   height: auto;
-  max-height: 225px; /* Or whatever fits nicely within your card */
+  max-height: 225px;
   object-fit: cover;
   object-position: top;
   border-radius: 10px 10px 0 0;
@@ -410,7 +399,6 @@ body {
     margin-bottom: 15px;
   }
 
-  /* Links */
   #join a,
   .contact-card a,
   #contact p a[href^="mailto"],
@@ -463,7 +451,6 @@ body {
     margin-bottom: 10px;
   }
 
-  /* Close Button Inside Popup */
   .popup-close-btn {
     margin-top: 15px;
     padding: 8px 16px;
@@ -480,7 +467,7 @@ body {
     color: #fff;
   }
 
-  /* Animation */
+
   @keyframes fadeInScale {
     0% {
       opacity: 0;
@@ -556,7 +543,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 3.0rem;
-  font-size: 2.05rem !important; /* <-- increase as needed */
+  font-size: 2.05rem !important;
   line-height: 1.6;
   color: #333;
   text-align: center;
@@ -583,8 +570,8 @@ body {
   height: 200px;
   object-fit: cover;
   object-position: center;
-  border-radius: 10px; /* or try 50% for circular */
-  border: 4px solid #f4b43a; /* golden frame */
+  border-radius: 10px; 
+  border: 4px solid #f4b43a; 
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   margin-bottom: 1rem;
 }
@@ -626,7 +613,6 @@ body {
   margin-bottom: 2px;
 }
 
-/* Animation effect */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -643,10 +629,10 @@ body {
 }
 
 .contact-highlight {
-  animation: fadeInUp 0.8s ease-in-out 0.3s; /* delayed */
+  animation: fadeInUp 0.8s ease-in-out 0.3s; 
 }
 
-/* Highlight Box Styles */
+
 .highlight-box {
   background-color: #1e1e1e;
   border: 1px solid #ffd2e3;
@@ -656,7 +642,6 @@ body {
   box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 
-/* Logo + Text layout */
 .logo-about-container {
   display: flex;
   align-items: flex-start;
@@ -744,20 +729,18 @@ a.join-btn:hover {
   background-color: #e59400;
 }
 
-/* Nav Links */
 .nav-links {
   list-style: none;
   display: flex;
   gap: 18px;
   margin: 0;
   padding: 0;
-  margin-left: auto;   /* pushes links to right */
+  margin-left: auto;  
   align-items: center;
 }
 
 .navbar ul {
-  justify-content: flex-end; /* not center */
-}
+  justify-content: flex-end;}
 
 .nav-links li a {
   text-decoration: none;
@@ -765,7 +748,6 @@ a.join-btn:hover {
   font-weight: 500;
 }
 
-/* Mobile Styles */
 .mobile-nav-toggle {
   display: none;
   font-size: 24px;
@@ -775,9 +757,9 @@ a.join-btn:hover {
   position: sticky;
   top: 0;
   z-index: 999;
-  background-color: var(--color-accent); /* Or your preferred navbar color */
+  background-color: var(--color-accent); 
   padding: 10px 20px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Optional shadow effect */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); 
 }
 .carousel-item {
   display: flex;
@@ -840,15 +822,13 @@ a.join-btn:hover {
   max-width: 200px;
   word-wrap: break-word;
 }
-/* Wrap calendar + legend side by side */
 .calendar-wrapper {
   display: flex;
   gap: 24px;
   align-items: flex-start;
-  flex-wrap: wrap;  /* stacks on mobile */
+  flex-wrap: wrap; 
 }
 
-/* Legend box styling */
 .calendar-legend {
   background: var(--color-card);
   padding: 16px;
@@ -857,7 +837,6 @@ a.join-btn:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-/* Legend title */
 .calendar-legend h3 {
   font-family: 'Montserrat', sans-serif;
   font-size: 1.1rem;
@@ -865,7 +844,6 @@ a.join-btn:hover {
   color: var(--color-accent);
 }
 
-/* Individual legend entries */
 .legend-item {
   display: flex;
   align-items: center;
@@ -874,7 +852,6 @@ a.join-btn:hover {
   color: var(--color-text);
 }
 
-/* The colored square */
 .legend-swatch {
   display: inline-block;
   width: 16px;
@@ -883,7 +860,6 @@ a.join-btn:hover {
   border-radius: 3px;
 }
 
-/* Responsive: stack legend under calendar on small screens */
 @media screen and (max-width: 768px) {
   .calendar-wrapper {
     flex-direction: column;
@@ -894,7 +870,6 @@ a.join-btn:hover {
     width: 100%;
   }
 }
-/* Two-column layout for calendar + legend */
 .calendar-container {
   display: grid;
   grid-template-columns: 160px 1fr;
@@ -902,7 +877,6 @@ a.join-btn:hover {
   align-items: start;
 }
 
-/* Legend box styling */
 .legend-box {
   background: var(--color-card);
   padding: 16px;
@@ -910,14 +884,12 @@ a.join-btn:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-/* Legend title */
 .legend-box h3 {
   font-family: 'Montserrat', sans-serif;
   color: var(--color-accent);
   margin-bottom: 12px;
 }
 
-/* Legend items */
 .legend-item {
   display: flex;
   align-items: center;
@@ -926,7 +898,6 @@ a.join-btn:hover {
   font-size: 0.95rem;
 }
 
-/* The color swatch */
 .legend-swatch {
   width: 16px;
   height: 16px;
@@ -934,12 +905,10 @@ a.join-btn:hover {
   border-radius: 3px;
 }
 
-/* Make sure calendar still fills its column */
 #rcph-calendar {
   width: 100% !important;
 }
 
-/* Responsive: stack on small screens */
 @media (max-width: 768px) {
   .calendar-container {
     display: block;
@@ -949,7 +918,6 @@ a.join-btn:hover {
     width: auto;
   }
 }
-/* Featured Projects Grid */
 #featured-projects {
   text-align: center;
 }
@@ -1008,7 +976,6 @@ a.join-btn:hover {
   text-align: left;
 }
 
-/* Responsive: stack to 2 cols, then 1 col */
 @media (max-width: 992px) {
   .projects-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -1021,13 +988,11 @@ a.join-btn:hover {
 }
 #district-council .bod-container,
 #searic-council .bod-container {
-  grid-template-columns: 1fr;    /* switch to a single column */
-  justify-items: center;         /* center the card in that column */
+  grid-template-columns: 1fr;    
+  justify-items: center;        
 }
 
-/* --- Mobile navbar fixes (force override desktop) --- */
 @media (max-width: 768px) {
-  /* show hamburger */
   .mobile-nav-toggle {
     display: block !important;
     font-size: 24px;
@@ -1035,9 +1000,8 @@ a.join-btn:hover {
     color: #fff;
   }
 
-  /* hide the desktop links by default */
   .navbar .nav-links {
-    display: none !important;              /* override .navbar ul { display:flex } */
+    display: none !important;              
     position: absolute;
     top: 60px;
     right: 10px;
@@ -2004,12 +1968,10 @@ html{ scroll-behavior: smooth; }
 
 .hero-content { position: relative; z-index: 1; }
 
-/* Mobile: reduce vine width so it doesn't crowd text */
 @media (max-width: 768px) {
   .hero-vine { width: 160px; opacity: 0.75; }
 }
 
-/* ===== Madhushala Popup Enhancements ===== */
 .madhushala-box .madhushala-title {
   font-weight: 900;
   letter-spacing: 0.5px;
@@ -2034,7 +1996,6 @@ html{ scroll-behavior: smooth; }
   transform: translateY(-1px) scale(1.02);
   filter: brightness(1.05);
 }
-/* ===== Madhushala Navbar Button ===== */
 .madhushala-nav-btn {
   background: linear-gradient(135deg, #000, #333);
   color: #f4b43a !important;
