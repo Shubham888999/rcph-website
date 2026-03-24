@@ -1002,6 +1002,66 @@ function renderDistrictGrid() {
 
   renderDistrictInsights(members, events);
 }
+function renderDistrictInsights(members, events) {
+  if (distEvtCount) distEvtCount.textContent = events.length || '0';
+
+  let totalSlots = 0;
+  let totalPresent = 0;
+
+  const perEventPresent = events.map(ev => {
+    let present = 0;
+    let considered = 0;
+
+    members.forEach(m => {
+      const v = (DIST_ATT[m.id] || {})[ev.id];
+      if (v !== 'NA') {
+        considered++;
+        if (v === true) present++;
+      }
+    });
+
+    totalSlots += considered;
+    totalPresent += present;
+    return present;
+  });
+
+  const avg = totalSlots ? Math.round((totalPresent / totalSlots) * 100) : 0;
+  if (distAvg) distAvg.textContent = `${avg}%`;
+
+  const topMembers = members.map(m => {
+    let c = 0;
+    events.forEach(ev => {
+      if ((DIST_ATT[m.id] || {})[ev.id] === true) c++;
+    });
+    return { name: m.name || '', c };
+  })
+  .sort((a, b) => b.c - a.c)
+  .slice(0, 3);
+
+  if (distTop) {
+    distTop.textContent = topMembers.length
+      ? topMembers.map(x => `${x.name.split(' ')[0]}(${x.c})`).join(', ')
+      : '–';
+  }
+
+  const ctx = document.getElementById('distChart');
+  drawChart('dist', ctx, {
+    type: 'bar',
+    data: {
+      labels: events.map(e => e.name || ''),
+      datasets: [{
+        label: 'Present',
+        data: perEventPresent
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
 if (distBody) {
   distBody.addEventListener('click', async (e) => {
     const td = e.target.closest('td[data-dist-m][data-dist-e]');
