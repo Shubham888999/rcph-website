@@ -911,7 +911,8 @@ function renderInsightsPanel() {
   else if (overallPct >= 70) attendanceHealth = 'Good';
   else if (overallPct >= 55) attendanceHealth = 'Average';
 
-  const lowAttendanceMembers = memberStats.filter(m => m.pct < 60 && m.total > 0);
+  const MIN_ATTENDANCE_PCT = 33.33;
+const lowAttendanceMembers = memberStats.filter(m => m.pct < MIN_ATTENDANCE_PCT && m.total > 0);
 
   const avenueCounts = {
     ISD: 0, CMD: 0, CSD: 0, PDD: 0, RRRO: 0, PRO: 0, DEI: 0, GBM: 0, Other: 0
@@ -972,8 +973,6 @@ function renderInsightsPanel() {
 
   const lines = [];
 
-  lines.push(`<div class="insight-item"><strong>${totalMembers}</strong> members and <strong>${totalEvents}</strong> events are currently tracked in the attendance system.</div>`);
-
   if (top3.length) {
     lines.push(`<div class="insight-item"><strong>Top Attendees:</strong> ${top3.map(x => `${x.name.split(' ')[0]} (${x.pct}%)`).join(', ')}</div>`);
   }
@@ -983,9 +982,6 @@ function renderInsightsPanel() {
   } else {
     lines.push(`<div class="insight-item"><strong>Great sign:</strong> No members are currently below the 60% attendance threshold.</div>`);
   }
-
-  lines.push(`<div class="insight-item"><strong>Most active avenue:</strong> ${topAvenue}</div>`);
-  lines.push(`<div class="insight-item"><strong>Recent trend:</strong> ${trendText}</div>`);
 
   insightSummaryList.innerHTML = lines.join('');
 }

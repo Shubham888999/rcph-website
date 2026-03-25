@@ -274,6 +274,68 @@
 .insight-item strong{
   color: var(--color-accent-l,#F4B43A);
 }
+
+.kpi-label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.kpi-help{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background: rgba(244,180,58,.14);
+  color: #f4b43a;
+  border: 1px solid rgba(244,180,58,.35);
+  font-size:11px;
+  font-weight:800;
+  cursor: help;
+  line-height:1;
+}
+
+.kpi-tooltip{
+  position:absolute;
+  left:50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  width: 240px;
+  background:#121212;
+  color:#e8eeee;
+  border:1px solid var(--color-border,#2e2e2e);
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:12px;
+  line-height:1.45;
+  box-shadow:0 10px 24px rgba(0,0,0,.28);
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .18s ease, visibility .18s ease, transform .18s ease;
+  z-index:20;
+}
+
+.kpi-tooltip::after{
+  content:"";
+  position:absolute;
+  top:100%;
+  left:50%;
+  transform:translateX(-50%);
+  border-width:6px;
+  border-style:solid;
+  border-color:#121212 transparent transparent transparent;
+}
+
+.kpi-help:hover .kpi-tooltip,
+.kpi-help:focus .kpi-tooltip{
+  opacity:1;
+  visibility:visible;
+  transform:translateX(-50%) translateY(-2px);
+}
   </style>
 </head>
 <body>
@@ -298,22 +360,51 @@
 
     <div class="toolbar" id="insightsGrid" style="gap:14px; align-items:stretch; flex-wrap:wrap;">
       <div class="kpi" style="min-width:220px;">
-        <div class="kpi-label">Overall Attendance</div>
+        <div class="kpi-label">
+  Overall Attendance
+  <span class="kpi-help" tabindex="0">
+    ?
+    <span class="kpi-tooltip">
+      Average attendance percentage across all counted members and all events, excluding NA entries.
+    </span>
+  </span>
+</div>
         <div class="kpi-value" id="insightAttendanceHealth">–</div>
       </div>
 
       <div class="kpi" style="min-width:220px;">
-        <div class="kpi-label">Low Attendance Members</div>
+        <div class="kpi-label">
+  Low Attendance Members
+  <span class="kpi-help" tabindex="0">?
+    <span class="kpi-tooltip">
+      Number of members below the bylaw minimum attendance of 33.33% (1/3rd attendance).
+    </span>
+  </span>
+</div>
         <div class="kpi-value" id="insightLowAttendance">–</div>
       </div>
 
       <div class="kpi" style="min-width:220px;">
-        <div class="kpi-label">Most Active Avenue</div>
+        <div class="kpi-label">
+  Most Active Avenue
+  <span class="kpi-help" tabindex="0">?
+    <span class="kpi-tooltip">
+      Avenue with the highest number of events currently present in the attendance event list.
+    </span>
+  </span>
+</div>
         <div class="kpi-value" id="insightTopAvenue">–</div>
       </div>
 
       <div class="kpi" style="min-width:220px;">
-        <div class="kpi-label">Recent Event Trend</div>
+        <div class="kpi-label">
+  Recent Attendance Trend
+  <span class="kpi-help" tabindex="0">?
+    <span class="kpi-tooltip">
+      Attendance percentage of the latest 5 events, compared with the overall attendance percentage.
+    </span>
+  </span>
+</div>
         <div class="kpi-value" id="insightTrend">–</div>
       </div>
     </div>
