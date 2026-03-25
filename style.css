@@ -1051,8 +1051,8 @@ a.button-link:hover {
 }
 
 .legend-item abbr {
-  text-decoration: none;   /* remove dotted underline on some browsers */
-  cursor: help;            /* indicates there’s a tooltip */
+  text-decoration: none;  
+  cursor: help;         
   color: inherit;
 }
 
@@ -1174,7 +1174,6 @@ a.button-link:hover {
 .hc-prev { left: 8px; }
 .hc-next { right: 8px; }
 
-/* Dots */
 .highlight-dots {
   display: flex;
   justify-content: center;

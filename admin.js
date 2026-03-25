@@ -1,26 +1,17 @@
-/**
- * admin.js
- * Complete updated version with new Treasurer fields and fixes.
- */
-
 function getGdriveImageUrl(url) {
   if (!url) return "";
-  // Check for standard Drive share links
   if (url.includes("drive.google.com")) {
     const idMatch = url.match(/[-\w]{25,}/);
     if (idMatch) {
-      // Use the thumbnail endpoint (sz=s1000 gives a 1000px image)
       return `https://drive.google.com/thumbnail?id=${idMatch[0]}&sz=s1000`;
     }
   }
   return url;
 }
 
-/* Uses global window.auth / window.db created in firebase-init.js */
 const auth = window.auth;
 const db   = window.db;
 
-/* DOM ELEMENTS */
 const countBadge  = document.getElementById('countBadge');
 const signOutBtn  = document.getElementById('signOutBtn');
 
@@ -38,7 +29,6 @@ if (addEventBtn)  addEventBtn.onclick  = () => openModal('addEventModal');
 const attHead  = document.getElementById('attHead');
 const attBody  = document.getElementById('attBody');
 
-/* Modal bits */
 const finesBadge = document.getElementById('finesBadge');
 const fineForm   = document.getElementById('fineForm');
 const fineMember = document.getElementById('fineMember');
@@ -60,18 +50,15 @@ const bodHead          = document.getElementById('bodHead');
 const bodBody          = document.getElementById('bodBody');
 const exportBodXlsxBtn = document.getElementById('exportBodXlsxBtn');
 
-/* TREASURER DOM ELEMENTS */
 const treBadge           = document.getElementById('treBadge');
 const treBody            = document.getElementById('treBody');
 const exportTreXlsxBtn   = document.getElementById('exportTreXlsxBtn');
 
-// Add Transaction Inputs
 const transName      = document.getElementById("transName");
 const transType      = document.getElementById("transType");
 const transAmount    = document.getElementById("transAmount");
 const transAvenue    = document.getElementById("transAvenue");
 const transDate      = document.getElementById("transDate");
-// NEW FIELDS
 const transPaidBy    = document.getElementById("transPaidBy");
 const transReimburse = document.getElementById("transReimburse");
 const transCheque    = document.getElementById("transCheque");
@@ -81,7 +68,6 @@ const transBillPreview = document.getElementById("transBillPreview");
 const addTransForm   = document.getElementById("addTransForm");
 const treAddBtn      = document.getElementById('treAddBtn');
 
-// Edit Transaction Inputs
 const editTransForm   = document.getElementById("editTransForm");
 const editTransId     = document.getElementById("editTransId"); // Ensure this hidden input exists
 const editTransName   = document.getElementById("editTransName");
@@ -91,15 +77,12 @@ const editTransAvenue = document.getElementById("editTransAvenue");
 const editTransDate   = document.getElementById("editTransDate");
 const editTransBill   = document.getElementById("editTransBill");
 const editTransBillPreview = document.getElementById("editTransBillPreview");
-// NEW EDIT FIELDS
 const editTransPaidBy    = document.getElementById("editTransPaidBy");
 const editTransReimburse = document.getElementById("editTransReimburse");
 const editTransCheque    = document.getElementById("editTransCheque");
 
-// Lightbox
 const billLightboxImg = document.getElementById("billLightboxImg");
 
-/* LOCK BUTTONS */
 const lockAttendanceBtn = document.getElementById('lockAttendanceBtn');
 const lockAttendanceState = document.getElementById('lockAttendanceState');
 const lockBodAttBtn = document.getElementById('lockBodAttBtn');
@@ -112,7 +95,6 @@ const lockTreasuryState = document.getElementById('lockTreasuryState');
 const treFilterType   = document.getElementById('treFilterType');
 const treFilterMonth  = document.getElementById('treFilterMonth');
 const treFilterAvenue = document.getElementById('treFilterAvenue');
-// ===== MODAL ELEMENTS =====
 const addMemberModal      = document.getElementById('addMemberModal');
 const addMemberForm       = document.getElementById('addMemberForm');
 const addMemName          = document.getElementById('addMemName');
@@ -149,7 +131,6 @@ const editBodMeetDate     = document.getElementById('editBodMeetDate');
 
 const goBodBtn = document.getElementById('goBodBtn');
 
-/* DISTRICT ATTENDANCE DOM */
 const distCountBadge   = document.getElementById('distCountBadge');
 
 const distMemberSearch = document.getElementById('distMemberSearch');
@@ -192,9 +173,14 @@ const sendGbmMailMenu       = document.getElementById('sendGbmMailMenu');
 const sendGbmWarningBtn     = document.getElementById('sendGbmWarningBtn');
 const sendGbmTerminationBtn = document.getElementById('sendGbmTerminationBtn');
 
+const insightAttendanceHealth = document.getElementById('insightAttendanceHealth');
+const insightLowAttendance    = document.getElementById('insightLowAttendance');
+const insightTopAvenue        = document.getElementById('insightTopAvenue');
+const insightTrend            = document.getElementById('insightTrend');
+const insightSummaryList      = document.getElementById('insightSummaryList');
+
 if (addDistEventBtn) addDistEventBtn.onclick = () => openModal('addDistEventModal');
 
-// Modal helpers
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.setAttribute('aria-hidden', 'false');
@@ -206,13 +192,11 @@ function closeModal(modalId) {
     modal.setAttribute('aria-hidden', 'true');
     const form = modal.querySelector('form');
     if (form) form.reset();
-    // Clear previews if any
     if(modalId === 'addTransModal' && transBillPreview) transBillPreview.innerHTML = "";
     if(modalId === 'editTransModal' && editTransBillPreview) editTransBillPreview.innerHTML = "";
   }
 }
 
-// Universal close handler for all modals
 document.addEventListener('click', async (e) => {
   const closeBtn = e.target.closest('[data-close]');
   if (closeBtn) {
@@ -236,22 +220,20 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-/* DATA STATE */
 let MEMBERS = [];
 let EVENTS  = [];
-let ATT     = {}; // {memberId: {eventId: boolean}}
+let ATT     = {}; 
 
 let DIST_EVENTS = [];
-let DIST_ATT    = {}; // { memberId: { districtEventId: true/false/"NA" } }
+let DIST_ATT    = {}; 
 
-let BODM = [];      // [{id, name, position}]
-let BODMEET = [];   // [{id, name, date}]
-let BODATT = {};    // { bodMemberId: { meetingId: boolean } }
+let BODM = [];      
+let BODMEET = [];   
+let BODATT = {};   
 
 let FINES = [];
-let TREAS = []; // Treasury Data
+let TREAS = []; 
 
-/* UNSUBSCRIBE HANDLERS */
 let unsubMembers = null;
 let unsubEvents  = null;
 let unsubAtt     = null; 
@@ -272,18 +254,15 @@ function drawChart(key, ctx, cfg){
   _charts[key] = new Chart(ctx, cfg);
 }
 
-// Small utils
 const fmt = n => Number(n).toLocaleString();
 const yyyymm = d => d.slice(0,7);
 
-/* Helper: map memberId -> name */
 function membersMap() {
   const map = {};
   MEMBERS.forEach(m => map[m.id] = m.name || '');
   return map;
 }
 
-/* ---------- Auth guard + role check ---------- */
 auth.onAuthStateChanged(async (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
 
@@ -301,7 +280,6 @@ auth.onAuthStateChanged(async (user) => {
             goDZRBtn.style.display = 'none';
         }
     }
-    // Only redirect if we KNOW they’re not admin.
     if (role && role !== 'admin' && role !== 'president') {
       window.location.href = 'bodlogin.html';
       return;
@@ -310,11 +288,9 @@ auth.onAuthStateChanged(async (user) => {
     console.warn('Role check failed; continuing:', e);
   }
 
-  // Immediately paint once, then attach realtime listeners
   await startAttendancePage();
 });
 
-/* Lock Logic */
 function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
   db.collection('locks').doc(panelKey).onSnapshot(snap => {
     const locked = snap.exists && !!snap.data().locked;
@@ -327,7 +303,6 @@ function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
   });
 }
 
-// Hook up locks
 watchLock('attendance', lockAttendanceBtn, lockAttendanceState, (locked) => {
   document.querySelectorAll('#attBody .cell-btn, #addMemberBtn, #addEventBtn')
     .forEach(el => el.disabled = locked);
@@ -341,7 +316,6 @@ watchLock('fines', lockFinesBtn, lockFinesState, (locked) => {
     .forEach(el => el.disabled = locked);
 });
 watchLock('treasury', lockTreasuryBtn, lockTreasuryState, (locked) => {
-  // Lock treasury inputs
   const btns = document.querySelectorAll('#treAddBtn, #treBody .icon-btn');
   btns.forEach(b => b.disabled = locked);
 });
@@ -367,20 +341,16 @@ if (goBodBtn) {
   goBodBtn.addEventListener('click', () => location.href = 'bodlogin.html');
 }
 
-// Helper: Filter Treasury Data based on dropdowns
 function getFilteredTreasury() {
   const typeVal   = treFilterType.value;
   const monthVal  = treFilterMonth.value;
   const avenueVal = treFilterAvenue.value;
 
   return TREAS.filter(t => {
-    // Filter Type
     if (typeVal && t.type !== typeVal) return false;
     
-    // Filter Month (Format: YYYY-MM)
     if (monthVal && (t.date || '').slice(0, 7) !== monthVal) return false;
 
-    // Filter Avenue
     if (avenueVal) {
       if (avenueVal === 'Other') {
         if (t.avenue && t.avenue !== 'No Avenue' && t.avenue !== 'Other') return false;
@@ -392,7 +362,6 @@ function getFilteredTreasury() {
   });
 }
 
-// Helper: Populate Month Filter dynamically
 function buildTreasuryMonthFilter() {
   const existingVal = treFilterMonth.value;
   treFilterMonth.innerHTML = '<option value="">All Months</option>';
@@ -409,12 +378,9 @@ function buildTreasuryMonthFilter() {
     treFilterMonth.appendChild(opt);
   });
 
-  // Restore selection if still valid
   if (existingVal) treFilterMonth.value = existingVal;
 }
-/* ---------- Data load ---------- */
 async function loadData(){
-  // Members & Events
   const [mSnap, eSnap] = await Promise.all([
     db.collection('members').orderBy('name').get(),
     db.collection('events').orderBy('date','desc').get()
@@ -423,13 +389,11 @@ async function loadData(){
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   
-  // Populate Fine Member Dropdown
   if (fineMember) {
     fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +
       MEMBERS.map(m => `<option value="${m.id}">${(m.name || '').replace(/</g,'&lt;')}</option>`).join('');
   }
   
-  // BOD
   if (bodHead && bodBody) {
     const [bmSnap, mtSnap, baSnap] = await Promise.all([
       db.collection('bodMembers').orderBy('name').get(),
@@ -443,28 +407,24 @@ async function loadData(){
     renderBodGrid();
   }
 
-  // Fines
   const fSnap = await db.collection('fines').orderBy('date','desc').get();
   FINES = fSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderFines();
 
-  // Attendance
   buildMonthFilterFromEvents();
   const attSnap = await db.collection('attendance').get();
   ATT = {};
   attSnap.forEach(d => { ATT[d.id] = d.data() || {}; });
   renderGrid();
-  // District attendance
   if (distHead && distBody) {
     await loadDistrictData();
   }
-  // Treasury
 if (treBody) {
   if (transDate && !transDate.value) transDate.value = new Date().toISOString().slice(0,10);
   const tSnap = await db.collection('treasury').orderBy('date','desc').get();
   TREAS = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  buildTreasuryMonthFilter(); // <--- Add this
+  buildTreasuryMonthFilter(); 
   renderTreasurer();
 }
 }
@@ -485,34 +445,31 @@ function attachRealtimeListeners() {
   if (unsubBodAt)   { unsubBodAt();   unsubBodAt   = null; }
   if (unsubTre)     { unsubTre();     unsubTre     = null; }
 
-  // Fines
   unsubFines = db.collection('fines').orderBy('date', 'desc').onSnapshot((snap) => {
     FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderFines();
   });
 
-  // Members
-  unsubMembers = db.collection('members').orderBy('name').onSnapshot((snap) => {
-    MEMBERS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderGrid(); 
-  });
+unsubMembers = db.collection('members').orderBy('name').onSnapshot((snap) => {
+  MEMBERS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderGrid();
+  renderInsightsPanel(); 
+});
 
-  // Events
-  unsubEvents = db.collection('events').orderBy('date', 'desc').onSnapshot((snap) => {
-    EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    buildMonthFilterFromEvents();
-    renderGrid();
-  });
+unsubEvents = db.collection('events').orderBy('date', 'desc').onSnapshot((snap) => {
+  EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  buildMonthFilterFromEvents();
+  renderGrid();
+  renderInsightsPanel();   
+});
 
-  // Attendance
-  unsubAtt = db.collection('attendance').onSnapshot((snap) => {
-    const next = {};
-    snap.forEach(d => { next[d.id] = d.data() || {}; });
-    ATT = next;
-    renderGrid();
-  });
-
-  // BOD
+unsubAtt = db.collection('attendance').onSnapshot((snap) => {
+  const next = {};
+  snap.forEach(d => { next[d.id] = d.data() || {}; });
+  ATT = next;
+  renderGrid();
+  renderInsightsPanel();   
+});
   if (bodHead) {
     unsubBodM = db.collection('bodMembers').orderBy('name').onSnapshot(snap => {
       BODM = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -543,7 +500,6 @@ function attachRealtimeListeners() {
       renderDistrictGrid();
     });
   }
-  // Treasury
   if (treBody) {
 unsubTre = db.collection('treasury').orderBy('date','desc').onSnapshot(snap => {
   TREAS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -729,7 +685,6 @@ async function loadDistrictData() {
   buildDistMonthFilterFromEvents();
   renderDistrictGrid();
 }
-/* ---------- Render grid (Attendance) ---------- */
 function renderGrid(){
   const memQuery = memberSearch.value.trim().toLowerCase();
   const evQuery  = eventSearch.value.trim().toLowerCase();
@@ -749,7 +704,6 @@ function renderGrid(){
     });
   }
 
-  // Header
   const headRow = document.createElement('tr');
   headRow.innerHTML =
     `<th class="sticky-col">Member \\ Event</th>` +
@@ -800,7 +754,6 @@ return `
   attHead.innerHTML = '';
   attHead.appendChild(headRow);
 
-  // Body
   attBody.innerHTML = '';
   members.forEach(m => {
     const tr = document.createElement('tr');
@@ -812,7 +765,6 @@ return `
     const present = considered.filter(v => v === true).length;
     const pct     = total ? Math.round((present/total)*100) : 0;
 
-    // GBM %
     const gbmIds = events.filter(e => {
       const a = Array.isArray(e.avenue) ? e.avenue : (e.avenue ? [e.avenue] : []);
       return a.includes('GBM');
@@ -869,7 +821,10 @@ return `
   countBadge.textContent = `${members.length} members · ${events.length} events`;
   renderAttendanceInsights();
 }
-
+function isExcludedFromAttendanceRanking(member) {
+  const name = String(member?.name || '').trim().toLowerCase();
+  return name === 'shubham deshpande';
+}
 function renderAttendanceInsights(){
   const { members, events } = getFilteredMembersAndEvents();
   document.getElementById('attEvtCount').textContent = events.length || '0';
@@ -889,14 +844,25 @@ function renderAttendanceInsights(){
   const avg = totalSlots ? Math.round((totalPresent/totalSlots)*100) : 0;
   document.getElementById('attAvg').textContent = `${avg}%`;
 
-  const perMemberPresent = members.map(m => {
-    let c = 0;
-    events.forEach(ev => { if ((ATT[m.id]||{})[ev.id] === true) c++; });
-    return { name: m.name || '', c };
-  }).sort((a,b)=>b.c-a.c).slice(0,3);
+  const perMemberPresent = members
+    .filter(m => !isExcludedFromAttendanceRanking(m))
+    .map(m => {
+      let c = 0;
+      events.forEach(ev => {
+        if ((ATT[m.id] || {})[ev.id] === true) c++;
+      });
+      return { name: m.name || '', c };
+    })
+    .sort((a, b) => b.c - a.c)
+    .slice(0, 3);
 
-  document.getElementById('attTop').textContent =
-    perMemberPresent.length ? perMemberPresent.map(x=>`${x.name.split(' ')[0]}(${x.c})`).join(', ') : '–';
+  const attTopEl = document.getElementById('attTop');
+  if (attTopEl) {
+    attTopEl.textContent =
+      perMemberPresent.length
+        ? perMemberPresent.map(x => `${x.name.split(' ')[0]}(${x.c})`).join(', ')
+        : '–';
+  }
 
   const ctx = document.getElementById('attChart');
   drawChart('att', ctx, {
@@ -907,6 +873,121 @@ function renderAttendanceInsights(){
     },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
   });
+}
+function renderInsightsPanel() {
+  if (!insightSummaryList) return;
+
+  const totalMembers = MEMBERS.length;
+  const totalEvents = EVENTS.length;
+
+  let totalSlots = 0;
+  let totalPresent = 0;
+
+  const memberStats = MEMBERS
+    .filter(m => !isExcludedFromAttendanceRanking(m))
+    .map(m => {
+      const att = ATT[m.id] || {};
+      const vals = EVENTS.map(e => att[e.id]);
+      const considered = vals.filter(v => v !== 'NA');
+      const total = considered.length;
+      const present = considered.filter(v => v === true).length;
+      const pct = total ? Math.round((present / total) * 100) : 0;
+
+      totalSlots += total;
+      totalPresent += present;
+
+      return {
+        name: m.name || '',
+        total,
+        present,
+        pct
+      };
+    });
+
+  const overallPct = totalSlots ? Math.round((totalPresent / totalSlots) * 100) : 0;
+
+  let attendanceHealth = '';
+  if (overallPct >= 85) attendanceHealth = 'Excellent';
+  else if (overallPct >= 70) attendanceHealth = 'Good';
+  else if (overallPct >= 55) attendanceHealth = 'Average';
+
+  const lowAttendanceMembers = memberStats.filter(m => m.pct < 60 && m.total > 0);
+
+  const avenueCounts = {
+    ISD: 0, CMD: 0, CSD: 0, PDD: 0, RRRO: 0, PRO: 0, DEI: 0, GBM: 0, Other: 0
+  };
+
+  EVENTS.forEach(ev => {
+    const avs = Array.isArray(ev.avenues) ? ev.avenues : (ev.avenue ? [ev.avenue] : []);
+    if (!avs.length) {
+      avenueCounts.Other++;
+    } else {
+      avs.forEach(a => {
+        if (avenueCounts[a] !== undefined) avenueCounts[a]++;
+        else avenueCounts.Other++;
+      });
+    }
+  });
+
+  const topAvenueEntry = Object.entries(avenueCounts).sort((a,b) => b[1] - a[1])[0];
+  const topAvenue = topAvenueEntry ? `${topAvenueEntry[0]} (${topAvenueEntry[1]})` : '–';
+
+  const recentEvents = [...EVENTS]
+    .filter(e => e.date)
+    .sort((a,b) => (b.date || '').localeCompare(a.date || ''))
+    .slice(0, 5);
+
+  let recentTotalSlots = 0;
+  let recentTotalPresent = 0;
+
+  recentEvents.forEach(ev => {
+    MEMBERS.forEach(m => {
+      const v = (ATT[m.id] || {})[ev.id];
+      if (v !== 'NA') {
+        recentTotalSlots++;
+        if (v === true) recentTotalPresent++;
+      }
+    });
+  });
+
+  const recentPct = recentTotalSlots ? Math.round((recentTotalPresent / recentTotalSlots) * 100) : 0;
+  const trendText =
+    recentPct > overallPct ? `Improving ↑ (${recentPct}%)`
+    : recentPct < overallPct ? `Dropping ↓ (${recentPct}%)`
+    : `Stable → (${recentPct}%)`;
+
+  if (insightAttendanceHealth) insightAttendanceHealth.textContent = `${attendanceHealth} (${overallPct}%)`;
+  if (insightLowAttendance) insightLowAttendance.textContent = `${lowAttendanceMembers.length}`;
+  if (insightTopAvenue) insightTopAvenue.textContent = topAvenue;
+  if (insightTrend) insightTrend.textContent = trendText;
+
+  const top3 = memberStats
+    .filter(m => m.total > 0)
+    .sort((a,b) => b.pct - a.pct)
+    .slice(0, 3);
+
+  const low3 = lowAttendanceMembers
+    .sort((a,b) => a.pct - b.pct)
+    .slice(0, 3);
+
+  const lines = [];
+
+  lines.push(`<div class="insight-item"><strong>${totalMembers}</strong> members and <strong>${totalEvents}</strong> events are currently tracked in the attendance system.</div>`);
+
+  if (top3.length) {
+    lines.push(`<div class="insight-item"><strong>Top Attendees:</strong> ${top3.map(x => `${x.name.split(' ')[0]} (${x.pct}%)`).join(', ')}</div>`);
+  }
+
+  if (low3.length) {
+    lines.push(`<div class="insight-item"><strong>Low Attendees:</strong> ${low3.map(x => `${x.name.split(' ')[0]} (${x.pct}%)`).join(', ')}</div>`);
+  } else {
+    lines.push(`<div class="insight-item"><strong>Great sign:</strong> No members are currently below the 60% attendance threshold.</div>`);
+  }
+
+  lines.push(`<div class="insight-item"><strong>Most active avenue:</strong> ${topAvenue}</div>`);
+  lines.push(`<div class="insight-item"><strong>Recent trend:</strong> ${trendText}</div>`);
+
+  insightSummaryList.innerHTML = lines.join('');
 }
 function renderDistrictGrid() {
   if (!distHead || !distBody) return;
@@ -1155,7 +1236,7 @@ if (exportDistXlsxBtn) {
     XLSX.writeFile(wb, 'district_attendance.xlsx');
   });
 }
-/* ---------- Render BOD Grid ---------- */
+
 function renderBodGrid(){
   if (!bodHead || !bodBody) return;
 
@@ -1269,7 +1350,6 @@ function renderBodInsights(){
   });
 }
 
-/* BOD Interactions */
 if (bodAddMemberBtn) {
   bodAddMemberBtn.addEventListener('click', async () => {
     const name = (bodMemName?.value || '').trim();
@@ -1294,9 +1374,7 @@ if (bodAddMeetingBtn) {
   });
 }
 
-/* BOD Click Handler (Delete, Edit, Toggle) */
 document.addEventListener('click', async (e) => {
-  // 1. Delete BOD member
   const delBodMem = e.target.closest('button[data-del-bod-member]');
   if (delBodMem) {
     const id = delBodMem.dataset.delBodMember;
@@ -1309,7 +1387,6 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // 2. Delete BOD meeting
   const delBodMeet = e.target.closest('button[data-del-bod-meeting]');
   if (delBodMeet) {
     const id = delBodMeet.dataset.delBodMeeting;
@@ -1325,7 +1402,6 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // 3. Edit BOD MEMBER
   const ebmBtn = e.target.closest('button[data-edit-bod-member]');
   if (ebmBtn) {
     const id = ebmBtn.dataset.editBodMember;
@@ -1338,7 +1414,6 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // 4. Edit BOD MEETING
   const ebmtBtn = e.target.closest('button[data-edit-bod-meeting]');
   if (ebmtBtn) {
     const id = ebmtBtn.dataset.editBodMeeting;
@@ -1351,7 +1426,6 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  // 5. Toggle BOD attendance
   const btn = e.target.closest('td[data-bod-m][data-bod-meet] .cell-btn');
   if (btn) {
     const td = btn.closest('td');
@@ -1631,7 +1705,6 @@ if (sendGbmMailBtn && sendGbmMailMenu) {
     const shouldOpen = sendGbmMailMenu.hidden;
     sendGbmMailMenu.hidden = !shouldOpen;
 
-    // close BOD menu if open
     if (sendMailMenu) sendMailMenu.hidden = true;
   });
 
@@ -1680,7 +1753,6 @@ if (mailForm) {
   });
 }
 
-/* ---------- Fines Logic ---------- */
 function renderFines(){
   if (!finesBody) return;
   const mnames = membersMap();
@@ -1792,16 +1864,13 @@ document.addEventListener('click', async (e) => {
   catch (err) { alert('Failed to delete fine: ' + err.message); }
 });
 
-/* ---------- Attendance Event/Member Actions ---------- */
 attHead.addEventListener('click', (e) => {
-  // Delete event
   const delBtn = e.target.closest('button[data-del-event]');
   if (delBtn) {
     removeEvent(delBtn.dataset.delEvent);
     return; 
   }
 
-  // Edit event
   const editBtn = e.target.closest('button[data-edit-event]');
   if (editBtn) {
     const id = editBtn.dataset.editEvent;
@@ -1826,14 +1895,12 @@ attHead.addEventListener('click', (e) => {
 });
 
 attBody.addEventListener('click', async (e) => {
-  // Delete member
   const delBtn = e.target.closest('button[data-del-member]');
   if (delBtn) {
     removeMember(delBtn.dataset.delMember);
     return;
   }
 
-  // Edit member
   const editBtn = e.target.closest('button[data-edit-member]');
   if (editBtn) {
     const id = editBtn.dataset.editMember;
@@ -1845,7 +1912,6 @@ attBody.addEventListener('click', async (e) => {
     return;
   }
 
-  // Cell toggle
   const btn = e.target.closest('.cell-btn');
   if (!btn) return;
 
@@ -1900,8 +1966,6 @@ attBody.addEventListener('change', async (e) => {
   await bulkSetAttendanceForMember(memberId, value);
   sel.value = '';
 });
-/* ---------- Treasurer Logic ---------- */
-// 1. RENDER
 function renderTreasurer(){
   if (!treBody) return;
 
@@ -1946,13 +2010,11 @@ function renderTreasurer(){
     </tr>`;
   }).join('');
 
-  // Calculate Net for the badge
   const net = inc - exp;
   if (treBadge) {
     treBadge.textContent = `${data.length} records · Net ₹ ${net.toLocaleString()}`;
   }
 
-  // Update KPIs and Chart with filtered data
   renderTreasurerInsights(data);
 }
 
@@ -1973,7 +2035,6 @@ function renderTreasurerInsights(data){
   document.getElementById('treExp').textContent = `₹ ${fmt(exp)}`;
   document.getElementById('treNet').textContent = `₹ ${fmt(net)}`;
 
-  // Sort by date for chart
   const rows = [...(data||[])].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   
   let running = 0;
@@ -1995,12 +2056,10 @@ function renderTreasurerInsights(data){
   }
 }
 
-// Add Modal Open
 if (treAddBtn) treAddBtn.onclick = () => {
   openModal("addTransModal");
 };
 
-// Bill Preview in Add Modal
 if (transBill) {
   transBill.addEventListener("change", () => {
     const file = transBill.files[0];
@@ -2019,7 +2078,6 @@ if (transBill) {
   });
 }
 
-// --- UPLOAD LOGIC ---
 const TREASURY_GAS_URL = "https://script.google.com/macros/s/AKfycbxhSGPm2HFUxUhZVLS16zKPiTV4Dnmxtz0CWC_OvH9KJobLYQSrSiAr3BcSIWS3-4Qtcg/exec";
 
 function readAsBase64(file) {
@@ -2030,14 +2088,11 @@ function readAsBase64(file) {
   });
 }
 
-// Find and replace the uploadBillToDrive function in admin.js
 async function uploadBillToDrive(file) {
   if (!file) return null;
   
-  // Convert file to base64
   const base64 = await readAsBase64(file);
   
-  // Prepare payload
   const payload = JSON.stringify({
     action: "uploadBill",
     fileName: file.name,
@@ -2045,7 +2100,6 @@ async function uploadBillToDrive(file) {
   });
   
   try {
-    // "Content-Type: text/plain" is crucial for Google Apps Script CORS
     const res = await fetch(TREASURY_GAS_URL, { 
       method: "POST", 
       body: payload,
@@ -2065,54 +2119,9 @@ async function uploadBillToDrive(file) {
 
   } catch (err) {
     console.error("Upload Error:", err);
-    // If it fails, we throw an error so the main Save function stops
     throw new Error("Bill upload failed. (Check: Is the script deployed as 'Anyone'?)");
   }
 }
-/*
-addTransForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = addTransForm.querySelector('button[type="submit"]');
-  const prevText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Saving...";
-
-  try {
-    const name = transName.value.trim();
-    const type = transType.value;
-    const amount = Number(transAmount.value);
-    const avenue = transAvenue.value;
-    
-    const paidBy = transPaidBy.value.trim();
-    const reimburse = transReimburse.value.trim();
-    const cheque = transCheque.value.trim();
-
-    const date = transDate.value;
-    const billFile = transBill.files[0];
-    let billUrl = "";
-
-    if (billFile) {
-      billUrl = await uploadBillToDrive(billFile);
-    }
-
-    await db.collection("treasury").add({
-      name, type, amount, avenue, date,
-      paidBy, reimburse, cheque, 
-      billUrl,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      createdBy: auth.currentUser.uid
-    });
-
-    closeModal("addTransModal");
-    alert("Transaction saved!");
-  } catch (err) {
-    console.error(err);
-    alert("Error: " + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = prevText;
-  }
-}); */
 addTransForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -2136,7 +2145,6 @@ addTransForm.addEventListener('submit', async (e) => {
     alert("Failed to add transaction: " + err.message);
   }
 });
-// 3. EDIT POPULATION
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-edit-tre]");
   if (!btn) return;
@@ -2147,19 +2155,16 @@ document.addEventListener("click", (e) => {
 
   document.getElementById("editTransId").value = id;
   
-  // Populate fields
   document.getElementById("editTransName").value = t.name || "";
   document.getElementById("editTransType").value = t.type || "income";
   document.getElementById("editTransAmount").value = t.amount || 0;
   document.getElementById("editTransAvenue").value = t.avenue || "";
   document.getElementById("editTransDate").value = (t.date || "").slice(0,10);
   
-  // NEW FIELDS
   editTransPaidBy.value = t.paidBy || "";
   editTransReimburse.value = t.reimburse || "";
   editTransCheque.value = t.cheque || "";
 
-  // Bill preview
   if (t.billUrl) {
     editTransBillPreview.innerHTML = `
       <img src="${getGdriveImageUrl(t.billUrl)}"
@@ -2173,7 +2178,6 @@ document.addEventListener("click", (e) => {
   openModal("editTransModal");
 });
 
-// 4. UPDATE TRANSACTION SUBMIT
 editTransForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = editTransForm.querySelector('button[type="submit"]');
@@ -2190,7 +2194,6 @@ editTransForm.addEventListener("submit", async (e) => {
       avenue: editTransAvenue.value.trim(),
       date: editTransDate.value,
       
-      // NEW FIELDS
       paidBy: editTransPaidBy.value.trim(),
       reimburse: editTransReimburse.value.trim(),
       cheque: editTransCheque.value.trim(),
@@ -2212,7 +2215,6 @@ editTransForm.addEventListener("submit", async (e) => {
   }
 });
 
-// Delete Transaction
 document.addEventListener('click', async (e) => {
   const delBtn = e.target.closest('button[data-del-tre]');
   if (!delBtn) return;
@@ -2225,8 +2227,6 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-/* ---------- Export Logic ---------- */
-// Treasury Export
 function exportTreasuryToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
 
@@ -2273,7 +2273,6 @@ if (exportTreXlsxBtn) {
   exportTreXlsxBtn.addEventListener('click', exportTreasuryToExcel);
 }
 
-// Attendance Export
 function exportAttendanceToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
   const { members, events } = getFilteredMembersAndEvents();
@@ -2303,7 +2302,6 @@ if (exportXlsxBtn) {
   exportXlsxBtn.addEventListener('click', exportAttendanceToExcel);
 }
 
-// BOD Export
 function exportBodAttendanceToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
   const header = [
@@ -2336,7 +2334,6 @@ if (exportBodXlsxBtn) {
   exportBodXlsxBtn.addEventListener('click', exportBodAttendanceToExcel);
 }
 
-/* ---------- Delete / Update Helpers ---------- */
 async function removeMember(memberId){
   const m = MEMBERS.find(x => x.id === memberId);
   if (!confirm(`Delete member "${m?.name || memberId}"? This also deletes their attendance.`)) return;
@@ -2362,12 +2359,10 @@ async function removeEvent(eventId){
   }
 }
 
-/* Filters */
 [memberSearch, eventSearch, monthFilter, avenueFilter].forEach(el => {
   if (el) el.addEventListener('input', renderGrid);
 });
 
-/* Modal Logic Helpers (Edit Forms) */
 if (editMemberForm) {
   editMemberForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2477,7 +2472,6 @@ if (document.getElementById('bodMeetCancel')) document.getElementById('bodMeetCa
 if (document.getElementById('memCancel')) document.getElementById('memCancel').onclick = () => closeModal('editMemberModal');
 if (document.getElementById('evCancel'))  document.getElementById('evCancel').onclick  = () => closeModal('editEventModal');
 
-// Treasury Filter Listeners
 if (treFilterType) treFilterType.addEventListener('change', renderTreasurer);
 if (treFilterMonth) treFilterMonth.addEventListener('change', renderTreasurer);
 if (treFilterAvenue) treFilterAvenue.addEventListener('change', renderTreasurer);

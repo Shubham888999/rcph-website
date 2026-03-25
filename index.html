@@ -76,12 +76,10 @@
   </script>
 </head>
 <body>
-  <!-- site content -->
 <div class="logo-strip">
   <img src="images/logo1.png" alt="AURA Logo Year Theme" class="logo-image" />
   <img src="images/logo2.png" alt="Rotaract District 3131 Logo" class="logo-image logo-large" />
   <img src="images/logo3.png" alt="Rotaract Club of Pune Heritage Official Logo" class="logo-image" />
-  <!--<img src="images/logo4.png" alt="New Partner Logo" class="logo-image" />-->
 </div>
 
 <nav class="navbar">
@@ -97,7 +95,6 @@
      🍷 Register - Madhushala 4.0
   </a>
 </li>
-    <!--<li><a href="madhushala.html">🍷 Madhushala 4.0</a></li>-->
     <li><a href="#home">Home</a></li>
     <li><a href="about.html">About</a></li>
     <li><a href="#featured-projects">Projects</a></li>
@@ -120,23 +117,6 @@
       <h1>Rotaract Club of Pune Heritage</h1>
       <h2>RID 3131 | ZONE 4</h2>
       <p class="theme-text">CREATE.CONNECT.CONTRIBUTE</p>
-
-          <!--Baking CTA (re-using coffee widget IDs so JS keeps working) 
-<div class="coffee-widget" id="coffeeWidget">
-<div id="coffeeLottie" class="coffee-lottie"></div>
-
-  <img src="images/tiramisu-emoji.svg"
-       alt="Tiramisu icon"
-       class="tiramisu-emoji">
-
-  <div class="coffee-text-wrap">
-    <p class="coffee-text-main">Whisking in progress</p>
-    <p class="coffee-text-sub">
-      Tiramisu Making - 14th&nbsp;December · Tap for event details
-    </p>
-  </div>
-</div>
--->
 
     </div>
   </section>
@@ -182,7 +162,6 @@
   <h2>Featured Rotaract Service Projects by Rotaract Club of Pune Heritage</h2>
 
   <div class="projects-grid">
-    <!-- Project 1 -->
     <div class="project-card">
       <img src="images/poh.jpg" alt="Pages of Hope by Rotaract Club of Pune Heritage District 3131" loading="lazy">
       <h3>Pages of Hope</h3>
@@ -191,7 +170,6 @@
       </ul>
     </div>
 
-    <!-- Project 2 -->
     <div class="project-card">
       <img src="images/insideout-1.jpg" alt="Inside Out by Rotaract Club of Pune Heritage District 3131" loading="lazy">
       <h3>Inside Out</h3>
@@ -200,7 +178,6 @@
       </ul>
     </div>
 
-    <!-- Project 3 -->
     <div class="project-card">
       <img src="images/Edureach1.jpg" alt="Project EduReach by Rotaract Club of Pune Heritage District 3131" loading="lazy">
       <h3>Project EduReach</h3>
@@ -220,13 +197,10 @@
   </div> -->
 </section>
 
-    <!-- Calendar -->
-<!-- Calendar -->
 <section id="calendar" class="section-box hideable-section">
   <h2>Event Calendar</h2>
 
   <div class="calendar-container">
-    <!-- LEFT COLUMN: Legend box -->
     <aside class="legend-box">
       <h3>Legend</h3>
 <div class="legend-item"><span class="legend-swatch" style="background:#1abc9c;"></span><abbr title="International Service Avenue">ISD</abbr></div>
@@ -243,19 +217,16 @@
 </div>
     </aside>
 
-    <!-- RIGHT COLUMN: Calendar itself -->
     <div id="rcph-calendar"></div>
   </div>
 </section>
 
 
-<!-- ================= Album Wall ================= -->
 <section id="gallery" class="section-box">
   <h2>Gallery</h2>
   <div id="awGrid" class="aw-grid"></div>
 </section>
 
-<!-- ================= Album Modal (3x3) ================= -->
 <div id="awModal" class="aw-modal" aria-hidden="true">
   <div class="aw-modal-inner">
     <button id="awClose" class="aw-close" aria-label="Close">×</button>
@@ -264,7 +235,6 @@
   </div>
 </div>
 
-<!-- (Optional) Simple lightbox for single-photo zoom -->
 <div id="awLightbox" class="aw-lightbox" aria-hidden="true">
   <button id="awLightClose" class="aw-close" aria-label="Close">×</button>
   <img id="awLightImg" alt="">
@@ -272,13 +242,11 @@
 
 
 
-    <!-- Join Us -->
     <section id="join" class="section-box hideable-section">
       <h2>Join Rotaract Club of Pune Heritage</h2>
       <p>Want to become a member? <a href="https://forms.gle/PH3zinWdkiwvPu1g6" target="_blank">Fill out this form</a>.</p>
     </section>
 
-    <!-- Contact -->
     <section id="contact" class="section-box">
       <h2>Contact Us</h2>
       <div class="contact-cards">
@@ -295,7 +263,6 @@
     </section>
   </main>
 
-  <!-- Modal -->
   <div id="eventModal" class="modal">
     <div class="modal-content">
       <span class="close-btn">&times;</span>
@@ -307,7 +274,6 @@
     </div>
   </div>
 
-  <!-- FullCalendar + Custom Scripts -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.9.6/lottie.min.js" defer></script>
@@ -323,7 +289,6 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
   <script src="script.js"></script>
 
-  <!-- Hamburger Toggle Script -->
   <script>
     const toggle = document.querySelector('.mobile-nav-toggle');
     const navLinks = document.querySelector('.nav-links');
@@ -335,108 +300,16 @@
     const popup = document.getElementById('eventPopup');
     const closeBtn = document.getElementById('closePopup');
 
-    // Show it with a delay
     setTimeout(() => {
       popup.style.display = 'flex';
     }, 1000);
 
-    // Close when user clicks close
     closeBtn.addEventListener('click', () => {
       popup.style.display = 'none';
     });
   });
   </script>
 
-
-<!-- Event Popup Modal -->
-<!--<div id="eventPopup" class="popup-overlay">
-  <div class="popup-box">
-    <h3>🚨 Next Event:  PAD AID - DONATION DRIVE</h3>
-    <p><strong>Description:</strong> We are hosting a sanitary pad collection and distribution drive to support underprivileged school girls.</p>
-    <p><strong>Date:</strong> October 11, 2025</p>-->
-    <!-- <p><strong>Time:</strong> 10AM - 1PM</p> -->
-    <!-- <p><strong>Venue:</strong> Amrut Kalash Society, Karve Nagar, Pune</p> -->
-    <!-- <p>With your support, we can promote menstrual hygiene, dignity, and comfort for many young girls who truly need it.</p>
-    <button id="closePopup"  class="popup-close-btn">Close</button>
-  </div>
-</div>-->
-    
-<!-- Coffee Widget 
-<div class="coffee-widget" id="coffeeWidget">
-  <div id="coffeeLottie" class="coffee-lottie"></div>
-  <p class="coffee-text">See what's brewing. Click Here</p>
-</div>-->
-
-
-<!-- Coffee Popup 
-<div class="popup-overlay" id="coffeePopup" style="display:none;">
-  <div class="popup-box">
-    <h2>Here's your coffee ☕</h2>
-    <p>While you enjoy it, check out our newly updated Board of Directors panel for RIY 25-26!</p>
-    <a href="bod.html">
-      <button class="popup-close-btn">View Board of Directors</button>
-    </a>
-    <button class="popup-close-btn" id="coffeeClose">Close</button>
-  </div>
-</div>-->
-
-<!-- Event Popup 
-<div class="popup-overlay" id="coffeePopup" style="display:none;">
-  <div class="popup-box">
-    <h2>Tiramisu Making Workshop</h2>
-
-    <p><strong>Date:</strong> 14th December</p>
-    <p><strong>Time:</strong> TBA</p>
-    <p><strong>Venue:</strong> TBA</p>
-
-    <p style="margin-top: 0.75rem;">
-      Join us for a hands-on Tiramisu baking session! Learn how to layer,
-      whip and plate the perfect dessert while bonding with fellow Rotaractors.
-    </p>
-        <p style="margin-top: 0.75rem;">
-          Contact us for more details.
-    </p>
-
-
-    <button class="popup-close-btn" id="coffeeClose">
-      Close
-    </button>
-  </div>
-</div>
--->
-
-<!-- ===== Sticky Reel Widget (Arunoday) ===== 
-<button id="reelWidget" class="reel-widget" aria-label="Watch Installation Reel">
-  <span class="reel-widget__badge">🌺 Arunoday</span>
-  <span class="reel-widget__text">Watch Installation Reel</span>
-</button>
-
-===== Reel Modal ===== 
-<div id="reelModal" class="reel-modal" aria-hidden="true">
-  <div class="reel-modal__inner" role="dialog" aria-modal="true" aria-label="Installation Reel">
-    <div class="reel-modal__head">
-      <h3>Installation Ceremony • Arunoday</h3>
-      <button id="reelClose" class="reel-close" aria-label="Close">×</button>
-    </div>
-
-<div class="reel-embed">
-  <blockquote
-    class="instagram-media"
-    data-instgrm-permalink="https://www.instagram.com/reel/DTN349zjfcD/"
-    data-instgrm-version="14"
-    style="background:#000; border-radius:12px; margin:0 auto; max-width: 900px; width: 100%;">
-  </blockquote>
-</div>
-
-<script async src="https://www.instagram.com/embed.js"></script>
-
-    <a class="reel-cta" href="https://www.instagram.com/rc_pune_heritage/" target="_blank" rel="noopener">
-      View more on Instagram →
-    </a>
-  </div>
-</div>
--->
-<!-- ================= Madhushala 4.0 Popup ================= -->
 <div id="madhushalaPopup" class="popup-overlay" style="display:none;">
   <div class="popup-box madhushala-box">
     <h2>Time to clink your glasses! 🥂</h2>

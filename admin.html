@@ -255,6 +255,25 @@
 .mail-menu__dropdown[hidden]{
   display: none !important;
 }
+#insightsPanel{
+  margin-bottom: 20px;
+}
+
+#insightsGrid .kpi{
+  flex: 1 1 220px;
+}
+
+.insight-item{
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #141414;
+  border: 1px solid var(--color-border,#2e2e2e);
+  line-height: 1.45;
+}
+
+.insight-item strong{
+  color: var(--color-accent-l,#F4B43A);
+}
   </style>
 </head>
 <body>
@@ -268,9 +287,45 @@
     <a href="login.html">Logout</a>
   </div>
 </nav>
-  <div class="admin-wrap">
-    <div class="admin-card" id="attendance">
-      <h1 class="admin-title">Admin Panel</h1>
+<div class="admin-wrap">
+
+  <div class="admin-card" id="insightsPanel">
+    <div class="topbar" style="margin-bottom:14px;">
+      <h1 class="admin-title" style="margin:0;">Admin Panel</h1>
+      <span class="badge">Insights</span>
+    </div>
+
+    <div class="toolbar" id="insightsGrid" style="gap:14px; align-items:stretch; flex-wrap:wrap;">
+      <div class="kpi" style="min-width:220px;">
+        <div class="kpi-label">Overall Attendance</div>
+        <div class="kpi-value" id="insightAttendanceHealth">–</div>
+      </div>
+
+      <div class="kpi" style="min-width:220px;">
+        <div class="kpi-label">Low Attendance Members</div>
+        <div class="kpi-value" id="insightLowAttendance">–</div>
+      </div>
+
+      <div class="kpi" style="min-width:220px;">
+        <div class="kpi-label">Most Active Avenue</div>
+        <div class="kpi-value" id="insightTopAvenue">–</div>
+      </div>
+
+      <div class="kpi" style="min-width:220px;">
+        <div class="kpi-label">Recent Event Trend</div>
+        <div class="kpi-value" id="insightTrend">–</div>
+      </div>
+    </div>
+
+    <div class="admin-card" style="margin-top:14px; padding:14px 16px;">
+      <div style="font-weight:800; margin-bottom:10px;">Quick Insights</div>
+      <div id="insightSummaryList" style="display:grid; gap:8px; color:#d8e6e6;">
+        <div>Loading insights...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-card" id="attendance">
       <div class="topbar">
         <h2>Attendance Manager <span id="countBadge" class="badge"></span></h2>
 <div style="display:flex; gap:8px; align-items:center;">
