@@ -97,7 +97,7 @@ auth.onAuthStateChanged(async (user) => {
         }
         if (goBodBtn) {
           goBodBtn.style.display = 'inline-block';
-          goBodBtn.onclick = () => location.href = 'bodlogin.html';
+          goBodBtn.onclick = () => location.href = 'BOD%20Event%20manager/bodlogin.html';
         }
       } else {
         // hide them for dzr/admin
@@ -112,7 +112,7 @@ auth.onAuthStateChanged(async (user) => {
 
     // ❌ Any other role is not allowed here
     if (role === 'bod') {
-      location.href = 'bodlogin.html';
+      location.href = 'BOD%20Event%20manager/bodlogin.html';
     } else {
       location.href = 'login.html';
     }
@@ -699,3 +699,4 @@ function attachListeners(){
   bodAllBtn.addEventListener('click', () => { for (const o of bodSelect.options) o.selected = true; renderBOD(); });
   meetAllBtn.addEventListener('click', () => { for (const o of meetSelect.options) o.selected = true; renderBOD(); });
 }
+

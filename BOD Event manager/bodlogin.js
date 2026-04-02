@@ -113,6 +113,10 @@ function toast(msg, ms=1800){
   setTimeout(()=>toastEl.classList.remove('show'), ms);
 }
 
+function avenueClassName(av) {
+  return 'avenue-' + String(av || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
 const exportSubsBtn = document.getElementById('exportSubsBtn');
 if (exportSubsBtn) {
   // Keep disabled until XLSX is present
@@ -210,7 +214,7 @@ if (form) {
 
 /* ---------- Auth guard ---------- */
 auth.onAuthStateChanged(async (user) => {
-  if (!user) { location.href = 'login.html'; return; }
+  if (!user) { location.href = '../login.html'; return; }
 
   try {
     const r = await db.collection('roles').doc(user.uid).get();
@@ -223,7 +227,7 @@ const goDZRBtn = document.getElementById('goDZRBtn');
 if (goDZRBtn) {
     if (IS_PRESIDENT) {
         goDZRBtn.style.display = 'inline-block';
-        goDZRBtn.onclick = () => location.href = 'dzrvisit.html';
+        goDZRBtn.onclick = () => location.href = '../dzrvisit.html';
     } else {
         goDZRBtn.style.display = 'none';
     }
@@ -233,7 +237,7 @@ if (goDZRBtn) {
     if (role === 'admin' || role === 'president') {
       if (goAdminBtn) {
         goAdminBtn.style.display = 'inline-block';
-        goAdminBtn.onclick = () => { location.href = 'admin.html'; };
+        goAdminBtn.onclick = () => { location.href = '../admin.html'; };
       }
     } else {
       if (goAdminBtn) goAdminBtn.style.display = 'none';
@@ -241,7 +245,7 @@ if (goDZRBtn) {
 
     // kick non-bod/non-admin users
     if (role !== 'bod' && role !== 'admin' && role !== 'president') {
-      location.href = 'login.html';
+      location.href = '../login.html';
       return;
     }
 
@@ -264,7 +268,7 @@ if (goDZRBtn) {
 if (signOutBtn) {
   signOutBtn.onclick = async () => {
     await auth.signOut();
-    location.href = 'login.html';
+    location.href = '../login.html';
   };
 }
 
@@ -486,7 +490,7 @@ if (avFilter) {
       const imgUrl = getGdriveImageUrl(r.previewLink);
 
       const chips = (Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []))
-        .map(av => `<span class="pill">${String(av).toUpperCase()}</span>`)
+        .map(av => `<span class="pill avenue-chip ${avenueClassName(av)}"><span class="avenue-dot" aria-hidden="true"></span>${String(av).toUpperCase()}</span>`)
         .join(' ');
       
       return `
@@ -744,3 +748,7 @@ document.addEventListener('click', (e) => {
     }
   }
 });
+
+
+
+

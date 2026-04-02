@@ -15,7 +15,7 @@ function guardPage() {
     const role = await getUserRole(user.uid);
 
     if (role !== requiredRole) {
-      window.location.href = (role === 'admin') ? 'admin.html' : 'bodlogin.html';
+      window.location.href = (role === 'admin') ? 'admin.html' : 'BOD%20Event%20manager/bodlogin.html';
       return;
     }
 
@@ -23,3 +23,5 @@ function guardPage() {
   });
 }
 guardPage();
+
+

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>RCPH • BOD Event Manager</title>
+
+  <link rel="stylesheet" href="../style.css"/>
+  <link rel="stylesheet" href="../mobile.css" media="only screen and (max-width: 768px)"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="bodlogin.css?v=1"/>
+</head>
+<body>
+  <div class="bod-wrap">
+    <div class="card">
+      <div class="titlebar">
+        <h2>BOD - Event Manager</h2>
+        <div style="display:flex; gap:8px; align-items:center">
+          <button id="goAdminBtn" class="btn btn-outline" style="display:none;">Admin Panel</button>
+          <button id="goDZRBtn" class="btn btn-outline" style="display:none;">Go to DZR Visit</button>
+          <button class="icon-btn" id="lockBodEventsBtn" title="Toggle lock">🔒</button>
+          <span id="lockBodEventsState" class="badge"></span>
+          <span class="pill" id="whoami">Signed in</span>
+          <button id="signOutBtn" class="btn btn-outline"><i class="fa-solid fa-arrow-right-from-bracket"></i>&nbsp; Sign out</button>
+        </div>
+      </div>
+
+
+
+<form id="bodEventForm" class="fm">
+
+  <div class="form-grid-row row-split-2-1">
+    <label>
+      <span>Event name</span>
+      <input id="evName" type="text" placeholder="e.g., Pad-Aid Drive" required />
+    </label>
+    <label>
+      <span>Conducted by (your name)</span>
+      <input id="conductedBy" type="text" placeholder="e.g., Rtr. ABC XYZ" required />
+    </label>
+  </div>
+
+  <div class="form-grid-row row-split-3">
+    <label>
+      <span>Start date</span>
+      <input id="eventStart" type="date" required />
+    </label>
+    <label>
+      <span>End date</span>
+      <input id="eventEnd" type="date" required />
+    </label>
+    <label>
+      <span>Event time (optional)</span>
+      <input id="eventTime" type="time" />
+    </label>
+  </div>
+  
+  <div class="form-grid-row row-split-tall">
+    <label>
+      <span>Description</span>
+      <textarea id="evDesc" placeholder="Short description for avenue reporting…" required></textarea>
+    </label>
+    <label>
+      <span>Avenues (pick atleast one)</span>
+      <select id="evAvenue" multiple size="8">
+        <option>ISD</option><option>CMD</option><option>CSD</option><option>PDD</option>
+        <option>RRRO</option><option>PRO</option><option>DEI</option><option>GBM</option>
+      </select>
+      <small class="note">Tip: Ctrl/Cmd-click (or long-press on mobile) to select multiple.</small>
+    </label>
+  </div>
+
+<div> 
+    <span>Event Images</span>
+    <div class="input-group"> <label for="imageUploader" class="file-upload-label">
+        Browse Files...
+      </label>
+      
+      <input id="imageUploader" type="file" multiple accept="image/png, image/jpeg, image/gif, image/webp" />
+      
+      <span id="file-upload-names">No files selected</span> </div>
+      <span id="selectedCountPill" class="pill" hidden>0 selected</span>
+      <div id="selectedThumbs" class="thumbs" hidden></div>
+    <small class="note">Upload one or more images. The first image will be used as the preview.</small>
+  </div>
+
+  <div class="actions">
+    <button type="reset" class="btn btn-outline">Clear</button>
+    <button type="submit" class="btn">Submit</button>
+  </div>
+
+  <div id="status" class="note"></div>
+</form>
+
+    </div>
+
+      <div class="info-banner" style="margin: 20px 0;"">
+  <div class="info-banner__icon">📁</div>
+  <div class="info-banner__text">
+    <strong>View All Event Photos:</strong>
+    <a class="info-banner__link" href="https://drive.google.com/drive/folders/1_NemT0BfUiW1TW0teS8p-kMxfhVjj6tT?usp=drive_link" target="_blank" rel="noopener">
+      All event submissions and photos are backed up to this central drive.
+    </a>
+  </div>
+</div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="titlebar" style="margin-bottom:8px">
+        <h3 style="margin:0">BOD Submissions</h3>
+      </div>
+
+<!-- KPI SUMMARY -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Total events</div>
+    <div id="kpiTotal" class="kpi-value">0</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">This month</div>
+    <div id="kpiThisMonth" class="kpi-value">0</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-label">Top conductors</div>
+    <div id="kpiTopConductors" class="kpi-value">—</div>
+  </div>
+
+  <div class="kpi-card avenue-card">
+    <div class="kpi-label">By avenue</div>
+    <div id="kpiAvenues" class="avenue-chips">
+      </div>
+  </div>
+</div>
+
+<div class="filterbar">
+  <label class="pill">
+    <span>Avenue</span>
+    <select id="filterAvenue" style="background:transparent;border:0;color:#1564b2">
+      <option value="">All</option>
+      <option>ISD</option><option>CMD</option><option>CSD</option><option>PDD</option>
+      <option>RRRO</option><option>PRO</option><option>DEI</option><option>GBM</option>
+    </select>
+  </label>
+
+  <label class="pill">
+    <span>Month</span>
+    <select id="filterMonth" style="background:transparent;border:0;color:#1564b2">
+      <option value="">All</option>
+    </select>
+  </label>
+
+  <label class="pill">
+    <input type="checkbox" id="filterMine" style="accent-color:#1564b2;vertical-align:middle"/>
+    <span>My submissions</span>
+  </label>
+
+  <div class="search">
+    <input id="filterSearch" type="text" placeholder="Search name/description…">
+  </div>
+
+  <span class="pill" id="countPill">0 items</span>
+  <span class="flex-1"></span>
+  <button id="exportSubsBtn" class="btn">Export to Excel</button>
+</div>
+
+      <div id="items" class="grid"></div>
+
+    </div>
+  </div>
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <script>    // --- SAME PROJECT CONFIG ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyC2Q7o_XeI-FFzO1W2K8FTyHtn84-4sINY",
+      authDomain: "rcph-admin.firebaseapp.com",
+      projectId: "rcph-admin",
+      storageBucket: "rcph-admin.firebasestorage.app",
+      messagingSenderId: "8400886293",
+      appId: "1:8400886293:web:449919cafaae21ba358c1c",
+      measurementId: "G-H6GVC7VZ88"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.2/dist/xlsx.full.min.js"></script>
+<!-- Remove your old ensureSheetJS block and paste this one instead -->
+<script>
+  (function loadSheetJS() {
+    // Try several sources; stop at the first that works
+    var sources = [
+      'https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js', // official
+      'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.2/xlsx.full.min.js',
+      'https://cdn.jsdelivr.net/npm/xlsx@0.20.2/dist/xlsx.full.min.js',
+      'https://unpkg.com/xlsx@0.20.2/dist/xlsx.full.min.js',
+      'libs/xlsx.full.min.js'  // <- local fallback (put file here)
+    ];
+    var i = 0;
+
+    function next() {
+      if (window.XLSX || i >= sources.length) return;
+      var s = document.createElement('script');
+      s.src = sources[i++];
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.onload = function () {
+        console.log('SheetJS loaded from:', s.src);
+        // enable export button if your JS disables it until XLSX is ready
+        var btn = document.getElementById('exportSubsBtn');
+        if (btn) btn.disabled = false;
+      };
+      s.onerror = function () {
+        console.warn('Failed to load:', s.src);
+        next();
+      };
+      document.head.appendChild(s);
+    }
+    next();
+  })();
+
+/* ---------- Month dropdown builder ---------- */
+function buildMonthFilter(all) {
+  if (!filterMonth) return;
+
+  // Remember selection so we don’t reset user’s choice
+  const selected = filterMonth.value || "";
+
+  // Build a unique list of YYYY-MM values from eventDate (YYYY-MM-DD)
+  const months = Array.from(
+    new Set(
+      all
+        .map(r => (r.eventStart || "").slice(0, 7))
+        .filter(Boolean)
+    )
+  ).sort().reverse(); // newest first
+
+  // Rebuild options
+  filterMonth.innerHTML = `<option value="">All</option>` +
+    months.map(m => `<option value="${m}">${m}</option>`).join("");
+
+  // Restore prior selection if still available
+  if (selected && [...filterMonth.options].some(o => o.value === selected)) {
+    filterMonth.value = selected;
+  }
+}
+
+/* ---------- KPI cards ---------- */
+function updateBodKpis(rows) {
+  // DOM nodes (exist in BOD%20Event%20manager/bodlogin.html)
+  const kpiTotal = document.getElementById('kpiTotal');
+  const kpiThis  = document.getElementById('kpiThisMonth');
+  const kpiTop   = document.getElementById('kpiTopConductors');
+  const kpiAvs   = document.getElementById('kpiAvenues');
+
+  // Total (respecting current filters)
+  if (kpiTotal) kpiTotal.textContent = String(rows.length);
+
+  // “This month” = items whose eventDate is in the current YYYY-MM
+  const nowYM = new Date().toISOString().slice(0, 7);
+  const thisMonthCount = rows.filter(r => (r.eventStart || '').startsWith(nowYM)).length;
+  if (kpiThis) kpiThis.textContent = String(thisMonthCount);
+
+  // Top conductors (by “conductedBy”)
+  const tally = {};
+  rows.forEach(r => {
+    const who = (r.conductedBy || '').trim();
+    if (!who) return;
+    tally[who] = (tally[who] || 0) + 1;
+  });
+  const top = Object.entries(tally)
+    .sort((a,b) => b[1]-a[1])
+    .slice(0, 2)
+    .map(([name, n]) => `${name} (${n})`)
+    .join(', ') || '—';
+  if (kpiTop) kpiTop.textContent = top;
+
+  // By avenue chips
+if (kpiAvs) {
+  const avTallies = {};
+  rows.forEach(r => {
+    const list = Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []);
+    list.forEach(av => {
+      const key = String(av).toUpperCase();
+      avTallies[key] = (avTallies[key] || 0) + 1;
+    });
+  });
+  const chips = Object.entries(avTallies)
+    .sort((a,b)=> b[1]-a[1])
+    .map(([av, n]) => `<span class="pill avenue-chip ${String(av).toLowerCase()}" title="${n}"><span class="avenue-dot" aria-hidden="true"></span>${av}: <strong>${n}</strong></span>`)
+    .join('') || '<span class="pill">—</span>';
+  kpiAvs.innerHTML = chips;
+}
+}
+//<p>Hello</p>
+
+</script>
+
+
+<div id="toast" class="toast">Saved!</div>
+
+</div>
+
+  <div id="editSubModal" class="adm-modal" aria-hidden="true">
+    <div class="adm-modal__sheet">
+      <div class="adm-modal__head">
+        <h3>Edit Submission</h3>
+        <button class="adm-close" data-close="editSubModal" aria-label="Close">×</button>
+      </div>
+      <form id="editSubForm" class="adm-form" autocomplete="off">
+        <input type="hidden" id="editSubId">
+        
+        <div class="form-grid-row row-split-2-1">
+          <label class="adm-field">
+            <span>Event name</span>
+            <input id="editEvName" type="text" required>
+          </label>
+          <label class="adm-field">
+            <span>Conducted by (your name)</span>
+            <input id="editConductedBy" type="text" required>
+          </label>
+        </div>
+        
+        <div class="form-grid-row row-split-3">
+          <label class="adm-field">
+            <span>Start date</span>
+            <input id="editEventStart" type="date" required />
+          </label>
+          <label class="adm-field">
+            <span>End date</span>
+            <input id="editEventEnd" type="date" required />
+          </label>
+          <label class="adm-field">
+            <span>Event time (optional)</span>
+            <input id="editEventTime" type="time" />
+          </label>
+        </div>
+
+        <div class="form-grid-row row-split-tall">
+          <label class="adm-field">
+            <span>Description</span>
+            <textarea id="editEvDesc" rows="6" required></textarea>
+          </label>
+          <label class="adm-field">
+            <span>Avenues (pick atleast one)</span>
+            <select id="editEvAvenue" multiple required>
+              <option>ISD</option><option>CMD</option><option>CSD</option><option>PDD</option>
+              <option>RRRO</option><option>PRO</option><option>DEI</option><option>GBM</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="adm-field">
+          <span>Drive folder (paste full URL or folder name)</span>
+          <input id="editDriveFolder" type="text">
+        </label>
+        
+        <label class="adm-field">
+          <span>Preview Image Link (paste full URL)</span>
+          <input id="editPreviewLink" type="text">
+        </label>
+        
+        <div class="adm-actions">
+          <button type="button" class="btn btn-outline" data-close="editSubModal">Cancel</button>
+          <button type="submit" class="btn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+<div id="loader" class="loader-overlay" aria-hidden="true">
+    <div class="spinner"></div>
+    <div id="loaderText" class="loader-text">Working...</div>
+  </div>
+
+  <div id="imageLightbox" class="lightbox-modal" aria-hidden="true">
+  <div id="toast" class="toast">Saved!</div>
+  <div id="imageLightbox" class="lightbox-modal" aria-hidden="true">
+    <button class="lightbox-close" data-close-lightbox>×</button>
+    <img id="lightboxImage" src="" alt="Event Preview">
+  </div>
+<script src="bodlogin.js?v=2"></script>
+<script>
+  (function(){
+    const d = document.getElementById('eventDate');
+    if (d && !d.value) d.value = new Date().toISOString().slice(0,10);
+  })();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

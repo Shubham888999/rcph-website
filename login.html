@@ -65,7 +65,7 @@
     <a href="admin.html" class="btn" style="flex:1;text-align:center"
        data-panel="admin">Admin Panel</a>
 
-    <a href="bodlogin.html" class="btn btn-outline" style="flex:1;text-align:center"
+    <a href="BOD%20Event%20manager/bodlogin.html" class="btn btn-outline" style="flex:1;text-align:center"
        data-panel="bod">BOD Panel</a>
 
     <!-- New: DZR panel, default hidden -->
@@ -131,7 +131,7 @@ async function routeByRole(user) {
     const role = String(snap.data().role || '').toLowerCase();
     const dest = new URLSearchParams(location.search).get('dest');
     if (dest === 'admin') { location.href = 'admin.html'; return; }
-    if (dest === 'bod')   { location.href = 'bodlogin.html'; return; }
+    if (dest === 'bod')   { location.href = 'BOD%20Event%20manager/bodlogin.html'; return; }
 
     if (role === 'admin' || role === 'president') {
       const chooser = document.getElementById('panelChooser');
@@ -146,7 +146,7 @@ async function routeByRole(user) {
 
       const preferred = localStorage.getItem('preferredPanel');
       if (preferred === 'admin') { location.href = 'admin.html'; return; }
-      if (preferred === 'bod')   { location.href = 'bodlogin.html'; return; }
+      if (preferred === 'bod')   { location.href = 'BOD%20Event%20manager/bodlogin.html'; return; }
       if (preferred === 'dzr' && role === 'president') {
         location.href = 'dzrvisit.html';
         return;
@@ -156,7 +156,7 @@ async function routeByRole(user) {
 
 
     if (role === 'bod') {
-      location.href = 'bodlogin.html';
+      location.href = 'BOD%20Event%20manager/bodlogin.html';
       return;
     }
     if (role === 'dzr') {
@@ -191,3 +191,4 @@ async function routeByRole(user) {
 </script>
 </body>
 </html>
+

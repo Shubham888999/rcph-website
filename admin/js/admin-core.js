@@ -20,7 +20,7 @@ auth.onAuthStateChanged(async (user) => {
         }
     }
     if (role && role !== 'admin' && role !== 'president') {
-      window.location.href = 'bodlogin.html';
+      window.location.href = 'BOD%20Event%20manager/bodlogin.html';
       return;
     }
   } catch (e) {
@@ -77,7 +77,7 @@ signOutBtn.addEventListener('click', async () => {
   location.href = 'login.html';
 });
 if (goBodBtn) {
-  goBodBtn.addEventListener('click', () => location.href = 'bodlogin.html');
+  goBodBtn.addEventListener('click', () => location.href = 'BOD%20Event%20manager/bodlogin.html');
 }
 
 
@@ -210,5 +210,7 @@ unsubTre = db.collection('treasury').orderBy('date','desc').onSnapshot(snap => {
 });
   }
 }
+
+
 
 
