@@ -170,6 +170,11 @@ const insightTopAvenue        = document.getElementById('insightTopAvenue');
 const insightTrend            = document.getElementById('insightTrend');
 const insightSummaryList      = document.getElementById('insightSummaryList');
 
+const accountRequestsPanel  = document.getElementById('accountRequestsPanel');
+const accountRequestsBody   = document.getElementById('accountRequestsBody');
+const accountRequestsBadge  = document.getElementById('accountRequestsBadge');
+const accountRequestFilter  = document.getElementById('accountRequestFilter');
+
 
 let MEMBERS = [];
 let EVENTS  = [];
@@ -184,6 +189,8 @@ let BODATT = {};
 
 let FINES = [];
 let TREAS = []; 
+let USERS = [];
+let PENDING_USERS = [];
 
 let unsubMembers = null;
 let unsubEvents  = null;
@@ -195,8 +202,11 @@ let unsubBodAt   = null;
 let unsubTre     = null;
 let unsubDistEvents = null;
 let unsubDistAtt    = null;
+let unsubUsers = null;
 
 let IS_PRESIDENT = false;
+let IS_ADMIN = false;
+let CURRENT_ROLE = '';
 
 
 

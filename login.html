@@ -2,193 +2,671 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RCPH - Sign In</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    .auth-shell {
+      max-width: 520px;
+      margin: 4rem auto;
+      padding: 0 14px;
+    }
+    .auth-card {
+      background: #1e1e1e;
+      border: 1px solid #2e2e2e;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 10px 28px rgba(0,0,0,.25);
+    }
+    .auth-title {
+      margin: 0 0 14px;
+      text-align: center;
+    }
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .auth-tabs button {
+      border-radius: 10px;
+    }
+    .auth-tabs button[aria-selected="false"] {
+      background: transparent;
+      color: #60C3C4;
+      border: 1px solid #60C3C4;
+    }
+    .auth-field {
+      display: grid;
+      gap: 6px;
+      margin: 10px 0;
+    }
+    .auth-field span {
+      color: #d8e6e6;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .auth-field input,
+    .auth-field select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #2e2e2e;
+      background: #101010;
+      color: #fff;
+    }
+    .auth-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .auth-links {
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+    }
+    .auth-links p {
+      margin: 8px 0 4px;
+      font-size: 14px;
+      color: #ddd;
+      font-weight: 600;
+    }
+    .auth-links a {
+      display: inline-block;
+      color: #6be0dc;
+      font-size: 13px;
+      text-decoration: underline;
+    }
+    .auth-message {
+      color: #ff6b6b;
+      margin-top: 12px;
+      min-height: 1.2em;
+      line-height: 1.45;
+    }
+    .auth-message.ok {
+      color: #7bd88f;
+    }
+    .auth-message.info {
+      color: #d8e6e6;
+    }
+    .panel-chooser {
+      display: none;
+      margin: 1rem 0 0;
+      padding: 12px;
+      border: 1px solid #2e2e2e;
+      border-radius: 12px;
+      background: #161616;
+    }
+    .panel-chooser__actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .panel-chooser__actions a {
+      flex: 1 1 140px;
+      text-align: center;
+    }
+    .otp-box {
+      margin-top: 14px;
+      border-top: 1px solid #333;
+      padding-top: 12px;
+      display: none;
+    }
+    .otp-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .otp-row input {
+      flex: 1 1 180px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #2e2e2e;
+      background: #101010;
+      color: #fff;
+    }
+    .muted-note {
+      color: #bfc9c9;
+      font-size: 13px;
+      line-height: 1.45;
+      margin: 8px 0 0;
+    }
+  </style>
 </head>
 <body>
-  <div style="max-width:420px;margin:4rem auto;padding:16px;background:#1e1e1e;border-radius:12px;">
-    <h2 style="text-align:center;margin-top:0;">Sign In</h2>
-    <input id="email" type="email" placeholder="Email"
-           style="width:100%;padding:10px;margin:.5rem 0;border-radius:8px;border:1px solid #2e2e2e;background:#101010;color:#fff;">
-    <input id="password" type="password" placeholder="Password"
-           style="width:100%;padding:10px;margin:.5rem 0;border-radius:8px;border:1px solid #2e2e2e;background:#101010;color:#fff;">
-    <button id="loginBtn" class="btn" style="width:100%;margin-top:.5rem;">Login</button>
+  <main class="auth-shell">
+    <section class="auth-card">
+      <h2 class="auth-title">RCPH Account</h2>
 
-    <button id="googleBtn" class="btn" style="width:100%;margin-top:.5rem;">
-  Continue with Google
-</button>
-    <div style="margin-top:8px; text-align:right;">
-  <button id="forgotBtn" class="btn btn-outline" style="padding:6px 10px;">Forgot password?</button>
-</div>
+      <div class="auth-tabs" role="tablist" aria-label="Authentication mode">
+        <button id="showLoginTab" class="btn" type="button" aria-selected="true">Sign In</button>
+        <button id="showSignupTab" class="btn" type="button" aria-selected="false">Create Account</button>
+      </div>
 
-<div id="otpBox" style="margin-top:14px; border-top:1px solid #333; padding-top:12px; display:none;">
-  <div style="display:flex; gap:8px; align-items:center;">
-    <input id="otpEmail" type="email" placeholder="Email for OTP"
-      style="flex:2; padding:10px; border-radius:8px; border:1px solid #2e2e2e; background:#101010; color:#fff;">
-    <button id="otpSend" class="btn btn-outline">Get code</button>
-  </div>
+      <form id="loginForm" autocomplete="on">
+        <label class="auth-field">
+          <span>Email</span>
+          <input id="email" type="email" autocomplete="email" required>
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input id="password" type="password" autocomplete="current-password" required>
+        </label>
+        <div class="auth-actions">
+          <button id="loginBtn" class="btn" type="submit">Login</button>
+          <button id="googleBtn" class="btn btn-outline" type="button">Continue with Google</button>
+        </div>
 
-  <div id="otpStep2" style="display:none; margin-top:10px;">
-    <input id="otpCode" type="text" placeholder="Enter 6-digit code"
-      style="width:160px; padding:10px; margin-right:8px; border-radius:8px; border:1px solid #2e2e2e; background:#101010; color:#fff;">
-    <input id="otpNewPass" type="password" placeholder="New password"
-      style="width:220px; padding:10px; margin-right:8px; border-radius:8px; border:1px solid #2e2e2e; background:#101010; color:#fff;">
-    <button id="otpConfirm" class="btn">Set password</button>
-  </div>
+        <div style="margin-top:8px; text-align:right;">
+          <button id="forgotBtn" class="btn btn-outline" type="button" style="padding:6px 10px;">Forgot password?</button>
+        </div>
 
-  <p id="otpMsg" style="color:#ccc; margin-top:8px;"></p>
-</div>
+        <div id="otpBox" class="otp-box">
+          <div class="otp-row">
+            <input id="otpEmail" type="email" placeholder="Email for OTP">
+            <button id="otpSend" class="btn btn-outline" type="button">Get code</button>
+          </div>
 
-<div style="margin-top:20px; padding:10px; border-top:1px solid #333;">
-  <p style="margin:8px 0 4px; font-size:14px; color:#ddd; font-weight:500;">💰 Reimbursement Form</p>
-  <a href="https://docs.google.com/forms/d/e/1FAIpQLSe5OXooAMkyD35Dl0KtRElDmwi1MMXd-ANHHJ4Z8ozp6NziZg/viewform?usp=header"
-     target="_blank"
-     style="display:inline-block; color:#6be0dc; font-size:13px; text-decoration:underline;">
-    Open Google Form
-  </a>
+          <div id="otpStep2" class="otp-row" style="display:none; margin-top:10px;">
+            <input id="otpCode" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code">
+            <input id="otpNewPass" type="password" placeholder="New password">
+            <button id="otpConfirm" class="btn" type="button">Set password</button>
+          </div>
 
-  <p style="margin:16px 0 4px; font-size:14px; color:#ddd; font-weight:500;">⚠️ Fine Repayment</p>
-  <a href="https://docs.google.com/forms/d/e/1FAIpQLSc-KbmpxbB1k6KoML3HNh5oVrqDSzU_WZExhAF6wwGgnKoxEg/viewform?usp=header"
-     target="_blank"
-     style="display:inline-block; color:#6be0dc; font-size:13px; text-decoration:underline;">
-    Open Google Form
-  </a>
-</div>
+          <p id="otpMsg" class="muted-note"></p>
+        </div>
+      </form>
 
-    <p id="authError" style="color:#ff6b6b;margin-top:10px;min-height:1.2em;"></p>
+      <form id="signupForm" autocomplete="on" style="display:none;">
+        <label class="auth-field">
+          <span>Full name</span>
+          <input id="signupName" type="text" autocomplete="name" required>
+        </label>
+        <label class="auth-field">
+          <span>Email</span>
+          <input id="signupEmail" type="email" autocomplete="email" required>
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input id="signupPassword" type="password" autocomplete="new-password" required>
+        </label>
+        <label class="auth-field">
+          <span>Confirm password</span>
+          <input id="signupConfirm" type="password" autocomplete="new-password" required>
+        </label>
+        <label class="auth-field">
+          <span>Requested role</span>
+          <select id="signupRole" required>
+            <option value="gbm">GBM</option>
+            <option value="bod">BOD</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <label id="signupInviteWrap" class="auth-field" style="display:none;">
+          <span>Admin invite code</span>
+          <input id="signupInvite" type="password" autocomplete="off">
+        </label>
+        <div class="auth-actions">
+          <button id="signupBtn" class="btn" type="submit">Create Account</button>
+          <button id="googleSignupBtn" class="btn btn-outline" type="button">Create with Google</button>
+        </div>
+        <p class="muted-note">BOD and Admin requests stay pending until an admin or president approves them.</p>
+      </form>
 
-    <!-- Panel chooser (hidden by default; shown for admins) -->
-<div id="panelChooser" style="display:none;max-width:420px;margin:1rem 0 0;
-     padding:12px;border:1px solid #2e2e2e;border-radius:12px;background:#161616">
-  <p style="margin:.25rem 0 1rem 0">Where do you want to go?</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <a href="admin.html" class="btn" style="flex:1;text-align:center"
-       data-panel="admin">Admin Panel</a>
+      <form id="profileForm" autocomplete="on" style="display:none;">
+        <h3 style="margin:12px 0 6px;">Complete account setup</h3>
+        <p class="muted-note">Choose the role you are requesting. President is manual-only and is not available here.</p>
+        <label class="auth-field">
+          <span>Full name</span>
+          <input id="profileName" type="text" autocomplete="name" required>
+        </label>
+        <label class="auth-field">
+          <span>Requested role</span>
+          <select id="profileRole" required>
+            <option value="gbm">GBM</option>
+            <option value="bod">BOD</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <label id="profileInviteWrap" class="auth-field" style="display:none;">
+          <span>Admin invite code</span>
+          <input id="profileInvite" type="password" autocomplete="off">
+        </label>
+        <button id="completeProfileBtn" class="btn" type="submit" style="width:100%;margin-top:8px;">Submit Request</button>
+      </form>
 
-    <a href="BOD%20Event%20manager/bodlogin.html" class="btn btn-outline" style="flex:1;text-align:center"
-       data-panel="bod">BOD Panel</a>
+      <p id="authError" class="auth-message"></p>
 
-    <!-- New: DZR panel, default hidden -->
-    <a href="dzrvisit.html" id="dzrPanelLink"
-       class="btn btn-outline"
-       style="flex:1;text-align:center;display:none"
-       data-panel="dzr">DRR Visit</a>
-  </div>
-</div>
+      <div class="auth-links">
+        <p>Reimbursement Form</p>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSe5OXooAMkyD35Dl0KtRElDmwi1MMXd-ANHHJ4Z8ozp6NziZg/viewform?usp=header"
+           target="_blank" rel="noopener">Open Google Form</a>
 
- <!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="firebase-init.js"></script>
-<script>
-  const auth = window.auth;
-  const db   = window.db;
-  (async function completeRedirectIfAny() {
-    try {
-      const result = await auth.getRedirectResult();
-      if (result && result.user) {
-        await routeByRole(result.user);
+        <p style="margin-top:16px;">Fine Repayment</p>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSc-KbmpxbB1k6KoML3HNh5oVrqDSzU_WZExhAF6wwGgnKoxEg/viewform?usp=header"
+           target="_blank" rel="noopener">Open Google Form</a>
+      </div>
+
+      <div id="panelChooser" class="panel-chooser">
+        <p style="margin:.25rem 0 1rem 0">Where do you want to go?</p>
+        <div class="panel-chooser__actions">
+          <a href="admin.html" class="btn" data-panel="admin">Admin Panel</a>
+          <a href="BOD%20Event%20manager/bodlogin.html" class="btn btn-outline" data-panel="bod">BOD Panel</a>
+          <a href="dzrvisit.html" id="dzrPanelLink" class="btn btn-outline" style="display:none" data-panel="dzr">DRR Visit</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+  <script src="firebase-init.js"></script>
+  <script>
+    const auth = window.auth;
+    const db = window.db;
+    const functionsClient = firebase.functions();
+    const createUserProfile = functionsClient.httpsCallable('createUserProfileAfterSignup');
+    const requestPasswordOtp = functionsClient.httpsCallable('requestPasswordOtp');
+    const resetPasswordWithOtp = functionsClient.httpsCallable('resetPasswordWithOtp');
+
+    const els = {
+      loginForm: document.getElementById('loginForm'),
+      signupForm: document.getElementById('signupForm'),
+      profileForm: document.getElementById('profileForm'),
+      showLoginTab: document.getElementById('showLoginTab'),
+      showSignupTab: document.getElementById('showSignupTab'),
+      authError: document.getElementById('authError'),
+      panelChooser: document.getElementById('panelChooser'),
+      dzrPanelLink: document.getElementById('dzrPanelLink'),
+      signupRole: document.getElementById('signupRole'),
+      signupInviteWrap: document.getElementById('signupInviteWrap'),
+      signupInvite: document.getElementById('signupInvite'),
+      profileRole: document.getElementById('profileRole'),
+      profileInviteWrap: document.getElementById('profileInviteWrap'),
+      profileInvite: document.getElementById('profileInvite'),
+      forgotBtn: document.getElementById('forgotBtn'),
+      otpBox: document.getElementById('otpBox'),
+      otpStep2: document.getElementById('otpStep2'),
+      otpMsg: document.getElementById('otpMsg')
+    };
+
+    function setMessage(message, tone = 'error') {
+      els.authError.textContent = message || '';
+      els.authError.className = `auth-message ${tone === 'ok' ? 'ok' : tone === 'info' ? 'info' : ''}`;
+    }
+
+    function setOtpMessage(message, ok = false) {
+      els.otpMsg.textContent = message || '';
+      els.otpMsg.style.color = ok ? '#7bd88f' : '#ccc';
+    }
+
+    function showMode(mode) {
+      els.loginForm.style.display = mode === 'login' ? 'block' : 'none';
+      els.signupForm.style.display = mode === 'signup' ? 'block' : 'none';
+      els.profileForm.style.display = mode === 'profile' ? 'block' : 'none';
+      els.panelChooser.style.display = 'none';
+      els.showLoginTab.setAttribute('aria-selected', mode === 'login' ? 'true' : 'false');
+      els.showSignupTab.setAttribute('aria-selected', mode === 'signup' ? 'true' : 'false');
+    }
+
+    function toggleInvite(roleEl, wrapEl, inputEl) {
+      const needsInvite = roleEl.value === 'admin';
+      wrapEl.style.display = needsInvite ? 'grid' : 'none';
+      if (!needsInvite) inputEl.value = '';
+      inputEl.required = needsInvite;
+    }
+
+    function mapAuthError(err) {
+      const code = err && err.code;
+      if (code === 'auth/weak-password') return 'Weak password. Use at least 6 characters, preferably with a mix of letters and numbers.';
+      if (code === 'auth/email-already-in-use') return 'Email already in use. Try signing in instead.';
+      if (code === 'auth/invalid-email') return 'Enter a valid email address.';
+      if (code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-credential') return 'Invalid email or password.';
+      if (code === 'functions/permission-denied') return err.message || 'Invalid admin invite code.';
+      if (code === 'functions/invalid-argument') return err.message || 'Please check the signup details.';
+      return (err && err.message) || 'Something went wrong.';
+    }
+
+    function getRedirectReasonMessage() {
+      const reason = new URLSearchParams(location.search).get('reason');
+      const messages = {
+        pending: 'Your account is pending approval.',
+        rejected: 'Your account request was rejected. Contact an admin or president for help.',
+        unauthorized: 'You do not have access to that panel.',
+        'bod-denied': 'BOD panel access is only for approved BOD, Admin, or President accounts.',
+        'no-role': 'No active role is assigned to this account yet.'
+      };
+      return messages[reason] || '';
+    }
+
+    async function readAccess(uid) {
+      const [userSnap, roleSnap] = await Promise.all([
+        db.collection('users').doc(uid).get().catch(() => null),
+        db.collection('roles').doc(uid).get().catch(() => null)
+      ]);
+
+      const userData = userSnap && userSnap.exists ? userSnap.data() : null;
+      const roleData = roleSnap && roleSnap.exists ? roleSnap.data() : null;
+      const roleStatus = String(roleData?.status || 'approved').toLowerCase();
+      const activeRole = roleData && roleStatus === 'approved'
+        ? String(roleData.role || '').toLowerCase()
+        : '';
+      const profileRole = userData && String(userData.status || '').toLowerCase() === 'approved'
+        ? String(userData.role || '').toLowerCase()
+        : '';
+
+      return {
+        hasProfile: !!userData,
+        status: String(userData?.status || '').toLowerCase(),
+        requestedRole: String(userData?.requestedRole || '').toLowerCase(),
+        rejectReason: userData?.rejectReason || '',
+        role: activeRole || profileRole,
+        roleData,
+        userData
+      };
+    }
+
+    function showProfileCompletion(user) {
+      showMode('profile');
+      document.getElementById('profileName').value = user.displayName || user.email?.split('@')[0] || '';
+      toggleInvite(els.profileRole, els.profileInviteWrap, els.profileInvite);
+      setMessage('Finish account setup to request access.', 'info');
+    }
+
+    async function finishSignup(resultData) {
+      const status = String(resultData?.status || '').toLowerCase();
+      const role = String(resultData?.role || '').toLowerCase();
+
+      if (status === 'approved' && role === 'gbm') {
+        setMessage('Account created and approved for GBM. Redirecting to the public site.', 'ok');
+        setTimeout(() => { location.href = 'index.html'; }, 1200);
         return;
       }
-    } catch (e) {
-      console.warn('getRedirectResult:', e && e.code, e && e.message);
-    }
-  })();
 
-  document.getElementById('googleBtn').onclick = async () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-
-    try {
-      const res = await auth.signInWithPopup(provider);
-      await routeByRole(res.user);
-    } catch (e) {
-      // If popup blocked or unsupported, fallback to redirect
-      if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
-        try {
-          await auth.signInWithRedirect(provider);
-          // Page navigates; the result is handled by getRedirectResult() above
-        } catch (er) {
-          document.getElementById('authError').textContent = er.message || 'Google sign-in failed (redirect).';
-        }
-      } else {
-        document.getElementById('authError').textContent = e.message || 'Google sign-in failed (popup).';
-      }
-    }
-  };
-
-async function routeByRole(user) {
-  const err = (m) => document.getElementById('authError').textContent = m || '';
-
-  try {
-    const snap = await db.collection('roles').doc(user.uid).get();
-    if (!snap.exists || !snap.data().role) {
-      await auth.signOut();
-      err('No role set for this user. Contact admin.');
-      return;
-    }
-
-    const role = String(snap.data().role || '').toLowerCase();
-    const dest = new URLSearchParams(location.search).get('dest');
-    if (dest === 'admin') { location.href = 'admin.html'; return; }
-    if (dest === 'bod')   { location.href = 'BOD%20Event%20manager/bodlogin.html'; return; }
-
-    if (role === 'admin' || role === 'president') {
-      const chooser = document.getElementById('panelChooser');
-      const dzrLink = document.getElementById('dzrPanelLink');
-
-      chooser.style.display = 'block';
-
-      // Only president sees DZR button
-      if (role === 'president' && dzrLink) {
-        dzrLink.style.display = 'inline-block';
+      if (status === 'pending') {
+        setMessage('Account created and pending approval. You will be able to access the requested panel after approval.', 'info');
+        await auth.signOut();
+        return;
       }
 
-      const preferred = localStorage.getItem('preferredPanel');
-      if (preferred === 'admin') { location.href = 'admin.html'; return; }
-      if (preferred === 'bod')   { location.href = 'BOD%20Event%20manager/bodlogin.html'; return; }
-      if (preferred === 'dzr' && role === 'president') {
+      if (status === 'approved') {
+        await routeByRole(auth.currentUser);
+      }
+    }
+
+    async function submitProfileRequest(payload) {
+      const res = await createUserProfile(payload);
+      return res.data || {};
+    }
+
+    async function routeByRole(user) {
+      if (!user) return;
+      setMessage('');
+      els.panelChooser.style.display = 'none';
+      els.dzrPanelLink.style.display = 'none';
+
+      const access = await readAccess(user.uid);
+
+      if (!access.hasProfile && !access.role) {
+        showProfileCompletion(user);
+        return;
+      }
+
+      if (!access.role && access.status === 'pending') {
+        await auth.signOut();
+        setMessage('Your account is pending approval.', 'info');
+        showMode('login');
+        return;
+      }
+
+      if (!access.role && access.status === 'rejected') {
+        await auth.signOut();
+        const detail = access.rejectReason ? ` Reason: ${access.rejectReason}` : '';
+        setMessage(`Your account request was rejected.${detail}`, 'error');
+        showMode('login');
+        return;
+      }
+
+      const role = access.role;
+      const dest = new URLSearchParams(location.search).get('dest');
+
+      if ((role === 'admin' || role === 'president') && dest === 'admin') {
+        location.href = 'admin.html';
+        return;
+      }
+      if ((role === 'bod' || role === 'admin' || role === 'president') && dest === 'bod') {
+        location.href = 'BOD%20Event%20manager/bodlogin.html';
+        return;
+      }
+      if (role === 'president' && dest === 'dzr') {
         location.href = 'dzrvisit.html';
         return;
       }
-      return;
+
+      if (role === 'admin' || role === 'president') {
+        showMode('login');
+        els.panelChooser.style.display = 'block';
+        if (role === 'president') els.dzrPanelLink.style.display = 'inline-block';
+
+        const preferred = localStorage.getItem('preferredPanel');
+        if (preferred === 'admin') { location.href = 'admin.html'; return; }
+        if (preferred === 'bod') { location.href = 'BOD%20Event%20manager/bodlogin.html'; return; }
+        if (preferred === 'dzr' && role === 'president') { location.href = 'dzrvisit.html'; return; }
+        setMessage('Signed in. Choose a panel to continue.', 'ok');
+        return;
+      }
+
+      if (role === 'bod') {
+        location.href = 'BOD%20Event%20manager/bodlogin.html';
+        return;
+      }
+
+      if (role === 'gbm') {
+        setMessage('Your GBM account is active. Redirecting to the public site.', 'ok');
+        setTimeout(() => { location.href = 'index.html'; }, 1000);
+        return;
+      }
+
+      await auth.signOut();
+      showMode('login');
+      setMessage('No active role is assigned to this account yet.');
     }
 
-
-    if (role === 'bod') {
-      location.href = 'BOD%20Event%20manager/bodlogin.html';
-      return;
-    }
-    if (role === 'dzr') {
-  location.href = 'dzrvisit.html';
-  return;
-}
-
-
-    await auth.signOut();
-    err(`Unknown role "${role}". Contact admin.`);
-  } catch (e) {
-    err(e.message || 'Could not read role.');
-  }
-}
-  document.getElementById('loginBtn').onclick = async () => {
-    const email = document.getElementById('email').value.trim();
-    const pass  = document.getElementById('password').value;
-
-    if (!email || !pass) {
-      document.getElementById('authError').textContent = 'Enter email and password.';
-      return;
+    async function signInWithGoogleForLogin() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        const res = await auth.signInWithPopup(provider);
+        await routeByRole(res.user);
+      } catch (err) {
+        if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment')) {
+          await auth.signInWithRedirect(provider);
+          return;
+        }
+        setMessage(mapAuthError(err));
+      }
     }
 
-    try {
-      const cred = await auth.signInWithEmailAndPassword(email, pass);
-      await routeByRole(cred.user);
-    } catch (e) {
-      document.getElementById('authError').textContent =
-        e.message || 'Login failed.';
+    function signupPayloadFromForm() {
+      const name = document.getElementById('signupName').value.trim();
+      const requestedRole = els.signupRole.value;
+      const inviteCode = els.signupInvite.value.trim();
+      return { name, requestedRole, inviteCode, provider: 'password' };
     }
-  };
-</script>
+
+    async function createWithGoogleFromSignup() {
+      const payload = signupPayloadFromForm();
+      if (!payload.name) {
+        setMessage('Enter your full name.');
+        return;
+      }
+      if (payload.requestedRole === 'admin' && !payload.inviteCode) {
+        setMessage('Enter the admin invite code.');
+        return;
+      }
+
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        const res = await auth.signInWithPopup(provider);
+        const data = await submitProfileRequest({ ...payload, provider: 'google' });
+        await finishSignup(data);
+      } catch (err) {
+        if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment')) {
+          sessionStorage.setItem('pendingGoogleSignup', JSON.stringify({ ...payload, provider: 'google' }));
+          await auth.signInWithRedirect(provider);
+          return;
+        }
+        setMessage(mapAuthError(err));
+      }
+    }
+
+    els.showLoginTab.onclick = () => { showMode('login'); setMessage(''); };
+    els.showSignupTab.onclick = () => { showMode('signup'); setMessage(''); };
+    els.signupRole.onchange = () => toggleInvite(els.signupRole, els.signupInviteWrap, els.signupInvite);
+    els.profileRole.onchange = () => toggleInvite(els.profileRole, els.profileInviteWrap, els.profileInvite);
+
+    document.querySelectorAll('[data-panel]').forEach(link => {
+      link.addEventListener('click', () => localStorage.setItem('preferredPanel', link.dataset.panel));
+    });
+
+    els.loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const pass = document.getElementById('password').value;
+      if (!email || !pass) {
+        setMessage('Enter email and password.');
+        return;
+      }
+
+      try {
+        const cred = await auth.signInWithEmailAndPassword(email, pass);
+        await routeByRole(cred.user);
+      } catch (err) {
+        setMessage(mapAuthError(err));
+      }
+    });
+
+    document.getElementById('googleBtn').onclick = signInWithGoogleForLogin;
+
+    els.signupForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const email = document.getElementById('signupEmail').value.trim();
+      const pass = document.getElementById('signupPassword').value;
+      const confirm = document.getElementById('signupConfirm').value;
+      const payload = signupPayloadFromForm();
+
+      if (pass !== confirm) {
+        setMessage('Password mismatch.');
+        return;
+      }
+      if (payload.requestedRole === 'admin' && !payload.inviteCode) {
+        setMessage('Enter the admin invite code.');
+        return;
+      }
+
+      let cred = null;
+      try {
+        cred = await auth.createUserWithEmailAndPassword(email, pass);
+        await cred.user.updateProfile({ displayName: payload.name });
+        const data = await submitProfileRequest({ ...payload, email, provider: 'password' });
+        await finishSignup(data);
+      } catch (err) {
+        if (cred && payload.requestedRole === 'admin' && err?.code === 'functions/permission-denied') {
+          try { await cred.user.delete(); } catch (deleteErr) { console.warn('Could not delete unapproved auth user', deleteErr); }
+        }
+        try { if (auth.currentUser && err?.code === 'functions/permission-denied') await auth.signOut(); } catch {}
+        setMessage(mapAuthError(err));
+      }
+    });
+
+    document.getElementById('googleSignupBtn').onclick = createWithGoogleFromSignup;
+
+    els.profileForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {
+        name: document.getElementById('profileName').value.trim(),
+        requestedRole: els.profileRole.value,
+        inviteCode: els.profileInvite.value.trim(),
+        provider: 'google'
+      };
+      if (!payload.name) {
+        setMessage('Enter your full name.');
+        return;
+      }
+      if (payload.requestedRole === 'admin' && !payload.inviteCode) {
+        setMessage('Enter the admin invite code.');
+        return;
+      }
+      try {
+        const data = await submitProfileRequest(payload);
+        await finishSignup(data);
+      } catch (err) {
+        setMessage(mapAuthError(err));
+      }
+    });
+
+    els.forgotBtn.onclick = () => {
+      els.otpBox.style.display = els.otpBox.style.display === 'none' || !els.otpBox.style.display ? 'block' : 'none';
+      document.getElementById('otpEmail').value = document.getElementById('email').value.trim();
+    };
+
+    document.getElementById('otpSend').onclick = async () => {
+      const email = document.getElementById('otpEmail').value.trim();
+      if (!email) {
+        setOtpMessage('Enter your email first.');
+        return;
+      }
+      try {
+        await requestPasswordOtp({ email });
+        els.otpStep2.style.display = 'flex';
+        setOtpMessage('If the email exists, a reset code has been sent.', true);
+      } catch (err) {
+        setOtpMessage(mapAuthError(err));
+      }
+    };
+
+    document.getElementById('otpConfirm').onclick = async () => {
+      const email = document.getElementById('otpEmail').value.trim();
+      const otp = document.getElementById('otpCode').value.trim();
+      const newPassword = document.getElementById('otpNewPass').value;
+      if (!email || !otp || !newPassword) {
+        setOtpMessage('Enter email, OTP, and new password.');
+        return;
+      }
+      try {
+        await resetPasswordWithOtp({ email, otp, newPassword });
+        setOtpMessage('Password updated. You can sign in now.', true);
+      } catch (err) {
+        setOtpMessage(mapAuthError(err));
+      }
+    };
+
+    (async function completeRedirectIfAny() {
+      toggleInvite(els.signupRole, els.signupInviteWrap, els.signupInvite);
+      toggleInvite(els.profileRole, els.profileInviteWrap, els.profileInvite);
+      const redirectMessage = getRedirectReasonMessage();
+      if (redirectMessage) setMessage(redirectMessage, redirectMessage.includes('pending') ? 'info' : 'error');
+
+      try {
+        const result = await auth.getRedirectResult();
+        if (result && result.user) {
+          const pendingSignup = sessionStorage.getItem('pendingGoogleSignup');
+          if (pendingSignup) {
+            sessionStorage.removeItem('pendingGoogleSignup');
+            const payload = JSON.parse(pendingSignup);
+            const data = await submitProfileRequest(payload);
+            await finishSignup(data);
+            return;
+          }
+          await routeByRole(result.user);
+        }
+      } catch (err) {
+        setMessage(mapAuthError(err));
+      }
+    })();
+  </script>
 </body>
 </html>
-

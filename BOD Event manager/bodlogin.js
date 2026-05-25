@@ -144,6 +144,26 @@ if (filterSearch) filterSearch.addEventListener('input', () => {
   window.__bodSearchT = setTimeout(loadItems, 150);
 });
 
+async function readMyAccess(uid) {
+  const [roleSnap, userSnap] = await Promise.all([
+    db.collection('roles').doc(uid).get().catch(() => null),
+    db.collection('users').doc(uid).get().catch(() => null)
+  ]);
+
+  const roleData = roleSnap && roleSnap.exists ? roleSnap.data() : null;
+  const roleStatus = String(roleData?.status || 'approved').toLowerCase();
+  const activeRole = roleData && roleStatus === 'approved'
+    ? String(roleData.role || '').toLowerCase()
+    : '';
+  const userData = userSnap && userSnap.exists ? userSnap.data() : null;
+
+  return {
+    role: activeRole,
+    status: String(userData?.status || '').toLowerCase(),
+    userData
+  };
+}
+
 // --- Image selection UI feedback ---
 const fileNamesEl       = document.getElementById('file-upload-names');
 const selectedCountPill = document.getElementById('selectedCountPill');
@@ -217,8 +237,23 @@ auth.onAuthStateChanged(async (user) => {
   if (!user) { location.href = '../login.html'; return; }
 
   try {
-    const r = await db.collection('roles').doc(user.uid).get();
-    const role = r.exists ? String(r.data().role || '').toLowerCase() : '';
+    const access = await readMyAccess(user.uid);
+    const role = access.role;
+
+    if (!role && access.status === 'pending') {
+      location.href = '../login.html?reason=pending';
+      return;
+    }
+
+    if (!role && access.status === 'rejected') {
+      location.href = '../login.html?reason=rejected';
+      return;
+    }
+
+    if (!role) {
+      location.href = '../login.html?reason=no-role';
+      return;
+    }
 
     // set role flags safely here
     IS_PRESIDENT = (role === 'president');
@@ -245,7 +280,7 @@ if (goDZRBtn) {
 
     // kick non-bod/non-admin users
     if (role !== 'bod' && role !== 'admin' && role !== 'president') {
-      location.href = '../login.html';
+      location.href = '../login.html?reason=bod-denied';
       return;
     }
 
@@ -257,11 +292,18 @@ if (goDZRBtn) {
     });
 
     if (whoami) whoami.textContent = `Signed in as ${user.email || 'BOD'}`;
-  } catch {
-    if (whoami) whoami.textContent = 'Signed in';
+  } catch (err) {
+    console.warn('BOD access check failed:', err);
+    location.href = '../login.html?reason=no-role';
+    return;
   }
 
-  loadItems();
+  try {
+    await loadItems();
+  } catch (err) {
+    console.error('Initial BOD load failed:', err);
+    if (whoami) whoami.textContent = 'Signed in';
+  }
 });
 
 

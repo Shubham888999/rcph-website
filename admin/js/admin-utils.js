@@ -69,5 +69,42 @@ function buildMailtoUrl({ to, subject, body, from }) {
   return `mailto:${encodeURIComponent(to || '')}?subject=${escapeMailValue(subject)}&body=${escapeMailValue(fullBody)}`;
 }
 
+function escapeHtml(value) {
+  const div = document.createElement('div');
+  div.textContent = String(value ?? '');
+  return div.innerHTML;
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function roleLabel(role) {
+  const labels = {
+    gbm: 'GBM',
+    bod: 'BOD',
+    admin: 'Admin',
+    president: 'President',
+    pending: 'Pending'
+  };
+  return labels[String(role || '').toLowerCase()] || '-';
+}
+
+function statusBadge(status) {
+  const s = String(status || 'pending').toLowerCase();
+  const colors = {
+    approved: 'background:#163f2a;color:#8ef0ad;border:1px solid #286b43;',
+    pending: 'background:#3d3216;color:#f4d35e;border:1px solid #6f5b25;',
+    rejected: 'background:#451f24;color:#ff9aa6;border:1px solid #74323b;'
+  };
+  return `<span class="badge" style="${colors[s] || ''}">${escapeHtml(roleLabel(s) === '-' ? s : roleLabel(s))}</span>`;
+}
 
 

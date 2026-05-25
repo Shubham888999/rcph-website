@@ -6,9 +6,31 @@ auth.onAuthStateChanged(async (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
 
   try {
-    const snap = await db.collection('roles').doc(user.uid).get();
-    const role = snap.exists ? String(snap.data().role).toLowerCase() : null;
+    const [roleSnap, userSnap] = await Promise.all([
+      db.collection('roles').doc(user.uid).get(),
+      db.collection('users').doc(user.uid).get().catch(() => null)
+    ]);
+
+    const roleData = roleSnap.exists ? roleSnap.data() : null;
+    const roleStatus = String(roleData?.status || 'approved').toLowerCase();
+    const role = roleData && roleStatus === 'approved'
+      ? String(roleData.role || '').toLowerCase()
+      : null;
+    const profile = userSnap && userSnap.exists ? userSnap.data() : null;
+    const profileStatus = String(profile?.status || '').toLowerCase();
+
+    if (!role && profileStatus === 'pending') {
+      window.location.href = 'login.html?reason=pending';
+      return;
+    }
+    if (!role && profileStatus === 'rejected') {
+      window.location.href = 'login.html?reason=rejected';
+      return;
+    }
+
+    CURRENT_ROLE = role || '';
     IS_PRESIDENT = (role === 'president');
+    IS_ADMIN = (role === 'admin' || role === 'president');
     
     const goDZRBtn = document.getElementById('goDZRBtn');
     if (goDZRBtn) {
@@ -19,14 +41,21 @@ auth.onAuthStateChanged(async (user) => {
             goDZRBtn.style.display = 'none';
         }
     }
-    if (role && role !== 'admin' && role !== 'president') {
+    if (role === 'bod') {
       window.location.href = 'BOD%20Event%20manager/bodlogin.html';
       return;
     }
+    if (!IS_ADMIN) {
+      window.location.href = 'login.html?reason=unauthorized';
+      return;
+    }
   } catch (e) {
-    console.warn('Role check failed; continuing:', e);
+    console.warn('Role check failed:', e);
+    window.location.href = 'login.html?reason=no-role';
+    return;
   }
 
+  startLockWatchers();
   await startAttendancePage();
 });
 
@@ -42,22 +71,28 @@ function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
   });
 }
 
-watchLock('attendance', lockAttendanceBtn, lockAttendanceState, (locked) => {
-  document.querySelectorAll('#attBody .cell-btn, #addMemberBtn, #addEventBtn')
-    .forEach(el => el.disabled = locked);
-});
-watchLock('bodAttendance', lockBodAttBtn, lockBodAttState, (locked) => {
-  document.querySelectorAll('#bodBody .cell-btn, #bodAddMemberBtn, #bodAddMeetingBtn')
-    .forEach(el => el.disabled = locked);
-});
-watchLock('fines', lockFinesBtn, lockFinesState, (locked) => {
-  document.querySelectorAll('#fineForm input, #fineForm select, #fineForm button')
-    .forEach(el => el.disabled = locked);
-});
-watchLock('treasury', lockTreasuryBtn, lockTreasuryState, (locked) => {
-  const btns = document.querySelectorAll('#treAddBtn, #treBody .icon-btn');
-  btns.forEach(b => b.disabled = locked);
-});
+let lockWatchersStarted = false;
+function startLockWatchers() {
+  if (lockWatchersStarted) return;
+  lockWatchersStarted = true;
+
+  watchLock('attendance', lockAttendanceBtn, lockAttendanceState, (locked) => {
+    document.querySelectorAll('#attBody .cell-btn, #addMemberBtn, #addEventBtn')
+      .forEach(el => el.disabled = locked);
+  });
+  watchLock('bodAttendance', lockBodAttBtn, lockBodAttState, (locked) => {
+    document.querySelectorAll('#bodBody .cell-btn, #bodAddMemberBtn, #bodAddMeetingBtn')
+      .forEach(el => el.disabled = locked);
+  });
+  watchLock('fines', lockFinesBtn, lockFinesState, (locked) => {
+    document.querySelectorAll('#fineForm input, #fineForm select, #fineForm button')
+      .forEach(el => el.disabled = locked);
+  });
+  watchLock('treasury', lockTreasuryBtn, lockTreasuryState, (locked) => {
+    const btns = document.querySelectorAll('#treAddBtn, #treBody .icon-btn');
+    btns.forEach(b => b.disabled = locked);
+  });
+}
 
 async function toggleLock(panelKey) {
   if (!IS_PRESIDENT) return; 
@@ -79,6 +114,124 @@ signOutBtn.addEventListener('click', async () => {
 if (goBodBtn) {
   goBodBtn.addEventListener('click', () => location.href = 'BOD%20Event%20manager/bodlogin.html');
 }
+
+function accountFunction(name) {
+  if (!firebase.functions) throw new Error('Firebase Functions SDK is not loaded.');
+  return firebase.functions().httpsCallable(name);
+}
+
+function attachUserRequestListener() {
+  if (!IS_ADMIN || !accountRequestsPanel || !accountRequestsBody) return;
+  accountRequestsPanel.style.display = 'block';
+
+  unsubUsers = db.collection('users').orderBy('createdAt', 'desc').onSnapshot((snap) => {
+    USERS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    PENDING_USERS = USERS.filter(u => String(u.status || '').toLowerCase() === 'pending');
+    renderAccountRequests();
+  }, (err) => {
+    console.error('Account request listener failed:', err);
+    accountRequestsBody.innerHTML = `<tr><td colspan="6" style="color:#ff9aa6;">${escapeHtml(err.message || 'Could not load account requests.')}</td></tr>`;
+  });
+}
+
+function accountRoleOptions(selectedRole) {
+  const roles = ['gbm', 'bod', 'admin'];
+  const selected = String(selectedRole || '').toLowerCase();
+  return roles.map(role => (
+    `<option value="${role}" ${role === selected ? 'selected' : ''}>${roleLabel(role)}</option>`
+  )).join('');
+}
+
+function renderAccountRequests() {
+  if (!accountRequestsBody) return;
+
+  const pendingCount = PENDING_USERS.length;
+  if (accountRequestsBadge) {
+    accountRequestsBadge.textContent = `${pendingCount} pending`;
+  }
+
+  const filter = accountRequestFilter?.value || 'pending';
+  const rows = USERS.filter(user => {
+    const status = String(user.status || 'pending').toLowerCase();
+    return filter === 'all' ? true : status === filter;
+  });
+
+  if (!rows.length) {
+    accountRequestsBody.innerHTML = '<tr><td colspan="6">No account requests match this filter.</td></tr>';
+    return;
+  }
+
+  accountRequestsBody.innerHTML = rows.map(user => {
+    const status = String(user.status || 'pending').toLowerCase();
+    const requested = String(user.requestedRole || 'gbm').toLowerCase();
+    const actions = status === 'pending'
+      ? `<div class="toolbar" style="margin:0;">
+          <select data-account-role="${escapeHtml(user.id)}" aria-label="Approve role for ${escapeHtml(user.name || user.email || 'user')}">
+            ${accountRoleOptions(requested)}
+          </select>
+          <button class="btn" type="button" data-account-approve="${escapeHtml(user.id)}">Approve</button>
+          <button class="btn btn-outline" type="button" data-account-reject="${escapeHtml(user.id)}">Reject</button>
+        </div>`
+      : (status === 'rejected' && user.rejectReason
+        ? `<span title="${escapeHtml(user.rejectReason)}">Rejected</span>`
+        : '<span style="color:#9aa;">No action</span>');
+
+    return `
+      <tr>
+        <td>${escapeHtml(user.name || '-')}</td>
+        <td>${escapeHtml(user.email || '-')}</td>
+        <td>${roleLabel(requested)}</td>
+        <td>${formatDate(user.createdAt)}</td>
+        <td>${statusBadge(status)}</td>
+        <td>${actions}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function approveAccountRequest(uid) {
+  const user = USERS.find(u => u.id === uid);
+  if (!user) return;
+  const select = Array.from(document.querySelectorAll('[data-account-role]'))
+    .find(el => el.dataset.accountRole === uid);
+  const approvedRole = select?.value || user.requestedRole;
+  if (!['gbm', 'bod', 'admin'].includes(String(approvedRole || '').toLowerCase())) {
+    alert('Choose GBM, BOD, or Admin.');
+    return;
+  }
+
+  try {
+    await accountFunction('approveUserRole')({ targetUid: uid, approvedRole });
+  } catch (err) {
+    alert(err.message || 'Could not approve account.');
+  }
+}
+
+async function rejectAccountRequest(uid) {
+  const user = USERS.find(u => u.id === uid);
+  if (!user) return;
+  const reason = prompt(`Reject ${user.name || user.email || 'this user'}? Optional reason:`);
+  if (reason === null) return;
+
+  try {
+    await accountFunction('rejectUserRoleRequest')({ targetUid: uid, rejectReason: reason.trim() });
+  } catch (err) {
+    alert(err.message || 'Could not reject account.');
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const approveBtn = event.target.closest('[data-account-approve]');
+  if (approveBtn) {
+    approveAccountRequest(approveBtn.dataset.accountApprove);
+    return;
+  }
+
+  const rejectBtn = event.target.closest('[data-account-reject]');
+  if (rejectBtn) {
+    rejectAccountRequest(rejectBtn.dataset.accountReject);
+  }
+});
 
 
 
@@ -146,6 +299,9 @@ function attachRealtimeListeners() {
   if (unsubBodMt)   { unsubBodMt();   unsubBodMt   = null; }
   if (unsubBodAt)   { unsubBodAt();   unsubBodAt   = null; }
   if (unsubTre)     { unsubTre();     unsubTre     = null; }
+  if (unsubUsers)   { unsubUsers();   unsubUsers   = null; }
+
+  attachUserRequestListener();
 
   unsubFines = db.collection('fines').orderBy('date', 'desc').onSnapshot((snap) => {
     FINES = snap.docs.map(d => ({ id: d.id, ...d.data() }));

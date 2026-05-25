@@ -88,6 +88,38 @@
     </div>
   </div>
 
+  <div class="admin-card" id="accountRequestsPanel" style="margin-bottom:20px; display:none;">
+    <div class="topbar">
+      <h2>Account Requests <span id="accountRequestsBadge" class="badge">0 pending</span></h2>
+      <div class="toolbar" style="margin:0;">
+        <select id="accountRequestFilter" aria-label="Filter account requests">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-wrap">
+      <table class="att">
+        <thead>
+          <tr>
+            <th style="min-width:180px;">Name</th>
+            <th style="min-width:220px;">Email</th>
+            <th style="min-width:140px;">Requested role</th>
+            <th style="min-width:160px;">Created</th>
+            <th style="min-width:110px;">Status</th>
+            <th style="min-width:260px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="accountRequestsBody">
+          <tr><td colspan="6">Loading requests...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="admin-card" id="attendance">
       <div class="topbar">
         <h2>Attendance Manager <span id="countBadge" class="badge"></span></h2>
@@ -875,6 +907,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 
 <!-- Your init (must come AFTER the SDKs) -->
 <script src="firebase-init.js"></script>

@@ -1,0 +1,115 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function rolePath() {
+      return /databases/$(database)/documents/roles/$(request.auth.uid);
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && exists(rolePath())
+        && get(rolePath()).data.role == role
+        && get(rolePath()).data.get('status', 'approved') == 'approved';
+    }
+
+    function isPresident() {
+      return hasRole('president');
+    }
+
+    function isAdmin() {
+      return hasRole('admin') || isPresident();
+    }
+
+    function isApprovedBod() {
+      return hasRole('bod') || isAdmin();
+    }
+
+    function panelLocked(panelKey) {
+      return exists(/databases/$(database)/documents/locks/$(panelKey))
+        && get(/databases/$(database)/documents/locks/$(panelKey)).data.locked == true;
+    }
+
+    match /roles/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update, delete: if false;
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+    }
+
+    match /members/{memberId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+    }
+
+    match /districtEvents/{eventId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+    }
+
+    match /districtAttendance/{attendanceId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+    }
+
+    match /bodMembers/{memberId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('bodAttendance');
+    }
+
+    match /bodMeetings/{meetingId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('bodAttendance');
+    }
+
+    match /bodAttendance/{attendanceId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('bodAttendance');
+    }
+
+    match /bodEvents/{eventId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isApprovedBod() && !panelLocked('bodEvents');
+    }
+
+    match /fines/{fineId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('fines');
+    }
+
+    match /treasury/{transactionId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin() && !panelLocked('treasury');
+    }
+
+    match /locks/{panelId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isPresident();
+    }
+
+    match /passwordResets/{resetId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

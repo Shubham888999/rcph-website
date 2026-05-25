@@ -8,4 +8,5 @@ if (addEventBtn)  addEventBtn.onclick  = () => openModal('addEventModal');
 
 if (addDistEventBtn) addDistEventBtn.onclick = () => openModal('addDistEventModal');
 
+if (accountRequestFilter) accountRequestFilter.addEventListener('change', renderAccountRequests);
 
