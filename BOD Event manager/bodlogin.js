@@ -39,6 +39,11 @@ function readFileAsBase64(file) {
 // bodlogin.js — upload-free (stores Drive folder/link only)
 const auth = firebase.auth();
 const db   = firebase.firestore();
+const functionsClient = firebase.functions();
+const submitBodEventFn = functionsClient.httpsCallable('submitBodEvent');
+const syncBodEventFn = functionsClient.httpsCallable('syncBodEventToAttendance');
+const updateBodEventFn = functionsClient.httpsCallable('updateBodEvent');
+const archiveBodEventFn = functionsClient.httpsCallable('archiveBodEvent');
 
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxNq8SrZI08kTb-hh9awLlgWufJeW5ReHD4eePcGxS0z6SyOKNG9YseKeNXAzUv9URD/exec"; // ⚠️ PASTE YOUR URL
 const imageUploader = document.getElementById('imageUploader');
@@ -69,8 +74,16 @@ const filterSearch = document.getElementById('filterSearch');
 const toastEl      = document.getElementById('toast');
 const imageLightbox = document.getElementById('imageLightbox'); // NEW
 const lightboxImage = document.getElementById('lightboxImage'); // NEW
+const previewTitle = document.getElementById('previewTitle');
+const previewMeta = document.getElementById('previewMeta');
+const previewAvenues = document.getElementById('previewAvenues');
+const previewDesc = document.getElementById('previewDesc');
 
 let IS_PRESIDENT = false;
+let IS_ADMIN = false;
+let CURRENT_ROLE = '';
+let BOD_EVENTS_LOCKED = false;
+let CURRENT_DISPLAY_NAME = '';
 
 // Lock UI helpers
 const lockBodEventsBtn   = document.getElementById('lockBodEventsBtn');
@@ -228,9 +241,60 @@ if (imageUploader) {
 if (form) {
   form.addEventListener('reset', () => {
     // let the reset visually finish, then clear
-    setTimeout(() => renderSelection([]), 0);
+    setTimeout(() => {
+      renderSelection([]);
+      const conductedByInput = document.getElementById('conductedBy');
+      if (conductedByInput && CURRENT_DISPLAY_NAME) conductedByInput.value = CURRENT_DISPLAY_NAME;
+      updateEventPreview();
+    }, 0);
   });
 }
+
+function getSelectedAvenues(selectEl = evAvenue) {
+  return Array.from(selectEl?.selectedOptions || []).map(o => String(o.value || o.textContent || '').trim()).filter(Boolean);
+}
+
+function setStatus(message, tone = '') {
+  if (!statusEl) return;
+  statusEl.textContent = message || '';
+  statusEl.dataset.tone = tone;
+}
+
+function updateEventPreview() {
+  const name = (evName?.value || '').trim() || 'Untitled event';
+  const conductedBy = (document.getElementById('conductedBy')?.value || '').trim();
+  const start = (document.getElementById('eventStart')?.value || '').trim();
+  const end = (document.getElementById('eventEnd')?.value || '').trim();
+  const time = (document.getElementById('eventTime')?.value || '').trim();
+  const desc = (evDesc?.value || '').trim();
+  const avenues = getSelectedAvenues();
+
+  if (previewTitle) previewTitle.textContent = name;
+  if (previewMeta) {
+    const dateText = start ? `${start}${end && end !== start ? ` to ${end}` : ''}` : 'Choose a date';
+    const bits = [dateText, time, conductedBy ? `by ${conductedBy}` : 'add conductor'].filter(Boolean);
+    previewMeta.textContent = bits.join(' | ');
+  }
+  if (previewDesc) previewDesc.textContent = desc || 'Add a short note to preview the event summary.';
+  if (previewAvenues) {
+    previewAvenues.innerHTML = avenues.length
+      ? avenues.map(av => `<span class="pill avenue-chip ${avenueClassName(av)}"><span class="avenue-dot" aria-hidden="true"></span>${escapeHtml(av.toUpperCase())}</span>`).join('')
+      : '<span class="pill">No avenue selected</span>';
+  }
+}
+
+if (evDesc) {
+  evDesc.required = false;
+  evDesc.placeholder = 'Short description for avenue reporting';
+}
+
+[evName, evDesc, evAvenue, document.getElementById('conductedBy'), document.getElementById('eventStart'), document.getElementById('eventEnd'), document.getElementById('eventTime')]
+  .filter(Boolean)
+  .forEach(el => {
+    el.addEventListener('input', updateEventPreview);
+    el.addEventListener('change', updateEventPreview);
+  });
+updateEventPreview();
 
 /* ---------- Auth guard ---------- */
 auth.onAuthStateChanged(async (user) => {
@@ -256,7 +320,9 @@ auth.onAuthStateChanged(async (user) => {
     }
 
     // set role flags safely here
+    CURRENT_ROLE = role;
     IS_PRESIDENT = (role === 'president');
+    IS_ADMIN = (role === 'admin' || role === 'president');
     // Show DZR button only for president
 const goDZRBtn = document.getElementById('goDZRBtn');
 if (goDZRBtn) {
@@ -284,14 +350,24 @@ if (goDZRBtn) {
       return;
     }
 
+    const signedInName = access.userData?.name || user.displayName || user.email || 'BOD';
+    CURRENT_DISPLAY_NAME = signedInName;
+    const conductedByInput = document.getElementById('conductedBy');
+    if (conductedByInput && !conductedByInput.value) {
+      conductedByInput.value = signedInName;
+      updateEventPreview();
+    }
+    if (whoami) whoami.textContent = `Signed in as ${signedInName}`;
+
     // start the lock watcher *after* we know IS_PRESIDENT
     watchLock('bodEvents', lockBodEventsBtn, lockBodEventsState, (locked) => {
+      BOD_EVENTS_LOCKED = !!locked;
+      const disableForm = locked && !IS_PRESIDENT;
       document
-        .querySelectorAll('#bodEventForm input, #bodEventForm select, #bodEventForm textarea, #bodEventForm button[type=submit]')
-        .forEach(el => el.disabled = locked);
+        .querySelectorAll('#bodEventForm input, #bodEventForm select, #bodEventForm textarea, #bodEventForm button')
+        .forEach(el => el.disabled = disableForm);
+      setStatus(disableForm ? 'BOD event submissions are locked by the president.' : '', disableForm ? 'locked' : '');
     });
-
-    if (whoami) whoami.textContent = `Signed in as ${user.email || 'BOD'}`;
   } catch (err) {
     console.warn('BOD access check failed:', err);
     location.href = '../login.html?reason=no-role';
@@ -342,27 +418,34 @@ if (form) {
     if (!user) return toast('You must be logged in.', 2000);
 
     const submitBtn = form.querySelector('button[type="submit"]');
-    const files = imageUploader.files;
+    const originalButtonText = submitBtn?.textContent || 'Submit Event';
+    const files = imageUploader?.files || [];
 
     // --- 1. Get all text data from form ---
-    const name        = (document.getElementById('evName')?.value || '').trim();
-    const description = (document.getElementById('evDesc')?.value || '').trim();
-    const avenues     = Array.from(document.getElementById('evAvenue').selectedOptions).map(o => o.value);
+    const name        = (evName?.value || '').trim();
+    const description = (evDesc?.value || '').trim();
+    const avenues     = getSelectedAvenues();
     const conductedBy = (document.getElementById('conductedBy')?.value || '').trim();
     const eventStart  = (document.getElementById('eventStart')?.value || '').trim();
-    const eventEnd    = (document.getElementById('eventEnd')?.value || '').trim();
+    const eventEnd    = (document.getElementById('eventEnd')?.value || '').trim() || eventStart;
     const eventTime   = (document.getElementById('eventTime')?.value || '').trim();
 
-    if (!name || !description || !avenues.length || !eventStart || !eventEnd || !conductedBy) {
+    if (BOD_EVENTS_LOCKED && !IS_PRESIDENT) {
+      return toast('BOD event submissions are locked.', 2500);
+    }
+
+    if (!name || !avenues.length || !eventStart || !eventEnd || !conductedBy) {
       return toast('Please fill all required fields.', 2000);
     }
     
     submitBtn?.setAttribute('disabled', 'disabled');
-    loader.setAttribute('aria-hidden', 'false');
+    if (submitBtn) submitBtn.textContent = 'Submitting...';
+    if (loader) loader.setAttribute('aria-hidden', 'false');
+    setStatus('Submitting event...');
 
     try {
       // --- 2. Step 1: Create the folder in Google Drive ---
-      loaderText.textContent = 'Creating event folder...';
+      if (loaderText) loaderText.textContent = 'Creating event folder...';
       
       const folderResponse = await fetch(GAS_WEB_APP_URL, {
         method: 'POST',
@@ -385,7 +468,8 @@ if (form) {
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          loaderText.textContent = `Uploading image ${i + 1} of ${files.length}...`;
+          if (loaderText) loaderText.textContent = `Uploading images... ${i + 1} of ${files.length}`;
+          setStatus(`Uploading images... ${i + 1} of ${files.length}`);
           
           // Read the file as a base64 string
           const fileData = await readFileAsBase64(file);
@@ -408,40 +492,44 @@ if (form) {
         }
       }
 
-      // --- 4. Step 3: Save the final record to Firebase ---
-      loaderText.textContent = 'Saving to database...';
-      
-      const doc = {
+      // --- 4. Step 3: Save through Cloud Functions and sync attendance ---
+      if (loaderText) loaderText.textContent = 'Syncing attendance...';
+      setStatus('Syncing attendance...');
+
+      const result = await submitBodEventFn({
         name,
-        description,
+        desc: description,
         avenue: avenues,
         conductedBy,
-        eventStart,
-        eventEnd,
-        eventTime,
-        driveFolderId: newFolderId, // Save the new Folder ID
-        previewLink: uploadedFileUrls[0] || '', // Use first image as preview
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdBy: user.uid,
-        createdByName: user.displayName || user.email,
-        createdByNameSearch: (user.displayName || user.email).toLowerCase().split(/\s+/),
-      };
-
-      await db.collection('bodEvents').add(doc);
+        date: eventStart,
+        endDate: eventEnd,
+        time: eventTime,
+        imageLinks: uploadedFileUrls,
+        driveLinks: uploadedFileUrls,
+        driveFolder: newFolderId,
+        driveFolderId: newFolderId
+      });
       
       // --- 5. Done ---
-      toast('Event submitted successfully!');
+      const rowsUpdated = result?.data?.attendanceRowsUpdated || 0;
+      toast('Event submitted and added to Attendance Manager.', 2600);
+      setStatus(`Event added to Attendance Manager. Attendance initialized for ${rowsUpdated} member rows.`, 'success');
       form.reset();
+      renderSelection([]);
+      updateEventPreview();
+      await loadItems();
       
     } catch (err) {
       console.error('Submission failed:', err);
-      toast('Error: ' + err.message, 3000);
+      const msg = err?.message || 'Submission failed';
+      toast('Error: ' + msg, 3500);
+      setStatus(msg, 'error');
     } finally {
       // --- 6. Hide loader and re-enable button ---
       submitBtn?.removeAttribute('disabled');
-      loader.setAttribute('aria-hidden', 'true');
-      loaderText.textContent = 'Working...';
+      if (submitBtn) submitBtn.textContent = originalButtonText;
+      if (loader) loader.setAttribute('aria-hidden', 'true');
+      if (loaderText) loaderText.textContent = 'Working...';
     }
   });
 }
@@ -484,7 +572,7 @@ async function loadItems() {
       id: d.id,
       ...d.data(),
       createdAt: d.data().createdAt?.toDate?.() || null
-    }));
+    })).filter(r => r.status !== 'deleted' && r.archived !== true);
 
     // 2) rebuild month dropdown from ALL rows
     buildMonthFilter(all);
@@ -530,6 +618,10 @@ if (avFilter) {
 
       // NEW: Get image URL
       const imgUrl = getGdriveImageUrl(r.previewLink);
+      const isSynced = !!r.syncedEventId || r.status === 'synced' || !!r.bodEventId;
+      const syncLabel = isSynced ? 'Synced to Attendance Manager' : 'Not synced';
+      const canSync = IS_ADMIN || IS_PRESIDENT;
+      const syncedId = r.syncedEventId || r.id;
 
       const chips = (Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []))
         .map(av => `<span class="pill avenue-chip ${avenueClassName(av)}"><span class="avenue-dot" aria-hidden="true"></span>${String(av).toUpperCase()}</span>`)
@@ -540,6 +632,7 @@ if (avFilter) {
 ${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-lightbox-src="${imgUrl}">` : ''}
           <div class="card__header">
             <span class="chipset">${chips}</span>
+            <span class="sync-chip ${isSynced ? 'is-synced' : ''}">${syncLabel}</span>
             <span class="timepill">${createdStr}</span>
             <button class="iconbtn" data-edit="${r.id}" title="Edit">✏️</button>
             <button class="iconbtn" data-del="${r.id}" title="Delete">🗑️</button>
@@ -552,9 +645,11 @@ ${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-li
             ${r.conductedBy ? ' • by ' + escapeHtml(r.conductedBy) : ''}
           </div>
           <div class="card__body">${escapeHtml(r.description || '')}</div>
-          ${driveUrl ? `
-            <a class="btn btn-outline" href="${driveUrl}" target="_blank">Open Drive folder</a>
-          ` : ''}
+          <div class="card-actions">
+            ${driveUrl ? `<a class="btn btn-outline" href="${driveUrl}" target="_blank">Open Drive folder</a>` : ''}
+            ${syncedId ? `<span class="pill">Event ID: ${escapeHtml(syncedId)}</span>` : ''}
+            ${canSync && !isSynced ? `<button class="btn btn-outline" data-sync="${r.id}">Sync to Attendance</button>` : ''}
+          </div>
         </div>
       `;
     }).join('') || '<p style="opacity:.7">No submissions match your filters.</p>';
@@ -622,7 +717,7 @@ function exportSubsToExcel(){
 }
 
 
-// Single, clean delete handler for BOD events
+// Single, clean archive handler for BOD events
 document.addEventListener('click', async (e) => {
   const delBtn = e.target.closest('.iconbtn[data-del]');
   if (!delBtn) return;
@@ -630,22 +725,42 @@ document.addEventListener('click', async (e) => {
   const id = delBtn.getAttribute('data-del');
   if (!id) return;
 
-  // simple confirm (or keep your popup UI if you prefer)
-  if (!confirm('Delete this submission? This cannot be undone.')) return;
+  // Keep attendance values intact by soft-archiving the submission and synced event.
+  if (!confirm('Archive this submission? Attendance values will be preserved.')) return;
 
   try {
-    await db.collection('bodEvents').doc(id).delete();
-    // nice removal animation if you have .fade-out CSS, otherwise just remove
+    await archiveBodEventFn({ eventId: id });
     delBtn.closest('.card')?.classList.add('fade-out');
-    setTimeout(() => delBtn.closest('.card')?.remove(), 200);
-    toast('Deleted successfully');
+    setTimeout(() => loadItems(), 200);
+    toast('Submission archived');
   } catch (err) {
-    // Show a helpful message when rules block the delete
-    const msg = (err && err.code === 'permission-denied')
-      ? 'You can only delete your own events, or you must be an admin.'
-      : (err?.message || 'Delete failed');
+    const msg = err?.message || 'Archive failed';
     toast(msg, 2500);
     console.error(err);
+  }
+});
+
+document.addEventListener('click', async (e) => {
+  const syncBtn = e.target.closest('button[data-sync]');
+  if (!syncBtn) return;
+
+  const id = syncBtn.getAttribute('data-sync');
+  if (!id) return;
+
+  syncBtn.disabled = true;
+  syncBtn.textContent = 'Syncing...';
+  try {
+    const result = await syncBodEventFn({ bodEventId: id });
+    const rows = result?.data?.attendanceRowsUpdated || 0;
+    toast(`Synced to Attendance Manager (${rows} rows).`, 2600);
+    await loadItems();
+  } catch (err) {
+    const msg = err?.message || 'Sync failed';
+    toast(msg, 3000);
+    console.error(err);
+  } finally {
+    syncBtn.disabled = false;
+    syncBtn.textContent = 'Sync to Attendance';
   }
 });
 /* ---------- Edit Modal Logic ---------- */
@@ -702,9 +817,9 @@ document.addEventListener('click', async (e) => {
   editEventStart.value = sub.eventStart || '';
   editEventEnd.value = sub.eventEnd || '';
   editEventTime.value = sub.eventTime || '';
-  editEvDesc.value = sub.description || '';
-  editDriveFolder.value = sub.driveFolder || '';
-  editPreviewLink.value = sub.previewLink || ''; // The new field
+  editEvDesc.value = sub.description || sub.desc || '';
+  editDriveFolder.value = sub.driveFolder || sub.driveFolderId || '';
+  editPreviewLink.value = sub.previewLink || (Array.isArray(sub.imageLinks) ? sub.imageLinks[0] : '') || '';
 
   // Set selected avenues
   const subAvenues = Array.isArray(sub.avenue) ? sub.avenue : (sub.avenue ? [sub.avenue] : []);
@@ -736,23 +851,26 @@ if (editForm) {
       const updateData = {
         name: editEvName.value.trim(),
         conductedBy: editConductedBy.value.trim(),
-        eventStart: editEventStart.value,
-        eventEnd: editEventEnd.value,
-        eventTime: editEventTime.value,
-        description: editEvDesc.value.trim(),
+        date: editEventStart.value,
+        endDate: editEventEnd.value || editEventStart.value,
+        time: editEventTime.value,
+        desc: editEvDesc.value.trim(),
         driveFolder: editDriveFolder.value.trim(),
-        previewLink: editPreviewLink.value.trim(), // The new field
+        imageLinks: editPreviewLink.value.trim() ? [editPreviewLink.value.trim()] : [],
         avenue: avenues
       };
 
       // Extract Drive ID just like in the main form
       const m = (updateData.driveFolder || '').match(/\/folders\/([a-zA-Z0-9_-]+)/);
-      updateData.driveFolderId = m ? m[1] : '';
+      if (m) updateData.driveFolderId = m[1];
 
-      // Update the doc in Firestore
-      await db.collection('bodEvents').doc(id).update(updateData);
+      if (!updateData.name || !updateData.conductedBy || !updateData.date || !updateData.endDate || !avenues.length) {
+        throw new Error('Please fill all required fields.');
+      }
 
-      toast('Changes saved!');
+      await updateBodEventFn({ eventId: id, ...updateData });
+
+      toast('Changes saved and synced.');
       closeModal('editSubModal');
       loadItems(); // Refresh the list to show changes
 

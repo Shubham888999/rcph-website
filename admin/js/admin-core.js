@@ -385,7 +385,8 @@ async function loadData(){
   ]);
 
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-  EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }))
+    .filter(e => e.archived !== true);
   
   if (fineMember) {
     fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +
@@ -458,7 +459,8 @@ unsubMembers = db.collection('members').orderBy('name').onSnapshot((snap) => {
 });
 
 unsubEvents = db.collection('events').orderBy('date', 'desc').onSnapshot((snap) => {
-  EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(e => e.archived !== true);
   buildMonthFilterFromEvents();
   renderGrid();
   renderInsightsPanel();   

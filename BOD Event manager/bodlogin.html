@@ -27,19 +27,28 @@
 
 
 
-<form id="bodEventForm" class="fm">
+<form id="bodEventForm" class="fm bod-event-form">
 
+  <section class="bod-form-section">
+    <div class="section-head">
+      <h3>Event Basics</h3>
+    </div>
   <div class="form-grid-row row-split-2-1">
     <label>
       <span>Event name</span>
       <input id="evName" type="text" placeholder="e.g., Pad-Aid Drive" required />
     </label>
     <label>
-      <span>Conducted by (your name)</span>
+      <span>Conducted by</span>
       <input id="conductedBy" type="text" placeholder="e.g., Rtr. ABC XYZ" required />
     </label>
   </div>
+  </section>
 
+  <section class="bod-form-section">
+    <div class="section-head">
+      <h3>Date &amp; Time</h3>
+    </div>
   <div class="form-grid-row row-split-3">
     <label>
       <span>Start date</span>
@@ -54,7 +63,12 @@
       <input id="eventTime" type="time" />
     </label>
   </div>
+  </section>
   
+  <section class="bod-form-section">
+    <div class="section-head">
+      <h3>Avenue Tags &amp; Description</h3>
+    </div>
   <div class="form-grid-row row-split-tall">
     <label>
       <span>Description</span>
@@ -69,9 +83,12 @@
       <small class="note">Tip: Ctrl/Cmd-click (or long-press on mobile) to select multiple.</small>
     </label>
   </div>
+  </section>
 
-<div> 
-    <span>Event Images</span>
+  <section class="bod-form-section">
+    <div class="section-head">
+      <h3>Images</h3>
+    </div>
     <div class="input-group"> <label for="imageUploader" class="file-upload-label">
         Browse Files...
       </label>
@@ -82,11 +99,23 @@
       <span id="selectedCountPill" class="pill" hidden>0 selected</span>
       <div id="selectedThumbs" class="thumbs" hidden></div>
     <small class="note">Upload one or more images. The first image will be used as the preview.</small>
-  </div>
+  </section>
+
+  <section class="bod-form-section">
+    <div class="section-head">
+      <h3>Preview</h3>
+    </div>
+    <div id="eventPreviewCard" class="event-preview-card">
+      <div id="previewTitle" class="preview-title">Untitled event</div>
+      <div id="previewMeta" class="preview-meta">Choose a date and conductor</div>
+      <div id="previewAvenues" class="preview-avenues"></div>
+      <p id="previewDesc" class="preview-desc">Add a short note to preview the event summary.</p>
+    </div>
+  </section>
 
   <div class="actions">
     <button type="reset" class="btn btn-outline">Clear</button>
-    <button type="submit" class="btn">Submit</button>
+    <button id="submitBodEventBtn" type="submit" class="btn">Submit Event</button>
   </div>
 
   <div id="status" class="note"></div>
@@ -94,7 +123,7 @@
 
     </div>
 
-      <div class="info-banner" style="margin: 20px 0;"">
+      <div class="info-banner" style="margin: 20px 0;">
   <div class="info-banner__icon">📁</div>
   <div class="info-banner__text">
     <strong>View All Event Photos:</strong>
@@ -173,6 +202,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 
   <script>    // --- SAME PROJECT CONFIG ---
     const firebaseConfig = {
@@ -375,12 +405,10 @@ if (kpiAvs) {
   </div>
 
   <div id="imageLightbox" class="lightbox-modal" aria-hidden="true">
-  <div id="toast" class="toast">Saved!</div>
-  <div id="imageLightbox" class="lightbox-modal" aria-hidden="true">
     <button class="lightbox-close" data-close-lightbox>×</button>
     <img id="lightboxImage" src="" alt="Event Preview">
   </div>
-<script src="bodlogin.js?v=2"></script>
+<script src="bodlogin.js?v=3"></script>
 <script>
   (function(){
     const d = document.getElementById('eventDate');

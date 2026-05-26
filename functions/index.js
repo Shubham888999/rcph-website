@@ -151,6 +151,14 @@ async function assertPresident(uid) {
   return active.role;
 }
 
+async function assertBodAdminOrPresident(uid) {
+  const active = await getActiveRole(uid);
+  if (!active || !['bod', 'admin', 'president'].includes(active.role)) {
+    throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
+  }
+  return active.role;
+}
+
 function inviteCodeMatches(inputCode, expectedCode) {
   const input = normalizeText(inputCode, 200);
   const expected = normalizeText(expectedCode, 200);
@@ -218,6 +226,172 @@ function setMemberProfileDoc(tx, ref, snap, profile, approvedRole, clubPosition,
     createdAt: existing.createdAt || now,
     updatedAt: now,
   }, { merge: true });
+}
+
+function normalizeStringArray(value, maxItems = 20, maxLength = 180) {
+  const input = Array.isArray(value) ? value : (value ? [value] : []);
+  const seen = new Set();
+  const out = [];
+  input.forEach(item => {
+    const cleaned = normalizeText(item, maxLength);
+    if (!cleaned || seen.has(cleaned)) return;
+    seen.add(cleaned);
+    out.push(cleaned);
+  });
+  return out.slice(0, maxItems);
+}
+
+function validateEventDocId(eventId) {
+  const cleaned = normalizeText(eventId, 128);
+  if (cleaned && cleaned.includes('/')) {
+    throw new HttpsError('invalid-argument', 'Invalid event ID.');
+  }
+  return cleaned;
+}
+
+function normalizeBodEventPayload(raw) {
+  const name = normalizeText(raw.name, 180);
+  const conductedBy = normalizeText(raw.conductedBy, 140);
+  const date = normalizeText(raw.date || raw.eventStart, 20);
+  const endDate = normalizeText(raw.endDate || raw.eventEnd || date, 20);
+  const time = normalizeText(raw.time || raw.eventTime, 20);
+  const desc = normalizeText(raw.desc || raw.description, 2500);
+  const avenue = normalizeStringArray(raw.avenue, 12, 40);
+  const imageLinks = normalizeStringArray(raw.imageLinks || raw.driveLinks || raw.uploadedFileUrls, 30, 700);
+  const driveLinks = normalizeStringArray(raw.driveLinks || imageLinks, 30, 700);
+  const driveFolder = normalizeText(raw.driveFolder || raw.driveFolderId, 700);
+
+  if (!name) throw new HttpsError('invalid-argument', 'Event name is required.');
+  if (!conductedBy) throw new HttpsError('invalid-argument', 'Conducted by is required.');
+  if (!date) throw new HttpsError('invalid-argument', 'Start date is required.');
+  if (!endDate) throw new HttpsError('invalid-argument', 'End date is required.');
+  if (!avenue.length) throw new HttpsError('invalid-argument', 'Select at least one avenue.');
+
+  return { name, conductedBy, date, endDate, time, desc, avenue, imageLinks, driveLinks, driveFolder };
+}
+
+async function assertBodEventsUnlockedForRole(role) {
+  const lockSnap = await db.collection('locks').doc('bodEvents').get();
+  const locked = lockSnap.exists && lockSnap.data()?.locked === true;
+  if (locked && role !== 'president') {
+    throw new HttpsError('failed-precondition', 'BOD event submissions are locked.');
+  }
+}
+
+async function getCallableUserProfile(uid, request) {
+  let record = null;
+  try {
+    record = await admin.auth().getUser(uid);
+  } catch (err) {
+    console.warn('Could not load auth user for BOD event', uid, err?.message);
+  }
+  const userSnap = await db.collection('users').doc(uid).get().catch(() => null);
+  const userData = userSnap?.exists ? (userSnap.data() || {}) : {};
+
+  return {
+    email: normalizeEmail(userData.email || record?.email || request.auth?.token?.email || ''),
+    name: normalizeText(userData.name || record?.displayName || request.auth?.token?.name || request.auth?.token?.email || uid, 140),
+  };
+}
+
+async function initializeAttendanceForEvent(eventId, now) {
+  const membersSnap = await db.collection('members').get();
+  const activeMembers = membersSnap.docs.filter(doc => (doc.data() || {}).active !== false);
+
+  const attendanceSnaps = await Promise.all(
+    activeMembers.map(memberDoc => db.collection('attendance').doc(memberDoc.id).get())
+  );
+
+  let batch = db.batch();
+  let batchOps = 0;
+  let attendanceRowsUpdated = 0;
+
+  for (let i = 0; i < activeMembers.length; i += 1) {
+    const memberDoc = activeMembers[i];
+    const attendanceSnap = attendanceSnaps[i];
+    const existing = attendanceSnap.exists ? (attendanceSnap.data() || {}) : {};
+
+    if (Object.prototype.hasOwnProperty.call(existing, eventId)) continue;
+
+    const payload = {
+      [eventId]: 'NA',
+      updatedAt: now,
+    };
+    if (!attendanceSnap.exists || !existing.createdAt) payload.createdAt = now;
+
+    batch.set(db.collection('attendance').doc(memberDoc.id), payload, { merge: true });
+    batchOps += 1;
+    attendanceRowsUpdated += 1;
+
+    if (batchOps >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      batchOps = 0;
+    }
+  }
+
+  if (batchOps > 0) await batch.commit();
+  return attendanceRowsUpdated;
+}
+
+async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, preserveCreatedAt = true }) {
+  const bodRef = db.collection('bodEvents').doc(eventId);
+  const eventRef = db.collection('events').doc(eventId);
+  const [bodSnap, eventSnap] = await Promise.all([bodRef.get(), eventRef.get()]);
+  const existingBod = bodSnap.exists ? (bodSnap.data() || {}) : {};
+  const existingEvent = eventSnap.exists ? (eventSnap.data() || {}) : {};
+  const driveFolderRaw = String(payload.driveFolder || '').trim();
+  const folderMatch = driveFolderRaw.match(/\/folders\/([a-zA-Z0-9_-]+)/) || driveFolderRaw.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  const driveFolderId = folderMatch ? folderMatch[1] : (driveFolderRaw && !driveFolderRaw.includes('http') ? driveFolderRaw : '');
+
+  const bodEventDoc = {
+    name: payload.name,
+    conductedBy: payload.conductedBy,
+    date: payload.date,
+    endDate: payload.endDate,
+    time: payload.time,
+    desc: payload.desc,
+    description: payload.desc,
+    avenue: payload.avenue,
+    imageLinks: payload.imageLinks,
+    driveFolder: payload.driveFolder,
+    driveFolderId: driveFolderId || existingBod.driveFolderId || '',
+    driveLinks: payload.driveLinks,
+    previewLink: payload.imageLinks[0] || existingBod.previewLink || '',
+    eventStart: payload.date,
+    eventEnd: payload.endDate,
+    eventTime: payload.time,
+    status: 'synced',
+    syncedEventId: eventId,
+    createdBy: existingBod.createdBy || uid,
+    createdByEmail: existingBod.createdByEmail || userProfile.email,
+    createdByName: existingBod.createdByName || userProfile.name,
+    createdByNameSearch: (existingBod.createdByName || userProfile.name || userProfile.email || '').toLowerCase().split(/\s+/).filter(Boolean),
+    createdAt: preserveCreatedAt ? (existingBod.createdAt || now) : now,
+    updatedAt: now,
+  };
+
+  const eventDoc = {
+    name: payload.name,
+    date: payload.date,
+    endDate: payload.endDate,
+    desc: payload.desc,
+    avenue: payload.avenue,
+    source: 'bodEventManager',
+    bodEventId: eventId,
+    conductedBy: payload.conductedBy,
+    createdBy: existingEvent.createdBy || uid,
+    createdAt: preserveCreatedAt ? (existingEvent.createdAt || now) : now,
+    updatedAt: now,
+    archived: false,
+  };
+
+  const batch = db.batch();
+  batch.set(bodRef, bodEventDoc, { merge: true });
+  batch.set(eventRef, eventDoc, { merge: true });
+  await batch.commit();
+
+  return { eventCreated: !eventSnap.exists };
 }
 
 exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -602,6 +776,128 @@ exports.syncExistingRolesToUsers = onCall(CALLABLE_OPTIONS, async (request) => {
 
   if (batchOps > 0) await batch.commit();
   return { ok: true, created };
+});
+
+exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const role = await assertBodAdminOrPresident(uid);
+  await assertBodEventsUnlockedForRole(role);
+
+  const data = request.data || {};
+  const eventId = validateEventDocId(data.eventId) || db.collection('events').doc().id;
+  const payload = normalizeBodEventPayload(data);
+  const userProfile = await getCallableUserProfile(uid, request);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  const { eventCreated } = await writeSyncedBodEvent({
+    eventId,
+    payload,
+    uid,
+    userProfile,
+    now,
+  });
+  const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
+
+  return {
+    ok: true,
+    eventId,
+    attendanceRowsUpdated,
+    eventCreated,
+  };
+});
+
+exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  await assertAdminOrPresident(uid);
+
+  const bodEventId = validateEventDocId(request.data?.bodEventId);
+  if (!bodEventId) throw new HttpsError('invalid-argument', 'BOD event ID is required.');
+
+  const bodSnap = await db.collection('bodEvents').doc(bodEventId).get();
+  if (!bodSnap.exists) throw new HttpsError('not-found', 'BOD event not found.');
+
+  const bodData = bodSnap.data() || {};
+  const payload = normalizeBodEventPayload({
+    ...bodData,
+    date: bodData.date || bodData.eventStart,
+    endDate: bodData.endDate || bodData.eventEnd,
+    time: bodData.time || bodData.eventTime,
+    desc: bodData.desc || bodData.description,
+    imageLinks: bodData.imageLinks || (bodData.previewLink ? [bodData.previewLink] : []),
+    driveFolder: bodData.driveFolder || bodData.driveFolderId,
+    driveLinks: bodData.driveLinks || bodData.imageLinks,
+  });
+  const userProfile = await getCallableUserProfile(uid, request);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  const { eventCreated } = await writeSyncedBodEvent({
+    eventId: bodEventId,
+    payload,
+    uid: bodData.createdBy || uid,
+    userProfile: {
+      email: bodData.createdByEmail || userProfile.email,
+      name: bodData.createdByName || userProfile.name,
+    },
+    now,
+  });
+  const attendanceRowsUpdated = await initializeAttendanceForEvent(bodEventId, now);
+
+  return {
+    ok: true,
+    eventId: bodEventId,
+    attendanceRowsUpdated,
+    eventCreated,
+  };
+});
+
+exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const role = await assertBodAdminOrPresident(uid);
+  await assertBodEventsUnlockedForRole(role);
+
+  const eventId = validateEventDocId(request.data?.eventId);
+  if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
+
+  const payload = normalizeBodEventPayload(request.data || {});
+  const userProfile = await getCallableUserProfile(uid, request);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
+  const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
+
+  return {
+    ok: true,
+    eventId,
+    attendanceRowsUpdated,
+  };
+});
+
+exports.archiveBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const role = await assertBodAdminOrPresident(uid);
+  await assertBodEventsUnlockedForRole(role);
+
+  const eventId = validateEventDocId(request.data?.eventId);
+  if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const batch = db.batch();
+  batch.set(db.collection('bodEvents').doc(eventId), {
+    status: 'deleted',
+    archived: true,
+    deletedAt: now,
+    deletedBy: uid,
+    updatedAt: now,
+  }, { merge: true });
+  batch.set(db.collection('events').doc(eventId), {
+    archived: true,
+    archivedAt: now,
+    archivedBy: uid,
+    updatedAt: now,
+  }, { merge: true });
+  await batch.commit();
+
+  return { ok: true, eventId };
 });
 
 const CLEAN_SLATE_CONFIRM_TEXT = 'RESET RCPH RIY DATA';
