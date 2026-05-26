@@ -8,6 +8,16 @@ const crypto = require('crypto');
 admin.initializeApp();
 const db = admin.firestore();
 const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE;
+const CALLABLE_OPTIONS = {
+  region: 'us-central1',
+  cors: [
+    'https://rcph3131.org',
+    'https://www.rcph3131.org',
+    'http://localhost:5000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+  ],
+};
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -91,6 +101,11 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeClubPosition(value, fallback) {
+  const cleaned = normalizeText(value, 120).replace(/\s+/g, ' ');
+  return cleaned || fallback;
+}
+
 function requireAuth(request) {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -128,6 +143,14 @@ async function assertAdminOrPresident(uid) {
   return active.role;
 }
 
+async function assertPresident(uid) {
+  const active = await getActiveRole(uid);
+  if (!active || active.role !== 'president') {
+    throw new HttpsError('permission-denied', 'President access required.');
+  }
+  return active.role;
+}
+
 function inviteCodeMatches(inputCode, expectedCode) {
   const input = normalizeText(inputCode, 200);
   const expected = normalizeText(expectedCode, 200);
@@ -161,7 +184,43 @@ async function buildProfileFromAuth(uid, request, data) {
   };
 }
 
-exports.createUserProfileAfterSignup = onCall(async (request) => {
+async function buildNaMapFromCollection(collectionName) {
+  const snap = await db.collection(collectionName).get();
+  const out = {};
+  snap.forEach(doc => { out[doc.id] = 'NA'; });
+  return out;
+}
+
+function setDocPreservingExistingAttendance(tx, ref, snap, eventIds, now) {
+  const existing = snap.exists ? (snap.data() || {}) : {};
+  const payload = { updatedAt: now };
+  if (!snap.exists || !existing.createdAt) payload.createdAt = now;
+
+  eventIds.forEach((id) => {
+    if (!Object.prototype.hasOwnProperty.call(existing, id)) {
+      payload[id] = 'NA';
+    }
+  });
+
+  tx.set(ref, payload, { merge: true });
+}
+
+function setMemberProfileDoc(tx, ref, snap, profile, approvedRole, clubPosition, now) {
+  const existing = snap.exists ? (snap.data() || {}) : {};
+  tx.set(ref, {
+    name: profile.name || existing.name || '',
+    email: profile.email || existing.email || '',
+    role: approvedRole,
+    position: clubPosition,
+    userId: profile.uid,
+    createdFromUser: true,
+    active: true,
+    createdAt: existing.createdAt || now,
+    updatedAt: now,
+  }, { merge: true });
+}
+
+exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
   const requestedRole = normalizeRole(data.requestedRole);
@@ -187,6 +246,8 @@ exports.createUserProfileAfterSignup = onCall(async (request) => {
   const now = admin.firestore.FieldValue.serverTimestamp();
   const userRef = db.collection('users').doc(uid);
   const roleRef = db.collection('roles').doc(uid);
+  const eventIds = Object.keys(await buildNaMapFromCollection('events'));
+  const districtEventIds = Object.keys(await buildNaMapFromCollection('districtEvents'));
 
   const result = await db.runTransaction(async (tx) => {
     const [userSnap, roleSnap] = await Promise.all([tx.get(userRef), tx.get(roleRef)]);
@@ -245,9 +306,21 @@ exports.createUserProfileAfterSignup = onCall(async (request) => {
     };
 
     if (requestedRole === 'gbm') {
+      const clubPosition = 'Member';
+      const memberRef = db.collection('members').doc(uid);
+      const attendanceRef = db.collection('attendance').doc(uid);
+      const districtAttendanceRef = db.collection('districtAttendance').doc(uid);
+      const [memberSnap, attendanceSnap, districtAttendanceSnap] = await Promise.all([
+        tx.get(memberRef),
+        tx.get(attendanceRef),
+        tx.get(districtAttendanceRef),
+      ]);
+
       tx.set(userRef, {
         ...base,
         role: 'gbm',
+        clubPosition,
+        addToBodAttendance: false,
         status: 'approved',
         approvedAt: now,
         approvedBy: 'system',
@@ -259,6 +332,9 @@ exports.createUserProfileAfterSignup = onCall(async (request) => {
         updatedAt: now,
         approvedBy: 'system',
       }, { merge: true });
+      setMemberProfileDoc(tx, memberRef, memberSnap, profile, 'gbm', clubPosition, now);
+      setDocPreservingExistingAttendance(tx, attendanceRef, attendanceSnap, eventIds, now);
+      setDocPreservingExistingAttendance(tx, districtAttendanceRef, districtAttendanceSnap, districtEventIds, now);
       return { status: 'approved', role: 'gbm', existing: false };
     }
 
@@ -274,7 +350,7 @@ exports.createUserProfileAfterSignup = onCall(async (request) => {
   return { ok: true, ...result };
 });
 
-exports.approveUserRole = onCall(async (request) => {
+exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const approverUid = requireAuth(request);
   await assertAdminOrPresident(approverUid);
 
@@ -290,20 +366,58 @@ exports.approveUserRole = onCall(async (request) => {
     throw new HttpsError('failed-precondition', 'President role is manual-only.');
   }
 
+  const positionFallbacks = {
+    gbm: 'Member',
+    bod: 'BOD',
+    admin: 'Admin',
+  };
+  const clubPosition = normalizeClubPosition(data.clubPosition, positionFallbacks[approvedRole]);
+  const addToBodAttendance = approvedRole === 'bod' || data.addToBodAttendance === true;
+  const eventIds = Object.keys(await buildNaMapFromCollection('events'));
+  const districtEventIds = Object.keys(await buildNaMapFromCollection('districtEvents'));
+  const bodMeetingIds = Object.keys(await buildNaMapFromCollection('bodMeetings'));
+
   const targetUserRef = db.collection('users').doc(targetUid);
   const targetRoleRef = db.collection('roles').doc(targetUid);
+  const memberRef = db.collection('members').doc(targetUid);
+  const attendanceRef = db.collection('attendance').doc(targetUid);
+  const districtAttendanceRef = db.collection('districtAttendance').doc(targetUid);
+  const bodMemberRef = db.collection('bodMembers').doc(targetUid);
+  const bodAttendanceRef = db.collection('bodAttendance').doc(targetUid);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   await db.runTransaction(async (tx) => {
-    const userSnap = await tx.get(targetUserRef);
+    const [
+      userSnap,
+      memberSnap,
+      attendanceSnap,
+      districtAttendanceSnap,
+      bodMemberSnap,
+      bodAttendanceSnap,
+    ] = await Promise.all([
+      tx.get(targetUserRef),
+      tx.get(memberRef),
+      tx.get(attendanceRef),
+      tx.get(districtAttendanceRef),
+      tx.get(bodMemberRef),
+      tx.get(bodAttendanceRef),
+    ]);
     if (!userSnap.exists) {
       throw new HttpsError('not-found', 'User profile not found.');
     }
+    const userData = userSnap.data() || {};
+    const profile = {
+      uid: targetUid,
+      name: normalizeText(userData.name || userData.email || targetUid, 120),
+      email: normalizeEmail(userData.email || ''),
+    };
 
     tx.set(targetUserRef, {
       status: 'approved',
       role: approvedRole,
       requestedRole: approvedRole,
+      clubPosition,
+      addToBodAttendance,
       approvedAt: now,
       approvedBy: approverUid,
       updatedAt: now,
@@ -318,12 +432,21 @@ exports.approveUserRole = onCall(async (request) => {
       approvedBy: approverUid,
       updatedAt: now,
     }, { merge: true });
+
+    setMemberProfileDoc(tx, memberRef, memberSnap, profile, approvedRole, clubPosition, now);
+    setDocPreservingExistingAttendance(tx, attendanceRef, attendanceSnap, eventIds, now);
+    setDocPreservingExistingAttendance(tx, districtAttendanceRef, districtAttendanceSnap, districtEventIds, now);
+
+    if (addToBodAttendance) {
+      setMemberProfileDoc(tx, bodMemberRef, bodMemberSnap, profile, approvedRole, clubPosition, now);
+      setDocPreservingExistingAttendance(tx, bodAttendanceRef, bodAttendanceSnap, bodMeetingIds, now);
+    }
   });
 
   return { ok: true, role: approvedRole };
 });
 
-exports.rejectUserRoleRequest = onCall(async (request) => {
+exports.rejectUserRoleRequest = onCall(CALLABLE_OPTIONS, async (request) => {
   const approverUid = requireAuth(request);
   await assertAdminOrPresident(approverUid);
 
@@ -368,7 +491,7 @@ exports.rejectUserRoleRequest = onCall(async (request) => {
   return { ok: true };
 });
 
-exports.updateUserRole = onCall(async (request) => {
+exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
   await assertAdminOrPresident(actorUid);
 
@@ -408,7 +531,7 @@ exports.updateUserRole = onCall(async (request) => {
   return { ok: true, role };
 });
 
-exports.getMyAccess = onCall(async (request) => {
+exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const [userSnap, roleSnap] = await Promise.all([
     db.collection('users').doc(uid).get(),
@@ -423,7 +546,7 @@ exports.getMyAccess = onCall(async (request) => {
   };
 });
 
-exports.syncExistingRolesToUsers = onCall(async (request) => {
+exports.syncExistingRolesToUsers = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
   await assertAdminOrPresident(actorUid);
 
@@ -479,4 +602,89 @@ exports.syncExistingRolesToUsers = onCall(async (request) => {
 
   if (batchOps > 0) await batch.commit();
   return { ok: true, created };
+});
+
+const CLEAN_SLATE_CONFIRM_TEXT = 'RESET RCPH RIY DATA';
+const CLEAN_SLATE_ALLOWED_COLLECTIONS = new Set([
+  'attendance',
+  'bodAttendance',
+  'bodEvents',
+  'bodMeetings',
+  'bodMembers',
+  'districtAttendance',
+  'districtEvents',
+  'events',
+  'fines',
+  'members',
+  'treasury',
+]);
+const CLEAN_SLATE_NEVER_DELETE = new Set(['users', 'roles', 'passwordResets']);
+
+async function countTopLevelCollection(collectionName) {
+  const snap = await db.collection(collectionName).get();
+  return snap.size;
+}
+
+async function deleteTopLevelCollection(collectionName) {
+  const snap = await db.collection(collectionName).get();
+  let deleted = 0;
+  let batch = db.batch();
+  let batchOps = 0;
+
+  for (const doc of snap.docs) {
+    batch.delete(doc.ref);
+    deleted += 1;
+    batchOps += 1;
+
+    if (batchOps >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      batchOps = 0;
+    }
+  }
+
+  if (batchOps > 0) await batch.commit();
+  return deleted;
+}
+
+// President-only reset helper for RIY rollover. Use only after an external backup.
+exports.cleanSlateForNewRiy = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertPresident(actorUid);
+
+  const data = request.data || {};
+  const confirmText = normalizeText(data.confirmText, 80);
+  const dryRun = data.dryRun !== false;
+  const requestedCollections = Array.isArray(data.deleteCollections)
+    ? data.deleteCollections.map(c => normalizeText(c, 80)).filter(Boolean)
+    : [];
+
+  if (confirmText !== CLEAN_SLATE_CONFIRM_TEXT) {
+    throw new HttpsError('failed-precondition', `Type "${CLEAN_SLATE_CONFIRM_TEXT}" to confirm.`);
+  }
+  if (!requestedCollections.length) {
+    throw new HttpsError('invalid-argument', 'Select at least one collection to reset.');
+  }
+
+  const uniqueCollections = Array.from(new Set(requestedCollections));
+  const blocked = uniqueCollections.filter(c =>
+    CLEAN_SLATE_NEVER_DELETE.has(c) || !CLEAN_SLATE_ALLOWED_COLLECTIONS.has(c)
+  );
+  if (blocked.length) {
+    throw new HttpsError('permission-denied', `Collection reset is not allowed for: ${blocked.join(', ')}`);
+  }
+
+  const results = {};
+  for (const collectionName of uniqueCollections) {
+    results[collectionName] = dryRun
+      ? await countTopLevelCollection(collectionName)
+      : await deleteTopLevelCollection(collectionName);
+  }
+
+  return {
+    ok: true,
+    dryRun,
+    collections: uniqueCollections,
+    counts: results,
+  };
 });

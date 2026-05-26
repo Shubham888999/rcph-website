@@ -97,6 +97,50 @@ function roleLabel(role) {
   return labels[String(role || '').toLowerCase()] || '-';
 }
 
+const CLUB_POSITIONS = [
+  'Member',
+  'President',
+  'Immediate Past President',
+  'Vice President',
+  'Secretary',
+  'Joint Secretary',
+  'Treasurer',
+  'Sergeant-at-Arms',
+  'Club Service Director',
+  'Community Service Director',
+  'International Service Director',
+  'Professional Development Director',
+  'Public Relations Officer',
+  'Rotary Rotaract Relations Officer',
+  'DEI Director',
+  'Website Director',
+  'Editor',
+  'Other'
+];
+
+function defaultClubPositionForRole(role) {
+  const r = String(role || '').toLowerCase();
+  if (r === 'gbm') return 'Member';
+  if (r === 'bod') return 'Website Director';
+  if (r === 'admin') return 'Website Director';
+  return 'Member';
+}
+
+function positionSelectOptions(position) {
+  const value = String(position || '').trim();
+  const selectedKnown = CLUB_POSITIONS.includes(value) ? value : (value ? 'Other' : '');
+  const options = [''].concat(CLUB_POSITIONS);
+  return options.map(pos => {
+    const label = pos || 'Select position...';
+    return `<option value="${escapeHtml(pos)}" ${pos === selectedKnown ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('');
+}
+
+function customPositionValue(position) {
+  const value = String(position || '').trim();
+  return value && !CLUB_POSITIONS.includes(value) ? value : '';
+}
+
 function statusBadge(status) {
   const s = String(status || 'pending').toLowerCase();
   const colors = {
@@ -106,5 +150,3 @@ function statusBadge(status) {
   };
   return `<span class="badge" style="${colors[s] || ''}">${escapeHtml(roleLabel(s) === '-' ? s : roleLabel(s))}</span>`;
 }
-
-

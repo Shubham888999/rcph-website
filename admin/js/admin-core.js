@@ -142,6 +142,116 @@ function accountRoleOptions(selectedRole) {
   )).join('');
 }
 
+function accountPositionSeed(user, role) {
+  const existing = String(user.clubPosition || '').trim();
+  if (existing) return existing;
+  return defaultClubPositionForRole(role);
+}
+
+function accountPositionControl(user, role) {
+  const seed = accountPositionSeed(user, role);
+  const customValue = customPositionValue(seed);
+  const showCustom = !!customValue;
+
+  return `
+    <label style="display:grid; gap:4px; min-width:180px;">
+      <span style="font-size:12px; color:#9aa;">Club position</span>
+      <select data-account-position="${escapeHtml(user.id)}" aria-label="Club position for ${escapeHtml(user.name || user.email || 'user')}">
+        ${positionSelectOptions(seed)}
+      </select>
+      <input
+        data-account-position-other="${escapeHtml(user.id)}"
+        type="text"
+        placeholder="Custom position"
+        value="${escapeHtml(customValue)}"
+        style="${showCustom ? '' : 'display:none;'}"
+      />
+    </label>
+  `;
+}
+
+function accountAddToBodControl(user, role) {
+  const r = String(role || '').toLowerCase();
+  const checked = r === 'bod' || user.addToBodAttendance === true;
+  const disabled = r === 'bod';
+  return `
+    <label style="display:inline-flex; align-items:center; gap:8px; color:#d8e6e6;">
+      <input
+        type="checkbox"
+        data-account-add-bod="${escapeHtml(user.id)}"
+        ${checked ? 'checked' : ''}
+        ${disabled ? 'disabled' : ''}
+      />
+      <span>Add to BOD Attendance</span>
+    </label>
+  `;
+}
+
+function accountApprovalActions(user, requested) {
+  return `
+    <div style="display:flex; flex-direction:column; gap:8px; align-items:stretch;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+        <label style="display:grid; gap:4px; min-width:120px;">
+          <span style="font-size:12px; color:#9aa;">Access role</span>
+          <select data-account-role="${escapeHtml(user.id)}" aria-label="Approve role for ${escapeHtml(user.name || user.email || 'user')}">
+            ${accountRoleOptions(requested)}
+          </select>
+        </label>
+        ${accountPositionControl(user, requested)}
+      </div>
+      ${accountAddToBodControl(user, requested)}
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" type="button" data-account-approve="${escapeHtml(user.id)}">Approve</button>
+        <button class="btn btn-outline" type="button" data-account-reject="${escapeHtml(user.id)}">Reject</button>
+      </div>
+    </div>
+  `;
+}
+
+function readAccountPosition(uid) {
+  const select = Array.from(document.querySelectorAll('[data-account-position]'))
+    .find(el => el.dataset.accountPosition === uid);
+  const other = Array.from(document.querySelectorAll('[data-account-position-other]'))
+    .find(el => el.dataset.accountPositionOther === uid);
+
+  if (!select) return '';
+  if (select.value === 'Other') return (other?.value || '').trim();
+  return select.value || '';
+}
+
+function readAccountAddToBod(uid, role) {
+  if (String(role || '').toLowerCase() === 'bod') return true;
+  const checkbox = Array.from(document.querySelectorAll('[data-account-add-bod]'))
+    .find(el => el.dataset.accountAddBod === uid);
+  return !!checkbox?.checked;
+}
+
+function syncAccountRequestControls(uid, role) {
+  const select = Array.from(document.querySelectorAll('[data-account-position]'))
+    .find(el => el.dataset.accountPosition === uid);
+  const other = Array.from(document.querySelectorAll('[data-account-position-other]'))
+    .find(el => el.dataset.accountPositionOther === uid);
+  const checkbox = Array.from(document.querySelectorAll('[data-account-add-bod]'))
+    .find(el => el.dataset.accountAddBod === uid);
+
+  if (select && other) {
+    const fallback = defaultClubPositionForRole(role);
+    select.value = fallback || '';
+    other.value = '';
+    other.style.display = select.value === 'Other' ? '' : 'none';
+  }
+
+  if (checkbox) {
+    if (role === 'bod') {
+      checkbox.checked = true;
+      checkbox.disabled = true;
+    } else {
+      checkbox.disabled = false;
+      checkbox.checked = false;
+    }
+  }
+}
+
 function renderAccountRequests() {
   if (!accountRequestsBody) return;
 
@@ -165,16 +275,13 @@ function renderAccountRequests() {
     const status = String(user.status || 'pending').toLowerCase();
     const requested = String(user.requestedRole || 'gbm').toLowerCase();
     const actions = status === 'pending'
-      ? `<div class="toolbar" style="margin:0;">
-          <select data-account-role="${escapeHtml(user.id)}" aria-label="Approve role for ${escapeHtml(user.name || user.email || 'user')}">
-            ${accountRoleOptions(requested)}
-          </select>
-          <button class="btn" type="button" data-account-approve="${escapeHtml(user.id)}">Approve</button>
-          <button class="btn btn-outline" type="button" data-account-reject="${escapeHtml(user.id)}">Reject</button>
-        </div>`
+      ? accountApprovalActions(user, requested)
       : (status === 'rejected' && user.rejectReason
         ? `<span title="${escapeHtml(user.rejectReason)}">Rejected</span>`
         : '<span style="color:#9aa;">No action</span>');
+    const approvedSummary = status === 'pending'
+      ? ''
+      : `<div style="color:#9aa;">${escapeHtml(user.clubPosition || '-')} ${user.addToBodAttendance ? '- BOD Attendance' : ''}</div>`;
 
     return `
       <tr>
@@ -183,7 +290,7 @@ function renderAccountRequests() {
         <td>${roleLabel(requested)}</td>
         <td>${formatDate(user.createdAt)}</td>
         <td>${statusBadge(status)}</td>
-        <td>${actions}</td>
+        <td>${actions}${approvedSummary}</td>
       </tr>
     `;
   }).join('');
@@ -199,9 +306,30 @@ async function approveAccountRequest(uid) {
     alert('Choose GBM, BOD, or Admin.');
     return;
   }
+  const clubPosition = readAccountPosition(uid);
+  const positionSelect = Array.from(document.querySelectorAll('[data-account-position]'))
+    .find(el => el.dataset.accountPosition === uid);
+  if (positionSelect?.value === 'Other' && !clubPosition) {
+    alert('Enter the custom club position before approving.');
+    return;
+  }
+  if (!clubPosition) {
+    alert('Choose or enter a club position before approving.');
+    return;
+  }
+  if (approvedRole === 'bod' && clubPosition.toLowerCase() === 'member') {
+    alert('BOD access cannot use Member as the club position.');
+    return;
+  }
+  const addToBodAttendance = readAccountAddToBod(uid, approvedRole);
 
   try {
-    await accountFunction('approveUserRole')({ targetUid: uid, approvedRole });
+    await accountFunction('approveUserRole')({
+      targetUid: uid,
+      approvedRole,
+      clubPosition,
+      addToBodAttendance,
+    });
   } catch (err) {
     alert(err.message || 'Could not approve account.');
   }
@@ -230,6 +358,21 @@ document.addEventListener('click', (event) => {
   const rejectBtn = event.target.closest('[data-account-reject]');
   if (rejectBtn) {
     rejectAccountRequest(rejectBtn.dataset.accountReject);
+  }
+});
+
+document.addEventListener('change', (event) => {
+  const roleSelect = event.target.closest('[data-account-role]');
+  if (roleSelect) {
+    syncAccountRequestControls(roleSelect.dataset.accountRole, roleSelect.value);
+    return;
+  }
+
+  const positionSelect = event.target.closest('[data-account-position]');
+  if (positionSelect) {
+    const other = Array.from(document.querySelectorAll('[data-account-position-other]'))
+      .find(el => el.dataset.accountPositionOther === positionSelect.dataset.accountPosition);
+    if (other) other.style.display = positionSelect.value === 'Other' ? '' : 'none';
   }
 });
 
