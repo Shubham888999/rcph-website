@@ -27,7 +27,8 @@ async function loadDistrictData() {
     db.collection('districtAttendance').get()
   ]);
 
-  DIST_EVENTS = deSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  DIST_EVENTS = deSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(ev => ev.archived !== true);
 
   DIST_ATT = {};
   daSnap.forEach(d => {
@@ -66,6 +67,7 @@ function renderDistrictGrid() {
         <div class="bulk-wrap">
           <div class="ev-head">
             <span>${e.name || ''}</span>
+            <button class="icon-btn" title="Edit district event" data-edit-dist-event="${e.id}">Edit</button>
             <button class="icon-btn" title="Delete district event" data-del-dist-event="${e.id}">🗑</button>
           </div>
           <small>
@@ -234,13 +236,13 @@ if (addDistEventForm) {
     }
 
     try {
-      await db.collection('districtEvents').add({
+      await callableFunction('createDistrictEventSynced')({
         name,
         date,
         endDate: endDate || '',
         desc: desc || '',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdBy: auth.currentUser?.uid || null
+        visibility: addDistEvPublic?.checked ? 'public' : 'internal',
+        showOnHomepage: !!addDistEvPublic?.checked
       });
 
       closeModal('addDistEventModal');
@@ -290,16 +292,63 @@ if (exportDistXlsxBtn) {
 
 
 document.addEventListener('click', async (e) => {
+  const editDistEventBtn = e.target.closest('button[data-edit-dist-event]');
+  if (editDistEventBtn) {
+    const id = editDistEventBtn.dataset.editDistEvent;
+    const ev = DIST_EVENTS.find(x => x.id === id);
+    if (!ev) return;
+    if (editDistEvId) editDistEvId.value = id;
+    if (editDistEvName) editDistEvName.value = ev.name || '';
+    if (editDistEvDate) editDistEvDate.value = (ev.date || '').slice(0, 10);
+    if (editDistEvEndDate) editDistEvEndDate.value = (ev.endDate || ev.date || '').slice(0, 10);
+    if (editDistEvDesc) editDistEvDesc.value = ev.desc || '';
+    if (editDistEvPublic) editDistEvPublic.checked = String(ev.visibility || 'internal').toLowerCase() === 'public';
+    openModal('editDistEventModal');
+    return;
+  }
+
   const delDistEventBtn = e.target.closest('button[data-del-dist-event]');
   if (!delDistEventBtn) return;
 
   const id = delDistEventBtn.dataset.delDistEvent;
   const ev = DIST_EVENTS.find(x => x.id === id);
-  if (!confirm(`Delete district event "${ev?.name || id}"?`)) return;
+  if (!confirm(`Archive district event "${ev?.name || id}"? District attendance values will be preserved.`)) return;
 
   try {
-    await db.collection('districtEvents').doc(id).delete();
+    await callableFunction('archiveDistrictEventSynced')({ districtEventId: id });
   } catch (err) {
-    alert('Failed to delete district event: ' + err.message);
+    alert('Failed to archive district event: ' + err.message);
   }
 });
+
+if (editDistEventForm) {
+  editDistEventForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const districtEventId = editDistEvId?.value || '';
+    const name = (editDistEvName?.value || '').trim();
+    const date = editDistEvDate?.value || '';
+    const endDate = editDistEvEndDate?.value || '';
+    const desc = (editDistEvDesc?.value || '').trim();
+
+    if (!districtEventId || !name || !date) {
+      alert('Please enter district event name and start date.');
+      return;
+    }
+
+    try {
+      await callableFunction('updateDistrictEventSynced')({
+        districtEventId,
+        name,
+        date,
+        endDate: endDate || '',
+        desc,
+        visibility: editDistEvPublic?.checked ? 'public' : 'internal',
+        showOnHomepage: !!editDistEvPublic?.checked
+      });
+      closeModal('editDistEventModal');
+    } catch (err) {
+      alert('Failed to save district event: ' + err.message);
+    }
+  });
+}

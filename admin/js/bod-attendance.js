@@ -168,7 +168,7 @@ if (bodAddMeetingBtn) {
     const date = (bodMeetDate?.value || '');
     if (!name || !date) return;
     try {
-      await db.collection('bodMeetings').add({ name, date });
+      await callableFunction('createBodMeetingSynced')({ name, date });
       if (bodMeetName) bodMeetName.value = '';
     } catch (err) { alert('Failed to add meeting: ' + err.message); }
   });
@@ -191,14 +191,10 @@ document.addEventListener('click', async (e) => {
   if (delBodMeet) {
     const id = delBodMeet.dataset.delBodMeeting;
     const mt = BODMEET.find(x => x.id === id);
-    if (!confirm(`Delete meeting "${mt?.name || id}"? This removes it from all BOD attendance.`)) return;
+    if (!confirm(`Archive meeting "${mt?.name || id}"? BOD attendance values will be preserved.`)) return;
     try {
-      await db.collection('bodMeetings').doc(id).delete();
-      const snap = await db.collection('bodAttendance').get();
-      const batch = db.batch();
-      snap.forEach(doc => batch.update(doc.ref, { [id]: firebase.firestore.FieldValue.delete() }));
-      await batch.commit();
-    } catch (err) { alert('Failed to delete meeting: ' + err.message); }
+      await callableFunction('archiveBodMeetingSynced')({ meetingId: id });
+    } catch (err) { alert('Failed to archive meeting: ' + err.message); }
     return;
   }
 
@@ -599,7 +595,7 @@ if (editBodMeetingForm) {
     const date = editBodMeetDate.value || '';
     if (!id || !name || !date) return;
     try {
-      await db.collection('bodMeetings').doc(id).update({ name, date });
+      await callableFunction('updateBodMeetingSynced')({ meetingId: id, name, date });
       closeModal('editBodMeetingModal');
     } catch (err) { alert('Failed to save meeting: ' + err.message); }
   });

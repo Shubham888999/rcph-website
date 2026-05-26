@@ -99,6 +99,7 @@ const addEventModal       = document.getElementById('addEventModal');
 const addEventForm        = document.getElementById('addEventForm');
 const addEvName           = document.getElementById('addEvName');
 const addEvDate           = document.getElementById('addEvDate');
+const addEvEndDate        = document.getElementById('addEvEndDate');
 const addEvDesc           = document.getElementById('addEvDesc');
 
 const editEventModal      = document.getElementById('editEventModal');
@@ -106,6 +107,7 @@ const editEventForm       = document.getElementById('editEventForm');
 const editEvId            = document.getElementById('editEvId');
 const editEvName          = document.getElementById('editEvName');
 const editEvDate          = document.getElementById('editEvDate');
+const editEvEndDate       = document.getElementById('editEvEndDate');
 const editEvDesc          = document.getElementById('editEvDesc');
 
 const editBodMemberModal  = document.getElementById('editBodMemberModal');
@@ -144,6 +146,15 @@ const addDistEvName    = document.getElementById('addDistEvName');
 const addDistEvDate    = document.getElementById('addDistEvDate');
 const addDistEvEndDate = document.getElementById('addDistEvEndDate');
 const addDistEvDesc    = document.getElementById('addDistEvDesc');
+const addDistEvPublic  = document.getElementById('addDistEvPublic');
+const editDistEventModal= document.getElementById('editDistEventModal');
+const editDistEventForm = document.getElementById('editDistEventForm');
+const editDistEvId      = document.getElementById('editDistEvId');
+const editDistEvName    = document.getElementById('editDistEvName');
+const editDistEvDate    = document.getElementById('editDistEvDate');
+const editDistEvEndDate = document.getElementById('editDistEvEndDate');
+const editDistEvDesc    = document.getElementById('editDistEvDesc');
+const editDistEvPublic  = document.getElementById('editDistEvPublic');
 
 const sendMailBtn        = document.getElementById('sendMailBtn');
 const sendMailMenu       = document.getElementById('sendMailMenu');

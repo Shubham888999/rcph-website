@@ -77,11 +77,11 @@ function startLockWatchers() {
   lockWatchersStarted = true;
 
   watchLock('attendance', lockAttendanceBtn, lockAttendanceState, (locked) => {
-    document.querySelectorAll('#attBody .cell-btn, #addMemberBtn, #addEventBtn')
+    document.querySelectorAll('#attBody .cell-btn, #attHead .icon-btn, #addMemberBtn, #addEventBtn, #distBody .cell-btn, #distHead .icon-btn, #addDistEventBtn')
       .forEach(el => el.disabled = locked);
   });
   watchLock('bodAttendance', lockBodAttBtn, lockBodAttState, (locked) => {
-    document.querySelectorAll('#bodBody .cell-btn, #bodAddMemberBtn, #bodAddMeetingBtn')
+    document.querySelectorAll('#bodBody .cell-btn, #bodHead .icon-btn, #bodAddMemberBtn, #bodAddMeetingBtn')
       .forEach(el => el.disabled = locked);
   });
   watchLock('fines', lockFinesBtn, lockFinesState, (locked) => {
@@ -116,8 +116,7 @@ if (goBodBtn) {
 }
 
 function accountFunction(name) {
-  if (!firebase.functions) throw new Error('Firebase Functions SDK is not loaded.');
-  return firebase.functions().httpsCallable(name);
+  return callableFunction(name);
 }
 
 function attachUserRequestListener() {
@@ -386,7 +385,7 @@ async function loadData(){
 
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }))
-    .filter(e => e.archived !== true);
+    .filter(e => e.archived !== true && String(e.type || 'clubEvent') === 'clubEvent');
   
   if (fineMember) {
     fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +
@@ -400,7 +399,8 @@ async function loadData(){
       db.collection('bodAttendance').get()
     ]);
     BODM    = bmSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    BODMEET = mtSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    BODMEET = mtSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(m => m.archived !== true);
     BODATT = {};
     baSnap.forEach(d => { BODATT[d.id] = d.data() || {}; });
     renderBodGrid();
@@ -460,7 +460,7 @@ unsubMembers = db.collection('members').orderBy('name').onSnapshot((snap) => {
 
 unsubEvents = db.collection('events').orderBy('date', 'desc').onSnapshot((snap) => {
   EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .filter(e => e.archived !== true);
+    .filter(e => e.archived !== true && String(e.type || 'clubEvent') === 'clubEvent');
   buildMonthFilterFromEvents();
   renderGrid();
   renderInsightsPanel();   
@@ -479,7 +479,8 @@ unsubAtt = db.collection('attendance').onSnapshot((snap) => {
       renderBodGrid();
     });
     unsubBodMt = db.collection('bodMeetings').orderBy('date','desc').onSnapshot(snap => {
-      BODMEET = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      BODMEET = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(m => m.archived !== true);
       renderBodGrid();
     });
     unsubBodAt = db.collection('bodAttendance').onSnapshot(snap => {
@@ -491,7 +492,8 @@ unsubAtt = db.collection('attendance').onSnapshot((snap) => {
   }
   if (distHead && distBody) {
     unsubDistEvents = db.collection('districtEvents').orderBy('date', 'desc').onSnapshot(snap => {
-      DIST_EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      DIST_EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(ev => ev.archived !== true);
       buildDistMonthFilterFromEvents();
       renderDistrictGrid();
     });

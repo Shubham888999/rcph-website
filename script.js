@@ -159,8 +159,11 @@ function closeLightbox(){
 async function fetchEventsForCalendar() {
   if (!window.dbPublic) return []; // fallback if Firebase isn't loaded on this page
   const snap = await dbPublic.collection('events').orderBy('date', 'asc').get();
-  return snap.docs.map(d => {
+  return snap.docs
+  .map(d => {
     const ev = d.data();
+    if (ev.archived === true) return null;
+    if (String(ev.visibility || 'public').toLowerCase() === 'internal') return null;
     const avenue = ev.avenue || ev.avenues || null; // accept string or array
     let end = null;
     if (ev.endDate && ev.endDate !== ev.date) {
@@ -178,10 +181,14 @@ async function fetchEventsForCalendar() {
         description: ev.desc || ev.description || '',
         avenue,
         startDate: ev.date,
-        endDate: ev.endDate || null
+        endDate: ev.endDate || null,
+        source: ev.source || '',
+        type: ev.type || 'clubEvent',
+        visibility: ev.visibility || 'public'
       }
     };
-  });
+  })
+  .filter(Boolean);
 }
 
 

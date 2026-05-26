@@ -68,6 +68,7 @@ const drivePrev   = document.getElementById('drivePreview');
 const driveIdOut  = document.getElementById('driveIdOut');
 const driveOpenOut= document.getElementById('driveOpenOut');
 const filterMonth = document.getElementById('filterMonth');
+const filterType = document.getElementById('filterType');
 
 const filterMine   = document.getElementById('filterMine');
 const filterSearch = document.getElementById('filterSearch');
@@ -130,6 +131,23 @@ function avenueClassName(av) {
   return 'avenue-' + String(av || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 }
 
+function bodEventType(value) {
+  const type = String(value || 'clubEvent');
+  return ['clubEvent', 'bodMeeting', 'districtEvent'].includes(type) ? type : 'clubEvent';
+}
+
+function bodEventTypeLabel(type) {
+  return {
+    clubEvent: 'Club Event',
+    bodMeeting: 'BOD Meeting',
+    districtEvent: 'District Event'
+  }[bodEventType(type)];
+}
+
+function visibilityLabel(value) {
+  return String(value || 'public').toLowerCase() === 'internal' ? 'Internal' : 'Public';
+}
+
 const exportSubsBtn = document.getElementById('exportSubsBtn');
 if (exportSubsBtn) {
   // Keep disabled until XLSX is present
@@ -150,6 +168,7 @@ let FILTERED_SUBS = [];
 
 if (filterAvenue) filterAvenue.addEventListener('change', loadItems);
 if (filterMonth)  filterMonth.addEventListener('change', loadItems);
+if (filterType)   filterType.addEventListener('change', loadItems);
 if (filterMine)   filterMine.addEventListener('change', loadItems);
 if (filterSearch) filterSearch.addEventListener('input', () => {
   // small debounce
@@ -572,7 +591,7 @@ async function loadItems() {
       id: d.id,
       ...d.data(),
       createdAt: d.data().createdAt?.toDate?.() || null
-    })).filter(r => r.status !== 'deleted' && r.archived !== true);
+    }));
 
     // 2) rebuild month dropdown from ALL rows
     buildMonthFilter(all);
@@ -580,22 +599,31 @@ async function loadItems() {
     // 3) apply filters to get visible rows
     const avFilter = (filterAvenue?.value || '').toUpperCase();
     const ymFilter = (filterMonth?.value || '');        // YYYY-MM or ''
+    const typeFilter = filterType?.value || '';
     const mineOnly = !!(filterMine?.checked);
     const q = (filterSearch?.value || '').trim().toLowerCase();
 
     let rows = all.filter(r => {
+      const archived = r.archived === true || r.status === 'deleted';
+      const type = bodEventType(r.type);
+      if (typeFilter === 'archived') {
+        if (!archived) return false;
+      } else {
+        if (archived) return false;
+        if (typeFilter && type !== typeFilter) return false;
+      }
 if (avFilter) {
   const avs = Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []);
   const has = avs.map(x => String(x).toUpperCase()).includes(avFilter);
   if (!has) return false;
 }
-      if (ymFilter && !(r.eventStart || '').startsWith(ymFilter)) return false;
+      if (ymFilter && !((r.eventStart || r.date || '').startsWith(ymFilter))) return false;
       if (mineOnly && user && r.createdBy !== user.uid)            return false;
 
       if (q) {
         const hay = [
-          r.name, r.description, r.avenue,
-          r.conductedBy, r.createdByEmail
+          r.name, r.description, r.desc, r.avenue,
+          r.conductedBy, r.createdByEmail, r.source, r.type, r.visibility
         ].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
       }
@@ -618,10 +646,13 @@ if (avFilter) {
 
       // NEW: Get image URL
       const imgUrl = getGdriveImageUrl(r.previewLink);
-      const isSynced = !!r.syncedEventId || r.status === 'synced' || !!r.bodEventId;
+      const type = bodEventType(r.type);
+      const visibility = visibilityLabel(r.visibility || (type === 'clubEvent' ? 'public' : 'internal'));
+      const isSynced = !!r.syncedEventId || !!r.syncedMeetingId || !!r.syncedDistrictEventId || r.status === 'synced' || !!r.bodEventId;
       const syncLabel = isSynced ? 'Synced to Attendance Manager' : 'Not synced';
       const canSync = IS_ADMIN || IS_PRESIDENT;
-      const syncedId = r.syncedEventId || r.id;
+      const syncedId = r.syncedEventId || r.syncedMeetingId || r.syncedDistrictEventId || r.id;
+      const canEditClubEvent = type === 'clubEvent';
 
       const chips = (Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []))
         .map(av => `<span class="pill avenue-chip ${avenueClassName(av)}"><span class="avenue-dot" aria-hidden="true"></span>${String(av).toUpperCase()}</span>`)
@@ -632,6 +663,8 @@ if (avFilter) {
 ${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-lightbox-src="${imgUrl}">` : ''}
           <div class="card__header">
             <span class="chipset">${chips}</span>
+            <span class="sync-chip">${bodEventTypeLabel(type)}</span>
+            <span class="sync-chip">${visibility}</span>
             <span class="sync-chip ${isSynced ? 'is-synced' : ''}">${syncLabel}</span>
             <span class="timepill">${createdStr}</span>
             <button class="iconbtn" data-edit="${r.id}" title="Edit">✏️</button>
@@ -653,6 +686,13 @@ ${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-li
         </div>
       `;
     }).join('') || '<p style="opacity:.7">No submissions match your filters.</p>';
+
+    Array.from(itemsEl.querySelectorAll('.card')).forEach((card, i) => {
+      const row = rows[i];
+      if (row && bodEventType(row.type) !== 'clubEvent') {
+        card.querySelectorAll('[data-edit], [data-del]').forEach(btn => btn.remove());
+      }
+    });
 
     if (countPill) countPill.textContent =
       `${rows.length} ${rows.length === 1 ? 'item' : 'items'}`;
@@ -724,6 +764,11 @@ document.addEventListener('click', async (e) => {
 
   const id = delBtn.getAttribute('data-del');
   if (!id) return;
+  const sub = FILTERED_SUBS.find(s => s.id === id);
+  if (sub && bodEventType(sub.type) !== 'clubEvent') {
+    toast('This record is managed from the admin attendance panel.', 2500);
+    return;
+  }
 
   // Keep attendance values intact by soft-archiving the submission and synced event.
   if (!confirm('Archive this submission? Attendance values will be preserved.')) return;
@@ -807,6 +852,10 @@ document.addEventListener('click', async (e) => {
   const sub = FILTERED_SUBS.find(s => s.id === id);
   if (!sub) {
     toast('Could not find submission data.', 2000);
+    return;
+  }
+  if (bodEventType(sub.type) !== 'clubEvent') {
+    toast('This record is managed from the admin attendance panel.', 2500);
     return;
   }
 

@@ -244,6 +244,7 @@ attHead.addEventListener('click', (e) => {
     document.getElementById('editEvId').value = id;
     document.getElementById('editEvName').value = ev.name || '';
     document.getElementById('editEvDate').value = (ev.date || '').slice(0, 10);
+    document.getElementById('editEvEndDate').value = (ev.endDate || ev.date || '').slice(0, 10);
     document.getElementById('editEvDesc').value = ev.desc || '';
 
     const avenueCheckboxes = document.querySelectorAll('#editEventModal input[type="checkbox"]');
@@ -375,15 +376,11 @@ async function removeMember(memberId){
 
 async function removeEvent(eventId){
   const ev = EVENTS.find(x => x.id === eventId);
-  if (!confirm(`Delete event "${ev?.name || eventId}"? This removes it from all attendance records.`)) return;
+  if (!confirm(`Archive event "${ev?.name || eventId}"? Attendance values will be preserved.`)) return;
   try{
-    await db.collection('events').doc(eventId).delete();
-    const snap = await db.collection('attendance').get();
-    const batch = db.batch();
-    snap.forEach(doc => batch.update(doc.ref, { [eventId]: firebase.firestore.FieldValue.delete() }));
-    await batch.commit();
+    await callableFunction('archiveAdminClubEvent')({ eventId });
   }catch(err){
-    alert('Failed to delete event: ' + err.message);
+    alert('Failed to archive event: ' + err.message);
   }
 }
 
@@ -417,7 +414,7 @@ if (editEventForm) {
 
     if (!id || !name || !date) return;
     try {
-      await db.collection('events').doc(id).update({ name, date, endDate, desc, avenue: avenues });
+      await callableFunction('updateAdminClubEvent')({ eventId: id, name, date, endDate, desc, avenue: avenues });
       closeModal('editEventModal');
     } catch (err) { alert('Failed to save event: ' + err.message); }
   });
@@ -445,8 +442,12 @@ if (addEventForm) {
     const avenues = Array.from(addEventForm.querySelectorAll('fieldset input[type="checkbox"]:checked'))
       .map(c => c.value);
     if (!name || !date) return;
-    await db.collection('events').add({ name, date, endDate, desc, avenue: avenues });
-    closeModal('addEventModal');
+    try {
+      await callableFunction('createAdminClubEvent')({ name, date, endDate, desc, avenue: avenues });
+      closeModal('addEventModal');
+    } catch (err) {
+      alert('Failed to add event: ' + err.message);
+    }
   });
 }
 

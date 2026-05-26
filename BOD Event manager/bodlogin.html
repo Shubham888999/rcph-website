@@ -180,6 +180,17 @@
   </label>
 
   <label class="pill">
+    <span>Type</span>
+    <select id="filterType" style="background:transparent;border:0;color:#1564b2">
+      <option value="">All active</option>
+      <option value="clubEvent">Club Events</option>
+      <option value="bodMeeting">BOD Meetings</option>
+      <option value="districtEvent">District Events</option>
+      <option value="archived">Archived</option>
+    </select>
+  </label>
+
+  <label class="pill">
     <input type="checkbox" id="filterMine" style="accent-color:#1564b2;vertical-align:middle"/>
     <span>My submissions</span>
   </label>
@@ -262,7 +273,7 @@ function buildMonthFilter(all) {
   const months = Array.from(
     new Set(
       all
-        .map(r => (r.eventStart || "").slice(0, 7))
+        .map(r => (r.eventStart || r.date || "").slice(0, 7))
         .filter(Boolean)
     )
   ).sort().reverse(); // newest first

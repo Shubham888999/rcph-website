@@ -486,7 +486,7 @@
         </label>
                 <label class="adm-field">
           <span>End Date (optional)</span>
-          <input id="addEvEndDate" type="date" required>
+          <input id="addEvEndDate" type="date">
         </label>
         <label class="adm-field">
           <span>Description (public calendar only)</span>
@@ -533,7 +533,7 @@
         </label>
                 <label class="adm-field">
           <span>End Date (optional)</span>
-          <input id="editEvEndDate" type="date" required>
+          <input id="editEvEndDate" type="date">
         </label>
         <label class="adm-field">
           <span>Description (public calendar only)</span>
@@ -589,9 +589,55 @@
         <textarea id="addDistEvDesc" rows="3" placeholder="Optional…"></textarea>
       </label>
 
+      <label class="adm-field" style="display:flex; flex-direction:row; align-items:center; gap:10px;">
+        <input id="addDistEvPublic" type="checkbox">
+        <span>Show on homepage calendar</span>
+      </label>
+
       <div class="adm-actions">
         <button type="button" class="btn btn-outline" data-close="addDistEventModal">Cancel</button>
         <button type="submit" class="btn">Add District Event</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="editDistEventModal" class="adm-modal" aria-hidden="true">
+  <div class="adm-modal__sheet">
+    <div class="adm-modal__head">
+      <h3>Edit District Event</h3>
+      <button class="adm-close" data-close="editDistEventModal" aria-label="Close">×</button>
+    </div>
+
+    <form id="editDistEventForm" class="adm-form" autocomplete="off">
+      <input type="hidden" id="editDistEvId">
+      <label class="adm-field">
+        <span>Event name</span>
+        <input id="editDistEvName" type="text" required>
+      </label>
+
+      <label class="adm-field">
+        <span>Start Date</span>
+        <input id="editDistEvDate" type="date" required>
+      </label>
+
+      <label class="adm-field">
+        <span>End Date (optional)</span>
+        <input id="editDistEvEndDate" type="date">
+      </label>
+
+      <label class="adm-field">
+        <span>Description (optional)</span>
+        <textarea id="editDistEvDesc" rows="3" placeholder="Optional…"></textarea>
+      </label>
+
+      <label class="adm-field" style="display:flex; flex-direction:row; align-items:center; gap:10px;">
+        <input id="editDistEvPublic" type="checkbox">
+        <span>Show on homepage calendar</span>
+      </label>
+
+      <div class="adm-actions">
+        <button type="button" class="btn btn-outline" data-close="editDistEventModal">Cancel</button>
+        <button type="submit" class="btn">Save District Event</button>
       </div>
     </form>
   </div>

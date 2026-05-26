@@ -75,6 +75,11 @@ function escapeHtml(value) {
   return div.innerHTML;
 }
 
+function callableFunction(name) {
+  if (!firebase.functions) throw new Error('Firebase Functions SDK is not loaded.');
+  return firebase.functions().httpsCallable(name);
+}
+
 function formatDate(value) {
   if (!value) return '-';
   const date = value?.toDate ? value.toDate() : new Date(value);
