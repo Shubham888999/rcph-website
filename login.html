@@ -390,8 +390,8 @@
       const role = String(resultData?.role || '').toLowerCase();
 
       if (status === 'approved' && role === 'gbm') {
-        setMessage('Account created and approved for GBM. Redirecting to the public site.', 'ok');
-        setTimeout(() => { location.href = 'index.html'; }, 1200);
+        setMessage('Account created and approved for GBM. Redirecting to your dashboard.', 'ok');
+        setTimeout(() => { location.href = 'my-dashboard.html'; }, 1200);
         return;
       }
 
@@ -456,15 +456,7 @@
       }
 
       if (role === 'admin' || role === 'president') {
-        showMode('login');
-        els.panelChooser.style.display = 'block';
-        if (role === 'president') els.dzrPanelLink.style.display = 'inline-block';
-
-        const preferred = localStorage.getItem('preferredPanel');
-        if (preferred === 'admin') { location.href = 'admin.html'; return; }
-        if (preferred === 'bod') { location.href = 'BOD%20Event%20manager/bodlogin.html'; return; }
-        if (preferred === 'dzr' && role === 'president') { location.href = 'dzrvisit.html'; return; }
-        setMessage('Signed in. Choose a panel to continue.', 'ok');
+        location.href = 'admin.html';
         return;
       }
 
@@ -474,8 +466,7 @@
       }
 
       if (role === 'gbm') {
-        setMessage('Your GBM account is active. Redirecting to the public site.', 'ok');
-        setTimeout(() => { location.href = 'index.html'; }, 1000);
+        location.href = 'my-dashboard.html';
         return;
       }
 

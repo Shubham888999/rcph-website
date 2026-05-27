@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My RCPH Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="my-dashboard.css">
+</head>
+<body>
+  <main class="member-shell">
+    <header class="member-topbar">
+      <div>
+        <p class="eyebrow">Rotaract Club of Pune Heritage</p>
+        <h1>My RCPH Dashboard</h1>
+      </div>
+      <nav class="member-actions" aria-label="Dashboard actions">
+        <a class="btn btn-outline" href="index.html">Back to Home</a>
+        <a id="adminPanelBtn" class="btn btn-outline" href="admin.html" hidden>Admin Panel</a>
+        <a id="bodPanelBtn" class="btn btn-outline" href="BOD%20Event%20manager/bodlogin.html" hidden>BOD Panel</a>
+        <button id="signOutBtn" class="btn" type="button">Sign Out</button>
+      </nav>
+    </header>
+
+    <section id="loadingState" class="dashboard-card dashboard-state">
+      <div class="loader-dot"></div>
+      <p>Loading your dashboard...</p>
+    </section>
+
+    <section id="errorState" class="dashboard-card dashboard-state" hidden>
+      <h2>Could not load dashboard</h2>
+      <p id="errorMessage"></p>
+      <a class="btn btn-outline" href="login.html">Back to Login</a>
+    </section>
+
+    <div id="dashboardContent" hidden>
+      <section class="welcome-card">
+        <div>
+          <p class="eyebrow">Welcome</p>
+          <h2 id="welcomeName">Welcome</h2>
+          <p id="memberLinkNote" class="subtle"></p>
+        </div>
+        <div class="chip-row">
+          <span id="roleChip" class="status-chip">Role</span>
+          <span id="positionChip" class="status-chip alt" hidden>Position</span>
+        </div>
+      </section>
+
+      <section class="kpi-grid" aria-label="Personal attendance summary">
+        <article class="kpi-card">
+          <span>My Attendance</span>
+          <strong id="kpiAttendance">0%</strong>
+        </article>
+        <article class="kpi-card">
+          <span>Events Attended</span>
+          <strong id="kpiPresent">0</strong>
+        </article>
+        <article class="kpi-card">
+          <span>Events Missed</span>
+          <strong id="kpiAbsent">0</strong>
+        </article>
+        <article class="kpi-card">
+          <span>My Club Rank</span>
+          <strong id="kpiRank">-</strong>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card span-2">
+          <div class="section-title">
+            <h2>Attendance Progress</h2>
+            <span id="countedNote" class="subtle">NA events are excluded</span>
+          </div>
+          <div class="progress-track" aria-label="Attendance percentage">
+            <div id="attendanceProgress" class="progress-fill"></div>
+          </div>
+          <p id="attendanceSummaryText" class="subtle"></p>
+        </article>
+
+        <article class="dashboard-card">
+          <div class="section-title">
+            <h2>Club Stats</h2>
+          </div>
+          <div id="clubStatsList" class="stat-list"></div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <div class="section-title">
+            <h2>Avenue Breakdown</h2>
+          </div>
+          <div id="avenueBreakdown" class="table-wrap"></div>
+        </article>
+
+        <article class="dashboard-card">
+          <div class="section-title">
+            <h2>District Attendance</h2>
+            <span id="districtPercent" class="status-chip">0%</span>
+          </div>
+          <div id="districtRecent" class="event-list"></div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card">
+          <div class="section-title">
+            <h2>Recent Attendance</h2>
+          </div>
+          <div id="recentAttendance" class="event-list"></div>
+        </article>
+
+        <article class="dashboard-card">
+          <div class="section-title">
+            <h2>Upcoming Events</h2>
+          </div>
+          <div id="upcomingEvents" class="event-list"></div>
+        </article>
+      </section>
+
+      <section class="dashboard-card">
+        <div class="section-title">
+          <h2>Events By Avenue</h2>
+        </div>
+        <div id="eventsByAvenue" class="avenue-bars"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+  <script src="firebase-init.js"></script>
+  <script src="my-dashboard.js"></script>
+</body>
+</html>

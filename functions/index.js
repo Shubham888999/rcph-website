@@ -662,6 +662,104 @@ async function writeDistrictEventSynced({ districtEventId, payload, uid, userPro
   return { districtEventCreated: !districtSnap.exists, publicEventCreated: isPublic && !publicEventSnap.exists };
 }
 
+function normalizeAvenuesForStats(avenue) {
+  const values = Array.isArray(avenue) ? avenue : (avenue ? [avenue] : []);
+  const cleaned = values
+    .map(item => normalizeText(item, 60))
+    .filter(Boolean);
+  return cleaned.length ? cleaned : ['Other'];
+}
+
+function attendanceLabel(value) {
+  if (value === true) return 'Present';
+  if (value === false) return 'Absent';
+  return 'NA';
+}
+
+function attendanceMonth(dateValue) {
+  const raw = normalizeText(dateValue, 20);
+  if (!raw) return 'Unknown';
+  return raw.slice(0, 7);
+}
+
+function percentage(present, totalCounted) {
+  return totalCounted ? Math.round((present / totalCounted) * 100) : 0;
+}
+
+function isDashboardClubEvent(event) {
+  return event
+    && event.archived !== true
+    && String(event.visibility || 'public').toLowerCase() !== 'internal'
+    && String(event.type || 'clubEvent') === 'clubEvent';
+}
+
+function summarizeAttendanceForEvents(attendanceData, events) {
+  let present = 0;
+  let absent = 0;
+  let na = 0;
+  const avenueMap = new Map();
+  const monthMap = new Map();
+
+  events.forEach(event => {
+    const value = attendanceData[event.id];
+    const counted = value === true || value === false;
+    if (value === true) present += 1;
+    else if (value === false) absent += 1;
+    else na += 1;
+
+    const avenues = normalizeAvenuesForStats(event.avenue);
+    avenues.forEach(avenue => {
+      if (!avenueMap.has(avenue)) avenueMap.set(avenue, { avenue, totalCounted: 0, present: 0, absent: 0 });
+      const row = avenueMap.get(avenue);
+      if (counted) {
+        row.totalCounted += 1;
+        if (value === true) row.present += 1;
+        else row.absent += 1;
+      }
+    });
+
+    const month = attendanceMonth(event.date);
+    if (!monthMap.has(month)) monthMap.set(month, { month, totalCounted: 0, present: 0, absent: 0 });
+    const monthRow = monthMap.get(month);
+    if (counted) {
+      monthRow.totalCounted += 1;
+      if (value === true) monthRow.present += 1;
+      else monthRow.absent += 1;
+    }
+  });
+
+  const totalCounted = present + absent;
+  return {
+    totalCounted,
+    present,
+    absent,
+    na,
+    percentage: percentage(present, totalCounted),
+    avenueBreakdown: Array.from(avenueMap.values())
+      .filter(row => row.totalCounted > 0)
+      .map(row => ({ ...row, percentage: percentage(row.present, row.totalCounted) }))
+      .sort((a, b) => b.totalCounted - a.totalCounted || a.avenue.localeCompare(b.avenue)),
+    monthlyBreakdown: Array.from(monthMap.values())
+      .filter(row => row.totalCounted > 0)
+      .map(row => ({ ...row, percentage: percentage(row.present, row.totalCounted) }))
+      .sort((a, b) => a.month.localeCompare(b.month)),
+  };
+}
+
+function safeEventForDashboard(event, value) {
+  return {
+    id: event.id,
+    name: event.name || '',
+    date: event.date || '',
+    endDate: event.endDate || '',
+    avenue: normalizeAvenuesForStats(event.avenue),
+    value: value === true ? true : value === false ? false : 'NA',
+    label: attendanceLabel(value),
+    type: event.type || 'clubEvent',
+    desc: event.desc || event.description || '',
+  };
+}
+
 exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
@@ -985,6 +1083,153 @@ exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
     uid,
     user: userSnap.exists ? userSnap.data() : null,
     role: roleSnap.exists ? roleSnap.data() : null,
+  };
+});
+
+exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const active = await getActiveRole(uid);
+  if (!active || !ACTIVE_ROLES.has(active.role)) {
+    throw new HttpsError('failed-precondition', 'Approved account required.');
+  }
+
+  const [
+    userSnap,
+    memberSnap,
+    myAttendanceSnap,
+    eventsSnap,
+    districtAttendanceSnap,
+    districtEventsSnap,
+    membersSnap,
+    allAttendanceSnap,
+  ] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.collection('members').doc(uid).get(),
+    db.collection('attendance').doc(uid).get(),
+    db.collection('events').get(),
+    db.collection('districtAttendance').doc(uid).get(),
+    db.collection('districtEvents').get(),
+    db.collection('members').get(),
+    db.collection('attendance').get(),
+  ]);
+
+  const userData = userSnap.exists ? (userSnap.data() || {}) : {};
+  const memberData = memberSnap.exists ? (memberSnap.data() || {}) : {};
+  const myAttendanceData = myAttendanceSnap.exists ? (myAttendanceSnap.data() || {}) : {};
+  const districtAttendanceData = districtAttendanceSnap.exists ? (districtAttendanceSnap.data() || {}) : {};
+
+  const events = eventsSnap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(isDashboardClubEvent)
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+
+  const districtEvents = districtEventsSnap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(event => event.archived !== true)
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+
+  const attendanceSummary = summarizeAttendanceForEvents(myAttendanceData, events);
+  const recentEvents = events
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, 8)
+    .map(event => safeEventForDashboard(event, myAttendanceData[event.id]));
+
+  const districtSummary = summarizeAttendanceForEvents(districtAttendanceData, districtEvents);
+  const recentDistrictEvents = districtEvents
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, 8)
+    .map(event => safeEventForDashboard({ ...event, type: 'districtEvent' }, districtAttendanceData[event.id]));
+
+  const publicEvents = eventsSnap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(event => event.archived !== true && String(event.visibility || 'public').toLowerCase() !== 'internal');
+
+  const eventsByAvenueMap = new Map();
+  events.forEach(event => {
+    normalizeAvenuesForStats(event.avenue).forEach(avenue => {
+      eventsByAvenueMap.set(avenue, (eventsByAvenueMap.get(avenue) || 0) + 1);
+    });
+  });
+  const eventsByAvenue = Array.from(eventsByAvenueMap.entries())
+    .map(([avenue, count]) => ({ avenue, count }))
+    .sort((a, b) => b.count - a.count || a.avenue.localeCompare(b.avenue));
+
+  const attendanceByMemberId = {};
+  allAttendanceSnap.forEach(doc => {
+    attendanceByMemberId[doc.id] = doc.data() || {};
+  });
+
+  const activeMembers = membersSnap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(member => member.active !== false);
+
+  const ranked = activeMembers
+    .map(member => {
+      const summary = summarizeAttendanceForEvents(attendanceByMemberId[member.id] || {}, events);
+      return {
+        id: member.id,
+        present: summary.present,
+        totalCounted: summary.totalCounted,
+        percentage: summary.percentage,
+      };
+    })
+    .filter(row => row.totalCounted > 0)
+    .sort((a, b) => b.percentage - a.percentage || b.present - a.present || a.id.localeCompare(b.id));
+
+  const myRankIndex = ranked.findIndex(row => row.id === uid);
+  const totalClubCounted = ranked.reduce((sum, row) => sum + row.totalCounted, 0);
+  const totalClubPresent = ranked.reduce((sum, row) => sum + row.present, 0);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const upcomingEvents = publicEvents
+    .filter(event => String(event.date || '') >= today)
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+    .slice(0, 5)
+    .map(event => ({
+      id: event.id,
+      name: event.name || '',
+      date: event.date || '',
+      endDate: event.endDate || '',
+      avenue: normalizeAvenuesForStats(event.avenue),
+      desc: event.desc || event.description || '',
+      type: event.type || 'clubEvent',
+    }));
+
+  return {
+    ok: true,
+    profile: {
+      uid,
+      name: userData.name || memberData.name || request.auth?.token?.name || '',
+      email: userData.email || memberData.email || request.auth?.token?.email || '',
+      role: active.role,
+      clubPosition: userData.clubPosition || '',
+      memberName: memberData.name || '',
+      memberPosition: memberData.position || '',
+    },
+    myAttendance: {
+      ...attendanceSummary,
+      recent: recentEvents,
+    },
+    districtAttendance: {
+      totalCounted: districtSummary.totalCounted,
+      present: districtSummary.present,
+      absent: districtSummary.absent,
+      na: districtSummary.na,
+      percentage: districtSummary.percentage,
+      recent: recentDistrictEvents,
+    },
+    clubStats: {
+      totalEvents: events.length,
+      totalPublicEvents: publicEvents.length,
+      eventsByAvenue,
+      mostActiveAvenue: eventsByAvenue[0]?.avenue || '',
+      clubAverageAttendance: percentage(totalClubPresent, totalClubCounted),
+      myRank: myRankIndex >= 0 ? myRankIndex + 1 : null,
+      rankedMemberCount: ranked.length,
+    },
+    upcomingEvents,
   };
 });
 
