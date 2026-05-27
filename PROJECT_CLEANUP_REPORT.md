@@ -426,3 +426,57 @@ If a listed file is intentionally archived later, skip that file and document it
   - `BOD Event manager/bodlogin.html`
   - `dzrvisit.html`
 
+## Cleanup Pass 1 Completed
+
+Date: 2026-05-26
+
+Scope: only the five approved safe archive moves were performed. No Firebase functions, Firestore rules, auth logic, event sync logic, admin modules, BOD logic, dashboard logic, homepage calendar logic, active images, favicon/PWA assets, or active animation files were edited.
+
+### Files Archived
+
+| Original File | Archived To |
+|---|---|
+| `Animation converter/gifc.html` | `_archive/old-pages/gifc.html` |
+| `animations/morning-coffee.json` | `_archive/animations-review/morning-coffee.json` |
+| `animations/Cupcake-Baking.json` | `_archive/animations-review/Cupcake-Baking.json` |
+| `logo3.jpg.jpeg` | `_archive/assets-review/logo3.jpg.jpeg` |
+| `images/group - Copy.jpeg` | `_archive/assets-review/group - Copy.jpeg` |
+
+### Files Not Touched
+
+- `admin.js`
+- `router.js`
+- `fragments/*`
+- Active images
+- Favicon and PWA assets
+- Firebase files
+- `functions/*`
+- Admin, BOD, dashboard, and homepage JavaScript/CSS
+- Root animation JSON files used by `dzrvisit.js`
+- `animations/stir_animation.json`
+
+### Checks Run
+
+```powershell
+node --check script.js
+node --check router.js
+node --check my-dashboard.js
+node --check admin/js/admin-core.js
+node --check admin/js/admin-init.js
+node --check admin/js/admin-modals.js
+node --check admin/js/admin-state.js
+node --check admin/js/admin-utils.js
+node --check admin/js/attendance.js
+node --check admin/js/bod-attendance.js
+node --check admin/js/district-attendance.js
+node --check admin/js/fines.js
+node --check admin/js/insights.js
+node --check admin/js/treasury.js
+node --check "BOD Event manager/bodlogin.js"
+node --check dzrvisit.js
+node --check functions/index.js
+```
+
+### Errors
+
+No syntax check errors were reported. All requested `node --check` commands passed.
