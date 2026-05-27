@@ -66,21 +66,30 @@ function statusClass(value) {
 
 function showLoading() {
   els.loading.hidden = false;
+  els.loading.removeAttribute('hidden');
   els.error.hidden = true;
+  els.error.setAttribute('hidden', '');
   els.content.hidden = true;
+  els.content.setAttribute('hidden', '');
 }
 
 function showError(message) {
   els.loading.hidden = true;
+  els.loading.setAttribute('hidden', '');
   els.error.hidden = false;
+  els.error.removeAttribute('hidden');
   els.content.hidden = true;
+  els.content.setAttribute('hidden', '');
   els.errorMessage.textContent = message || 'Something went wrong.';
 }
 
 function showDashboard() {
   els.loading.hidden = true;
+  els.loading.setAttribute('hidden', '');
   els.error.hidden = true;
+  els.error.setAttribute('hidden', '');
   els.content.hidden = false;
+  els.content.removeAttribute('hidden');
 }
 
 function renderEventList(target, events, emptyText) {
