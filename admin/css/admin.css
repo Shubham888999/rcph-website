@@ -40,9 +40,9 @@
       filter: drop-shadow(0 0 4px rgba(0,0,0,.55));
     }
     .cell-btn.on{ background:#129a62; box-shadow:0 0 14px rgba(0,255,150,.35); }
-    .cell-btn.on::before{ background-image:url("../../check.png"); }
+    .cell-btn.on::before{ background-image:url("../../assets/icons/check.png"); }
     .cell-btn.off{ background:#b52738; box-shadow:0 0 14px rgba(255,60,70,.30); }
-    .cell-btn.off::before{ background-image:url("../../cross.png"); }
+    .cell-btn.off::before{ background-image:url("../../assets/icons/cross.png"); }
 
     /* modal */
     .adm-modal{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:9999; padding:16px}
@@ -101,7 +101,7 @@
 .cell-btn.na::before{
   content:"";
   position:absolute; inset:8px;
-  background-image:url("../../NA_Button.png");
+  background-image:url("../../assets/icons/NA_Button.png");
   background-repeat:no-repeat;
   background-position:center;
   background-size:contain;

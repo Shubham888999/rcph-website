@@ -480,3 +480,105 @@ node --check functions/index.js
 ### Errors
 
 No syntax check errors were reported. All requested `node --check` commands passed.
+
+## Cleanup Pass 2 Completed
+
+Date: 2026-05-27
+
+Scope: only the approved root-level asset organization was performed. No HTML pages were moved. No Firebase Cloud Function logic, Firestore rules logic, auth routing, event sync logic, admin/BOD/dashboard logic, homepage calendar logic, `images/`, `animations/stir_animation.json`, or `_archive` contents were changed.
+
+### Files Moved
+
+| Original File | New Location |
+|---|---|
+| `check.png` | `assets/icons/check.png` |
+| `cross.png` | `assets/icons/cross.png` |
+| `NA_Button.png` | `assets/icons/NA_Button.png` |
+| `Lemonade.json` | `assets/animations/Lemonade.json` |
+| `butterfly 04.json` | `assets/animations/butterfly 04.json` |
+| `Palm Tree Leaf Animation.json` | `assets/animations/Palm Tree Leaf Animation.json` |
+| `favicon.ico` | `assets/favicons/favicon.ico` |
+| `favicon.svg` | `assets/favicons/favicon.svg` |
+| `favicon-16x16.png` | `assets/favicons/favicon-16x16.png` |
+| `favicon-32x32.png` | `assets/favicons/favicon-32x32.png` |
+| `favicon-48x48.png` | `assets/favicons/favicon-48x48.png` |
+| `favicon-96x96.png` | `assets/favicons/favicon-96x96.png` |
+| `apple-touch-icon.png` | `assets/favicons/apple-touch-icon.png` |
+| `web-app-manifest-192x192.png` | `assets/favicons/web-app-manifest-192x192.png` |
+| `web-app-manifest-512x512.png` | `assets/favicons/web-app-manifest-512x512.png` |
+
+### References Updated
+
+| File | Updated References |
+|---|---|
+| `index.html` | Favicon, PNG favicon sizes, SVG favicon, Apple touch icon, and Microsoft tile image now point to `assets/favicons/` |
+| `about.html` | Favicon now points to `assets/favicons/favicon.ico` |
+| `bod.html` | Favicon now points to `assets/favicons/favicon.ico` |
+| `site.webmanifest` | PWA icon paths now point to `assets/favicons/web-app-manifest-192x192.png` and `assets/favicons/web-app-manifest-512x512.png` |
+| `style.css` | Attendance icon backgrounds now point to `assets/icons/` |
+| `admin/css/admin.css` | Attendance icon backgrounds now point to `../../assets/icons/` |
+| `dzrvisit.html` | Inline attendance icon backgrounds now point to `assets/icons/` |
+| `dzrvisit.js` | DZR Lottie paths now point to `assets/animations/` |
+
+Reference sweep result: live file references to the moved filenames now point to `assets/icons/`, `assets/animations/`, or `assets/favicons/`. Remaining old-path mentions are historical notes in this cleanup report.
+
+### Files Intentionally Not Moved
+
+- `images/`
+- `animations/stir_animation.json`
+- Root HTML pages
+- `style.css`
+- `mobile.css`
+- `my-dashboard.css`
+- `my-dashboard.js`
+- `script.js`
+- `firebase-init.js`
+- `router.js`
+- `dzrvisit.js`
+- `admin.js`
+- Firebase files
+- `functions/`
+- `admin/`
+- `BOD Event manager/`
+- `CNAME`
+- `robots.txt`
+- `sitemap.xml`
+
+### Checks Run
+
+```powershell
+node --check script.js
+node --check router.js
+node --check my-dashboard.js
+node --check dzrvisit.js
+node --check admin/js/admin-core.js
+node --check admin/js/admin-init.js
+node --check admin/js/admin-modals.js
+node --check admin/js/admin-state.js
+node --check admin/js/admin-utils.js
+node --check admin/js/attendance.js
+node --check admin/js/bod-attendance.js
+node --check admin/js/district-attendance.js
+node --check admin/js/fines.js
+node --check admin/js/insights.js
+node --check admin/js/treasury.js
+node --check "BOD Event manager/bodlogin.js"
+node --check functions/index.js
+```
+
+### Errors
+
+No syntax check errors were reported. All requested `node --check` commands passed.
+
+### Manual Test Checklist
+
+- Homepage loads.
+- Favicons still show.
+- PWA manifest has no broken icon paths.
+- Admin attendance status icons still show.
+- DZR visit animations still load.
+- Login works.
+- My dashboard works.
+- Admin panel works.
+- BOD panel works.
+- No console 404 errors for moved files.

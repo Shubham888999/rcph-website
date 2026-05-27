@@ -1532,9 +1532,9 @@ a.button-link:hover {
 }
 .legend { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
 .att-icon { width:18px; height:18px; display:inline-block; background-size:contain; background-repeat:no-repeat; vertical-align:-3px; }
-.att-p  { background-image: url('check.png'); }   /* same used in admin */
-.att-a  { background-image: url('cross.png'); }
-.att-na { background-image: url('NA_Button.png'); }
+.att-p  { background-image: url('assets/icons/check.png'); }   /* same used in admin */
+.att-a  { background-image: url('assets/icons/cross.png'); }
+.att-na { background-image: url('assets/icons/NA_Button.png'); }
 
 /* === Coffee Widget === */
 

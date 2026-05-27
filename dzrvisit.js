@@ -134,7 +134,7 @@ function initLemonadeAnimations() {
       renderer: 'svg',
       loop: true,
       autoplay: true,
-      path: 'Lemonade.json'
+      path: 'assets/animations/Lemonade.json'
     });
   }
 
@@ -144,7 +144,7 @@ function initLemonadeAnimations() {
       renderer: 'svg',
       loop: true,
       autoplay: true,
-      path: 'Lemonade.json'
+      path: 'assets/animations/Lemonade.json'
     });
   }
 }
@@ -160,7 +160,7 @@ function initButterflies() {
       renderer: 'svg',
       loop: true,
       autoplay: true,
-      path: 'butterfly 04.json'
+      path: 'assets/animations/butterfly 04.json'
     });
   }
 
@@ -170,7 +170,7 @@ function initButterflies() {
       renderer: 'svg',
       loop: true,
       autoplay: true,
-      path: 'butterfly 04.json'
+      path: 'assets/animations/butterfly 04.json'
     });
   }
 }
@@ -192,7 +192,7 @@ function initKpiPalmTrees() {
       renderer: 'svg',
       loop: true,
       autoplay: true,
-      path: 'Palm Tree Leaf Animation.json'
+      path: 'assets/animations/Palm Tree Leaf Animation.json'
     });
   });
 }
