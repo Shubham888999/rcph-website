@@ -1,4 +1,13 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.rcph3131.org/sitemap.xml
+Disallow: /admin/
+Disallow: /admin.html
+Disallow: /functions/
+Disallow: /BOD%20Event%20manager/
+Disallow: /BOD Event manager/
+Disallow: /my-dashboard.html
+Disallow: /login.html
+Disallow: /_archive/
+
+Sitemap: https://rcph3131.org/sitemap.xml

@@ -1,6 +1,7 @@
 {
   "name": "Rotaract Club of Pune Heritage",
   "short_name": "RCPH",
+  "description": "Official public website of Rotaract Club of Pune Heritage, RID 3131, Pune.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
