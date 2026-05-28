@@ -49,6 +49,9 @@ auth.onAuthStateChanged(async (user) => {
       window.location.href = 'login.html?reason=unauthorized';
       return;
     }
+    document.querySelectorAll('[data-admin-quick-nav]').forEach(link => {
+      link.hidden = false;
+    });
   } catch (e) {
     console.warn('Role check failed:', e);
     window.location.href = 'login.html?reason=no-role';

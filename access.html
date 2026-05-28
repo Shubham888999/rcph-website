@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RCPH Access Hub</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="access.css" />
+</head>
+<body>
+  <main class="access-shell">
+    <header class="access-topbar">
+      <div>
+        <p class="eyebrow">Rotaract Club of Pune Heritage</p>
+        <h1>Access Hub</h1>
+        <p id="accessIntro" class="access-subtitle">Choose where you want to go.</p>
+      </div>
+      <nav class="access-actions" aria-label="Access actions">
+        <a class="btn btn-outline" href="index.html">Home</a>
+        <button id="signOutBtn" class="btn" type="button">Sign Out</button>
+      </nav>
+    </header>
+
+    <section id="loadingState" class="access-card access-state">
+      <div class="loader-dot"></div>
+      <p>Checking your access...</p>
+    </section>
+
+    <section id="messageState" class="access-card access-state" hidden>
+      <h2 id="messageTitle">Access unavailable</h2>
+      <p id="messageText"></p>
+      <div class="access-actions inline">
+        <a class="btn btn-outline" href="login.html">Back to Login</a>
+        <a class="btn btn-outline" href="index.html">Back to Home</a>
+      </div>
+    </section>
+
+    <section id="hubContent" hidden>
+      <div class="access-profile access-card">
+        <div>
+          <p class="eyebrow">Signed in as</p>
+          <h2 id="profileName">Member</h2>
+          <p id="profileEmail" class="access-subtitle"></p>
+        </div>
+        <span id="roleChip" class="access-chip">Role</span>
+      </div>
+
+      <div id="accessCards" class="access-grid" aria-label="Available panels"></div>
+    </section>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+  <script src="firebase-init.js"></script>
+  <script src="access.js"></script>
+</body>
+</html>

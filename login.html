@@ -390,8 +390,8 @@
       const role = String(resultData?.role || '').toLowerCase();
 
       if (status === 'approved' && role === 'gbm') {
-        setMessage('Account created and approved for GBM. Redirecting to your dashboard.', 'ok');
-        setTimeout(() => { location.href = 'my-dashboard.html'; }, 1200);
+        setMessage('Account created and approved for GBM. Redirecting to your access hub.', 'ok');
+        setTimeout(() => { location.href = 'access.html'; }, 1200);
         return;
       }
 
@@ -402,7 +402,8 @@
       }
 
       if (status === 'approved') {
-        await routeByRole(auth.currentUser);
+        setMessage('Account approved. Redirecting to your access hub.', 'ok');
+        setTimeout(() => { location.href = 'access.html'; }, 900);
       }
     }
 
@@ -439,34 +440,8 @@
         return;
       }
 
-      const role = access.role;
-      const dest = new URLSearchParams(location.search).get('dest');
-
-      if ((role === 'admin' || role === 'president') && dest === 'admin') {
-        location.href = 'admin.html';
-        return;
-      }
-      if ((role === 'bod' || role === 'admin' || role === 'president') && dest === 'bod') {
-        location.href = 'BOD%20Event%20manager/bodlogin.html';
-        return;
-      }
-      if (role === 'president' && dest === 'dzr') {
-        location.href = 'dzrvisit.html';
-        return;
-      }
-
-      if (role === 'admin' || role === 'president') {
-        location.href = 'admin.html';
-        return;
-      }
-
-      if (role === 'bod') {
-        location.href = 'BOD%20Event%20manager/bodlogin.html';
-        return;
-      }
-
-      if (role === 'gbm') {
-        location.href = 'my-dashboard.html';
+      if (access.role) {
+        location.href = 'access.html';
         return;
       }
 

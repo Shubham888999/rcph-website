@@ -1,0 +1,146 @@
+[hidden] {
+  display: none !important;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.access-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 28px auto;
+}
+
+.access-topbar,
+.access-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.access-topbar {
+  background:
+    linear-gradient(145deg, rgba(96,195,196,0.14), rgba(212,164,55,0.1)),
+    #151515;
+  border: 1px solid #2a2113;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.22);
+  margin-bottom: 18px;
+}
+
+.access-topbar h1,
+.access-profile h2 {
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+  color: var(--color-accent);
+}
+
+.access-subtitle {
+  margin: 6px 0 0;
+  color: var(--color-muted);
+}
+
+.access-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.access-actions.inline {
+  margin-top: 16px;
+}
+
+.access-card {
+  background: #151515;
+  border: 1px solid #2a2113;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.2);
+}
+
+.access-state {
+  text-align: center;
+}
+
+.loader-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  margin: 0 auto 12px;
+  animation: pulseDot 1s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(0.8); opacity: 0.55; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+.access-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(96,195,196,0.14);
+  color: #8fe9e7;
+  border: 1px solid rgba(96,195,196,0.45);
+  font-weight: 800;
+}
+
+.access-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.panel-card {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015)),
+    #151515;
+  border: 1px solid #2a2113;
+  border-radius: 12px;
+  padding: 18px;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.panel-card h3 {
+  margin: 0 0 8px;
+  color: var(--color-accent);
+  font-family: 'Montserrat', sans-serif;
+}
+
+.panel-card p {
+  margin: 0;
+  color: #ddd0b3;
+}
+
+.panel-card .btn {
+  align-self: flex-start;
+}
+
+@media (max-width: 860px) {
+  .access-topbar,
+  .access-profile {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .access-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .access-actions .btn,
+  .panel-card .btn {
+    width: 100%;
+    text-align: center;
+  }
+}
