@@ -11,3 +11,5 @@ Disallow: /login.html
 Disallow: /_archive/
 
 Sitemap: https://rcph3131.org/sitemap.xml
+# AI-friendly public site summary
+# https://rcph3131.org/llms.txt

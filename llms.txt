@@ -1,0 +1,50 @@
+# Rotaract Club of Pune Heritage
+
+> Official website of Rotaract Club of Pune Heritage, a community-based Rotaract club in Pune, Maharashtra under Rotaract District 3131. RCPH works on community service, youth leadership, professional development, fellowship, district initiatives, and public events.
+
+Website: https://rcph3131.org/
+Location: Pune, Maharashtra, India
+Organization: Rotaract Club of Pune Heritage
+Short name: RCPH
+District: Rotaract District 3131
+Parent Rotary connection: Rotary Club of Pune Heritage
+
+## Important Public Pages
+
+- [Home](https://rcph3131.org/) - Overview of Rotaract Club of Pune Heritage, featured projects, public calendar, gallery, and contact details.
+- [About](https://rcph3131.org/about.html) - Club history, theme, logo meaning, Rotary and Rotaract background.
+- [Events](https://rcph3131.org/events.html) - Public RCPH events, upcoming activities, recent events, and avenue-wise activities.
+- [Projects](https://rcph3131.org/projects.html) - Public project stories including Project EduReach, Pages of Hope, Sports RYLA, Cultural Exchange, Club Assembly, and Samyati 3.0.
+- [Join](https://rcph3131.org/join.html) - Information for students, young professionals, volunteers, and people interested in joining RCPH.
+- [Contact](https://rcph3131.org/contact.html) - Contact and collaboration information for NGOs, colleges, Rotary clubs, sponsors, students, and volunteers.
+- [Board of Directors](https://rcph3131.org/bod.html) - Current Board of Directors and club leadership.
+- [Madhushala](https://rcph3131.org/madhushala.html) - Public page for the Madhushala flagship event.
+- [DZR Visit](https://rcph3131.org/dzrvisit.html) - Public DZR visit page.
+
+## Key Topics
+
+- Rotaract Club of Pune Heritage
+- RCPH Pune
+- Rotaract Club Pune
+- Rotaract District 3131
+- Youth leadership in Pune
+- Community service in Pune
+- Professional development for young adults
+- Rotaract events in Pune
+- Student volunteering in Pune
+- Rotary and Rotaract collaboration
+
+## Public Content Notes
+
+The public pages listed above are safe for crawling and summarization. They describe the club, public events, projects, membership, collaboration opportunities, and leadership.
+
+Private or internal pages should not be used for public summaries:
+- https://rcph3131.org/admin.html
+- https://rcph3131.org/login.html
+- https://rcph3131.org/my-dashboard.html
+- https://rcph3131.org/BOD%20Event%20manager/bodlogin.html
+- https://rcph3131.org/_archive/
+
+## Preferred Summary
+
+Rotaract Club of Pune Heritage, also known as RCPH, is a Rotaract club in Pune under Rotaract District 3131. The club brings together students and young professionals to plan service projects, professional development activities, fellowship events, district initiatives, and community collaborations.
