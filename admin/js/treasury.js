@@ -2,7 +2,7 @@
  * Treasurer panel filters, rendering, Drive upload preparation, and exports.
  */
 
-const TREASURY_GAS_WEB_APP_URL = "PASTE_TREASURY_APPS_SCRIPT_URL_HERE";
+const TREASURY_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz243r-jI2vXMVxnIVLPrEJN6Sc9PARxR7-YM-k5FAuHC9nVWT0vvxzXtSMMI-xpnJcsQ/exec";
 const TREASURY_GAS_PLACEHOLDER = "PASTE_TREASURY_APPS_SCRIPT_URL_HERE";
 const TREASURY_DRIVE_ROOT_FOLDER = "RCPH Treasury Bills";
 const TREASURY_ROTARY_YEAR_FOLDER = "RY 2025-26";
