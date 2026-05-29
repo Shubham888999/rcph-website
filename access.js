@@ -22,21 +22,21 @@ const PANEL_DEFS = [
   {
     key: 'dashboard',
     title: 'My Member Dashboard',
-    description: 'View your attendance, upcoming events, avenue breakdowns and safe club-level stats.',
+    description: 'View your attendance, upcoming events, avenue breakdowns and club-level stats.',
     href: 'my-dashboard.html',
     roles: ['gbm', 'bod', 'admin', 'president']
   },
   {
     key: 'bod',
     title: 'BOD Event Manager',
-    description: 'Submit and review BOD event records. Access remains guarded by the BOD panel.',
+    description: 'Submit and review avenue event records..',
     href: 'BOD%20Event%20manager/bodlogin.html',
     roles: ['bod', 'admin', 'president']
   },
   {
     key: 'admin',
     title: 'Admin Panel',
-    description: 'Manage account approvals, attendance, BOD attendance, district attendance and admin workflows.',
+    description: 'Manage account approvals, avenue event attendance, BOD attendance, district event attendance and admin workflows.',
     href: 'admin.html',
     roles: ['admin', 'president']
   }
