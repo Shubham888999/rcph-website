@@ -299,7 +299,7 @@
       <thead>
         <tr>
           <th style="min-width:180px">Member</th>
-          <th style="min-width:120px">Amount (₹)</th> <!-- NEW -->
+          <th style="min-width:120px">Amount (INR)</th> <!-- NEW -->
           <th style="min-width:160px">Reason</th>
           <th style="min-width:220px">Event / Meeting</th>
           <th style="min-width:140px">Date</th>
@@ -368,15 +368,17 @@
     <table class="att">
       <thead>
         <tr>
-          <th style="min-width:200px">Name</th>
+          <th style="min-width:220px">Title</th>
           <th style="min-width:100px">Type</th>
-          <th style="min-width:120px">Amount (₹)</th>
+          <th style="min-width:120px">Amount (INR)</th>
           <th style="min-width:100px">Avenue</th>
           <th style="min-width:120px">Date</th>
-          <th style="min-width:120px">Paid By</th>
-          <th style="min-width:120px">Reimbursement</th>
-          <th style="min-width:100px">Bank Statement</th>
-          <th style="min-width:80px">Bill</th>
+          <th style="min-width:180px">Purpose</th>
+          <th style="min-width:140px">Paid By</th>
+          <th style="min-width:140px">Paid To</th>
+          <th style="min-width:130px">Mode</th>
+          <th style="min-width:150px">Reimbursement</th>
+          <th style="min-width:90px">Bill</th>
           <th style="min-width:110px">Actions</th>
         </tr>
       </thead>
@@ -416,7 +418,7 @@
       <tr>
         <th style="min-width:200px">Name</th>
         <th style="min-width:100px">Type</th>
-        <th style="min-width:120px">Amount (₹)</th>
+        <th style="min-width:120px">Amount (INR)</th>
         <th style="min-width:100px">Avenue</th>
         <th style="min-width:120px">Date</th>
         <th style="min-width:120px">Paid By</th>
@@ -694,70 +696,135 @@
   </div>
 
 <div id="addTransModal" class="adm-modal" aria-hidden="true">
-  <div class="adm-modal__sheet">
+  <div class="adm-modal__sheet treasury-modal-sheet">
     <div class="adm-modal__head">
       <h3>Add Transaction</h3>
-      <button class="adm-close" data-close="addTransModal">✕</button>
+      <button class="adm-close" data-close="addTransModal" aria-label="Close">&times;</button>
     </div>
-    <form id="addTransForm" class="adm-form">
-      <div class="adm-field">
-        <label>Transaction Name</label>
-        <input id="transName" required/>
-      </div>
-      <div class="adm-field">
-        <label>Type</label>
-        <select id="transType" required>
-          <option value="">Select type</option>
-          <option value="income">Income</option>
-          <option value="expense">Expense</option>
-        </select>
-      </div>
-      <div class="adm-field">
-        <label>Amount (₹)</label>
-        <input id="transAmount" type="number" required/>
-      </div>
-      <div class="adm-field">
-        <label>Avenue</label>
-        <select id="transAvenue" required>
-          <option value="">Select avenue</option>
-          <option value="ISD">ISD</option>
-          <option value="CMD">CMD</option>
-          <option value="CSD">CSD</option>
-          <option value="PDD">PDD</option>
-          <option value="RRRO">RRRO</option>
-          <option value="PRO">PRO</option>
-          <option value="DEI">DEI</option>
-          <option value="GBM">GBM</option>
-          <option value="Other">No Avenue</option>
-        </select>
-      </div>
-      <div class="adm-field">
-        <label>Paid By</label>
-        <input id="transPaidBy" placeholder="e.g. President"/>
-      </div>
-      <div class="adm-field">
-        <label>Reimbursement</label>
-        <input id="transReimburse" placeholder="e.g. Pending / Done"/>
-      </div>
-      <div class="adm-field">
-        <label>Bank Statement</label>
-        <input id="transCheque" type="text" />
-      </div>
-      <div class="adm-field">
-        <label>Date</label>
-        <input id="transDate" type="date" required/>
-      </div>
-      <div class="adm-field">
-  <label>Bill Image URL (Google Drive / JPG / PNG)</label>
-  <input id="transBillUrl" placeholder="https://drive.google.com/..."/>
-</div>
-      <!--<div class="adm-field">
-        <label>Upload Bill</label>
-        <input id="transBill" type="file" accept="image/*"/>
-        <div id="transBillPreview" style="margin-top:6px;"></div>
-      </div>-->
+    <form id="addTransForm" class="adm-form treasury-form">
+      <section class="treasury-form-section">
+        <h4>Basic Details</h4>
+        <div class="treasury-form-grid">
+          <label class="adm-field">
+            <span>Transaction Title</span>
+            <input id="transName" required>
+          </label>
+          <label class="adm-field">
+            <span>Type</span>
+            <select id="transType" required>
+              <option value="">Select type</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+          </label>
+          <label class="adm-field">
+            <span>Amount (INR)</span>
+            <input id="transAmount" type="number" min="0" step="0.01" required>
+          </label>
+          <label class="adm-field">
+            <span>Date</span>
+            <input id="transDate" type="date" required>
+          </label>
+          <label class="adm-field">
+            <span>Avenue</span>
+            <select id="transAvenue" required>
+              <option value="">Select avenue</option>
+              <option value="ISD">ISD</option>
+              <option value="CMD">CMD</option>
+              <option value="CSD">CSD</option>
+              <option value="PDD">PDD</option>
+              <option value="RRRO">RRRO</option>
+              <option value="PRO">PRO</option>
+              <option value="DEI">DEI</option>
+              <option value="GBM">GBM</option>
+              <option value="Other">No Avenue</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Link / Purpose</h4>
+        <label class="adm-field">
+          <span>Purpose / Linked Event</span>
+          <input id="transPurpose" placeholder="e.g. Installation Ceremony, GBM, project supplies">
+        </label>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Payment Details</h4>
+        <div class="treasury-form-grid">
+          <label class="adm-field">
+            <span>Paid By / Received From</span>
+            <input id="transPaidBy" placeholder="Name or source">
+          </label>
+          <label class="adm-field">
+            <span>Paid To</span>
+            <input id="transPaidTo" placeholder="Vendor, member, venue, etc.">
+          </label>
+          <label class="adm-field">
+            <span>Payment Mode</span>
+            <select id="transPaymentMode">
+              <option value="">Select mode</option>
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Card">Card</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <label class="adm-field">
+            <span>Reference No. / UPI ID / Cheque No.</span>
+            <input id="transCheque" type="text">
+          </label>
+        </div>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Reimbursement</h4>
+        <div class="treasury-form-grid">
+          <label class="adm-field">
+            <span>Reimbursement Status</span>
+            <select id="transReimburse">
+              <option value="Not Applicable">Not Applicable</option>
+              <option value="Pending">Pending</option>
+              <option value="Done">Done</option>
+            </select>
+          </label>
+          <label class="adm-field">
+            <span>Reimbursed To</span>
+            <input id="transReimbursedTo">
+          </label>
+          <label class="adm-field">
+            <span>Reimbursement Date</span>
+            <input id="transReimbursementDate" type="date">
+          </label>
+        </div>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Bill / Receipt</h4>
+        <div class="treasury-file-row">
+          <label class="adm-field">
+            <span>Upload Bill / Receipt</span>
+            <input id="transBill" type="file" accept="image/*,.pdf">
+          </label>
+          <label class="adm-field">
+            <span>Existing Drive URL</span>
+            <input id="transBillUrl" placeholder="https://drive.google.com/...">
+          </label>
+        </div>
+        <div class="treasury-bill-actions">
+          <button id="transClearBillFile" type="button" class="btn btn-outline">Remove Selected File</button>
+        </div>
+        <div id="transBillPreview" class="treasury-bill-preview">No bill selected.</div>
+        <div id="transBillStatus" class="treasury-upload-status" aria-live="polite"></div>
+      </section>
+
       <div class="adm-actions">
-        <button type="submit" class="btn">Save</button>
+        <button type="button" class="btn btn-outline" data-close="addTransModal">Cancel</button>
+        <button id="addTransSaveBtn" type="submit" class="btn">Save Transaction</button>
       </div>
     </form>
   </div>
@@ -774,54 +841,138 @@
   </div>
 </div>  
 <div class="adm-modal" id="editTransModal" aria-hidden="true">
-  <div class="adm-modal__sheet">
-    <button class="adm-close" data-close="editTransModal">✕</button>
-    <h2>Edit Transaction</h2>
-    <form id="editTransForm" class="adm-form">
+  <div class="adm-modal__sheet treasury-modal-sheet">
+    <div class="adm-modal__head">
+      <h3>Edit Transaction</h3>
+      <button class="adm-close" data-close="editTransModal" aria-label="Close">&times;</button>
+    </div>
+    <form id="editTransForm" class="adm-form treasury-form">
       <input type="hidden" id="editTransId">
-      
-      <label class="adm-field">
-        <span>Name</span>
-        <input id="editTransName" required>
-      </label>
-      <label class="adm-field">
-        <span>Type</span>
-        <select id="editTransType">
-          <option value="income">Income</option>
-          <option value="expense">Expense</option>
-        </select>
-      </label>
-      <label class="adm-field">
-        <span>Amount (₹)</span>
-        <input id="editTransAmount" type="number" required>
-      </label>
-      <label class="adm-field">
-        <span>Avenue</span>
-        <input id="editTransAvenue">
-      </label>
 
-      <label class="adm-field">
-        <span>Paid By</span>
-        <input id="editTransPaidBy">
-      </label>
-      <label class="adm-field">
-        <span>Reimbursement</span>
-        <input id="editTransReimburse">
-      </label>
-      <label class="adm-field">
-        <span>Bank Statement</span>
-        <input id="editTransCheque" type="text">
-      </label>
-      <label class="adm-field">
-        <span>Date</span>
-        <input id="editTransDate" type="date" required>
-      </label>
-      <label class="adm-field">
-        <span>Bill (replace)</span>
-        <input id="editTransBill" type="file" accept="image/*">
-      </label>
-      <div id="editTransBillPreview" style="margin-top:10px;"></div>
-      <button type="submit" class="btn">Save Changes</button>
+      <section class="treasury-form-section">
+        <h4>Basic Details</h4>
+        <div class="treasury-form-grid">
+          <label class="adm-field">
+            <span>Transaction Title</span>
+            <input id="editTransName" required>
+          </label>
+          <label class="adm-field">
+            <span>Type</span>
+            <select id="editTransType" required>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+          </label>
+          <label class="adm-field">
+            <span>Amount (INR)</span>
+            <input id="editTransAmount" type="number" min="0" step="0.01" required>
+          </label>
+          <label class="adm-field">
+            <span>Date</span>
+            <input id="editTransDate" type="date" required>
+          </label>
+          <label class="adm-field">
+            <span>Avenue</span>
+            <select id="editTransAvenue">
+              <option value="">Select avenue</option>
+              <option value="ISD">ISD</option>
+              <option value="CMD">CMD</option>
+              <option value="CSD">CSD</option>
+              <option value="PDD">PDD</option>
+              <option value="RRRO">RRRO</option>
+              <option value="PRO">PRO</option>
+              <option value="DEI">DEI</option>
+              <option value="GBM">GBM</option>
+              <option value="Other">No Avenue</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Link / Purpose</h4>
+        <label class="adm-field">
+          <span>Purpose / Linked Event</span>
+          <input id="editTransPurpose">
+        </label>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Payment Details</h4>
+        <div class="treasury-form-grid">
+          <label class="adm-field">
+            <span>Paid By / Received From</span>
+            <input id="editTransPaidBy">
+          </label>
+          <label class="adm-field">
+            <span>Paid To</span>
+            <input id="editTransPaidTo">
+          </label>
+          <label class="adm-field">
+            <span>Payment Mode</span>
+            <select id="editTransPaymentMode">
+              <option value="">Select mode</option>
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Card">Card</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <label class="adm-field">
+            <span>Reference No. / UPI ID / Cheque No.</span>
+            <input id="editTransCheque" type="text">
+          </label>
+        </div>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Reimbursement</h4>
+        <div class="treasury-form-grid">
+          <label class="adm-field">
+            <span>Reimbursement Status</span>
+            <select id="editTransReimburse">
+              <option value="Not Applicable">Not Applicable</option>
+              <option value="Pending">Pending</option>
+              <option value="Done">Done</option>
+            </select>
+          </label>
+          <label class="adm-field">
+            <span>Reimbursed To</span>
+            <input id="editTransReimbursedTo">
+          </label>
+          <label class="adm-field">
+            <span>Reimbursement Date</span>
+            <input id="editTransReimbursementDate" type="date">
+          </label>
+        </div>
+      </section>
+
+      <section class="treasury-form-section">
+        <h4>Bill / Receipt</h4>
+        <div class="treasury-file-row">
+          <label class="adm-field">
+            <span>Upload Replacement Bill / Receipt</span>
+            <input id="editTransBill" type="file" accept="image/*,.pdf">
+          </label>
+          <label class="adm-field">
+            <span>Existing Drive URL</span>
+            <input id="editTransBillUrl" placeholder="https://drive.google.com/...">
+          </label>
+        </div>
+        <div class="treasury-bill-actions">
+          <button id="editTransClearBillFile" type="button" class="btn btn-outline">Remove Selected File</button>
+          <button id="editTransClearBill" type="button" class="btn btn-outline">Clear Bill Link</button>
+        </div>
+        <div id="editTransBillPreview" class="treasury-bill-preview">No bill uploaded.</div>
+        <div id="editTransBillStatus" class="treasury-upload-status" aria-live="polite"></div>
+      </section>
+
+      <div class="adm-actions">
+        <button type="button" class="btn btn-outline" data-close="editTransModal">Cancel</button>
+        <button id="editTransSaveBtn" type="submit" class="btn">Save Changes</button>
+      </div>
     </form>
   </div>
 </div>

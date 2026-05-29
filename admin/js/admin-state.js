@@ -50,12 +50,21 @@ const transType      = document.getElementById("transType");
 const transAmount    = document.getElementById("transAmount");
 const transAvenue    = document.getElementById("transAvenue");
 const transDate      = document.getElementById("transDate");
+const transPurpose   = document.getElementById("transPurpose");
 const transPaidBy    = document.getElementById("transPaidBy");
+const transPaidTo    = document.getElementById("transPaidTo");
+const transPaymentMode = document.getElementById("transPaymentMode");
 const transReimburse = document.getElementById("transReimburse");
 const transCheque    = document.getElementById("transCheque");
+const transReimbursedTo = document.getElementById("transReimbursedTo");
+const transReimbursementDate = document.getElementById("transReimbursementDate");
 
 const transBill      = document.getElementById("transBill");
+const transClearBillFile = document.getElementById("transClearBillFile");
+const transBillUrl   = document.getElementById("transBillUrl");
 const transBillPreview = document.getElementById("transBillPreview");
+const transBillStatus = document.getElementById("transBillStatus");
+const addTransSaveBtn = document.getElementById("addTransSaveBtn");
 const addTransForm   = document.getElementById("addTransForm");
 const treAddBtn      = document.getElementById('treAddBtn');
 
@@ -66,11 +75,21 @@ const editTransType   = document.getElementById("editTransType");
 const editTransAmount = document.getElementById("editTransAmount");
 const editTransAvenue = document.getElementById("editTransAvenue");
 const editTransDate   = document.getElementById("editTransDate");
+const editTransPurpose = document.getElementById("editTransPurpose");
 const editTransBill   = document.getElementById("editTransBill");
+const editTransClearBillFile = document.getElementById("editTransClearBillFile");
+const editTransBillUrl = document.getElementById("editTransBillUrl");
+const editTransClearBill = document.getElementById("editTransClearBill");
 const editTransBillPreview = document.getElementById("editTransBillPreview");
+const editTransBillStatus = document.getElementById("editTransBillStatus");
+const editTransSaveBtn = document.getElementById("editTransSaveBtn");
 const editTransPaidBy    = document.getElementById("editTransPaidBy");
+const editTransPaidTo    = document.getElementById("editTransPaidTo");
+const editTransPaymentMode = document.getElementById("editTransPaymentMode");
 const editTransReimburse = document.getElementById("editTransReimburse");
 const editTransCheque    = document.getElementById("editTransCheque");
+const editTransReimbursedTo = document.getElementById("editTransReimbursedTo");
+const editTransReimbursementDate = document.getElementById("editTransReimbursementDate");
 
 const billLightboxImg = document.getElementById("billLightboxImg");
 

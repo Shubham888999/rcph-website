@@ -13,8 +13,15 @@ function closeModal(modalId) {
     modal.setAttribute('aria-hidden', 'true');
     const form = modal.querySelector('form');
     if (form) form.reset();
-    if (modalId === 'addTransModal' && transBillPreview) transBillPreview.innerHTML = '';
-    if (modalId === 'editTransModal' && editTransBillPreview) editTransBillPreview.innerHTML = '';
+    if (modalId === 'addTransModal') {
+      if (transBillPreview) transBillPreview.textContent = 'No bill selected.';
+      if (transBillStatus) transBillStatus.textContent = '';
+    }
+    if (modalId === 'editTransModal') {
+      if (editTransBillPreview) editTransBillPreview.textContent = 'No bill uploaded.';
+      if (editTransBillStatus) editTransBillStatus.textContent = '';
+      if (editTransForm) editTransForm.dataset.clearBill = '';
+    }
   }
 }
 
