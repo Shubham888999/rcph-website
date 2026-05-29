@@ -17,6 +17,7 @@ Parent Rotary connection: Rotary Club of Pune Heritage
 - [Projects](https://rcph3131.org/projects.html) - Public project stories including Project EduReach, Pages of Hope, Sports RYLA, Cultural Exchange, Club Assembly, and Samyati 3.0.
 - [Join](https://rcph3131.org/join.html) - Information for students, young professionals, volunteers, and people interested in joining RCPH.
 - [Contact](https://rcph3131.org/contact.html) - Contact and collaboration information for NGOs, colleges, Rotary clubs, sponsors, students, and volunteers.
+- [FAQ](https://rcph3131.org/faq.html) - Official answers about RCPH identity, Rotaract District 3131, Zone 4, sponsor club, membership, events, collaborations, and the website's public and internal purpose.
 - [Board of Directors](https://rcph3131.org/bod.html) - Current Board of Directors and club leadership.
 - [Madhushala](https://rcph3131.org/madhushala.html) - Public page for the Madhushala flagship event.
 - [DZR Visit](https://rcph3131.org/dzrvisit.html) - Public DZR visit page.
