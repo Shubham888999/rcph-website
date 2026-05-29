@@ -6,6 +6,7 @@ const TREASURY_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz243r
 const TREASURY_GAS_PLACEHOLDER = "PASTE_TREASURY_APPS_SCRIPT_URL_HERE";
 const TREASURY_DRIVE_ROOT_FOLDER = "RCPH Treasury Bills";
 const TREASURY_ROTARY_YEAR_FOLDER = "RY 2025-26";
+const TREASURY_CLUB_NAME = "Rotaract Club of Pune Heritage";
 
 function treasuryText(value, fallback = '-') {
   const text = String(value ?? '').trim();
@@ -278,6 +279,103 @@ function buildTreasuryFolderMetadata(transaction) {
   };
 }
 
+function memberDisplayName(member) {
+  return treasuryText(member?.name || member?.memberName || member?.email, '');
+}
+
+function populateTreasuryMemberSelect(selectEl, selectedId = '', selectedName = '') {
+  if (!selectEl) return;
+
+  const previous = selectedId || selectEl.value || '';
+  selectEl.innerHTML = '<option value="">Select member</option>';
+  MEMBERS
+    .slice()
+    .sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b)))
+    .forEach(member => {
+      const opt = document.createElement('option');
+      opt.value = member.id;
+      opt.textContent = memberDisplayName(member);
+      opt.dataset.memberName = memberDisplayName(member);
+      selectEl.appendChild(opt);
+    });
+
+  if (previous && !Array.from(selectEl.options).some(opt => opt.value === previous)) {
+    const opt = document.createElement('option');
+    opt.value = previous;
+    opt.textContent = selectedName || previous;
+    opt.dataset.memberName = selectedName || previous;
+    selectEl.appendChild(opt);
+  }
+
+  selectEl.value = previous || '';
+}
+
+function syncTreasuryPartyControl(party) {
+  if (!party?.typeEl) return;
+  const type = String(party.typeEl.value || 'other').toLowerCase();
+  const isMember = type === 'member';
+  const isOther = type === 'other';
+
+  if (party.memberEl) party.memberEl.hidden = !isMember;
+  if (party.otherEl) party.otherEl.hidden = !isOther;
+
+  const current = readTreasuryParty(party);
+  if (party.hiddenEl) party.hiddenEl.value = current.name;
+}
+
+function readTreasuryParty(party) {
+  const type = String(party?.typeEl?.value || 'other').toLowerCase();
+
+  if (type === 'member') {
+    const memberId = party?.memberEl?.value || '';
+    const opt = party?.memberEl?.selectedOptions?.[0] || null;
+    const name = treasuryText(opt?.dataset?.memberName || opt?.textContent, '');
+    return {
+      type: 'member',
+      memberId,
+      name: memberId ? name : ''
+    };
+  }
+
+  if (type === 'club') {
+    return {
+      type: 'club',
+      memberId: '',
+      name: TREASURY_CLUB_NAME
+    };
+  }
+
+  return {
+    type: 'other',
+    memberId: '',
+    name: treasuryText(party?.otherEl?.value, '')
+  };
+}
+
+function setTreasuryPartyControl(party, data) {
+  if (!party?.typeEl) return;
+
+  const rawType = String(data?.type || '').toLowerCase();
+  const type = ['member', 'club', 'other'].includes(rawType) ? rawType : 'other';
+  const memberId = data?.memberId || '';
+  const name = treasuryText(data?.name, '');
+
+  populateTreasuryMemberSelect(party.memberEl, memberId, name);
+  party.typeEl.value = type;
+
+  if (type === 'other' && party.otherEl) {
+    party.otherEl.value = name;
+  } else if (party.otherEl) {
+    party.otherEl.value = '';
+  }
+
+  syncTreasuryPartyControl(party);
+}
+
+function resetTreasuryPartyControl(party) {
+  setTreasuryPartyControl(party, { type: 'other', memberId: '', name: '' });
+}
+
 async function uploadBillToDrive(file, transaction) {
   if (!file) return null;
   if (!isTreasuryGasConfigured()) {
@@ -337,6 +435,8 @@ function buildTransactionPayload(source) {
   const purpose = treasuryText(source.purposeEl?.value, '');
   const reimbursementStatus = treasuryText(source.reimburseEl?.value, 'Not Applicable');
   const referenceNumber = treasuryText(source.referenceEl?.value, '');
+  const paidByParty = readTreasuryParty(source.paidByParty);
+  const paidToParty = readTreasuryParty(source.paidToParty);
 
   return {
     title,
@@ -349,8 +449,14 @@ function buildTransactionPayload(source) {
     purpose,
     linkedEventName: purpose,
 
-    paidBy: treasuryText(source.paidByEl?.value, ''),
-    paidTo: treasuryText(source.paidToEl?.value, ''),
+    paidBy: paidByParty.name,
+    paidByType: paidByParty.type,
+    paidByMemberId: paidByParty.memberId,
+    paidByName: paidByParty.name,
+    paidTo: paidToParty.name,
+    paidToType: paidToParty.type,
+    paidToMemberId: paidToParty.memberId,
+    paidToName: paidToParty.name,
     paymentMode: treasuryText(source.paymentModeEl?.value, ''),
     referenceNumber,
 
@@ -370,6 +476,12 @@ function validateTransactionPayload(payload) {
   if (!Number.isFinite(payload.amount) || payload.amount <= 0) throw new Error('Enter a valid amount.');
   if (!payload.date) throw new Error('Select a transaction date.');
   if (!payload.avenue) throw new Error('Select an avenue.');
+  if (payload.paidByType === 'member' && !payload.paidByMemberId) {
+    throw new Error('Select a member for Paid By / Received From, or choose Club/Other.');
+  }
+  if (payload.paidToType === 'member' && !payload.paidToMemberId) {
+    throw new Error('Select a member for Paid To, or choose Club/Other.');
+  }
 }
 
 function addSourceRefs() {
@@ -380,8 +492,18 @@ function addSourceRefs() {
     avenueEl: transAvenue,
     dateEl: transDate,
     purposeEl: transPurpose,
-    paidByEl: transPaidBy,
-    paidToEl: transPaidTo,
+    paidByParty: {
+      typeEl: transPaidByType,
+      memberEl: transPaidByMember,
+      otherEl: transPaidByOther,
+      hiddenEl: transPaidBy
+    },
+    paidToParty: {
+      typeEl: transPaidToType,
+      memberEl: transPaidToMember,
+      otherEl: transPaidToOther,
+      hiddenEl: transPaidTo
+    },
     paymentModeEl: transPaymentMode,
     referenceEl: transCheque,
     reimburseEl: transReimburse,
@@ -399,8 +521,18 @@ function editSourceRefs() {
     avenueEl: editTransAvenue,
     dateEl: editTransDate,
     purposeEl: editTransPurpose,
-    paidByEl: editTransPaidBy,
-    paidToEl: editTransPaidTo,
+    paidByParty: {
+      typeEl: editTransPaidByType,
+      memberEl: editTransPaidByMember,
+      otherEl: editTransPaidByOther,
+      hiddenEl: editTransPaidBy
+    },
+    paidToParty: {
+      typeEl: editTransPaidToType,
+      memberEl: editTransPaidToMember,
+      otherEl: editTransPaidToOther,
+      hiddenEl: editTransPaidTo
+    },
     paymentModeEl: editTransPaymentMode,
     referenceEl: editTransCheque,
     reimburseEl: editTransReimburse,
@@ -440,10 +572,26 @@ function setSelectValue(selectEl, value, fallback = '', allowCustom = false) {
   selectEl.value = fallback;
 }
 
+function wireTreasuryPartyControl(party) {
+  if (!party?.typeEl) return;
+  const update = () => syncTreasuryPartyControl(party);
+  party.typeEl.addEventListener('change', update);
+  party.memberEl?.addEventListener('change', update);
+  party.otherEl?.addEventListener('input', update);
+  syncTreasuryPartyControl(party);
+}
+
+wireTreasuryPartyControl(addSourceRefs().paidByParty);
+wireTreasuryPartyControl(addSourceRefs().paidToParty);
+wireTreasuryPartyControl(editSourceRefs().paidByParty);
+wireTreasuryPartyControl(editSourceRefs().paidToParty);
+
 if (treAddBtn) {
   treAddBtn.onclick = () => {
     if (addTransForm) addTransForm.reset();
     if (transReimburse) transReimburse.value = 'Not Applicable';
+    resetTreasuryPartyControl(addSourceRefs().paidByParty);
+    resetTreasuryPartyControl(addSourceRefs().paidToParty);
     previewSelectedBill(transBill, transBillUrl, transBillPreview, transBillStatus);
     openModal('addTransModal');
   };
@@ -525,8 +673,16 @@ document.addEventListener('click', (e) => {
   editTransDate.value = (t.date || '').slice(0, 10);
 
   editTransPurpose.value = treasuryText(t.purpose || t.linkedEventName, '');
-  editTransPaidBy.value = treasuryText(t.paidBy, '');
-  editTransPaidTo.value = treasuryText(t.paidTo, '');
+  setTreasuryPartyControl(editSourceRefs().paidByParty, {
+    type: t.paidByType || 'other',
+    memberId: t.paidByMemberId || '',
+    name: t.paidByName || t.paidBy || ''
+  });
+  setTreasuryPartyControl(editSourceRefs().paidToParty, {
+    type: t.paidToType || 'other',
+    memberId: t.paidToMemberId || '',
+    name: t.paidToName || t.paidTo || ''
+  });
   setSelectValue(editTransPaymentMode, t.paymentMode, '', true);
   editTransCheque.value = treasuryReference(t);
   setSelectValue(editTransReimburse, t.reimbursementStatus || t.reimburse, 'Not Applicable', true);

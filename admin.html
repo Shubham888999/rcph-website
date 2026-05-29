@@ -753,15 +753,34 @@
 
       <section class="treasury-form-section">
         <h4>Payment Details</h4>
+        <p class="treasury-field-help">Choose Member for reimbursements or member-paid expenses. Choose Club for club account payments.</p>
         <div class="treasury-form-grid">
-          <label class="adm-field">
+          <div class="adm-field treasury-party-control">
             <span>Paid By / Received From</span>
-            <input id="transPaidBy" placeholder="Name or source">
-          </label>
-          <label class="adm-field">
+            <select id="transPaidByType" data-party-type>
+              <option value="member">Member</option>
+              <option value="club">Club</option>
+              <option value="other" selected>Other</option>
+            </select>
+            <select id="transPaidByMember" data-party-member>
+              <option value="">Select member</option>
+            </select>
+            <input id="transPaidByOther" data-party-other placeholder="Enter name or source">
+            <input id="transPaidBy" type="hidden">
+          </div>
+          <div class="adm-field treasury-party-control">
             <span>Paid To</span>
-            <input id="transPaidTo" placeholder="Vendor, member, venue, etc.">
-          </label>
+            <select id="transPaidToType" data-party-type>
+              <option value="member">Member</option>
+              <option value="club">Club</option>
+              <option value="other" selected>Other</option>
+            </select>
+            <select id="transPaidToMember" data-party-member>
+              <option value="">Select member</option>
+            </select>
+            <input id="transPaidToOther" data-party-other placeholder="Enter recipient name">
+            <input id="transPaidTo" type="hidden">
+          </div>
           <label class="adm-field">
             <span>Payment Mode</span>
             <select id="transPaymentMode">
@@ -899,15 +918,34 @@
 
       <section class="treasury-form-section">
         <h4>Payment Details</h4>
+        <p class="treasury-field-help">Choose Member for reimbursements or member-paid expenses. Choose Club for club account payments.</p>
         <div class="treasury-form-grid">
-          <label class="adm-field">
+          <div class="adm-field treasury-party-control">
             <span>Paid By / Received From</span>
-            <input id="editTransPaidBy">
-          </label>
-          <label class="adm-field">
+            <select id="editTransPaidByType" data-party-type>
+              <option value="member">Member</option>
+              <option value="club">Club</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="editTransPaidByMember" data-party-member>
+              <option value="">Select member</option>
+            </select>
+            <input id="editTransPaidByOther" data-party-other placeholder="Enter name or source">
+            <input id="editTransPaidBy" type="hidden">
+          </div>
+          <div class="adm-field treasury-party-control">
             <span>Paid To</span>
-            <input id="editTransPaidTo">
-          </label>
+            <select id="editTransPaidToType" data-party-type>
+              <option value="member">Member</option>
+              <option value="club">Club</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="editTransPaidToMember" data-party-member>
+              <option value="">Select member</option>
+            </select>
+            <input id="editTransPaidToOther" data-party-other placeholder="Enter recipient name">
+            <input id="editTransPaidTo" type="hidden">
+          </div>
           <label class="adm-field">
             <span>Payment Mode</span>
             <select id="editTransPaymentMode">
