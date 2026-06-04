@@ -2097,14 +2097,19 @@ a.button-link:hover {
   transition: opacity 0.28s ease, visibility 0.28s ease;
 }
 
+#rcphMembershipPopup[hidden] {
+  display: none !important;
+}
+
+body.rcph-popup-open {
+  overflow: hidden;
+}
+
 .membership-popup.is-visible {
+  display: flex;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-}
-
-.membership-popup[aria-hidden="true"] {
-  display: none;
 }
 
 .membership-popup-card {

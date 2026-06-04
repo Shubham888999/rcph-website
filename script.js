@@ -436,6 +436,7 @@ function initMembershipInvitationPopup() {
 
   const KEY = 'rcphMembershipPopupSeen2026';
   let previousFocus = null;
+  let timer = null;
 
   const storageGet = () => {
     try { return window.localStorage.getItem(KEY); }
@@ -443,37 +444,42 @@ function initMembershipInvitationPopup() {
   };
 
   const markSeen = () => {
-    try { window.localStorage.setItem(KEY, '1'); }
+    try { window.localStorage.setItem(KEY, 'true'); }
     catch (err) {}
   };
 
+  // To test popup manually:
+  // localStorage.removeItem("rcphMembershipPopupSeen2026");
+  // location.reload();
   if (storageGet()) return;
 
-  const openPopup = () => {
+  const showRcphMembershipPopup = () => {
     if (storageGet()) return;
     previousFocus = document.activeElement;
+    popup.hidden = false;
+    popup.removeAttribute('hidden');
     popup.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
+    document.body.classList.add('rcph-popup-open');
     requestAnimationFrame(() => {
       popup.classList.add('is-visible');
       close.focus({ preventScroll: true });
     });
   };
 
-  const closePopup = (shouldMarkSeen = true) => {
+  const hideRcphMembershipPopup = (shouldMarkSeen = true) => {
     if (timer) clearTimeout(timer);
     if (shouldMarkSeen) markSeen();
     popup.classList.remove('is-visible');
     popup.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
+    popup.hidden = true;
+    document.body.classList.remove('rcph-popup-open');
     if (previousFocus && typeof previousFocus.focus === 'function') {
       previousFocus.focus({ preventScroll: true });
     }
   };
 
-  let timer = null;
   const schedulePopup = () => {
-    timer = setTimeout(openPopup, 1200);
+    timer = setTimeout(showRcphMembershipPopup, 1200);
   };
 
   if (document.readyState === 'complete') {
@@ -482,8 +488,8 @@ function initMembershipInvitationPopup() {
     window.addEventListener('load', schedulePopup, { once: true });
   }
 
-  close.addEventListener('click', () => closePopup(true));
-  maybeLater.addEventListener('click', () => closePopup(true));
+  close.addEventListener('click', () => hideRcphMembershipPopup(true));
+  maybeLater.addEventListener('click', () => hideRcphMembershipPopup(true));
 
   [joinLink, faqLink].forEach(link => {
     if (!link) return;
@@ -491,13 +497,13 @@ function initMembershipInvitationPopup() {
   });
 
   popup.addEventListener('click', (e) => {
-    if (e.target === popup) closePopup(true);
+    if (e.target === popup) hideRcphMembershipPopup(true);
   });
 
   document.addEventListener('keydown', (e) => {
     if (popup.getAttribute('aria-hidden') === 'false' && e.key === 'Escape') {
       if (timer) clearTimeout(timer);
-      closePopup(true);
+      hideRcphMembershipPopup(true);
     }
   });
 }

@@ -291,6 +291,7 @@
     aria-labelledby="rcphMembershipPopupTitle"
     aria-describedby="rcphMembershipPopupDesc"
     aria-hidden="true"
+    hidden
   >
     <div id="rcphMembershipPopupCard" class="membership-popup-card">
       <button id="rcphMembershipPopupClose" class="membership-popup-close" type="button" aria-label="Close membership popup">&times;</button>
@@ -298,11 +299,11 @@
       <div class="membership-pattern" aria-hidden="true"></div>
 
       <div class="membership-popup-content">
-        <p class="membership-badge">RIY 2026-2027</p>
+        <p class="membership-badge">RIY 2026 - 2027 Membership</p>
         <p class="membership-invite-line">You&rsquo;re invited to be part of Rotaract Club of Pune Heritage</p>
         <h2 id="rcphMembershipPopupTitle">Start Your Rotaract Journey with RCPH</h2>
         <p id="rcphMembershipPopupDesc">
-          Membership for RIY 2026-2027 is now open. Join a youth-led community of students and young professionals working on service, leadership, fellowship, and meaningful projects in Pune.
+          Membership for RIY 2026 - 2027 is now open. Join a youth-led community of students and young professionals working on service, leadership, fellowship, and meaningful projects in Pune.
         </p>
 
         <div class="membership-chip-row" aria-label="Membership themes">
@@ -316,6 +317,7 @@
         <div class="membership-popup-actions">
           <a id="rcphMembershipJoinLink" class="membership-primary-btn" href="join.html">Join RCPH</a>
           <a id="rcphMembershipFaqLink" class="membership-secondary-btn" href="faq.html">Read FAQ</a>
+          <button id="rcphMembershipMaybeLater" class="membership-later-btn" type="button">Maybe Later</button>
         </div>
       </div>
     </div>
@@ -342,19 +344,6 @@
     toggle.addEventListener('click', () => {
       navLinks.classList.toggle('active');
     });
-
-      window.addEventListener('load', () => {
-    const popup = document.getElementById('eventPopup');
-    const closeBtn = document.getElementById('closePopup');
-
-    setTimeout(() => {
-      popup.style.display = 'flex';
-    }, 1000);
-
-    closeBtn.addEventListener('click', () => {
-      popup.style.display = 'none';
-    });
-  });
   </script>
 <!--
 <div id="madhushalaPopup" class="popup-overlay" style="display:none;">
