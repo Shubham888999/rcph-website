@@ -423,6 +423,85 @@ function initMadhushalaPopup() {
     if (popup.style.display === 'flex' && e.key === 'Escape') shut();
   });
 }
+
+function initMembershipInvitationPopup() {
+  const popup = document.getElementById('rcphMembershipPopup');
+  const card = document.getElementById('rcphMembershipPopupCard');
+  const close = document.getElementById('rcphMembershipPopupClose');
+  const maybeLater = document.getElementById('rcphMembershipMaybeLater');
+  const joinLink = document.getElementById('rcphMembershipJoinLink');
+  const faqLink = document.getElementById('rcphMembershipFaqLink');
+
+  if (!popup || !card || !close || !maybeLater) return;
+
+  const KEY = 'rcphMembershipPopupSeen2026';
+  let previousFocus = null;
+
+  const storageGet = () => {
+    try { return window.localStorage.getItem(KEY); }
+    catch (err) { return null; }
+  };
+
+  const markSeen = () => {
+    try { window.localStorage.setItem(KEY, '1'); }
+    catch (err) {}
+  };
+
+  if (storageGet()) return;
+
+  const openPopup = () => {
+    if (storageGet()) return;
+    previousFocus = document.activeElement;
+    popup.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => {
+      popup.classList.add('is-visible');
+      close.focus({ preventScroll: true });
+    });
+  };
+
+  const closePopup = (shouldMarkSeen = true) => {
+    if (timer) clearTimeout(timer);
+    if (shouldMarkSeen) markSeen();
+    popup.classList.remove('is-visible');
+    popup.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    if (previousFocus && typeof previousFocus.focus === 'function') {
+      previousFocus.focus({ preventScroll: true });
+    }
+  };
+
+  let timer = null;
+  const schedulePopup = () => {
+    timer = setTimeout(openPopup, 1200);
+  };
+
+  if (document.readyState === 'complete') {
+    schedulePopup();
+  } else {
+    window.addEventListener('load', schedulePopup, { once: true });
+  }
+
+  close.addEventListener('click', () => closePopup(true));
+  maybeLater.addEventListener('click', () => closePopup(true));
+
+  [joinLink, faqLink].forEach(link => {
+    if (!link) return;
+    link.addEventListener('click', markSeen);
+  });
+
+  popup.addEventListener('click', (e) => {
+    if (e.target === popup) closePopup(true);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (popup.getAttribute('aria-hidden') === 'false' && e.key === 'Escape') {
+      if (timer) clearTimeout(timer);
+      closePopup(true);
+    }
+  });
+}
+
 function runInit() {
   // 1. IMMEDIATE: Essential UI interactions
   // We run these right away so buttons and sliders work immediately.
@@ -430,6 +509,7 @@ function runInit() {
   initHighlightCarousel();
   initCoffeeWidget();
   initMadhushalaPopup();
+  initMembershipInvitationPopup();
 
 
   // 2. SHORT DELAY (500ms): Content Generation

@@ -2005,6 +2005,333 @@ a.button-link:hover {
   color: var(--color-accent-l);
 }
 
+.recruitment-section {
+  position: relative;
+  text-align: left;
+  border-color: rgba(244,180,58,0.42);
+  background:
+    linear-gradient(135deg, rgba(244,180,58,0.16), rgba(96,195,196,0.06) 42%, rgba(17,17,17,0.98)),
+    var(--color-card);
+  box-shadow: 0 16px 42px rgba(0,0,0,0.28);
+}
+
+.recruitment-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(244,180,58,0.16);
+  pointer-events: none;
+}
+
+.recruitment-content {
+  position: relative;
+  z-index: 1;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.recruitment-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(244,180,58,0.16);
+  color: var(--color-accent-l);
+  border: 1px solid rgba(244,180,58,0.42);
+  font-weight: 900;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.recruitment-section h2 {
+  display: block;
+  text-align: left;
+  margin-left: 0;
+  margin-right: 0;
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+}
+
+.recruitment-section h2::after {
+  left: 0;
+  transform: none;
+}
+
+.recruitment-section p {
+  max-width: 860px;
+}
+
+.recruitment-actions {
+  justify-content: flex-start;
+  margin-top: 20px;
+}
+
+.recruitment-note {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--color-accent,#60C3C4);
+  border-radius: 8px;
+  background: rgba(96,195,196,0.08);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.membership-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(244,180,58,0.24), transparent 34%),
+    rgba(0,0,0,0.74);
+  backdrop-filter: blur(7px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.membership-popup.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.membership-popup[aria-hidden="true"] {
+  display: none;
+}
+
+.membership-popup-card {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: min(88vh, 680px);
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(244,180,58,0.48);
+  background:
+    linear-gradient(145deg, rgba(26,26,26,0.92), rgba(10,10,10,0.96)),
+    rgba(18,18,18,0.9);
+  box-shadow:
+    0 28px 80px rgba(0,0,0,0.6),
+    0 0 38px rgba(96,195,196,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  transform: translateY(20px) scale(0.97);
+  transition: transform 0.34s ease;
+}
+
+.membership-popup.is-visible .membership-popup-card {
+  animation: membershipCardIn 0.42s ease forwards;
+}
+
+.membership-popup-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at top left, rgba(244,180,58,0.24), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(96,195,196,0.18), transparent 38%);
+  pointer-events: none;
+}
+
+.membership-shine {
+  position: absolute;
+  top: 0;
+  left: -70%;
+  width: 55%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,244,196,0.9), transparent);
+  animation: membershipShine 2.8s ease-in-out infinite;
+  z-index: 2;
+}
+
+.membership-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background-image:
+    radial-gradient(circle, rgba(244,180,58,0.45) 1px, transparent 1px),
+    linear-gradient(135deg, transparent 0 44%, rgba(96,195,196,0.18) 45% 46%, transparent 47% 100%);
+  background-size: 22px 22px, 160px 160px;
+  pointer-events: none;
+}
+
+.membership-popup-content {
+  position: relative;
+  z-index: 1;
+  padding: 34px;
+  text-align: center;
+}
+
+.membership-popup-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(244,180,58,0.24);
+  border-radius: 50%;
+  background: rgba(0,0,0,0.34);
+  color: #f7e6b2;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.membership-popup-close:hover,
+.membership-popup-close:focus-visible {
+  background: rgba(244,180,58,0.16);
+  outline: 2px solid rgba(96,195,196,0.55);
+}
+
+.membership-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 auto 14px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(244,180,58,0.5);
+  background: rgba(244,180,58,0.14);
+  color: var(--color-accent-l,#F4B43A);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.membership-invite-line {
+  margin: 0 0 8px;
+  color: #d5f9f8;
+  font-weight: 700;
+  font-size: 0.94rem;
+}
+
+.membership-popup h2 {
+  margin: 0 auto 14px;
+  max-width: 440px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.75rem);
+  line-height: 1.08;
+  background: linear-gradient(135deg, #fff4c4, #f4b43a 56%, #ffe29a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.membership-popup h2::after {
+  display: none;
+}
+
+.membership-popup p {
+  max-width: 470px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.membership-chip-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 20px 0;
+}
+
+.membership-chip-row span {
+  min-width: 78px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(96,195,196,0.38);
+  background: rgba(96,195,196,0.09);
+  color: #dffafa;
+  font-weight: 800;
+}
+
+.membership-identity {
+  margin: 4px auto 22px;
+  color: rgba(255,255,255,0.76);
+  font-size: 0.86rem;
+}
+
+.membership-popup-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.membership-primary-btn,
+.membership-secondary-btn,
+.membership-later-btn {
+  min-height: 44px;
+  padding: 11px 16px;
+  border-radius: 9px;
+  font-weight: 900;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.membership-primary-btn {
+  color: #111;
+  background: linear-gradient(135deg, #f4b43a, #ffe29a);
+  box-shadow: 0 12px 26px rgba(244,180,58,0.22);
+}
+
+.membership-secondary-btn {
+  color: #f4d98b;
+  border-color: rgba(244,180,58,0.48);
+  background: rgba(244,180,58,0.08);
+}
+
+.membership-later-btn {
+  color: #d8eeee;
+  border-color: rgba(96,195,196,0.3);
+  background: rgba(96,195,196,0.08);
+}
+
+.membership-primary-btn:hover,
+.membership-secondary-btn:hover,
+.membership-later-btn:hover,
+.membership-primary-btn:focus-visible,
+.membership-secondary-btn:focus-visible,
+.membership-later-btn:focus-visible {
+  transform: translateY(-1px);
+  outline: 2px solid rgba(96,195,196,0.45);
+  text-decoration: none;
+}
+
+@keyframes membershipCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes membershipShine {
+  0%, 20% {
+    left: -70%;
+    opacity: 0;
+  }
+  38% {
+    opacity: 1;
+  }
+  68%, 100% {
+    left: 115%;
+    opacity: 0;
+  }
+}
+
 .faq-page .section-box {
   text-align: left;
 }
@@ -2065,6 +2392,48 @@ a.button-link:hover {
   }
 
   .btn-like {
+    width: 100%;
+  }
+
+  .recruitment-section {
+    padding: 22px 16px;
+  }
+
+  .recruitment-section h2 {
+    font-size: 1.75rem;
+  }
+
+  .recruitment-actions {
+    gap: 10px;
+  }
+
+  .membership-popup {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .membership-popup-card {
+    max-height: 92vh;
+    overflow-y: auto;
+    border-radius: 16px;
+  }
+
+  .membership-popup-content {
+    padding: 30px 18px 20px;
+  }
+
+  .membership-popup h2 {
+    font-size: 1.75rem;
+  }
+
+  .membership-popup-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .membership-primary-btn,
+  .membership-secondary-btn,
+  .membership-later-btn {
     width: 100%;
   }
 }
