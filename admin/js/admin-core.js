@@ -418,6 +418,9 @@ async function loadData(){
   ATT = {};
   attSnap.forEach(d => { ATT[d.id] = d.data() || {}; });
   renderGrid();
+  renderInsightsPanel();
+  buildCollaborationFilters();
+  renderCollaborationReports();
   if (distHead && distBody) {
     await loadDistrictData();
   }
@@ -465,8 +468,10 @@ unsubEvents = db.collection('events').orderBy('date', 'desc').onSnapshot((snap) 
   EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .filter(e => e.archived !== true && String(e.type || 'clubEvent') === 'clubEvent');
   buildMonthFilterFromEvents();
+  buildCollaborationFilters();
   renderGrid();
   renderInsightsPanel();   
+  renderCollaborationReports();
 });
 
 unsubAtt = db.collection('attendance').onSnapshot((snap) => {

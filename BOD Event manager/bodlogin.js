@@ -58,6 +58,10 @@ const evName      = document.getElementById('evName');
 const evDesc      = document.getElementById('evDesc');
 const evAvenue    = document.getElementById('evAvenue');
 const driveInput  = document.getElementById('driveFolder');
+const eventRcphRole = document.getElementById('eventRcphRole');
+const eventHostClub = document.getElementById('eventHostClub');
+const eventCollaboratorsText = document.getElementById('eventCollaboratorsText');
+const eventCollaborationNotes = document.getElementById('eventCollaborationNotes');
 
 const itemsEl      = document.getElementById('items');
 const filterAvenue = document.getElementById('filterAvenue');
@@ -79,6 +83,7 @@ const previewTitle = document.getElementById('previewTitle');
 const previewMeta = document.getElementById('previewMeta');
 const previewAvenues = document.getElementById('previewAvenues');
 const previewDesc = document.getElementById('previewDesc');
+const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
 
 let IS_PRESIDENT = false;
 let IS_ADMIN = false;
@@ -147,6 +152,111 @@ function bodEventTypeLabel(type) {
 function visibilityLabel(value) {
   return String(value || 'public').toLowerCase() === 'internal' ? 'Internal' : 'Public';
 }
+
+function normalizeRcphRole(value) {
+  const role = String(value || '').trim().toLowerCase();
+  return ['host', 'cohost', 'collaborator', 'participant'].includes(role) ? role : 'host';
+}
+
+function rcphRoleLabel(value) {
+  return {
+    host: 'Host Club',
+    cohost: 'Co-host',
+    collaborator: 'Collaborating Club',
+    participant: 'Participating Club'
+  }[normalizeRcphRole(value)];
+}
+
+function parseCollaborators(text) {
+  const seen = new Set();
+  return String(text || '')
+    .split(/\r?\n/)
+    .map(name => name.trim().slice(0, 180))
+    .filter(Boolean)
+    .filter(name => {
+      const key = name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 20)
+    .map(name => ({ name, type: 'unspecified' }));
+}
+
+function normalizeCollaboratorList(collaborators) {
+  if (!Array.isArray(collaborators)) return [];
+  const seen = new Set();
+  return collaborators
+    .map(item => {
+      const name = String(typeof item === 'string' ? item : item?.name || '').trim().slice(0, 180);
+      const type = String(typeof item === 'object' ? item?.type || 'unspecified' : 'unspecified').trim().slice(0, 60) || 'unspecified';
+      return { name, type };
+    })
+    .filter(item => {
+      if (!item.name) return false;
+      const key = item.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 20);
+}
+
+function formatCollaborators(collaborators) {
+  return normalizeCollaboratorList(collaborators).map(c => c.name).join(', ');
+}
+
+function collaboratorsToText(collaborators) {
+  return normalizeCollaboratorList(collaborators).map(c => c.name).join('\n');
+}
+
+function currentCollaborationPayload(prefix = '') {
+  const roleEl = prefix ? document.getElementById(`${prefix}EventRcphRole`) : eventRcphRole;
+  const hostEl = prefix ? document.getElementById(`${prefix}EventHostClub`) : eventHostClub;
+  const collabEl = prefix ? document.getElementById(`${prefix}EventCollaboratorsText`) : eventCollaboratorsText;
+  const notesEl = prefix ? document.getElementById(`${prefix}EventCollaborationNotes`) : eventCollaborationNotes;
+  const rcphRole = normalizeRcphRole(roleEl?.value);
+  const hostClub = (hostEl?.value || '').trim() || RCPH_CLUB_NAME;
+  return {
+    rcphRole,
+    hostClub,
+    collaborators: parseCollaborators(collabEl?.value || ''),
+    collaborationNotes: (notesEl?.value || '').trim().slice(0, 1000)
+  };
+}
+
+function syncHostClubDefault(roleEl = eventRcphRole, hostEl = eventHostClub) {
+  if (!roleEl || !hostEl) return;
+  const role = normalizeRcphRole(roleEl.value);
+  if ((role === 'host' || role === 'cohost') && !hostEl.value.trim()) {
+    hostEl.value = RCPH_CLUB_NAME;
+  }
+}
+
+function collaborationBlockHtml(eventData) {
+  const role = normalizeRcphRole(eventData.rcphRole);
+  const hostClub = eventData.hostClub || RCPH_CLUB_NAME;
+  const collaborators = normalizeCollaboratorList(eventData.collaborators);
+  return `
+    <div class="collab-block">
+      <div><strong>RCPH Role:</strong> ${escapeHtml(rcphRoleLabel(role))}</div>
+      <div><strong>Host:</strong> ${escapeHtml(hostClub)}</div>
+      ${collaborators.length ? `
+        <div>
+          <strong>Collaborators:</strong>
+          <span class="collab-partners">
+            ${collaborators.map(c => `<span class="collab-chip">${escapeHtml(c.name)}</span>`).join('')}
+          </span>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+if (eventRcphRole) {
+  eventRcphRole.addEventListener('change', () => syncHostClubDefault(eventRcphRole, eventHostClub));
+}
+syncHostClubDefault(eventRcphRole, eventHostClub);
 
 const exportSubsBtn = document.getElementById('exportSubsBtn');
 if (exportSubsBtn) {
@@ -264,6 +374,10 @@ if (form) {
       renderSelection([]);
       const conductedByInput = document.getElementById('conductedBy');
       if (conductedByInput && CURRENT_DISPLAY_NAME) conductedByInput.value = CURRENT_DISPLAY_NAME;
+      if (eventRcphRole) eventRcphRole.value = 'host';
+      if (eventHostClub) eventHostClub.value = RCPH_CLUB_NAME;
+      if (eventCollaboratorsText) eventCollaboratorsText.value = '';
+      if (eventCollaborationNotes) eventCollaborationNotes.value = '';
       updateEventPreview();
     }, 0);
   });
@@ -526,7 +640,8 @@ if (form) {
         imageLinks: uploadedFileUrls,
         driveLinks: uploadedFileUrls,
         driveFolder: newFolderId,
-        driveFolderId: newFolderId
+        driveFolderId: newFolderId,
+        ...currentCollaborationPayload()
       });
       
       // --- 5. Done ---
@@ -623,7 +738,8 @@ if (avFilter) {
       if (q) {
         const hay = [
           r.name, r.description, r.desc, r.avenue,
-          r.conductedBy, r.createdByEmail, r.source, r.type, r.visibility
+          r.conductedBy, r.createdByEmail, r.createdByName, r.source, r.type, r.visibility,
+          r.hostClub, formatCollaborators(r.collaborators), r.collaborationNotes
         ].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
       }
@@ -678,6 +794,7 @@ ${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-li
             ${r.conductedBy ? ' • by ' + escapeHtml(r.conductedBy) : ''}
           </div>
           <div class="card__body">${escapeHtml(r.description || '')}</div>
+          ${collaborationBlockHtml(r)}
           <div class="card-actions">
             ${driveUrl ? `<a class="btn btn-outline" href="${driveUrl}" target="_blank">Open Drive folder</a>` : ''}
             ${syncedId ? `<span class="pill">Event ID: ${escapeHtml(syncedId)}</span>` : ''}
@@ -713,6 +830,7 @@ function exportSubsToExcel(){
 
   const header = [
     'Event Name','Avenues','Conducted By','Start Date','End Date','Time',
+    'RCPH Role','Host Club','Collaborators','Collaboration Notes',
     'Created','Description','Drive Link','Drive Folder ID','Created By'
   ];
 
@@ -731,6 +849,10 @@ function exportSubsToExcel(){
       r.eventStart || '',
       r.eventEnd || '',
       r.eventTime || '',
+      rcphRoleLabel(r.rcphRole),
+      r.hostClub || RCPH_CLUB_NAME,
+      formatCollaborators(r.collaborators),
+      r.collaborationNotes || '',
       createdStr,
       r.description || '',
       driveLink,
@@ -743,6 +865,7 @@ function exportSubsToExcel(){
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [
     {wch:28},{wch:12},{wch:20},{wch:12},{wch:12},{wch:8},
+    {wch:20},{wch:30},{wch:40},{wch:42},
     {wch:18},{wch:40},{wch:36},{wch:24},{wch:26}
   ];
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
@@ -823,6 +946,14 @@ const editEvDesc = document.getElementById('editEvDesc');
 const editEvAvenue = document.getElementById('editEvAvenue');
 const editDriveFolder = document.getElementById('editDriveFolder');
 const editPreviewLink = document.getElementById('editPreviewLink');
+const editEventRcphRole = document.getElementById('editEventRcphRole');
+const editEventHostClub = document.getElementById('editEventHostClub');
+const editEventCollaboratorsText = document.getElementById('editEventCollaboratorsText');
+const editEventCollaborationNotes = document.getElementById('editEventCollaborationNotes');
+
+if (editEventRcphRole) {
+  editEventRcphRole.addEventListener('change', () => syncHostClubDefault(editEventRcphRole, editEventHostClub));
+}
 
 // Helper to open/close modal
 function openModal(modalId) {
@@ -869,6 +1000,10 @@ document.addEventListener('click', async (e) => {
   editEvDesc.value = sub.description || sub.desc || '';
   editDriveFolder.value = sub.driveFolder || sub.driveFolderId || '';
   editPreviewLink.value = sub.previewLink || (Array.isArray(sub.imageLinks) ? sub.imageLinks[0] : '') || '';
+  if (editEventRcphRole) editEventRcphRole.value = normalizeRcphRole(sub.rcphRole);
+  if (editEventHostClub) editEventHostClub.value = sub.hostClub || RCPH_CLUB_NAME;
+  if (editEventCollaboratorsText) editEventCollaboratorsText.value = collaboratorsToText(sub.collaborators);
+  if (editEventCollaborationNotes) editEventCollaborationNotes.value = sub.collaborationNotes || '';
 
   // Set selected avenues
   const subAvenues = Array.isArray(sub.avenue) ? sub.avenue : (sub.avenue ? [sub.avenue] : []);
@@ -906,7 +1041,8 @@ if (editForm) {
         desc: editEvDesc.value.trim(),
         driveFolder: editDriveFolder.value.trim(),
         imageLinks: editPreviewLink.value.trim() ? [editPreviewLink.value.trim()] : [],
-        avenue: avenues
+        avenue: avenues,
+        ...currentCollaborationPayload('edit')
       };
 
       // Extract Drive ID just like in the main form

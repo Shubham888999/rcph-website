@@ -217,6 +217,28 @@ const accountRequestsBody   = document.getElementById('accountRequestsBody');
 const accountRequestsBadge  = document.getElementById('accountRequestsBadge');
 const accountRequestFilter  = document.getElementById('accountRequestFilter');
 
+const collaborationReports        = document.getElementById('collaborationReports');
+const collaborationReportsCard    = document.getElementById('collaborationReportsCard');
+const collaborationReportsToggle  = document.getElementById('collaborationReportsToggle');
+const collaborationReportsToggleText = document.getElementById('collaborationReportsToggleText');
+const collaborationReportsBody    = document.getElementById('collaborationReportsBody');
+const collaborationReportsChevron = document.getElementById('collaborationReportsChevron');
+const collaborationReportsBadge   = document.getElementById('collaborationReportsBadge');
+const collabMonthFilter      = document.getElementById('collabMonthFilter');
+const collabAvenueFilter     = document.getElementById('collabAvenueFilter');
+const collabRoleFilter       = document.getElementById('collabRoleFilter');
+const collabSearch           = document.getElementById('collabSearch');
+const collabTotalEvents      = document.getElementById('collabTotalEvents');
+const collabHostedCount      = document.getElementById('collabHostedCount');
+const collabCohostedCount    = document.getElementById('collabCohostedCount');
+const collabCollaboratorCount= document.getElementById('collabCollaboratorCount');
+const collabParticipantCount = document.getElementById('collabParticipantCount');
+const collabUniquePartners   = document.getElementById('collabUniquePartners');
+const collabRoleChart        = document.getElementById('collabRoleChart');
+const collabAvenueChart      = document.getElementById('collabAvenueChart');
+const collabReportBody       = document.getElementById('collabReportBody');
+const exportCollabXlsxBtn    = document.getElementById('exportCollabXlsxBtn');
+
 
 let MEMBERS = [];
 let EVENTS  = [];

@@ -47,6 +47,38 @@
   </div>
   </section>
 
+  <section class="bod-form-section collaboration-section">
+    <div class="section-head">
+      <h3>Event Collaboration</h3>
+    </div>
+    <div class="form-grid-row row-split-2-1">
+      <label>
+        <span>RCPH Role in Event</span>
+        <select id="eventRcphRole">
+          <option value="host" selected>Host Club</option>
+          <option value="cohost">Co-host</option>
+          <option value="collaborator">Collaborating Club</option>
+          <option value="participant">Participating Club</option>
+        </select>
+      </label>
+      <label>
+        <span>Host Club / Primary Organizer</span>
+        <input id="eventHostClub" type="text" value="Rotaract Club of Pune Heritage" />
+      </label>
+    </div>
+    <div class="form-grid-row row-split-2">
+      <label>
+        <span>Collaborating Clubs / Partners</span>
+        <textarea id="eventCollaboratorsText" placeholder="Rotaract Club of Pune Metro&#10;Rotaract Club of Panvel&#10;Rotary Club of Pune Heritage"></textarea>
+        <small class="note">Enter one club/partner per line.</small>
+      </label>
+      <label>
+        <span>Collaboration Notes</span>
+        <textarea id="eventCollaborationNotes" placeholder="Short internal note about the collaboration, host club, or RCPH's role."></textarea>
+      </label>
+    </div>
+  </section>
+
   <section class="bod-form-section">
     <div class="section-head">
       <h3>Date &amp; Time</h3>
@@ -366,6 +398,38 @@ if (kpiAvs) {
           </label>
         </div>
         
+        <section class="bod-form-section collaboration-section edit-collaboration-section">
+          <div class="section-head">
+            <h3>Event Ownership &amp; Collaboration</h3>
+          </div>
+          <p class="collab-helper">This information is used for internal reports only and will not be shown publicly.</p>
+          <div class="form-grid-row row-split-2-1">
+            <label class="adm-field">
+              <span>RCPH Role in Event</span>
+              <select id="editEventRcphRole">
+                <option value="host">Host Club</option>
+                <option value="cohost">Co-host</option>
+                <option value="collaborator">Collaborating Club</option>
+                <option value="participant">Participating Club</option>
+              </select>
+            </label>
+            <label class="adm-field">
+              <span>Host Club / Primary Organizer</span>
+              <input id="editEventHostClub" type="text">
+            </label>
+          </div>
+          <div class="form-grid-row row-split-2">
+            <label class="adm-field">
+              <span>Collaborating Clubs / Partners</span>
+              <textarea id="editEventCollaboratorsText" rows="5" placeholder="Enter one club/partner per line."></textarea>
+            </label>
+            <label class="adm-field">
+              <span>Collaboration Notes</span>
+              <textarea id="editEventCollaborationNotes" rows="5" placeholder="Optional internal note."></textarea>
+            </label>
+          </div>
+        </section>
+
         <div class="form-grid-row row-split-3">
           <label class="adm-field">
             <span>Start date</span>

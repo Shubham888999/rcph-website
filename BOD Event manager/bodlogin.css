@@ -148,6 +148,10 @@ input[type="time"]::-moz-placeholder {
 .row-split-3 {
   grid-template-columns: repeat(3, 1fr);
 }
+/* For paired text areas */
+.row-split-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 /* For Description + Avenues */
 .row-split-tall {
   grid-template-columns: 2fr 1fr;
@@ -164,6 +168,7 @@ input[type="time"]::-moz-placeholder {
 /* On mobile, stack everything into a single column */
 @media (max-width: 768px) {
   .row-split-2-1,
+  .row-split-2,
   .row-split-3,
   .row-split-tall {
     grid-template-columns: 1fr;
@@ -535,6 +540,59 @@ input[type="time"]::-moz-placeholder {
   background: linear-gradient(180deg, rgba(18,18,18,.9), rgba(12,12,12,.94));
 }
 
+.collaboration-section {
+  border-color: rgba(96,195,196,.25);
+  background:
+    linear-gradient(145deg, rgba(96,195,196,.06), rgba(18,18,18,.92)),
+    #101010;
+}
+
+.collab-helper {
+  margin: 0;
+  color: #9fb9bd;
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.collaboration-section textarea {
+  min-height: 120px;
+}
+
+.collab-block {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(96,195,196,.2);
+  border-radius: 10px;
+  background: rgba(96,195,196,.06);
+  color: #d8e8ea;
+  font-size: .92rem;
+  line-height: 1.45;
+}
+
+.collab-block strong {
+  color: #f4d98b;
+}
+
+.collab-partners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.collab-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(244,180,58,.28);
+  background: rgba(244,180,58,.08);
+  color: #f6e6b5;
+  overflow-wrap: anywhere;
+}
+
 .section-head {
   display: flex;
   align-items: center;
@@ -749,6 +807,7 @@ body {
 
   .form-grid-row,
   .row-split-2-1,
+  .row-split-2,
   .row-split-3,
   .row-split-tall {
     grid-template-columns: 1fr !important;

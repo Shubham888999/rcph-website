@@ -88,6 +88,7 @@ exports.resetPasswordWithOtp = functions.https.onCall(async (data) => {
 const ACTIVE_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
 const REQUESTABLE_ROLES = new Set(['gbm', 'bod', 'admin']);
 const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin']);
+const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
 
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
@@ -261,11 +262,38 @@ function normalizeEventType(value, fallback = 'clubEvent') {
   return allowed.has(cleaned) ? cleaned : fallback;
 }
 
+function normalizeRcphRole(value) {
+  const cleaned = normalizeText(value, 40).toLowerCase();
+  const allowed = new Set(['host', 'cohost', 'collaborator', 'participant']);
+  return allowed.has(cleaned) ? cleaned : 'host';
+}
+
+function normalizeCollaborators(value) {
+  const input = Array.isArray(value) ? value : [];
+  const seen = new Set();
+  const out = [];
+
+  input.forEach((item) => {
+    const rawName = typeof item === 'string' ? item : item?.name;
+    const rawType = typeof item === 'object' ? item?.type : '';
+    const name = normalizeText(rawName, 180).replace(/\s+/g, ' ');
+    const type = normalizeText(rawType || 'unspecified', 60).replace(/\s+/g, ' ') || 'unspecified';
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    out.push({ name, type });
+  });
+
+  return out.slice(0, 20);
+}
+
 function timestampCreatedAt(existing, now) {
   return existing.createdAt || now;
 }
 
 function normalizeBodEventPayload(raw) {
+  const hasCollaborationFields = ['rcphRole', 'hostClub', 'collaborators', 'collaborationNotes']
+    .some(field => Object.prototype.hasOwnProperty.call(raw || {}, field));
   const name = normalizeText(raw.name, 180);
   const conductedBy = normalizeText(raw.conductedBy, 140);
   const date = normalizeText(raw.date || raw.eventStart, 20);
@@ -286,8 +314,31 @@ function normalizeBodEventPayload(raw) {
   const source = normalizeText(raw.source, 80);
   const type = normalizeEventType(raw.type, 'clubEvent');
   const visibility = normalizeVisibility(raw.visibility, 'public');
+  const rcphRole = normalizeRcphRole(raw.rcphRole);
+  const hostClub = normalizeText(raw.hostClub, 180).replace(/\s+/g, ' ') || RCPH_CLUB_NAME;
+  const collaborators = normalizeCollaborators(raw.collaborators);
+  const collaborationNotes = normalizeText(raw.collaborationNotes, 1000);
 
-  return { name, conductedBy, date, endDate, time, desc, avenue, imageLinks, driveLinks, driveFolder, source, type, visibility };
+  return {
+    name,
+    conductedBy,
+    date,
+    endDate,
+    time,
+    desc,
+    avenue,
+    imageLinks,
+    driveLinks,
+    driveFolder,
+    source,
+    type,
+    visibility,
+    rcphRole,
+    hostClub,
+    collaborators,
+    collaborationNotes,
+    _hasCollaborationFields: hasCollaborationFields,
+  };
 }
 
 function normalizeClubEventPayload(raw, userProfile, source = 'adminAttendanceManager') {
@@ -476,6 +527,19 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
   const source = payload.source || existingBod.source || existingEvent.source || 'bodEventManager';
   const type = normalizeEventType(payload.type || existingBod.type || existingEvent.type, 'clubEvent');
   const visibility = normalizeVisibility(payload.visibility || existingBod.visibility || existingEvent.visibility, 'public');
+  const shouldUsePayloadCollab = payload._hasCollaborationFields || (!bodSnap.exists && !eventSnap.exists);
+  const rcphRole = shouldUsePayloadCollab
+    ? (payload.rcphRole || 'host')
+    : normalizeRcphRole(existingBod.rcphRole || existingEvent.rcphRole);
+  const hostClub = shouldUsePayloadCollab
+    ? (payload.hostClub || RCPH_CLUB_NAME)
+    : (normalizeText(existingBod.hostClub || existingEvent.hostClub, 180).replace(/\s+/g, ' ') || RCPH_CLUB_NAME);
+  const collaborators = shouldUsePayloadCollab
+    ? (payload.collaborators || [])
+    : normalizeCollaborators(existingBod.collaborators || existingEvent.collaborators || []);
+  const collaborationNotes = shouldUsePayloadCollab
+    ? (payload.collaborationNotes || '')
+    : normalizeText(existingBod.collaborationNotes || existingEvent.collaborationNotes, 1000);
 
   const bodEventDoc = {
     name: payload.name,
@@ -499,6 +563,10 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     source,
     type,
     visibility,
+    rcphRole,
+    hostClub,
+    collaborators,
+    collaborationNotes,
     archived: false,
     createdBy: existingBod.createdBy || uid,
     createdByEmail: existingBod.createdByEmail || userProfile.email,
@@ -518,6 +586,10 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     bodEventId: eventId,
     type,
     visibility,
+    rcphRole,
+    hostClub,
+    collaborators,
+    collaborationNotes,
     conductedBy: payload.conductedBy,
     createdBy: existingEvent.createdBy || uid,
     createdAt: preserveCreatedAt ? timestampCreatedAt(existingEvent, now) : now,

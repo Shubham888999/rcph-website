@@ -17,6 +17,7 @@
     <a href="my-dashboard.html" data-admin-quick-nav hidden>My Dashboard</a>
     <a href="BOD%20Event%20manager/bodlogin.html" data-admin-quick-nav hidden>BOD Panel</a>
     <a href="#attendance">Attendance Manager</a>
+    <a href="#collaborationReports">Collaboration Reports</a>
     <a href="#districtAttendance">District Event Attendance</a>
     <a href="#bod">BOD Attendance</a>
     <a href="#fines">Fines</a>
@@ -432,6 +433,90 @@
   </table>
 </div>
 </div>-->
+
+  <div class="admin-card collaboration-reports-card is-collapsed" id="collaborationReports" style="margin-top:20px;">
+    <div id="collaborationReportsCard" class="collaboration-reports-header">
+      <div class="collaboration-reports-title">
+        <h2>Collaboration Reports</h2>
+        <p>Internal event ownership and collaboration analytics</p>
+      </div>
+      <div class="collaboration-reports-controls">
+        <span id="collaborationReportsBadge" class="badge">Internal</span>
+        <button
+          id="collaborationReportsToggle"
+          class="btn btn-outline"
+          type="button"
+          aria-expanded="false"
+          aria-controls="collaborationReportsBody">
+          <span id="collaborationReportsToggleText">Show Reports</span>
+          <span id="collaborationReportsChevron" class="collaboration-reports-chevron" aria-hidden="true">▾</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="collaborationReportsBody" class="collaboration-reports-body" hidden>
+      <div class="topbar collab-body-topbar">
+        <h3>Detailed Collaboration Report</h3>
+        <button id="exportCollabXlsxBtn" class="btn">Export to Excel</button>
+      </div>
+
+      <div class="toolbar collab-report-filters">
+        <select id="collabMonthFilter" aria-label="Filter collaboration reports by month">
+          <option value="">All months</option>
+        </select>
+        <select id="collabAvenueFilter" aria-label="Filter collaboration reports by avenue">
+          <option value="">All avenues</option>
+        </select>
+        <select id="collabRoleFilter" aria-label="Filter collaboration reports by RCPH role">
+          <option value="">All Roles</option>
+          <option value="host">Host Club</option>
+          <option value="cohost">Co-host</option>
+          <option value="collaborator">Collaborating Club</option>
+          <option value="participant">Participating Club</option>
+        </select>
+        <input id="collabSearch" type="text" placeholder="Search event, host, collaborator&hellip;" />
+      </div>
+
+      <div class="toolbar collab-kpis" style="gap:14px; align-items:stretch;">
+        <div class="kpi"><div class="kpi-label">Total Events</div><div class="kpi-value" id="collabTotalEvents">0</div></div>
+        <div class="kpi"><div class="kpi-label">Hosted by RCPH</div><div class="kpi-value" id="collabHostedCount">0</div></div>
+        <div class="kpi"><div class="kpi-label">Co-hosted</div><div class="kpi-value" id="collabCohostedCount">0</div></div>
+        <div class="kpi"><div class="kpi-label">Collaborations</div><div class="kpi-value" id="collabCollaboratorCount">0</div></div>
+        <div class="kpi"><div class="kpi-label">Participated</div><div class="kpi-value" id="collabParticipantCount">0</div></div>
+        <div class="kpi"><div class="kpi-label">Unique Partners</div><div class="kpi-value" id="collabUniquePartners">0</div></div>
+      </div>
+
+      <div class="collab-chart-grid">
+        <div class="chart-wrap">
+          <div class="chart-title">Events by RCPH Role</div>
+          <canvas id="collabRoleChart"></canvas>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">Events by Avenue</div>
+          <canvas id="collabAvenueChart"></canvas>
+        </div>
+      </div>
+
+      <div class="grid-wrap">
+        <table class="att collab-report-table">
+          <thead>
+            <tr>
+              <th style="min-width:220px;">Event</th>
+              <th style="min-width:120px;">Date</th>
+              <th style="min-width:140px;">Avenue</th>
+              <th style="min-width:150px;">RCPH Role</th>
+              <th style="min-width:220px;">Host Club</th>
+              <th style="min-width:260px;">Collaborators</th>
+              <th style="min-width:180px;">Created By</th>
+            </tr>
+          </thead>
+          <tbody id="collabReportBody">
+            <tr><td colspan="7">Loading collaboration reports...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 
   </div>
