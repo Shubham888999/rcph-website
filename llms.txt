@@ -14,6 +14,7 @@ Parent Rotary connection: Rotary Club of Pune Heritage
 - [Home](https://rcph3131.org/) - Overview of Rotaract Club of Pune Heritage, featured projects, public calendar, gallery, and contact details.
 - [About](https://rcph3131.org/about.html) - Club history, theme, logo meaning, Rotary and Rotaract background.
 - [Events](https://rcph3131.org/events.html) - Public RCPH events, upcoming activities, recent events, and avenue-wise activities.
+- [Event Stories and Reports](https://rcph3131.org/events/example-event.html) - Example public event report page. The `/events/` folder contains individual public event stories and reports for selected RCPH initiatives.
 - [Projects](https://rcph3131.org/projects.html) - Public project stories including Project EduReach, Pages of Hope, Sports RYLA, Cultural Exchange, Club Assembly, and Samyati 3.0.
 - [Join](https://rcph3131.org/join.html) - Information for students, young professionals, volunteers, and people interested in joining RCPH.
 - [Contact](https://rcph3131.org/contact.html) - Contact and collaboration information for NGOs, colleges, Rotary clubs, sponsors, students, and volunteers.
@@ -38,6 +39,8 @@ Parent Rotary connection: Rotary Club of Pune Heritage
 ## Public Content Notes
 
 The public pages listed above are safe for crawling and summarization. They describe the club, public events, projects, membership, collaboration opportunities, and leadership.
+
+The `/events/` folder is for public event report pages. `events/template.html` is a reusable noindex editing template and should not be treated as a published event story.
 
 Private or internal pages should not be used for public summaries:
 - https://rcph3131.org/admin.html
