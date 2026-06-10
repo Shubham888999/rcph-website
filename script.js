@@ -62,8 +62,8 @@ const AW_ALBUMS = [
   {
     id: "personal-branding",
     title: "Personal Branding 101",
-    cover: "images/branding101.jpg",
-    photos: [ "images/branding101.jpg" ]
+    cover: "images/branding101.webp",
+    photos: [ "images/branding101.webp" ]
   },
   {
     id: "club-assembly",
@@ -83,7 +83,7 @@ const AW_ALBUMS = [
     cover: "images/poh.jpg",
     photos: [
       "images/poh3.jpg",
-      "images/poh4.jpg",
+      "images/poh4.webp",
       "images/poh1.jpg"
     ]
   }

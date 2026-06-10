@@ -94,7 +94,7 @@ body {
     min-height: 100vh;
     background:
       linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
-      url('images/group.jpeg') top/cover no-repeat;
+      url('images/group.webp') top/cover no-repeat;
     padding: 0 20px;
   }
   .hero-content {
@@ -2544,7 +2544,7 @@ body[data-rcph-page="home"] .hero-banner::after {
 
 body[data-rcph-page="home"] .hero-banner::before {
   z-index: 0;
-  background: url('images/group.jpeg') top/cover no-repeat;
+  background: url('images/group.webp') top/cover no-repeat;
   transform: translate3d(0, var(--rcph-hero-bg-y), 0) scale(var(--rcph-hero-bg-scale));
   transform-origin: center top;
   will-change: transform;
