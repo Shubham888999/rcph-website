@@ -22,7 +22,9 @@
     dynamicObserved: new WeakSet(),
     dynamicObservers: [],
     homepageGalleryObserved: false,
-    homepageProjectTiltReady: false
+    homepageProjectTiltReady: false,
+    bodShowcaseReady: false,
+    bodTiltReady: false
   };
 
   function onReady(callback) {
@@ -74,6 +76,13 @@
     var pageName = body ? body.getAttribute('data-rcph-page') : '';
     var path = window.location.pathname.split('/').pop().toLowerCase();
     return pageName === 'home' || path === '' || path === 'index.html';
+  }
+
+  function isBodPage() {
+    var body = document.body;
+    var pageName = body ? body.getAttribute('data-rcph-page') : '';
+    var path = window.location.pathname.split('/').pop().toLowerCase();
+    return pageName === 'bod' || path === 'bod.html';
   }
 
   function track(animation) {
@@ -1032,6 +1041,432 @@
     }));
   }
 
+  function initBodCardTilt(cards) {
+    if (state.bodTiltReady || state.reduceMotion || isSmallScreen() || !hasGsap()) {
+      return;
+    }
+
+    state.bodTiltReady = true;
+    var gsap = getGsap();
+
+    cards.forEach(function (card) {
+      card.addEventListener('pointermove', function (event) {
+        var rect = card.getBoundingClientRect();
+        var relX = (event.clientX - rect.left) / Math.max(1, rect.width) - 0.5;
+        var relY = (event.clientY - rect.top) / Math.max(1, rect.height) - 0.5;
+
+        card.style.setProperty('--rcph-bod-shine-x', String((relX + 0.5) * 100) + '%');
+        card.style.setProperty('--rcph-bod-shine-y', String((relY + 0.5) * 100) + '%');
+
+        gsap.to(card, {
+          rotateX: relY * -3.5,
+          rotateY: relX * 4,
+          y: -6,
+          scale: 1.012,
+          duration: 0.24,
+          ease: 'power2.out',
+          overwrite: true
+        });
+      });
+
+      card.addEventListener('pointerleave', function () {
+        card.style.removeProperty('--rcph-bod-shine-x');
+        card.style.removeProperty('--rcph-bod-shine-y');
+
+        gsap.to(card, {
+          rotateX: 0,
+          rotateY: 0,
+          y: 0,
+          scale: 1,
+          duration: 0.42,
+          ease: 'power3.out',
+          overwrite: true,
+          onComplete: function () {
+            gsap.set(card, { clearProps: 'transform' });
+          }
+        });
+      });
+    });
+  }
+
+  function initBodHeroIntro() {
+    var hero = document.getElementById('bod');
+    if (!hero || state.reduceMotion || !hasGsap()) {
+      revealAll(hero || document);
+      return;
+    }
+
+    var gsap = getGsap();
+    var heroItems = toArray('.bod-leadership-badge, .seo-section-heading, .bod-leadership-intro', hero);
+
+    state.prepared.add(hero);
+    heroItems.forEach(function (item) {
+      state.prepared.add(item);
+      item.classList.add('rcph-animating');
+    });
+
+    gsap.set(hero, {
+      autoAlpha: 0,
+      y: isSmallScreen() ? 18 : 34,
+      scale: 0.985,
+      '--rcph-bod-panel-glow': 0.32,
+      willChange: 'opacity, transform'
+    });
+
+    gsap.set(heroItems, {
+      autoAlpha: 0,
+      y: isSmallScreen() ? 16 : 28,
+      willChange: 'opacity, transform'
+    });
+
+    track(gsap.timeline({
+      defaults: {
+        ease: 'power3.out'
+      },
+      onStart: function () {
+        hero.classList.add('rcph-animating');
+      },
+      onComplete: function () {
+        finishElement(hero);
+        finishElements(heroItems);
+      }
+    })
+      .to(hero, {
+        autoAlpha: 1,
+        y: 0,
+        scale: 1,
+        duration: 0.9
+      }, 0)
+      .to(hero, {
+        '--rcph-bod-panel-glow': 1,
+        duration: 1.35
+      }, 0.05)
+      .to(heroItems, {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.78,
+        stagger: 0.12
+      }, 0.18));
+  }
+
+  function initBodAccentProgress() {
+    var page = document.querySelector('.bod-showcase-page');
+    if (!page || !canUseScrollAnimations() || !window.ScrollTrigger) {
+      return;
+    }
+
+    document.body.style.setProperty('--rcph-bod-accent-progress', '0.12');
+
+    track(window.ScrollTrigger.create({
+      trigger: page,
+      start: 'top 80%',
+      end: 'bottom bottom',
+      scrub: 0.35,
+      onUpdate: function (self) {
+        document.body.style.setProperty(
+          '--rcph-bod-accent-progress',
+          String(Math.max(0.12, self.progress).toFixed(3))
+        );
+      }
+    }));
+  }
+
+  function initBodTitleProgress(root) {
+    if (!canUseScrollAnimations()) {
+      return;
+    }
+
+    var gsap = getGsap();
+
+    toArray('.bod-section-title', root).forEach(function (title) {
+      gsap.set(title, { '--rcph-bod-title-line': 0 });
+
+      track(gsap.to(title, {
+        '--rcph-bod-title-line': 1,
+        duration: 0.85,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: title,
+          start: 'top 84%',
+          once: true
+        }
+      }));
+    });
+  }
+
+  function initBodSectionPanels(root) {
+    if (!canUseScrollAnimations()) {
+      return;
+    }
+
+    var gsap = getGsap();
+    var sections = toArray('.bod-showcase-section', root).filter(function (section) {
+      return section.id !== 'bod';
+    });
+
+    sections.forEach(function (section, index) {
+      if (state.prepared.has(section)) {
+        return;
+      }
+
+      state.prepared.add(section);
+      gsap.set(section, {
+        autoAlpha: 0,
+        x: !isSmallScreen() ? (index % 2 === 0 ? -16 : 16) : 0,
+        y: isSmallScreen() ? 22 : 42,
+        scale: 0.982,
+        willChange: 'opacity, transform'
+      });
+
+      track(gsap.to(section, {
+        autoAlpha: 1,
+        x: 0,
+        y: 0,
+        scale: 1,
+        duration: 0.9,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: section,
+          start: 'top 94%',
+          once: true
+        },
+        onStart: function () {
+          section.classList.add('rcph-animating');
+        },
+        onComplete: function () {
+          finishElement(section);
+        }
+      }));
+    });
+  }
+
+  function getBodCardFromVars(index, total) {
+    if (isSmallScreen()) {
+      return {
+        autoAlpha: 0,
+        x: 0,
+        y: 24,
+        scale: 0.98,
+        rotationY: 0
+      };
+    }
+
+    var columns = Math.min(4, Math.max(1, total));
+    var column = index % columns;
+    var firstRow = index < columns;
+    var fromVars = {
+      autoAlpha: 0,
+      x: index % 2 === 0 ? -18 : 18,
+      y: 36,
+      scale: 0.975,
+      rotationY: 0
+    };
+
+    if (firstRow) {
+      if (column === 0) {
+        fromVars.x = -74;
+        fromVars.rotationY = -5;
+      } else if (column === columns - 1) {
+        fromVars.x = 74;
+        fromVars.rotationY = 5;
+      } else {
+        fromVars.x = 0;
+        fromVars.y = 58;
+      }
+    }
+
+    return fromVars;
+  }
+
+  function initBodLeadershipWall(root) {
+    var wall = document.querySelector('.bod-leadership-wall');
+    if (!wall || !canUseScrollAnimations()) {
+      return;
+    }
+
+    var gsap = getGsap();
+    var cards = toArray('.bod-card', wall).filter(function (card) {
+      return !state.prepared.has(card);
+    });
+
+    if (!cards.length) {
+      return;
+    }
+
+    cards.forEach(function (card, index) {
+      state.prepared.add(card);
+      card.classList.add('rcph-bod-card');
+
+      gsap.set(card, Object.assign(getBodCardFromVars(index, cards.length), {
+        transformPerspective: 900,
+        willChange: 'opacity, transform'
+      }));
+    });
+
+    track(gsap.to(cards, {
+      autoAlpha: 1,
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotationY: 0,
+      duration: 0.92,
+      ease: 'power3.out',
+      stagger: {
+        each: isSmallScreen() ? 0.045 : 0.07,
+        grid: 'auto',
+        from: 'start'
+      },
+      scrollTrigger: {
+        trigger: wall,
+        start: 'top 94%',
+        once: true
+      },
+      onStart: function () {
+        cards.forEach(function (card) {
+          card.classList.add('rcph-animating');
+        });
+      },
+      onComplete: function () {
+        finishElements(cards);
+      }
+    }));
+  }
+
+  function initBodCouncilCards(root) {
+    if (!canUseScrollAnimations()) {
+      return;
+    }
+
+    var gsap = getGsap();
+
+    toArray('#district-council, #searic-council', root).forEach(function (section) {
+      var cards = toArray('.bod-card', section).filter(function (card) {
+        return !state.prepared.has(card);
+      });
+
+      if (!cards.length) {
+        return;
+      }
+
+      cards.forEach(function (card) {
+        state.prepared.add(card);
+        card.classList.add('rcph-bod-card');
+        gsap.set(card, {
+          autoAlpha: 0,
+          y: isSmallScreen() ? 18 : 30,
+          scale: 0.965,
+          willChange: 'opacity, transform'
+        });
+      });
+
+      track(gsap.to(cards, {
+        autoAlpha: 1,
+        y: 0,
+        scale: 1,
+        duration: 0.84,
+        ease: 'power3.out',
+        stagger: 0.08,
+        scrollTrigger: {
+          trigger: section,
+          start: 'top 94%',
+          once: true
+        },
+        onStart: function () {
+          cards.forEach(function (card) {
+            card.classList.add('rcph-animating');
+          });
+        },
+        onComplete: function () {
+          finishElements(cards);
+        }
+      }));
+    });
+  }
+
+  function initBodContactReveal(root) {
+    var contact = document.getElementById('contact');
+    if (!contact || !canUseScrollAnimations()) {
+      return;
+    }
+
+    var gsap = getGsap();
+    var items = toArray('.contact-card, #contact > p', root).filter(function (item) {
+      return !state.prepared.has(item);
+    });
+
+    if (!items.length) {
+      return;
+    }
+
+    items.forEach(function (item) {
+      state.prepared.add(item);
+      gsap.set(item, {
+        autoAlpha: 0,
+        y: isSmallScreen() ? 16 : 26,
+        scale: item.classList.contains('contact-card') ? 0.975 : 1,
+        willChange: 'opacity, transform'
+      });
+    });
+
+    track(gsap.to(items, {
+      autoAlpha: 1,
+      y: 0,
+      scale: 1,
+      duration: 0.74,
+      ease: 'power3.out',
+      stagger: 0.08,
+      scrollTrigger: {
+        trigger: contact,
+        start: 'top 94%',
+        once: true
+      },
+      onStart: function () {
+        items.forEach(function (item) {
+          item.classList.add('rcph-animating');
+        });
+      },
+      onComplete: function () {
+        finishElements(items);
+      }
+    }));
+  }
+
+  function initBodLeadershipShowcase() {
+    if (!isBodPage()) {
+      return;
+    }
+
+    var root = document.querySelector('body[data-rcph-page="bod"]') || document.body;
+    var cards = toArray('.bod-card', root);
+
+    cards.forEach(function (card) {
+      card.classList.add('rcph-bod-card');
+    });
+
+    if (state.bodShowcaseReady) {
+      initBodCardTilt(cards);
+      return;
+    }
+
+    state.bodShowcaseReady = true;
+    root.classList.add('rcph-bod-showcase-ready');
+
+    if (state.reduceMotion || !hasGsap() || !state.scrollTriggerReady) {
+      revealAll(root);
+      return;
+    }
+
+    initBodHeroIntro();
+    initBodAccentProgress();
+    initBodTitleProgress(root);
+    initBodSectionPanels(root);
+    initBodLeadershipWall(root);
+    initBodCouncilCards(root);
+    initBodContactReveal(root);
+    initBodCardTilt(cards);
+    scheduleRefreshes();
+  }
+
   function initHomepageCinematicAnimations() {
     initHomepageCinematicHero();
     initHomepageScrollProgress();
@@ -1065,6 +1500,11 @@
       return;
     }
 
+    if (isBodPage()) {
+      initBodLeadershipShowcase();
+      return;
+    }
+
     initHeroIntroAnimation();
     initCardStaggerAnimations();
     initScrollRevealAnimations();
@@ -1086,6 +1526,7 @@
     initHomepagePanelTransitions: initHomepagePanelTransitions,
     initHomepageProjectDeck: initHomepageProjectDeck,
     initHomepageGalleryMotion: initHomepageGalleryMotion,
+    initBodLeadershipShowcase: initBodLeadershipShowcase,
     refresh: refreshScrollTriggers
   };
 
