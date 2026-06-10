@@ -45,7 +45,7 @@
   }
   </script>
 </head>
-<body>
+<body data-rcph-page="projects">
   <div class="logo-strip">
     <img src="images/logo1.png" alt="AURA annual theme logo of Rotaract District 3131" class="logo-image" />
     <img src="images/logo2.png" alt="Rotaract District 3131 official logo" class="logo-image logo-large" />
@@ -72,22 +72,22 @@
   </nav>
 
   <main class="content-wrapper seo-page">
-    <section class="section-box seo-hero">
-      <p class="seo-kicker">Community service Pune</p>
-      <h1>Projects by Rotaract Club of Pune Heritage</h1>
-<p>
+    <section class="section-box seo-hero" data-animate-scope="hero">
+      <p class="seo-kicker" data-animate="fade-up">Community service Pune</p>
+      <h1 data-animate="fade-up">Projects by Rotaract Club of Pune Heritage</h1>
+<p data-animate="fade-up">
   Every RCPH project starts with a simple idea: bring people together and do something useful with the time, energy, and skills we have.
   Our projects include education support, fellowship activities, cultural exchanges, leadership experiences, and collaborations with schools, clubs, and communities.
 </p>
-      <div class="page-actions">
+      <div class="page-actions" data-animate-group="stagger" data-animate-children="fade-up">
         <a class="btn-like" href="events.html">See Events</a>
         <a class="btn-like btn-like-outline" href="contact.html">Collaborate</a>
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Featured Project Stories</h2>
-      <div class="projects-grid seo-project-grid">
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Featured Project Stories</h2>
+      <div class="projects-grid seo-project-grid" data-animate-group="alternate" data-animate-children="fade-up" data-rcph-stagger="80">
         <article class="project-card">
           <img src="images/Edureach1.jpg" alt="Project EduReach education support initiative by Rotaract Club of Pune Heritage" loading="lazy" />
           <h3>Project EduReach</h3>
@@ -140,13 +140,13 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Build With Us</h2>
-      <p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Build With Us</h2>
+      <p data-animate="fade-up">
         NGOs, colleges, sponsors and Rotary clubs can work with RCPH on community service Pune projects,
         professional development Pune sessions and Rotaract events Pune.
       </p>
-      <p>Explore <a href="events.html">upcoming events</a>, read the <a href="faq.html">RCPH FAQ</a>, or <a href="contact.html">contact the club</a> for collaborations.</p>
+      <p data-animate="fade-up">Explore <a href="events.html">upcoming events</a>, read the <a href="faq.html">RCPH FAQ</a>, or <a href="contact.html">contact the club</a> for collaborations.</p>
     </section>
   </main>
 
@@ -160,5 +160,8 @@
       });
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="js/public-animations.js" defer></script>
 </body>
 </html>

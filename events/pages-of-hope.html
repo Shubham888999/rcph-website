@@ -124,7 +124,7 @@
   }
   </script>
 </head>
-<body class="event-page">
+<body class="event-page" data-rcph-page="pages-of-hope">
   <div class="logo-strip">
     <img src="../images/logo1.png" alt="AURA annual theme logo of Rotaract District 3131" class="logo-image" />
     <img src="../images/logo2.png" alt="Rotaract District 3131 official logo" class="logo-image logo-large" />
@@ -156,13 +156,13 @@
   </nav>
 
   <main class="event-main">
-    <section class="event-hero" aria-labelledby="event-title">
+    <section class="event-hero" aria-labelledby="event-title" data-animate-scope="hero">
       <div class="event-hero-content">
-        <p class="event-kicker">Community Service</p>
-        <h1 id="event-title">Pages of Hope</h1>
-        <p class="event-summary">A book donation initiative supporting students through access to learning resources and meaningful interaction.</p>
+        <p class="event-kicker" data-animate="fade-up">Community Service</p>
+        <h1 id="event-title" data-animate="fade-up">Pages of Hope</h1>
+        <p class="event-summary" data-animate="fade-up">A book donation initiative supporting students through access to learning resources and meaningful interaction.</p>
 
-        <div class="event-meta-grid" aria-label="Event overview">
+        <div class="event-meta-grid" aria-label="Event overview" data-animate-group="timeline" data-animate-children="fade-up">
           <div class="event-chip">
             <span>Date</span>
             <strong>2025-08-29</strong>
@@ -177,19 +177,19 @@
           </div>
         </div>
 
-        <div class="event-actions" aria-label="Event actions">
+        <div class="event-actions" aria-label="Event actions" data-animate-group="stagger" data-animate-children="fade-up">
           <a class="event-button" href="../events.html">Back to Events</a>
           <a class="event-button secondary" href="../join.html">Join RCPH</a>
           <a class="event-button tertiary" href="../contact.html">Contact Us</a>
         </div>
       </div>
-      <figure class="event-hero-media">
-        <img src="../images/poh.jpg" alt="Pages of Hope book donation initiative by Rotaract Club of Pune Heritage" fetchpriority="high" />
+      <figure class="event-hero-media" data-animate="fade-right">
+        <img src="../images/poh.jpg" alt="Pages of Hope book donation initiative by Rotaract Club of Pune Heritage" fetchpriority="high" data-parallax="soft" />
         <figcaption class="event-caption">Pages of Hope focused on books, learning resources, and student interaction.</figcaption>
       </figure>
     </section>
 
-    <div class="event-story-grid">
+    <div class="event-story-grid" data-animate-group="alternate" data-animate-children="fade-up">
       <section class="event-card" aria-labelledby="summary-heading">
         <p class="event-eyebrow">Event report</p>
         <h2 id="summary-heading">Event Summary</h2>
@@ -252,10 +252,10 @@
       </section>
     </div>
 
-    <section class="event-gallery-section" aria-labelledby="gallery-heading">
-      <h2 id="gallery-heading">Gallery</h2>
-      <p>A few glimpses from the Pages of Hope initiative and its education-focused community service work.</p>
-      <div class="event-gallery">
+    <section class="event-gallery-section" aria-labelledby="gallery-heading" data-animate="scale-in">
+      <h2 id="gallery-heading" data-animate="fade-up">Gallery</h2>
+      <p data-animate="fade-up">A few glimpses from the Pages of Hope initiative and its education-focused community service work.</p>
+      <div class="event-gallery" data-animate-group="stagger" data-animate-children="scale-in">
         <figure>
           <img src="../images/poh.jpg" alt="Pages of Hope event cover with books donated for students" loading="lazy" />
         </figure>
@@ -268,13 +268,13 @@
       </div>
     </section>
 
-    <blockquote class="event-quote">
+    <blockquote class="event-quote" data-animate="fade-up">
       <p>&ldquo;Every event at RCPH is a chance to create, connect, and contribute.&rdquo;</p>
     </blockquote>
 
-    <section class="related-section" aria-labelledby="related-heading">
-      <h2 id="related-heading">Continue Exploring</h2>
-      <div class="related-grid">
+    <section class="related-section" aria-labelledby="related-heading" data-animate="scale-in">
+      <h2 id="related-heading" data-animate="fade-up">Continue Exploring</h2>
+      <div class="related-grid" data-animate-group="stagger" data-animate-children="fade-up">
         <a class="related-card" href="../events.html">
           <strong>View More Events</strong>
           <span>Return to the public RCPH events archive.</span>
@@ -295,11 +295,14 @@
     </section>
   </main>
 
-  <footer class="event-footer">
+  <footer class="event-footer" data-animate="fade-up">
     <p><strong>Rotaract Club of Pune Heritage</strong></p>
     <p>RID 3131 | Zone 4</p>
     <p>Create. Connect. Contribute.</p>
     <p>rcph3131.org</p>
   </footer>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="../js/public-animations.js" defer></script>
 </body>
 </html>

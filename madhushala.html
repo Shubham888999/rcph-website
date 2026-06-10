@@ -87,7 +87,7 @@
   </script>
 </head>
 
-<body class="m4-body">
+<body class="m4-body" data-rcph-page="madhushala">
   <div class="logo-strip">
     <img src="images/logo1.png" alt="AURA Logo Year Theme" class="logo-image" />
     <img src="images/logo2.png" alt="Rotaract District 3131 Logo" class="logo-image logo-large" />
@@ -116,18 +116,20 @@
   </nav>
 
   <main class="m4-main">
-    <header class="m4-hero">
+    <header class="m4-hero" data-animate-scope="hero">
       <h1 class="seo-visually-hidden">Madhushala 4.0</h1>
       <img
         src="images/madhushala-hero.png"
         alt="Madhushala 4.0 flagship Rotaract event in Pune by Rotaract Club of Pune Heritage"
         class="m4-hero-img"
+        data-animate="scale-in"
+        data-parallax="soft"
         loading="eager"
       />
 
-      <p class="m4-subtitle">Flagship Wine-Making Experience • Rotaract Club of Pune Heritage (RID 3131)</p>
+      <p class="m4-subtitle" data-animate="fade-up">Flagship Wine-Making Experience • Rotaract Club of Pune Heritage (RID 3131)</p>
 
-      <div class="m4-hero-actions">
+      <div class="m4-hero-actions" data-animate-group="stagger" data-animate-children="fade-up">
         <a class="m4-cta" href="https://forms.gle/qHvExahdQNysAq7m8" target="_blank" rel="noopener">
           Register Now →
         </a>
@@ -135,16 +137,16 @@
       </div>
     </header>
 
-    <section id="timeline" class="m4-section m4-fade">
-      <h2>Event Dates</h2>
-      <div class="m4-pills">
+    <section id="timeline" class="m4-section m4-fade" data-animate="scale-in">
+      <h2 data-animate="fade-up">Event Dates</h2>
+      <div class="m4-pills" data-animate-group="timeline" data-animate-children="fade-up">
         <div class="m4-pill"><b>4 Apr 2026</b><span>Kickoff Session</span></div>
         <div class="m4-pill"><b>11 Apr 2026</b><span>Follow-up Session</span></div>
         <div class="m4-pill"><b>Collection Day</b><span>Shared after registration</span></div>
       </div>
     </section>
 
-    <section id="details" class="m4-section m4-grid m4-fade">
+    <section id="details" class="m4-section m4-grid m4-fade" data-animate-group="alternate" data-animate-children="fade-up">
       <div class="m4-card">
         <h2>What is Madhushala 4.0?</h2>
         <p>
@@ -187,7 +189,7 @@
       </div>
     </section>-->
 
-    <footer class="m4-footer m4-fade">
+    <footer class="m4-footer m4-fade" data-animate="fade-up">
       <p>© Rotaract Club of Pune Heritage (RID 3131)</p>
       <p><a href="index.html">Back to main website</a></p>
     </footer>
@@ -228,5 +230,8 @@
       items.forEach((el) => obs.observe(el));
     })();
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="js/public-animations.js" defer></script>
 </body>
 </html>

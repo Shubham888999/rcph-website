@@ -45,7 +45,7 @@
   }
   </script>
 </head>
-<body>
+<body data-rcph-page="join">
   <div class="logo-strip">
     <img src="images/logo1.png" alt="AURA annual theme logo of Rotaract District 3131" class="logo-image" />
     <img src="images/logo2.png" alt="Rotaract District 3131 official logo" class="logo-image logo-large" />
@@ -72,30 +72,30 @@
   </nav>
 
   <main class="content-wrapper seo-page">
-    <section class="section-box seo-hero">
-      <p class="seo-kicker">Join Rotaract in Pune</p>
-      <h1>Join Rotaract Club of Pune Heritage</h1>
-      <p>
+    <section class="section-box seo-hero" data-animate-scope="hero">
+      <p class="seo-kicker" data-animate="fade-up">Join Rotaract in Pune</p>
+      <h1 data-animate="fade-up">Join Rotaract Club of Pune Heritage</h1>
+      <p data-animate="fade-up">
         Rotaract Club of Pune Heritage welcomes students and young professionals who want to create impact,
         connect with people and contribute to community service in Pune under RID 3131.
       </p>
-      <div class="page-actions">
+      <div class="page-actions" data-animate-group="stagger" data-animate-children="fade-up">
         <a class="btn-like" href="login.html">Create Member Account</a>
         <a class="btn-like btn-like-outline" href="contact.html">Ask a Question</a>
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Who Can Join?</h2>
-<p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Who Can Join?</h2>
+<p data-animate="fade-up">
   If you are a student or young professional in Pune and want to be part of service projects, events, friendships, and leadership opportunities, you can explore membership with RCPH.
   Rotaract is for people who want to learn outside the classroom and contribute beyond their routine.
 </p>
     </section>
 
-    <section class="section-box">
-      <h2>Why Join RCPH?</h2>
-      <div class="seo-grid">
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Why Join RCPH?</h2>
+      <div class="seo-grid" data-animate-group="stagger" data-animate-children="fade-up">
         <article class="seo-card">
           <h3>Community Service</h3>
           <p>Work on meaningful projects with schools, communities, NGOs and local partners in Pune.</p>
@@ -111,12 +111,12 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>How to Apply or Volunteer</h2>
-<p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">How to Apply or Volunteer</h2>
+<p data-animate="fade-up">
   You can start by creating a member account or by contacting us first if you have questions. Club members can create an account directly.
 </p>
-<p>
+<p data-animate="fade-up">
   For membership, volunteering, or collaboration questions, visit the <a href="contact.html">Contact page</a>.
   You can also read the <a href="faq.html">RCPH FAQ</a> for quick answers about the club, membership, and website access.
 </p>
@@ -133,5 +133,8 @@
       });
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="js/public-animations.js" defer></script>
 </body>
 </html>

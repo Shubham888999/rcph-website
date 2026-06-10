@@ -45,7 +45,7 @@
   }
   </script>
 </head>
-<body>
+<body data-rcph-page="events">
   <div class="logo-strip">
     <img src="images/logo1.png" alt="AURA annual theme logo of Rotaract District 3131" class="logo-image" />
     <img src="images/logo2.png" alt="Rotaract District 3131 official logo" class="logo-image logo-large" />
@@ -72,26 +72,26 @@
   </nav>
 
   <main class="content-wrapper seo-page">
-    <section class="section-box seo-hero">
-      <p class="seo-kicker">Rotaract events Pune</p>
-      <h1>Events by Rotaract Club of Pune Heritage</h1>
-<p>
+    <section class="section-box seo-hero" data-animate-scope="hero">
+      <p class="seo-kicker" data-animate="fade-up">Rotaract events Pune</p>
+      <h1 data-animate="fade-up">Events by Rotaract Club of Pune Heritage</h1>
+<p data-animate="fade-up">
   Our events range from service drives and General Meetings to workshops, fellowships, district initiatives, and collaborations across Pune.
   Some events are about giving back, some are about learning, and some are simply about bringing people together.
   Through each one, RCPH tries to create spaces where young people can lead, participate, and feel connected.
 </p>
-      <div class="page-actions">
+      <div class="page-actions" data-animate-group="stagger" data-animate-children="fade-up">
         <a class="btn-like" href="join.html">Attend or Join</a>
         <a class="btn-like btn-like-outline" href="projects.html">See Projects</a>
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Upcoming Events</h2>
-      <p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Upcoming Events</h2>
+      <p data-animate="fade-up">
   Upcoming Events from the RCPH Calendar.
 </p>
-      <div id="upcomingEvents" class="event-list">
+      <div id="upcomingEvents" class="event-list" data-animate-group="timeline" data-animate-children="fade-up" data-animate-dynamic="true">
         <article class="event-row">
           <h3>RCPH public calendar</h3>
           <p>Loading upcoming Rotaract events in Pune...</p>
@@ -99,12 +99,12 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Recent Events</h2>
-      <p><p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Recent Events</h2>
+      <p data-animate="fade-up">
   A quick look at the events and activities recently added to the public RCPH calendar.
-</p></p>
-      <div id="recentEvents" class="event-list">
+</p>
+      <div id="recentEvents" class="event-list" data-animate-group="timeline" data-animate-children="fade-up" data-animate-dynamic="true">
         <article class="event-row">
           <h3>Recent public events</h3>
           <p>Loading recent event highlights...</p>
@@ -112,12 +112,12 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Event Stories &amp; Reports</h2>
-      <p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Event Stories &amp; Reports</h2>
+      <p data-animate="fade-up">
         Read polished public reports from selected RCPH events, service initiatives, collaborations, and club experiences.
       </p>
-      <div class="seo-grid">
+      <div class="seo-grid" data-animate-group="stagger" data-animate-children="fade-up">
         <article class="seo-card">
           <p class="seo-kicker">Community Service</p>
           <h3>Pages of Hope</h3>
@@ -127,12 +127,12 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Avenue-wise Events</h2>
-      <p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Avenue-wise Events</h2>
+      <p data-animate="fade-up">
         RCPH events are organized across International Service, Community Service, Club Service, Professional Development and many other avenues.
       </p>
-      <div id="avenueEvents" class="seo-grid">
+      <div id="avenueEvents" class="seo-grid" data-animate-group="stagger" data-animate-children="fade-up">
         <article class="seo-card">
           <h3>Community Service</h3>
           <p>Service projects and collaborations that address local needs in Pune.</p>
@@ -148,12 +148,12 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>How to Attend or Collaborate</h2>
-<p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">How to Attend or Collaborate</h2>
+<p data-animate="fade-up">
   Anyone can join as members or volunteers. Colleges, NGOs, Rotary clubs, sponsors, and community partners can reach out to collaborate on service projects, sessions, and youth-led initiatives.
 </p>
-<p>
+<p data-animate="fade-up">
   Start with the <a href="join.html">Join page</a>, browse our <a href="projects.html">projects</a>, read the <a href="faq.html">FAQ</a>, or <a href="contact.html">contact RCPH</a> directly.
 </p>
     </section>
@@ -236,5 +236,8 @@
       renderEvents('recentEvents', [], 'Recent public events will appear here after they are added to the RCPH calendar.');
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="js/public-animations.js" defer></script>
 </body>
 </html>

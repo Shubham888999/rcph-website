@@ -54,7 +54,7 @@
     }
   </style>
 </head>
-<body>
+<body data-rcph-page="bod">
 
   <!-- Logo Strip -->
   <div class="logo-strip">
@@ -89,9 +89,9 @@
   <main class="content-wrapper">
 
     <!-- Board of Directors 2025 - 2026 -->
-    <section id="bod" class="section-box">
-      <h1 class="seo-section-heading">Board of Directors 2025 - 2026</h1>
-      <div class="bod-container">
+    <section id="bod" class="section-box" data-animate-scope="hero" data-animate="scale-in">
+      <h1 class="seo-section-heading" data-animate="fade-up">Board of Directors 2025 - 2026</h1>
+      <div class="bod-container" data-animate-group="stagger" data-animate-children="fade-up" data-rcph-stagger="70">
         <!-- President -->
         <div class="bod-card">
           <div class="bod-card-inner">
@@ -350,9 +350,9 @@
       </div>
     </section>
 
-  <section id="district-council" class="section-box">
-    <h2>District 3131 Council Member</h2>
-    <div class="bod-container">
+  <section id="district-council" class="section-box" data-animate="scale-in">
+    <h2 data-animate="fade-up">District 3131 Council Member</h2>
+    <div class="bod-container" data-animate-group="stagger" data-animate-children="fade-up">
       <div class="bod-card">
         <div class="bod-card-inner">
           <!-- Front of the card -->
@@ -369,9 +369,9 @@
   </section>
 
   <!-- SEARIC MDIO Joint Secretary -->
-  <section id="searic-council" class="section-box">
-    <h2>SEARIC MDIO Council Member</h2>
-    <div class="bod-container">
+  <section id="searic-council" class="section-box" data-animate="scale-in">
+    <h2 data-animate="fade-up">SEARIC MDIO Council Member</h2>
+    <div class="bod-container" data-animate-group="stagger" data-animate-children="fade-up">
       <div class="bod-card">
         <div class="bod-card-inner">
           <!-- Front of the card -->
@@ -390,9 +390,9 @@
   </section>
 
     <!-- Contact Us -->
-    <section id="contact" class="section-box">
-      <h2>Contact Us</h2>
-      <div class="contact-cards">
+    <section id="contact" class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Contact Us</h2>
+      <div class="contact-cards" data-animate-group="stagger" data-animate-children="fade-up">
         <div class="contact-card">
           <h3>Rtr. Aneesh Ladkat</h3>
           <p>President</p>
@@ -401,8 +401,8 @@
           <p><a href="tel:+919175935956">+91 91759 35956</a></p>
         </div>
       </div>
-      <p><i class="fas fa-envelope"></i> <a href="mailto:rcpuneheritage3131@gmail.com">rcpuneheritage3131@gmail.com</a></p>
-      <p><i class="fab fa-instagram"></i> <a href="https://instagram.com/rc_pune_heritage/">@rc_pune_heritage</a></p>
+      <p data-animate="fade-up"><i class="fas fa-envelope"></i> <a href="mailto:rcpuneheritage3131@gmail.com">rcpuneheritage3131@gmail.com</a></p>
+      <p data-animate="fade-up"><i class="fab fa-instagram"></i> <a href="https://instagram.com/rc_pune_heritage/">@rc_pune_heritage</a></p>
     </section>
 
   </main>
@@ -415,6 +415,9 @@
       navLinks.classList.toggle('active');
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="js/public-animations.js" defer></script>
 
 </body>
 </html>

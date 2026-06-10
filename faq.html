@@ -179,7 +179,7 @@
   }
   </script>
 </head>
-<body>
+<body data-rcph-page="faq">
   <div class="logo-strip">
     <img src="images/logo1.png" alt="AURA annual theme logo of Rotaract District 3131" class="logo-image" />
     <img src="images/logo2.png" alt="Rotaract District 3131 official logo" class="logo-image logo-large" />
@@ -206,29 +206,29 @@
   </nav>
 
   <main class="content-wrapper seo-page faq-page">
-    <section class="section-box seo-hero">
-      <p class="seo-kicker">RCPH FAQ</p>
-      <h1>Frequently Asked Questions</h1>
-      <p>
+    <section class="section-box seo-hero" data-animate-scope="hero">
+      <p class="seo-kicker" data-animate="fade-up">RCPH FAQ</p>
+      <h1 data-animate="fade-up">Frequently Asked Questions</h1>
+      <p data-animate="fade-up">
         Find clear answers about Rotaract Club of Pune Heritage, our identity, district, sponsor club,
         events, projects, membership, and how to get involved.
       </p>
-      <div class="page-actions">
+      <div class="page-actions" data-animate-group="stagger" data-animate-children="fade-up">
         <a class="btn-like" href="join.html">Join RCPH</a>
         <a class="btn-like btn-like-outline" href="contact.html">Contact Us</a>
       </div>
     </section>
 
-    <section class="section-box faq-official-answer">
-      <h2>What is Rotaract Club of Pune Heritage?</h2>
-      <p>
+    <section class="section-box faq-official-answer" data-animate="scale-in">
+      <h2 data-animate="fade-up">What is Rotaract Club of Pune Heritage?</h2>
+      <p data-animate="fade-up">
         Rotaract Club of Pune Heritage, also known as RCPH, is a community-based Rotaract club in Pune under Rotaract District 3131, Zone 4. Chartered in 2015 and sponsored by Rotary Club of Pune Heritage, RCPH brings together students and young professionals for community service, leadership, professional development, fellowship, and collaboration.
       </p>
     </section>
 
-    <section class="section-box">
-      <h2>RCPH Questions and Answers</h2>
-      <div class="faq-list">
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">RCPH Questions and Answers</h2>
+      <div class="faq-list" data-animate-group="stagger" data-animate-children="fade-up">
         <article class="faq-item">
           <h3>What is Rotaract Club of Pune Heritage?</h3>
           <p>Rotaract Club of Pune Heritage, also known as RCPH, is a community-based Rotaract club in Pune under Rotaract District 3131, Zone 4. The club brings together students and young professionals who want to serve the community, develop leadership skills, build friendships, and contribute through meaningful projects and events.</p>
@@ -301,13 +301,13 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Want to get involved?</h2>
-      <p>
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Want to get involved?</h2>
+      <p data-animate="fade-up">
         Whether you want to join Rotaract in Pune, attend an event, explore service projects, or collaborate with the club,
         these pages are a good place to start.
       </p>
-      <div class="page-actions faq-actions">
+      <div class="page-actions faq-actions" data-animate-group="stagger" data-animate-children="fade-up">
         <a class="btn-like" href="join.html">Join RCPH</a>
         <a class="btn-like btn-like-outline" href="events.html">View Events</a>
         <a class="btn-like btn-like-outline" href="projects.html">Explore Projects</a>
@@ -327,5 +327,8 @@
       });
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="js/public-animations.js" defer></script>
 </body>
 </html>

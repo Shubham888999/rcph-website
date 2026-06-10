@@ -45,7 +45,7 @@
   }
   </script>
 </head>
-<body>
+<body data-rcph-page="contact">
   <div class="logo-strip">
     <img src="images/logo1.png" alt="AURA annual theme logo of Rotaract District 3131" class="logo-image" />
     <img src="images/logo2.png" alt="Rotaract District 3131 official logo" class="logo-image logo-large" />
@@ -72,18 +72,18 @@
   </nav>
 
   <main class="content-wrapper seo-page">
-    <section class="section-box seo-hero">
-      <p class="seo-kicker">Collaborate with RCPH</p>
-      <h1>Contact Rotaract Club of Pune Heritage</h1>
-<p>
+    <section class="section-box seo-hero" data-animate-scope="hero">
+      <p class="seo-kicker" data-animate="fade-up">Collaborate with RCPH</p>
+      <h1 data-animate="fade-up">Contact Rotaract Club of Pune Heritage</h1>
+<p data-animate="fade-up">
   Want to collaborate, volunteer, invite RCPH for a session, or know more about joining the club?
   We would love to hear from NGOs, colleges, sponsors, Rotary and Rotaract clubs, students, and community partners.
 </p>
     </section>
 
-    <section class="section-box">
-      <h2>Collaboration Enquiries</h2>
-      <div class="seo-grid">
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Collaboration Enquiries</h2>
+      <div class="seo-grid" data-animate-group="alternate" data-animate-children="fade-up">
         <article class="seo-card">
           <h3>NGOs and Community Partners</h3>
 <p>
@@ -102,9 +102,9 @@
       </div>
     </section>
 
-    <section class="section-box">
-      <h2>Reach Us</h2>
-      <div class="contact-cards">
+    <section class="section-box" data-animate="scale-in">
+      <h2 data-animate="fade-up">Reach Us</h2>
+      <div class="contact-cards" data-animate-group="stagger" data-animate-children="fade-up">
         <div class="contact-card">
           <h3>Rotaract Club of Pune Heritage</h3>
           <p>RID 3131, Pune, Maharashtra</p>
@@ -112,7 +112,7 @@
           <p><i class="fab fa-instagram"></i> <a href="https://instagram.com/rc_pune_heritage/">@rc_pune_heritage</a></p>
         </div>
       </div>
-      <p>For membership, visit <a href="join.html">Join RCPH</a>. For past work, explore <a href="projects.html">Projects</a> and <a href="events.html">Events</a>. For official club answers, read the <a href="faq.html">RCPH FAQ</a>.</p>
+      <p data-animate="fade-up">For membership, visit <a href="join.html">Join RCPH</a>. For past work, explore <a href="projects.html">Projects</a> and <a href="events.html">Events</a>. For official club answers, read the <a href="faq.html">RCPH FAQ</a>.</p>
     </section>
   </main>
 
@@ -126,5 +126,8 @@
       });
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+  <script src="js/public-animations.js" defer></script>
 </body>
 </html>
