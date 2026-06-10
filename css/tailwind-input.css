@@ -1,0 +1,12 @@
+/*
+  Phase 1 public modernization foundation.
+  Tailwind is scoped with a tw- prefix and preflight is disabled in tailwind.config.js
+  so existing public, admin, auth, dashboard, and BOD styles remain unchanged.
+*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rcph-modern-foundation: 1;
+}
