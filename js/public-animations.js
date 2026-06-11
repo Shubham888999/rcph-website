@@ -23,6 +23,10 @@
     dynamicObservers: [],
     homepageGalleryObserved: false,
     homepageProjectTiltReady: false,
+    homepageAmbientReady: false,
+    homepageAmbientResizeReady: false,
+    homepageAmbientBreakpoint: '',
+    homepageAmbientAnimations: [],
     bodShowcaseReady: false,
     bodTiltReady: false
   };
@@ -1041,6 +1045,360 @@
     }));
   }
 
+  function getHomepageAmbientBreakpoint() {
+    if (typeof window.matchMedia !== 'function') {
+      return 'desktop';
+    }
+
+    if (window.matchMedia('(max-width: 640px)').matches) {
+      return 'mobile';
+    }
+
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      return 'tablet';
+    }
+
+    return 'desktop';
+  }
+
+  function createSeededRandom(seedText) {
+    var seed = 2166136261;
+    var index;
+
+    for (index = 0; index < seedText.length; index += 1) {
+      seed ^= seedText.charCodeAt(index);
+      seed = Math.imul(seed, 16777619);
+    }
+
+    return function () {
+      seed += 0x6D2B79F5;
+      var value = seed;
+      value = Math.imul(value ^ value >>> 15, value | 1);
+      value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+      return ((value ^ value >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function randomBetween(random, min, max) {
+    return min + ((max - min) * random());
+  }
+
+  function chooseAmbientValue(random, values) {
+    return values[Math.floor(random() * values.length) % values.length];
+  }
+
+  function clearHomepageAmbientAnimations() {
+    state.homepageAmbientAnimations.forEach(function (animation) {
+      if (animation && typeof animation.kill === 'function') {
+        animation.kill();
+      }
+    });
+    state.homepageAmbientAnimations = [];
+  }
+
+  function trackHomepageAmbient(animation) {
+    if (animation) {
+      state.homepageAmbientAnimations.push(animation);
+      track(animation);
+    }
+
+    return animation;
+  }
+
+  function getHomepageAmbientSettings(breakpoint) {
+    if (breakpoint === 'mobile') {
+      return {
+        count: 5,
+        wordBudget: 1,
+        centerChance: 0,
+        motionChance: 0.18,
+        sweepCount: 0
+      };
+    }
+
+    if (breakpoint === 'tablet') {
+      return {
+        count: 12,
+        wordBudget: 3,
+        centerChance: 0.08,
+        motionChance: 0.72,
+        sweepCount: 2
+      };
+    }
+
+    return {
+      count: 20,
+      wordBudget: 5,
+      centerChance: 0.08,
+      motionChance: 0.86,
+      sweepCount: 3
+    };
+  }
+
+  function getHomepageAmbientSize(random, type, breakpoint) {
+    if (type === 'word') {
+      if (breakpoint === 'mobile') {
+        return randomBetween(random, 130, 170);
+      }
+
+      if (breakpoint === 'tablet') {
+        return randomBetween(random, 150, 240);
+      }
+
+      return randomBetween(random, 180, 280);
+    }
+
+    if (type === 'ring' || type === 'arc') {
+      return breakpoint === 'mobile'
+        ? randomBetween(random, 70, 120)
+        : randomBetween(random, 90, 180);
+    }
+
+    return randomBetween(random, 24, 80);
+  }
+
+  function createHomepageAmbientItem(random, index, settings, breakpoint, wordsUsed) {
+    var layer = document.querySelector('.rcph-ambient-layer');
+    if (!layer) {
+      return { element: null, wordsUsed: wordsUsed };
+    }
+
+    var geometryTypes = ['ring', 'arc', 'mark', 'orb', 'ring', 'arc'];
+    var type = chooseAmbientValue(random, geometryTypes);
+    var shouldUseWord = wordsUsed < settings.wordBudget && (index % 5 === 2 || random() > 0.82);
+
+    if (shouldUseWord) {
+      type = 'word';
+      wordsUsed += 1;
+    }
+
+    var colors = ['#f4b43a', '#ffe2a0', '#60c3c4'];
+    var words = ['CREATE', 'CONNECT', 'CONTRIBUTE', 'SERVICE', 'LEADERSHIP', 'FELLOWSHIP'];
+    var isCenter = breakpoint !== 'mobile' && random() < settings.centerChance;
+    var isLeft = random() > 0.5;
+    var x = isCenter
+      ? randomBetween(random, 38, 62)
+      : (isLeft ? randomBetween(random, 2, 22) : randomBetween(random, 78, 98));
+    var y = randomBetween(random, breakpoint === 'mobile' ? 10 : 5, breakpoint === 'mobile' ? 90 : 96);
+    var size = getHomepageAmbientSize(random, type, breakpoint);
+    var opacity = type === 'word'
+      ? randomBetween(random, 0.026, 0.055)
+      : randomBetween(random, 0.025, 0.08);
+    var viewportWidth = Math.max(document.documentElement.clientWidth || window.innerWidth || 1, 1);
+    var safeX = (((size * 0.72) + 28) / viewportWidth) * 100;
+
+    x = Math.min(Math.max(x, safeX), 100 - safeX);
+
+    if (isCenter) {
+      opacity *= 0.42;
+    }
+
+    var element = document.createElement('span');
+    element.className = 'rcph-ambient-item rcph-ambient-' + type;
+    element.style.setProperty('--rcph-ambient-x', x.toFixed(2) + 'vw');
+    element.style.setProperty('--rcph-ambient-y', y.toFixed(2) + 'vh');
+    element.style.setProperty('--rcph-ambient-size', size.toFixed(0) + 'px');
+    element.style.setProperty('--rcph-ambient-opacity', opacity.toFixed(3));
+    element.style.setProperty('--rcph-ambient-color', chooseAmbientValue(random, colors));
+    element.style.setProperty('--rcph-ambient-rotation', randomBetween(random, -34, 34).toFixed(2) + 'deg');
+    element.style.setProperty('--rcph-ambient-drift-x', '0px');
+    element.style.setProperty('--rcph-ambient-drift-y', '0px');
+    element.style.setProperty('--rcph-ambient-scroll-y', '0px');
+    element.style.setProperty('--rcph-ambient-motion-rotation', '0deg');
+
+    if (type === 'word') {
+      element.textContent = chooseAmbientValue(random, words);
+      element.style.fontSize = randomBetween(random, breakpoint === 'desktop' ? 26 : 18, breakpoint === 'desktop' ? 42 : 30).toFixed(0) + 'px';
+      element.setAttribute('data-ambient-word', 'true');
+    }
+
+    if (random() < settings.motionChance) {
+      element.setAttribute('data-ambient-motion', 'true');
+    }
+
+    layer.appendChild(element);
+    return { element: element, wordsUsed: wordsUsed };
+  }
+
+  function createHomepageAmbientSweeps(random, settings, breakpoint) {
+    var layer = document.querySelector('.rcph-ambient-layer');
+    var sweeps = [];
+    var index;
+    var sweep;
+
+    if (!layer || !settings.sweepCount) {
+      return sweeps;
+    }
+
+    for (index = 0; index < settings.sweepCount; index += 1) {
+      sweep = document.createElement('span');
+      sweep.className = 'rcph-ambient-sweep rcph-ambient-sweep-' + ((index % 3) + 1);
+      sweep.style.setProperty('--rcph-sweep-x', randomBetween(random, 8, 92).toFixed(2) + 'vw');
+      sweep.style.setProperty('--rcph-sweep-y', randomBetween(random, 8, 92).toFixed(2) + 'vh');
+      sweep.style.setProperty('--rcph-sweep-rotation', randomBetween(random, -28, 28).toFixed(2) + 'deg');
+      sweep.style.setProperty('--rcph-sweep-scale', randomBetween(random, breakpoint === 'desktop' ? 0.92 : 0.75, breakpoint === 'desktop' ? 1.3 : 1.02).toFixed(2));
+      layer.appendChild(sweep);
+      sweeps.push(sweep);
+    }
+
+    return sweeps;
+  }
+
+  function animateHomepageAmbientItems(items, random, breakpoint) {
+    if (state.reduceMotion || !hasGsap()) {
+      return;
+    }
+
+    var gsap = getGsap();
+    var motionItems = items.filter(function (item) {
+      return item && item.getAttribute('data-ambient-motion') === 'true';
+    });
+
+    motionItems.forEach(function (item) {
+      var driftDuration = breakpoint === 'mobile'
+        ? randomBetween(random, 22, 34)
+        : randomBetween(random, 14, 32);
+      var rotationDuration = randomBetween(random, 22, 45);
+      var driftMin = breakpoint === 'mobile' ? 4 : 10;
+      var driftMax = breakpoint === 'mobile' ? 10 : 26;
+      var pulseBase = Number(item.style.getPropertyValue('--rcph-ambient-opacity')) || 0.04;
+      var pulsePeak = Math.min(0.08, pulseBase + randomBetween(random, 0.012, 0.028));
+
+      trackHomepageAmbient(gsap.to(item, {
+        '--rcph-ambient-drift-x': randomBetween(random, -driftMax, driftMax).toFixed(1) + 'px',
+        '--rcph-ambient-drift-y': randomBetween(random, driftMin, driftMax).toFixed(1) * (random() > 0.5 ? 1 : -1) + 'px',
+        duration: driftDuration,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        delay: randomBetween(random, -driftDuration, 0)
+      }));
+
+      trackHomepageAmbient(gsap.to(item, {
+        '--rcph-ambient-motion-rotation': randomBetween(random, -36, 36).toFixed(1) + 'deg',
+        duration: rotationDuration,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        delay: randomBetween(random, -rotationDuration, 0)
+      }));
+
+      trackHomepageAmbient(gsap.to(item, {
+        opacity: pulsePeak,
+        duration: randomBetween(random, 8, 18),
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        delay: randomBetween(random, -10, 0)
+      }));
+    });
+
+    if (breakpoint !== 'desktop' || !state.scrollTriggerReady || !window.ScrollTrigger) {
+      return;
+    }
+
+    motionItems.slice(0, 12).forEach(function (item, index) {
+      var direction = index % 2 === 0 ? -1 : 1;
+      trackHomepageAmbient(gsap.to(item, {
+        '--rcph-ambient-scroll-y': (direction * randomBetween(random, 18, 42)).toFixed(1) + 'px',
+        ease: 'none',
+        scrollTrigger: {
+          trigger: document.body,
+          start: 0,
+          end: 'max',
+          scrub: randomBetween(random, 0.75, 1.8)
+        }
+      }));
+    });
+  }
+
+  function animateHomepageAmbientSweeps(sweeps, random, breakpoint) {
+    if (state.reduceMotion || !hasGsap() || !sweeps.length || breakpoint === 'mobile') {
+      return;
+    }
+
+    var gsap = getGsap();
+
+    sweeps.forEach(function (sweep, index) {
+      var duration = randomBetween(random, 12, 20);
+      trackHomepageAmbient(gsap.fromTo(sweep, {
+        autoAlpha: 0,
+        xPercent: index % 2 === 0 ? -42 : 42,
+        yPercent: index % 2 === 0 ? 18 : -18
+      }, {
+        autoAlpha: randomBetween(random, 0.08, 0.16),
+        xPercent: index % 2 === 0 ? 42 : -42,
+        yPercent: index % 2 === 0 ? -18 : 18,
+        duration: duration,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        delay: randomBetween(random, -duration, 0)
+      }));
+    });
+  }
+
+  function initHomepageAmbientBackground() {
+    if (!isHomepage()) {
+      return;
+    }
+
+    var layer = document.querySelector('.rcph-ambient-layer');
+    if (!layer) {
+      return;
+    }
+
+    var breakpoint = getHomepageAmbientBreakpoint();
+    var settings = getHomepageAmbientSettings(breakpoint);
+    var signature = breakpoint + ':' + settings.count;
+
+    if (state.homepageAmbientReady && state.homepageAmbientBreakpoint === signature) {
+      return;
+    }
+
+    clearHomepageAmbientAnimations();
+    while (layer.firstChild) {
+      layer.removeChild(layer.firstChild);
+    }
+
+    state.homepageAmbientReady = true;
+    state.homepageAmbientBreakpoint = signature;
+    layer.setAttribute('data-ambient-breakpoint', breakpoint);
+    layer.setAttribute('data-ambient-count', String(settings.count));
+
+    var random = createSeededRandom('rcph-home-ambient:' + breakpoint);
+    var sweepRandom = createSeededRandom('rcph-home-ambient-sweeps:' + breakpoint);
+    var items = [];
+    var sweeps = createHomepageAmbientSweeps(sweepRandom, settings, breakpoint);
+    var wordsUsed = 0;
+    var index;
+    var result;
+
+    for (index = 0; index < settings.count; index += 1) {
+      result = createHomepageAmbientItem(random, index, settings, breakpoint, wordsUsed);
+      wordsUsed = result.wordsUsed;
+      if (result.element) {
+        items.push(result.element);
+      }
+    }
+
+    animateHomepageAmbientItems(items, createSeededRandom('rcph-home-ambient-motion:' + breakpoint), breakpoint);
+    animateHomepageAmbientSweeps(sweeps, createSeededRandom('rcph-home-ambient-sweep-motion:' + breakpoint), breakpoint);
+
+    if (state.homepageAmbientResizeReady || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    state.homepageAmbientResizeReady = true;
+    var resizeTimer = 0;
+    window.addEventListener('resize', function () {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(function () {
+        initHomepageAmbientBackground();
+      }, 180);
+    }, { passive: true });
+  }
+
   function initBodCardTilt(cards) {
     if (state.bodTiltReady || state.reduceMotion || isSmallScreen() || !hasGsap()) {
       return;
@@ -1468,6 +1826,7 @@
   }
 
   function initHomepageCinematicAnimations() {
+    initHomepageAmbientBackground();
     initHomepageCinematicHero();
     initHomepageScrollProgress();
     initHomepagePanelTransitions();
@@ -1478,6 +1837,10 @@
   }
 
   function initPremiumAnimations() {
+    if (isHomepage() && (state.reduceMotion || !hasGsap())) {
+      initHomepageAmbientBackground();
+    }
+
     if (state.reduceMotion) {
       revealAll();
       return;
@@ -1526,6 +1889,7 @@
     initHomepagePanelTransitions: initHomepagePanelTransitions,
     initHomepageProjectDeck: initHomepageProjectDeck,
     initHomepageGalleryMotion: initHomepageGalleryMotion,
+    initHomepageAmbientBackground: initHomepageAmbientBackground,
     initBodLeadershipShowcase: initBodLeadershipShowcase,
     refresh: refreshScrollTriggers
   };
