@@ -217,6 +217,20 @@ const accountRequestsBody   = document.getElementById('accountRequestsBody');
 const accountRequestsBadge  = document.getElementById('accountRequestsBadge');
 const accountRequestFilter  = document.getElementById('accountRequestFilter');
 
+const prospectMembersBody       = document.getElementById('prospectMembersBody');
+const prospectMembersToggle     = document.getElementById('prospectMembersToggle');
+const prospectMembersBadge      = document.getElementById('prospectMembersBadge');
+const prospectSearch            = document.getElementById('prospectSearch');
+const prospectFilter            = document.getElementById('prospectFilter');
+const prospectRefreshBtn        = document.getElementById('prospectRefreshBtn');
+const prospectManagementMessage = document.getElementById('prospectManagementMessage');
+const prospectCards             = document.getElementById('prospectCards');
+const prospectTotalKpi          = document.getElementById('prospectTotalKpi');
+const prospectReadyKpi          = document.getElementById('prospectReadyKpi');
+const prospectNeedGbmKpi        = document.getElementById('prospectNeedGbmKpi');
+const prospectNeedAvenueKpi     = document.getElementById('prospectNeedAvenueKpi');
+const prospectNeedDuesKpi       = document.getElementById('prospectNeedDuesKpi');
+
 const collaborationReports        = document.getElementById('collaborationReports');
 const collaborationReportsCard    = document.getElementById('collaborationReportsCard');
 const collaborationReportsToggle  = document.getElementById('collaborationReportsToggle');
@@ -255,6 +269,17 @@ let FINES = [];
 let TREAS = []; 
 let USERS = [];
 let PENDING_USERS = [];
+let PROSPECTS = [];
+let PROSPECT_SUMMARY = {
+  total: 0,
+  active: 0,
+  ready: 0,
+  promoted: 0,
+  needGbm: 0,
+  needAvenue: 0,
+  needDues: 0,
+};
+let PROSPECTS_LOADED = false;
 
 let unsubMembers = null;
 let unsubEvents  = null;

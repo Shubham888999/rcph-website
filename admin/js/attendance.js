@@ -21,7 +21,7 @@ function buildMonthFilterFromEvents() {
     });
 }
 async function bulkSetAttendanceForEvent(eventId, value) {
-  const { members } = getFilteredMembersAndEvents();
+  const { members } = getFilteredMembersAndEvents({ includeProspects: true });
   if (!members.length) return;
 
   const batch = db.batch();
@@ -34,11 +34,14 @@ async function bulkSetAttendanceForEvent(eventId, value) {
   });
 
   await batch.commit();
+  await syncProspectProgressAfterAttendance(
+    members.filter(member => member._isProspect).map(member => member.id)
+  );
   renderGrid();
 }
 
 async function bulkSetAttendanceForMember(memberId, value) {
-  const { events } = getFilteredMembersAndEvents();
+  const { events } = getFilteredMembersAndEvents({ includeProspects: true });
   if (!events.length) return;
 
   const payload = {};
@@ -53,6 +56,9 @@ async function bulkSetAttendanceForMember(memberId, value) {
     ATT[memberId][ev.id] = value;
   });
 
+  if (isProspectAttendancePerson(memberId)) {
+    await syncProspectProgressAfterAttendance([memberId]);
+  }
   renderGrid();
 }
 
@@ -96,7 +102,9 @@ function renderGrid(){
   const monthSel = monthFilter.value; 
   const avenueSel = avenueFilter.value; 
 
-  const members = MEMBERS.filter(m => (m.name || '').toLowerCase().includes(memQuery));
+  const members = getAttendanceRoster().filter(m => (
+    `${m.name || ''} ${m.email || ''}`.toLowerCase().includes(memQuery)
+  ));
   let events = EVENTS.filter(e => (e.name || '').toLowerCase().includes(evQuery));
   
   if (monthSel) events = events.filter(e => (e.date || '').startsWith(monthSel));
@@ -192,9 +200,9 @@ return `
 
     <div class="bulk-wrap" style="align-items:flex-start;">
       <div class="mem-cell">
-        <span>${m.name || ''}</span>
-        <button class="icon-btn" title="Rename member" data-edit-member="${m.id}">✏️</button>
-        <button class="icon-btn" title="Delete member" data-del-member="${m.id}">🗑</button>
+        <span>${m.name || ''}${m._isProspect ? '<span class="prospect-member-tag">Prospect</span>' : ''}</span>
+        ${m._isProspect ? '' : `<button class="icon-btn" title="Rename member" data-edit-member="${m.id}">✏️</button>`}
+        ${m._isProspect ? '' : `<button class="icon-btn" title="Delete member" data-del-member="${m.id}">🗑</button>`}
       </div>
 
       <select class="bulk-select" data-bulk-member="${m.id}">
@@ -223,7 +231,8 @@ return `
     attBody.appendChild(tr);
   });
 
-  countBadge.textContent = `${members.length} members · ${events.length} events`;
+  const prospectCount = members.filter(member => member._isProspect).length;
+  countBadge.textContent = `${members.length} people${prospectCount ? ` (${prospectCount} prospects)` : ''} · ${events.length} events`;
   renderAttendanceInsights();
 }
 
@@ -298,6 +307,9 @@ attBody.addEventListener('click', async (e) => {
   await ref.set({ [eventId]: next }, { merge: true });
   ATT[memberId] = ATT[memberId] || {};
   ATT[memberId][eventId] = next;
+  if (isProspectAttendancePerson(memberId)) {
+    await syncProspectProgressAfterAttendance([memberId]);
+  }
 });
 attHead.addEventListener('change', async (e) => {
   const sel = e.target.closest('select[data-bulk-event]');
@@ -307,7 +319,7 @@ attHead.addEventListener('change', async (e) => {
   const value = sel.value === 'P' ? true : sel.value === 'A' ? false : 'NA';
 
   const label = value === true ? 'Present' : value === false ? 'Absent' : 'NA';
-  if (!confirm(`Mark all visible members as ${label} for this event?`)) {
+  if (!confirm(`Mark all visible people as ${label} for this event?`)) {
     sel.value = '';
     return;
   }
@@ -335,7 +347,7 @@ attBody.addEventListener('change', async (e) => {
 
 function exportAttendanceToExcel(){
   if (!window.XLSX) { alert('Excel exporter not loaded.'); return; }
-  const { members, events } = getFilteredMembersAndEvents();
+  const { members, events } = getFilteredMembersAndEvents({ includeProspects: true });
   const header = ['Member \\ Event', ...events.map(e => {
     const d = (e.date||'').slice(0,10);
     return d ? `${e.name||''} (${d})` : (e.name||'');

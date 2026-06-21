@@ -378,6 +378,182 @@ document.addEventListener('change', (event) => {
   }
 });
 
+function prospectFunction(name) {
+  return callableFunction(name);
+}
+
+function setProspectManagementMessage(message, isError = false) {
+  if (!prospectManagementMessage) return;
+  prospectManagementMessage.textContent = message || '';
+  prospectManagementMessage.classList.toggle('is-error', isError);
+}
+
+function prospectStatusLabel(prospect) {
+  if (prospect.status === 'promoted') return 'Promoted';
+  if (prospect.ready) return 'Ready for Promotion';
+  if (Number(prospect.percent || 0) >= 67) return 'Almost There';
+  if (Number(prospect.percent || 0) > 0) return 'In Progress';
+  return 'Getting Started';
+}
+
+function prospectStatusClass(prospect) {
+  if (prospect.status === 'promoted') return 'is-promoted';
+  if (prospect.ready) return 'is-ready';
+  return '';
+}
+
+function renderProspectSummary() {
+  const summary = PROSPECT_SUMMARY || {};
+  if (prospectMembersBadge) {
+    prospectMembersBadge.textContent = `${Number(summary.total || 0)} prospects · ${Number(summary.ready || 0)} ready`;
+  }
+  if (prospectTotalKpi) prospectTotalKpi.textContent = Number(summary.total || 0);
+  if (prospectReadyKpi) prospectReadyKpi.textContent = Number(summary.ready || 0);
+  if (prospectNeedGbmKpi) prospectNeedGbmKpi.textContent = Number(summary.needGbm || 0);
+  if (prospectNeedAvenueKpi) prospectNeedAvenueKpi.textContent = Number(summary.needAvenue || 0);
+  if (prospectNeedDuesKpi) prospectNeedDuesKpi.textContent = Number(summary.needDues || 0);
+}
+
+function getFilteredProspects() {
+  const query = String(prospectSearch?.value || '').trim().toLowerCase();
+  const filter = prospectFilter?.value || 'all';
+  return (PROSPECTS || []).filter(prospect => {
+    const matchesSearch = `${prospect.name || ''} ${prospect.email || ''}`.toLowerCase().includes(query);
+    if (!matchesSearch) return false;
+    if (filter === 'ready') return prospect.ready === true;
+    if (filter === 'promoted') return prospect.status === 'promoted';
+    if (filter === 'in_progress') return prospect.status !== 'promoted' && prospect.ready !== true;
+    return true;
+  });
+}
+
+function renderProspectCards() {
+  if (!prospectCards) return;
+  renderProspectSummary();
+  const rows = getFilteredProspects();
+  if (!PROSPECTS_LOADED) {
+    prospectCards.innerHTML = '';
+    return;
+  }
+  if (!rows.length) {
+    prospectCards.innerHTML = '<p class="prospect-message">No prospects match this view.</p>';
+    return;
+  }
+
+  prospectCards.innerHTML = rows.map(prospect => {
+    const criteria = prospect.criteria || {};
+    const requiredGbm = Number(criteria.requiredGbm || 2);
+    const requiredAvenue = Number(criteria.requiredAvenueEvents || 2);
+    const percent = Math.max(0, Math.min(100, Number(prospect.percent || 0)));
+    const promoted = prospect.status === 'promoted';
+    const statusClass = prospectStatusClass(prospect);
+    const promotionHelp = prospect.ready
+      ? 'All criteria are complete. This prospect can be promoted.'
+      : `Needs${prospect.gbmAttended < requiredGbm ? ' GBM attendance,' : ''}${prospect.avenueEventsAttended < requiredAvenue ? ' avenue attendance,' : ''}${!prospect.duesPaid ? ' dues payment,' : ''}`.replace(/,$/, '.');
+    return `
+      <article class="prospect-card ${statusClass}">
+        <div class="prospect-card__head">
+          <div>
+            <h3>${escapeHtml(prospect.name || 'Prospect')}</h3>
+            <p class="prospect-card__meta">${escapeHtml(prospect.email || '-')}</p>
+            ${prospect.phone ? `<p class="prospect-card__meta">${escapeHtml(prospect.phone)}</p>` : ''}
+          </div>
+          <span class="prospect-status ${statusClass}">${escapeHtml(prospectStatusLabel(prospect))}</span>
+        </div>
+
+        <div class="prospect-card__details">
+          <p><strong>Hobbies:</strong> ${escapeHtml(prospect.hobbies || 'N/A')}</p>
+          <p><strong>Why RCPH:</strong> ${escapeHtml(prospect.joinReason || 'N/A')}</p>
+          <p><strong>Referred by:</strong> ${escapeHtml(prospect.referredBy || 'N/A')}</p>
+          <p><strong>Previous Rotaract:</strong> ${escapeHtml(prospect.previousRotaractDetails || 'N/A')}</p>
+        </div>
+
+        <div class="prospect-card__progress">
+          <div class="prospect-card__progress-row"><span>GBM progress</span><strong>${Number(prospect.gbmAttended || 0)} / ${requiredGbm}</strong></div>
+          <div class="prospect-card__progress-row"><span>Avenue progress</span><strong>${Number(prospect.avenueEventsAttended || 0)} / ${requiredAvenue}</strong></div>
+          <div class="prospect-card__progress-row"><span>Total progress</span><strong>${percent}%</strong></div>
+          <div class="prospect-progress-track" role="progressbar" aria-label="${escapeHtml(prospect.name || 'Prospect')} onboarding progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
+            <div class="prospect-progress-fill" style="width:${percent}%"></div>
+          </div>
+        </div>
+
+        <label class="prospect-card__dues">
+          <input type="checkbox" data-prospect-dues="${escapeHtml(prospect.uid)}" ${prospect.duesPaid ? 'checked' : ''} ${promoted ? 'disabled' : ''}>
+          <span>Dues Paid: ${prospect.duesPaid ? 'Yes' : 'No'}</span>
+        </label>
+
+        <div class="prospect-card__actions">
+          ${promoted ? '<span class="prospect-promotion-help">This prospect has been promoted to GBM.</span>' : `
+            <button class="btn" type="button" data-prospect-promote="${escapeHtml(prospect.uid)}" ${prospect.ready ? '' : 'disabled'}>Promote to GBM</button>
+            <span class="prospect-promotion-help">${escapeHtml(promotionHelp)}</span>
+          `}
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+async function loadProspectManagementData(options = {}) {
+  const { showLoading = true, renderAttendance = true } = options;
+  if (!IS_ADMIN) return;
+  if (showLoading) setProspectManagementMessage('Loading and recalculating prospect progress...');
+  if (prospectRefreshBtn) prospectRefreshBtn.disabled = true;
+
+  try {
+    const result = await prospectFunction('getProspectManagementData')({});
+    const data = result.data || {};
+    PROSPECTS = Array.isArray(data.prospects) ? data.prospects : [];
+    PROSPECT_SUMMARY = { ...PROSPECT_SUMMARY, ...(data.summary || {}) };
+    PROSPECTS_LOADED = true;
+    renderProspectCards();
+    if (renderAttendance && attHead && attBody) renderGrid();
+    setProspectManagementMessage(`Updated ${PROSPECTS.length} prospect record${PROSPECTS.length === 1 ? '' : 's'}.`);
+  } catch (err) {
+    console.error('Prospect management load failed:', err);
+    setProspectManagementMessage(err?.message || 'Could not load prospect management data.', true);
+  } finally {
+    if (prospectRefreshBtn) prospectRefreshBtn.disabled = false;
+  }
+}
+
+async function syncProspectProgressAfterAttendance(uids) {
+  const prospectUids = Array.from(new Set((uids || []).filter(uid => isProspectAttendancePerson(uid))));
+  if (!prospectUids.length) return;
+  try {
+    await Promise.all(prospectUids.map(uid => prospectFunction('recalculateProspectProgress')({ uid })));
+    await loadProspectManagementData({ showLoading: false, renderAttendance: false });
+  } catch (err) {
+    console.error('Prospect progress recalculation failed:', err);
+    setProspectManagementMessage(err?.message || 'Attendance saved, but prospect progress could not be refreshed.', true);
+  }
+}
+
+async function updateProspectDuesAdmin(uid, duesPaid) {
+  setProspectManagementMessage('Updating dues and progress...');
+  try {
+    await prospectFunction('updateProspectDues')({ uid, duesPaid });
+    await loadProspectManagementData({ showLoading: false });
+  } catch (err) {
+    setProspectManagementMessage(err?.message || 'Could not update prospect dues.', true);
+    await loadProspectManagementData({ showLoading: false });
+  }
+}
+
+async function promoteProspectAdmin(uid) {
+  const prospect = PROSPECTS.find(item => item.uid === uid);
+  if (!prospect?.ready) return;
+  if (!confirm(`Promote ${prospect.name || prospect.email || 'this prospect'} to GBM?`)) return;
+
+  setProspectManagementMessage('Promoting prospect and initializing member records...');
+  try {
+    await prospectFunction('promoteProspectToGbm')({ uid });
+    await loadProspectManagementData({ showLoading: false });
+    setProspectManagementMessage(`${prospect.name || 'Prospect'} was promoted to GBM.`);
+  } catch (err) {
+    setProspectManagementMessage(err?.message || 'Could not promote this prospect.', true);
+  }
+}
+
 
 
 async function loadData(){
@@ -389,6 +565,8 @@ async function loadData(){
   MEMBERS = mSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   EVENTS  = eSnap.docs.map(d => ({ id:d.id, ...d.data() }))
     .filter(e => e.archived !== true && String(e.type || 'clubEvent') === 'clubEvent');
+
+  await loadProspectManagementData({ showLoading: false, renderAttendance: false });
   
   if (fineMember) {
     fineMember.innerHTML = '<option value="" disabled selected>Member…</option>' +

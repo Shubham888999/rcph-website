@@ -30,14 +30,36 @@ function membersMap() {
   return map;
 }
 
+function getAttendanceRoster() {
+  const memberIds = new Set(MEMBERS.map(member => member.id));
+  const activeProspects = (PROSPECTS || [])
+    .filter(prospect => prospect.status !== 'promoted' && !memberIds.has(prospect.uid))
+    .map(prospect => ({
+      id: prospect.uid,
+      name: prospect.name || prospect.email || 'Prospect',
+      email: prospect.email || '',
+      role: 'prospect',
+      position: 'Prospect',
+      _isProspect: true,
+    }));
+  return [...MEMBERS, ...activeProspects];
+}
 
-function getFilteredMembersAndEvents() {
+function isProspectAttendancePerson(uid) {
+  return (PROSPECTS || []).some(prospect => prospect.uid === uid && prospect.status !== 'promoted');
+}
+
+
+function getFilteredMembersAndEvents(options = {}) {
   const memQuery = memberSearch.value.trim().toLowerCase();
   const evQuery  = eventSearch.value.trim().toLowerCase();
   const monthSel = monthFilter.value;
   const avenueSel = avenueFilter.value;
 
-  const members = MEMBERS.filter(m => (m.name || '').toLowerCase().includes(memQuery));
+  const roster = options.includeProspects ? getAttendanceRoster() : MEMBERS;
+  const members = roster.filter(m => (
+    `${m.name || ''} ${m.email || ''}`.toLowerCase().includes(memQuery)
+  ));
 
   let events = EVENTS.filter(e => (e.name || '').toLowerCase().includes(evQuery));
 
