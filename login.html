@@ -31,6 +31,10 @@
       color: var(--auth-ink);
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     .auth-bg-effects {
       position: fixed;
       inset: 0;
@@ -358,6 +362,7 @@
 
     .auth-field input,
     .auth-field select,
+    .auth-field textarea,
     .otp-row input {
       width: 100%;
       box-sizing: border-box;
@@ -374,12 +379,93 @@
 
     .auth-field input:focus,
     .auth-field select:focus,
+    .auth-field textarea:focus,
     .otp-row input:focus {
       border-color: var(--auth-cyan);
       background: rgba(0,0,0,0.5);
       box-shadow:
         0 0 0 3px rgba(96,195,196,0.16),
         0 0 26px rgba(96,195,196,0.11);
+    }
+
+    .auth-field textarea {
+      min-height: 104px;
+      resize: vertical;
+      font: inherit;
+    }
+
+    .signup-member-question {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid var(--auth-line-cyan);
+      border-radius: 14px;
+      background: rgba(96,195,196,0.06);
+      text-align: center;
+    }
+
+    .signup-member-question h3 {
+      margin: 0;
+      color: var(--auth-ink);
+      font-size: 1.08rem;
+    }
+
+    .signup-choice-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .signup-path-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 4px 0 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(244,180,58,0.08);
+      color: var(--auth-gold-soft);
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    .signup-change-path {
+      border: 0;
+      background: transparent;
+      color: var(--auth-cyan);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 900;
+      text-decoration: underline;
+    }
+
+    .signup-role-note {
+      margin: -4px 0 12px;
+    }
+
+    .signup-readonly-role {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 12px 0;
+      padding: 12px;
+      border: 1px solid var(--auth-line-cyan);
+      border-radius: 10px;
+      background: rgba(96,195,196,0.08);
+    }
+
+    .signup-readonly-role span {
+      color: rgba(248,243,231,0.86);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .signup-readonly-role strong {
+      color: #d8fbfb;
+      font-size: 0.95rem;
     }
 
     .auth-actions {
@@ -598,6 +684,10 @@
         grid-template-columns: 1fr;
       }
 
+      .signup-choice-actions {
+        grid-template-columns: 1fr;
+      }
+
       .otp-row {
         display: grid;
       }
@@ -694,40 +784,116 @@
         </div>
       </form>
 
-      <form id="signupForm" autocomplete="on" style="display:none;">
-        <label class="auth-field">
-          <span>Full name</span>
-          <input id="signupName" type="text" autocomplete="name" required>
-        </label>
-        <label class="auth-field">
-          <span>Email</span>
-          <input id="signupEmail" type="email" autocomplete="email" required>
-        </label>
-        <label class="auth-field">
-          <span>Password</span>
-          <input id="signupPassword" type="password" autocomplete="new-password" required>
-        </label>
-        <label class="auth-field">
-          <span>Confirm password</span>
-          <input id="signupConfirm" type="password" autocomplete="new-password" required>
-        </label>
-        <label class="auth-field">
-          <span>Requested role</span>
-          <select id="signupRole" required>
-            <option value="gbm">GBM</option>
-            <option value="bod">BOD</option>
-            <option value="admin">Admin</option>
-          </select>
-        </label>
-        <label id="signupInviteWrap" class="auth-field" style="display:none;">
-          <span>Admin invite code</span>
-          <input id="signupInvite" type="password" autocomplete="off">
-        </label>
-        <div class="auth-actions">
-          <button id="signupBtn" class="btn" type="submit">Create Account</button>
-          <button id="googleSignupBtn" class="btn btn-outline" type="button">Create with Google</button>
+      <form id="signupForm" autocomplete="on" style="display:none;" novalidate>
+        <div id="signupMemberQuestion" class="signup-member-question">
+          <h3>Are you already part of RCPH?</h3>
+          <div class="signup-choice-actions">
+            <button id="signupMemberYes" class="btn" type="button">Yes, I am already part of RCPH</button>
+            <button id="signupMemberNo" class="btn btn-outline" type="button">No, I am new and want to join RCPH</button>
+          </div>
         </div>
-        <p class="muted-note">BOD and Admin requests stay pending until an admin or president approves them.</p>
+
+        <div id="signupDetails" hidden>
+          <input id="signupMemberType" type="hidden" value="">
+          <div class="signup-path-summary">
+            <span id="signupPathLabel"></span>
+            <button id="signupChangePath" class="signup-change-path" type="button">Change answer</button>
+          </div>
+
+          <label class="auth-field">
+            <span>Full name</span>
+            <input id="signupName" type="text" autocomplete="name">
+          </label>
+          <label class="auth-field">
+            <span>Phone number</span>
+            <input id="signupPhone" type="tel" autocomplete="tel">
+          </label>
+          <label class="auth-field">
+            <span>Email</span>
+            <input id="signupEmail" type="email" autocomplete="email">
+          </label>
+          <label class="auth-field">
+            <span>Gender</span>
+            <select id="signupGender">
+              <option value="">Select an option</option>
+              <option value="woman">Woman</option>
+              <option value="man">Man</option>
+              <option value="non-binary">Non-binary</option>
+              <option value="self-describe">Prefer to self-describe</option>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+            </select>
+          </label>
+          <label id="signupGenderSelfWrap" class="auth-field" hidden>
+            <span>Please self-describe</span>
+            <input id="signupGenderSelf" type="text" autocomplete="off">
+          </label>
+
+          <div id="signupNewMemberFields" hidden>
+            <label class="auth-field">
+              <span>Hobbies / interests</span>
+              <textarea id="signupHobbies" placeholder="Tell us a little about your interests"></textarea>
+            </label>
+            <label class="auth-field">
+              <span>Have you been part of Rotaract before?</span>
+              <select id="signupPreviousRotaract">
+                <option value="">Select an option</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <label id="signupPreviousRotaractWrap" class="auth-field" hidden>
+              <span>Please specify your previous Rotaract experience</span>
+              <textarea id="signupPreviousRotaractDetails" placeholder="Example: Club name, role, years, events/projects, or N/A"></textarea>
+            </label>
+            <label class="auth-field">
+              <span>Why do you want to join RCPH?</span>
+              <textarea id="signupWhyJoin"></textarea>
+            </label>
+            <label class="auth-field">
+              <span>Were you referred by someone?</span>
+              <select id="signupReferred">
+                <option value="">Select an option</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <label id="signupReferredByWrap" class="auth-field" hidden>
+              <span>Who referred you?</span>
+              <input id="signupReferredBy" type="text" autocomplete="off" placeholder="Enter member name, or N/A">
+            </label>
+          </div>
+
+          <label class="auth-field">
+            <span>Password</span>
+            <input id="signupPassword" type="password" autocomplete="new-password">
+          </label>
+          <label class="auth-field">
+            <span>Confirm password</span>
+            <input id="signupConfirm" type="password" autocomplete="new-password">
+          </label>
+          <label id="signupRoleWrap" class="auth-field">
+            <span>Requested role</span>
+            <select id="signupRole">
+              <option value="gbm">GBM</option>
+              <option value="bod">BOD</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <div id="signupProspectRoleDisplay" class="signup-readonly-role" hidden>
+            <span>Requested role:</span>
+            <strong>Prospect Member</strong>
+          </div>
+          <p id="signupInternalRoleNote" class="muted-note signup-role-note">GBM requests are approved automatically. BOD/Admin requests require approval.</p>
+          <p id="signupProspectRoleNote" class="muted-note signup-role-note" hidden>You are signing up as a Prospect Member. After completing the onboarding criteria, the club team can move you to GBM/member status.</p>
+          <label id="signupInviteWrap" class="auth-field" style="display:none;">
+            <span>Admin invite code</span>
+            <input id="signupInvite" type="password" autocomplete="off">
+          </label>
+          <div class="auth-actions">
+            <button id="signupBtn" class="btn" type="submit">Create Account</button>
+            <button id="googleSignupBtn" class="btn btn-outline" type="button">Create with Google</button>
+          </div>
+        </div>
       </form>
 
       <form id="profileForm" autocomplete="on" style="display:none;">
@@ -801,6 +967,26 @@
       authError: document.getElementById('authError'),
       panelChooser: document.getElementById('panelChooser'),
       dzrPanelLink: document.getElementById('dzrPanelLink'),
+      signupMemberQuestion: document.getElementById('signupMemberQuestion'),
+      signupDetails: document.getElementById('signupDetails'),
+      signupMemberType: document.getElementById('signupMemberType'),
+      signupPathLabel: document.getElementById('signupPathLabel'),
+      signupNewMemberFields: document.getElementById('signupNewMemberFields'),
+      signupGender: document.getElementById('signupGender'),
+      signupGenderSelfWrap: document.getElementById('signupGenderSelfWrap'),
+      signupGenderSelf: document.getElementById('signupGenderSelf'),
+      signupHobbies: document.getElementById('signupHobbies'),
+      signupPreviousRotaract: document.getElementById('signupPreviousRotaract'),
+      signupPreviousRotaractWrap: document.getElementById('signupPreviousRotaractWrap'),
+      signupPreviousRotaractDetails: document.getElementById('signupPreviousRotaractDetails'),
+      signupWhyJoin: document.getElementById('signupWhyJoin'),
+      signupReferred: document.getElementById('signupReferred'),
+      signupReferredByWrap: document.getElementById('signupReferredByWrap'),
+      signupReferredBy: document.getElementById('signupReferredBy'),
+      signupRoleWrap: document.getElementById('signupRoleWrap'),
+      signupProspectRoleDisplay: document.getElementById('signupProspectRoleDisplay'),
+      signupInternalRoleNote: document.getElementById('signupInternalRoleNote'),
+      signupProspectRoleNote: document.getElementById('signupProspectRoleNote'),
       signupRole: document.getElementById('signupRole'),
       signupInviteWrap: document.getElementById('signupInviteWrap'),
       signupInvite: document.getElementById('signupInvite'),
@@ -837,6 +1023,144 @@
       wrapEl.style.display = needsInvite ? 'grid' : 'none';
       if (!needsInvite) inputEl.value = '';
       inputEl.required = needsInvite;
+    }
+
+    function toggleGenderSelfDescription() {
+      const show = !els.signupDetails.hidden && els.signupGender.value === 'self-describe';
+      els.signupGenderSelfWrap.hidden = !show;
+      els.signupGenderSelf.required = show;
+      if (!show) els.signupGenderSelf.value = '';
+    }
+
+    function togglePreviousRotaractDetails() {
+      const show = els.signupMemberType.value === 'prospect' && els.signupPreviousRotaract.value === 'yes';
+      els.signupPreviousRotaractWrap.hidden = !show;
+      els.signupPreviousRotaractDetails.required = show;
+      if (!show) els.signupPreviousRotaractDetails.value = '';
+    }
+
+    function toggleReferralDetails() {
+      const show = els.signupMemberType.value === 'prospect' && els.signupReferred.value === 'yes';
+      els.signupReferredByWrap.hidden = !show;
+      els.signupReferredBy.required = show;
+      if (!show) els.signupReferredBy.value = '';
+    }
+
+    function setSignupRequiredState(enabled) {
+      ['signupName', 'signupPhone', 'signupEmail', 'signupGender', 'signupPassword', 'signupConfirm']
+        .forEach(id => { document.getElementById(id).required = enabled; });
+
+      const isProspect = enabled && els.signupMemberType.value === 'prospect';
+      els.signupRole.required = enabled && !isProspect;
+      els.signupHobbies.required = isProspect;
+      els.signupPreviousRotaract.required = isProspect;
+      els.signupWhyJoin.required = isProspect;
+      els.signupReferred.required = isProspect;
+      toggleGenderSelfDescription();
+      togglePreviousRotaractDetails();
+      toggleReferralDetails();
+    }
+
+    function resetSignupPath() {
+      els.signupMemberType.value = '';
+      els.signupMemberQuestion.hidden = false;
+      els.signupDetails.hidden = true;
+      els.signupNewMemberFields.hidden = true;
+      setSignupRequiredState(false);
+    }
+
+    function selectSignupPath(memberType) {
+      const isProspect = memberType === 'prospect';
+      els.signupMemberType.value = memberType;
+      els.signupMemberQuestion.hidden = true;
+      els.signupDetails.hidden = false;
+      els.signupNewMemberFields.hidden = !isProspect;
+      els.signupRoleWrap.hidden = isProspect;
+      els.signupProspectRoleDisplay.hidden = !isProspect;
+      els.signupRole.disabled = isProspect;
+      els.signupInternalRoleNote.hidden = isProspect;
+      els.signupProspectRoleNote.hidden = !isProspect;
+      els.signupPathLabel.textContent = isProspect ? 'Prospect Member application' : 'Existing RCPH member account';
+
+      if (!isProspect) {
+        els.signupHobbies.value = '';
+        els.signupPreviousRotaract.value = '';
+        els.signupWhyJoin.value = '';
+        els.signupReferred.value = '';
+      } else {
+        els.signupRole.value = 'gbm';
+      }
+
+      setSignupRequiredState(true);
+      toggleInvite(els.signupRole, els.signupInviteWrap, els.signupInvite);
+      setMessage('');
+      document.getElementById('signupName').focus();
+    }
+
+    function signupValidationError(message, field) {
+      setMessage(message);
+      if (field && !field.hidden) field.focus();
+      return false;
+    }
+
+    function validateSignupForm({ requireCredentials, payload }) {
+      const signupPath = payload?.signupType === 'prospect'
+        ? 'prospect'
+        : els.signupMemberType.value;
+      const isProspect = signupPath === 'prospect';
+
+      if (!signupPath) {
+        return signupValidationError('Please answer whether you are already part of RCPH.');
+      }
+
+      const name = document.getElementById('signupName');
+      const phone = document.getElementById('signupPhone');
+      const email = document.getElementById('signupEmail');
+      const pass = document.getElementById('signupPassword');
+      const confirm = document.getElementById('signupConfirm');
+
+      if (!name.value.trim()) return signupValidationError('Enter your full name.', name);
+      if (!phone.value.trim()) return signupValidationError('Enter your phone number.', phone);
+      if (!email.value.trim()) return signupValidationError('Enter your email address.', email);
+      if (email.value.trim() && !email.checkValidity()) return signupValidationError('Enter a valid email address.', email);
+      if (!els.signupGender.value) return signupValidationError('Select a gender option.', els.signupGender);
+      if (els.signupGender.value === 'self-describe' && !els.signupGenderSelf.value.trim()) {
+        return signupValidationError('Please describe your gender.', els.signupGenderSelf);
+      }
+
+      if (isProspect) {
+        if (!els.signupHobbies.value.trim()) {
+          return signupValidationError('Please tell us about your hobbies or interests.', els.signupHobbies);
+        }
+        if (!els.signupPreviousRotaract.value) {
+          return signupValidationError('Please say whether you have been part of Rotaract before.', els.signupPreviousRotaract);
+        }
+        if (els.signupPreviousRotaract.value === 'yes' && !els.signupPreviousRotaractDetails.value.trim()) {
+          return signupValidationError('Please specify your previous Rotaract experience.', els.signupPreviousRotaractDetails);
+        }
+        if (!els.signupWhyJoin.value.trim()) {
+          return signupValidationError('Please tell us why you want to join RCPH.', els.signupWhyJoin);
+        }
+        if (!els.signupReferred.value) {
+          return signupValidationError('Please say whether someone referred you.', els.signupReferred);
+        }
+        if (els.signupReferred.value === 'yes' && !els.signupReferredBy.value.trim()) {
+          return signupValidationError('Enter the name of the person who referred you.', els.signupReferredBy);
+        }
+      }
+
+      if (requireCredentials && !pass.value) return signupValidationError('Enter a password.', pass);
+      if (requireCredentials && !confirm.value) return signupValidationError('Confirm your password.', confirm);
+      if (requireCredentials && pass.value !== confirm.value) return signupValidationError('Password mismatch.', confirm);
+      const requestedRole = payload?.requestedRole || els.signupRole.value;
+      if (!isProspect && !['gbm', 'bod', 'admin'].includes(requestedRole)) {
+        return signupValidationError('Choose GBM, BOD, or Admin.', els.signupRole);
+      }
+      if (!isProspect && requestedRole === 'admin' && !els.signupInvite.value.trim()) {
+        return signupValidationError('Enter the admin invite code.', els.signupInvite);
+      }
+
+      return true;
     }
 
     function mapAuthError(err) {
@@ -919,7 +1243,22 @@
     }
 
     async function submitProfileRequest(payload) {
-      const res = await createUserProfile(payload);
+      const signupPath = payload?.signupType === 'prospect'
+        ? 'prospect'
+        : els.signupMemberType.value;
+      const callablePayload = signupPath === 'prospect'
+        ? { ...payload, requestedRole: 'prospect', signupType: 'prospect' }
+        : payload;
+
+      if (['localhost', '127.0.0.1'].includes(location.hostname)) {
+        console.debug('[RCPH signup]', {
+          signupPath,
+          requestedRole: callablePayload.requestedRole,
+          signupType: callablePayload.signupType
+        });
+      }
+
+      const res = await createUserProfile(callablePayload);
       return res.data || {};
     }
 
@@ -977,26 +1316,47 @@
 
     function signupPayloadFromForm() {
       const name = document.getElementById('signupName').value.trim();
-      const requestedRole = els.signupRole.value;
+      const phone = document.getElementById('signupPhone').value.trim();
+      const email = document.getElementById('signupEmail').value.trim();
+      const isProspect = els.signupMemberType.value === 'prospect';
+      const requestedRole = isProspect ? 'prospect' : els.signupRole.value;
       const inviteCode = els.signupInvite.value.trim();
-      return { name, requestedRole, inviteCode, provider: 'password' };
+      const payload = {
+        name,
+        phone,
+        email,
+        requestedRole,
+        inviteCode,
+        provider: 'password',
+        gender: els.signupGender.value,
+        genderSelfDescribe: els.signupGender.value === 'self-describe' ? els.signupGenderSelf.value.trim() : ''
+      };
+
+      if (isProspect) {
+        const previousRotaract = els.signupPreviousRotaract.value === 'yes';
+        const referred = els.signupReferred.value === 'yes';
+        Object.assign(payload, {
+          signupType: 'prospect',
+          hobbies: els.signupHobbies.value.trim(),
+          previousRotaract,
+          previousRotaractDetails: previousRotaract ? els.signupPreviousRotaractDetails.value.trim() : 'N/A',
+          joinReason: els.signupWhyJoin.value.trim(),
+          referred,
+          referredBy: referred ? els.signupReferredBy.value.trim() : 'N/A'
+        });
+      }
+
+      return payload;
     }
 
     async function createWithGoogleFromSignup() {
       const payload = signupPayloadFromForm();
-      if (!payload.name) {
-        setMessage('Enter your full name.');
-        return;
-      }
-      if (payload.requestedRole === 'admin' && !payload.inviteCode) {
-        setMessage('Enter the admin invite code.');
-        return;
-      }
+      if (!validateSignupForm({ requireCredentials: false, payload })) return;
 
       const provider = new firebase.auth.GoogleAuthProvider();
       try {
         const res = await auth.signInWithPopup(provider);
-        const data = await submitProfileRequest({ ...payload, provider: 'google' });
+        const data = await submitProfileRequest({ ...payload, email: res.user.email || payload.email, provider: 'google' });
         await finishSignup(data);
       } catch (err) {
         if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment')) {
@@ -1009,7 +1369,13 @@
     }
 
     els.showLoginTab.onclick = () => { showMode('login'); setMessage(''); };
-    els.showSignupTab.onclick = () => { showMode('signup'); setMessage(''); };
+    els.showSignupTab.onclick = () => { resetSignupPath(); showMode('signup'); setMessage(''); };
+    document.getElementById('signupMemberYes').onclick = () => selectSignupPath('existing');
+    document.getElementById('signupMemberNo').onclick = () => selectSignupPath('prospect');
+    document.getElementById('signupChangePath').onclick = () => { resetSignupPath(); setMessage(''); };
+    els.signupGender.onchange = toggleGenderSelfDescription;
+    els.signupPreviousRotaract.onchange = togglePreviousRotaractDetails;
+    els.signupReferred.onchange = toggleReferralDetails;
     els.signupRole.onchange = () => toggleInvite(els.signupRole, els.signupInviteWrap, els.signupInvite);
     els.profileRole.onchange = () => toggleInvite(els.profileRole, els.profileInviteWrap, els.profileInvite);
 
@@ -1040,17 +1406,9 @@
       event.preventDefault();
       const email = document.getElementById('signupEmail').value.trim();
       const pass = document.getElementById('signupPassword').value;
-      const confirm = document.getElementById('signupConfirm').value;
       const payload = signupPayloadFromForm();
 
-      if (pass !== confirm) {
-        setMessage('Password mismatch.');
-        return;
-      }
-      if (payload.requestedRole === 'admin' && !payload.inviteCode) {
-        setMessage('Enter the admin invite code.');
-        return;
-      }
+      if (!validateSignupForm({ requireCredentials: true, payload })) return;
 
       let cred = null;
       try {
@@ -1130,6 +1488,7 @@
     };
 
     (async function completeRedirectIfAny() {
+      resetSignupPath();
       toggleInvite(els.signupRole, els.signupInviteWrap, els.signupInvite);
       toggleInvite(els.profileRole, els.profileInviteWrap, els.profileInvite);
       const redirectMessage = getRedirectReasonMessage();
@@ -1142,7 +1501,7 @@
           if (pendingSignup) {
             sessionStorage.removeItem('pendingGoogleSignup');
             const payload = JSON.parse(pendingSignup);
-            const data = await submitProfileRequest(payload);
+            const data = await submitProfileRequest({ ...payload, email: result.user.email || payload.email });
             await finishSignup(data);
             return;
           }

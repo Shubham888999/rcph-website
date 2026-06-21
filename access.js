@@ -17,6 +17,7 @@ const els = {
 const auth = window.auth;
 const functionsClient = firebase.functions();
 const getMyAccess = functionsClient.httpsCallable('getMyAccess');
+const PROSPECT_WHATSAPP_URL = 'https://chat.whatsapp.com/PLACEHOLDER';
 
 const PANEL_DEFS = [
   {
@@ -24,7 +25,25 @@ const PANEL_DEFS = [
     title: 'My Member Dashboard',
     description: 'View your attendance, upcoming events, avenue breakdowns and club-level stats.',
     href: 'my-dashboard.html',
-    roles: ['gbm', 'bod', 'admin', 'president']
+    roles: ['prospect', 'gbm', 'bod', 'admin', 'president']
+  },
+  {
+    key: 'whatsapp',
+    title: 'Join Our WhatsApp Group',
+    description: 'Get updates about meetings, avenue events, projects, and onboarding announcements.',
+    href: PROSPECT_WHATSAPP_URL,
+    target: '_blank',
+    rel: 'noopener',
+    actionLabel: 'Join Group',
+    roles: ['prospect']
+  },
+  {
+    key: 'membership-progress',
+    title: 'Membership Progress',
+    description: 'Complete 2 GBMs, 2 avenue events, and dues payment to become an official member.',
+    href: 'my-dashboard.html',
+    actionLabel: 'View Progress',
+    roles: ['prospect']
   },
   {
     key: 'bod',
@@ -50,6 +69,7 @@ function setState(state) {
 
 function roleLabel(role) {
   const labels = {
+    prospect: 'Prospect',
     gbm: 'GBM',
     bod: 'BOD',
     admin: 'Admin',
@@ -93,15 +113,24 @@ function showMessage(title, message) {
 
 function renderCards(role) {
   const allowed = PANEL_DEFS.filter(panel => panel.roles.includes(role));
-  els.accessCards.innerHTML = allowed.map(panel => `
-    <article class="panel-card">
+  els.accessCards.innerHTML = allowed.map(panel => {
+    const isProspectDashboard = role === 'prospect' && panel.key === 'dashboard';
+    const title = isProspectDashboard ? 'My Dashboard' : panel.title;
+    const description = isProspectDashboard
+      ? 'Track your onboarding journey and next steps toward becoming an official RCPH member.'
+      : panel.description;
+    const target = panel.target ? ` target="${panel.target}"` : '';
+    const rel = panel.rel ? ` rel="${panel.rel}"` : '';
+    return `
+    <article class="panel-card panel-card--${panel.key}">
       <div>
-        <h3>${panel.title}</h3>
-        <p>${panel.description}</p>
+        <h3>${title}</h3>
+        <p>${description}</p>
       </div>
-      <a class="btn" href="${panel.href}">Open</a>
+      <a class="btn" href="${panel.href}"${target}${rel}>${panel.actionLabel || 'Open'}</a>
     </article>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderHub(user, access, role) {
@@ -109,7 +138,9 @@ function renderHub(user, access, role) {
   els.profileName.textContent = profile.name || user.displayName || user.email || 'RCPH Member';
   els.profileEmail.textContent = profile.email || user.email || '';
   els.roleChip.textContent = roleLabel(role);
-  els.accessIntro.textContent = `Approved ${roleLabel(role)} account. Choose an available panel.`;
+  els.accessIntro.textContent = role === 'prospect'
+    ? 'Prospect account approved. Complete your onboarding steps to become an official RCPH member.'
+    : `Approved ${roleLabel(role)} account. Choose an available panel.`;
   renderCards(role);
   setState('hub');
 }

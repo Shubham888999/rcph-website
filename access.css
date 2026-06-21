@@ -121,10 +121,22 @@ body {
 .panel-card p {
   margin: 0;
   color: #ddd0b3;
+  overflow-wrap: anywhere;
 }
 
 .panel-card .btn {
   align-self: flex-start;
+}
+
+.panel-card--whatsapp {
+  border-color: rgba(96,195,196,0.45);
+  background:
+    linear-gradient(180deg, rgba(96,195,196,0.09), rgba(255,255,255,0.015)),
+    #151515;
+}
+
+.panel-card--membership-progress {
+  border-color: rgba(212,164,55,0.45);
 }
 
 @media (max-width: 860px) {

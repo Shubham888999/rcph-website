@@ -12,7 +12,7 @@
     <header class="member-topbar">
       <div>
         <p class="eyebrow">Rotaract Club of Pune Heritage</p>
-        <h1>My RCPH Dashboard</h1>
+        <h1 id="dashboardTitle">My RCPH Dashboard</h1>
       </div>
       <nav class="member-actions" aria-label="Dashboard actions">
         <a class="btn btn-outline" href="index.html">Back to Home</a>
@@ -47,7 +47,8 @@
         </div>
       </section>
 
-      <section class="kpi-grid" aria-label="Personal attendance summary">
+      <div id="memberDashboardSections" class="member-dashboard-sections">
+        <section class="kpi-grid" aria-label="Personal attendance summary">
         <article class="kpi-card">
           <span>My Attendance</span>
           <strong id="kpiAttendance">0%</strong>
@@ -119,12 +120,72 @@
         </article>
       </section>
 
-      <section class="dashboard-card">
-        <div class="section-title">
-          <h2>Events By Avenue</h2>
-        </div>
-        <div id="eventsByAvenue" class="avenue-bars"></div>
-      </section>
+        <section class="dashboard-card">
+          <div class="section-title">
+            <h2>Events By Avenue</h2>
+          </div>
+          <div id="eventsByAvenue" class="avenue-bars"></div>
+        </section>
+      </div>
+
+      <div id="prospectDashboardSections" class="prospect-dashboard" hidden>
+        <section class="prospect-grid">
+          <article class="dashboard-card prospect-whatsapp-card">
+            <p class="eyebrow">Stay connected</p>
+            <h2>Join Our WhatsApp Group</h2>
+            <p class="subtle">Get updates about meetings, avenue events, projects, and onboarding announcements.</p>
+            <a class="btn prospect-action" href="https://chat.whatsapp.com/PLACEHOLDER" target="_blank" rel="noopener">Join WhatsApp Group</a>
+            <p class="placeholder-note">Replace this placeholder link with the official RCPH WhatsApp invite.</p>
+          </article>
+
+          <article class="dashboard-card prospect-criteria-card">
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Membership Criteria</p>
+                <h2>Your onboarding progress</h2>
+              </div>
+              <span id="prospectProgressStatus" class="status-chip">Getting Started</span>
+            </div>
+            <div class="prospect-progress-summary">
+              <strong id="prospectProgressPercent">0%</strong>
+              <span id="prospectProgressCount" class="subtle">0 of 3 criteria complete</span>
+            </div>
+            <div id="prospectProgressTrack" class="progress-track" role="progressbar" aria-label="Membership onboarding progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div id="prospectProgressFill" class="progress-fill"></div>
+            </div>
+            <ul class="prospect-checklist" aria-label="Membership criteria checklist">
+              <li id="prospectGbmItem">
+                <span class="criteria-check" aria-hidden="true"></span>
+                <div>
+                  <strong>Attend 2 General Body Meetings</strong>
+                  <span id="prospectGbmValue">0 / 2 attended</span>
+                </div>
+              </li>
+              <li id="prospectAvenueItem">
+                <span class="criteria-check" aria-hidden="true"></span>
+                <div>
+                  <strong>Attend 2 Avenue Events</strong>
+                  <span id="prospectAvenueValue">0 / 2 attended</span>
+                </div>
+              </li>
+              <li id="prospectDuesItem">
+                <span class="criteria-check" aria-hidden="true"></span>
+                <div>
+                  <strong>Pay Membership Dues</strong>
+                  <span id="prospectDuesValue">Not paid</span>
+                </div>
+              </li>
+            </ul>
+          </article>
+        </section>
+
+        <section class="dashboard-card prospect-upcoming-card">
+          <div class="section-title">
+            <h2>Upcoming Events</h2>
+          </div>
+          <div id="prospectUpcomingEvents" class="event-list"></div>
+        </section>
+      </div>
     </div>
   </main>
 

@@ -1,12 +1,15 @@
 const auth = window.auth;
 const db = window.db;
 const dashboardFunction = firebase.functions().httpsCallable('getMyDashboardStats');
+const REQUIRED_GBM = 2;
+const REQUIRED_AVENUE_EVENTS = 2;
 
 const els = {
   loading: document.getElementById('loadingState'),
   error: document.getElementById('errorState'),
   errorMessage: document.getElementById('errorMessage'),
   content: document.getElementById('dashboardContent'),
+  dashboardTitle: document.getElementById('dashboardTitle'),
   welcomeName: document.getElementById('welcomeName'),
   memberLinkNote: document.getElementById('memberLinkNote'),
   roleChip: document.getElementById('roleChip'),
@@ -27,7 +30,21 @@ const els = {
   districtRecent: document.getElementById('districtRecent'),
   clubStatsList: document.getElementById('clubStatsList'),
   upcomingEvents: document.getElementById('upcomingEvents'),
-  eventsByAvenue: document.getElementById('eventsByAvenue')
+  eventsByAvenue: document.getElementById('eventsByAvenue'),
+  memberDashboardSections: document.getElementById('memberDashboardSections'),
+  prospectDashboardSections: document.getElementById('prospectDashboardSections'),
+  prospectProgressStatus: document.getElementById('prospectProgressStatus'),
+  prospectProgressPercent: document.getElementById('prospectProgressPercent'),
+  prospectProgressCount: document.getElementById('prospectProgressCount'),
+  prospectProgressTrack: document.getElementById('prospectProgressTrack'),
+  prospectProgressFill: document.getElementById('prospectProgressFill'),
+  prospectGbmItem: document.getElementById('prospectGbmItem'),
+  prospectGbmValue: document.getElementById('prospectGbmValue'),
+  prospectAvenueItem: document.getElementById('prospectAvenueItem'),
+  prospectAvenueValue: document.getElementById('prospectAvenueValue'),
+  prospectDuesItem: document.getElementById('prospectDuesItem'),
+  prospectDuesValue: document.getElementById('prospectDuesValue'),
+  prospectUpcomingEvents: document.getElementById('prospectUpcomingEvents')
 };
 
 function escapeHtml(value) {
@@ -38,6 +55,7 @@ function escapeHtml(value) {
 
 function roleLabel(role) {
   const labels = {
+    prospect: 'Prospect',
     gbm: 'GBM',
     bod: 'BOD',
     admin: 'Admin',
@@ -177,13 +195,13 @@ function renderEventsByAvenue(rows) {
   }).join('');
 }
 
-function renderUpcoming(events) {
+function renderUpcoming(target, events) {
   if (!events || !events.length) {
-    els.upcomingEvents.innerHTML = '<p class="subtle">No upcoming public events yet.</p>';
+    target.innerHTML = '<p class="subtle">No upcoming public events yet.</p>';
     return;
   }
 
-  els.upcomingEvents.innerHTML = events.map(event => `
+  target.innerHTML = events.map(event => `
     <article class="event-row">
       <div>
         <h3>${escapeHtml(event.name || '-')}</h3>
@@ -195,7 +213,19 @@ function renderUpcoming(events) {
   `).join('');
 }
 
-function renderDashboard(data) {
+function setDashboardMode(isProspect) {
+  els.memberDashboardSections.hidden = isProspect;
+  els.prospectDashboardSections.hidden = !isProspect;
+  if (isProspect) {
+    els.memberDashboardSections.setAttribute('hidden', '');
+    els.prospectDashboardSections.removeAttribute('hidden');
+  } else {
+    els.memberDashboardSections.removeAttribute('hidden');
+    els.prospectDashboardSections.setAttribute('hidden', '');
+  }
+}
+
+function renderMemberDashboard(data) {
   const profile = data.profile || {};
   const my = data.myAttendance || {};
   const district = data.districtAttendance || {};
@@ -203,6 +233,9 @@ function renderDashboard(data) {
   const displayName = profile.name || profile.memberName || 'Member';
   const position = profile.memberPosition || profile.clubPosition || '';
 
+  document.title = 'My RCPH Dashboard';
+  els.dashboardTitle.textContent = 'My RCPH Dashboard';
+  setDashboardMode(false);
   els.welcomeName.textContent = `Welcome, ${displayName}`;
   els.roleChip.textContent = roleLabel(profile.role);
   els.positionChip.hidden = !position;
@@ -233,9 +266,73 @@ function renderDashboard(data) {
   els.districtPercent.textContent = `${district.percentage || 0}%`;
   renderEventList(els.districtRecent, district.recent || [], 'No district attendance has been recorded yet.');
   renderClubStats(club);
-  renderUpcoming(data.upcomingEvents || []);
+  renderUpcoming(els.upcomingEvents, data.upcomingEvents || []);
   renderEventsByAvenue(club.eventsByAvenue || []);
   showDashboard();
+}
+
+function progressStatus(percent) {
+  if (percent >= 100) return 'Ready for Review';
+  if (percent >= 67) return 'Almost There';
+  if (percent > 0) return 'In Progress';
+  return 'Getting Started';
+}
+
+function setCriterionState(item, complete) {
+  item.classList.toggle('is-complete', complete);
+}
+
+function renderProspectDashboard(data) {
+  const profile = data.profile || {};
+  const progress = data.prospectProgress || {};
+  const criteria = progress.criteria || {};
+  const requiredGbm = Math.max(1, Number(criteria.requiredGbm) || REQUIRED_GBM);
+  const requiredAvenueEvents = Math.max(1, Number(criteria.requiredAvenueEvents) || REQUIRED_AVENUE_EVENTS);
+  const gbmAttended = Math.max(0, Number(progress.gbmAttended) || 0);
+  const avenueEventsAttended = Math.max(0, Number(progress.avenueEventsAttended) || 0);
+  const duesPaid = progress.duesPaid === true;
+  const gbmComplete = gbmAttended >= requiredGbm;
+  const avenueComplete = avenueEventsAttended >= requiredAvenueEvents;
+  const completedFallback = [gbmComplete, avenueComplete, duesPaid].filter(Boolean).length;
+  const completedCount = Math.max(0, Number(progress.completedCount) || completedFallback);
+  const totalCount = Math.max(1, Number(progress.totalCount) || 3);
+  const calculatedPercent = Math.round((completedCount / totalCount) * 100);
+  const suppliedPercent = Number(progress.percent);
+  const percent = Math.max(0, Math.min(100, Number.isFinite(suppliedPercent) ? suppliedPercent : calculatedPercent));
+  const displayName = profile.name || 'Prospect';
+
+  document.title = 'My Dashboard';
+  els.dashboardTitle.textContent = 'My Dashboard';
+  setDashboardMode(true);
+  els.welcomeName.textContent = `Welcome, ${displayName}`;
+  els.roleChip.textContent = 'Prospect';
+  els.positionChip.hidden = true;
+  els.positionChip.setAttribute('hidden', '');
+  els.memberLinkNote.textContent = 'You are currently a Prospect Member. Complete the onboarding criteria below to become an official RCPH member.';
+  els.adminPanelBtn.hidden = true;
+  els.bodPanelBtn.hidden = true;
+
+  els.prospectProgressStatus.textContent = progressStatus(percent);
+  els.prospectProgressPercent.textContent = `${percent}%`;
+  els.prospectProgressCount.textContent = `${completedCount} of ${totalCount} criteria complete`;
+  els.prospectProgressFill.style.width = `${percent}%`;
+  els.prospectProgressTrack.setAttribute('aria-valuenow', String(percent));
+  els.prospectGbmValue.textContent = `${gbmAttended} / ${requiredGbm} attended`;
+  els.prospectAvenueValue.textContent = `${avenueEventsAttended} / ${requiredAvenueEvents} attended`;
+  els.prospectDuesValue.textContent = duesPaid ? 'Paid' : 'Not paid';
+  setCriterionState(els.prospectGbmItem, gbmComplete);
+  setCriterionState(els.prospectAvenueItem, avenueComplete);
+  setCriterionState(els.prospectDuesItem, duesPaid);
+  renderUpcoming(els.prospectUpcomingEvents, data.upcomingEvents || []);
+  showDashboard();
+}
+
+function renderDashboard(data) {
+  if (data.mode === 'prospect') {
+    renderProspectDashboard(data);
+    return;
+  }
+  renderMemberDashboard(data);
 }
 
 async function redirectForAccountState(user) {

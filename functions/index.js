@@ -85,10 +85,16 @@ exports.resetPasswordWithOtp = functions.https.onCall(async (data) => {
   return { ok: true };
 });
 
-const ACTIVE_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
-const REQUESTABLE_ROLES = new Set(['gbm', 'bod', 'admin']);
+const ACTIVE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
+const REQUESTABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin']);
 const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin']);
 const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
+const PROSPECT_CRITERIA = Object.freeze({
+  requiredGbm: 2,
+  requiredAvenueEvents: 2,
+  duesRequired: true,
+});
+const PROSPECT_GENDERS = new Set(['woman', 'man', 'non-binary', 'self-describe', 'prefer-not-to-say']);
 
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
@@ -100,6 +106,52 @@ function normalizeText(value, max = 300) {
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function normalizeBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  return ['true', 'yes', '1'].includes(String(value || '').trim().toLowerCase());
+}
+
+function normalizeProspectSignupData(data) {
+  const phone = normalizeText(data.phone, 40);
+  const gender = normalizeText(data.gender, 40).toLowerCase();
+  const genderSelfDescribe = gender === 'self-describe'
+    ? normalizeText(data.genderSelfDescribe ?? data.genderSelfDescription, 160)
+    : '';
+  const hobbies = normalizeText(data.hobbies, 600);
+  const previousRotaract = normalizeBoolean(data.previousRotaract);
+  const previousRotaractDetails = previousRotaract
+    ? normalizeText(data.previousRotaractDetails, 1200)
+    : 'N/A';
+  const joinReason = normalizeText(data.joinReason, 1200);
+  const referred = normalizeBoolean(data.referred);
+  const referredBy = referred ? normalizeText(data.referredBy, 160) : 'N/A';
+
+  if (!phone || !PROSPECT_GENDERS.has(gender) || !hobbies || !joinReason) {
+    throw new HttpsError('invalid-argument', 'Phone, gender, hobbies, and reason for joining are required.');
+  }
+  if (gender === 'self-describe' && !genderSelfDescribe) {
+    throw new HttpsError('invalid-argument', 'Please provide the gender self-description.');
+  }
+  if (previousRotaract && !previousRotaractDetails) {
+    throw new HttpsError('invalid-argument', 'Previous Rotaract experience is required.');
+  }
+  if (referred && !referredBy) {
+    throw new HttpsError('invalid-argument', 'Referrer name is required.');
+  }
+
+  return {
+    phone,
+    gender,
+    genderSelfDescribe,
+    hobbies,
+    previousRotaract,
+    previousRotaractDetails,
+    joinReason,
+    referred,
+    referredBy,
+  };
 }
 
 function normalizeClubPosition(value, fallback) {
@@ -835,10 +887,13 @@ function safeEventForDashboard(event, value) {
 exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const data = request.data || {};
-  const requestedRole = normalizeRole(data.requestedRole);
+  const signupType = normalizeRole(data.signupType);
+  const requestedRole = signupType === 'prospect'
+    ? 'prospect'
+    : normalizeRole(data.requestedRole);
 
   if (!REQUESTABLE_ROLES.has(requestedRole)) {
-    throw new HttpsError('invalid-argument', 'Choose GBM, BOD, or Admin.');
+    throw new HttpsError('invalid-argument', 'Choose Prospect, GBM, BOD, or Admin.');
   }
   if (requestedRole === 'president') {
     throw new HttpsError('permission-denied', 'President accounts are manual-only.');
@@ -855,11 +910,27 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
   }
 
   const profile = await buildProfileFromAuth(uid, request, data);
+  const commonSignupData = {
+    phone: normalizeText(data.phone, 40),
+    gender: normalizeText(data.gender, 40).toLowerCase(),
+    genderSelfDescribe: normalizeText(data.genderSelfDescribe ?? data.genderSelfDescription, 160),
+  };
+  const prospectSignup = requestedRole === 'prospect' ? normalizeProspectSignupData(data) : null;
   const now = admin.firestore.FieldValue.serverTimestamp();
   const userRef = db.collection('users').doc(uid);
   const roleRef = db.collection('roles').doc(uid);
-  const eventIds = Object.keys(await buildNaMapFromCollection('events'));
-  const districtEventIds = Object.keys(await buildNaMapFromCollection('districtEvents'));
+  const prospectProgressRef = db.collection('prospectProgress').doc(uid);
+  let eventIds = [];
+  let districtEventIds = [];
+
+  if (requestedRole === 'gbm') {
+    const [eventMap, districtEventMap] = await Promise.all([
+      buildNaMapFromCollection('events'),
+      buildNaMapFromCollection('districtEvents'),
+    ]);
+    eventIds = Object.keys(eventMap);
+    districtEventIds = Object.keys(districtEventMap);
+  }
 
   const result = await db.runTransaction(async (tx) => {
     const [userSnap, roleSnap] = await Promise.all([tx.get(userRef), tx.get(roleRef)]);
@@ -869,6 +940,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
     if (roleData && ACTIVE_ROLES.has(existingRole) && isApprovedRoleDoc(roleData, existingRole)) {
       const approvedProfile = {
         ...profile,
+        ...(existingRole === 'prospect' && prospectSignup ? prospectSignup : {}),
         role: existingRole,
         requestedRole: existingRole === 'president' ? 'admin' : existingRole,
         status: 'approved',
@@ -908,6 +980,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
 
     const base = {
       ...profile,
+      ...commonSignupData,
       requestedRole,
       updatedAt: now,
       approvedAt: null,
@@ -916,6 +989,47 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       rejectedBy: null,
       rejectReason: null,
     };
+
+    if (requestedRole === 'prospect') {
+      const progressSnap = await tx.get(prospectProgressRef);
+      const currentProgress = progressSnap.exists ? (progressSnap.data() || {}) : {};
+      const currentCriteria = currentProgress.criteria || {};
+
+      tx.set(userRef, {
+        ...base,
+        ...prospectSignup,
+        role: 'prospect',
+        requestedRole: 'prospect',
+        memberType: 'prospect',
+        signupType: 'prospect',
+        clubPosition: 'Prospect',
+        status: 'approved',
+        approvedAt: now,
+        approvedBy: 'system',
+        createdAt: userData?.createdAt || now,
+      }, { merge: true });
+      tx.set(roleRef, {
+        role: 'prospect',
+        status: 'approved',
+        updatedAt: now,
+        approvedBy: 'system',
+      }, { merge: true });
+      tx.set(prospectProgressRef, {
+        uid,
+        gbmAttended: Math.max(0, Number(currentProgress.gbmAttended) || 0),
+        avenueEventsAttended: Math.max(0, Number(currentProgress.avenueEventsAttended) || 0),
+        duesPaid: currentProgress.duesPaid === true,
+        whatsappJoined: currentProgress.whatsappJoined === true,
+        criteria: {
+          requiredGbm: Math.max(1, Number(currentCriteria.requiredGbm) || PROSPECT_CRITERIA.requiredGbm),
+          requiredAvenueEvents: Math.max(1, Number(currentCriteria.requiredAvenueEvents) || PROSPECT_CRITERIA.requiredAvenueEvents),
+          duesRequired: currentCriteria.duesRequired !== false,
+        },
+        createdAt: currentProgress.createdAt || now,
+        updatedAt: now,
+      }, { merge: true });
+      return { status: 'approved', role: 'prospect', requestedRole: 'prospect', existing: false };
+    }
 
     if (requestedRole === 'gbm') {
       const clubPosition = 'Member';
@@ -1163,6 +1277,78 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   const active = await getActiveRole(uid);
   if (!active || !ACTIVE_ROLES.has(active.role)) {
     throw new HttpsError('failed-precondition', 'Approved account required.');
+  }
+
+  if (active.role === 'prospect') {
+    const [userSnap, progressSnap, eventsSnap] = await Promise.all([
+      db.collection('users').doc(uid).get(),
+      db.collection('prospectProgress').doc(uid).get(),
+      db.collection('events').get(),
+    ]);
+    const userData = userSnap.exists ? (userSnap.data() || {}) : {};
+    const progressData = progressSnap.exists ? (progressSnap.data() || {}) : {};
+    const storedCriteria = progressData.criteria || {};
+    const criteria = {
+      requiredGbm: Math.max(1, Number(storedCriteria.requiredGbm) || PROSPECT_CRITERIA.requiredGbm),
+      requiredAvenueEvents: Math.max(1, Number(storedCriteria.requiredAvenueEvents) || PROSPECT_CRITERIA.requiredAvenueEvents),
+      duesRequired: storedCriteria.duesRequired !== false,
+    };
+    const gbmAttended = Math.max(0, Number(progressData.gbmAttended) || 0);
+    const avenueEventsAttended = Math.max(0, Number(progressData.avenueEventsAttended) || 0);
+    const duesPaid = progressData.duesPaid === true;
+    const completionChecks = [
+      gbmAttended >= criteria.requiredGbm,
+      avenueEventsAttended >= criteria.requiredAvenueEvents,
+    ];
+    if (criteria.duesRequired) completionChecks.push(duesPaid);
+    const completedCount = completionChecks.filter(Boolean).length;
+    const totalCount = completionChecks.length;
+    const today = new Date().toISOString().slice(0, 10);
+    const upcomingEvents = eventsSnap.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .filter(event => event.archived !== true
+        && String(event.visibility || 'public').toLowerCase() !== 'internal'
+        && String(event.date || '') >= today)
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+      .slice(0, 5)
+      .map(event => ({
+        id: event.id,
+        name: event.name || '',
+        date: event.date || '',
+        endDate: event.endDate || '',
+        avenue: normalizeAvenuesForStats(event.avenue),
+        desc: event.desc || event.description || '',
+        type: event.type || 'clubEvent',
+      }));
+
+    return {
+      ok: true,
+      mode: 'prospect',
+      profile: {
+        uid,
+        name: userData.name || request.auth?.token?.name || '',
+        email: userData.email || request.auth?.token?.email || '',
+        role: 'prospect',
+        clubPosition: 'Prospect',
+        phone: userData.phone || '',
+        gender: userData.gender || '',
+        hobbies: userData.hobbies || '',
+        joinReason: userData.joinReason || '',
+        referredBy: userData.referredBy || 'N/A',
+        previousRotaractDetails: userData.previousRotaractDetails || 'N/A',
+      },
+      prospectProgress: {
+        gbmAttended,
+        avenueEventsAttended,
+        duesPaid,
+        whatsappJoined: progressData.whatsappJoined === true,
+        criteria,
+        completedCount,
+        totalCount,
+        percent: percentage(completedCount, totalCount),
+      },
+      upcomingEvents,
+    };
   }
 
   const [

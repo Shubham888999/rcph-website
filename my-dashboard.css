@@ -342,6 +342,135 @@ body {
   background: linear-gradient(90deg, var(--member-teal), var(--member-gold));
 }
 
+.member-dashboard-sections {
+  display: contents;
+}
+
+.prospect-dashboard {
+  display: grid;
+  gap: 14px;
+}
+
+.prospect-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr);
+  gap: 14px;
+}
+
+.prospect-whatsapp-card,
+.prospect-criteria-card {
+  min-width: 0;
+}
+
+.prospect-whatsapp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background:
+    radial-gradient(circle at top right, rgba(96,195,196,.16), transparent 46%),
+    linear-gradient(180deg, rgba(22,23,23,.96), rgba(13,14,14,.98));
+}
+
+.prospect-whatsapp-card h2 {
+  margin: 8px 0 4px;
+}
+
+.prospect-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  min-height: 44px;
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+.placeholder-note {
+  margin: 12px 0 0;
+  color: #d4bd86;
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.prospect-progress-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.prospect-progress-summary strong {
+  color: var(--member-gold);
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1;
+}
+
+.prospect-checklist {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prospect-checklist li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px;
+  background: rgba(255,255,255,.025);
+}
+
+.prospect-checklist li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.prospect-checklist li strong,
+.prospect-checklist li span {
+  overflow-wrap: anywhere;
+}
+
+.prospect-checklist li > div span {
+  color: var(--member-muted);
+  font-size: .84rem;
+}
+
+.criteria-check {
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(96,195,196,.52);
+  border-radius: 50%;
+  background: rgba(96,195,196,.08);
+}
+
+.prospect-checklist li.is-complete {
+  border-color: rgba(120,217,154,.35);
+  background: rgba(120,217,154,.07);
+}
+
+.prospect-checklist li.is-complete .criteria-check {
+  display: grid;
+  place-items: center;
+  border-color: var(--member-good);
+  background: var(--member-good);
+  color: #092412;
+}
+
+.prospect-checklist li.is-complete .criteria-check::after {
+  content: "✓";
+  font-weight: 900;
+}
+
+.prospect-upcoming-card {
+  margin-top: 0;
+}
+
 .dashboard-state {
   display: grid;
   justify-items: center;
@@ -388,8 +517,14 @@ body {
   }
 
   .kpi-grid,
-  .dashboard-grid {
+  .dashboard-grid,
+  .prospect-grid {
     grid-template-columns: 1fr;
+  }
+
+  .prospect-progress-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .event-row {
