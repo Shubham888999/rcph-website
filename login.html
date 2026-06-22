@@ -1069,11 +1069,13 @@
       els.signupDetails.hidden = false;
       els.signupNewMemberFields.hidden = !isProspect;
       els.signupRoleWrap.hidden = isProspect;
-      els.signupProspectRoleDisplay.hidden = !isProspect;
+      if (els.signupProspectRoleDisplay) els.signupProspectRoleDisplay.hidden = !isProspect;
       els.signupRole.disabled = isProspect;
-      els.signupInternalRoleNote.hidden = isProspect;
-      els.signupProspectRoleNote.hidden = !isProspect;
-      els.signupPathLabel.textContent = isProspect ? 'Prospect Member application' : 'Existing RCPH member account';
+      if (els.signupInternalRoleNote) els.signupInternalRoleNote.hidden = isProspect;
+      if (els.signupProspectRoleNote) els.signupProspectRoleNote.hidden = !isProspect;
+      if (els.signupPathLabel) {
+        els.signupPathLabel.textContent = isProspect ? 'Prospect Member application' : 'Existing RCPH member account';
+      }
 
       if (!isProspect) {
         els.signupHobbies.value = '';
@@ -1086,6 +1088,9 @@
 
       setSignupRequiredState(true);
       toggleInvite(els.signupRole, els.signupInviteWrap, els.signupInvite);
+      togglePreviousRotaractDetails();
+      toggleReferralDetails();
+      toggleGenderSelfDescription();
       setMessage('');
       document.getElementById('signupName').focus();
     }
@@ -1365,10 +1370,13 @@
     els.showSignupTab.onclick = () => { resetSignupPath(); showMode('signup'); setMessage(''); };
     document.getElementById('signupMemberYes').onclick = () => selectSignupPath('existing');
     document.getElementById('signupMemberNo').onclick = () => selectSignupPath('prospect');
-    document.getElementById('signupChangePath').onclick = () => { resetSignupPath(); setMessage(''); };
-    els.signupGender.onchange = toggleGenderSelfDescription;
-    els.signupPreviousRotaract.onchange = togglePreviousRotaractDetails;
-    els.signupReferred.onchange = toggleReferralDetails;
+    const signupChangePathButton = document.getElementById('signupChangePath');
+    if (signupChangePathButton) {
+      signupChangePathButton.onclick = () => { resetSignupPath(); setMessage(''); };
+    }
+    els.signupGender.addEventListener('change', toggleGenderSelfDescription);
+    els.signupPreviousRotaract.addEventListener('change', togglePreviousRotaractDetails);
+    els.signupReferred.addEventListener('change', toggleReferralDetails);
     els.signupRole.onchange = () => toggleInvite(els.signupRole, els.signupInviteWrap, els.signupInvite);
     els.profileRole.onchange = () => toggleInvite(els.profileRole, els.profileInviteWrap, els.profileInvite);
 
