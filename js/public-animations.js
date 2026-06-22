@@ -1061,32 +1061,6 @@
     return 'desktop';
   }
 
-  function createSeededRandom(seedText) {
-    var seed = 2166136261;
-    var index;
-
-    for (index = 0; index < seedText.length; index += 1) {
-      seed ^= seedText.charCodeAt(index);
-      seed = Math.imul(seed, 16777619);
-    }
-
-    return function () {
-      seed += 0x6D2B79F5;
-      var value = seed;
-      value = Math.imul(value ^ value >>> 15, value | 1);
-      value ^= value + Math.imul(value ^ value >>> 7, value | 61);
-      return ((value ^ value >>> 14) >>> 0) / 4294967296;
-    };
-  }
-
-  function randomBetween(random, min, max) {
-    return min + ((max - min) * random());
-  }
-
-  function chooseAmbientValue(random, values) {
-    return values[Math.floor(random() * values.length) % values.length];
-  }
-
   function clearHomepageAmbientAnimations() {
     state.homepageAmbientAnimations.forEach(function (animation) {
       if (animation && typeof animation.kill === 'function') {
@@ -1105,235 +1079,416 @@
     return animation;
   }
 
-  function getHomepageAmbientSettings(breakpoint) {
+  function createAmbientSvg(className, viewBox, artwork) {
+    var wrapper = document.createElement('span');
+    wrapper.className = className;
+    wrapper.innerHTML = '<svg viewBox="' + viewBox + '" aria-hidden="true" focusable="false" fill="none" xmlns="http://www.w3.org/2000/svg">' + artwork + '</svg>';
+    return wrapper;
+  }
+
+  function createPuneHeritageAmbient(layer) {
+    var heritage = document.createElement('div');
+    heritage.className = 'rcph-heritage-ambient';
+    heritage.setAttribute('aria-hidden', 'true');
+
+    var landmarks = [
+      {
+        key: 'shaniwar-wada',
+        label: 'Shaniwar Wada',
+        viewBox: '0 0 240 170',
+        artwork: '<path d="M24 145V68h24V50h18v18h22V42h18v26h28V42h18v26h22V50h18v18h24v77"/><path d="M16 145h208M36 145V84h168v61M86 145v-36c0-25 16-42 34-42s34 17 34 42v36M101 145v-35c0-13 8-23 19-23s19 10 19 23v35M48 98h24v18H48zM168 98h24v18h-24z"/><path d="M66 50l11-12 11 12M152 50l11-12 11 12M106 42l14-17 14 17"/>'
+      },
+      {
+        key: 'sinhagad',
+        label: 'Sinhagad',
+        viewBox: '0 0 260 150',
+        artwork: '<path d="M5 130l28-18 23 5 28-28 25 8 25-35 21 8 18-17 19 26 20-7 23 26 24-3 26 35"/><path d="M96 92V66h12V54h15v12h16V52h15v14h14v28M85 94h97M109 77h12M142 77h12"/><path d="M5 139c34-11 63-8 91-3 32 6 58 5 84-4 27-10 51-9 75 4"/>'
+      },
+      {
+        key: 'university-dome',
+        label: 'Pune University',
+        viewBox: '0 0 250 170',
+        artwork: '<path d="M20 145h210M36 145V99h48v46M166 145V99h48v46M75 99h100M88 145V91h74v54"/><path d="M94 91c3-25 15-41 31-41s28 16 31 41M107 50c2-12 9-21 18-21s16 9 18 21M125 29V15M118 15h14"/><path d="M98 145v-35h14v35M118 145v-35h14v35M138 145v-35h14v35M45 114h13v18H45zM192 114h13v18h-13z"/>'
+      }
+    ];
+
+    landmarks.forEach(function (landmark) {
+      var figure = document.createElement('figure');
+      figure.className = 'rcph-heritage-mark rcph-heritage-' + landmark.key;
+      figure.setAttribute('data-heritage-landmark', landmark.label);
+      figure.appendChild(createAmbientSvg('rcph-heritage-vector', landmark.viewBox, landmark.artwork));
+      heritage.appendChild(figure);
+    });
+
+    layer.appendChild(heritage);
+    return Array.prototype.slice.call(heritage.querySelectorAll('.rcph-heritage-mark'));
+  }
+
+  function createRotaractJourneyAmbient(layer, breakpoint) {
     if (breakpoint === 'mobile') {
-      return {
-        count: 5,
-        wordBudget: 1,
-        centerChance: 0,
-        motionChance: 0.18,
-        sweepCount: 0
-      };
+      return null;
     }
 
-    if (breakpoint === 'tablet') {
-      return {
-        count: 12,
-        wordBudget: 3,
-        centerChance: 0.08,
-        motionChance: 0.72,
-        sweepCount: 2
-      };
-    }
+    var journey = document.createElement('div');
+    journey.className = 'rcph-journey-ambient';
+    journey.setAttribute('aria-hidden', 'true');
+    journey.appendChild(createAmbientSvg(
+      'rcph-journey-route',
+      '0 0 180 720',
+      '<defs><mask id="rcph-journey-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="720"><path class="rcph-journey-reveal" d="M76 10C148 88 25 151 86 224s59 118 3 177-43 118 15 176 27 91-10 133" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-journey-route-mask)"><path class="rcph-journey-line" d="M76 10C148 88 25 151 86 224s59 118 3 177-43 118 15 176 27 91-10 133"/><path class="rcph-journey-line-glow" d="M76 10C148 88 25 151 86 224s59 118 3 177-43 118 15 176 27 91-10 133"/></g>'
+    ));
 
-    return {
-      count: 20,
-      wordBudget: 5,
-      centerChance: 0.08,
-      motionChance: 0.86,
-      sweepCount: 3
-    };
+    var stages = [
+      { name: 'Service', top: '2%', icon: '<path d="M5 18c5-1 8 1 11 4 4-5 8-6 13-3M8 18l4-10 8 3 7-7M23 4h6v6"/>' },
+      { name: 'Leadership', top: '25%', icon: '<path d="M8 29V5M9 6h18l-5 7 5 7H9M4 29h10"/>' },
+      { name: 'Fellowship', top: '49%', icon: '<path d="M5 26c1-7 5-10 10-10s9 3 10 10M10 10c0-4 2-6 5-6s5 2 5 6-2 6-5 6-5-2-5-6M21 15c2-3 4-4 7-3 3 1 4 4 3 7M25 26c1-4 4-6 8-5"/>' },
+      { name: 'Community', top: '73%', icon: '<path d="M4 17L18 5l14 12M8 15v15h20V15M14 30V20h8v10M4 30h28"/>' },
+      { name: 'Impact', top: '94%', icon: '<path d="M18 3l12 7-2 15-10 7-10-7-2-15 12-7zM18 9l5 7-5 10-5-10 5-7z"/>' }
+    ];
+
+    var list = document.createElement('ol');
+    list.className = 'rcph-journey-stages';
+    stages.forEach(function (stage) {
+      var item = document.createElement('li');
+      item.className = 'rcph-journey-stage';
+      item.style.setProperty('--rcph-journey-top', stage.top);
+      item.appendChild(createAmbientSvg('rcph-journey-icon', '0 0 36 36', stage.icon));
+
+      var label = document.createElement('span');
+      label.className = 'rcph-journey-label';
+      label.textContent = stage.name;
+      item.appendChild(label);
+      list.appendChild(item);
+    });
+
+    journey.appendChild(list);
+    layer.appendChild(journey);
+    return journey;
   }
 
-  function getHomepageAmbientSize(random, type, breakpoint) {
-    if (type === 'word') {
-      if (breakpoint === 'mobile') {
-        return randomBetween(random, 130, 170);
+  function createLeftAvenueAmbient(layer, breakpoint) {
+    if (breakpoint === 'mobile') {
+      return null;
+    }
+
+    var avenue = document.createElement('div');
+    avenue.className = 'rcph-avenue-ambient';
+    avenue.setAttribute('aria-hidden', 'true');
+    avenue.appendChild(createAmbientSvg(
+      'rcph-avenue-route',
+      '0 0 190 720',
+      '<defs><mask id="rcph-avenue-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="190" height="720"><path class="rcph-avenue-reveal" d="M112 12C34 104 161 187 97 281S31 439 103 522s48 127 3 188" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-avenue-route-mask)"><path class="rcph-avenue-line" d="M112 12C34 104 161 187 97 281S31 439 103 522s48 127 3 188"/><path class="rcph-avenue-line-glow" d="M112 12C34 104 161 187 97 281S31 439 103 522s48 127 3 188"/></g>'
+    ));
+
+    var stages = [
+      { name: 'Professional Development', top: '5%', icon: '<path d="M18 3c8 0 14 7 14 15s-6 15-14 15S4 26 4 18 10 3 18 3zM4 18h28M18 3c4 4 6 9 6 15s-2 11-6 15M18 3c-4 4-6 9-6 15s2 11 6 15M25 9l5-3-1 6"/>' },
+      { name: 'Community Service', top: '34%', icon: '<path d="M5 29c1-7 5-10 10-10s9 3 10 10M10 12c0-4 2-6 5-6s5 2 5 6-2 6-5 6-5-2-5-6M22 18c2-3 5-4 8-2 3 2 4 5 2 8M25 29c1-4 4-6 8-5"/>' },
+      { name: 'International Service', top: '63%', icon: '<path d="M4 12h28v18H4zM12 12V7h12v5M4 19c8 4 20 4 28 0M15 19h6v5h-6M24 8l5-4M29 4v6"/>' },
+      { name: 'Club Service', top: '91%', icon: '<path d="M4 21c5-2 9 0 14 7 5-7 9-9 14-7M7 21l3-11 8 4 8-4 3 11M18 14c-2-5-8-5-8 1 0 5 8 10 8 10s8-5 8-10c0-6-6-6-8-1z"/>' }
+    ];
+
+    var list = document.createElement('ol');
+    list.className = 'rcph-avenue-stages';
+    stages.forEach(function (stage) {
+      var item = document.createElement('li');
+      item.className = 'rcph-avenue-stage';
+      item.style.setProperty('--rcph-avenue-top', stage.top);
+      item.appendChild(createAmbientSvg('rcph-avenue-icon', '0 0 36 36', stage.icon));
+
+      var label = document.createElement('span');
+      label.className = 'rcph-avenue-label';
+      label.textContent = stage.name;
+      item.appendChild(label);
+      list.appendChild(item);
+    });
+
+    avenue.appendChild(list);
+    layer.appendChild(avenue);
+    return avenue;
+  }
+
+  function prepareDrawPath(path) {
+    if (!path || typeof path.getTotalLength !== 'function') {
+      return 0;
+    }
+
+    var length;
+    try {
+      length = path.getTotalLength();
+    } catch (error) {
+      return 0;
+    }
+
+    if (!Number.isFinite(length) || length <= 0) {
+      return 0;
+    }
+
+    path.classList.add('rcph-draw-path');
+    path.style.strokeDasharray = length.toFixed(2) + 'px';
+    path.style.strokeDashoffset = length.toFixed(2) + 'px';
+    return length;
+  }
+
+  function showDrawPathStatic(path) {
+    if (!path) {
+      return;
+    }
+
+    path.classList.remove('rcph-draw-path');
+    path.style.removeProperty('stroke-dasharray');
+    path.style.removeProperty('stroke-dashoffset');
+  }
+
+  function drawPathOnScroll(path, trigger, start, end) {
+    if (!path || state.reduceMotion || !hasGsap() || !state.scrollTriggerReady || !window.ScrollTrigger) {
+      showDrawPathStatic(path);
+      return null;
+    }
+
+    if (!prepareDrawPath(path)) {
+      showDrawPathStatic(path);
+      return null;
+    }
+
+    return trackHomepageAmbient(getGsap().to(path, {
+      strokeDashoffset: 0,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: trigger || document.body,
+        start: start,
+        end: end,
+        scrub: 1.15,
+        invalidateOnRefresh: true
       }
+    }));
+  }
 
-      if (breakpoint === 'tablet') {
-        return randomBetween(random, 150, 240);
+  function getHomepageElementScrollTop(element) {
+    if (!element || typeof element.getBoundingClientRect !== 'function') {
+      return 0;
+    }
+
+    return element.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
+  }
+
+  function getJourneyDrawStart() {
+    var membership = document.querySelector('#riy-recruitment') || document.querySelector('main');
+    return Math.max(0, getHomepageElementScrollTop(membership) - (window.innerHeight * 0.78));
+  }
+
+  function getJourneyDrawEnd() {
+    var contact = document.querySelector('#contact') || document.querySelector('#gallery') || document.body;
+    return Math.max(getJourneyDrawStart() + window.innerHeight, getHomepageElementScrollTop(contact) - (window.innerHeight * 0.62));
+  }
+
+  function getAvenueDrawStart() {
+    var intro = document.querySelector('.section-box') || document.querySelector('#home') || document.body;
+    return Math.max(0, getHomepageElementScrollTop(intro) - (window.innerHeight * 0.82));
+  }
+
+  function getAvenueDrawEnd() {
+    var gallery = document.querySelector('#gallery') || document.querySelector('#contact') || document.body;
+    return Math.max(getAvenueDrawStart() + window.innerHeight, getHomepageElementScrollTop(gallery) - (window.innerHeight * 0.58));
+  }
+
+  function updateAmbientActiveStage(items, progress, revealPoints, options) {
+    if (!items || !items.length || !hasGsap()) {
+      return;
+    }
+
+    var settings = options || {};
+    var inactiveOpacity = settings.inactiveOpacity || 0.05;
+    var activeOpacity = settings.activeOpacity || 0.15;
+    var influenceRange = settings.influenceRange || 0.16;
+    var revealLead = settings.revealLead || 0.12;
+    var drift = settings.drift || 16;
+    var gsap = getGsap();
+
+    items.forEach(function (item, index) {
+      var point = revealPoints[index] || 0;
+      var distance = Math.abs(progress - point);
+      var influence = Math.max(0, 1 - (distance / influenceRange));
+      var revealProgress = Math.max(0, Math.min(1, (progress - point + revealLead) / revealLead));
+      var opacity = revealProgress * (inactiveOpacity + ((activeOpacity - inactiveOpacity) * influence));
+
+      item.toggleAttribute('data-ambient-active', influence >= 0.65 && revealProgress > 0.5);
+      gsap.set(item, {
+        y: -(drift * progress),
+        opacity: opacity,
+        overwrite: 'auto'
+      });
+    });
+  }
+
+  function revealJourneyItems(container, options) {
+    var settings = options || {};
+    var itemSelector = settings.itemSelector || '.rcph-journey-stage';
+    if (!container || state.reduceMotion || !hasGsap() || !state.scrollTriggerReady || !window.ScrollTrigger) {
+      if (container) {
+        Array.prototype.forEach.call(container.querySelectorAll(itemSelector), function (item) {
+          item.style.removeProperty('opacity');
+          item.style.removeProperty('transform');
+          item.removeAttribute('data-ambient-active');
+        });
       }
-
-      return randomBetween(random, 180, 280);
+      return null;
     }
 
-    if (type === 'ring' || type === 'arc') {
-      return breakpoint === 'mobile'
-        ? randomBetween(random, 70, 120)
-        : randomBetween(random, 90, 180);
-    }
+    var gsap = getGsap();
+    var items = Array.prototype.slice.call(container.querySelectorAll(itemSelector));
+    var revealPoints = settings.revealPoints || [0.02, 0.25, 0.49, 0.73, 0.94];
+    var progressState = { value: 0 };
 
-    return randomBetween(random, 24, 80);
+    updateAmbientActiveStage(items, 0, revealPoints, settings);
+    return trackHomepageAmbient(gsap.to(progressState, {
+      value: 1,
+      ease: 'none',
+      onUpdate: function () {
+        updateAmbientActiveStage(items, progressState.value, revealPoints, settings);
+      },
+      scrollTrigger: {
+        trigger: document.body,
+        start: settings.start || getJourneyDrawStart,
+        end: settings.end || getJourneyDrawEnd,
+        scrub: settings.scrub || 1.2,
+        invalidateOnRefresh: true
+      }
+    }));
   }
 
-  function createHomepageAmbientItem(random, index, settings, breakpoint, wordsUsed) {
-    var layer = document.querySelector('.rcph-ambient-layer');
-    if (!layer) {
-      return { element: null, wordsUsed: wordsUsed };
+  function initRightJourneyPath(journey) {
+    if (!journey) {
+      return;
     }
 
-    var geometryTypes = ['ring', 'arc', 'mark', 'orb', 'ring', 'arc'];
-    var type = chooseAmbientValue(random, geometryTypes);
-    var shouldUseWord = wordsUsed < settings.wordBudget && (index % 5 === 2 || random() > 0.82);
-
-    if (shouldUseWord) {
-      type = 'word';
-      wordsUsed += 1;
-    }
-
-    var colors = ['#f4b43a', '#ffe2a0', '#60c3c4'];
-    var words = ['CREATE', 'CONNECT', 'CONTRIBUTE', 'SERVICE', 'LEADERSHIP', 'FELLOWSHIP'];
-    var isCenter = breakpoint !== 'mobile' && random() < settings.centerChance;
-    var isLeft = random() > 0.5;
-    var x = isCenter
-      ? randomBetween(random, 38, 62)
-      : (isLeft ? randomBetween(random, 2, 22) : randomBetween(random, 78, 98));
-    var y = randomBetween(random, breakpoint === 'mobile' ? 10 : 5, breakpoint === 'mobile' ? 90 : 96);
-    var size = getHomepageAmbientSize(random, type, breakpoint);
-    var opacity = type === 'word'
-      ? randomBetween(random, 0.026, 0.055)
-      : randomBetween(random, 0.025, 0.08);
-    var viewportWidth = Math.max(document.documentElement.clientWidth || window.innerWidth || 1, 1);
-    var safeX = (((size * 0.72) + 28) / viewportWidth) * 100;
-
-    x = Math.min(Math.max(x, safeX), 100 - safeX);
-
-    if (isCenter) {
-      opacity *= 0.42;
-    }
-
-    var element = document.createElement('span');
-    element.className = 'rcph-ambient-item rcph-ambient-' + type;
-    element.style.setProperty('--rcph-ambient-x', x.toFixed(2) + 'vw');
-    element.style.setProperty('--rcph-ambient-y', y.toFixed(2) + 'vh');
-    element.style.setProperty('--rcph-ambient-size', size.toFixed(0) + 'px');
-    element.style.setProperty('--rcph-ambient-opacity', opacity.toFixed(3));
-    element.style.setProperty('--rcph-ambient-color', chooseAmbientValue(random, colors));
-    element.style.setProperty('--rcph-ambient-rotation', randomBetween(random, -34, 34).toFixed(2) + 'deg');
-    element.style.setProperty('--rcph-ambient-drift-x', '0px');
-    element.style.setProperty('--rcph-ambient-drift-y', '0px');
-    element.style.setProperty('--rcph-ambient-scroll-y', '0px');
-    element.style.setProperty('--rcph-ambient-motion-rotation', '0deg');
-
-    if (type === 'word') {
-      element.textContent = chooseAmbientValue(random, words);
-      element.style.fontSize = randomBetween(random, breakpoint === 'desktop' ? 26 : 18, breakpoint === 'desktop' ? 42 : 30).toFixed(0) + 'px';
-      element.setAttribute('data-ambient-word', 'true');
-    }
-
-    if (random() < settings.motionChance) {
-      element.setAttribute('data-ambient-motion', 'true');
-    }
-
-    layer.appendChild(element);
-    return { element: element, wordsUsed: wordsUsed };
+    drawPathOnScroll(
+      journey.querySelector('.rcph-journey-reveal'),
+      document.body,
+      getJourneyDrawStart,
+      getJourneyDrawEnd
+    );
+    revealJourneyItems(journey, {
+      itemSelector: '.rcph-journey-stage',
+      revealPoints: [0.02, 0.25, 0.49, 0.73, 0.94],
+      start: getJourneyDrawStart,
+      end: getJourneyDrawEnd,
+      drift: 18,
+      inactiveOpacity: 0.02,
+      activeOpacity: 0.50
+    });
   }
 
-  function createHomepageAmbientSweeps(random, settings, breakpoint) {
-    var layer = document.querySelector('.rcph-ambient-layer');
-    var sweeps = [];
-    var index;
-    var sweep;
-
-    if (!layer || !settings.sweepCount) {
-      return sweeps;
+  function initLeftAvenuePath(avenue) {
+    if (!avenue) {
+      return;
     }
 
-    for (index = 0; index < settings.sweepCount; index += 1) {
-      sweep = document.createElement('span');
-      sweep.className = 'rcph-ambient-sweep rcph-ambient-sweep-' + ((index % 3) + 1);
-      sweep.style.setProperty('--rcph-sweep-x', randomBetween(random, 8, 92).toFixed(2) + 'vw');
-      sweep.style.setProperty('--rcph-sweep-y', randomBetween(random, 8, 92).toFixed(2) + 'vh');
-      sweep.style.setProperty('--rcph-sweep-rotation', randomBetween(random, -28, 28).toFixed(2) + 'deg');
-      sweep.style.setProperty('--rcph-sweep-scale', randomBetween(random, breakpoint === 'desktop' ? 0.92 : 0.75, breakpoint === 'desktop' ? 1.3 : 1.02).toFixed(2));
-      layer.appendChild(sweep);
-      sweeps.push(sweep);
-    }
-
-    return sweeps;
+    drawPathOnScroll(
+      avenue.querySelector('.rcph-avenue-reveal'),
+      document.body,
+      getAvenueDrawStart,
+      getAvenueDrawEnd
+    );
+    revealJourneyItems(avenue, {
+      itemSelector: '.rcph-avenue-stage',
+      revealPoints: [0.05, 0.34, 0.63, 0.91],
+      start: getAvenueDrawStart,
+      end: getAvenueDrawEnd,
+      drift: 16,
+      inactiveOpacity: 0.02,
+      activeOpacity: 0.50,
+      influenceRange: 0.18
+    });
   }
 
-  function animateHomepageAmbientItems(items, random, breakpoint) {
-    if (state.reduceMotion || !hasGsap()) {
+  function initPuneHeritageDraw(heritageMarks) {
+    if (!heritageMarks || !heritageMarks.length || state.reduceMotion || !hasGsap() || !state.scrollTriggerReady || !window.ScrollTrigger) {
+      (heritageMarks || []).forEach(function (mark) {
+        Array.prototype.forEach.call(mark.querySelectorAll('path'), showDrawPathStatic);
+      });
       return;
     }
 
     var gsap = getGsap();
-    var motionItems = items.filter(function (item) {
-      return item && item.getAttribute('data-ambient-motion') === 'true';
+    var triggerSelectors = ['#riy-recruitment', '#featured-projects', '#gallery'];
+    heritageMarks.forEach(function (mark, markIndex) {
+      if (typeof window.getComputedStyle === 'function' && window.getComputedStyle(mark).display === 'none') {
+        return;
+      }
+
+      var paths = Array.prototype.slice.call(mark.querySelectorAll('path'));
+      var drawablePaths = paths.filter(function (path) {
+        return prepareDrawPath(path) > 0;
+      });
+
+      if (!drawablePaths.length) {
+        return;
+      }
+
+      var trigger = document.querySelector(triggerSelectors[markIndex]) || document.body;
+      var timeline = gsap.timeline({
+        scrollTrigger: {
+          trigger: trigger,
+          start: 'top 86%',
+          end: function () {
+            return '+=' + Math.round(window.innerHeight * 0.3);
+          },
+          scrub: 1.1,
+          invalidateOnRefresh: true
+        }
+      });
+
+      drawablePaths.forEach(function (path, pathIndex) {
+        timeline.to(path, {
+          strokeDashoffset: 0,
+          duration: 1,
+          ease: 'none'
+        }, pathIndex === 0 ? 0 : '>-0.18');
+      });
+      trackHomepageAmbient(timeline);
+    });
+  }
+
+  function showHomepageAmbientStatic(heritageMarks, journey, avenue) {
+    (heritageMarks || []).forEach(function (mark) {
+      Array.prototype.forEach.call(mark.querySelectorAll('path'), showDrawPathStatic);
     });
 
-    motionItems.forEach(function (item) {
-      var driftDuration = breakpoint === 'mobile'
-        ? randomBetween(random, 22, 34)
-        : randomBetween(random, 14, 32);
-      var rotationDuration = randomBetween(random, 22, 45);
-      var driftMin = breakpoint === 'mobile' ? 4 : 10;
-      var driftMax = breakpoint === 'mobile' ? 10 : 26;
-      var pulseBase = Number(item.style.getPropertyValue('--rcph-ambient-opacity')) || 0.04;
-      var pulsePeak = Math.min(0.08, pulseBase + randomBetween(random, 0.012, 0.028));
+    if (journey) {
+      showDrawPathStatic(journey.querySelector('.rcph-journey-reveal'));
+      Array.prototype.forEach.call(journey.querySelectorAll('.rcph-journey-stage'), function (item) {
+        item.style.removeProperty('opacity');
+        item.style.removeProperty('transform');
+        item.removeAttribute('data-ambient-active');
+      });
+    }
 
-      trackHomepageAmbient(gsap.to(item, {
-        '--rcph-ambient-drift-x': randomBetween(random, -driftMax, driftMax).toFixed(1) + 'px',
-        '--rcph-ambient-drift-y': randomBetween(random, driftMin, driftMax).toFixed(1) * (random() > 0.5 ? 1 : -1) + 'px',
-        duration: driftDuration,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-        delay: randomBetween(random, -driftDuration, 0)
-      }));
+    if (avenue) {
+      showDrawPathStatic(avenue.querySelector('.rcph-avenue-reveal'));
+      Array.prototype.forEach.call(avenue.querySelectorAll('.rcph-avenue-stage'), function (item) {
+        item.style.removeProperty('opacity');
+        item.style.removeProperty('transform');
+        item.removeAttribute('data-ambient-active');
+      });
+    }
+  }
 
-      trackHomepageAmbient(gsap.to(item, {
-        '--rcph-ambient-motion-rotation': randomBetween(random, -36, 36).toFixed(1) + 'deg',
-        duration: rotationDuration,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-        delay: randomBetween(random, -rotationDuration, 0)
-      }));
-
-      trackHomepageAmbient(gsap.to(item, {
-        opacity: pulsePeak,
-        duration: randomBetween(random, 8, 18),
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-        delay: randomBetween(random, -10, 0)
-      }));
-    });
-
-    if (breakpoint !== 'desktop' || !state.scrollTriggerReady || !window.ScrollTrigger) {
+  function animateHomepageAmbientSystem(heritageMarks, breakpoint) {
+    if (state.reduceMotion || breakpoint !== 'desktop' || !hasGsap() || !state.scrollTriggerReady || !window.ScrollTrigger) {
       return;
     }
 
-    motionItems.slice(0, 12).forEach(function (item, index) {
-      var direction = index % 2 === 0 ? -1 : 1;
-      trackHomepageAmbient(gsap.to(item, {
-        '--rcph-ambient-scroll-y': (direction * randomBetween(random, 18, 42)).toFixed(1) + 'px',
+    var gsap = getGsap();
+    heritageMarks.forEach(function (mark, index) {
+      trackHomepageAmbient(gsap.to(mark, {
+        y: index % 2 === 0 ? -5 : 4,
         ease: 'none',
         scrollTrigger: {
           trigger: document.body,
           start: 0,
           end: 'max',
-          scrub: randomBetween(random, 0.75, 1.8)
+          scrub: 2.2 + (index * 0.4)
         }
-      }));
-    });
-  }
-
-  function animateHomepageAmbientSweeps(sweeps, random, breakpoint) {
-    if (state.reduceMotion || !hasGsap() || !sweeps.length || breakpoint === 'mobile') {
-      return;
-    }
-
-    var gsap = getGsap();
-
-    sweeps.forEach(function (sweep, index) {
-      var duration = randomBetween(random, 12, 20);
-      trackHomepageAmbient(gsap.fromTo(sweep, {
-        autoAlpha: 0,
-        xPercent: index % 2 === 0 ? -42 : 42,
-        yPercent: index % 2 === 0 ? 18 : -18
-      }, {
-        autoAlpha: randomBetween(random, 0.08, 0.16),
-        xPercent: index % 2 === 0 ? 42 : -42,
-        yPercent: index % 2 === 0 ? -18 : 18,
-        duration: duration,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-        delay: randomBetween(random, -duration, 0)
       }));
     });
   }
@@ -1349,8 +1504,7 @@
     }
 
     var breakpoint = getHomepageAmbientBreakpoint();
-    var settings = getHomepageAmbientSettings(breakpoint);
-    var signature = breakpoint + ':' + settings.count;
+    var signature = 'pune-dual-ambient-paths:' + breakpoint;
 
     if (state.homepageAmbientReady && state.homepageAmbientBreakpoint === signature) {
       return;
@@ -1364,27 +1518,18 @@
     state.homepageAmbientReady = true;
     state.homepageAmbientBreakpoint = signature;
     layer.setAttribute('data-ambient-breakpoint', breakpoint);
-    layer.setAttribute('data-ambient-count', String(settings.count));
+    layer.setAttribute('data-ambient-system', 'pune-avenues-rotaract-journey');
 
-    var random = createSeededRandom('rcph-home-ambient:' + breakpoint);
-    var sweepRandom = createSeededRandom('rcph-home-ambient-sweeps:' + breakpoint);
-    var items = [];
-    var sweeps = createHomepageAmbientSweeps(sweepRandom, settings, breakpoint);
-    var wordsUsed = 0;
-    var index;
-    var result;
+    var avenue = createLeftAvenueAmbient(layer, breakpoint);
+    var journey = createRotaractJourneyAmbient(layer, breakpoint);
+    var canDrawOnScroll = !state.reduceMotion && breakpoint === 'desktop' && hasGsap() && state.scrollTriggerReady && window.ScrollTrigger;
 
-    for (index = 0; index < settings.count; index += 1) {
-      result = createHomepageAmbientItem(random, index, settings, breakpoint, wordsUsed);
-      wordsUsed = result.wordsUsed;
-      if (result.element) {
-        items.push(result.element);
-      }
+    if (canDrawOnScroll) {
+      initRightJourneyPath(journey);
+      initLeftAvenuePath(avenue);
+    } else {
+      showHomepageAmbientStatic([], journey, avenue);
     }
-
-    animateHomepageAmbientItems(items, createSeededRandom('rcph-home-ambient-motion:' + breakpoint), breakpoint);
-    animateHomepageAmbientSweeps(sweeps, createSeededRandom('rcph-home-ambient-sweep-motion:' + breakpoint), breakpoint);
-
     if (state.homepageAmbientResizeReady || typeof window.matchMedia !== 'function') {
       return;
     }

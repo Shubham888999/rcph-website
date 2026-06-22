@@ -2683,144 +2683,252 @@ body[data-rcph-page="home"] .navbar {
   z-index: 999;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-item {
+body[data-rcph-page="home"] .rcph-heritage-ambient,
+body[data-rcph-page="home"] .rcph-avenue-ambient,
+body[data-rcph-page="home"] .rcph-journey-ambient {
+  position: absolute;
+  pointer-events: none;
+}
+
+body[data-rcph-page="home"] .rcph-heritage-ambient {
+  top: max(112px, 12vh);
+  bottom: 7vh;
+  left: clamp(2px, 0.8vw, 14px);
+  width: clamp(140px, 13vw, 205px);
+  color: #f4b43a;
+}
+
+body[data-rcph-page="home"] .rcph-avenue-ambient,
+body[data-rcph-page="home"] .rcph-journey-ambient {
+  top: max(84px, 6.5vh);
+  bottom: 1.5vh;
+}
+
+body[data-rcph-page="home"] .rcph-heritage-mark {
   position: absolute;
   left: 0;
-  top: 0;
-  width: var(--rcph-ambient-size);
-  height: var(--rcph-ambient-size);
-  opacity: var(--rcph-ambient-opacity);
-  color: var(--rcph-ambient-color, #f4b43a);
-  transform:
-    translate3d(
-      calc(var(--rcph-ambient-x) - 50% + var(--rcph-ambient-drift-x, 0px)),
-      calc(var(--rcph-ambient-y) - 50% + var(--rcph-ambient-drift-y, 0px) + var(--rcph-ambient-scroll-y, 0px)),
-      0
-    )
-    rotate(calc(var(--rcph-ambient-rotation, 0deg) + var(--rcph-ambient-motion-rotation, 0deg)));
-  transform-origin: center;
+  width: 100%;
+  margin: 0;
+  opacity: 0.02;
   will-change: transform;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-ring,
-body[data-rcph-page="home"] .rcph-ambient-orb {
-  border: 1px solid currentColor;
-  border-radius: 50%;
+body[data-rcph-page="home"] .rcph-heritage-shaniwar-wada {
+  top: 2%;
+  width: 94%;
+  aspect-ratio: 240 / 170;
+  opacity: 0.022;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-ring::before,
-body[data-rcph-page="home"] .rcph-ambient-orb::before {
-  content: "";
-  position: absolute;
-  inset: 18%;
-  border: 1px solid currentColor;
-  border-radius: inherit;
-  opacity: 0.55;
+body[data-rcph-page="home"] .rcph-heritage-sinhagad {
+  display: none;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-orb {
-  width: calc(var(--rcph-ambient-size) * 0.58);
-  height: calc(var(--rcph-ambient-size) * 0.58);
+body[data-rcph-page="home"] .rcph-heritage-university-dome {
+  top: 72%;
+  left: 5%;
+  width: 88%;
+  aspect-ratio: 250 / 170;
+  opacity: 0.02;
+  color: #60c3c4;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-arc {
-  border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: currentColor;
-  border-right-color: currentColor;
-}
-
-body[data-rcph-page="home"] .rcph-ambient-arc::after {
-  content: "";
-  position: absolute;
-  inset: 22%;
-  border-radius: 50%;
-  border: 1px solid transparent;
-  border-left-color: currentColor;
-  border-bottom-color: currentColor;
-  opacity: 0.5;
-}
-
-body[data-rcph-page="home"] .rcph-ambient-mark {
-  display: grid;
-  place-items: center;
-}
-
-body[data-rcph-page="home"] .rcph-ambient-mark::before,
-body[data-rcph-page="home"] .rcph-ambient-mark::after {
-  content: "";
-  position: absolute;
+body[data-rcph-page="home"] .rcph-heritage-vector,
+body[data-rcph-page="home"] .rcph-heritage-vector svg,
+body[data-rcph-page="home"] .rcph-journey-route,
+body[data-rcph-page="home"] .rcph-journey-route svg,
+body[data-rcph-page="home"] .rcph-journey-icon,
+body[data-rcph-page="home"] .rcph-journey-icon svg,
+body[data-rcph-page="home"] .rcph-avenue-route,
+body[data-rcph-page="home"] .rcph-avenue-route svg,
+body[data-rcph-page="home"] .rcph-avenue-icon,
+body[data-rcph-page="home"] .rcph-avenue-icon svg {
+  display: block;
   width: 100%;
-  height: 1px;
-  background: currentColor;
-  border-radius: 999px;
-  box-shadow:
-    0 calc(var(--rcph-ambient-size) * 0.24) 0 currentColor,
-    0 calc(var(--rcph-ambient-size) * -0.24) 0 currentColor;
+  height: 100%;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-mark::after {
-  transform: rotate(90deg);
+body[data-rcph-page="home"] .rcph-heritage-vector svg {
+  overflow: visible;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  will-change: transform;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-word {
-  width: var(--rcph-ambient-size);
-  height: auto;
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 900;
-  letter-spacing: 0;
-  line-height: 1;
-  text-align: center;
-  white-space: nowrap;
-  color: transparent;
-  -webkit-text-stroke: 1px currentColor;
-  text-stroke: 1px currentColor;
+body[data-rcph-page="home"] .rcph-heritage-vector path,
+body[data-rcph-page="home"] .rcph-journey-reveal,
+body[data-rcph-page="home"] .rcph-journey-line,
+body[data-rcph-page="home"] .rcph-journey-line-glow,
+body[data-rcph-page="home"] .rcph-avenue-reveal,
+body[data-rcph-page="home"] .rcph-avenue-line,
+body[data-rcph-page="home"] .rcph-avenue-line-glow {
+  vector-effect: non-scaling-stroke;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-sweep {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: min(56vw, 720px);
-  height: min(26vw, 320px);
-  opacity: 0;
-  pointer-events: none;
-  transform:
-    translate3d(calc(var(--rcph-sweep-x) - 50%), calc(var(--rcph-sweep-y) - 50%), 0)
-    rotate(var(--rcph-sweep-rotation, -18deg))
-    scale(var(--rcph-sweep-scale, 1));
-  transform-origin: center;
-  will-change: opacity, transform;
-  filter: blur(2px);
+body[data-rcph-page="home"] .rcph-draw-path {
+  will-change: stroke-dashoffset;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-sweep::before {
-  content: "";
-  position: absolute;
-  inset: 42% -10%;
-  border-radius: 999px;
-  background:
-    linear-gradient(90deg, transparent, rgba(244,180,58,0.16), rgba(255,232,166,0.22), transparent);
-  box-shadow: 0 0 28px rgba(244,180,58,0.12);
+body[data-rcph-page="home"] .rcph-journey-ambient {
+  
+  right: clamp(4px, 1.1vw, 20px);
+  width: clamp(155px, 14vw, 220px);
+  color: #60c3c4;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-sweep::after {
-  content: "";
+body[data-rcph-page="home"] .rcph-avenue-ambient {
+  left: clamp(4px, 1vw, 18px);
+  width: clamp(190px, 16vw, 245px);
+  color: #f4b43a;
+}
+
+body[data-rcph-page="home"] .rcph-journey-route,
+
+body[data-rcph-page="home"] .rcph-avenue-route {
+  
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(244,180,58,0.08), transparent 58%);
 }
 
-body[data-rcph-page="home"] .rcph-ambient-sweep-2::before {
-  background:
-    linear-gradient(90deg, transparent, rgba(96,195,196,0.08), rgba(244,180,58,0.17), transparent);
+body[data-rcph-page="home"] .rcph-journey-route svg,
+body[data-rcph-page="home"] .rcph-avenue-route svg {
+  overflow: visible;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
-body[data-rcph-page="home"] .rcph-ambient-sweep-3::after {
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255,232,166,0.09), transparent 56%);
+body[data-rcph-page="home"] .rcph-journey-line {
+  stroke: #f4b43a;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 8;
+  opacity: 0.085;
+}
+
+body[data-rcph-page="home"] .rcph-journey-line-glow {
+  stroke: #60c3c4;
+  stroke-width: 2.5;
+  opacity: 0.035;
+  filter: drop-shadow(0 0 5px rgba(96, 195, 196, 0.3));
+  will-change: opacity;
+}
+
+body[data-rcph-page="home"] .rcph-avenue-line {
+  stroke: #60c3c4;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 8;
+  opacity: 0.08;
+}
+
+body[data-rcph-page="home"] .rcph-avenue-line-glow {
+  stroke: #f4b43a;
+  stroke-width: 2.4;
+  opacity: 0.032;
+  filter: drop-shadow(0 0 5px rgba(244, 180, 58, 0.24));
+  will-change: opacity;
+}
+
+body[data-rcph-page="home"] .rcph-journey-reveal,
+body[data-rcph-page="home"] .rcph-avenue-reveal {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body[data-rcph-page="home"] .rcph-journey-stages,
+body[data-rcph-page="home"] .rcph-avenue-stages {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body[data-rcph-page="home"] .rcph-journey-stage,
+body[data-rcph-page="home"] .rcph-avenue-stage {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.055;
+  color: #ffe2a0;
+  will-change: opacity, transform;
+}
+
+body[data-rcph-page="home"] .rcph-journey-stage {
+  top: var(--rcph-journey-top);
+  right: 0;
+  width: 80%;
+}
+
+body[data-rcph-page="home"] .rcph-avenue-stage {
+  top: var(--rcph-avenue-top);
+  left: 0;
+  width: 94%;
+}
+
+body[data-rcph-page="home"] .rcph-journey-icon,
+body[data-rcph-page="home"] .rcph-avenue-icon {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+}
+
+body[data-rcph-page="home"] .rcph-journey-icon svg,
+body[data-rcph-page="home"] .rcph-avenue-icon svg {
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+body[data-rcph-page="home"] .rcph-journey-label,
+body[data-rcph-page="home"] .rcph-avenue-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: clamp(0.58rem, 0.7vw, 0.72rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+body[data-rcph-page="home"] .rcph-avenue-label {
+  max-width: 150px;
+  font-size: clamp(0.54rem, 0.64vw, 0.68rem);
+  line-height: 1.2;
+  white-space: normal;
+}
+
+body[data-rcph-page="home"] .rcph-journey-stage[data-ambient-active],
+body[data-rcph-page="home"] .rcph-avenue-stage[data-ambient-active] {
+  color: #fff0c3;
+}
+
+@media (max-width: 1180px) {
+  body[data-rcph-page="home"] .rcph-heritage-ambient {
+    left: -48px;
+    width: 145px;
+  }
+
+  body[data-rcph-page="home"] .rcph-journey-ambient {
+    right: -40px;
+    width: 150px;
+  }
+
+  body[data-rcph-page="home"] .rcph-avenue-ambient {
+    left: -42px;
+    width: 165px;
+  }
+
+  body[data-rcph-page="home"] .rcph-journey-label,
+  body[data-rcph-page="home"] .rcph-avenue-label {
+    display: none;
+  }
 }
 
 /* === BOD leadership showcase layer === */
@@ -3046,21 +3154,37 @@ body[data-rcph-page="bod"] #contact > p a[href]:focus-visible {
     transition: none;
   }
 
-  body[data-rcph-page="home"] .rcph-ambient-item {
+  body[data-rcph-page="home"] .rcph-heritage-mark,
+  body[data-rcph-page="home"] .rcph-heritage-vector,
+  body[data-rcph-page="home"] .rcph-journey-stage,
+  body[data-rcph-page="home"] .rcph-avenue-stage,
+  body[data-rcph-page="home"] .rcph-journey-line-glow,
+  body[data-rcph-page="home"] .rcph-avenue-line-glow,
+  body[data-rcph-page="home"] .rcph-draw-path {
     animation: none !important;
     transition: none !important;
     will-change: auto !important;
   }
 
-  body[data-rcph-page="home"] .rcph-ambient-sweep {
-    opacity: 0 !important;
-    animation: none !important;
-    transition: none !important;
-    transform:
-      translate3d(calc(var(--rcph-sweep-x) - 50%), calc(var(--rcph-sweep-y) - 50%), 0)
-      rotate(var(--rcph-sweep-rotation, -18deg))
-      scale(var(--rcph-sweep-scale, 1)) !important;
-    will-change: auto !important;
+  body[data-rcph-page="home"] .rcph-heritage-mark,
+  body[data-rcph-page="home"] .rcph-heritage-vector {
+    transform: none !important;
+  }
+
+  body[data-rcph-page="home"] .rcph-journey-stage,
+  body[data-rcph-page="home"] .rcph-avenue-stage {
+    opacity: 0.06 !important;
+    transform: none !important;
+  }
+
+  body[data-rcph-page="home"] .rcph-journey-line-glow,
+  body[data-rcph-page="home"] .rcph-avenue-line-glow {
+    opacity: 0.035 !important;
+  }
+
+  body[data-rcph-page="home"] .rcph-draw-path {
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
   }
 
   .membership-popup,
@@ -3096,7 +3220,37 @@ body[data-rcph-page="bod"] #contact > p a[href]:focus-visible {
     transform: none;
   }
 
-  body[data-rcph-page="home"] .rcph-ambient-item {
+  body[data-rcph-page="home"] .rcph-journey-ambient,
+  body[data-rcph-page="home"] .rcph-avenue-ambient {
+    display: none;
+  }
+
+  body[data-rcph-page="home"] .rcph-heritage-ambient {
+    top: auto;
+    right: auto;
+    bottom: 1.5vh;
+    left: -34px;
+    width: 150px;
+    height: 150px;
+  }
+
+  body[data-rcph-page="home"] .rcph-heritage-mark {
+    display: none;
+    transform: none !important;
+    will-change: auto;
+  }
+
+  body[data-rcph-page="home"] .rcph-heritage-shaniwar-wada {
+    display: block;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    opacity: 0.03;
+  }
+
+  body[data-rcph-page="home"] .rcph-heritage-vector {
+    transform: none !important;
     will-change: auto;
   }
 
