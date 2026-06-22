@@ -227,14 +227,48 @@
       animation-delay: -4s;
     }
 
-    .auth-brand-footer {
-      display: grid;
-      gap: 10px;
-      margin-top: 34px;
-      color: rgba(248,243,231,0.72);
-      font-size: 0.92rem;
-    }
+.auth-brand-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 34px;
+}
+.portal-values {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
+.portal-values span {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #fff8df;
+  letter-spacing: 0.02em;
+}
+
+.portal-values span:nth-child(1) {
+  color: var(--auth-gold-soft);
+}
+
+.portal-values span:nth-child(2) {
+  color: #ffffff;
+}
+
+.portal-values span:nth-child(3) {
+  color: #ffffff;
+}
+
+.portal-tagline {
+  max-width: 280px;
+  line-height: 1.6;
+  color: rgba(248,243,231,0.72);
+  font-size: 0.95rem;
+}
+
+.portal-note {
+  color: rgba(248,243,231,0.55);
+  font-size: 0.85rem;
+}
     .auth-brand-footer strong {
       color: var(--auth-gold-soft);
     }
@@ -768,10 +802,17 @@
         </div>
       </div>
 
-      <div class="auth-brand-footer">
-        <span><strong>Create.</strong> Connect. Contribute.</span>
-        <span>Use your approved RCPH account to continue.</span>
-      </div>
+<div class="auth-brand-footer">
+  <div class="portal-values">
+    <span>Create</span>
+    <span>Connect</span>
+    <span>Contribute</span>
+  </div>
+
+  <span class="portal-note">
+    Use your approved RCPH account to continue.
+  </span>
+</div>
     </aside>
 
     <section class="auth-card rcph-panel">
