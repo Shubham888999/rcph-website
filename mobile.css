@@ -182,3 +182,29 @@ header { position: relative; }
     color: #f4a621 !important;
   }
 }
+
+@media (max-width: 560px) {
+
+  .auth-brand-panel {
+    min-height: auto !important;
+    justify-content: flex-start;
+  }
+
+  .auth-brand-footer {
+    margin-top: 50px;
+    gap: 2px;
+  }
+
+  .portal-values {
+    gap: 2px;
+  }
+
+  .portal-values span {
+    font-size: 2rem;
+    line-height: 1.05;
+  }
+
+  .portal-note {
+    margin-top: 6px;
+  }
+}
