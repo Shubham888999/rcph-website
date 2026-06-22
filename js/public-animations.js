@@ -10,6 +10,17 @@
   var DYNAMIC_GROUP_SELECTOR = '[data-animate-dynamic="true"]';
   var PARALLAX_SELECTOR = '[data-parallax="soft"]';
   var HERO_SELECTOR = '#home [data-animate], [data-animate-scope="hero"] [data-animate]';
+  var PUBLIC_AMBIENT_PAGES = [
+    'home',
+    'about',
+    'events',
+    'projects',
+    'join',
+    'contact',
+    'faq',
+    'madhushala',
+    'pages-of-hope'
+  ];
 
   var state = {
     initialized: false,
@@ -75,18 +86,37 @@
       window.matchMedia('(max-width: 768px)').matches;
   }
 
-  function isHomepage() {
+  function getAmbientPageType() {
     var body = document.body;
-    var pageName = body ? body.getAttribute('data-rcph-page') : '';
+    var pageName = body ? String(body.getAttribute('data-rcph-page') || '').toLowerCase() : '';
     var path = window.location.pathname.split('/').pop().toLowerCase();
-    return pageName === 'home' || path === '' || path === 'index.html';
+
+    if (pageName) {
+      return pageName;
+    }
+
+    if (path === '' || path === 'index.html') {
+      return 'home';
+    }
+
+    return path.replace(/\.html$/, '');
+  }
+
+  function isPublicAmbientPage() {
+    var body = document.body;
+    if (!body || body.classList.contains('login-page')) {
+      return false;
+    }
+
+    return PUBLIC_AMBIENT_PAGES.indexOf(getAmbientPageType()) !== -1;
+  }
+
+  function isHomepage() {
+    return getAmbientPageType() === 'home';
   }
 
   function isBodPage() {
-    var body = document.body;
-    var pageName = body ? body.getAttribute('data-rcph-page') : '';
-    var path = window.location.pathname.split('/').pop().toLowerCase();
-    return pageName === 'bod' || path === 'bod.html';
+    return getAmbientPageType() === 'bod';
   }
 
   function track(animation) {
@@ -1045,7 +1075,7 @@
     }));
   }
 
-  function getHomepageAmbientBreakpoint() {
+  function getAmbientBreakpoint() {
     if (typeof window.matchMedia !== 'function') {
       return 'desktop';
     }
@@ -1086,49 +1116,7 @@
     return wrapper;
   }
 
-  function createPuneHeritageAmbient(layer) {
-    var heritage = document.createElement('div');
-    heritage.className = 'rcph-heritage-ambient';
-    heritage.setAttribute('aria-hidden', 'true');
-
-    var landmarks = [
-      {
-        key: 'shaniwar-wada',
-        label: 'Shaniwar Wada',
-        viewBox: '0 0 240 170',
-        artwork: '<path d="M24 145V68h24V50h18v18h22V42h18v26h28V42h18v26h22V50h18v18h24v77"/><path d="M16 145h208M36 145V84h168v61M86 145v-36c0-25 16-42 34-42s34 17 34 42v36M101 145v-35c0-13 8-23 19-23s19 10 19 23v35M48 98h24v18H48zM168 98h24v18h-24z"/><path d="M66 50l11-12 11 12M152 50l11-12 11 12M106 42l14-17 14 17"/>'
-      },
-      {
-        key: 'sinhagad',
-        label: 'Sinhagad',
-        viewBox: '0 0 260 150',
-        artwork: '<path d="M5 130l28-18 23 5 28-28 25 8 25-35 21 8 18-17 19 26 20-7 23 26 24-3 26 35"/><path d="M96 92V66h12V54h15v12h16V52h15v14h14v28M85 94h97M109 77h12M142 77h12"/><path d="M5 139c34-11 63-8 91-3 32 6 58 5 84-4 27-10 51-9 75 4"/>'
-      },
-      {
-        key: 'university-dome',
-        label: 'Pune University',
-        viewBox: '0 0 250 170',
-        artwork: '<path d="M20 145h210M36 145V99h48v46M166 145V99h48v46M75 99h100M88 145V91h74v54"/><path d="M94 91c3-25 15-41 31-41s28 16 31 41M107 50c2-12 9-21 18-21s16 9 18 21M125 29V15M118 15h14"/><path d="M98 145v-35h14v35M118 145v-35h14v35M138 145v-35h14v35M45 114h13v18H45zM192 114h13v18h-13z"/>'
-      }
-    ];
-
-    landmarks.forEach(function (landmark) {
-      var figure = document.createElement('figure');
-      figure.className = 'rcph-heritage-mark rcph-heritage-' + landmark.key;
-      figure.setAttribute('data-heritage-landmark', landmark.label);
-      figure.appendChild(createAmbientSvg('rcph-heritage-vector', landmark.viewBox, landmark.artwork));
-      heritage.appendChild(figure);
-    });
-
-    layer.appendChild(heritage);
-    return Array.prototype.slice.call(heritage.querySelectorAll('.rcph-heritage-mark'));
-  }
-
   function createRotaractJourneyAmbient(layer, breakpoint) {
-    if (breakpoint === 'mobile') {
-      return null;
-    }
-
     var journey = document.createElement('div');
     journey.className = 'rcph-journey-ambient';
     journey.setAttribute('aria-hidden', 'true');
@@ -1181,10 +1169,10 @@
     ));
 
     var stages = [
-      { name: 'Professional Development', top: '5%', icon: '<path d="M18 3c8 0 14 7 14 15s-6 15-14 15S4 26 4 18 10 3 18 3zM4 18h28M18 3c4 4 6 9 6 15s-2 11-6 15M18 3c-4 4-6 9-6 15s2 11 6 15M25 9l5-3-1 6"/>' },
-      { name: 'Community Service', top: '34%', icon: '<path d="M5 29c1-7 5-10 10-10s9 3 10 10M10 12c0-4 2-6 5-6s5 2 5 6-2 6-5 6-5-2-5-6M22 18c2-3 5-4 8-2 3 2 4 5 2 8M25 29c1-4 4-6 8-5"/>' },
-      { name: 'International Service', top: '63%', icon: '<path d="M4 12h28v18H4zM12 12V7h12v5M4 19c8 4 20 4 28 0M15 19h6v5h-6M24 8l5-4M29 4v6"/>' },
-      { name: 'Club Service', top: '91%', icon: '<path d="M4 21c5-2 9 0 14 7 5-7 9-9 14-7M7 21l3-11 8 4 8-4 3 11M18 14c-2-5-8-5-8 1 0 5 8 10 8 10s8-5 8-10c0-6-6-6-8-1z"/>' }
+      { name: 'International Service', top: '5%', icon: '<path d="M18 3c8 0 14 7 14 15s-6 15-14 15S4 26 4 18 10 3 18 3zM4 18h28M18 3c4 4 6 9 6 15s-2 11-6 15M18 3c-4 4-6 9-6 15s2 11 6 15M25 9l5-3-1 6"/>' },
+      { name: 'Club Service', top: '34%', icon: '<path d="M5 29c1-7 5-10 10-10s9 3 10 10M10 12c0-4 2-6 5-6s5 2 5 6-2 6-5 6-5-2-5-6M22 18c2-3 5-4 8-2 3 2 4 5 2 8M25 29c1-4 4-6 8-5"/>' },
+      { name: 'Professional Service', top: '63%', icon: '<path d="M4 12h28v18H4zM12 12V7h12v5M4 19c8 4 20 4 28 0M15 19h6v5h-6M24 8l5-4M29 4v6"/>' },
+      { name: 'Community Service', top: '91%', icon: '<path d="M4 21c5-2 9 0 14 7 5-7 9-9 14-7M7 21l3-11 8 4 8-4 3 11M18 14c-2-5-8-5-8 1 0 5 8 10 8 10s8-5 8-10c0-6-6-6-8-1z"/>' }
     ];
 
     var list = document.createElement('ol');
@@ -1291,6 +1279,18 @@
     return Math.max(getAvenueDrawStart() + window.innerHeight, getHomepageElementScrollTop(gallery) - (window.innerHeight * 0.58));
   }
 
+  function getAmbientDrawStart() {
+    return 0;
+  }
+
+  function getAmbientDrawEnd() {
+    return Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  }
+
+  function hasAmbientScrollRange() {
+    return getAmbientDrawEnd() > Math.max(120, window.innerHeight * 0.18);
+  }
+
   function updateAmbientActiveStage(items, progress, revealPoints, options) {
     if (!items || !items.length || !hasGsap()) {
       return;
@@ -1356,104 +1356,60 @@
     }));
   }
 
-  function initRightJourneyPath(journey) {
+  function initRightJourneyPath(journey, pageType) {
     if (!journey) {
       return;
     }
 
+    var isHome = pageType === 'home';
+    var start = isHome ? getJourneyDrawStart : getAmbientDrawStart;
+    var end = isHome ? getJourneyDrawEnd : getAmbientDrawEnd;
+
     drawPathOnScroll(
       journey.querySelector('.rcph-journey-reveal'),
       document.body,
-      getJourneyDrawStart,
-      getJourneyDrawEnd
+      start,
+      end
     );
     revealJourneyItems(journey, {
       itemSelector: '.rcph-journey-stage',
       revealPoints: [0.02, 0.25, 0.49, 0.73, 0.94],
-      start: getJourneyDrawStart,
-      end: getJourneyDrawEnd,
-      drift: 18,
-      inactiveOpacity: 0.02,
-      activeOpacity: 0.50
+      start: start,
+      end: end,
+      drift: isHome ? 18 : 11,
+      inactiveOpacity: isHome ? 0.02 : 0.018,
+      activeOpacity: isHome ? 0.50 : 0.11
     });
   }
 
-  function initLeftAvenuePath(avenue) {
+  function initLeftAvenuePath(avenue, pageType) {
     if (!avenue) {
       return;
     }
 
+    var isHome = pageType === 'home';
+    var start = isHome ? getAvenueDrawStart : getAmbientDrawStart;
+    var end = isHome ? getAvenueDrawEnd : getAmbientDrawEnd;
+
     drawPathOnScroll(
       avenue.querySelector('.rcph-avenue-reveal'),
       document.body,
-      getAvenueDrawStart,
-      getAvenueDrawEnd
+      start,
+      end
     );
     revealJourneyItems(avenue, {
       itemSelector: '.rcph-avenue-stage',
       revealPoints: [0.05, 0.34, 0.63, 0.91],
-      start: getAvenueDrawStart,
-      end: getAvenueDrawEnd,
-      drift: 16,
-      inactiveOpacity: 0.02,
-      activeOpacity: 0.50,
+      start: start,
+      end: end,
+      drift: isHome ? 16 : 10,
+      inactiveOpacity: isHome ? 0.02 : 0.018,
+      activeOpacity: isHome ? 0.50 : 0.105,
       influenceRange: 0.18
     });
   }
 
-  function initPuneHeritageDraw(heritageMarks) {
-    if (!heritageMarks || !heritageMarks.length || state.reduceMotion || !hasGsap() || !state.scrollTriggerReady || !window.ScrollTrigger) {
-      (heritageMarks || []).forEach(function (mark) {
-        Array.prototype.forEach.call(mark.querySelectorAll('path'), showDrawPathStatic);
-      });
-      return;
-    }
-
-    var gsap = getGsap();
-    var triggerSelectors = ['#riy-recruitment', '#featured-projects', '#gallery'];
-    heritageMarks.forEach(function (mark, markIndex) {
-      if (typeof window.getComputedStyle === 'function' && window.getComputedStyle(mark).display === 'none') {
-        return;
-      }
-
-      var paths = Array.prototype.slice.call(mark.querySelectorAll('path'));
-      var drawablePaths = paths.filter(function (path) {
-        return prepareDrawPath(path) > 0;
-      });
-
-      if (!drawablePaths.length) {
-        return;
-      }
-
-      var trigger = document.querySelector(triggerSelectors[markIndex]) || document.body;
-      var timeline = gsap.timeline({
-        scrollTrigger: {
-          trigger: trigger,
-          start: 'top 86%',
-          end: function () {
-            return '+=' + Math.round(window.innerHeight * 0.3);
-          },
-          scrub: 1.1,
-          invalidateOnRefresh: true
-        }
-      });
-
-      drawablePaths.forEach(function (path, pathIndex) {
-        timeline.to(path, {
-          strokeDashoffset: 0,
-          duration: 1,
-          ease: 'none'
-        }, pathIndex === 0 ? 0 : '>-0.18');
-      });
-      trackHomepageAmbient(timeline);
-    });
-  }
-
-  function showHomepageAmbientStatic(heritageMarks, journey, avenue) {
-    (heritageMarks || []).forEach(function (mark) {
-      Array.prototype.forEach.call(mark.querySelectorAll('path'), showDrawPathStatic);
-    });
-
+  function showPublicAmbientStatic(journey, avenue) {
     if (journey) {
       showDrawPathStatic(journey.querySelector('.rcph-journey-reveal'));
       Array.prototype.forEach.call(journey.querySelectorAll('.rcph-journey-stage'), function (item) {
@@ -1473,28 +1429,8 @@
     }
   }
 
-  function animateHomepageAmbientSystem(heritageMarks, breakpoint) {
-    if (state.reduceMotion || breakpoint !== 'desktop' || !hasGsap() || !state.scrollTriggerReady || !window.ScrollTrigger) {
-      return;
-    }
-
-    var gsap = getGsap();
-    heritageMarks.forEach(function (mark, index) {
-      trackHomepageAmbient(gsap.to(mark, {
-        y: index % 2 === 0 ? -5 : 4,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: document.body,
-          start: 0,
-          end: 'max',
-          scrub: 2.2 + (index * 0.4)
-        }
-      }));
-    });
-  }
-
-  function initHomepageAmbientBackground() {
-    if (!isHomepage()) {
+  function initPublicAmbientBackground() {
+    if (!isPublicAmbientPage()) {
       return;
     }
 
@@ -1503,8 +1439,9 @@
       return;
     }
 
-    var breakpoint = getHomepageAmbientBreakpoint();
-    var signature = 'pune-dual-ambient-paths:' + breakpoint;
+    var pageType = getAmbientPageType();
+    var breakpoint = getAmbientBreakpoint();
+    var signature = 'public-dual-ambient-paths:' + pageType + ':' + breakpoint;
 
     if (state.homepageAmbientReady && state.homepageAmbientBreakpoint === signature) {
       return;
@@ -1519,17 +1456,20 @@
     state.homepageAmbientBreakpoint = signature;
     layer.setAttribute('data-ambient-breakpoint', breakpoint);
     layer.setAttribute('data-ambient-system', 'pune-avenues-rotaract-journey');
+    layer.setAttribute('data-ambient-page-type', pageType === 'home' ? 'home' : 'public');
+    layer.setAttribute('data-ambient-page', pageType);
 
     var avenue = createLeftAvenueAmbient(layer, breakpoint);
     var journey = createRotaractJourneyAmbient(layer, breakpoint);
-    var canDrawOnScroll = !state.reduceMotion && breakpoint === 'desktop' && hasGsap() && state.scrollTriggerReady && window.ScrollTrigger;
+    var canDrawOnScroll = !state.reduceMotion && breakpoint === 'desktop' && hasGsap() && state.scrollTriggerReady && window.ScrollTrigger && (pageType === 'home' || hasAmbientScrollRange());
 
     if (canDrawOnScroll) {
-      initRightJourneyPath(journey);
-      initLeftAvenuePath(avenue);
+      initRightJourneyPath(journey, pageType);
+      initLeftAvenuePath(avenue, pageType);
     } else {
-      showHomepageAmbientStatic([], journey, avenue);
+      showPublicAmbientStatic(journey, avenue);
     }
+
     if (state.homepageAmbientResizeReady || typeof window.matchMedia !== 'function') {
       return;
     }
@@ -1539,9 +1479,13 @@
     window.addEventListener('resize', function () {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(function () {
-        initHomepageAmbientBackground();
+        initPublicAmbientBackground();
       }, 180);
     }, { passive: true });
+  }
+
+  function initHomepageAmbientBackground() {
+    initPublicAmbientBackground();
   }
 
   function initBodCardTilt(cards) {
@@ -1982,8 +1926,8 @@
   }
 
   function initPremiumAnimations() {
-    if (isHomepage() && (state.reduceMotion || !hasGsap())) {
-      initHomepageAmbientBackground();
+    if (isPublicAmbientPage() && (state.reduceMotion || !hasGsap())) {
+      initPublicAmbientBackground();
     }
 
     if (state.reduceMotion) {
@@ -2002,6 +1946,7 @@
     state.initialized = true;
     state.scrollTriggerReady = registerScrollTrigger();
     document.documentElement.classList.add('rcph-animations-ready');
+    initPublicAmbientBackground();
 
     if (isHomepage()) {
       initHomepageCinematicAnimations();
@@ -2035,6 +1980,7 @@
     initHomepageProjectDeck: initHomepageProjectDeck,
     initHomepageGalleryMotion: initHomepageGalleryMotion,
     initHomepageAmbientBackground: initHomepageAmbientBackground,
+    initPublicAmbientBackground: initPublicAmbientBackground,
     initBodLeadershipShowcase: initBodLeadershipShowcase,
     refresh: refreshScrollTriggers
   };
