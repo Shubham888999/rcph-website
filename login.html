@@ -74,15 +74,19 @@
       margin: 0 auto;
       padding: clamp(28px, 5vw, 72px) 0;
       display: grid;
-      grid-template-columns: minmax(0, 0.92fr) minmax(360px, 520px);
-      gap: clamp(22px, 4vw, 56px);
-      align-items: center;
+      grid-template-columns: repeat(2, minmax(0, 520px));
+      gap: clamp(22px, 3vw, 40px);
+      align-items: start;
+      justify-content: center;
     }
 
-    .auth-brand-panel,
-    .auth-card {
+    .rcph-panel {
       position: relative;
+      min-width: 0;
+      padding: clamp(20px, 3.2vw, 30px);
+      border-radius: 20px;
       border: 1px solid var(--auth-line);
+      overflow: hidden;
       background:
         linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)),
         var(--auth-panel);
@@ -94,29 +98,48 @@
     }
 
     .auth-brand-panel {
-      min-height: 560px;
-      padding: clamp(26px, 4vw, 46px);
-      border-radius: 22px;
-      overflow: hidden;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      min-height: 755px;
+      height: auto;
+      isolation: isolate;
+      box-shadow:
+        0 28px 90px rgba(0,0,0,0.52),
+        0 0 18px rgba(243,193,75,0.13),
+        inset 0 1px 0 rgba(255,255,255,0.06);
     }
 
     .auth-brand-panel::before {
       content: "";
       position: absolute;
       inset: -1px;
+      z-index: 2;
+      padding: 2px;
       border-radius: inherit;
       pointer-events: none;
-      background:
-        radial-gradient(circle at 24% 22%, rgba(244,180,58,0.22), transparent 34%),
-        radial-gradient(circle at 88% 88%, rgba(96,195,196,0.12), transparent 38%);
+      background: conic-gradient(
+        from var(--rcph-border-angle, 0deg),
+        transparent 0deg 250deg,
+        rgba(255,224,138,0.32) 278deg,
+        rgba(255,224,138,0.96) 304deg,
+        #d4a437 330deg,
+        transparent 360deg
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      animation: rcphBorderAngle 9s linear infinite;
     }
 
-    .auth-brand-panel > * {
+    .rcph-panel > * {
       position: relative;
-      z-index: 1;
+      z-index: 3;
     }
 
     .auth-brand-mark {
@@ -154,7 +177,7 @@
     }
 
     .auth-hero-copy h1 {
-      margin: clamp(34px, 6vw, 72px) 0 14px;
+      margin: 34px 0 18px;
       max-width: 11ch;
       color: #fff8df;
       font-family: 'Montserrat', 'Inter', sans-serif;
@@ -217,9 +240,6 @@
     }
 
     .auth-card {
-      border-radius: 20px;
-      padding: clamp(20px, 3.2vw, 30px);
-      overflow: hidden;
       animation: authCardIn 620ms ease both;
     }
 
@@ -232,11 +252,6 @@
         linear-gradient(120deg, transparent 0 28%, rgba(244,180,58,0.09) 42%, transparent 54% 100%);
       transform: translateX(-120%);
       animation: cardSweep 1.25s ease 260ms both;
-    }
-
-    .auth-card > * {
-      position: relative;
-      z-index: 1;
     }
 
     .auth-card-head {
@@ -628,6 +643,16 @@
       to { transform: translateX(120%); }
     }
 
+    @property --rcph-border-angle {
+      syntax: "<angle>";
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    @keyframes rcphBorderAngle {
+      to { --rcph-border-angle: 360deg; }
+    }
+
     @keyframes authAmbientShift {
       from { transform: translate3d(-1%, -1%, 0) scale(1); }
       to { transform: translate3d(1%, 1%, 0) scale(1.03); }
@@ -646,10 +671,6 @@
         padding-bottom: 28px;
       }
 
-      .auth-brand-panel {
-        min-height: auto;
-      }
-
       .auth-hero-copy h1 {
         max-width: none;
         margin-top: 30px;
@@ -661,14 +682,16 @@
         width: min(100% - 22px, 520px);
       }
 
-      .auth-brand-panel {
-        padding: 20px;
+      .rcph-panel {
+        padding: 18px;
         border-radius: 18px;
       }
 
-      .auth-card {
-        padding: 18px;
-        border-radius: 18px;
+      .auth-brand-panel {
+        box-shadow:
+          0 22px 64px rgba(0,0,0,0.48),
+          0 0 16px rgba(243,193,75,0.11),
+          inset 0 1px 0 rgba(255,255,255,0.05);
       }
 
       .auth-brand-mark img {
@@ -707,13 +730,26 @@
         scroll-behavior: auto !important;
         transition-duration: 0.01ms !important;
       }
+
+      .auth-brand-panel {
+        border-color: #f3c14b;
+        box-shadow:
+          0 28px 90px rgba(0,0,0,0.52),
+          0 0 18px rgba(243,193,75,0.14),
+          inset 0 1px 0 rgba(255,255,255,0.06);
+      }
+
+      .auth-brand-panel::before {
+        animation: none !important;
+        --rcph-border-angle: 18deg;
+      }
     }
   </style>
 </head>
 <body class="login-page">
   <div class="auth-bg-effects" aria-hidden="true"></div>
   <main class="auth-shell">
-    <aside class="auth-brand-panel" aria-label="RCPH account portal overview">
+    <aside class="auth-brand-panel rcph-panel" aria-label="RCPH account portal overview">
       <div>
         <div class="auth-brand-mark">
           <img src="images/logo3.webp" alt="Rotaract Club of Pune Heritage logo">
@@ -738,7 +774,7 @@
       </div>
     </aside>
 
-    <section class="auth-card">
+    <section class="auth-card rcph-panel">
       <div class="auth-card-head">
         <h2 class="auth-title">RCPH Account</h2>
         <p class="auth-subtitle">Sign in or create an account.</p>
