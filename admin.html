@@ -7,25 +7,62 @@
 
   <link rel="stylesheet" href="style.css?v=7"/>
   <link rel="stylesheet" href="mobile.css?v=7" media="only screen and (max-width: 768px)"/>
-  <link rel="stylesheet" href="admin/css/admin.css?v=2"/>
+  <link rel="stylesheet" href="admin/css/admin.css?v=3"/>
 </head>
 <body>
-  <nav class="admin-nav">
-  <div class="admin-nav__inner">
-    <a href="index.html">Home</a>
-    <a href="access.html" data-admin-quick-nav hidden>Access Hub</a>
-    <a href="my-dashboard.html" data-admin-quick-nav hidden>My Dashboard</a>
-    <a href="BOD%20Event%20manager/bodlogin.html" data-admin-quick-nav hidden>BOD Panel</a>
-    <a href="#attendance">Attendance Manager</a>
-    <a href="#collaborationReports">Collaboration Reports</a>
-    <a href="#districtAttendance">District Event Attendance</a>
-    <a href="#bod">BOD Attendance</a>
-    <a href="#fines">Fines</a>
-    <a href="#prospectMembers">Prospect Members</a>
-    <a href="#treasurer">Treasurer Panel</a>
-    <a href="login.html">Logout</a>
-  </div>
-</nav>
+  <nav class="admin-nav" aria-label="Admin panel navigation">
+    <div class="admin-nav__inner">
+      <span class="admin-nav__brand">RCPH Admin</span>
+
+      <button
+        id="adminNavToggle"
+        class="admin-nav__mobile-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="adminNavMenu"
+        aria-label="Open admin navigation"
+      >
+        <span class="admin-nav__hamburger" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Menu</span>
+      </button>
+
+      <div id="adminNavMenu" class="admin-nav__menu">
+        <div class="admin-nav__primary" aria-label="Primary admin workflows">
+          <a class="admin-nav__link" href="#insightsPanel" data-admin-section-link>Admin</a>
+          <a class="admin-nav__link" href="#attendance" data-admin-section-link>Attendance</a>
+          <a class="admin-nav__link" href="#prospectMembers" data-admin-section-link>Prospects</a>
+          <a class="admin-nav__link" href="#treasurer" data-admin-section-link>Treasurer</a>
+          <a class="admin-nav__link" href="#collaborationReports" data-admin-section-link>Reports</a>
+        </div>
+
+        <div class="admin-nav__more">
+          <button
+            id="adminMoreToggle"
+            class="admin-nav__more-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="adminMoreMenu"
+            aria-haspopup="true"
+          >
+            <span>More</span>
+            <span class="admin-nav__chevron" aria-hidden="true"></span>
+          </button>
+
+          <div id="adminMoreMenu" class="admin-nav__more-menu" hidden>
+            <a class="admin-nav__link" href="index.html">Home</a>
+            <a class="admin-nav__link" href="access.html" data-admin-quick-nav hidden>Access Hub</a>
+            <a class="admin-nav__link" href="my-dashboard.html" data-admin-quick-nav hidden>My Dashboard</a>
+            <a class="admin-nav__link" href="BOD%20Event%20manager/bodlogin.html" data-admin-quick-nav hidden>BOD Panel</a>
+            <a class="admin-nav__link" href="#districtAttendance" data-admin-section-link>District</a>
+            <a class="admin-nav__link" href="#bod" data-admin-section-link>BOD Attendance</a>
+            <a class="admin-nav__link" href="#fines" data-admin-section-link>Fines</a>
+            <div class="admin-nav__separator" aria-hidden="true"></div>
+            <a id="adminNavLogout" class="admin-nav__link admin-nav__logout" href="login.html">Logout</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
 <div class="admin-wrap">
 
   <div class="admin-card" id="insightsPanel">
@@ -1302,7 +1339,7 @@
   <script src="admin/js/fines.js?v=1"></script>
   <script src="admin/js/treasury.js?v=1"></script>
   <script src="admin/js/admin-core.js?v=2"></script>
-  <script src="admin/js/admin-init.js?v=2"></script>
+  <script src="admin/js/admin-init.js?v=3"></script>
   
 </body>
 </html>
