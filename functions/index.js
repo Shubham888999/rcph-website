@@ -8,6 +8,9 @@ const crypto = require('crypto');
 admin.initializeApp();
 const db = admin.firestore();
 const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE;
+const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER || '';
+const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS || '';
+const DEFAULT_SIGNUP_NOTIFY_TO = 'rcph3131@gmail.com';
 const CALLABLE_OPTIONS = {
   region: 'us-central1',
   cors: [
@@ -21,7 +24,10 @@ const CALLABLE_OPTIONS = {
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
 });
 
 function genOtp() {
@@ -153,6 +159,138 @@ function normalizeProspectSignupData(data) {
     referred,
     referredBy,
   };
+}
+
+function escapeEmailHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function signupEmailValue(value, fallback = 'N/A') {
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  const normalized = normalizeText(value, 2000);
+  return normalized || fallback;
+}
+
+function getSignupNotificationRecipients() {
+  const configured = normalizeText(
+    process.env.SIGNUP_NOTIFY_TO || process.env.EMAIL_TO || DEFAULT_SIGNUP_NOTIFY_TO,
+    1200
+  );
+  const recipients = configured
+    .split(/[;,\s]+/)
+    .map(address => address.trim().toLowerCase())
+    .filter(address => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address));
+
+  return recipients.length ? Array.from(new Set(recipients)) : [DEFAULT_SIGNUP_NOTIFY_TO];
+}
+
+function getSignupNotificationSubject(userData) {
+  const role = normalizeRole(userData.requestedRole || userData.role);
+  if (role === 'prospect') return 'New Prospect Signup - RCPH';
+  if (role === 'gbm') return 'New GBM Signup - RCPH';
+  if (role === 'bod') return 'New BOD Access Request - RCPH';
+  if (role === 'admin') return 'New Admin Access Request - RCPH';
+  return 'New Account Signup - RCPH';
+}
+
+function getSignupNotificationHighlight(userData) {
+  const role = normalizeRole(userData.requestedRole || userData.role);
+  if (role === 'prospect') {
+    return 'Prospect Member auto-approved. Onboarding criteria: 2 GBMs, 2 Avenue Events, and Dues Paid.';
+  }
+  if (role === 'gbm') return 'GBM auto-approved.';
+  if (role === 'bod' || role === 'admin') {
+    return 'Pending approval. Admin action required in Account Requests.';
+  }
+  return 'A new RCPH account was created.';
+}
+
+function getSignupNotificationRows(userData) {
+  const role = normalizeRole(userData.requestedRole || userData.role);
+  const gender = signupEmailValue(userData.gender);
+  const describedGender = normalizeText(userData.genderSelfDescribe, 160);
+  const rows = [
+    ['Full name', signupEmailValue(userData.name)],
+    ['Email', signupEmailValue(userData.email)],
+    ['Phone', signupEmailValue(userData.phone)],
+    ['Requested role', signupEmailValue(role)],
+    ['Signup type', signupEmailValue(userData.signupType)],
+    ['Status', signupEmailValue(userData.status)],
+    ['Gender', describedGender ? `${gender} (${describedGender})` : gender],
+  ];
+
+  if (role === 'prospect') {
+    rows.push(
+      ['Hobbies / interests', signupEmailValue(userData.hobbies)],
+      ['Previous Rotaract member', signupEmailValue(userData.previousRotaract)],
+      ['Previous Rotaract experience', signupEmailValue(userData.previousRotaractDetails)],
+      ['Reason for joining RCPH', signupEmailValue(userData.joinReason)],
+      ['Referred by', signupEmailValue(userData.referredBy)]
+    );
+  }
+
+  rows.push(
+    ['Created timestamp', signupEmailValue(userData.createdAt)],
+    ['Firebase UID', signupEmailValue(userData.uid)]
+  );
+  return rows;
+}
+
+function buildSignupNotificationHtml(userData) {
+  const highlight = escapeEmailHtml(getSignupNotificationHighlight(userData));
+  const rows = getSignupNotificationRows(userData)
+    .map(([label, value]) => `
+      <tr>
+        <th style="padding:8px 12px;border:1px solid #e6e6e6;text-align:left;background:#faf7ef;vertical-align:top;">${escapeEmailHtml(label)}</th>
+        <td style="padding:8px 12px;border:1px solid #e6e6e6;white-space:pre-wrap;">${escapeEmailHtml(value)}</td>
+      </tr>`)
+    .join('');
+
+  return `
+    <div style="font-family:Arial,sans-serif;color:#1f1f1f;line-height:1.5;max-width:760px;">
+      <h2 style="color:#9b6814;margin-bottom:8px;">New RCPH account notification</h2>
+      <p style="padding:12px 14px;background:#fff7df;border-left:4px solid #f4b43a;"><strong>${highlight}</strong></p>
+      <table style="border-collapse:collapse;width:100%;margin:18px 0;">${rows}</table>
+      <p><strong>Please review this user in the RCPH Admin Panel if approval/action is required.</strong></p>
+    </div>`;
+}
+
+function buildSignupNotificationText(userData) {
+  const rows = getSignupNotificationRows(userData)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join('\n');
+
+  return [
+    'New RCPH account notification',
+    '',
+    getSignupNotificationHighlight(userData),
+    '',
+    rows,
+    '',
+    'Please review this user in the RCPH Admin Panel if approval/action is required.',
+  ].join('\n');
+}
+
+async function sendSignupNotificationEmail(userData) {
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    console.warn('Signup notification email skipped: EMAIL_USER/EMAIL_PASS (or SMTP_USER/SMTP_PASS) is not configured.');
+    return { sent: false, reason: 'email-not-configured' };
+  }
+
+  const recipients = getSignupNotificationRecipients();
+  await transporter.sendMail({
+    from: `"RCPH Platform" <${EMAIL_USER}>`,
+    to: recipients,
+    subject: getSignupNotificationSubject(userData),
+    text: buildSignupNotificationText(userData),
+    html: buildSignupNotificationHtml(userData),
+  });
+  return { sent: true };
 }
 
 function normalizeClubPosition(value, fallback) {
@@ -1068,7 +1206,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
           }, { merge: true });
         }
       }
-      return { status: 'approved', role: existingRole, existing: true };
+      return { status: 'approved', role: existingRole, existing: true, shouldNotify: false };
     }
 
     const userData = userSnap.exists ? (userSnap.data() || {}) : null;
@@ -1077,6 +1215,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
         status: 'approved',
         role: normalizeRole(userData.role),
         existing: true,
+        shouldNotify: false,
       };
     }
 
@@ -1130,7 +1269,13 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
         createdAt: currentProgress.createdAt || now,
         updatedAt: now,
       }, { merge: true });
-      return { status: 'approved', role: 'prospect', requestedRole: 'prospect', existing: false };
+      return {
+        status: 'approved',
+        role: 'prospect',
+        requestedRole: 'prospect',
+        existing: false,
+        shouldNotify: !userSnap.exists,
+      };
     }
 
     if (requestedRole === 'gbm') {
@@ -1163,7 +1308,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       setMemberProfileDoc(tx, memberRef, memberSnap, profile, 'gbm', clubPosition, now);
       setDocPreservingExistingAttendance(tx, attendanceRef, attendanceSnap, eventIds, now);
       setDocPreservingExistingAttendance(tx, districtAttendanceRef, districtAttendanceSnap, districtEventIds, now);
-      return { status: 'approved', role: 'gbm', existing: false };
+      return { status: 'approved', role: 'gbm', existing: false, shouldNotify: !userSnap.exists };
     }
 
     tx.set(userRef, {
@@ -1172,10 +1317,44 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       status: 'pending',
       createdAt: userData?.createdAt || now,
     }, { merge: true });
-    return { status: 'pending', role: 'pending', requestedRole, existing: false };
+    return {
+      status: 'pending',
+      role: 'pending',
+      requestedRole,
+      existing: false,
+      shouldNotify: !userSnap.exists,
+    };
   });
 
-  return { ok: true, ...result };
+  if (result.shouldNotify) {
+    const notificationData = {
+      uid,
+      name: profile.name,
+      email: profile.email,
+      phone: commonSignupData.phone,
+      requestedRole,
+      role: result.role,
+      signupType: requestedRole === 'prospect' ? 'prospect' : 'internal',
+      status: result.status,
+      gender: commonSignupData.gender,
+      genderSelfDescribe: commonSignupData.genderSelfDescribe,
+      ...(prospectSignup || {}),
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await sendSignupNotificationEmail(notificationData);
+    } catch (err) {
+      console.warn('Signup notification email failed', {
+        uid,
+        requestedRole,
+        message: err?.message || String(err),
+      });
+    }
+  }
+
+  const { shouldNotify, ...signupResult } = result;
+  return { ok: true, ...signupResult };
 });
 
 exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
