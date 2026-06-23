@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
@@ -95,6 +96,19 @@ const ACTIVE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
 const REQUESTABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin']);
 const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin']);
 const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
+const DRIVE_UPLOAD_SHARED_SECRET = defineSecret('DRIVE_UPLOAD_SHARED_SECRET');
+const DRIVE_UPLOAD_TICKET_TTL_MS = 5 * 60 * 1000;
+const DRIVE_UPLOAD_TICKET_DELETE_GRACE_MS = 24 * 60 * 60 * 1000;
+const DRIVE_UPLOAD_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const BOD_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+const TREASURY_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const DRIVE_UPLOAD_ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury']);
 const PROSPECT_CRITERIA = Object.freeze({
   requiredGbm: 2,
   requiredAvenueEvents: 2,
@@ -439,6 +453,276 @@ function validateEventDocId(eventId) {
     throw new HttpsError('invalid-argument', 'Invalid event ID.');
   }
   return cleaned;
+}
+
+function normalizeUploadFileName(value) {
+  const raw = value === undefined || value === null ? '' : String(value).trim();
+  if (raw.length > 180) {
+    throw new HttpsError('invalid-argument', 'File name must be 180 characters or fewer.');
+  }
+  const cleaned = normalizeText(raw, 180)
+    .replace(/[\\/:*?"<>|\x00-\x1F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[.\s]+/, '')
+    .replace(/[.\s]+$/, '')
+    .trim();
+  if (!cleaned) throw new HttpsError('invalid-argument', 'File name is required.');
+  return cleaned;
+}
+
+function validateDriveUploadMimeType(value) {
+  const mimeType = normalizeText(value, 120).toLowerCase();
+  if (!DRIVE_UPLOAD_ALLOWED_MIME_TYPES.has(mimeType)) {
+    throw new HttpsError('invalid-argument', 'Unsupported upload file type.');
+  }
+  return mimeType;
+}
+
+function validateDriveUploadSizeBytes(value, maxBytes) {
+  const sizeBytes = typeof value === 'number' ? value : Number(value);
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
+    throw new HttpsError('invalid-argument', 'Valid upload size is required.');
+  }
+  if (sizeBytes > maxBytes) {
+    throw new HttpsError('invalid-argument', 'Upload file is too large.');
+  }
+  return sizeBytes;
+}
+
+function generateDriveUploadTicket() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function hashDriveUploadTicket(ticket) {
+  return crypto.createHash('sha256').update(String(ticket || ''), 'utf8').digest('hex');
+}
+
+function timingSafeSharedSecretMatches(providedValue, expectedValue) {
+  const provided = typeof providedValue === 'string' ? providedValue : '';
+  const expected = typeof expectedValue === 'string' ? expectedValue : '';
+  if (!provided || !expected) return false;
+  const providedHash = crypto.createHash('sha256').update(provided, 'utf8').digest();
+  const expectedHash = crypto.createHash('sha256').update(expected, 'utf8').digest();
+  return crypto.timingSafeEqual(providedHash, expectedHash);
+}
+
+function validateDriveUploadType(value) {
+  const uploadType = normalizeText(value, 20).toLowerCase();
+  if (!DRIVE_UPLOAD_TYPES.has(uploadType)) {
+    throw new HttpsError('invalid-argument', 'Invalid upload type.');
+  }
+  return uploadType;
+}
+
+function normalizeDriveUploadText(value, max, label, { required = false } = {}) {
+  const raw = value === undefined || value === null ? '' : String(value).trim();
+  if (raw.length > max) {
+    throw new HttpsError('invalid-argument', `${label} must be ${max} characters or fewer.`);
+  }
+  const cleaned = normalizeText(raw, max);
+  if (required && !cleaned) {
+    throw new HttpsError('invalid-argument', `${label} is required.`);
+  }
+  return cleaned;
+}
+
+function generateDriveUploadGroupId() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+function hasSuppliedDriveUploadGroupId(value) {
+  return value !== undefined && value !== null && String(value).trim() !== '';
+}
+
+function normalizeDriveUploadGroupId(value, { required = false } = {}) {
+  const supplied = hasSuppliedDriveUploadGroupId(value);
+  if (!supplied) {
+    if (required) throw new HttpsError('invalid-argument', 'Upload group ID is required.');
+    return generateDriveUploadGroupId();
+  }
+  const raw = String(value).trim();
+  if (raw.length > 100) {
+    throw new HttpsError('invalid-argument', 'Upload group ID must be 100 characters or fewer.');
+  }
+  const uploadGroupId = normalizeText(raw, 100);
+  if (!/^(?=.*[A-Za-z0-9])[A-Za-z0-9._:-]{1,100}$/.test(uploadGroupId)) {
+    throw new HttpsError('invalid-argument', 'Invalid upload group ID.');
+  }
+  return uploadGroupId;
+}
+
+function assertBodUploadGroupMatches(groupSnap, { uid, eventName, eventDate }) {
+  if (!groupSnap?.exists) {
+    throw new HttpsError('failed-precondition', 'Upload group is not valid for this event.');
+  }
+
+  const groupData = groupSnap.data() || {};
+  if (groupData.uid !== uid) {
+    throw new HttpsError('permission-denied', 'Upload group is not valid for this user.');
+  }
+  if (groupData.eventName !== eventName || groupData.eventDate !== eventDate) {
+    throw new HttpsError('failed-precondition', 'Upload group is not valid for this event.');
+  }
+}
+
+function validateDriveTransactionId(value) {
+  const raw = value === undefined || value === null ? '' : String(value).trim();
+  if (raw.length > 128) {
+    throw new HttpsError('invalid-argument', 'Transaction ID must be 128 characters or fewer.');
+  }
+  const transactionId = normalizeText(raw, 128);
+  if (!transactionId || /[\\/]/.test(transactionId)) {
+    throw new HttpsError('invalid-argument', 'Valid transaction ID is required.');
+  }
+  return transactionId;
+}
+
+function validateDriveTransactionType(value) {
+  const transactionType = normalizeText(value, 20).toLowerCase();
+  if (transactionType !== 'income' && transactionType !== 'expense') {
+    throw new HttpsError('invalid-argument', 'Transaction type must be income or expense.');
+  }
+  return transactionType;
+}
+
+function validateDriveTransactionAmount(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    throw new HttpsError('invalid-argument', 'Valid transaction amount is required.');
+  }
+  const transactionAmount = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(transactionAmount) || transactionAmount < 0) {
+    throw new HttpsError('invalid-argument', 'Valid transaction amount is required.');
+  }
+  return transactionAmount;
+}
+
+function normalizeRawDriveUploadTicket(value) {
+  const ticket = normalizeText(value, 100);
+  if (!/^[a-f0-9]{64}$/i.test(ticket)) {
+    throw new HttpsError('invalid-argument', 'Valid upload ticket is required.');
+  }
+  return ticket.toLowerCase();
+}
+
+async function assertDriveUploadRateLimit(tx, { uid, uploadType, limit, nowMillis, rateLimitRef, rateLimitSnap }) {
+  const ref = rateLimitRef || db.collection('driveUploadRateLimits').doc(`${uid}_${uploadType}`);
+  const snap = rateLimitSnap || await tx.get(ref);
+  const existing = snap.exists ? (snap.data() || {}) : {};
+  const windowStart = nowMillis - DRIVE_UPLOAD_RATE_LIMIT_WINDOW_MS;
+  const recentCreatedAtMillis = Array.isArray(existing.createdAtMillis)
+    ? existing.createdAtMillis
+      .filter(value => Number.isSafeInteger(value) && value > windowStart)
+      .slice(-limit)
+    : [];
+
+  if (recentCreatedAtMillis.length >= limit) {
+    throw new HttpsError('resource-exhausted', 'Too many upload tickets requested. Try again later.');
+  }
+
+  recentCreatedAtMillis.push(nowMillis);
+  tx.set(ref, {
+    uid,
+    uploadType,
+    limit,
+    windowMs: DRIVE_UPLOAD_RATE_LIMIT_WINDOW_MS,
+    createdAtMillis: recentCreatedAtMillis,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
+async function createDriveUploadTicketDoc({ uid, role, uploadType, limit, metadata, bodUploadGroup = null }) {
+  const ticket = generateDriveUploadTicket();
+  const ticketHash = hashDriveUploadTicket(ticket);
+  const nowMillis = Date.now();
+  const expiresAtMillis = nowMillis + DRIVE_UPLOAD_TICKET_TTL_MS;
+  const deleteAtMillis = expiresAtMillis + DRIVE_UPLOAD_TICKET_DELETE_GRACE_MS;
+  const ticketRef = db.collection('driveUploadTickets').doc(ticketHash);
+  const rateLimitRef = db.collection('driveUploadRateLimits').doc(`${uid}_${uploadType}`);
+  const uploadGroupRef = bodUploadGroup
+    ? db.collection('driveUploadGroups').doc(bodUploadGroup.uploadGroupId)
+    : null;
+
+  await db.runTransaction(async (tx) => {
+    const uploadGroupSnap = bodUploadGroup?.supplied ? await tx.get(uploadGroupRef) : null;
+    const rateLimitSnap = await tx.get(rateLimitRef);
+
+    await assertDriveUploadRateLimit(tx, {
+      uid,
+      uploadType,
+      limit,
+      nowMillis,
+      rateLimitRef,
+      rateLimitSnap,
+    });
+
+    if (bodUploadGroup) {
+      const groupTimestamp = admin.firestore.FieldValue.serverTimestamp();
+      if (bodUploadGroup.supplied) {
+        assertBodUploadGroupMatches(uploadGroupSnap, bodUploadGroup);
+        tx.set(uploadGroupRef, { updatedAt: groupTimestamp }, { merge: true });
+      } else {
+        tx.create(uploadGroupRef, {
+          uploadGroupId: bodUploadGroup.uploadGroupId,
+          uid,
+          eventName: bodUploadGroup.eventName,
+          eventDate: bodUploadGroup.eventDate,
+          createdAt: groupTimestamp,
+          updatedAt: groupTimestamp,
+        });
+      }
+    }
+
+    tx.create(ticketRef, {
+      uid,
+      role,
+      uploadType,
+      ...metadata,
+      expiresAt: admin.firestore.Timestamp.fromMillis(expiresAtMillis),
+      deleteAt: admin.firestore.Timestamp.fromMillis(deleteAtMillis),
+      used: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      usedAt: null,
+    });
+  });
+
+  return { ticket, expiresAtMillis };
+}
+
+function sendDriveUploadJson(res, status, payload) {
+  res.status(status)
+    .set('Content-Type', 'application/json; charset=utf-8')
+    .set('Cache-Control', 'no-store')
+    .send(JSON.stringify(payload));
+}
+
+function parseDriveUploadRequestBody(req) {
+  const body = req.body;
+  if (body && typeof body === 'object' && !Buffer.isBuffer(body)) return body;
+  if (Buffer.isBuffer(body)) return JSON.parse(body.toString('utf8'));
+  if (typeof body === 'string') return JSON.parse(body || '{}');
+  return {};
+}
+
+function httpError(status, message) {
+  const err = new Error(message);
+  err.httpStatus = status;
+  return err;
+}
+
+function httpStatusFromHttpsError(err) {
+  if (err instanceof SyntaxError) return 400;
+  const statusByCode = {
+    'invalid-argument': 400,
+    unauthenticated: 401,
+    'permission-denied': 403,
+    'not-found': 404,
+    'already-exists': 409,
+    'failed-precondition': 412,
+    'resource-exhausted': 429,
+    'deadline-exceeded': 410,
+  };
+  return statusByCode[err?.code] || 500;
 }
 
 function normalizeVisibility(value, fallback = 'public') {
@@ -2043,6 +2327,207 @@ exports.syncExistingRolesToUsers = onCall(CALLABLE_OPTIONS, async (request) => {
 
   if (batchOps > 0) await batch.commit();
   return { ok: true, created };
+});
+
+exports.createBodUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const role = await assertBodAdminOrPresident(uid);
+  await assertBodEventsUnlockedForRole(role);
+
+  const data = request.data || {};
+  const fileName = normalizeUploadFileName(data.fileName);
+  const mimeType = validateDriveUploadMimeType(data.mimeType);
+  const sizeBytes = validateDriveUploadSizeBytes(data.sizeBytes, BOD_UPLOAD_MAX_BYTES);
+  const eventName = normalizeDriveUploadText(data.eventName, 180, 'Event name', { required: true });
+  const eventDate = normalizeDriveUploadText(data.eventDate, 20, 'Event date', { required: true });
+  const suppliedUploadGroupId = hasSuppliedDriveUploadGroupId(data.uploadGroupId);
+  const uploadGroupId = normalizeDriveUploadGroupId(data.uploadGroupId);
+
+  const { ticket, expiresAtMillis } = await createDriveUploadTicketDoc({
+    uid,
+    role,
+    uploadType: 'bod',
+    limit: 30,
+    metadata: {
+      fileName,
+      mimeType,
+      sizeBytes,
+      eventName,
+      eventDate,
+      uploadGroupId,
+    },
+    bodUploadGroup: {
+      supplied: suppliedUploadGroupId,
+      uploadGroupId,
+      uid,
+      eventName,
+      eventDate,
+    },
+  });
+
+  return {
+    ticket,
+    expiresAt: expiresAtMillis,
+    uploadGroupId,
+    fileName,
+    mimeType,
+    sizeBytes,
+  };
+});
+
+exports.createTreasuryUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const role = await assertAdminOrPresident(uid);
+  await assertPanelUnlockedForRole('treasury', role, 'Treasury');
+
+  const data = request.data || {};
+  const fileName = normalizeUploadFileName(data.fileName);
+  const mimeType = validateDriveUploadMimeType(data.mimeType);
+  const sizeBytes = validateDriveUploadSizeBytes(data.sizeBytes, TREASURY_UPLOAD_MAX_BYTES);
+  const transactionId = validateDriveTransactionId(data.transactionId);
+  const transactionDate = normalizeDriveUploadText(data.transactionDate, 20, 'Transaction date', { required: true });
+  const transactionPurpose = normalizeDriveUploadText(data.transactionPurpose, 180, 'Transaction purpose', { required: true });
+  const transactionType = validateDriveTransactionType(data.transactionType);
+  const transactionAmount = validateDriveTransactionAmount(data.transactionAmount);
+
+  const { ticket, expiresAtMillis } = await createDriveUploadTicketDoc({
+    uid,
+    role,
+    uploadType: 'treasury',
+    limit: 20,
+    metadata: {
+      fileName,
+      mimeType,
+      sizeBytes,
+      transactionId,
+      transactionDate,
+      transactionPurpose,
+      transactionType,
+      transactionAmount,
+    },
+  });
+
+  return {
+    ticket,
+    expiresAt: expiresAtMillis,
+    fileName,
+    mimeType,
+    sizeBytes,
+    transactionId,
+    transactionDate,
+    transactionPurpose,
+    transactionType,
+    transactionAmount,
+  };
+});
+
+exports.validateDriveUploadTicket = onRequest({
+  region: 'us-central1',
+  secrets: [DRIVE_UPLOAD_SHARED_SECRET],
+  timeoutSeconds: 30,
+  memory: '256MiB',
+  maxInstances: 5,
+  concurrency: 20,
+}, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.set('Allow', 'POST');
+    return sendDriveUploadJson(res, 405, {
+      ok: false,
+      error: 'method-not-allowed',
+      message: 'POST required.',
+    });
+  }
+
+  if (!timingSafeSharedSecretMatches(req.get('x-rcph-drive-secret'), DRIVE_UPLOAD_SHARED_SECRET.value())) {
+    return sendDriveUploadJson(res, 403, {
+      ok: false,
+      error: 'permission-denied',
+      message: 'Forbidden.',
+    });
+  }
+
+  try {
+    const data = parseDriveUploadRequestBody(req);
+    const uploadType = validateDriveUploadType(data.uploadType);
+    const ticket = normalizeRawDriveUploadTicket(data.ticket);
+    const fileName = normalizeUploadFileName(data.fileName);
+    const mimeType = validateDriveUploadMimeType(data.mimeType);
+    const maxBytes = uploadType === 'bod' ? BOD_UPLOAD_MAX_BYTES : TREASURY_UPLOAD_MAX_BYTES;
+    const sizeBytes = validateDriveUploadSizeBytes(data.sizeBytes, maxBytes);
+    const uploadGroupId = uploadType === 'bod'
+      ? normalizeDriveUploadGroupId(data.uploadGroupId, { required: true })
+      : '';
+    const transactionId = uploadType === 'treasury'
+      ? validateDriveTransactionId(data.transactionId)
+      : '';
+    const ticketHash = hashDriveUploadTicket(ticket);
+    const ticketRef = db.collection('driveUploadTickets').doc(ticketHash);
+    const nowMillis = Date.now();
+
+    const response = await db.runTransaction(async (tx) => {
+      const ticketSnap = await tx.get(ticketRef);
+      if (!ticketSnap.exists) throw httpError(404, 'Upload ticket not found.');
+
+      const ticketData = ticketSnap.data() || {};
+      const expiresAtMillis = typeof ticketData.expiresAt?.toMillis === 'function'
+        ? ticketData.expiresAt.toMillis()
+        : Number(ticketData.expiresAt || 0);
+
+      if (ticketData.used === true) throw httpError(409, 'Upload ticket already used.');
+      if (!expiresAtMillis || expiresAtMillis <= nowMillis) {
+        throw httpError(410, 'Upload ticket expired.');
+      }
+      if (
+        ticketData.uploadType !== uploadType
+        || ticketData.fileName !== fileName
+        || ticketData.mimeType !== mimeType
+        || ticketData.sizeBytes !== sizeBytes
+        || (uploadType === 'bod' && ticketData.uploadGroupId !== uploadGroupId)
+        || (uploadType === 'treasury' && ticketData.transactionId !== transactionId)
+      ) {
+        throw httpError(409, 'Upload ticket metadata mismatch.');
+      }
+
+      tx.update(ticketRef, {
+        used: true,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      if (uploadType === 'bod') {
+        return {
+          ok: true,
+          uploadType: 'bod',
+          safeFileName: ticketData.fileName,
+          uploadGroupId: ticketData.uploadGroupId,
+          eventName: ticketData.eventName,
+          eventDate: ticketData.eventDate,
+          uploaderUid: ticketData.uid,
+        };
+      }
+
+      return {
+        ok: true,
+        uploadType: 'treasury',
+        safeFileName: ticketData.fileName,
+        transactionId: ticketData.transactionId,
+        transactionDate: ticketData.transactionDate,
+        transactionPurpose: ticketData.transactionPurpose,
+        transactionType: ticketData.transactionType,
+        transactionAmount: ticketData.transactionAmount,
+        uploaderUid: ticketData.uid,
+      };
+    });
+
+    return sendDriveUploadJson(res, 200, response);
+  } catch (err) {
+    const status = err?.httpStatus || httpStatusFromHttpsError(err);
+    const message = status >= 500 ? 'Upload ticket validation failed.' : err.message;
+    return sendDriveUploadJson(res, status, {
+      ok: false,
+      error: status >= 500 ? 'internal' : 'upload-ticket-rejected',
+      message,
+    });
+  }
 });
 
 exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {

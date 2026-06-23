@@ -108,6 +108,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /driveUploadTickets/{ticketId} {
+      allow read, write: if false;
+    }
+
+    match /driveUploadRateLimits/{limitId} {
+      allow read, write: if false;
+    }
+
+    match /driveUploadGroups/{groupId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
