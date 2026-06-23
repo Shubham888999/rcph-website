@@ -1165,13 +1165,13 @@ journey.appendChild(createAmbientSvg(
 avenue.appendChild(createAmbientSvg(
   'rcph-avenue-route',
   '0 0 190 720',
-  '<defs><mask id="rcph-avenue-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="190" height="720"><path class="rcph-avenue-reveal" d="M6 10V710" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-avenue-route-mask)"><path class="rcph-avenue-line" d="M6 10V710"/><path class="rcph-avenue-line-glow" d="M6 10V710"/></g>'
+  '<defs><mask id="rcph-avenue-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="190" height="720"><path class="rcph-avenue-reveal" d="M2 10V710" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-avenue-route-mask)"><path class="rcph-avenue-line" d="M2 10V710"/><path class="rcph-avenue-line-glow" d="M2 10V710"/></g>'
 ));
     var stages = [
-      { name: 'International Service', top: '5%', icon: '<path d="M18 3c8 0 14 7 14 15s-6 15-14 15S4 26 4 18 10 3 18 3zM4 18h28M18 3c4 4 6 9 6 15s-2 11-6 15M18 3c-4 4-6 9-6 15s2 11 6 15M25 9l5-3-1 6"/>' },
-      { name: 'Club Service', top: '34%', icon: '<path d="M5 29c1-7 5-10 10-10s9 3 10 10M10 12c0-4 2-6 5-6s5 2 5 6-2 6-5 6-5-2-5-6M22 18c2-3 5-4 8-2 3 2 4 5 2 8M25 29c1-4 4-6 8-5"/>' },
-      { name: 'Professional Service', top: '63%', icon: '<path d="M4 12h28v18H4zM12 12V7h12v5M4 19c8 4 20 4 28 0M15 19h6v5h-6M24 8l5-4M29 4v6"/>' },
-      { name: 'Community Service', top: '91%', icon: '<path d="M4 21c5-2 9 0 14 7 5-7 9-9 14-7M7 21l3-11 8 4 8-4 3 11M18 14c-2-5-8-5-8 1 0 5 8 10 8 10s8-5 8-10c0-6-6-6-8-1z"/>' }
+      { name: 'International\nService', top: '5%', icon: '<path d="M18 3c8 0 14 7 14 15s-6 15-14 15S4 26 4 18 10 3 18 3zM4 18h28M18 3c4 4 6 9 6 15s-2 11-6 15M18 3c-4 4-6 9-6 15s2 11 6 15M25 9l5-3-1 6"/>' },
+      { name: 'Club\nService', top: '34%', icon: '<path d="M5 29c1-7 5-10 10-10s9 3 10 10M10 12c0-4 2-6 5-6s5 2 5 6-2 6-5 6-5-2-5-6M22 18c2-3 5-4 8-2 3 2 4 5 2 8M25 29c1-4 4-6 8-5"/>' },
+      { name: 'Professional\nDevelopment', top: '63%', icon: '<path d="M4 12h28v18H4zM12 12V7h12v5M4 19c8 4 20 4 28 0M15 19h6v5h-6M24 8l5-4M29 4v6"/>' },
+      { name: 'Community\nService', top: '91%', icon: '<path d="M4 21c5-2 9 0 14 7 5-7 9-9 14-7M7 21l3-11 8 4 8-4 3 11M18 14c-2-5-8-5-8 1 0 5 8 10 8 10s8-5 8-10c0-6-6-6-8-1z"/>' }
     ];
 
     var list = document.createElement('ol');

@@ -2854,7 +2854,7 @@ body[data-rcph-page] .rcph-avenue-label {
   max-width: 150px;
   font-size: clamp(0.54rem, 0.64vw, 0.68rem);
   line-height: 1.2;
-  white-space: normal;
+  white-space: pre-line;
 }
 
 body[data-rcph-page] .rcph-journey-stage[data-ambient-active],
