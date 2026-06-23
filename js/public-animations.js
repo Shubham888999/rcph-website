@@ -21,7 +21,33 @@
     'madhushala',
     'pages-of-hope'
   ];
-
+  var AMBIENT_WHEEL_PAGES = ['home'];
+  var AMBIENT_WHEEL_SCROLL_DEGREES = 280;
+  var AMBIENT_WHEEL_DEFINITIONS = [
+    {
+      side: 'left',
+      direction: 1,
+      frontAngle: 0,
+      labels: [
+        ['International', 'Service'],
+        ['Club', 'Service'],
+        ['Professional', 'Service'],
+        ['Community', 'Service']
+      ]
+    },
+    {
+      side: 'right',
+      direction: -1,
+      frontAngle: 180,
+      labels: [
+        ['Service'],
+        ['Leadership'],
+        ['Fellowship'],
+        ['Community'],
+        ['Impact']
+      ]
+    }
+  ];
   var state = {
     initialized: false,
     motionFallbackReady: false,
@@ -38,6 +64,8 @@
     homepageAmbientResizeReady: false,
     homepageAmbientBreakpoint: '',
     homepageAmbientAnimations: [],
+    homepageAmbientWheelReady: false,
+    homepageAmbientWheelInstances: [],
     bodShowcaseReady: false,
     bodTiltReady: false
   };
@@ -221,6 +249,11 @@
       if (state.reduceMotion) {
         killTrackedAnimations();
         revealAll();
+      }
+
+      if (isPublicAmbientPage()) {
+        state.homepageAmbientBreakpoint = '';
+        initPublicAmbientBackground();
       }
     };
 
@@ -1091,6 +1124,74 @@
     return 'desktop';
   }
 
+  function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function getViewportWidth() {
+    return window.innerWidth || document.documentElement.clientWidth || 1200;
+  }
+
+  function usesAmbientWheelSystem(pageType) {
+    return AMBIENT_WHEEL_PAGES.indexOf(pageType) !== -1;
+  }
+
+  function getAmbientWheelMode(breakpoint) {
+    var width = getViewportWidth();
+
+    if (breakpoint === 'mobile' || width <= 768) {
+      return 'mobile-static';
+    }
+
+    if (width < 980) {
+      return 'compact-static';
+    }
+
+    if (breakpoint === 'tablet') {
+      return 'tablet-scroll';
+    }
+
+    return 'desktop-scroll';
+  }
+
+  function isCompactAmbientWheelMode(mode) {
+    return mode === 'mobile-static' || mode === 'compact-static';
+  }
+
+  function isAmbientWheelScrollMode(mode) {
+    return mode === 'desktop-scroll' || mode === 'tablet-scroll';
+  }
+
+  function getAmbientWheelMetrics(mode) {
+    var width = getViewportWidth();
+    var size;
+
+    if (mode === 'mobile-static') {
+      size = clampNumber(width * 0.84, 300, 390);
+    } else if (mode === 'compact-static') {
+      size = clampNumber(width * 0.58, 340, 460);
+    } else if (mode === 'tablet-scroll') {
+      size = clampNumber(width * 0.48, 390, 500);
+    } else {
+      size = clampNumber(width * 0.39, 460, 660);
+    }
+
+    return {
+      size: size,
+      radius: size * (mode === 'mobile-static' ? 0.34 : 0.37)
+    };
+  }
+
+  function getAmbientWheelDefinitionsForMode(mode) {
+    if (!isCompactAmbientWheelMode(mode)) {
+      return AMBIENT_WHEEL_DEFINITIONS;
+    }
+
+    return AMBIENT_WHEEL_DEFINITIONS.filter(function (definition) {
+      return definition.side !== 'left';
+    });
+  }
+
   function clearHomepageAmbientAnimations() {
     state.homepageAmbientAnimations.forEach(function (animation) {
       if (animation && typeof animation.kill === 'function') {
@@ -1098,6 +1199,8 @@
       }
     });
     state.homepageAmbientAnimations = [];
+    state.homepageAmbientWheelReady = false;
+    state.homepageAmbientWheelInstances = [];
   }
 
   function trackHomepageAmbient(animation) {
@@ -1114,6 +1217,250 @@
     wrapper.className = className;
     wrapper.innerHTML = '<svg viewBox="' + viewBox + '" aria-hidden="true" focusable="false" fill="none" xmlns="http://www.w3.org/2000/svg">' + artwork + '</svg>';
     return wrapper;
+  }
+
+  function getWheelPoint(angle, radius) {
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius
+    };
+  }
+
+  function formatWheelPoint(point) {
+    return point.x.toFixed(2) + ' ' + point.y.toFixed(2);
+  }
+
+  function createWheelArcPath(startDegrees, endDegrees, radius) {
+    var start = getWheelPoint(startDegrees * Math.PI / 180, radius);
+    var end = getWheelPoint(endDegrees * Math.PI / 180, radius);
+    var largeArc = Math.abs(endDegrees - startDegrees) > 180 ? 1 : 0;
+
+    return 'M ' + formatWheelPoint(start) +
+      ' A ' + radius + ' ' + radius + ' 0 ' + largeArc + ' 1 ' + formatWheelPoint(end);
+  }
+
+  function createWheelSpokes(count) {
+    var spokes = '';
+
+    for (var index = 0; index < count; index += 1) {
+      var angle = (Math.PI * 2 * index) / count;
+      var inner = getWheelPoint(angle, 76);
+      var outer = getWheelPoint(angle, 334);
+
+      spokes += '<line class="rcph-wheel-spoke" x1="' + inner.x.toFixed(2) + '" y1="' + inner.y.toFixed(2) +
+        '" x2="' + outer.x.toFixed(2) + '" y2="' + outer.y.toFixed(2) + '"/>';
+    }
+
+    return spokes;
+  }
+
+  function createWheelFrame(className, side) {
+    var frontAngle = side === 'right' ? 180 : 0;
+    var frontArc = createWheelArcPath(frontAngle - 42, frontAngle + 42, 388);
+
+    return createAmbientSvg(
+      'rcph-wheel-frame ' + className,
+      '-460 -460 920 920',
+      '<g class="rcph-wheel-rotating">' +
+        '<circle class="rcph-wheel-rim" cx="0" cy="0" r="388"/>' +
+        '<circle class="rcph-wheel-inner-rim" cx="0" cy="0" r="286"/>' +
+        '<g class="rcph-wheel-spokes">' + createWheelSpokes(6) + '</g>' +
+      '</g>' +
+      '<path class="rcph-wheel-front-arc" d="' + frontArc + '"/>'
+    );
+  }
+
+  function createWheelBoard(lines, index, total, definition) {
+    var board = document.createElement('li');
+    var label = document.createElement('span');
+    var spacing = 360 / Math.max(1, total);
+
+    board.className = 'rcph-wheel-board';
+    board.setAttribute('aria-hidden', 'true');
+    board.style.setProperty('--rcph-wheel-board-index', String(index));
+
+    var connector = document.createElement('span');
+    connector.className = 'rcph-wheel-connector';
+    board.appendChild(connector);
+
+    label.className = 'rcph-wheel-board-label';
+    lines.forEach(function (line) {
+      var lineElement = document.createElement('span');
+      lineElement.textContent = line;
+      label.appendChild(lineElement);
+    });
+
+    board.appendChild(label);
+
+    return {
+      element: board,
+      connector: connector,
+      baseAngle: definition.frontAngle + (spacing * index)
+    };
+  }
+
+  function createAmbientWheel(layer, definition, mode) {
+    var metrics = getAmbientWheelMetrics(mode);
+    var wheel = document.createElement('div');
+    var axle = document.createElement('span');
+    var spotlight = document.createElement('span');
+    var stage = document.createElement('div');
+    var boardsLayer = document.createElement('ol');
+    var backFrame = createWheelFrame('rcph-wheel-rim-back', definition.side);
+    var frontFrame = createWheelFrame('rcph-wheel-rim-front', definition.side);
+    var hub = document.createElement('span');
+    var boards = [];
+    var rotors = Array.prototype.slice.call(backFrame.querySelectorAll('.rcph-wheel-rotating'))
+      .concat(Array.prototype.slice.call(frontFrame.querySelectorAll('.rcph-wheel-rotating')));
+
+    wheel.className = 'rcph-ambient-wheel rcph-ambient-wheel--' + definition.side;
+    wheel.setAttribute('aria-hidden', 'true');
+    wheel.style.setProperty('--rcph-wheel-size', metrics.size.toFixed(2) + 'px');
+    wheel.style.setProperty('--rcph-wheel-radius', metrics.radius.toFixed(2) + 'px');
+    wheel.style.setProperty('--rcph-wheel-front-x', definition.side === 'left' ? '72%' : '28%');
+    wheel.style.setProperty('--rcph-wheel-board-count', String(definition.labels.length));
+
+    axle.className = 'rcph-wheel-axle';
+    spotlight.className = 'rcph-wheel-spotlight';
+    stage.className = 'rcph-wheel-stage';
+    boardsLayer.className = 'rcph-wheel-boards';
+    hub.className = 'rcph-wheel-hub';
+
+    definition.labels.forEach(function (lines, index) {
+      var board = createWheelBoard(lines, index, definition.labels.length, definition);
+      boards.push(board);
+      boardsLayer.appendChild(board.element);
+    });
+
+    stage.appendChild(backFrame);
+    stage.appendChild(boardsLayer);
+    stage.appendChild(frontFrame);
+    stage.appendChild(hub);
+
+    wheel.appendChild(axle);
+    wheel.appendChild(spotlight);
+    wheel.appendChild(stage);
+    layer.appendChild(wheel);
+
+    return {
+      element: wheel,
+      frames: [backFrame, frontFrame],
+      rotors: rotors,
+      boards: boards,
+      definition: definition,
+      metrics: metrics
+    };
+  }
+
+  function refreshAmbientWheelMetrics(wheels, mode) {
+    var metrics = getAmbientWheelMetrics(mode);
+
+    wheels.forEach(function (wheel) {
+      wheel.metrics = metrics;
+      wheel.element.style.setProperty('--rcph-wheel-size', metrics.size.toFixed(2) + 'px');
+      wheel.element.style.setProperty('--rcph-wheel-radius', metrics.radius.toFixed(2) + 'px');
+    });
+  }
+
+  function updateWheelBoards(wheels, progress) {
+    var safeProgress = clampNumber(progress || 0, 0, 1);
+
+    wheels.forEach(function (wheel) {
+      var rotation = wheel.definition.direction * AMBIENT_WHEEL_SCROLL_DEGREES * safeProgress;
+      var radius = wheel.metrics.radius;
+
+      wheel.rotors.forEach(function (rotor) {
+        rotor.setAttribute('transform', 'rotate(' + rotation.toFixed(3) + ')');
+      });
+
+      wheel.boards.forEach(function (board) {
+        var angle = board.baseAngle + rotation;
+        var radians = angle * Math.PI / 180;
+        var cosine = Math.cos(radians);
+        var x = cosine * radius;
+        var y = Math.sin(radians) * radius;
+        var depth = wheel.definition.side === 'right'
+          ? ((-cosine + 1) / 2)
+          : ((cosine + 1) / 2);
+        var easedDepth = Math.pow(clampNumber(depth, 0, 1), 2.6);
+        var opacity = 0.018 + (0.962 * easedDepth);
+        var scale = 0.84 + (0.22 * easedDepth);
+        var brightness = 0.58 + (0.52 * easedDepth);
+        var blur = (1 - easedDepth) * 0.48;
+        var glow = Math.pow(depth, 3) * 0.18;
+        var border = 0.12 + (easedDepth * 0.58);
+        var connectorAngle = angle;
+
+        board.element.style.opacity = opacity.toFixed(3);
+        board.element.style.zIndex = String(1 + Math.round(easedDepth * 9));
+        board.element.style.filter = 'brightness(' + brightness.toFixed(3) + ') blur(' + blur.toFixed(2) + 'px)';
+        board.element.style.transform = 'translate(-50%, -50%) translate3d(' +
+          x.toFixed(2) + 'px, ' + y.toFixed(2) + 'px, 0) scale(' + scale.toFixed(3) + ')';
+        board.element.style.setProperty('--rcph-wheel-depth', depth.toFixed(3));
+        board.element.style.setProperty('--rcph-wheel-glow-alpha', glow.toFixed(3));
+        board.element.style.setProperty('--rcph-wheel-border-alpha', border.toFixed(3));
+        board.element.style.setProperty('--rcph-wheel-connector-angle', connectorAngle.toFixed(2) + 'deg');
+      });
+    });
+  }
+
+  function applyStaticWheelFallback(wheels) {
+    updateWheelBoards(wheels, 0);
+  }
+
+  function destroyHomepageAmbientWheels(layer) {
+    clearHomepageAmbientAnimations();
+
+    if (!layer) {
+      return;
+    }
+
+    while (layer.firstChild) {
+      layer.removeChild(layer.firstChild);
+    }
+  }
+
+  function initHomepageAmbientWheels(layer, mode) {
+    var definitions = getAmbientWheelDefinitionsForMode(mode);
+    var wheels = definitions.map(function (definition) {
+      return createAmbientWheel(layer, definition, mode);
+    });
+    var canScroll = isAmbientWheelScrollMode(mode) &&
+      !state.reduceMotion &&
+      hasGsap() &&
+      state.scrollTriggerReady &&
+      window.ScrollTrigger &&
+      hasAmbientScrollRange();
+
+    state.homepageAmbientWheelReady = true;
+    state.homepageAmbientWheelInstances = wheels;
+    layer.setAttribute('data-ambient-motion', canScroll ? 'scroll' : 'static');
+    applyStaticWheelFallback(wheels);
+
+    if (!canScroll) {
+      return;
+    }
+
+    var progressState = { value: 0 };
+
+    trackHomepageAmbient(getGsap().to(progressState, {
+      value: 1,
+      ease: 'none',
+      onUpdate: function () {
+        updateWheelBoards(wheels, progressState.value);
+      },
+      scrollTrigger: {
+        trigger: document.documentElement,
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 0.8,
+        invalidateOnRefresh: true,
+        onRefresh: function () {
+          refreshAmbientWheelMetrics(wheels, mode);
+          updateWheelBoards(wheels, progressState.value);
+        }
+      }
+    }));
   }
 
   function createRotaractJourneyAmbient(layer, breakpoint) {
@@ -1440,33 +1787,40 @@ avenue.appendChild(createAmbientSvg(
 
     var pageType = getAmbientPageType();
     var breakpoint = getAmbientBreakpoint();
-    var signature = 'public-dual-ambient-paths:' + pageType + ':' + breakpoint;
+    var useWheelSystem = usesAmbientWheelSystem(pageType);
+    var ambientMode = useWheelSystem ? getAmbientWheelMode(breakpoint) : breakpoint;
+    var ambientSystem = useWheelSystem ? 'homepage-outline-wheels' : 'pune-avenues-rotaract-journey';
+    var motionSignature = state.reduceMotion ? 'reduced' : 'motion';
+    var sizeSignature = useWheelSystem ? ':' + Math.round(getAmbientWheelMetrics(ambientMode).size) : '';
+    var signature = ambientSystem + ':' + pageType + ':' + ambientMode + sizeSignature + ':' + motionSignature;
 
     if (state.homepageAmbientReady && state.homepageAmbientBreakpoint === signature) {
       return;
     }
 
-    clearHomepageAmbientAnimations();
-    while (layer.firstChild) {
-      layer.removeChild(layer.firstChild);
-    }
+    destroyHomepageAmbientWheels(layer);
 
     state.homepageAmbientReady = true;
     state.homepageAmbientBreakpoint = signature;
     layer.setAttribute('data-ambient-breakpoint', breakpoint);
-    layer.setAttribute('data-ambient-system', 'pune-avenues-rotaract-journey');
+    layer.setAttribute('data-ambient-mode', ambientMode);
+    layer.setAttribute('data-ambient-system', ambientSystem);
     layer.setAttribute('data-ambient-page-type', pageType === 'home' ? 'home' : 'public');
     layer.setAttribute('data-ambient-page', pageType);
 
-    var avenue = createLeftAvenueAmbient(layer, breakpoint);
-    var journey = createRotaractJourneyAmbient(layer, breakpoint);
-    var canDrawOnScroll = !state.reduceMotion && breakpoint === 'desktop' && hasGsap() && state.scrollTriggerReady && window.ScrollTrigger && (pageType === 'home' || hasAmbientScrollRange());
-
-    if (canDrawOnScroll) {
-      initRightJourneyPath(journey, pageType);
-      initLeftAvenuePath(avenue, pageType);
+    if (useWheelSystem) {
+      initHomepageAmbientWheels(layer, ambientMode);
     } else {
-      showPublicAmbientStatic(journey, avenue);
+      var avenue = createLeftAvenueAmbient(layer, breakpoint);
+      var journey = createRotaractJourneyAmbient(layer, breakpoint);
+      var canDrawOnScroll = !state.reduceMotion && breakpoint === 'desktop' && hasGsap() && state.scrollTriggerReady && window.ScrollTrigger && (pageType === 'home' || hasAmbientScrollRange());
+
+      if (canDrawOnScroll) {
+        initRightJourneyPath(journey, pageType);
+        initLeftAvenuePath(avenue, pageType);
+      } else {
+        showPublicAmbientStatic(journey, avenue);
+      }
     }
 
     if (state.homepageAmbientResizeReady || typeof window.matchMedia !== 'function') {
