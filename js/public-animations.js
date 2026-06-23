@@ -1120,11 +1120,11 @@
     var journey = document.createElement('div');
     journey.className = 'rcph-journey-ambient';
     journey.setAttribute('aria-hidden', 'true');
-    journey.appendChild(createAmbientSvg(
-      'rcph-journey-route',
-      '0 0 180 720',
-      '<defs><mask id="rcph-journey-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="720"><path class="rcph-journey-reveal" d="M76 10C148 88 25 151 86 224s59 118 3 177-43 118 15 176 27 91-10 133" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-journey-route-mask)"><path class="rcph-journey-line" d="M76 10C148 88 25 151 86 224s59 118 3 177-43 118 15 176 27 91-10 133"/><path class="rcph-journey-line-glow" d="M76 10C148 88 25 151 86 224s59 118 3 177-43 118 15 176 27 91-10 133"/></g>'
-    ));
+journey.appendChild(createAmbientSvg(
+  'rcph-journey-route',
+  '0 0 180 720',
+  '<defs><mask id="rcph-journey-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="720"><path class="rcph-journey-reveal" d="M180 10V710" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-journey-route-mask)"><path class="rcph-journey-line" d="M180 10V710"/><path class="rcph-journey-line-glow" d="M180 10V710"/></g>'
+));
 
     var stages = [
       { name: 'Service', top: '2%', icon: '<path d="M5 18c5-1 8 1 11 4 4-5 8-6 13-3M8 18l4-10 8 3 7-7M23 4h6v6"/>' },
@@ -1162,12 +1162,11 @@
     var avenue = document.createElement('div');
     avenue.className = 'rcph-avenue-ambient';
     avenue.setAttribute('aria-hidden', 'true');
-    avenue.appendChild(createAmbientSvg(
-      'rcph-avenue-route',
-      '0 0 190 720',
-      '<defs><mask id="rcph-avenue-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="190" height="720"><path class="rcph-avenue-reveal" d="M112 12C34 104 161 187 97 281S31 439 103 522s48 127 3 188" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-avenue-route-mask)"><path class="rcph-avenue-line" d="M112 12C34 104 161 187 97 281S31 439 103 522s48 127 3 188"/><path class="rcph-avenue-line-glow" d="M112 12C34 104 161 187 97 281S31 439 103 522s48 127 3 188"/></g>'
-    ));
-
+avenue.appendChild(createAmbientSvg(
+  'rcph-avenue-route',
+  '0 0 190 720',
+  '<defs><mask id="rcph-avenue-route-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="190" height="720"><path class="rcph-avenue-reveal" d="M6 10V710" stroke="#fff" stroke-width="12"/></mask></defs><g mask="url(#rcph-avenue-route-mask)"><path class="rcph-avenue-line" d="M6 10V710"/><path class="rcph-avenue-line-glow" d="M6 10V710"/></g>'
+));
     var stages = [
       { name: 'International Service', top: '5%', icon: '<path d="M18 3c8 0 14 7 14 15s-6 15-14 15S4 26 4 18 10 3 18 3zM4 18h28M18 3c4 4 6 9 6 15s-2 11-6 15M18 3c-4 4-6 9-6 15s2 11 6 15M25 9l5-3-1 6"/>' },
       { name: 'Club Service', top: '34%', icon: '<path d="M5 29c1-7 5-10 10-10s9 3 10 10M10 12c0-4 2-6 5-6s5 2 5 6-2 6-5 6-5-2-5-6M22 18c2-3 5-4 8-2 3 2 4 5 2 8M25 29c1-4 4-6 8-5"/>' },
