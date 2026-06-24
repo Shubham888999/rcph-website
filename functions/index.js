@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const positionHelpers = require('./lib/positions');
 
 admin.initializeApp();
 const db = admin.firestore();
