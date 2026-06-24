@@ -20,15 +20,42 @@ Implemented in the first code phase:
 - derived position metadata helper
 - read-only compatibility resolver for existing records
 - local verification script in `functions/scripts/verify-position-catalog.js`
+- backend assignment engine in `functions/lib/position-assignments.js`
+- canonical `updateUserAccessAndPositions` callable
+- `approveUserRole` and `updateUserRole` now delegate to the canonical role/position sync engine
+- `bodPositionOccupancy/{positionKey}` current-state writes
+- `bodPositionAssignments/{assignmentId}` historical assignment writes
+- `rolePositionAudit/{auditId}` backend audit writes
+- local verification script in `functions/scripts/verify-position-assignments.js`
 
 Not implemented yet:
 
 - Admin grouped multi-select UI
-- approval or role-maintenance behavior changes
-- `bodPositionOccupancy` or `bodPositionAssignments` writes
 - live Firestore migration
-- attendance synchronization changes
+- attendance UI changes
 - Visit Submission System integration
+
+## Compatibility behavior
+
+`approveUserRole` keeps its existing callable name for frontend compatibility.
+
+- New callers may send `positionKeys` and `confirmJointPositionKeys`.
+- Legacy callers may continue sending `clubPosition`.
+- If `positionKeys` is supplied, it is used as the source of truth.
+- If `positionKeys` is omitted, legacy `clubPosition` is canonicalized for BOD/Admin/President approvals.
+- Unknown legacy club positions fail instead of becoming authorization keys.
+- Legacy `addToBodAttendance` is accepted but no longer controls BOD roster eligibility.
+- BOD roster eligibility now comes from one or more canonical active positions.
+
+`updateUserRole` also delegates to the same sync engine.
+
+- New callers may send `positionKeys` and `confirmJointPositionKeys`.
+- If an old caller sends only a role, current canonical positions are preserved for `bod`, `admin`, and `president`.
+- If an old caller moves a user to `gbm`, positions are cleared.
+- Moving a user to `bod` without supplied or existing positions fails safely.
+- President is now assignable by approved Admin or President callers.
+
+Occupancy documents are retained when empty with `holderUids: []`, `jointAssignment: false`, and `active: false` for easier audit/debugging.
 
 ## Recommended schema
 

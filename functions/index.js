@@ -6,9 +6,16 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const positionHelpers = require('./lib/positions');
+const { createPositionAssignmentService } = require('./lib/position-assignments');
 
 admin.initializeApp();
 const db = admin.firestore();
+const rolePositionAssignments = createPositionAssignmentService({
+  db,
+  admin,
+  HttpsError,
+  positionHelpers,
+});
 const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE;
 const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS || '';
@@ -95,7 +102,7 @@ exports.resetPasswordWithOtp = functions.https.onCall(async (data) => {
 
 const ACTIVE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
 const REQUESTABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin']);
-const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin']);
+const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
 const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
 const DRIVE_UPLOAD_SHARED_SECRET = defineSecret('DRIVE_UPLOAD_SHARED_SECRET');
 const DRIVE_UPLOAD_TICKET_TTL_MS = 5 * 60 * 1000;
@@ -433,6 +440,70 @@ function setMemberProfileDoc(tx, ref, snap, profile, approvedRole, clubPosition,
     createdAt: existing.createdAt || now,
     updatedAt: now,
   }, { merge: true });
+}
+
+const GENERAL_MEMBER_ATTENDANCE_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
+
+async function ensureAttendanceRowsForRolePositionSync(uid, role, hasBodPosition) {
+  const normalizedRole = normalizeRole(role);
+  if (!GENERAL_MEMBER_ATTENDANCE_ROLES.has(normalizedRole)) {
+    return { ok: true, generalAttendance: false, bodAttendance: false, skipped: true };
+  }
+
+  const [eventMap, districtEventMap, bodMeetingMap] = await Promise.all([
+    buildNaMapFromCollection('events'),
+    buildNaMapFromCollection('districtEvents'),
+    hasBodPosition ? buildNaMapFromCollection('bodMeetings') : Promise.resolve({}),
+  ]);
+  const eventIds = Object.keys(eventMap);
+  const districtEventIds = Object.keys(districtEventMap);
+  const bodMeetingIds = Object.keys(bodMeetingMap);
+  const attendanceRef = db.collection('attendance').doc(uid);
+  const districtAttendanceRef = db.collection('districtAttendance').doc(uid);
+  const bodAttendanceRef = db.collection('bodAttendance').doc(uid);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await db.runTransaction(async (tx) => {
+    const refs = [attendanceRef, districtAttendanceRef];
+    if (hasBodPosition) refs.push(bodAttendanceRef);
+    const snaps = await Promise.all(refs.map(ref => tx.get(ref)));
+    setDocPreservingExistingAttendance(tx, attendanceRef, snaps[0], eventIds, now);
+    setDocPreservingExistingAttendance(tx, districtAttendanceRef, snaps[1], districtEventIds, now);
+    if (hasBodPosition) {
+      setDocPreservingExistingAttendance(tx, bodAttendanceRef, snaps[2], bodMeetingIds, now);
+    }
+  });
+
+  return {
+    ok: true,
+    generalAttendance: true,
+    bodAttendance: hasBodPosition === true,
+  };
+}
+
+async function syncUserAccessAndPositionsWithAttendance(options) {
+  const result = await rolePositionAssignments.syncUserRoleAndPositions(options);
+  try {
+    const attendanceSync = await ensureAttendanceRowsForRolePositionSync(
+      result.targetUid,
+      result.role,
+      result.bodRosterActive
+    );
+    return { ...result, attendanceSync };
+  } catch (err) {
+    console.warn('Role/position authority updated but attendance initialization failed', {
+      targetUid: result.targetUid,
+      role: result.role,
+      message: err?.message || String(err),
+    });
+    return {
+      ...result,
+      attendanceSync: {
+        ok: false,
+        message: 'Role and position data was updated, but attendance initialization needs retry.',
+      },
+    };
+  }
 }
 
 function normalizeStringArray(value, maxItems = 20, maxLength = 180) {
@@ -1644,7 +1715,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
 
 exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const approverUid = requireAuth(request);
-  await assertAdminOrPresident(approverUid);
+  const approverRole = await assertAdminOrPresident(approverUid);
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -1653,89 +1724,74 @@ exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
     throw new HttpsError('invalid-argument', 'Valid target user and approved role required.');
   }
 
-  const targetRole = await getActiveRole(targetUid);
-  if (targetRole?.role === 'president') {
-    throw new HttpsError('failed-precondition', 'President role is manual-only.');
+  const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
+  const syncOptions = {
+    actorUid: approverUid,
+    actorRole: approverRole,
+    targetUid,
+    role: approvedRole,
+    confirmJointPositionKeys: data.confirmJointPositionKeys || [],
+    operationSource: 'accountApproval',
+    positionKeysProvided,
+  };
+  if (positionKeysProvided) {
+    syncOptions.positionKeys = data.positionKeys;
+  } else if (approvedRole !== 'gbm') {
+    syncOptions.legacyClubPosition = data.clubPosition;
   }
 
-  const positionFallbacks = {
-    gbm: 'Member',
-    bod: 'BOD',
-    admin: 'Admin',
+  const result = await syncUserAccessAndPositionsWithAttendance(syncOptions);
+  return {
+    ok: true,
+    role: result.role,
+    positionKeys: result.positionKeys,
+    positionTitles: result.positionTitles,
+    avenueCodes: result.avenueCodes,
+    addedPositionKeys: result.addedPositionKeys,
+    removedPositionKeys: result.removedPositionKeys,
+    jointPositionKeys: result.jointPositionKeys,
+    bodRosterActive: result.bodRosterActive,
+    attendanceSync: result.attendanceSync,
   };
-  const clubPosition = normalizeClubPosition(data.clubPosition, positionFallbacks[approvedRole]);
-  const addToBodAttendance = approvedRole === 'bod' || data.addToBodAttendance === true;
-  const eventIds = Object.keys(await buildNaMapFromCollection('events'));
-  const districtEventIds = Object.keys(await buildNaMapFromCollection('districtEvents'));
-  const bodMeetingIds = Object.keys(await buildNaMapFromCollection('bodMeetings'));
+});
 
-  const targetUserRef = db.collection('users').doc(targetUid);
-  const targetRoleRef = db.collection('roles').doc(targetUid);
-  const memberRef = db.collection('members').doc(targetUid);
-  const attendanceRef = db.collection('attendance').doc(targetUid);
-  const districtAttendanceRef = db.collection('districtAttendance').doc(targetUid);
-  const bodMemberRef = db.collection('bodMembers').doc(targetUid);
-  const bodAttendanceRef = db.collection('bodAttendance').doc(targetUid);
-  const now = admin.firestore.FieldValue.serverTimestamp();
+exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  const actorRole = await assertAdminOrPresident(actorUid);
 
-  await db.runTransaction(async (tx) => {
-    const [
-      userSnap,
-      memberSnap,
-      attendanceSnap,
-      districtAttendanceSnap,
-      bodMemberSnap,
-      bodAttendanceSnap,
-    ] = await Promise.all([
-      tx.get(targetUserRef),
-      tx.get(memberRef),
-      tx.get(attendanceRef),
-      tx.get(districtAttendanceRef),
-      tx.get(bodMemberRef),
-      tx.get(bodAttendanceRef),
-    ]);
-    if (!userSnap.exists) {
-      throw new HttpsError('not-found', 'User profile not found.');
-    }
-    const userData = userSnap.data() || {};
-    const profile = {
-      uid: targetUid,
-      name: normalizeText(userData.name || userData.email || targetUid, 120),
-      email: normalizeEmail(userData.email || ''),
-    };
+  const data = request.data || {};
+  const targetUid = normalizeText(data.targetUid, 128);
+  const role = normalizeRole(data.role);
+  const operationSource = normalizeText(data.operationSource || 'roleMaintenance', 80);
+  if (!targetUid || !APPROVABLE_ROLES.has(role)) {
+    throw new HttpsError('invalid-argument', 'Valid target user and role required.');
+  }
 
-    tx.set(targetUserRef, {
-      status: 'approved',
-      role: approvedRole,
-      requestedRole: approvedRole,
-      clubPosition,
-      addToBodAttendance,
-      approvedAt: now,
-      approvedBy: approverUid,
-      updatedAt: now,
-      rejectedAt: null,
-      rejectedBy: null,
-      rejectReason: null,
-    }, { merge: true });
-
-    tx.set(targetRoleRef, {
-      role: approvedRole,
-      status: 'approved',
-      approvedBy: approverUid,
-      updatedAt: now,
-    }, { merge: true });
-
-    setMemberProfileDoc(tx, memberRef, memberSnap, profile, approvedRole, clubPosition, now);
-    setDocPreservingExistingAttendance(tx, attendanceRef, attendanceSnap, eventIds, now);
-    setDocPreservingExistingAttendance(tx, districtAttendanceRef, districtAttendanceSnap, districtEventIds, now);
-
-    if (addToBodAttendance) {
-      setMemberProfileDoc(tx, bodMemberRef, bodMemberSnap, profile, approvedRole, clubPosition, now);
-      setDocPreservingExistingAttendance(tx, bodAttendanceRef, bodAttendanceSnap, bodMeetingIds, now);
-    }
+  const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
+  const result = await syncUserAccessAndPositionsWithAttendance({
+    actorUid,
+    actorRole,
+    targetUid,
+    role,
+    positionKeys: data.positionKeys,
+    positionKeysProvided,
+    confirmJointPositionKeys: data.confirmJointPositionKeys || [],
+    operationSource,
   });
 
-  return { ok: true, role: approvedRole };
+  return {
+    ok: true,
+    targetUid: result.targetUid,
+    role: result.role,
+    positionKeys: result.positionKeys,
+    positionTitles: result.positionTitles,
+    avenueCodes: result.avenueCodes,
+    addedPositionKeys: result.addedPositionKeys,
+    removedPositionKeys: result.removedPositionKeys,
+    jointPositionKeys: result.jointPositionKeys,
+    bodRosterActive: result.bodRosterActive,
+    attendanceSync: result.attendanceSync,
+  };
 });
 
 exports.rejectUserRoleRequest = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -1785,7 +1841,7 @@ exports.rejectUserRoleRequest = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
-  await assertAdminOrPresident(actorUid);
+  const actorRole = await assertAdminOrPresident(actorUid);
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -1794,33 +1850,30 @@ exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
     throw new HttpsError('invalid-argument', 'Valid target user and role required.');
   }
 
-  const targetRole = await getActiveRole(targetUid);
-  if (targetRole?.role === 'president') {
-    throw new HttpsError('failed-precondition', 'President role is manual-only.');
-  }
+  const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
+  const result = await syncUserAccessAndPositionsWithAttendance({
+    actorUid,
+    actorRole,
+    targetUid,
+    role,
+    positionKeys: data.positionKeys,
+    positionKeysProvided,
+    confirmJointPositionKeys: data.confirmJointPositionKeys || [],
+    operationSource: 'roleMaintenance',
+  });
 
-  const now = admin.firestore.FieldValue.serverTimestamp();
-  await Promise.all([
-    db.collection('users').doc(targetUid).set({
-      status: 'approved',
-      role,
-      requestedRole: role,
-      approvedAt: now,
-      approvedBy: actorUid,
-      updatedAt: now,
-      rejectedAt: null,
-      rejectedBy: null,
-      rejectReason: null,
-    }, { merge: true }),
-    db.collection('roles').doc(targetUid).set({
-      role,
-      status: 'approved',
-      updatedAt: now,
-      approvedBy: actorUid,
-    }, { merge: true }),
-  ]);
-
-  return { ok: true, role };
+  return {
+    ok: true,
+    role: result.role,
+    positionKeys: result.positionKeys,
+    positionTitles: result.positionTitles,
+    avenueCodes: result.avenueCodes,
+    addedPositionKeys: result.addedPositionKeys,
+    removedPositionKeys: result.removedPositionKeys,
+    jointPositionKeys: result.jointPositionKeys,
+    bodRosterActive: result.bodRosterActive,
+    attendanceSync: result.attendanceSync,
+  };
 });
 
 exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {

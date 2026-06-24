@@ -2,7 +2,7 @@
 
 ## Phase 2: position catalog and backend helpers
 
-Status: partially implemented. The canonical catalog, normalization helpers, derived metadata helper, validation helper, read-only resolver, and local verification script now exist. Assignment sync helpers are not implemented yet.
+Status: implemented for backend foundations. The canonical catalog, normalization helpers, derived metadata helper, validation helper, read-only resolver, backend assignment engine, canonical management callable, and local verification scripts now exist.
 
 Add a shared canonical position catalog and helper functions:
 
@@ -17,6 +17,8 @@ No UI should write arbitrary position strings after this phase.
 
 ## Phase 3: approval and role maintenance
 
+Status: backend callable behavior implemented; Admin UI controls are not implemented.
+
 Update Admin approval and role maintenance:
 
 - replace single position select with multi-position control
@@ -28,7 +30,24 @@ Update Admin approval and role maintenance:
 - warn and require explicit confirmation for joint assignments
 - call a backend function that syncs users, roles, assignments, members, and attendance records
 
+Compatibility retained:
+
+- `approveUserRole` still accepts legacy `clubPosition` input.
+- `approveUserRole` also accepts new `positionKeys` input.
+- legacy `addToBodAttendance` is ignored for authority and roster eligibility.
+- `updateUserRole` preserves positions for compatible old calls that omit `positionKeys`.
+- `updateUserRole` clears positions when moving to `gbm`.
+- President may be assigned by approved Admin or President callers.
+
+Not implemented:
+
+- grouped Admin multi-select UI
+- frontend conflict-confirmation UX
+- live migration
+
 ## Phase 4: assignment collection and migration dry run
+
+Status: assignment and occupancy write support exists; live migration has not been run.
 
 Introduce `bodPositionOccupancy` and `bodPositionAssignments`, then run a dry-run migration:
 
