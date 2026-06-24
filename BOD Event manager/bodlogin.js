@@ -44,8 +44,17 @@ const submitBodEventFn = functionsClient.httpsCallable('submitBodEvent');
 const syncBodEventFn = functionsClient.httpsCallable('syncBodEventToAttendance');
 const updateBodEventFn = functionsClient.httpsCallable('updateBodEvent');
 const archiveBodEventFn = functionsClient.httpsCallable('archiveBodEvent');
+const createBodUploadTicketFn = functionsClient.httpsCallable('createBodUploadTicket');
 
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxNq8SrZI08kTb-hh9awLlgWufJeW5ReHD4eePcGxS0z6SyOKNG9YseKeNXAzUv9URD/exec"; // ⚠️ PASTE YOUR URL
+const BOD_UPLOAD_WEB_APP_URL =
+  'https://script.google.com/macros/s/AKfycby1iqbZHj2LJFz3FZzE7XkjGMZ1Tqi6Y-rCJmH1ZWs5bXBFRGrb--bkNfFh_D7dS0UfKw/exec';
+const BOD_UPLOAD_ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp'
+]);
+const BOD_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
 const imageUploader = document.getElementById('imageUploader');
 const loader = document.getElementById('loader');
 const loaderText = document.getElementById('loaderText');
@@ -336,7 +345,7 @@ function renderSelection(files) {
   if (n === 1) {
     fileNamesEl.textContent = files[0].name;
   } else {
-    fileNamesEl.textContent = `${n} images selected`;
+    fileNamesEl.textContent = `${n} files selected`;
   }
 
   // Count pill
@@ -351,18 +360,126 @@ function renderSelection(files) {
     __prevObjectUrls.push(url);
     const wrap = document.createElement('div');
     wrap.className = 'thumb';
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = f.name;
-    wrap.appendChild(img);
+    if (f.type && f.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = f.name;
+      wrap.appendChild(img);
+    } else {
+      wrap.textContent = 'PDF';
+      wrap.title = f.name;
+    }
     selectedThumbs.appendChild(wrap);
   });
 }
 
+function validateBodUploadFile(file) {
+  if (!file) throw new Error('Choose a file to upload.');
+  if (!BOD_UPLOAD_ALLOWED_MIME_TYPES.has(file.type)) {
+    throw new Error(`${file.name} is not an allowed upload type. Use PDF, JPG, PNG, or WebP.`);
+  }
+  if (!Number.isFinite(file.size) || file.size <= 0) {
+    throw new Error(`${file.name} is empty or could not be read.`);
+  }
+  if (file.size > BOD_UPLOAD_MAX_BYTES) {
+    throw new Error(`${file.name} is larger than the 15 MB limit.`);
+  }
+}
+
+function validateBodUploadFiles(files) {
+  Array.from(files || []).forEach(validateBodUploadFile);
+}
+
+function normalizeManualBodDriveFolder(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return { driveFolder: '', driveFolderId: '' };
+
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error('Manual Drive folder must be a valid Google Drive https URL.');
+  }
+
+  if (url.protocol !== 'https:' || url.hostname !== 'drive.google.com') {
+    throw new Error('Manual Drive folder must be a Google Drive https URL.');
+  }
+
+  const folderMatch = url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  const queryId = url.searchParams.get('id');
+  const driveFolderId = folderMatch?.[1] || (/^[a-zA-Z0-9_-]+$/.test(queryId || '') ? queryId : '');
+
+  if (!driveFolderId) {
+    throw new Error('Manual Drive URL must point to a Google Drive folder.');
+  }
+
+  return {
+    driveFolder: raw,
+    driveFolderId
+  };
+}
+
+async function uploadBodFileWithTicket(file, { eventName, eventDate, uploadGroupId }) {
+  validateBodUploadFile(file);
+  const base64 = await readFileAsBase64(file);
+  const ticketResult = await createBodUploadTicketFn({
+    fileName: file.name,
+    mimeType: file.type,
+    sizeBytes: file.size,
+    eventName,
+    eventDate,
+    ...(uploadGroupId ? { uploadGroupId } : {})
+  });
+  const approved = ticketResult?.data || {};
+  if (!approved.ticket || !approved.uploadGroupId) {
+    throw new Error('Upload ticket response was incomplete.');
+  }
+
+  const response = await fetch(BOD_UPLOAD_WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'uploadBodFile',
+      ticket: approved.ticket,
+      uploadGroupId: approved.uploadGroupId,
+      fileName: approved.fileName,
+      mimeType: approved.mimeType,
+      sizeBytes: approved.sizeBytes,
+      base64
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`File upload failed with status ${response.status}.`);
+  }
+
+  const json = await response.json();
+  if (!json.ok) {
+    throw new Error(json.message || 'File upload failed.');
+  }
+  if (!json.fileUrl) {
+    throw new Error('File upload did not return a Drive file URL.');
+  }
+
+  return {
+    ...json,
+    uploadGroupId: json.uploadGroupId || approved.uploadGroupId
+  };
+}
+
 // Fire when the user picks files
 if (imageUploader) {
+  imageUploader.accept = 'application/pdf,image/jpeg,image/png,image/webp';
   imageUploader.addEventListener('change', () => {
-    renderSelection(imageUploader.files || []);
+    const files = imageUploader.files || [];
+    try {
+      validateBodUploadFiles(files);
+      setStatus('');
+    } catch (err) {
+      toast(err.message || 'Invalid file selected.', 3000);
+      setStatus(err.message || 'Invalid file selected.', 'error');
+    }
+    renderSelection(files);
   });
 }
 
@@ -570,6 +687,25 @@ if (form) {
     if (!name || !avenues.length || !eventStart || !eventEnd || !conductedBy) {
       return toast('Please fill all required fields.', 2000);
     }
+
+    try {
+      validateBodUploadFiles(files);
+    } catch (err) {
+      toast(err.message || 'Invalid file selected.', 3000);
+      setStatus(err.message || 'Invalid file selected.', 'error');
+      return;
+    }
+
+    let manualDriveMetadata = { driveFolder: '', driveFolderId: '' };
+    try {
+      if (!files.length) {
+        manualDriveMetadata = normalizeManualBodDriveFolder(driveInput?.value || '');
+      }
+    } catch (err) {
+      toast(err.message || 'Invalid Drive folder URL.', 3000);
+      setStatus(err.message || 'Invalid Drive folder URL.', 'error');
+      return;
+    }
     
     submitBtn?.setAttribute('disabled', 'disabled');
     if (submitBtn) submitBtn.textContent = 'Submitting...';
@@ -577,55 +713,31 @@ if (form) {
     setStatus('Submitting event...');
 
     try {
-      // --- 2. Step 1: Create the folder in Google Drive ---
-      if (loaderText) loaderText.textContent = 'Creating event folder...';
-      
-      const folderResponse = await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, // Use text/plain for GAS
-        body: JSON.stringify({
-          action: 'createFolder',
-          eventName: name
-        })
-      });
-      
-      const folderResult = await folderResponse.json();
-      if (folderResult.status !== 'success') {
-        throw new Error(folderResult.message || 'Failed to create folder.');
-      }
-      
-      const newFolderId = folderResult.data.folderId;
-      
-      // --- 3. Step 2: Upload files (if any) ---
-      let uploadedFileUrls = [];
+      // --- 2. Upload files through one-use backend tickets ---
+      const uploadedFileUrls = [];
+      let uploadGroupId = '';
+      let uploadedFolderId = '';
+      let uploadedFolderUrl = '';
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          if (loaderText) loaderText.textContent = `Uploading images... ${i + 1} of ${files.length}`;
-          setStatus(`Uploading images... ${i + 1} of ${files.length}`);
-          
-          // Read the file as a base64 string
-          const fileData = await readFileAsBase64(file);
-          
-          const fileResponse = await fetch(GAS_WEB_APP_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-              action: 'uploadFile',
-              folderId: newFolderId,
-              fileName: file.name,
-              fileData: fileData // Send the base64 string
-            })
+          if (loaderText) loaderText.textContent = `Uploading files... ${i + 1} of ${files.length}`;
+          setStatus(`Uploading files... ${i + 1} of ${files.length}`);
+
+          const uploadResult = await uploadBodFileWithTicket(file, {
+            eventName: name,
+            eventDate: eventStart,
+            uploadGroupId
           });
-          
-          const fileResult = await fileResponse.json();
-          if (fileResult.status === 'success') {
-            uploadedFileUrls.push(fileResult.data.url); // Save the URL
-          }
+
+          uploadGroupId = uploadResult.uploadGroupId || uploadGroupId;
+          if (uploadResult.fileUrl) uploadedFileUrls.push(uploadResult.fileUrl);
+          uploadedFolderId = uploadResult.folderId || uploadedFolderId;
+          uploadedFolderUrl = uploadResult.folderUrl || uploadedFolderUrl;
         }
       }
 
-      // --- 4. Step 3: Save through Cloud Functions and sync attendance ---
+      // --- 3. Save through Cloud Functions and sync attendance ---
       if (loaderText) loaderText.textContent = 'Syncing attendance...';
       setStatus('Syncing attendance...');
 
@@ -639,12 +751,13 @@ if (form) {
         time: eventTime,
         imageLinks: uploadedFileUrls,
         driveLinks: uploadedFileUrls,
-        driveFolder: newFolderId,
-        driveFolderId: newFolderId,
+        uploadedFileUrls,
+        driveFolder: uploadedFolderUrl || uploadedFolderId || manualDriveMetadata.driveFolder,
+        driveFolderId: uploadedFolderId || manualDriveMetadata.driveFolderId,
         ...currentCollaborationPayload()
       });
       
-      // --- 5. Done ---
+      // --- 4. Done ---
       const rowsUpdated = result?.data?.attendanceRowsUpdated || 0;
       toast('Event submitted and added to Attendance Manager.', 2600);
       setStatus(`Event added to Attendance Manager. Attendance initialized for ${rowsUpdated} member rows.`, 'success');

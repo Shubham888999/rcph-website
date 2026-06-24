@@ -2,10 +2,16 @@
  * Treasurer panel filters, rendering, Drive upload preparation, and exports.
  */
 
-const TREASURY_GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz243r-jI2vXMVxnIVLPrEJN6Sc9PARxR7-YM-k5FAuHC9nVWT0vvxzXtSMMI-xpnJcsQ/exec";
-const TREASURY_GAS_PLACEHOLDER = "PASTE_TREASURY_APPS_SCRIPT_URL_HERE";
-const TREASURY_DRIVE_ROOT_FOLDER = "RCPH Treasury Bills";
-const TREASURY_ROTARY_YEAR_FOLDER = "RY 2025-26";
+const TREASURY_UPLOAD_WEB_APP_URL =
+  'https://script.google.com/macros/s/AKfycbyiB-ao2xmNH7aVe-ECfZnBDZLbq8i4sN-83p8r-GnHYz6-G1whNTyhC33ghb2gQhEheg/exec';
+const createTreasuryUploadTicketFn = callableFunction('createTreasuryUploadTicket');
+const TREASURY_UPLOAD_ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp'
+]);
+const TREASURY_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const TREASURY_CLUB_NAME = "Rotaract Club of Pune Heritage";
 
 function treasuryText(value, fallback = '-') {
@@ -43,9 +49,9 @@ function setTreasuryStatus(el, message = '', tone = '') {
   el.className = `treasury-upload-status${tone ? ` is-${tone}` : ''}`;
 }
 
-function isTreasuryGasConfigured() {
-  const url = String(TREASURY_GAS_WEB_APP_URL || '').trim();
-  return !!url && url !== TREASURY_GAS_PLACEHOLDER && /^https:\/\/script\.google\.com\/macros\/s\//.test(url);
+function isTreasuryUploadConfigured() {
+  const url = String(TREASURY_UPLOAD_WEB_APP_URL || '').trim();
+  return !!url && /^https:\/\/script\.google\.com\/macros\/s\//.test(url);
 }
 
 function getFilteredTreasury() {
@@ -220,7 +226,13 @@ function previewSelectedBill(fileInput, urlInput, previewEl, statusEl) {
         </div>
       </div>
     `;
-    if (!isTreasuryGasConfigured()) {
+    try {
+      validateTreasuryUploadFile(file);
+    } catch (err) {
+      setTreasuryStatus(statusEl, err.message || 'Selected file cannot be uploaded.', 'error');
+      return;
+    }
+    if (!isTreasuryUploadConfigured()) {
       setTreasuryStatus(statusEl, 'Google Drive upload is not configured yet. Paste a Drive URL or configure the Apps Script URL.', 'warning');
     } else {
       setTreasuryStatus(statusEl, 'Selected file will be uploaded to Google Drive when you save.', 'info');
@@ -258,25 +270,41 @@ function readAsBase64(file) {
   });
 }
 
-function safeFolderPart(value) {
-  return String(value || '')
-    .trim()
-    .replace(/[^a-z0-9_-]+/gi, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'transaction';
+function validateTreasuryUploadFile(file) {
+  if (!file) throw new Error('Choose a bill file to upload.');
+  if (!TREASURY_UPLOAD_ALLOWED_MIME_TYPES.has(file.type)) {
+    throw new Error(`${file.name} is not an allowed bill type. Use PDF, JPG, PNG, or WebP.`);
+  }
+  if (!Number.isFinite(file.size) || file.size <= 0) {
+    throw new Error(`${file.name} is empty or could not be read.`);
+  }
+  if (file.size > TREASURY_UPLOAD_MAX_BYTES) {
+    throw new Error(`${file.name} is larger than the 10 MB limit.`);
+  }
 }
 
-function buildTreasuryFolderMetadata(transaction) {
-  const month = (transaction.date || '').slice(0, 7) || 'undated';
-  const titlePart = safeFolderPart(transaction.purpose || transaction.title || transaction.name);
-  const typePart = safeFolderPart(transaction.type || 'transaction');
-  const amountPart = safeFolderPart(String(transaction.amount || 0));
-  return {
-    rootFolderName: TREASURY_DRIVE_ROOT_FOLDER,
-    rotaryYearFolderName: TREASURY_ROTARY_YEAR_FOLDER,
-    monthFolderName: month,
-    transactionFolderName: `${transaction.date || 'undated'}_${titlePart}_${typePart}_${amountPart}`
-  };
+function validateManualBillUrl(url) {
+  const value = treasuryText(url, '');
+  if (!value) return '';
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Bill URL must be a valid https link.');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Bill URL must use https.');
+  }
+  return value;
+}
+
+function clearTreasuryGeneratedUploadMetadata(payload) {
+  payload.billDriveFileId = '';
+  payload.billFileName = '';
+  payload.billFolderId = '';
+  payload.billFolderUrl = '';
+  payload.billFolderName = '';
+  payload.billUploadedAt = firebase.firestore.FieldValue.delete();
 }
 
 function memberDisplayName(member) {
@@ -376,32 +404,44 @@ function resetTreasuryPartyControl(party) {
   setTreasuryPartyControl(party, { type: 'other', memberId: '', name: '' });
 }
 
-async function uploadBillToDrive(file, transaction) {
+async function uploadBillToDrive(file, transaction, transactionId) {
   if (!file) return null;
-  if (!isTreasuryGasConfigured()) {
+  if (!transactionId) throw new Error('Transaction ID is required before uploading a bill.');
+  validateTreasuryUploadFile(file);
+  if (!treasuryText(transaction.purpose, '')) {
+    throw new Error('Enter a transaction purpose before uploading a bill.');
+  }
+  if (!isTreasuryUploadConfigured()) {
     throw new Error('Google Drive upload is not configured yet. Paste a Drive URL or configure the Apps Script URL.');
   }
 
   const base64 = await readAsBase64(file);
-  const folderMetadata = buildTreasuryFolderMetadata(transaction);
+  const ticketResult = await createTreasuryUploadTicketFn({
+    fileName: file.name,
+    mimeType: file.type,
+    sizeBytes: file.size,
+    transactionId,
+    transactionDate: transaction.date,
+    transactionPurpose: transaction.purpose,
+    transactionType: transaction.type,
+    transactionAmount: transaction.amount
+  });
+  const approved = ticketResult?.data || {};
+  if (!approved.ticket || !approved.transactionId) {
+    throw new Error('Upload ticket response was incomplete.');
+  }
+
   const payload = {
     action: 'uploadTreasuryBill',
-    fileName: file.name,
-    mimeType: file.type || 'application/octet-stream',
-    base64,
-    transaction: {
-      title: transaction.title,
-      type: transaction.type,
-      amount: transaction.amount,
-      date: transaction.date,
-      avenue: transaction.avenue,
-      purpose: transaction.purpose,
-      paymentMode: transaction.paymentMode,
-      ...folderMetadata
-    }
+    ticket: approved.ticket,
+    transactionId: approved.transactionId,
+    fileName: approved.fileName,
+    mimeType: approved.mimeType,
+    sizeBytes: approved.sizeBytes,
+    base64
   };
 
-  const res = await fetch(TREASURY_GAS_WEB_APP_URL, {
+  const res = await fetch(TREASURY_UPLOAD_WEB_APP_URL, {
     method: 'POST',
     body: JSON.stringify(payload),
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
@@ -418,13 +458,17 @@ async function uploadBillToDrive(file, transaction) {
   if (!json.fileUrl && !json.url) {
     throw new Error('Bill upload did not return a file URL.');
   }
+  if (json.transactionId && json.transactionId !== approved.transactionId) {
+    throw new Error('Bill upload returned mismatched transaction metadata.');
+  }
 
   return {
     billUrl: json.fileUrl || json.url || '',
     billDriveFileId: json.fileId || '',
-    billFileName: json.fileName || file.name,
+    billFileName: json.fileName || approved.fileName || file.name,
+    billFolderId: json.folderId || '',
     billFolderUrl: json.folderUrl || '',
-    billFolderName: json.folderName || folderMetadata.transactionFolderName,
+    billFolderName: json.folderName || '',
     billUploadedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 }
@@ -586,6 +630,10 @@ wireTreasuryPartyControl(addSourceRefs().paidToParty);
 wireTreasuryPartyControl(editSourceRefs().paidByParty);
 wireTreasuryPartyControl(editSourceRefs().paidToParty);
 
+[transBill, editTransBill].filter(Boolean).forEach(input => {
+  input.accept = 'application/pdf,image/jpeg,image/png,image/webp';
+});
+
 if (treAddBtn) {
   treAddBtn.onclick = () => {
     if (addTransForm) addTransForm.reset();
@@ -627,14 +675,18 @@ if (addTransForm) {
     try {
       const payload = buildTransactionPayload(addSourceRefs());
       validateTransactionPayload(payload);
+      const transactionRef = db.collection('treasury').doc();
+      const transactionId = transactionRef.id;
 
       if (file) {
         setTreasuryStatus(transBillStatus, 'Uploading bill to Google Drive...', 'info');
-        const uploadMeta = await uploadBillToDrive(file, payload);
+        const uploadMeta = await uploadBillToDrive(file, payload, transactionId);
         Object.assign(payload, uploadMeta);
+      } else {
+        payload.billUrl = validateManualBillUrl(payload.billUrl);
       }
 
-      await db.collection('treasury').add({
+      await transactionRef.set({
         ...payload,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -664,6 +716,7 @@ document.addEventListener('click', (e) => {
   if (!t) return;
 
   editTransForm.dataset.clearBill = '';
+  editTransForm.dataset.originalBillUrl = treasuryText(t.billUrl, '');
   editTransId.value = id;
 
   editTransName.value = treasuryTitle(t);
@@ -738,19 +791,23 @@ if (editTransForm) {
       const id = editTransId.value;
       const payload = buildTransactionPayload(editSourceRefs());
       validateTransactionPayload(payload);
+      const existingTransaction = TREAS.find(x => x.id === id) || {};
+      const originalBillUrl = treasuryText(existingTransaction.billUrl || editTransForm.dataset.originalBillUrl, '');
 
       if (editTransForm.dataset.clearBill === 'true') {
+        clearTreasuryGeneratedUploadMetadata(payload);
         payload.billUrl = '';
-        payload.billDriveFileId = '';
-        payload.billFileName = '';
-        payload.billFolderUrl = '';
-        payload.billFolderName = '';
       }
 
       if (file) {
         setTreasuryStatus(editTransBillStatus, 'Uploading bill to Google Drive...', 'info');
-        const uploadMeta = await uploadBillToDrive(file, payload);
+        const uploadMeta = await uploadBillToDrive(file, payload, id);
         Object.assign(payload, uploadMeta);
+      } else if (editTransForm.dataset.clearBill !== 'true') {
+        payload.billUrl = validateManualBillUrl(payload.billUrl);
+        if (payload.billUrl !== originalBillUrl) {
+          clearTreasuryGeneratedUploadMetadata(payload);
+        }
       }
 
       await db.collection('treasury').doc(id).update({
