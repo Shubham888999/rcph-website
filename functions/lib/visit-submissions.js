@@ -582,7 +582,26 @@ function shapePosition(positionData, visitTypeValue, positionKeyValue, actorUid,
   };
 }
 
-function shapeSubmission(submission) {
+function submissionActionPermissions(submission, access) {
+  const isActive = (submission.status || 'active') === 'active';
+  if (!isActive || !access) {
+    return { canWithdraw: false, canReplace: false, canRemove: false };
+  }
+  if (access.canManageVisitSystem === true) {
+    return { canWithdraw: false, canReplace: true, canRemove: true };
+  }
+  const positionKey = submission.positionKey || '';
+  const authorizedPosition = Array.isArray(access.positionKeys) && access.positionKeys.includes(positionKey);
+  const ownsSubmission = submission.uploadedByUid === access.uid;
+  return {
+    canWithdraw: authorizedPosition && ownsSubmission,
+    canReplace: authorizedPosition && ownsSubmission,
+    canRemove: false,
+  };
+}
+
+function shapeSubmission(submission, access) {
+  const permissions = submissionActionPermissions(submission, access);
   return {
     submissionId: submission.submissionId || submission.id || '',
     visitType: submission.visitType,
@@ -599,6 +618,9 @@ function shapeSubmission(submission) {
     status: submission.status || 'active',
     createdAt: submission.createdAt || null,
     updatedAt: submission.updatedAt || null,
+    canWithdraw: permissions.canWithdraw,
+    canReplace: permissions.canReplace,
+    canRemove: permissions.canRemove,
   };
 }
 
@@ -1096,7 +1118,7 @@ function createVisitSubmissionService(options) {
         instructions: config.instructions || '',
       },
       folder: buildFolderResponse(config, folder, access),
-      submissions: submissions.map(doc => shapeSubmission({ id: doc.id, ...doc.data })),
+      submissions: submissions.map(doc => shapeSubmission({ id: doc.id, ...doc.data }, access)),
       limits: {
         maxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES),
         maxFilesPerSelection: Number(folder.maxFilesPerSelection || DEFAULT_MAX_FILES_PER_SELECTION),
@@ -1905,7 +1927,7 @@ function createVisitSubmissionService(options) {
     return {
       ok: true,
       submissions: pageItems.map(doc => ({
-        ...shapeSubmission({ id: doc.id, ...doc.data }),
+        ...shapeSubmission({ id: doc.id, ...doc.data }, access),
         driveFileId: doc.data.driveFileId || '',
         driveFolderId: doc.data.driveFolderId || '',
         deletedAt: doc.data.deletedAt || null,
@@ -1976,6 +1998,7 @@ module.exports = {
   buildVisitConfigDefaults,
   buildVisitPositionDefaults,
   buildAuditPayload,
+  submissionActionPermissions,
   shapeSubmission,
   buildFolderResponse,
   createFirestoreVisitSubmissionAdapter,

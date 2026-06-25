@@ -163,6 +163,48 @@ function assertVisitRuleDenyBlock(rules, collection) {
   assert.deepStrictEqual(secretaryFolder.submissions.map(item => item.positionKey), ['secretary']);
   assert.strictEqual(secretaryFolder.submissions.length, 1, 'inaccessible submission metadata is not returned');
   assertNoInternalSubmissionFields(secretaryFolder.submissions[0]);
+  assert.strictEqual(secretaryFolder.submissions[0].canWithdraw, true, 'BOD can withdraw own active submission');
+  assert.strictEqual(secretaryFolder.submissions[0].canReplace, true, 'BOD can replace own active submission');
+  assert.strictEqual(secretaryFolder.submissions[0].canRemove, false, 'BOD cannot remove submissions');
+
+  const otherUploaderSeed = JSON.parse(JSON.stringify(fixture));
+  otherUploaderSeed.visitSubmissions['secretary-other-file'] = {
+    ...otherUploaderSeed.visitSubmissions['secretary-file'],
+    submissionId: 'secretary-other-file',
+    uploadedByUid: 'other-bod',
+    uploadedByName: 'Other BOD',
+    fileName: 'secretary-other.pdf',
+    originalFileName: 'secretary-other.pdf',
+  };
+  const otherUploaderEnv = createEnv(otherUploaderSeed);
+  await otherUploaderEnv.service.initializeStructure('president-uid');
+  const secretaryWithOther = await otherUploaderEnv.service.getFolder('bod-secretary', 'clubAssembly', 'secretary');
+  const otherSubmission = secretaryWithOther.submissions.find(item => item.submissionId === 'secretary-other-file');
+  assert.ok(otherSubmission, 'BOD can see same-position active submission from another uploader');
+  assert.strictEqual(otherSubmission.canWithdraw, false, 'BOD cannot withdraw another uploader submission');
+  assert.strictEqual(otherSubmission.canReplace, false, 'BOD cannot replace another uploader submission');
+  assert.strictEqual(otherSubmission.canRemove, false, 'BOD cannot remove another uploader submission');
+
+  const managerSecretaryFolder = await otherUploaderEnv.service.getFolder('admin-uid', 'clubAssembly', 'secretary');
+  const managerSubmission = managerSecretaryFolder.submissions.find(item => item.submissionId === 'secretary-file');
+  assert.strictEqual(managerSubmission.canWithdraw, false, 'manager does not withdraw through normal BOD action');
+  assert.strictEqual(managerSubmission.canReplace, true, 'manager can replace active submission');
+  assert.strictEqual(managerSubmission.canRemove, true, 'manager can remove active submission');
+
+  const archivedShape = visit.shapeSubmission({
+    submissionId: 'archived-submission',
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    status: 'archived',
+    uploadedByUid: 'bod-secretary',
+  }, {
+    uid: 'bod-secretary',
+    positionKeys: ['secretary'],
+    canManageVisitSystem: false,
+  });
+  assert.strictEqual(archivedShape.canWithdraw, false, 'archived submission cannot be withdrawn');
+  assert.strictEqual(archivedShape.canReplace, false, 'archived submission cannot be replaced');
+  assert.strictEqual(archivedShape.canRemove, false, 'archived submission cannot be removed');
 
   const multiEditorFolder = await first.service.getFolder('bod-multi', 'clubAssembly', 'editor');
   assert.deepStrictEqual(multiEditorFolder.submissions.map(item => item.positionKey), ['editor']);

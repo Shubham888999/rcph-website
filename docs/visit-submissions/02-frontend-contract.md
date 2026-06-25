@@ -286,7 +286,7 @@ Apps Script calls `validateDriveUploadTicket` with:
 }
 ```
 
-The endpoint returns an `uploadProof`. The browser must pass that proof to finalization along with the Drive file result.
+The endpoint returns an `uploadProof` to the trusted Apps Script uploader. Apps Script uses that proof when calling `completeVisitSubmissionDriveUpload` after Drive upload succeeds. The browser finalizes only with the returned `completionProof`; it does not pass Drive IDs or URLs as authority.
 
 ### `finalizeVisitSubmissionUpload`
 
@@ -297,14 +297,11 @@ Request:
   "sessionId": "...",
   "clientFileId": "local-1",
   "ticket": "...",
-  "uploadProof": "...",
-  "driveFileId": "...",
-  "driveFolderId": "...",
-  "driveFileUrl": "https://drive.google.com/file/d/.../view"
+  "completionProof": "..."
 }
 ```
 
-Finalization creates the active submission record and updates counters. It fails if the ticket was not consumed by the trusted validator.
+Finalization creates the active submission record and updates counters. It fails if the ticket was not consumed by the trusted validator and completed by the trusted Apps Script completion endpoint. The browser must not send Drive IDs or URLs as authority.
 
 ### Lifecycle Actions
 

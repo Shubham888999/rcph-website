@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RCPH Visit Submissions</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="css/visit-submissions.css" />
+</head>
+<body>
+  <main class="visit-shell">
+    <header class="visit-topbar">
+      <div>
+        <p class="eyebrow">Rotaract Club of Pune Heritage</p>
+        <h1>Visit Submissions</h1>
+        <p class="visit-subtitle">Prepare and manage documents for Club Assembly, DZR Visit, and DRR Visit.</p>
+      </div>
+      <nav class="visit-actions" aria-label="Visit Submission navigation">
+        <a class="btn btn-outline" href="access.html">Access Hub</a>
+        <button id="visitSignOutBtn" class="btn" type="button">Sign Out</button>
+      </nav>
+    </header>
+
+    <section id="visitToastRegion" class="visit-toast-region" aria-live="polite" aria-atomic="true"></section>
+
+    <section id="visitLoading" class="visit-state-card">
+      <div class="visit-loader" aria-hidden="true"></div>
+      <p>Loading Visit Submission access...</p>
+    </section>
+
+    <section id="visitMessage" class="visit-state-card" hidden>
+      <h2 id="visitMessageTitle">Visit Submissions unavailable</h2>
+      <p id="visitMessageText"></p>
+      <div id="visitMessageActions" class="visit-actions inline"></div>
+    </section>
+
+    <section id="visitApp" hidden>
+      <nav class="visit-breadcrumb" aria-label="Visit Submission breadcrumb">
+        <button class="visit-link-button" type="button" data-route-dashboard>Dashboard</button>
+        <span id="visitBreadcrumbTrail"></span>
+      </nav>
+
+      <div id="visitAppContent" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div id="visitDialog" class="visit-dialog" aria-hidden="true">
+    <div class="visit-dialog__sheet" role="dialog" aria-modal="true" aria-labelledby="visitDialogTitle">
+      <div class="visit-dialog__head">
+        <h2 id="visitDialogTitle">Confirm action</h2>
+        <button id="visitDialogClose" class="visit-icon-button" type="button" aria-label="Close dialog">&times;</button>
+      </div>
+      <div id="visitDialogBody"></div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+  <script src="firebase-init.js"></script>
+  <script src="js/runtime-config.js"></script>
+  <script src="js/visit-submission-api.js"></script>
+  <script src="js/visit-submission-state.js"></script>
+  <script src="js/visit-submission-upload.js"></script>
+  <script src="js/visit-submission-render.js"></script>
+  <script src="js/visit-submissions.js"></script>
+</body>
+</html>

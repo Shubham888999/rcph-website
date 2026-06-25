@@ -53,6 +53,13 @@ const PANEL_DEFS = [
     roles: ['bod', 'admin', 'president']
   },
   {
+    key: 'visit-submissions',
+    title: 'Visit Submissions',
+    description: 'Prepare and manage documents for Club Assembly, DZR Visit, and DRR Visit.',
+    href: 'visit-submissions.html',
+    roles: ['bod', 'admin', 'president']
+  },
+  {
     key: 'admin',
     title: 'Admin Panel',
     description: 'Manage account approvals, avenue event attendance, BOD attendance, district event attendance and admin workflows.',
