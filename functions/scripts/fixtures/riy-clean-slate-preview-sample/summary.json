@@ -1,0 +1,19 @@
+{
+  "projectId": "rcph-admin",
+  "preservedUid": "fixture-president",
+  "readOnly": true,
+  "preservedAuthUserFound": true,
+  "preservedUserDocFound": true,
+  "preservedRoleDocFound": true,
+  "firestoreDocumentsToRemove": 27,
+  "authUsersToRemove": 4,
+  "collectionsToReset": 22,
+  "collectionsToPreserve": 1,
+  "collectionsRequiringReview": 2,
+  "readyForExecutionDesign": false,
+  "blockers": [],
+  "warnings": [
+    "Preserved role document is not currently approved President and would be rebuilt.",
+    "One or more collections require manual review before an execution design is approved."
+  ]
+}

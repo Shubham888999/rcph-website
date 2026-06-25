@@ -59,6 +59,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /visitSubmissionConfig/{visitType} {
+      allow read, write: if false;
+    }
+
+    match /visitSubmissionPositions/{folderId} {
+      allow read, write: if false;
+    }
+
+    match /visitSubmissions/{submissionId} {
+      allow read, write: if false;
+    }
+
+    match /visitSubmissionAudit/{auditId} {
+      allow read, write: if false;
+    }
+
+    match /visitSubmissionFolderLocks/{folderLockId} {
+      allow read, write: if false;
+    }
+
+    match /visitSubmissionUploadSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
     match /events/{eventId} {
       allow read: if true;
       allow create, update, delete: if isAdmin() && !panelLocked('attendance');

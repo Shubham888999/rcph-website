@@ -1,0 +1,250 @@
+{
+  "authUsers": [
+    {
+      "uid": "fixture-president",
+      "email": "president@example.com",
+      "displayName": "Fixture President",
+      "disabled": false
+    },
+    {
+      "uid": "old-member",
+      "email": "old.member@example.com",
+      "displayName": "Old Member",
+      "disabled": false
+    },
+    {
+      "uid": "legacy-test",
+      "email": "legacy.test@example.com",
+      "displayName": "Legacy Test",
+      "disabled": true
+    }
+  ],
+  "collections": {
+    "users": {
+      "fixture-president": {
+        "name": "Fixture President",
+        "email": "president@example.com",
+        "role": "president",
+        "requestedRole": "president",
+        "status": "approved",
+        "positionKeys": ["president"],
+        "positionTitles": ["President"],
+        "avenueCodes": ["PRES"],
+        "clubPosition": "President",
+        "hasBodPosition": true
+      },
+      "old-member": {
+        "name": "Old Member",
+        "email": "old.member@example.com",
+        "role": "gbm",
+        "status": "approved"
+      },
+      "legacy-test": {
+        "name": "Legacy Test",
+        "email": "legacy.test@example.com",
+        "role": "admin",
+        "status": "approved"
+      }
+    },
+    "roles": {
+      "fixture-president": {
+        "role": "president",
+        "status": "approved"
+      },
+      "old-member": {
+        "role": "gbm",
+        "status": "approved"
+      },
+      "legacy-test": {
+        "role": "admin",
+        "status": "approved"
+      }
+    },
+    "passwordResets": {
+      "reset-one": {
+        "email": "old.member@example.com"
+      }
+    },
+    "members": {
+      "fixture-president": {
+        "name": "Fixture President",
+        "email": "president@example.com",
+        "role": "president",
+        "position": "President",
+        "userId": "fixture-president"
+      },
+      "old-member": {
+        "name": "Old Member",
+        "email": "old.member@example.com",
+        "role": "gbm"
+      }
+    },
+    "prospectProgress": {
+      "old-prospect": {
+        "name": "Old Prospect",
+        "email": "prospect@example.com"
+      }
+    },
+    "attendance": {
+      "fixture-president": {
+        "userId": "fixture-president",
+        "active": true
+      },
+      "old-member": {
+        "userId": "old-member",
+        "active": true,
+        "gbm-1": "P"
+      }
+    },
+    "districtAttendance": {
+      "old-member": {
+        "userId": "old-member",
+        "district-event-1": true
+      }
+    },
+    "bodMembers": {
+      "fixture-president": {
+        "name": "Fixture President",
+        "email": "president@example.com",
+        "position": "President",
+        "positionKeys": ["president"],
+        "userId": "fixture-president",
+        "active": true
+      },
+      "old-bod": {
+        "name": "Old BOD",
+        "email": "old.bod@example.com",
+        "position": "Secretary",
+        "positionKeys": ["secretary"],
+        "userId": "old-bod",
+        "active": true
+      }
+    },
+    "bodAttendance": {
+      "fixture-president": {
+        "userId": "fixture-president",
+        "active": true
+      },
+      "old-bod": {
+        "userId": "old-bod",
+        "bod-meeting-1": "P"
+      }
+    },
+    "events": {
+      "old-event": {
+        "name": "Old GBM",
+        "date": "2026-01-01"
+      }
+    },
+    "bodEvents": {
+      "old-bod-event": {
+        "name": "Old BOD Event",
+        "fileUrl": "https://drive.google.com/file/d/old-bod-event"
+      }
+    },
+    "bodMeetings": {
+      "old-bod-meeting": {
+        "name": "Old BOD Meeting"
+      }
+    },
+    "districtEvents": {
+      "old-district-event": {
+        "name": "Old District Event"
+      }
+    },
+    "fines": {
+      "fine-one": {
+        "uid": "old-member",
+        "amount": 100
+      }
+    },
+    "treasury": {
+      "bill-one": {
+        "amount": 500,
+        "billUrl": "https://drive.google.com/file/d/old-bill",
+        "folderUrl": "https://drive.google.com/drive/folders/old-folder"
+      }
+    },
+    "bodPositionOccupancy": {
+      "president": {
+        "positionKey": "president",
+        "holderUids": ["old-president"],
+        "active": true
+      },
+      "secretary": {
+        "positionKey": "secretary",
+        "holderUids": ["old-bod"],
+        "active": true
+      }
+    },
+    "bodPositionAssignments": {
+      "president_old-president": {
+        "positionKey": "president",
+        "uid": "old-president",
+        "active": true
+      },
+      "secretary_old-bod": {
+        "positionKey": "secretary",
+        "uid": "old-bod",
+        "active": true
+      }
+    },
+    "rolePositionAudit": {
+      "audit-one": {
+        "action": "updateUserAccessAndPositions",
+        "targetUid": "old-bod"
+      }
+    },
+    "driveUploadTickets": {
+      "ticket-one": {
+        "uid": "old-bod",
+        "purpose": "bodEventUpload"
+      }
+    },
+    "driveUploadRateLimits": {
+      "old-bod": {
+        "count": 3
+      }
+    },
+    "driveUploadGroups": {
+      "group-one": {
+        "uid": "old-bod",
+        "folderUrl": "https://drive.google.com/drive/folders/old-upload-folder",
+        "files": [
+          {
+            "fileName": "old-report.pdf"
+          }
+        ]
+      }
+    },
+    "locks": {
+      "attendance": {
+        "locked": true
+      },
+      "customLegacyLock": {
+        "locked": true
+      }
+    },
+    "visitSubmissionConfig": {
+      "clubAssembly": {
+        "active": true
+      }
+    },
+    "visitSubmissions": {
+      "clubAssembly_secretary": {
+        "positionKey": "secretary",
+        "fileCount": 1
+      }
+    },
+    "visitSubmissionAudit": {
+      "visit-audit-one": {
+        "action": "upload"
+      }
+    },
+    "unknownExperimental": {
+      "unknown-one": {
+        "note": "Unknown collection must be reviewed, not deleted."
+      }
+    }
+  }
+}

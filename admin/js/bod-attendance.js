@@ -7,7 +7,7 @@ async function bulkSetBodForMeeting(meetingId, value) {
 
   const batch = db.batch();
 
-  BODM.forEach(m => {
+  activeBodRosterMembers().forEach(m => {
     const ref = db.collection('bodAttendance').doc(m.id);
     batch.set(ref, { [meetingId]: value }, { merge: true });
     BODATT[m.id] = BODATT[m.id] || {};
@@ -34,6 +34,85 @@ async function bulkSetBodForMember(memberId, value) {
   });
 
   renderBodGrid();
+}
+
+function isUidLinkedBodMember(member) {
+  return !!(
+    member
+    && (
+      member.userId
+      || member.uid
+      || member.createdFromUser === true
+      || Array.isArray(member.positionKeys)
+    )
+  );
+}
+
+function isActiveBodRosterMember(member) {
+  return !!member && member.active !== false;
+}
+
+function activeBodRosterMembers() {
+  return (BODM || []).filter(isActiveBodRosterMember);
+}
+
+function bodMemberAuthorityUid(member) {
+  return member?.userId || member?.uid || member?.id || '';
+}
+
+function bodMemberPositionText(member) {
+  if (Array.isArray(member?.positionKeys) && window.RcphPositions) {
+    return window.RcphPositions.formatPositionSummary(member.positionKeys, member.position || '');
+  }
+  if (Array.isArray(member?.positionTitles) && member.positionTitles.length) {
+    return member.positionTitles.join(', ');
+  }
+  return member?.position || '';
+}
+
+function ensureBodPositionNotice() {
+  if (!editBodMemPos || document.getElementById('editBodPositionAuthorityNotice')) return;
+  const notice = document.createElement('p');
+  notice.id = 'editBodPositionAuthorityNotice';
+  notice.className = 'legacy-position-warning';
+  notice.textContent = '';
+  editBodMemPos.insertAdjacentElement('afterend', notice);
+}
+
+function setBodPositionNotice(message) {
+  ensureBodPositionNotice();
+  const notice = document.getElementById('editBodPositionAuthorityNotice');
+  if (!notice) return;
+  notice.textContent = message || '';
+  notice.hidden = !message;
+}
+
+function bodMemberAccessAction(member) {
+  if (isUidLinkedBodMember(member)) {
+    return `<button class="icon-btn" title="Manage access from Account & Role Management" data-manage-bod-access="${escapeHtml(member.id)}">Manage access</button>`;
+  }
+  return `<button class="icon-btn" title="Remove BOD" data-del-bod-member="${escapeHtml(member.id)}">🗑</button>`;
+}
+
+function scrollToAccountManagementForBodMember(member) {
+  const panel = document.getElementById('accountRequestsPanel');
+  if (!panel) return;
+  if (accountRequestFilter && accountRequestFilter.value !== 'approved') {
+    accountRequestFilter.value = 'approved';
+    if (typeof renderAccountRequests === 'function') renderAccountRequests();
+  }
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const uid = bodMemberAuthorityUid(member);
+  if (!uid) return;
+  window.setTimeout(() => {
+    const editor = document.querySelector(`[data-account-editor="${CSS.escape(uid)}"]`);
+    if (!editor) return;
+    editor.classList.add('account-access-editor--highlight');
+    const focusTarget = editor.querySelector('select, button');
+    if (focusTarget) focusTarget.focus();
+    window.setTimeout(() => editor.classList.remove('account-access-editor--highlight'), 2200);
+  }, 150);
 }
 
 
@@ -90,10 +169,10 @@ function renderBodGrid(){
 
     <div class="bulk-wrap" style="align-items:flex-start;">
       <div class="mem-cell">
-        <span>${m.name || ''}</span>
-        <small style="opacity:.7; display:block">${m.position || ''}</small>
+        <span>${escapeHtml(m.name || '')}</span>
+        <small style="opacity:.7; display:block">${escapeHtml(bodMemberPositionText(m))}</small>
         <button class="icon-btn" title="Edit name/position" data-edit-bod-member="${m.id}">✏️</button>
-        <button class="icon-btn" title="Remove BOD" data-del-bod-member="${m.id}">🗑</button>
+        ${bodMemberAccessAction(m)}
       </div>
 
       <select class="bulk-select" data-bulk-bod-member="${m.id}">
@@ -122,7 +201,7 @@ function renderBodGrid(){
     bodBody.appendChild(tr);
   });
 
-  if (bodCountBadge) bodCountBadge.textContent = `${BODM.length} BOD · ${BODMEET.length} meetings`;
+  if (bodCountBadge) bodCountBadge.textContent = `${activeBodRosterMembers().length} BOD · ${BODMEET.length} meetings`;
   renderBodInsights();
 }
 
@@ -131,7 +210,7 @@ function renderBodInsights(){
   let totalSlots = 0, totalPresent = 0;
   const perMeetingPresent = BODMEET.map(mt => {
     let c = 0, considered = 0;
-    BODM.forEach(m => {
+    activeBodRosterMembers().forEach(m => {
       const v = (BODATT[m.id] || {})[mt.id];
       if (v !== 'NA') { considered++; if (v === true) c++; }
     });
@@ -175,10 +254,23 @@ if (bodAddMeetingBtn) {
 }
 
 document.addEventListener('click', async (e) => {
+  const manageBodAccess = e.target.closest('button[data-manage-bod-access]');
+  if (manageBodAccess) {
+    const id = manageBodAccess.dataset.manageBodAccess;
+    const m = BODM.find(x => x.id === id);
+    scrollToAccountManagementForBodMember(m);
+    return;
+  }
+
   const delBodMem = e.target.closest('button[data-del-bod-member]');
   if (delBodMem) {
     const id = delBodMem.dataset.delBodMember;
     const m  = BODM.find(x => x.id === id);
+    if (isUidLinkedBodMember(m)) {
+      alert("This authenticated user's BOD access and positions must be managed from Account & Role Management. Their attendance history will be preserved.");
+      scrollToAccountManagementForBodMember(m);
+      return;
+    }
     if (!confirm(`Remove BOD "${m?.name || id}"? This also deletes their BOD attendance.`)) return;
     try {
       await db.collection('bodMembers').doc(id).delete();
@@ -205,7 +297,12 @@ document.addEventListener('click', async (e) => {
     if (!m) return;
     editBodMemId.value   = id;
     editBodMemName.value = m.name || '';
-    editBodMemPos.value  = m.position || '';
+    editBodMemPos.value  = bodMemberPositionText(m);
+    editBodMemPos.disabled = isUidLinkedBodMember(m);
+    editBodMemberForm.dataset.authLinked = isUidLinkedBodMember(m) ? 'true' : 'false';
+    setBodPositionNotice(isUidLinkedBodMember(m)
+      ? "Manage this user's positions from Account & Role Management."
+      : '');
     openModal('editBodMemberModal');
     return;
   }
@@ -549,7 +646,7 @@ function exportBodAttendanceToExcel(){
       return d ? `${mt.name || ''} (${d})` : (mt.name || '');
     })
   ];
-  const rows = BODM.map(m => {
+  const rows = activeBodRosterMembers().map(m => {
     const att = BODATT[m.id] || {};
     const cells = BODMEET.map(mt => {
       const v = att[mt.id];
@@ -558,7 +655,8 @@ function exportBodAttendanceToExcel(){
       if (v === 'NA')  return 'NA';
       return '';
     });
-    const namePos = `${m.name || ''}${m.position ? ' — ' + m.position : ''}`;
+    const positionText = bodMemberPositionText(m);
+    const namePos = `${m.name || ''}${positionText ? ' - ' + positionText : ''}`;
     return [namePos, ...cells];
   });
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
@@ -581,7 +679,10 @@ if (editBodMemberForm) {
     const pos  = (editBodMemPos.value || '').trim();
     if (!id || !name) return;
     try {
-      await db.collection('bodMembers').doc(id).update({ name, position: pos });
+      const payload = editBodMemberForm.dataset.authLinked === 'true'
+        ? { name }
+        : { name, position: pos };
+      await db.collection('bodMembers').doc(id).update(payload);
       closeModal('editBodMemberModal');
     } catch (err) { alert('Failed to save BOD member: ' + err.message); }
   });

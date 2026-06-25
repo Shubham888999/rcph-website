@@ -1,0 +1,205 @@
+{
+  "preservedEmail": "fixture-president@example.com",
+  "preservedName": "Fixture President",
+  "authUsers": [
+    {
+      "uid": "fixture-president",
+      "email": "fixture-president@example.com",
+      "displayName": "Fixture President",
+      "disabled": false
+    },
+    {
+      "uid": "old-president",
+      "email": "dshubham8788@gmail.com",
+      "displayName": "Shubham Deshpande",
+      "disabled": false
+    },
+    {
+      "uid": "old-gbm",
+      "email": "old-gbm@example.com",
+      "displayName": "Old GBM",
+      "disabled": false
+    },
+    {
+      "uid": "old-test",
+      "email": "old-test@example.com",
+      "displayName": "Old Test",
+      "disabled": true
+    }
+  ],
+  "collections": {
+    "users": {
+      "fixture-president": {
+        "uid": "fixture-president",
+        "name": "Fixture President",
+        "email": "fixture-president@example.com",
+        "role": "admin",
+        "status": "approved",
+        "phone": "123",
+        "photoURL": "https://example.com/photo.jpg",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      },
+      "old-president": {
+        "uid": "old-president",
+        "name": "Old President",
+        "email": "dshubham8788@gmail.com",
+        "role": "president"
+      },
+      "old-gbm": {
+        "uid": "old-gbm",
+        "name": "Old GBM",
+        "email": "old-gbm@example.com",
+        "role": "gbm"
+      }
+    },
+    "roles": {
+      "fixture-president": {
+        "role": "admin",
+        "status": "approved"
+      },
+      "old-president": {
+        "role": "president",
+        "status": "approved"
+      },
+      "old-gbm": {
+        "role": "gbm",
+        "status": "approved"
+      }
+    },
+    "passwordResets": {
+      "reset-one": {
+        "email": "old-gbm@example.com"
+      }
+    },
+    "members": {
+      "old-gbm": {
+        "userId": "old-gbm"
+      }
+    },
+    "prospectProgress": {
+      "prospect-one": {
+        "uid": "prospect-one"
+      }
+    },
+    "attendance": {
+      "old-gbm": {
+        "userId": "old-gbm",
+        "event-one": "P"
+      }
+    },
+    "districtAttendance": {
+      "old-gbm": {
+        "userId": "old-gbm"
+      }
+    },
+    "bodMembers": {
+      "old-president": {
+        "userId": "old-president",
+        "position": "President"
+      }
+    },
+    "bodAttendance": {
+      "old-president": {
+        "userId": "old-president"
+      }
+    },
+    "events": {
+      "event-one": {
+        "name": "Old Event"
+      }
+    },
+    "bodEvents": {
+      "bod-event-one": {
+        "name": "Old BOD Event",
+        "fileUrl": "https://drive.google.com/file/d/old"
+      }
+    },
+    "bodMeetings": {
+      "meeting-one": {
+        "name": "Old Meeting"
+      }
+    },
+    "districtEvents": {
+      "district-event-one": {
+        "name": "Old District Event"
+      }
+    },
+    "fines": {
+      "fine-one": {
+        "uid": "old-gbm"
+      }
+    },
+    "treasury": {
+      "bill-one": {
+        "billUrl": "https://drive.google.com/file/d/bill"
+      }
+    },
+    "bodPositionOccupancy": {
+      "president": {
+        "holderUids": ["old-president"]
+      }
+    },
+    "bodPositionAssignments": {
+      "president_old-president": {
+        "uid": "old-president"
+      }
+    },
+    "rolePositionAudit": {
+      "audit-one": {
+        "targetUid": "old-president"
+      }
+    },
+    "driveUploadTickets": {
+      "ticket-one": {}
+    },
+    "driveUploadRateLimits": {
+      "old-president": {}
+    },
+    "driveUploadGroups": {
+      "group-one": {
+        "folderUrl": "https://drive.google.com/drive/folders/old"
+      }
+    },
+    "visitSubmissionConfig": {
+      "clubAssembly": {}
+    },
+    "visitSubmissionPositions": {
+      "president": {}
+    },
+    "visitSubmissions": {
+      "submission-one": {}
+    },
+    "visitSubmissionAudit": {
+      "audit-one": {}
+    },
+    "visitSubmissionFolderLocks": {
+      "lock-one": {}
+    },
+    "locks": {
+      "attendance": {
+        "locked": true,
+        "label": "Attendance"
+      },
+      "bodAttendance": {
+        "locked": true
+      },
+      "bodEvents": {
+        "locked": true
+      },
+      "fines": {
+        "locked": true
+      },
+      "treasury": {
+        "locked": true
+      },
+      "customLock": {
+        "locked": true
+      }
+    },
+    "unknownCollection": {
+      "unknown-one": {
+        "value": true
+      }
+    }
+  }
+}

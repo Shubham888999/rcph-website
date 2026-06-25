@@ -1,0 +1,43 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "visitSubmissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visitType", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visitSubmissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visitType", "order": "ASCENDING" },
+        { "fieldPath": "positionKey", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visitSubmissionUploadSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "expiresAtMillis", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visitSubmissionUploadSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visitType", "order": "ASCENDING" },
+        { "fieldPath": "positionKey", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

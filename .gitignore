@@ -79,6 +79,10 @@ serviceAccountKey.json
 *.patch
 *.tmp
 *.bak
+reports/multi-position-migration/
+reports/riy-clean-slate/
+reports/riy-clean-slate-manifests/
+reports/riy-clean-slate-executions/
 
 # Operating-system files
 .DS_Store

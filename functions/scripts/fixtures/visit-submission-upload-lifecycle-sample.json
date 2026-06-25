@@ -1,0 +1,62 @@
+{
+  "users": {
+    "president-uid": {
+      "role": "president",
+      "status": "approved",
+      "name": "President User",
+      "email": "president@example.com",
+      "positionKeys": ["president"]
+    },
+    "admin-uid": {
+      "role": "admin",
+      "status": "approved",
+      "name": "Admin User",
+      "email": "admin@example.com",
+      "positionKeys": []
+    },
+    "bod-secretary": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Secretary User",
+      "email": "secretary@example.com",
+      "positionKeys": ["secretary"]
+    },
+    "bod-editor": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Editor User",
+      "email": "editor@example.com",
+      "positionKeys": ["editor"]
+    },
+    "gbm-uid": {
+      "role": "gbm",
+      "status": "approved",
+      "name": "GBM User",
+      "email": "gbm@example.com",
+      "positionKeys": []
+    },
+    "prospect-uid": {
+      "role": "prospect",
+      "status": "approved",
+      "name": "Prospect User",
+      "email": "prospect@example.com",
+      "positionKeys": []
+    }
+  },
+  "roles": {
+    "president-uid": { "role": "president", "status": "approved" },
+    "admin-uid": { "role": "admin", "status": "approved" },
+    "bod-secretary": { "role": "bod", "status": "approved" },
+    "bod-editor": { "role": "bod", "status": "approved" },
+    "gbm-uid": { "role": "gbm", "status": "approved" },
+    "prospect-uid": { "role": "prospect", "status": "approved" }
+  },
+  "bodMembers": {},
+  "visitSubmissionConfig": {},
+  "visitSubmissionPositions": {},
+  "visitSubmissions": {},
+  "visitSubmissionAudit": {},
+  "visitSubmissionUploadSessions": {},
+  "driveUploadTickets": {},
+  "driveUploadRateLimits": {}
+}

@@ -1,0 +1,177 @@
+{
+  "users": {
+    "president-uid": {
+      "role": "president",
+      "status": "approved",
+      "name": "President User",
+      "email": "president@example.com",
+      "positionKeys": ["president"]
+    },
+    "admin-uid": {
+      "role": "admin",
+      "status": "approved",
+      "name": "Admin User",
+      "email": "admin@example.com",
+      "positionKeys": []
+    },
+    "bod-secretary": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Secretary User",
+      "email": "secretary@example.com",
+      "positionKeys": ["secretary"]
+    },
+    "bod-multi": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Multi Position User",
+      "email": "multi@example.com",
+      "positionKeys": ["secretary", "editor"]
+    },
+    "gbm-uid": {
+      "role": "gbm",
+      "status": "approved",
+      "name": "GBM User",
+      "email": "gbm@example.com",
+      "positionKeys": []
+    },
+    "prospect-uid": {
+      "role": "prospect",
+      "status": "approved",
+      "name": "Prospect User",
+      "email": "prospect@example.com",
+      "positionKeys": []
+    },
+    "pending-bod": {
+      "role": "bod",
+      "status": "pending",
+      "name": "Pending BOD",
+      "email": "pending@example.com",
+      "positionKeys": ["treasurer"]
+    },
+    "bod-manual-only": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Manual Only",
+      "email": "manual-only@example.com"
+    },
+    "bod-malformed": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Malformed",
+      "email": "malformed@example.com",
+      "positionKeys": ["not-a-position"]
+    },
+    "missing-status": {
+      "role": "bod",
+      "name": "Missing Status",
+      "email": "missing-status@example.com",
+      "positionKeys": ["secretary"]
+    },
+    "inactive-user": {
+      "role": "bod",
+      "status": "approved",
+      "active": false,
+      "name": "Inactive User",
+      "email": "inactive@example.com",
+      "positionKeys": ["secretary"]
+    },
+    "role-conflict": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Role Conflict",
+      "email": "role-conflict@example.com",
+      "positionKeys": ["secretary"]
+    },
+    "role-rejected": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Rejected Role",
+      "email": "role-rejected@example.com",
+      "positionKeys": ["secretary"]
+    }
+  },
+  "roles": {
+    "president-uid": { "role": "president", "status": "approved" },
+    "admin-uid": { "role": "admin", "status": "approved" },
+    "bod-secretary": { "role": "bod", "status": "approved" },
+    "bod-multi": { "role": "bod", "status": "approved" },
+    "gbm-uid": { "role": "gbm", "status": "approved" },
+    "prospect-uid": { "role": "prospect", "status": "approved" },
+    "pending-bod": { "role": "bod", "status": "approved" },
+    "bod-manual-only": { "role": "bod", "status": "approved" },
+    "bod-malformed": { "role": "bod", "status": "approved" },
+    "missing-status": { "role": "bod", "status": "approved" },
+    "inactive-user": { "role": "bod", "status": "approved" },
+    "role-conflict": { "role": "admin", "status": "approved" },
+    "role-rejected": { "role": "bod", "status": "rejected" },
+    "orphan-role": { "role": "bod", "status": "approved" }
+  },
+  "bodMembers": {
+    "manual-generated-row": {
+      "name": "Manual Generated Row",
+      "positionKeys": ["secretary"],
+      "position": "Secretary"
+    }
+  },
+  "visitSubmissionConfig": {},
+  "visitSubmissionPositions": {},
+  "visitSubmissions": {
+    "secretary-file": {
+      "submissionId": "secretary-file",
+      "visitType": "clubAssembly",
+      "positionKey": "secretary",
+      "positionTitle": "Secretary",
+      "uploadedByUid": "bod-secretary",
+      "uploadedByName": "Secretary User",
+      "uploadedByRole": "bod",
+      "fileName": "secretary.pdf",
+      "originalFileName": "secretary.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 12345,
+      "driveFileId": "internal-drive-file-id",
+      "driveFileUrl": "https://drive.example/secretary",
+      "driveFolderId": "internal-folder-id",
+      "deletedByUid": "admin-uid",
+      "deleteReason": "internal",
+      "status": "active",
+      "createdAt": null,
+      "updatedAt": null
+    },
+    "editor-file": {
+      "submissionId": "editor-file",
+      "visitType": "clubAssembly",
+      "positionKey": "editor",
+      "positionTitle": "Editor",
+      "uploadedByUid": "bod-multi",
+      "uploadedByName": "Multi Position User",
+      "uploadedByRole": "bod",
+      "fileName": "editor.pdf",
+      "originalFileName": "editor.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 23456,
+      "driveFileUrl": "https://drive.example/editor",
+      "status": "active",
+      "createdAt": null,
+      "updatedAt": null
+    },
+    "treasurer-file": {
+      "submissionId": "treasurer-file",
+      "visitType": "clubAssembly",
+      "positionKey": "treasurer",
+      "positionTitle": "Treasurer",
+      "uploadedByUid": "treasurer-uid",
+      "uploadedByName": "Treasurer User",
+      "uploadedByRole": "bod",
+      "fileName": "treasurer.pdf",
+      "originalFileName": "treasurer.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 34567,
+      "driveFileUrl": "https://drive.example/treasurer",
+      "status": "active",
+      "createdAt": null,
+      "updatedAt": null
+    }
+  },
+  "visitSubmissionAudit": {}
+}

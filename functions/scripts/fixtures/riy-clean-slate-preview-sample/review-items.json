@@ -1,0 +1,7 @@
+[
+  { "severity": "review", "area": "collection-inventory", "collection": "visitSubmissionConfig", "message": "Fixture visit config review." },
+  { "severity": "review", "area": "collection-inventory", "collection": "visitSubmissionPositions", "message": "Fixture visit positions review." },
+  { "severity": "review", "area": "external-drive", "collection": "bodEvents", "documentId": "fixture-bod-event", "message": "Firestore reset will not delete Google Drive files or folders." },
+  { "severity": "review", "area": "external-drive", "collection": "treasury", "documentId": "fixture-bill", "message": "Firestore reset will not delete Google Drive files or folders." },
+  { "severity": "review", "area": "external-drive", "collection": "driveUploadGroups", "documentId": "fixture-group", "message": "Firestore reset will not delete Google Drive files or folders." }
+]

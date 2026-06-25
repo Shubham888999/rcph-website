@@ -1,0 +1,32 @@
+{
+  "backupEvidence": {
+    "projectId": "rcph-admin",
+    "backupType": "manual-json-archive",
+    "createdAt": "2026-06-24T22:25:00.000Z",
+    "location": "local-fixture-archive/riy-clean-slate",
+    "verifiedBy": "Shubham Deshpande",
+    "verificationNotes": "Fixture backup evidence for manifest verification.",
+    "collectionCounts": {
+      "users": 5,
+      "roles": 5,
+      "members": 2,
+      "attendance": 2,
+      "districtAttendance": 1,
+      "bodMembers": 1,
+      "bodAttendance": 1,
+      "events": 1,
+      "bodEvents": 1,
+      "bodMeetings": 0,
+      "districtEvents": 1,
+      "fines": 1,
+      "treasury": 1,
+      "prospectProgress": 1,
+      "driveUploadTickets": 1,
+      "driveUploadRateLimits": 1,
+      "driveUploadGroups": 1,
+      "bodPositionOccupancy": 1,
+      "bodPositionAssignments": 1,
+      "rolePositionAudit": 1
+    }
+  }
+}

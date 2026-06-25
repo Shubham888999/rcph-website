@@ -7,6 +7,10 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const positionHelpers = require('./lib/positions');
 const { createPositionAssignmentService } = require('./lib/position-assignments');
+const {
+  VISIT_UPLOAD_TYPE,
+  createVisitSubmissionService,
+} = require('./lib/visit-submissions');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -14,6 +18,11 @@ const rolePositionAssignments = createPositionAssignmentService({
   db,
   admin,
   HttpsError,
+  positionHelpers,
+});
+const visitSubmissions = createVisitSubmissionService({
+  db,
+  admin,
   positionHelpers,
 });
 const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE;
@@ -116,7 +125,7 @@ const DRIVE_UPLOAD_ALLOWED_MIME_TYPES = new Set([
   'image/png',
   'image/webp',
 ]);
-const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury']);
+const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury', VISIT_UPLOAD_TYPE]);
 const PROSPECT_CRITERIA = Object.freeze({
   requiredGbm: 2,
   requiredAvenueEvents: 2,
@@ -324,6 +333,26 @@ function requireAuth(request) {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in required.');
   return uid;
+}
+
+function throwCallableServiceError(err, fallbackMessage) {
+  if (err instanceof HttpsError) throw err;
+  const code = err?.httpsCode || err?.code;
+  const callableCodes = new Set([
+    'unauthenticated',
+    'permission-denied',
+    'failed-precondition',
+    'invalid-argument',
+    'not-found',
+    'already-exists',
+    'resource-exhausted',
+    'internal',
+  ]);
+  if (callableCodes.has(code)) {
+    throw new HttpsError(code, err.message || fallbackMessage, err.details || {});
+  }
+  console.warn(fallbackMessage, { message: err?.message || String(err) });
+  throw new HttpsError('internal', fallbackMessage);
 }
 
 function safeProviderFromAuth(request, fallback) {
@@ -1876,6 +1905,145 @@ exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   };
 });
 
+exports.initializeVisitSubmissionStructure = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.initializeStructure(uid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission initialization failed.');
+  }
+});
+
+exports.getVisitSubmissionDashboard = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.getDashboard(uid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission dashboard request failed.');
+  }
+});
+
+exports.getVisitSubmissionFolders = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.getFolders(uid, request.data?.visitType);
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission folders request failed.');
+  }
+});
+
+exports.getVisitSubmissionFolder = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.getFolder(
+      uid,
+      request.data?.visitType,
+      request.data?.positionKey
+    );
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission folder request failed.');
+  }
+});
+
+exports.updateVisitSubmissionConfig = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.updateConfig(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission configuration update failed.');
+  }
+});
+
+exports.updateVisitSubmissionFolder = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.updateFolder(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission folder update failed.');
+  }
+});
+
+exports.createVisitSubmissionUploadSession = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.createUploadSession(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission upload session creation failed.');
+  }
+});
+
+exports.finalizeVisitSubmissionUpload = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.finalizeUpload(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission upload finalization failed.');
+  }
+});
+
+exports.withdrawVisitSubmission = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.withdrawSubmission(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission withdrawal failed.');
+  }
+});
+
+exports.removeVisitSubmission = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.removeSubmission(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission removal failed.');
+  }
+});
+
+exports.replaceVisitSubmission = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.replaceSubmission(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission replacement failed.');
+  }
+});
+
+exports.reconcileVisitSubmissionFolderCount = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.reconcileFolderCount(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission count reconciliation failed.');
+  }
+});
+
+exports.getVisitSubmissionModerationData = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.getModerationData(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission moderation request failed.');
+  }
+});
+
+exports.cleanupExpiredVisitUploadSessions = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.cleanupExpiredUploadSessions(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission upload session cleanup failed.');
+  }
+});
+
+exports.cancelVisitSubmissionUploadSession = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.cancelUploadSession(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission upload session cancellation failed.');
+  }
+});
+
 exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const [userSnap, roleSnap] = await Promise.all([
@@ -2504,6 +2672,13 @@ exports.validateDriveUploadTicket = onRequest({
     const data = parseDriveUploadRequestBody(req);
     const uploadType = validateDriveUploadType(data.uploadType);
     const ticket = normalizeRawDriveUploadTicket(data.ticket);
+    if (uploadType === VISIT_UPLOAD_TYPE) {
+      const response = await visitSubmissions.validateVisitUploadTicketWithProof({
+        ...data,
+        ticket,
+      });
+      return sendDriveUploadJson(res, 200, response);
+    }
     const fileName = normalizeUploadFileName(data.fileName);
     const mimeType = validateDriveUploadMimeType(data.mimeType);
     const maxBytes = uploadType === 'bod' ? BOD_UPLOAD_MAX_BYTES : TREASURY_UPLOAD_MAX_BYTES;
@@ -2579,6 +2754,50 @@ exports.validateDriveUploadTicket = onRequest({
     return sendDriveUploadJson(res, status, {
       ok: false,
       error: status >= 500 ? 'internal' : 'upload-ticket-rejected',
+      message,
+    });
+  }
+});
+
+exports.completeVisitSubmissionDriveUpload = onRequest({
+  region: 'us-central1',
+  secrets: [DRIVE_UPLOAD_SHARED_SECRET],
+  timeoutSeconds: 30,
+  memory: '256MiB',
+  maxInstances: 5,
+  concurrency: 20,
+}, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.set('Allow', 'POST');
+    return sendDriveUploadJson(res, 405, {
+      ok: false,
+      error: 'method-not-allowed',
+      message: 'POST required.',
+    });
+  }
+
+  if (!timingSafeSharedSecretMatches(req.get('x-rcph-drive-secret'), DRIVE_UPLOAD_SHARED_SECRET.value())) {
+    return sendDriveUploadJson(res, 403, {
+      ok: false,
+      error: 'permission-denied',
+      message: 'Forbidden.',
+    });
+  }
+
+  try {
+    const data = parseDriveUploadRequestBody(req);
+    const uploadType = validateDriveUploadType(data.uploadType);
+    if (uploadType !== VISIT_UPLOAD_TYPE) {
+      throw new HttpsError('invalid-argument', 'Invalid upload type.');
+    }
+    const response = await visitSubmissions.completeDriveUpload(data);
+    return sendDriveUploadJson(res, 200, response);
+  } catch (err) {
+    const status = err?.httpStatus || httpStatusFromHttpsError(err);
+    const message = status >= 500 ? 'Visit upload completion failed.' : err.message;
+    return sendDriveUploadJson(res, status, {
+      ok: false,
+      error: status >= 500 ? 'internal' : 'visit-upload-completion-rejected',
       message,
     });
   }

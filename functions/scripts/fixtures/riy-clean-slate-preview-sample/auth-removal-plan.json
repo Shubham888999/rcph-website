@@ -1,0 +1,52 @@
+[
+  {
+    "uid": "fixture-president",
+    "email": "dshubham7788@gmail.com",
+    "displayName": "Shubham Deshpande",
+    "disabled": false,
+    "matchingUserDocExists": true,
+    "matchingRoleDocExists": true,
+    "action": "preserve",
+    "reason": "preserved account"
+  },
+  {
+    "uid": "7kQSF1BSugZqsJXbbMZMceZOxwI3",
+    "email": "dshubham8788@gmail.com",
+    "displayName": "Shubham Deshpande",
+    "disabled": false,
+    "matchingUserDocExists": false,
+    "matchingRoleDocExists": true,
+    "action": "future-delete",
+    "reason": "new RIY reset"
+  },
+  {
+    "uid": "fixture-admin",
+    "email": "admin@example.com",
+    "displayName": "Fixture Admin",
+    "disabled": false,
+    "matchingUserDocExists": true,
+    "matchingRoleDocExists": true,
+    "action": "future-delete",
+    "reason": "new RIY reset"
+  },
+  {
+    "uid": "fixture-gbm",
+    "email": "gbm@example.com",
+    "displayName": "Fixture GBM",
+    "disabled": false,
+    "matchingUserDocExists": true,
+    "matchingRoleDocExists": true,
+    "action": "future-delete",
+    "reason": "new RIY reset"
+  },
+  {
+    "uid": "fixture-test",
+    "email": "test@example.com",
+    "displayName": "Fixture Test",
+    "disabled": true,
+    "matchingUserDocExists": true,
+    "matchingRoleDocExists": true,
+    "action": "future-delete",
+    "reason": "new RIY reset"
+  }
+]

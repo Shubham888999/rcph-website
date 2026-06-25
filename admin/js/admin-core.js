@@ -122,6 +122,9 @@ function accountFunction(name) {
   return callableFunction(name);
 }
 
+const ACCOUNT_ASSIGNABLE_ROLES = ['gbm', 'bod', 'admin', 'president'];
+let pendingJointSubmission = null;
+
 function attachUserRequestListener() {
   if (!IS_ADMIN || !accountRequestsPanel || !accountRequestsBody) return;
   accountRequestsPanel.style.display = 'block';
@@ -137,72 +140,194 @@ function attachUserRequestListener() {
 }
 
 function accountRoleOptions(selectedRole) {
-  const roles = ['gbm', 'bod', 'admin'];
   const selected = String(selectedRole || '').toLowerCase();
-  return roles.map(role => (
+  return ACCOUNT_ASSIGNABLE_ROLES.map(role => (
     `<option value="${role}" ${role === selected ? 'selected' : ''}>${roleLabel(role)}</option>`
   )).join('');
 }
 
-function accountPositionSeed(user, role) {
-  const existing = String(user.clubPosition || '').trim();
-  if (existing) return existing;
-  return defaultClubPositionForRole(role);
+function accountRoleValue(user, fallbackRole) {
+  return String(user.role || fallbackRole || user.requestedRole || 'gbm').toLowerCase();
 }
 
-function accountPositionControl(user, role) {
-  const seed = accountPositionSeed(user, role);
-  const customValue = customPositionValue(seed);
-  const showCustom = !!customValue;
+function normalizeExplicitPositionKeys(values) {
+  const rawValues = Array.isArray(values) ? values : [];
+  const known = [];
+  const unknownValues = [];
+  rawValues.forEach(value => {
+    const key = String(value || '').trim();
+    if (!key) return;
+    if (window.RcphPositions.getPositionByKey(key)) {
+      known.push(key);
+    } else {
+      unknownValues.push(key);
+    }
+  });
+  return {
+    positionKeys: window.RcphPositions.sortPositionKeys(known),
+    unknownValues
+  };
+}
 
+function accountPositionState(user, options = {}) {
+  if (Array.isArray(user.positionKeys)) {
+    const normalized = normalizeExplicitPositionKeys(user.positionKeys);
+    return {
+      positionKeys: normalized.positionKeys,
+      unknownValues: normalized.unknownValues,
+      source: 'user.positionKeys',
+      warning: normalized.unknownValues.length
+        ? `Unknown saved position keys: ${normalized.unknownValues.join(', ')}. Select the correct positions before saving.`
+        : ''
+    };
+  }
+
+  const legacyValue = String(user.clubPosition || user.position || '').trim();
+  if (legacyValue) {
+    const mapped = window.RcphPositions.mapLegacyPositionText(legacyValue);
+    return {
+      positionKeys: mapped.positionKeys,
+      unknownValues: mapped.unknownValues,
+      source: 'legacy',
+      warning: mapped.unknownValues.length
+        ? 'This account has a legacy position value that could not be mapped safely. Select the correct positions before saving.'
+        : ''
+    };
+  }
+
+  const role = accountRoleValue(user, options.role);
+  if (options.defaultPresident && role === 'president') {
+    return { positionKeys: ['president'], unknownValues: [], source: 'presidentDefault', warning: '' };
+  }
+
+  return { positionKeys: [], unknownValues: [], source: 'empty', warning: '' };
+}
+
+function positionOptionHtml(position, uid, selectedKeys, disabled) {
+  const checked = selectedKeys.includes(position.key);
+  const searchValue = `${position.displayTitle} ${position.avenueCode} ${position.key}`.toLowerCase();
   return `
-    <label style="display:grid; gap:4px; min-width:180px;">
-      <span style="font-size:12px; color:#9aa;">Club position</span>
-      <select data-account-position="${escapeHtml(user.id)}" aria-label="Club position for ${escapeHtml(user.name || user.email || 'user')}">
-        ${positionSelectOptions(seed)}
-      </select>
+    <label class="position-multiselect__option" data-position-option="${escapeHtml(uid)}" data-position-search-value="${escapeHtml(searchValue)}">
       <input
-        data-account-position-other="${escapeHtml(user.id)}"
-        type="text"
-        placeholder="Custom position"
-        value="${escapeHtml(customValue)}"
-        style="${showCustom ? '' : 'display:none;'}"
-      />
+        type="checkbox"
+        value="${escapeHtml(position.key)}"
+        data-position-checkbox="${escapeHtml(uid)}"
+        ${checked ? 'checked' : ''}
+        ${disabled ? 'disabled' : ''}
+      >
+      <span class="position-multiselect__option-main">
+        <span>${escapeHtml(position.displayTitle)}</span>
+        <small>${escapeHtml(position.avenueCode)}</small>
+      </span>
     </label>
   `;
 }
 
-function accountAddToBodControl(user, role) {
-  const r = String(role || '').toLowerCase();
-  const checked = r === 'bod' || user.addToBodAttendance === true;
-  const disabled = r === 'bod';
+function positionGroupHtml(group, uid, selectedKeys, disabled) {
+  const positions = window.RcphPositions.POSITION_CATALOG
+    .filter(position => position.group === group.key)
+    .map(position => positionOptionHtml(position, uid, selectedKeys, disabled))
+    .join('');
   return `
-    <label style="display:inline-flex; align-items:center; gap:8px; color:#d8e6e6;">
-      <input
-        type="checkbox"
-        data-account-add-bod="${escapeHtml(user.id)}"
-        ${checked ? 'checked' : ''}
+    <div class="position-multiselect__group" data-position-group="${escapeHtml(uid)}">
+      <div class="position-multiselect__group-title">${escapeHtml(group.label)}</div>
+      ${positions}
+    </div>
+  `;
+}
+
+function positionChipListHtml(uid, selectedKeys) {
+  const chips = window.RcphPositions.sortPositionKeys(selectedKeys).map(key => {
+    const position = window.RcphPositions.getPositionByKey(key);
+    if (!position) return '';
+    return `
+      <span class="position-chip">
+        <span>${escapeHtml(position.displayTitle)}</span>
+        <button type="button" data-position-remove="${escapeHtml(uid)}" data-position-key="${escapeHtml(key)}" aria-label="Remove ${escapeHtml(position.displayTitle)}">x</button>
+      </span>
+    `;
+  }).join('');
+  return `<div class="position-chip-list" data-position-chips="${escapeHtml(uid)}">${chips}</div>`;
+}
+
+function positionTriggerText(selectedKeys) {
+  const count = window.RcphPositions.sortPositionKeys(selectedKeys).length;
+  if (!count) return 'Select club positions';
+  if (count === 1) return '1 position selected';
+  return `${count} positions selected`;
+}
+
+function accountPositionControl(user, role, options = {}) {
+  const state = accountPositionState(user, {
+    role,
+    defaultPresident: options.defaultPresident
+  });
+  const disabled = role === 'gbm';
+  const selectedKeys = disabled
+    ? []
+    : window.RcphPositions.sortPositionKeys(state.positionKeys);
+  const uid = String(user.id || '');
+  const help = disabled
+    ? 'GBM does not receive BOD positions.'
+    : (role === 'bod' && !selectedKeys.length
+      ? 'Select at least one club position for BOD access.'
+      : (role === 'admin' || role === 'president' ? 'Positions are optional for this access role.' : ''));
+
+  return `
+    <div
+      class="position-multiselect"
+      data-position-scope="${escapeHtml(uid)}"
+      data-current-role="${escapeHtml(role)}"
+      data-position-source="${escapeHtml(state.source)}"
+      data-legacy-position-warning="${state.warning ? 'true' : 'false'}"
+      data-president-default-applied="${state.source === 'presidentDefault' ? 'true' : 'false'}"
+    >
+      <span class="position-multiselect__label">Club positions</span>
+      <button
+        class="position-multiselect__trigger"
+        type="button"
+        data-position-trigger="${escapeHtml(uid)}"
+        aria-haspopup="true"
+        aria-expanded="false"
         ${disabled ? 'disabled' : ''}
-      />
-      <span>Add to BOD Attendance</span>
-    </label>
+      >${escapeHtml(positionTriggerText(selectedKeys))}</button>
+      <div class="position-multiselect__menu" data-position-menu="${escapeHtml(uid)}" hidden>
+        <label class="sr-only" for="positionSearch-${escapeHtml(uid)}">Search club positions</label>
+        <input
+          id="positionSearch-${escapeHtml(uid)}"
+          class="position-multiselect__search"
+          data-position-search="${escapeHtml(uid)}"
+          type="search"
+          placeholder="Search positions"
+          autocomplete="off"
+        >
+        <div class="position-multiselect__groups">
+          ${window.RcphPositions.POSITION_GROUPS.map(group => positionGroupHtml(group, uid, selectedKeys, disabled)).join('')}
+        </div>
+      </div>
+      ${positionChipListHtml(uid, selectedKeys)}
+      <p class="position-multiselect__message" data-position-message="${escapeHtml(uid)}">${escapeHtml(help)}</p>
+      ${state.warning ? `<p class="legacy-position-warning" data-legacy-warning="${escapeHtml(uid)}">${escapeHtml(state.warning)}</p>` : ''}
+    </div>
   `;
 }
 
 function accountApprovalActions(user, requested) {
+  const role = ACCOUNT_ASSIGNABLE_ROLES.includes(requested) ? requested : 'gbm';
   return `
-    <div style="display:flex; flex-direction:column; gap:8px; align-items:stretch;">
-      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
-        <label style="display:grid; gap:4px; min-width:120px;">
-          <span style="font-size:12px; color:#9aa;">Access role</span>
+    <div class="account-access-editor" data-account-editor="${escapeHtml(user.id)}" data-account-mode="approval">
+      <div class="account-access-editor__row">
+        <label class="account-access-editor__role">
+          <span>Access role</span>
           <select data-account-role="${escapeHtml(user.id)}" aria-label="Approve role for ${escapeHtml(user.name || user.email || 'user')}">
-            ${accountRoleOptions(requested)}
+            ${accountRoleOptions(role)}
           </select>
         </label>
-        ${accountPositionControl(user, requested)}
+        ${accountPositionControl(user, role, { defaultPresident: true })}
       </div>
-      ${accountAddToBodControl(user, requested)}
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <p class="account-access-editor__note">BOD attendance now follows assigned club positions.</p>
+      <p class="account-access-editor__message" data-account-message="${escapeHtml(user.id)}" role="alert"></p>
+      <div class="account-access-editor__actions">
         <button class="btn" type="button" data-account-approve="${escapeHtml(user.id)}">Approve</button>
         <button class="btn btn-outline" type="button" data-account-reject="${escapeHtml(user.id)}">Reject</button>
       </div>
@@ -210,47 +335,348 @@ function accountApprovalActions(user, requested) {
   `;
 }
 
-function readAccountPosition(uid) {
-  const select = Array.from(document.querySelectorAll('[data-account-position]'))
-    .find(el => el.dataset.accountPosition === uid);
-  const other = Array.from(document.querySelectorAll('[data-account-position-other]'))
-    .find(el => el.dataset.accountPositionOther === uid);
-
-  if (!select) return '';
-  if (select.value === 'Other') return (other?.value || '').trim();
-  return select.value || '';
+function accountMaintenanceActions(user) {
+  const role = ACCOUNT_ASSIGNABLE_ROLES.includes(accountRoleValue(user)) ? accountRoleValue(user) : 'gbm';
+  return `
+    <div class="account-access-editor" data-account-editor="${escapeHtml(user.id)}" data-account-mode="maintenance">
+      <div class="account-access-editor__row">
+        <label class="account-access-editor__role">
+          <span>Access role</span>
+          <select data-account-role="${escapeHtml(user.id)}" aria-label="Access role for ${escapeHtml(user.name || user.email || 'user')}">
+            ${accountRoleOptions(role)}
+          </select>
+        </label>
+        ${accountPositionControl(user, role, { defaultPresident: false })}
+      </div>
+      <p class="account-access-editor__message" data-account-message="${escapeHtml(user.id)}" role="alert"></p>
+      <div class="account-access-editor__actions">
+        <button class="btn" type="button" data-account-save="${escapeHtml(user.id)}">Save access</button>
+      </div>
+    </div>
+  `;
 }
 
-function readAccountAddToBod(uid, role) {
-  if (String(role || '').toLowerCase() === 'bod') return true;
-  const checkbox = Array.from(document.querySelectorAll('[data-account-add-bod]'))
-    .find(el => el.dataset.accountAddBod === uid);
-  return !!checkbox?.checked;
+function accountElementByData(attributeName, uid) {
+  return Array.from(document.querySelectorAll(`[${attributeName}]`))
+    .find(el => el.getAttribute(attributeName) === uid);
 }
 
-function syncAccountRequestControls(uid, role) {
-  const select = Array.from(document.querySelectorAll('[data-account-position]'))
-    .find(el => el.dataset.accountPosition === uid);
-  const other = Array.from(document.querySelectorAll('[data-account-position-other]'))
-    .find(el => el.dataset.accountPositionOther === uid);
-  const checkbox = Array.from(document.querySelectorAll('[data-account-add-bod]'))
-    .find(el => el.dataset.accountAddBod === uid);
+function readAccountRole(uid) {
+  const select = accountElementByData('data-account-role', uid);
+  return String(select?.value || 'gbm').toLowerCase();
+}
 
-  if (select && other) {
-    const fallback = defaultClubPositionForRole(role);
-    select.value = fallback || '';
-    other.value = '';
-    other.style.display = select.value === 'Other' ? '' : 'none';
+function readSelectedPositionKeys(uid) {
+  const checked = Array.from(document.querySelectorAll(`[data-position-checkbox="${CSS.escape(uid)}"]`))
+    .filter(input => input.checked)
+    .map(input => input.value);
+  return window.RcphPositions.sortPositionKeys(checked);
+}
+
+function setSelectedPositionKeys(uid, keys) {
+  const selected = new Set(window.RcphPositions.sortPositionKeys(keys));
+  document.querySelectorAll(`[data-position-checkbox="${CSS.escape(uid)}"]`).forEach(input => {
+    input.checked = selected.has(input.value);
+  });
+  refreshPositionControl(uid);
+}
+
+function setAccountMessage(uid, message, isError = false) {
+  const messageEl = accountElementByData('data-account-message', uid);
+  if (!messageEl) return;
+  messageEl.textContent = message || '';
+  messageEl.classList.toggle('is-error', !!isError);
+}
+
+function setAccountEditorBusy(uid, isBusy, busyText) {
+  const editor = accountElementByData('data-account-editor', uid);
+  if (!editor) return;
+  editor.classList.toggle('is-saving', !!isBusy);
+  editor.querySelectorAll('select, button, input').forEach(el => {
+    el.disabled = !!isBusy;
+  });
+  const actionButton = editor.querySelector('[data-account-approve], [data-account-save]');
+  if (actionButton) {
+    if (isBusy) {
+      actionButton.dataset.originalText = actionButton.textContent;
+      actionButton.textContent = busyText || 'Saving...';
+    } else if (actionButton.dataset.originalText) {
+      actionButton.textContent = actionButton.dataset.originalText;
+      delete actionButton.dataset.originalText;
+    }
+  }
+  if (!isBusy) {
+    refreshPositionControl(uid);
+  }
+}
+
+function refreshPositionControl(uid, options = {}) {
+  const role = readAccountRole(uid);
+  const scope = accountElementByData('data-position-scope', uid);
+  if (!scope) return;
+
+  const previousRole = options.roleChanged ? String(scope.dataset.currentRole || '') : role;
+  const transition = window.RcphPositions.applyRoleTransition({
+    previousRole,
+    nextRole: role,
+    selectedKeys: readSelectedPositionKeys(uid),
+    presidentDefaultApplied: scope.dataset.presidentDefaultApplied === 'true'
+  });
+
+  const selected = new Set(transition.positionKeys);
+  scope.dataset.currentRole = role;
+  scope.dataset.presidentDefaultApplied = transition.presidentDefaultApplied ? 'true' : 'false';
+
+  scope.querySelectorAll('[data-position-checkbox]').forEach(input => {
+    input.checked = selected.has(input.value);
+    input.disabled = !!transition.disabled;
+  });
+
+  const trigger = accountElementByData('data-position-trigger', uid);
+  if (trigger) {
+    trigger.textContent = positionTriggerText(transition.positionKeys);
+    trigger.disabled = !!transition.disabled;
+    if (transition.disabled) {
+      trigger.setAttribute('aria-expanded', 'false');
+      closePositionMenu(uid, false);
+    }
   }
 
-  if (checkbox) {
-    if (role === 'bod') {
-      checkbox.checked = true;
-      checkbox.disabled = true;
-    } else {
-      checkbox.disabled = false;
-      checkbox.checked = false;
+  const chips = accountElementByData('data-position-chips', uid);
+  if (chips) chips.outerHTML = positionChipListHtml(uid, transition.positionKeys);
+
+  const message = accountElementByData('data-position-message', uid);
+  if (message) message.textContent = transition.message || '';
+}
+
+function filterPositionMenu(uid, query) {
+  const term = String(query || '').trim().toLowerCase();
+  document.querySelectorAll(`[data-position-option="${CSS.escape(uid)}"]`).forEach(option => {
+    const searchValue = option.dataset.positionSearchValue || '';
+    option.hidden = !!term && !searchValue.includes(term);
+  });
+  document.querySelectorAll(`[data-position-group="${CSS.escape(uid)}"]`).forEach(group => {
+    const visible = Array.from(group.querySelectorAll('[data-position-option]')).some(option => !option.hidden);
+    group.hidden = !visible;
+  });
+}
+
+function closePositionMenu(uid, restoreFocus = true) {
+  const menu = accountElementByData('data-position-menu', uid);
+  const trigger = accountElementByData('data-position-trigger', uid);
+  if (menu) menu.hidden = true;
+  if (trigger) {
+    trigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) trigger.focus();
+  }
+}
+
+function closeAllPositionMenus(exceptUid) {
+  document.querySelectorAll('[data-position-menu]').forEach(menu => {
+    const uid = menu.getAttribute('data-position-menu');
+    if (uid && uid !== exceptUid) closePositionMenu(uid, false);
+  });
+}
+
+function togglePositionMenu(uid) {
+  const menu = accountElementByData('data-position-menu', uid);
+  const trigger = accountElementByData('data-position-trigger', uid);
+  if (!menu || !trigger || trigger.disabled) return;
+  const willOpen = menu.hidden;
+  closeAllPositionMenus(uid);
+  menu.hidden = !willOpen;
+  trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  if (willOpen) {
+    const search = accountElementByData('data-position-search', uid);
+    if (search) {
+      search.value = '';
+      filterPositionMenu(uid, '');
+      search.focus();
     }
+  }
+}
+
+function buildAccountAccessPayload(uid, mode) {
+  const role = readAccountRole(uid);
+  const positionKeys = readSelectedPositionKeys(uid);
+  const validation = window.RcphPositions.validateRolePositions(role, positionKeys);
+  const scope = accountElementByData('data-position-scope', uid);
+
+  if (!validation.ok) {
+    setAccountMessage(uid, validation.message, true);
+    return null;
+  }
+
+  if (
+    mode === 'maintenance'
+    && scope?.dataset.legacyPositionWarning === 'true'
+    && role !== 'gbm'
+    && validation.positionKeys.length === 0
+  ) {
+    setAccountMessage(uid, 'Select the correct positions before saving this legacy account.', true);
+    return null;
+  }
+
+  return {
+    targetUid: uid,
+    role,
+    positionKeys: validation.positionKeys,
+    confirmJointPositionKeys: [],
+    operationSource: mode === 'approval' ? 'accountApproval' : 'roleMaintenance'
+  };
+}
+
+function extractCallableError(err) {
+  const details = err?.details || err?.customData?.details || err?.customData || err?.data || null;
+  const code = String(err?.code || details?.code || '').replace(/^functions\//, '');
+  return {
+    code,
+    message: err?.message || details?.message || 'The request could not be completed.',
+    details
+  };
+}
+
+function getJointConflicts(errorInfo) {
+  const details = errorInfo?.details || {};
+  const conflicts = Array.isArray(details.conflicts) ? details.conflicts : [];
+  const isConflict = String(errorInfo?.code || '').includes('failed-precondition')
+    && (details.code === 'joint-assignment-conflict' || conflicts.length > 0);
+  return isConflict ? conflicts : [];
+}
+
+async function submitAccountAccessPayload(payload, options = {}) {
+  const uid = payload.targetUid;
+  setAccountMessage(uid, '');
+  setAccountEditorBusy(uid, true, options.busyText || 'Saving...');
+
+  try {
+    await accountFunction('updateUserAccessAndPositions')(payload);
+    setAccountMessage(uid, 'Access updated.');
+    closeJointConflictDialog();
+    return true;
+  } catch (err) {
+    const errorInfo = extractCallableError(err);
+    const conflicts = getJointConflicts(errorInfo);
+    if (conflicts.length) {
+      showJointConflictDialog(payload, conflicts, options.mode || 'maintenance');
+      setAccountMessage(uid, 'Joint position confirmation is required.', true);
+    } else {
+      setAccountMessage(uid, errorInfo.message, true);
+      alert(errorInfo.message);
+    }
+    return false;
+  } finally {
+    setAccountEditorBusy(uid, false);
+  }
+}
+
+async function approveAccountRequest(uid) {
+  const payload = buildAccountAccessPayload(uid, 'approval');
+  if (!payload) return;
+  await submitAccountAccessPayload(payload, { mode: 'approval', busyText: 'Approving...' });
+}
+
+async function saveAccountAccess(uid) {
+  const payload = buildAccountAccessPayload(uid, 'maintenance');
+  if (!payload) return;
+  await submitAccountAccessPayload(payload, { mode: 'maintenance', busyText: 'Saving...' });
+}
+
+function ensureJointConflictDialog() {
+  let dialog = document.getElementById('jointConflictDialog');
+  if (dialog) return dialog;
+  dialog = document.createElement('div');
+  dialog.id = 'jointConflictDialog';
+  dialog.className = 'joint-conflict-dialog';
+  dialog.hidden = true;
+  dialog.innerHTML = `
+    <div class="joint-conflict-dialog__backdrop" data-joint-cancel></div>
+    <section class="joint-conflict-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="jointConflictTitle">
+      <h2 id="jointConflictTitle">Confirm joint position assignment</h2>
+      <p>The selected position is already assigned. Confirming will retain existing holders and add this user. Both holders may access position-owned systems later.</p>
+      <div class="joint-conflict-dialog__list" data-joint-conflict-list></div>
+      <p class="joint-conflict-dialog__message" data-joint-conflict-message></p>
+      <div class="joint-conflict-dialog__actions">
+        <button class="btn btn-outline" type="button" data-joint-cancel>Cancel</button>
+        <button class="btn" type="button" data-joint-confirm>Confirm joint assignment</button>
+      </div>
+    </section>
+  `;
+  document.body.appendChild(dialog);
+  return dialog;
+}
+
+function holderText(holder) {
+  const name = holder?.name || holder?.displayName || holder?.uid || 'Existing holder';
+  const email = holder?.email ? ` (${holder.email})` : '';
+  return `${name}${email}`;
+}
+
+function showJointConflictDialog(payload, conflicts, mode) {
+  const dialog = ensureJointConflictDialog();
+  pendingJointSubmission = {
+    payload: JSON.parse(JSON.stringify(payload)),
+    conflicts: JSON.parse(JSON.stringify(conflicts || [])),
+    mode
+  };
+
+  const list = dialog.querySelector('[data-joint-conflict-list]');
+  if (list) {
+    list.innerHTML = conflicts.map(conflict => {
+      const holders = Array.isArray(conflict.existingHolders) && conflict.existingHolders.length
+        ? conflict.existingHolders.map(holder => `<li>${escapeHtml(holderText(holder))}</li>`).join('')
+        : (Array.isArray(conflict.existingHolderUids) ? conflict.existingHolderUids : [])
+          .map(uid => `<li>${escapeHtml(uid)}</li>`)
+          .join('');
+      return `
+        <article class="joint-conflict-dialog__item">
+          <h3>${escapeHtml(conflict.displayTitle || conflict.positionKey || 'Position')}</h3>
+          <ul>${holders || '<li>Existing holder</li>'}</ul>
+        </article>
+      `;
+    }).join('');
+  }
+
+  const message = dialog.querySelector('[data-joint-conflict-message]');
+  if (message) message.textContent = '';
+  const confirmBtn = dialog.querySelector('[data-joint-confirm]');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm joint assignment';
+  }
+  dialog.hidden = false;
+}
+
+function closeJointConflictDialog() {
+  const dialog = document.getElementById('jointConflictDialog');
+  if (dialog) dialog.hidden = true;
+  pendingJointSubmission = null;
+}
+
+async function confirmJointConflict() {
+  if (!pendingJointSubmission) return;
+  const dialog = ensureJointConflictDialog();
+  const confirmBtn = dialog.querySelector('[data-joint-confirm]');
+  const message = dialog.querySelector('[data-joint-conflict-message]');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Confirming...';
+  }
+  if (message) message.textContent = '';
+
+  const conflictKeys = window.RcphPositions.extractConflictKeys({
+    conflicts: pendingJointSubmission.conflicts
+  });
+  const retryPayload = window.RcphPositions.buildJointRetryPayload(pendingJointSubmission.payload, conflictKeys);
+  const mode = pendingJointSubmission.mode || 'maintenance';
+  const ok = await submitAccountAccessPayload(retryPayload, {
+    mode,
+    busyText: mode === 'approval' ? 'Approving...' : 'Saving...'
+  });
+
+  if (!ok && confirmBtn && !dialog.hidden) {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm joint assignment';
   }
 }
 
@@ -276,65 +702,27 @@ function renderAccountRequests() {
   accountRequestsBody.innerHTML = rows.map(user => {
     const status = String(user.status || 'pending').toLowerCase();
     const requested = String(user.requestedRole || 'gbm').toLowerCase();
+    const currentRole = accountRoleValue(user, requested);
     const actions = status === 'pending'
       ? accountApprovalActions(user, requested)
       : (status === 'rejected' && user.rejectReason
         ? `<span title="${escapeHtml(user.rejectReason)}">Rejected</span>`
-        : '<span style="color:#9aa;">No action</span>');
+        : accountMaintenanceActions(user));
     const approvedSummary = status === 'pending'
       ? ''
-      : `<div style="color:#9aa;">${escapeHtml(user.clubPosition || '-')} ${user.addToBodAttendance ? '- BOD Attendance' : ''}</div>`;
+      : `<div class="account-position-summary">Current: ${escapeHtml(window.RcphPositions.formatPositionSummary(user.positionKeys || [], user.clubPosition || '-'))}</div>`;
 
     return `
       <tr>
         <td>${escapeHtml(user.name || '-')}</td>
         <td>${escapeHtml(user.email || '-')}</td>
-        <td>${roleLabel(requested)}</td>
+        <td>${roleLabel(status === 'pending' ? requested : currentRole)}</td>
         <td>${formatDate(user.createdAt)}</td>
         <td>${statusBadge(status)}</td>
         <td>${actions}${approvedSummary}</td>
       </tr>
     `;
   }).join('');
-}
-
-async function approveAccountRequest(uid) {
-  const user = USERS.find(u => u.id === uid);
-  if (!user) return;
-  const select = Array.from(document.querySelectorAll('[data-account-role]'))
-    .find(el => el.dataset.accountRole === uid);
-  const approvedRole = select?.value || user.requestedRole;
-  if (!['gbm', 'bod', 'admin'].includes(String(approvedRole || '').toLowerCase())) {
-    alert('Choose GBM, BOD, or Admin.');
-    return;
-  }
-  const clubPosition = readAccountPosition(uid);
-  const positionSelect = Array.from(document.querySelectorAll('[data-account-position]'))
-    .find(el => el.dataset.accountPosition === uid);
-  if (positionSelect?.value === 'Other' && !clubPosition) {
-    alert('Enter the custom club position before approving.');
-    return;
-  }
-  if (!clubPosition) {
-    alert('Choose or enter a club position before approving.');
-    return;
-  }
-  if (approvedRole === 'bod' && clubPosition.toLowerCase() === 'member') {
-    alert('BOD access cannot use Member as the club position.');
-    return;
-  }
-  const addToBodAttendance = readAccountAddToBod(uid, approvedRole);
-
-  try {
-    await accountFunction('approveUserRole')({
-      targetUid: uid,
-      approvedRole,
-      clubPosition,
-      addToBodAttendance,
-    });
-  } catch (err) {
-    alert(err.message || 'Could not approve account.');
-  }
 }
 
 async function rejectAccountRequest(uid) {
@@ -351,6 +739,21 @@ async function rejectAccountRequest(uid) {
 }
 
 document.addEventListener('click', (event) => {
+  const positionTrigger = event.target.closest('[data-position-trigger]');
+  if (positionTrigger) {
+    togglePositionMenu(positionTrigger.dataset.positionTrigger);
+    return;
+  }
+
+  const positionRemove = event.target.closest('[data-position-remove]');
+  if (positionRemove) {
+    const uid = positionRemove.dataset.positionRemove;
+    const key = positionRemove.dataset.positionKey;
+    const selected = readSelectedPositionKeys(uid).filter(item => item !== key);
+    setSelectedPositionKeys(uid, selected);
+    return;
+  }
+
   const approveBtn = event.target.closest('[data-account-approve]');
   if (approveBtn) {
     approveAccountRequest(approveBtn.dataset.accountApprove);
@@ -360,21 +763,60 @@ document.addEventListener('click', (event) => {
   const rejectBtn = event.target.closest('[data-account-reject]');
   if (rejectBtn) {
     rejectAccountRequest(rejectBtn.dataset.accountReject);
+    return;
+  }
+
+  const saveBtn = event.target.closest('[data-account-save]');
+  if (saveBtn) {
+    saveAccountAccess(saveBtn.dataset.accountSave);
+    return;
+  }
+
+  const jointCancel = event.target.closest('[data-joint-cancel]');
+  if (jointCancel) {
+    closeJointConflictDialog();
+    return;
+  }
+
+  const jointConfirm = event.target.closest('[data-joint-confirm]');
+  if (jointConfirm) {
+    confirmJointConflict();
+    return;
+  }
+
+  if (!event.target.closest('.position-multiselect')) {
+    closeAllPositionMenus();
   }
 });
 
 document.addEventListener('change', (event) => {
   const roleSelect = event.target.closest('[data-account-role]');
   if (roleSelect) {
-    syncAccountRequestControls(roleSelect.dataset.accountRole, roleSelect.value);
+    refreshPositionControl(roleSelect.dataset.accountRole, { roleChanged: true });
     return;
   }
 
-  const positionSelect = event.target.closest('[data-account-position]');
-  if (positionSelect) {
-    const other = Array.from(document.querySelectorAll('[data-account-position-other]'))
-      .find(el => el.dataset.accountPositionOther === positionSelect.dataset.accountPosition);
-    if (other) other.style.display = positionSelect.value === 'Other' ? '' : 'none';
+  const positionCheckbox = event.target.closest('[data-position-checkbox]');
+  if (positionCheckbox) {
+    refreshPositionControl(positionCheckbox.dataset.positionCheckbox);
+  }
+});
+
+document.addEventListener('input', (event) => {
+  const search = event.target.closest('[data-position-search]');
+  if (search) {
+    filterPositionMenu(search.dataset.positionSearch, search.value);
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    const openMenu = Array.from(document.querySelectorAll('[data-position-menu]')).find(menu => !menu.hidden);
+    if (openMenu) {
+      closePositionMenu(openMenu.getAttribute('data-position-menu'), true);
+    } else if (!document.getElementById('jointConflictDialog')?.hidden) {
+      closeJointConflictDialog();
+    }
   }
 });
 
@@ -579,7 +1021,8 @@ async function loadData(){
       db.collection('bodMeetings').orderBy('date','desc').get(),
       db.collection('bodAttendance').get()
     ]);
-    BODM    = bmSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    BODM    = bmSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(isActiveBodRosterMember);
     BODMEET = mtSnap.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(m => m.archived !== true);
     BODATT = {};
@@ -661,7 +1104,8 @@ unsubAtt = db.collection('attendance').onSnapshot((snap) => {
 });
   if (bodHead) {
     unsubBodM = db.collection('bodMembers').orderBy('name').onSnapshot(snap => {
-      BODM = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      BODM = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(isActiveBodRosterMember);
       renderBodGrid();
     });
     unsubBodMt = db.collection('bodMeetings').orderBy('date','desc').onSnapshot(snap => {

@@ -1,0 +1,12 @@
+[
+  { "path": "users/fixture-president", "action": "future-rebuild", "fields": { "uid": "fixture-president", "role": "president", "requestedRole": "president", "status": "approved", "positionKeys": ["president"], "positionTitles": ["President"], "avenueCodes": ["PRES"], "clubPosition": "President", "hasBodPosition": true } },
+  { "path": "roles/fixture-president", "action": "future-rebuild", "fields": { "role": "president", "status": "approved" } },
+  { "path": "members/fixture-president", "action": "future-create", "fields": { "userId": "fixture-president", "positionKeys": ["president"] } },
+  { "path": "attendance/fixture-president", "action": "future-create", "fields": { "userId": "fixture-president" } },
+  { "path": "districtAttendance/fixture-president", "action": "future-create", "fields": { "userId": "fixture-president" } },
+  { "path": "bodMembers/fixture-president", "action": "future-create", "fields": { "userId": "fixture-president", "positionKeys": ["president"] } },
+  { "path": "bodAttendance/fixture-president", "action": "future-create", "fields": { "userId": "fixture-president" } },
+  { "path": "bodPositionOccupancy/president", "action": "future-create", "fields": { "positionKey": "president", "holderUids": ["fixture-president"], "active": true } },
+  { "path": "bodPositionAssignments/president_fixture-president", "action": "future-create", "fields": { "assignmentId": "president_fixture-president", "positionKey": "president", "uid": "fixture-president", "active": true } },
+  { "path": "rolePositionAudit/{generatedId}", "action": "future-create", "fields": { "action": "newRiyCleanSlateRebuildPresident", "targetUid": "fixture-president" } }
+]

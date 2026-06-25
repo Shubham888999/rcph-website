@@ -1,0 +1,197 @@
+{
+  "collections": {
+    "users": {
+      "uid-admin-zero": {
+        "name": "Asha Admin",
+        "email": "asha@example.com",
+        "status": "approved",
+        "role": "admin"
+      },
+      "uid-secretary": {
+        "name": "Seema Secretary",
+        "email": "seema@example.com",
+        "status": "approved",
+        "role": "bod",
+        "clubPosition": "Secretary"
+      },
+      "uid-secretary-two": {
+        "name": "Second Secretary",
+        "email": "second.secretary@example.com",
+        "status": "approved",
+        "role": "bod",
+        "positionKeys": ["secretary"]
+      },
+      "uid-rrro": {
+        "name": "Ravi RRRO",
+        "email": "ravi@example.com",
+        "status": "approved",
+        "role": "bod",
+        "positionKeys": ["rrro"]
+      },
+      "uid-unknown": {
+        "name": "Unknown Legacy",
+        "email": "unknown@example.com",
+        "status": "approved",
+        "role": "bod",
+        "clubPosition": "Secretary & RRRO"
+      },
+      "uid-gbm-legacy": {
+        "name": "Gita GBM",
+        "email": "gita@example.com",
+        "status": "approved",
+        "role": "gbm",
+        "clubPosition": "CSD"
+      },
+      "uid-pdd-ipp": {
+        "name": "Dev Director",
+        "email": "dev@example.com",
+        "status": "approved",
+        "role": "admin",
+        "positionKeys": ["pdd", "immediate-past-president"]
+      },
+      "uid-wr-wrwc": {
+        "name": "Women WRWC",
+        "email": "wr@example.com",
+        "status": "approved",
+        "role": "bod",
+        "positionKeys": ["wrwc", "wr"]
+      },
+      "uid-pending-bod": {
+        "name": "Pending BOD Request",
+        "email": "pending.bod@example.com",
+        "status": "pending",
+        "requestedRole": "bod",
+        "clubPosition": "Secretary"
+      },
+      "uid-rejected-request": {
+        "name": "Rejected Request",
+        "email": "rejected.request@example.com",
+        "status": "rejected",
+        "requestedRole": "admin"
+      }
+    },
+    "roles": {
+      "uid-admin-zero": { "role": "admin", "status": "approved" },
+      "uid-secretary": { "role": "bod", "status": "approved" },
+      "uid-secretary-two": { "role": "bod", "status": "approved" },
+      "uid-rrro": { "role": "bod", "status": "approved" },
+      "uid-unknown": { "role": "bod", "status": "approved" },
+      "uid-gbm-legacy": { "role": "gbm", "status": "approved" },
+      "uid-pdd-ipp": { "role": "admin", "status": "approved" },
+      "uid-wr-wrwc": { "role": "bod", "status": "approved" },
+      "missing-user-role": { "role": "admin", "status": "approved" }
+    },
+    "members": {
+      "uid-admin-zero": {
+        "name": "Asha Admin",
+        "email": "asha@example.com",
+        "role": "admin",
+        "userId": "uid-admin-zero"
+      },
+      "uid-secretary": {
+        "name": "Seema Secretary",
+        "email": "seema@example.com",
+        "role": "bod",
+        "position": "Secretary",
+        "userId": "uid-secretary"
+      },
+      "manual-email-match": {
+        "name": "Seema Manual",
+        "email": "seema@example.com",
+        "position": "Secretary"
+      },
+      "manual-name-match": {
+        "name": "Asha Admin",
+        "position": "Member"
+      },
+      "manual-only": {
+        "name": "Manual Member",
+        "email": "manual@example.com",
+        "position": "Member"
+      }
+    },
+    "bodMembers": {
+      "uid-secretary": {
+        "name": "Seema Secretary",
+        "email": "seema@example.com",
+        "position": "Secretary",
+        "userId": "uid-secretary",
+        "active": true
+      },
+      "uid-rrro": {
+        "name": "Ravi RRRO",
+        "email": "ravi@example.com",
+        "positionKeys": ["rrro"],
+        "userId": "uid-rrro",
+        "active": false
+      },
+      "manual-bod-userid": {
+        "name": "Ravi Manual",
+        "userId": "uid-rrro",
+        "position": "RRRO"
+      },
+      "manual-bod-only": {
+        "name": "Manual BOD",
+        "position": "Sports Representative"
+      }
+    },
+    "attendance": {
+      "uid-secretary": { "meeting-one": true },
+      "manual-email-match": { "meeting-one": false },
+      "orphan-attendance": { "meeting-one": true }
+    },
+    "districtAttendance": {
+      "uid-secretary": { "district-one": true }
+    },
+    "bodAttendance": {
+      "uid-secretary": { "bod-one": true },
+      "orphan-bod-attendance": { "bod-one": false }
+    },
+    "bodPositionOccupancy": {
+      "secretary": {
+        "positionKey": "secretary",
+        "holderUids": ["uid-secretary"],
+        "active": true
+      },
+      "pdd": {
+        "positionKey": "pdd",
+        "holderUids": ["uid-pdd-ipp"],
+        "active": true
+      },
+      "cwd": {
+        "positionKey": "cwd",
+        "holderUids": ["missing-user"],
+        "active": true
+      }
+    },
+    "bodPositionAssignments": {
+      "secretary_uid-secretary": {
+        "assignmentId": "secretary_uid-secretary",
+        "positionKey": "secretary",
+        "uid": "uid-secretary",
+        "active": true
+      },
+      "rrro_uid-rrro": {
+        "assignmentId": "rrro_uid-rrro",
+        "positionKey": "rrro",
+        "uid": "uid-rrro",
+        "active": false
+      },
+      "isd_stale-user": {
+        "assignmentId": "isd_stale-user",
+        "positionKey": "isd",
+        "uid": "stale-user",
+        "active": true
+      }
+    },
+    "events": {
+      "meeting-one": { "name": "Meeting One" }
+    },
+    "districtEvents": {
+      "district-one": { "name": "District One" }
+    },
+    "bodMeetings": {
+      "bod-one": { "name": "BOD One" }
+    }
+  }
+}

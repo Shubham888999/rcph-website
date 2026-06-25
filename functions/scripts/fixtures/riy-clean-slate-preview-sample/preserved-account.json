@@ -1,0 +1,32 @@
+{
+  "preservedUid": "fixture-president",
+  "preservedAuthUserFound": true,
+  "preservedUserDocFound": true,
+  "preservedRoleDocFound": true,
+  "checkAuth": true,
+  "authUser": {
+    "uid": "fixture-president",
+    "email": "dshubham7788@gmail.com",
+    "displayName": "Shubham Deshpande",
+    "disabled": false
+  },
+  "userDocSummary": {
+    "collection": "users",
+    "documentId": "fixture-president",
+    "uid": "fixture-president",
+    "email": "dshubham7788@gmail.com",
+    "name": "Shubham Deshpande",
+    "role": "admin",
+    "status": "approved"
+  },
+  "roleDocSummary": {
+    "collection": "roles",
+    "documentId": "fixture-president",
+    "role": "admin",
+    "status": "approved"
+  },
+  "intendedRoleStateMatches": false,
+  "intendedUserStateMatches": false,
+  "blockers": [],
+  "warnings": []
+}

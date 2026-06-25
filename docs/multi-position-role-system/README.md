@@ -27,12 +27,21 @@ Implemented in the first code phase:
 - `bodPositionAssignments/{assignmentId}` historical assignment writes
 - `rolePositionAudit/{auditId}` backend audit writes
 - local verification script in `functions/scripts/verify-position-assignments.js`
+- browser-safe Admin position catalog in `admin/js/admin-positions.js`
+- Admin account approval UI with searchable grouped checkbox multi-select and removable chips
+- Admin account role-maintenance UI that submits explicit canonical `positionKeys`
+- frontend joint-assignment confirmation dialog and safe callable retry flow
+- BOD Attendance display support for multiple position labels, with UID-linked authority position edits routed back to Account & Role Management
+- local Admin UI helper verification script in `scripts/verify-admin-position-ui.js`
+- read-only migration dry-run analyzer in `functions/lib/position-migration.js`
+- gated dry-run report generator in `functions/scripts/dry-run-position-migration.js`
+- fixture-only migration verifier in `functions/scripts/verify-position-migration.js`
+- dry-run eligibility classification so pending, rejected, and unapproved accounts are reported but not migrated
 
 Not implemented yet:
 
-- Admin grouped multi-select UI
 - live Firestore migration
-- attendance UI changes
+- broader attendance/manual-row cleanup beyond the targeted BOD position display/edit guard
 - Visit Submission System integration
 
 ## Compatibility behavior
@@ -105,16 +114,16 @@ Confirmed initial positions:
 
 Requester signup should continue to request only the system role. Users should not self-select verified club positions.
 
-Admin or President approval should assign positions:
+Admin or President approval now assigns positions through the Admin panel:
 
 - `bod`: at least one position required
 - `admin`: zero or more positions allowed
 - `president`: zero or more positions allowed, with `president` default-selected
 - `gbm` and `prospect`: no BOD-position assignment through this control
 
-The existing role-only update flow should be replaced or wrapped by a backend flow that also syncs position assignments and attendance display records.
+The Admin UI uses `updateUserAccessAndPositions` for both pending approval and existing-user role maintenance. It submits canonical `positionKeys`, not free-text `clubPosition`.
 
-The position selector should be a searchable grouped checkbox multi-select with removable chips. Groups are presentation-only; authorization must use canonical `positionKeys`.
+The position selector is a searchable grouped checkbox multi-select with removable chips. Groups are presentation-only; authorization uses canonical `positionKeys`.
 
 ## Attendance behavior
 
@@ -181,27 +190,31 @@ Recommended Access Hub UX:
 
 ## Manual steps expected from Shubham
 
-- Review a dry-run migration report before any writes.
+- Run and review a real dry-run migration report before any writes.
 - Confirm joint assignments found during migration before any write.
+- Approve any manual duplicate-row, unknown-position, or orphan-attendance decisions before write tooling is used.
+- Keep pending and rejected account requests in the normal approval workflow; migration dry-run reports them only and never approves them.
 
 ## Security risks to avoid
 
 - Do not let users self-authorize `positionKeys`.
+- Do not treat `requestedRole` as migration authority or implicitly approve pending accounts.
 - Do not trust `clubPosition` text for authorization.
 - Do not create one attendance row per position.
 - Do not create one attendance row per joint holder beyond that person's normal UID row.
 - Do not use generated-ID BOD member rows to authorize authenticated features.
 - Do not update access role without syncing position assignments and BOD attendance state.
 - Do not allow direct browser writes to assignment authority documents.
+- Do not run write migration tooling until the dry-run report has no unresolved blockers and Shubham has approved the review.
 - Preserve the final wildcard deny rule in Firestore rules.
 
 ## Implementation order
 
 1. Add a shared canonical position catalog and normalization helpers.
 2. Add backend role-position validation and assignment sync helpers.
-3. Update Admin approval and role maintenance UI for multi-position selection.
-4. Add `bodPositionOccupancy` and `bodPositionAssignments`.
-5. Run a dry-run migration and review the report.
+3. Add `bodPositionOccupancy` and `bodPositionAssignments`.
+4. Update Admin approval and role maintenance UI for multi-position selection.
+5. Run the read-only dry-run migration report and review the output.
 6. Apply the approved migration.
 7. Update dashboard, Access Hub, and attendance displays.
 8. Integrate the Visit Submission System with `positionKeys` authorization.
@@ -216,3 +229,5 @@ Recommended Access Hub UX:
 - `05-permission-and-conflict-model.md`
 - `06-migration-plan.md`
 - `07-implementation-phases.md`
+- `08-admin-ui-test-checklist.md`
+- `09-migration-dry-run-guide.md`

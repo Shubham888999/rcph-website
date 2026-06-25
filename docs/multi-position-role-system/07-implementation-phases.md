@@ -17,7 +17,7 @@ No UI should write arbitrary position strings after this phase.
 
 ## Phase 3: approval and role maintenance
 
-Status: backend callable behavior implemented; Admin UI controls are not implemented.
+Status: implemented for the Admin account-management frontend and backend callable path.
 
 Update Admin approval and role maintenance:
 
@@ -29,6 +29,9 @@ Update Admin approval and role maintenance:
 - default-select the `president` club position when the President access role is chosen
 - warn and require explicit confirmation for joint assignments
 - call a backend function that syncs users, roles, assignments, members, and attendance records
+- submit approval and maintenance changes through `updateUserAccessAndPositions`
+- keep conflict retry payloads immutable and add only explicitly confirmed joint-position keys
+- prevent UID-linked BOD authority position edits from the BOD Attendance screen
 
 Compatibility retained:
 
@@ -41,13 +44,13 @@ Compatibility retained:
 
 Not implemented:
 
-- grouped Admin multi-select UI
-- frontend conflict-confirmation UX
 - live migration
+- Visit Submission integration
+- dashboard and Access Hub multi-position display
 
 ## Phase 4: assignment collection and migration dry run
 
-Status: assignment and occupancy write support exists; live migration has not been run.
+Status: dry-run tooling is implemented; live migration has not been run.
 
 Introduce `bodPositionOccupancy` and `bodPositionAssignments`, then run a dry-run migration:
 
@@ -56,6 +59,14 @@ Introduce `bodPositionOccupancy` and `bodPositionAssignments`, then run a dry-ru
 - flag multi-holder positions that need joint-assignment confirmation
 - flag generated-ID attendance rows
 - produce a reviewable report
+
+Implemented:
+
+- pure migration analyzer in `functions/lib/position-migration.js`
+- read-only CLI in `functions/scripts/dry-run-position-migration.js`
+- fixture verifier in `functions/scripts/verify-position-migration.js`
+- sample fixture in `functions/scripts/fixtures/position-migration-sample.json`
+- local report output under ignored `reports/multi-position-migration/`
 
 Do not write until Shubham approves the report.
 
@@ -73,12 +84,25 @@ After approval:
 
 ## Phase 6: dashboard, Access Hub, and attendance UI
 
+Status: only the targeted BOD Attendance position display/edit guard is implemented.
+
 Update UI surfaces:
 
 - `my-dashboard.js`: show multiple position chips
 - `access.js`: make future position-owned cards position-aware
 - `admin/js/attendance.js`: avoid duplicate UID/manual person rows where possible
 - `admin/js/bod-attendance.js`: show multi-position labels and active/inactive BOD person state
+
+Implemented in the Admin UI phase:
+
+- `admin/js/bod-attendance.js` renders UID-linked `positionKeys`/`positionTitles` as multiple labels.
+- UID-linked BOD rows no longer allow authority position text edits from the BOD Attendance edit modal.
+- Manual generated-ID rows retain the existing free-text position workflow.
+
+Still pending:
+
+- broader attendance deduplication and manual-row reconciliation
+- dashboard and Access Hub multi-position display
 
 ## Phase 7: security rules and callable hardening
 
