@@ -226,6 +226,9 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   await rejectsWithCode(() => consumeTicket(env, session, 0, { sizeBytes: 999 }), 'failed-precondition', 'mismatched size rejected');
 
   const proof = await consumeTicket(env, session);
+  assert.strictEqual(proof.visitDisplayTitle, 'Club Assembly', 'validator returns canonical visit display title');
+  assert.strictEqual(proof.positionTitle, 'Secretary', 'validator returns canonical position title');
+  assert.strictEqual(proof.avenueCode, 'SEC', 'validator returns canonical avenue code');
   await rejectsWithCode(() => consumeTicket(env, session), 'already-exists', 'ticket single-use');
   await rejectsWithCode(() => finalize(env, 'bod-secretary', session, { completionProof: 'not-completed' }), 'failed-precondition');
   const wrongSessionForBinding = await createSession(env, 'admin-uid', { positionKey: 'editor', file: { clientFileId: 'wrong-session-file' } });

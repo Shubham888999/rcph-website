@@ -2,4 +2,5 @@
 
 // Public runtime configuration. This file must never contain shared secrets,
 // privileged backend credentials or private keys.
-window.RCPH_VISIT_UPLOAD_WEB_APP_URL = window.RCPH_VISIT_UPLOAD_WEB_APP_URL || '';
+// Set this to the deployed Firebase HTTPS endpoint after review/deployment.
+window.RCPH_VISIT_UPLOAD_ENDPOINT = 'https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile';

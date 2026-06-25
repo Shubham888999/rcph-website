@@ -4,8 +4,8 @@
 
 `createVisitSubmissionUploadSession` reserves capacity by incrementing `reservedFileCount`. `finalizeVisitSubmissionUpload` creates the active submission only after:
 
-1. Apps Script consumes the ticket through `validateDriveUploadTicket`.
-2. Apps Script records the actual Drive result through `completeVisitSubmissionDriveUpload`.
+1. The Firebase HTTPS upload endpoint consumes the ticket through `validateVisitUploadTicketWithProof`.
+2. The endpoint uploads raw bytes to Drive and records the actual Drive result through `completeDriveUpload`.
 3. The browser supplies the one-use completion proof returned by that trusted endpoint.
 
 Finalization updates:

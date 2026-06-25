@@ -5,14 +5,20 @@ The browser orchestrates uploads but does not become Drive authority.
 1. User selects or drops files in a position folder.
 2. Client performs quick feedback validation using server-returned folder limits.
 3. Browser calls `createVisitSubmissionUploadSession` or `replaceVisitSubmission` with descriptors only.
-4. Browser sends each file sequentially to the configured trusted Apps Script uploader using `FormData` and the one-use ticket.
-5. Apps Script validates the ticket server-to-server, uploads to Drive, calls the trusted completion endpoint, and returns a `completionProof`.
+4. Browser sends each file sequentially to the configured Firebase HTTPS upload endpoint using `FormData` and the one-use ticket.
+5. The HTTPS endpoint validates the ticket through the existing Visit service, uploads to Drive server-side, records trusted Drive completion, and returns a `completionProof`.
 6. Browser calls `finalizeVisitSubmissionUpload` with `sessionId`, `clientFileId`, `ticket`, and `completionProof`.
 7. Browser refreshes the folder data from the backend after finalization.
 
 The browser does not send `driveFileId`, `driveFolderId`, or `driveFileUrl` to finalization.
 
-The Apps Script web-app URL is read from `window.RCPH_VISIT_UPLOAD_WEB_APP_URL`, defined in `js/runtime-config.js`. The expected Apps Script action is `uploadVisitSubmissionFile`, and the response must include:
+The Firebase HTTPS upload endpoint URL is read from `window.RCPH_VISIT_UPLOAD_ENDPOINT`, defined in `js/runtime-config.js`. The endpoint is expected to be:
+
+```text
+https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile
+```
+
+The response must include:
 
 ```json
 {
@@ -20,7 +26,7 @@ The Apps Script web-app URL is read from `window.RCPH_VISIT_UPLOAD_WEB_APP_URL`,
 }
 ```
 
-If the URL is blank, the UI remains safely disabled for live Drive upload and shows a configuration message.
+If the endpoint is blank, the UI remains safely disabled for live Drive upload and shows a configuration message.
 
 ## Queue States
 

@@ -1,8 +1,10 @@
 {
   "dependencies": {
+    "@fastify/busboy": "^3.2.0",
     "bcryptjs": "^3.0.2",
     "firebase-admin": "^13.5.0",
     "firebase-functions": "^6.5.0",
+    "googleapis": "^144.0.0",
     "nodemailer": "^7.0.13"
   }
 }

@@ -268,25 +268,23 @@ Request:
 }
 ```
 
-Response includes `sessionId`, `uploadType: "visitSubmission"`, and one ticket per file. Send each ticket to the trusted Apps Script uploader; do not send file bytes through a callable.
+Response includes `sessionId`, `uploadType: "visitSubmission"`, and one ticket per file. Send each ticket with one file to the Firebase HTTPS multipart endpoint; do not send file bytes through a callable.
 
-### Apps Script Ticket Validation
+### Firebase HTTP File Upload
 
-Apps Script calls `validateDriveUploadTicket` with:
+The browser posts `multipart/form-data` to `uploadVisitSubmissionFile` with:
 
-```json
-{
-  "uploadType": "visitSubmission",
-  "ticket": "...",
-  "sessionId": "...",
-  "clientFileId": "local-1",
-  "fileName": "server-approved-name.pdf",
-  "mimeType": "application/pdf",
-  "sizeBytes": 123456
-}
+```text
+ticket
+sessionId
+clientFileId
+fileName
+mimeType
+sizeBytes
+file
 ```
 
-The endpoint returns an `uploadProof` to the trusted Apps Script uploader. Apps Script uses that proof when calling `completeVisitSubmissionDriveUpload` after Drive upload succeeds. The browser finalizes only with the returned `completionProof`; it does not pass Drive IDs or URLs as authority.
+The HTTPS endpoint validates and consumes the ticket through the Visit service, uploads the file to Drive server-side, records trusted completion, and returns a `completionProof`. The browser finalizes only with that `completionProof`; it does not pass Drive IDs or URLs as authority.
 
 ### `finalizeVisitSubmissionUpload`
 
@@ -301,7 +299,7 @@ Request:
 }
 ```
 
-Finalization creates the active submission record and updates counters. It fails if the ticket was not consumed by the trusted validator and completed by the trusted Apps Script completion endpoint. The browser must not send Drive IDs or URLs as authority.
+Finalization creates the active submission record and updates counters. It fails if the ticket was not consumed by the trusted HTTP endpoint and completed by the backend Drive completion service. The browser must not send Drive IDs or URLs as authority.
 
 ### Lifecycle Actions
 

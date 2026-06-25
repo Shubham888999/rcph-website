@@ -150,7 +150,7 @@ Update callables reject requests with no mutable fields using `invalid-argument`
 | `updateVisitSubmissionConfig` | `admin`, `president` | Partially updates visit-level settings. |
 | `updateVisitSubmissionFolder` | `admin`, `president` | Partially updates folder limits and lock state. |
 | `createVisitSubmissionUploadSession` | `bod`, `admin`, `president` | Reserves capacity and returns one-use Drive upload tickets. |
-| `finalizeVisitSubmissionUpload` | `bod`, `admin`, `president` | Finalizes metadata after trusted Apps Script upload. |
+| `finalizeVisitSubmissionUpload` | `bod`, `admin`, `president` | Finalizes metadata after trusted Firebase HTTP Drive upload completion. |
 | `withdrawVisitSubmission` | `bod`, `admin`, `president` | Archives an uploader-owned active submission. |
 | `removeVisitSubmission` | `admin`, `president` | Marks an active submission as manager removed. |
 | `replaceVisitSubmission` | `bod`, `admin`, `president` | Creates a replacement upload session. |

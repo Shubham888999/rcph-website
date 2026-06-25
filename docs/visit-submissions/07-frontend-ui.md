@@ -36,13 +36,13 @@ The frontend does not infer ownership from browser state. BOD users see actions 
 
 ## Runtime Configuration
 
-`js/runtime-config.js` exposes the public Apps Script web-app URL:
+`js/runtime-config.js` exposes the public Firebase HTTPS upload endpoint:
 
 ```js
-window.RCPH_VISIT_UPLOAD_WEB_APP_URL = '';
+window.RCPH_VISIT_UPLOAD_ENDPOINT = '';
 ```
 
-The value is intentionally blank until the Visit Submission Apps Script uploader is deployed. Configure only the public web-app URL there. Do not place backend secrets, privileged credentials, private keys, or Drive root folder authority in frontend files.
+The value is intentionally blank until the Firebase HTTPS upload endpoint is deployed. Configure only the public endpoint URL there. Do not place backend secrets, privileged credentials, private keys, or Drive root folder authority in frontend files.
 
 ## Initialization
 

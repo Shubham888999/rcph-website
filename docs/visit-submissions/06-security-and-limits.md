@@ -78,4 +78,4 @@ Per-file session state is intentionally distinct:
 - `cancelled`
 - `expired`
 
-A consumed ticket only proves that Apps Script was authorized to start the Drive upload. It is not proof that Drive upload succeeded. Finalization requires the trusted completion proof created after Apps Script reports the actual Drive result.
+A consumed ticket only proves that the Firebase HTTPS upload endpoint was authorized to start the Drive upload. It is not proof that Drive upload succeeded. Finalization requires the trusted completion proof created after the endpoint records the actual Drive result.

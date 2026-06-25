@@ -103,8 +103,10 @@ assert(!/\bconfirm\s*\(/.test(combinedVisitJs), 'Visit UI does not use native co
 assert(/data-dialog-cancel/.test(combinedVisitJs), 'Custom dialog includes cancel buttons.');
 assert(/data-confirm-maintenance/.test(combinedVisitJs), 'Custom dialog includes confirm buttons for maintenance.');
 assert(/aria-live/.test(sources['visit-submissions.html'] + sources['js/visit-submission-render.js']), 'Upload/status areas use aria-live.');
-assert(/RCPH_VISIT_UPLOAD_WEB_APP_URL/.test(sources['js/runtime-config.js'] + combinedVisitJs), 'Safe runtime URL configuration exists.');
-assert(/uploadVisitSubmissionFile/.test(sources['js/visit-submission-upload.js']), 'Expected Apps Script action is wired.');
+assert(/RCPH_VISIT_UPLOAD_ENDPOINT/.test(sources['js/runtime-config.js'] + combinedVisitJs), 'Safe Firebase upload endpoint runtime configuration exists.');
+assert(/uploadVisitSubmissionFile/.test(sources['js/visit-submission-upload.js']), 'Expected Firebase HTTPS upload endpoint is wired.');
+assert(!/RCPH_VISIT_UPLOAD_WEB_APP_URL/.test(sources['js/runtime-config.js'] + combinedVisitJs), 'Visit UI no longer depends on Apps Script URL config.');
+assert(!/formData\.append\('action', 'uploadVisitSubmissionFile'\)/.test(sources['js/visit-submission-upload.js']), 'Visit UI no longer sends Apps Script upload action.');
 assert(!/DRIVE_UPLOAD_SHARED_SECRET|private_key|service-account|OAuth token|client_secret/i.test(combinedVisitJs + sources['visit-submissions.html'] + sources['js/runtime-config.js']), 'No shared secret appears in frontend source.');
 assert(!/firebase deploy|functions:deploy|deploy --/.test(combinedVisitJs), 'No deploy command introduced.');
 assert(!/localStorage/.test(combinedVisitJs), 'No direct role authorization from localStorage.');

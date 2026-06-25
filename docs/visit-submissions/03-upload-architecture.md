@@ -1,16 +1,18 @@
 # Visit Submission Upload Architecture
 
-Phase 2 reuses the existing secure Drive-upload pattern:
+Visit Submission file bytes now use a Firebase HTTPS multipart endpoint, not Apps Script.
 
-1. Browser calls a Firebase callable to request a scoped upload session.
+1. Browser calls `createVisitSubmissionUploadSession` or `replaceVisitSubmission` with file descriptors only.
 2. Backend validates authenticated role, canonical position ownership, visit/folder open state, file metadata, rate limits, and capacity.
 3. Backend creates `visitSubmissionUploadSessions/{sessionId}` and one hashed ticket in `driveUploadTickets` per file with `uploadPurpose: "visitSubmission"`.
-4. Browser sends file bytes to the trusted Apps Script uploader with the one-use ticket. The callable never receives base64/file bytes.
-5. Apps Script calls `validateDriveUploadTicket` with the shared backend secret. For Visit tickets, the endpoint consumes the ticket and returns a short-lived upload proof.
-6. After the Drive upload succeeds, Apps Script calls `completeVisitSubmissionDriveUpload` with the same shared secret, the upload proof, and the actual Drive result.
-7. The completion endpoint stores server-owned Drive result fields on the ticket and returns a one-use completion proof.
-8. Browser calls `finalizeVisitSubmissionUpload` with the ticket/session/client file ID and completion proof only.
-9. Backend loads Drive IDs/URLs only from the trusted completion record and writes the active `visitSubmissions/{submissionId}` record transactionally with counters.
+4. Browser posts exactly one file as `multipart/form-data` to `uploadVisitSubmissionFile`.
+5. The HTTPS endpoint parses the multipart request with Busboy, validates the ticket through the existing Visit service, and consumes the one-use ticket before any Drive write.
+6. The endpoint creates or reuses the canonical Drive folder hierarchy server-side.
+7. The endpoint uploads raw bytes to Drive using the backend-approved storage file name.
+8. The endpoint calls the existing internal `completeDriveUpload` service with the actual Drive result and upload proof.
+9. The endpoint returns only `completionProof` and a safe `fileUrl` to the browser.
+10. Browser calls `finalizeVisitSubmissionUpload` with `sessionId`, `clientFileId`, `ticket`, and `completionProof`.
+11. Backend loads Drive IDs/URLs only from the trusted completion record and writes the active `visitSubmissions/{submissionId}` record transactionally with counters.
 
 ## Reused Infrastructure
 
@@ -18,30 +20,44 @@ Reused:
 
 - `driveUploadTickets` for hashed one-use ticket records.
 - `driveUploadRateLimits` for UID-scoped upload throttling.
-- `validateDriveUploadTicket` HTTP endpoint protected by `DRIVE_UPLOAD_SHARED_SECRET`.
-- The Apps Script handoff model used by BOD Event and Treasury uploads.
+- `validateVisitUploadTicketWithProof` service method for ticket validation and proof generation.
+- `completeDriveUpload` service method for trusted Drive completion and completion proof generation.
+- `finalizeVisitSubmissionUpload` callable for final metadata creation.
 
-Visit-specific:
+Visit-specific HTTP upload:
 
-- `visitSubmissionUploadSessions` tracks file reservations and expected descriptors.
-- `uploadPurpose: "visitSubmission"` prevents other upload flows from consuming Visit tickets.
-- `uploadProof` is generated only by the trusted validator and is required by Apps Script to record Drive completion.
-- `completionProof` is generated only by `completeVisitSubmissionDriveUpload` and is required for browser finalization.
+- `uploadVisitSubmissionFile` Firebase HTTPS endpoint.
+- `functions/lib/visit-drive.js` for Busboy parsing, CORS, Drive folder hierarchy, Drive upload, and safe JSON responses.
+- Google Drive v3 API through `googleapis` and Google Application Default Credentials.
 
-## Callables
+The older Apps Script source is retained only for legacy BOD/Treasury upload routes and historical reference. It is superseded for Visit file-byte transport.
 
-- `createVisitSubmissionUploadSession`
-- `finalizeVisitSubmissionUpload`
-- `completeVisitSubmissionDriveUpload` HTTP endpoint for trusted Apps Script completion
-- `cancelVisitSubmissionUploadSession`
-- `cleanupExpiredVisitUploadSessions`
-- `withdrawVisitSubmission`
-- `removeVisitSubmission`
-- `replaceVisitSubmission`
-- `reconcileVisitSubmissionFolderCount`
-- `getVisitSubmissionModerationData`
+## Endpoint Contract
 
-No Drive credentials, root folder IDs, service account data, shared secrets, or plaintext ticket hashes are returned to the browser.
+`uploadVisitSubmissionFile` accepts `multipart/form-data` with:
+
+```text
+ticket
+sessionId
+clientFileId
+fileName
+mimeType
+sizeBytes
+file
+```
+
+The endpoint rejects browser-supplied:
+
+```text
+driveFolderId
+rootFolderId
+visitType
+positionKey
+driveFileId
+driveFileUrl
+```
+
+No base64 JSON upload is supported.
 
 ## Ticket Binding
 
@@ -60,7 +76,7 @@ Tickets are one-use, short-lived, and rejected after session cancellation/expira
 
 ## Completion Binding
 
-The browser-facing finalization callable does not accept authoritative `driveFileId`, `driveFolderId`, or `driveFileUrl`. Any such fields in the callable request are ignored. The backend uses only the server-owned completion fields stored by `completeVisitSubmissionDriveUpload`.
+The browser-facing finalization callable does not accept authoritative `driveFileId`, `driveFolderId`, or `driveFileUrl`. Any such fields in the callable request are ignored. The backend uses only server-owned completion fields written after Firebase uploads the file to Drive.
 
 Completion is bound to:
 

@@ -1,25 +1,25 @@
 'use strict';
 
 (function initVisitSubmissionUpload(global) {
-  const DEFAULT_UPLOAD_WEB_APP_URL = '';
+  const DEFAULT_UPLOAD_ENDPOINT = '';
 
-  function getUploadWebAppUrl() {
-    return String(global.RCPH_VISIT_UPLOAD_WEB_APP_URL || DEFAULT_UPLOAD_WEB_APP_URL || '').trim();
+  function getUploadEndpoint() {
+    return String(global.RCPH_VISIT_UPLOAD_ENDPOINT || DEFAULT_UPLOAD_ENDPOINT || '').trim();
   }
 
   function isUploadTransportConfigured() {
-    return /^https:\/\/script\.google\.com\/macros\/s\//.test(getUploadWebAppUrl());
+    const url = getUploadEndpoint();
+    return /^https:\/\/us-central1-rcph-admin\.cloudfunctions\.net\/uploadVisitSubmissionFile$/.test(url)
+      || /^https?:\/\/(localhost|127\.0\.0\.1):\d+\/.*uploadVisitSubmissionFile/.test(url);
   }
 
-  async function uploadFileToTrustedAppsScript(file, session, sessionFile, onProgress) {
-    const url = getUploadWebAppUrl();
+  async function uploadFileToFirebaseEndpoint(file, session, sessionFile, onProgress) {
+    const url = getUploadEndpoint();
     if (!isUploadTransportConfigured()) {
-      throw new Error('Visit Submission Drive uploader is not configured yet.');
+      throw new Error('Visit Submission upload endpoint is not configured yet.');
     }
 
     const formData = new FormData();
-    formData.append('action', 'uploadVisitSubmissionFile');
-    formData.append('uploadType', 'visitSubmission');
     formData.append('ticket', sessionFile.ticket);
     formData.append('sessionId', session.sessionId);
     formData.append('clientFileId', sessionFile.clientFileId);
@@ -37,11 +37,17 @@
 
     if (typeof onProgress === 'function') onProgress(85);
 
-    if (!response.ok) {
-      throw new Error(`Drive upload failed with status ${response.status}.`);
+    let json = null;
+    try {
+      json = await response.json();
+    } catch {
+      json = null;
     }
 
-    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.message || `Upload failed with status ${response.status}.`);
+    }
+
     if (!json || json.ok === false || json.status === 'error') {
       throw new Error(json?.message || 'Drive upload failed.');
     }
@@ -117,7 +123,7 @@
       render();
 
       try {
-        const trusted = await uploadFileToTrustedAppsScript(item.file, session, approved, (progress) => {
+        const trusted = await uploadFileToFirebaseEndpoint(item.file, session, approved, (progress) => {
           item.progress = progress;
           render();
         });
@@ -180,8 +186,8 @@
 
   global.RcphVisitUpload = Object.freeze({
     isUploadTransportConfigured,
-    getUploadWebAppUrl,
-    uploadFileToTrustedAppsScript,
+    getUploadEndpoint,
+    uploadFileToFirebaseEndpoint,
     runSequentialUpload,
     cancelActiveSession,
   });

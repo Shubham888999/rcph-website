@@ -6,5 +6,21 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
-  }
+  },
+"hosting": {
+  "public": ".",
+  "ignore": [
+    "firebase.json",
+    ".firebaserc",
+    "**/.*",
+    "**/node_modules/**",
+    "functions/**",
+    "docs/**",
+    "scripts/**",
+    "apps-script/**",
+    "*.log",
+    "package.json",
+    "package-lock.json"
+  ]
+}
 }

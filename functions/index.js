@@ -11,6 +11,10 @@ const {
   VISIT_UPLOAD_TYPE,
   createVisitSubmissionService,
 } = require('./lib/visit-submissions');
+const {
+  createFirestoreFolderLockManager,
+  createVisitHttpUploadHandler,
+} = require('./lib/visit-drive');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -25,6 +29,23 @@ const visitSubmissions = createVisitSubmissionService({
   admin,
   positionHelpers,
 });
+const VISIT_DRIVE_CLIENT_ID = defineSecret('VISIT_DRIVE_CLIENT_ID');
+const VISIT_DRIVE_CLIENT_SECRET = defineSecret('VISIT_DRIVE_CLIENT_SECRET');
+const VISIT_DRIVE_REFRESH_TOKEN = defineSecret('VISIT_DRIVE_REFRESH_TOKEN');
+const visitFolderLockManager = createFirestoreFolderLockManager({
+  db,
+  admin,
+});
+const uploadVisitSubmissionFileHandler = createVisitHttpUploadHandler({
+  visitService: visitSubmissions,
+  folderLockManager: visitFolderLockManager,
+  secrets: {
+    VISIT_DRIVE_CLIENT_ID,
+    VISIT_DRIVE_CLIENT_SECRET,
+    VISIT_DRIVE_REFRESH_TOKEN,
+  },
+  logger: console,
+});
 const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE;
 const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS || '';
@@ -34,6 +55,8 @@ const CALLABLE_OPTIONS = {
   cors: [
     'https://rcph3131.org',
     'https://www.rcph3131.org',
+    'https://rcph-admin.web.app',
+    'https://rcph-admin.firebaseapp.com',
     'http://localhost:5000',
     'http://localhost:5500',
     'http://127.0.0.1:5500',
@@ -2043,6 +2066,19 @@ exports.cancelVisitSubmissionUploadSession = onCall(CALLABLE_OPTIONS, async (req
     throwCallableServiceError(err, 'Visit Submission upload session cancellation failed.');
   }
 });
+
+exports.uploadVisitSubmissionFile = onRequest({
+  region: 'us-central1',
+  timeoutSeconds: 120,
+  memory: '512MiB',
+  maxInstances: 5,
+  concurrency: 10,
+  secrets: [
+    VISIT_DRIVE_CLIENT_ID,
+    VISIT_DRIVE_CLIENT_SECRET,
+    VISIT_DRIVE_REFRESH_TOKEN,
+  ],
+}, uploadVisitSubmissionFileHandler);
 
 exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);

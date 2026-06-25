@@ -29,11 +29,11 @@ The authoritative persisted folder reference is:
 visitSubmissionPositions/{visitType}_{positionKey}.driveFolderId
 ```
 
-The field is stored by the backend during finalization from the trusted Apps Script completion record. Ordinary read APIs do not return `driveFolderId`; manager moderation may expose it for operational review.
+The field is stored by the backend during finalization from the trusted Firebase HTTP upload completion record. Ordinary read APIs do not return `driveFolderId`; manager moderation may expose it for operational review.
 
 ## Idempotency
 
-Apps Script should create or reuse the folder for the canonical visit/position. Once `driveFolderId` exists, future uploads for the same visit/position must use the same folder. If a trusted completion reports a different folder ID, finalization rejects it with `failed-precondition`.
+The Firebase Drive helper creates or reuses the folder for the canonical visit/position. Once `driveFolderId` exists, future uploads for the same visit/position must use the same folder. If trusted completion reports a different folder ID, finalization rejects it with `failed-precondition`.
 
 The browser cannot choose, override, or repair folder IDs.
 

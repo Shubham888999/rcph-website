@@ -13,73 +13,131 @@
     return `<span class="visit-badge ${state ? `is-${state}` : ''}">${escapeHtml(label)}</span>`;
   }
 
-  function statusBadges(item) {
-    const badges = [];
-    badges.push(badge(item.enabled === false ? 'Disabled' : 'Enabled', item.enabled === false ? 'disabled' : 'enabled'));
-    badges.push(badge(item.submissionOpen === false ? 'Closed' : 'Open', item.submissionOpen === false ? 'closed' : 'open'));
-    if (item.locked) badges.push(badge('Locked', 'locked'));
-    return badges.join('');
-  }
+function statusBadge(item, type = 'visit') {
+if (item.enabled === false) {
+return `<span class="visit-status-text is-disabled">       <span aria-hidden="true">—</span> Disabled     </span>`;
+}
+
+if (item.locked === true) {
+return `<span class="visit-status-text is-locked">       <span aria-hidden="true">🔒</span> Locked     </span>`;
+}
+
+if (item.submissionOpen === false) {
+return `<span class="visit-status-text is-closed">       <span aria-hidden="true">🔒</span>
+      ${type === 'folder' ? 'Uploads closed' : 'Submissions closed'}     </span>`;
+}
+
+return `<span class="visit-status-text is-open">     <span aria-hidden="true">●</span> Open   </span>`;
+}
+
 
   function dateLine(label, value) {
     if (!value) return '';
     return `<div class="visit-muted"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(S.formatDate(value))}</div>`;
   }
 
-  function renderDashboard(data) {
-    const access = data?.access || {};
-    const visits = data?.visits || [];
-    return `
-      <section class="visit-panel">
-        <div class="visit-panel__head">
+function renderDashboard(data) {
+const access = data?.access || {};
+const visits = data?.visits || [];
+
+return `
+<section class="visit-panel">
+<div class="visit-panel__head">
+<div>
+<h2>Submission Dashboard</h2>
+<p class="visit-muted">
+Select a visit to manage position folders and documents.
+</p>
+</div>
+
+    ${access.canManage ? `
+      <div class="visit-role-note">
+        Signed in as ${escapeHtml(access.role || 'manager')}
+      </div>
+    ` : ''}
+  </div>
+
+  <div class="visit-grid">
+    ${visits.map(visit => `
+      <article class="visit-card visit-card--traditional"
+               data-visit-card="${escapeHtml(visit.visitType)}">
+
+        <div class="visit-card__top">
           <div>
-            <h2>Submission Dashboard</h2>
-            <p class="visit-muted">Use the three visit cards to open folders, upload files, and review submission progress.</p>
+            <h3>${escapeHtml(visit.displayTitle)}</h3>
+            <p class="visit-muted">
+              ${escapeHtml(visit.description || 'Visit submission workspace')}
+            </p>
           </div>
-          <div class="visit-badges">
-            ${badge(access.role || 'Role', access.canManage ? 'manager' : '')}
-            ${access.canManage ? badge('Manager controls enabled', 'manager') : ''}
-          </div>
+
+          ${statusBadge(visit, 'visit')}
         </div>
-        <div class="visit-grid">
-          ${visits.map(visit => `
-            <article class="visit-card" data-visit-card="${escapeHtml(visit.visitType)}">
-              <div>
-                <div class="visit-badges">${statusBadges(visit)}</div>
-                <h3>${escapeHtml(visit.displayTitle)}</h3>
-                <p class="visit-muted">${escapeHtml(visit.description || 'Visit submission workspace')}</p>
-                ${dateLine('Visit date', visit.visitDate)}
-                ${dateLine('Deadline', visit.submissionDeadline)}
-              </div>
-              <div class="visit-stat-grid">
-                <div class="visit-stat"><span>Accessible</span><strong>${Number(visit.accessiblePositionCount || 0)}</strong></div>
-                <div class="visit-stat"><span>Total</span><strong>${Number(visit.totalPositionCount || 0)}</strong></div>
-                <div class="visit-stat"><span>Active files</span><strong>${Number(visit.activeSubmissionCount || 0)}</strong></div>
-                <div class="visit-stat"><span>Locked</span><strong>${Number(visit.lockedPositionCount || 0)}</strong></div>
-              </div>
-              <div class="visit-actions">
-                <button class="btn" type="button" data-open-visit="${escapeHtml(visit.visitType)}">Open folders</button>
-                <button class="btn btn-outline" type="button" data-view-visit-submissions="${escapeHtml(visit.visitType)}">View submissions</button>
-                ${access.canManage ? `<button class="btn btn-outline" type="button" data-manage-visit="${escapeHtml(visit.visitType)}">Manage settings</button>` : ''}
-              </div>
-            </article>
-          `).join('')}
+
+        <div class="visit-card__dates">
+          ${dateLine('Visit date', visit.visitDate)}
+          ${dateLine('Deadline', visit.submissionDeadline)}
         </div>
-        ${access.canManage ? `
-          <div class="visit-manager-panel" style="margin-top:16px;">
-            <div class="visit-section-head">
-              <div>
-                <h3>System Maintenance</h3>
-                <p class="visit-muted">Use these actions only when setting up or repairing Visit Submission data.</p>
-              </div>
-              <button class="btn btn-outline" type="button" data-clean-expired>Clean expired upload sessions</button>
-            </div>
-            <div id="visitModerationMount">${renderModerationPanel(data)}</div>
+
+        <p class="visit-card__summary">
+          <strong>${Number(visit.accessiblePositionCount || 0)}</strong>
+          accessible folders
+          <span aria-hidden="true">·</span>
+          <strong>${Number(visit.activeSubmissionCount || 0)}</strong>
+          active files
+          <span aria-hidden="true">·</span>
+          <strong>${Number(visit.lockedPositionCount || 0)}</strong>
+          locked
+        </p>
+
+        <div class="visit-card__footer">
+          <button class="btn"
+                  type="button"
+                  data-open-visit="${escapeHtml(visit.visitType)}">
+            Open
+          </button>
+
+          ${access.canManage ? `
+            <button class="visit-text-action"
+                    type="button"
+                    data-manage-visit="${escapeHtml(visit.visitType)}">
+              Settings
+            </button>
+          ` : ''}
+        </div>
+      </article>
+    `).join('')}
+  </div>
+
+  ${access.canManage ? `
+    <details class="visit-maintenance">
+      <summary>Administration and maintenance</summary>
+
+      <div class="visit-maintenance__content">
+        <div class="visit-section-head">
+          <div>
+            <h3>System Maintenance</h3>
+            <p class="visit-muted">
+              Use these tools only for configuration or data repair.
+            </p>
           </div>
-        ` : ''}
-      </section>
-    `;
-  }
+
+          <button class="btn btn-outline"
+                  type="button"
+                  data-clean-expired>
+            Clean expired sessions
+          </button>
+        </div>
+
+        <div id="visitModerationMount">
+          ${renderModerationPanel(data)}
+        </div>
+      </div>
+    </details>
+  ` : ''}
+</section>
+
+`;
+}
 
   function renderUninitialized(canInitialize, message) {
     return `
@@ -126,27 +184,57 @@
     `;
   }
 
-  function renderFolderCard(folder, access) {
-    const remaining = Math.max(0, Number(folder.maxActiveFiles || 0) - Number(folder.activeFileCount || 0));
-    return `
-      <article class="visit-folder-card">
-        <div>
-          <div class="visit-badges">${statusBadges(folder)}</div>
-          <h3>${escapeHtml(folder.positionTitle)}</h3>
-          <p class="visit-muted">${escapeHtml(folder.avenueCode || folder.positionKey)}</p>
-          ${folder.lockReason ? `<p class="visit-muted"><strong>Reason:</strong> ${escapeHtml(folder.lockReason)}</p>` : ''}
-        </div>
-        <div class="visit-stat-grid">
-          <div class="visit-stat"><span>Files</span><strong>${Number(folder.activeFileCount || 0)}/${Number(folder.maxActiveFiles || 0)}</strong></div>
-          <div class="visit-stat"><span>Remaining</span><strong>${remaining}</strong></div>
-        </div>
-        <div class="visit-actions">
-          ${folder.canOpen ? `<button class="btn" type="button" data-open-folder="${escapeHtml(folder.visitType)}:${escapeHtml(folder.positionKey)}">Open folder</button>` : ''}
-          ${access.canManage || folder.canManage ? `<button class="btn btn-outline" type="button" data-manage-folder="${escapeHtml(folder.visitType)}:${escapeHtml(folder.positionKey)}">Settings</button>` : ''}
-        </div>
-      </article>
-    `;
-  }
+function renderFolderCard(folder, access) {
+const active = Number(folder.activeFileCount || 0);
+const maximum = Number(folder.maxActiveFiles || 0);
+const remaining = Math.max(0, maximum - active);
+
+return `
+<article class="visit-folder-card visit-folder-card--traditional">
+<div class="visit-folder-card__top">
+<div>
+<h3>${escapeHtml(folder.positionTitle)}</h3>
+<p class="visit-folder-code">
+${escapeHtml(folder.avenueCode || folder.positionKey)}
+</p>
+</div>
+
+    ${statusBadge(folder, 'folder')}
+  </div>
+
+  ${folder.lockReason ? `
+    <p class="visit-folder-reason">
+      ${escapeHtml(folder.lockReason)}
+    </p>
+  ` : ''}
+
+  <p class="visit-folder-count">
+    <strong>${active}</strong> of ${maximum} files
+    <span aria-hidden="true">·</span>
+    ${remaining} remaining
+  </p>
+
+  <div class="visit-card__footer">
+    ${folder.canOpen ? `
+      <button class="btn"
+              type="button"
+              data-open-folder="${escapeHtml(folder.visitType)}:${escapeHtml(folder.positionKey)}">
+        Open
+      </button>
+    ` : ''}
+
+    ${access.canManage || folder.canManage ? `
+      <button class="visit-text-action"
+              type="button"
+              data-manage-folder="${escapeHtml(folder.visitType)}:${escapeHtml(folder.positionKey)}">
+        Settings
+      </button>
+    ` : ''}
+  </div>
+</article>
+
+`;
+}
 
   function uploadUnavailableReason(visit, folder) {
     if (!folder.canOpen) return 'You do not have permission to open this folder.';
@@ -171,8 +259,15 @@
           <div>
             <h2>${escapeHtml(visit.displayTitle || folder.visitType)} - ${escapeHtml(folder.positionTitle || folder.positionKey)}</h2>
             <p class="visit-muted">${escapeHtml(folder.avenueCode || '')}</p>
-            <div class="visit-badges">${statusBadges(visit)}${statusBadges(folder)}${access.canManage ? badge('Manager', 'manager') : ''}</div>
-            ${folder.lockReason ? `<p class="visit-muted"><strong>Lock reason:</strong> ${escapeHtml(folder.lockReason)}</p>` : ''}
+<div class="visit-status-row">
+  <span class="visit-status-label">Visit:</span>
+  ${statusBadge(visit, 'visit')}
+
+  <span class="visit-status-divider" aria-hidden="true">|</span>
+
+  <span class="visit-status-label">Folder:</span>
+  ${statusBadge(folder, 'folder')}
+</div>            ${folder.lockReason ? `<p class="visit-muted"><strong>Lock reason:</strong> ${escapeHtml(folder.lockReason)}</p>` : ''}
             ${dateLine('Deadline', visit.submissionDeadline)}
           </div>
           <div class="visit-stat-grid">
@@ -359,7 +454,7 @@
   global.RcphVisitRender = Object.freeze({
     escapeHtml,
     badge,
-    statusBadges,
+    statusBadge,
     renderDashboard,
     renderUninitialized,
     renderVisitFolders,
