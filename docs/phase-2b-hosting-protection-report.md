@@ -60,7 +60,7 @@ Root HTML pages remain available because no root HTML ignore pattern was added.
 
 Moved:
 
-- From: `PROJECT_CLEANUP_REPORT.md`
+- From: `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
 - To: `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
 
 This was a move only. The historical report contents were preserved, and no generated report directories or zip files were deleted.
@@ -71,10 +71,10 @@ Documentation-only references to the old root filename were updated to the archi
 
 - `docs/documentation-consolidation-plan.md`
 - `docs/hosting-ignore-review.md`
-- `docs/repository-audit/01-file-inventory.md`
-- `docs/repository-audit/02-reference-map.md`
-- `docs/repository-audit/05-cleanup-candidates.md`
-- `docs/repository-audit/README.md`
+- `docs/archive/repository-audit-legacy/01-file-inventory.md`
+- `docs/archive/repository-audit-legacy/02-reference-map.md`
+- `docs/archive/repository-audit-legacy/05-cleanup-candidates.md`
+- `docs/archive/repository-audit-legacy/README.md`
 - `docs/repository-organization-audit.md`
 
 No root `README.md` changes were made.
@@ -93,11 +93,11 @@ Inspection and reference checks:
 ```powershell
 Get-Content -Raw firebase.json
 Test-Path docs\archive
-Test-Path PROJECT_CLEANUP_REPORT.md
+Test-Path docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md
 rg -n "PROJECT_CLEANUP_REPORT\.md" -g "!node_modules/**" -g "!functions/node_modules/**" -g "!.git/**" -g "!.firebase/**"
 rg -n "PROJECT_CLEANUP_REPORT" docs README.md firebase.json package.json -g "!node_modules/**"
 rg -n "PROJECT_CLEANUP_REPORT\.md" docs -g "!archive/**"
-rg -n "docs/archive/docs/archive|PROJECT_CLEANUP_REPORT\.md" docs -g "!archive/**"
+rg -n "PROJECT_CLEANUP_REPORT-2026-05-26\.md" docs -g "!archive/**"
 ```
 
 Hosting validation:
@@ -178,16 +178,16 @@ Failed:
 - `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
 - `docs/documentation-consolidation-plan.md`
 - `docs/hosting-ignore-review.md`
-- `docs/repository-audit/01-file-inventory.md`
-- `docs/repository-audit/02-reference-map.md`
-- `docs/repository-audit/05-cleanup-candidates.md`
-- `docs/repository-audit/README.md`
+- `docs/archive/repository-audit-legacy/01-file-inventory.md`
+- `docs/archive/repository-audit-legacy/02-reference-map.md`
+- `docs/archive/repository-audit-legacy/05-cleanup-candidates.md`
+- `docs/archive/repository-audit-legacy/README.md`
 - `docs/repository-organization-audit.md`
 - `docs/phase-2b-hosting-protection-report.md`
 
 Moved:
 
-- `PROJECT_CLEANUP_REPORT.md` -> `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
+- `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` -> `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
 
 Deleted:
 
@@ -202,13 +202,13 @@ Deployment:
 Expected after creating this report:
 
 ```text
- D PROJECT_CLEANUP_REPORT.md
+ D docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md
  M docs/documentation-consolidation-plan.md
  M docs/hosting-ignore-review.md
- M docs/repository-audit/01-file-inventory.md
- M docs/repository-audit/02-reference-map.md
- M docs/repository-audit/05-cleanup-candidates.md
- M docs/repository-audit/README.md
+ M docs/archive/repository-audit-legacy/01-file-inventory.md
+ M docs/archive/repository-audit-legacy/02-reference-map.md
+ M docs/archive/repository-audit-legacy/05-cleanup-candidates.md
+ M docs/archive/repository-audit-legacy/README.md
  M docs/repository-organization-audit.md
  M firebase.json
 ?? docs/archive/

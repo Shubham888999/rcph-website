@@ -1,5 +1,7 @@
 # BOD Visit Submission System
 
+> Historical documentation only. This folder describes an earlier proposed Visit Submission design and must not be treated as the current implementation. The authoritative implementation documentation is in `docs/visit-submissions/`.
+
 Phase 1 documentation for the proposed BOD Visit Submission System.
 
 No feature code has been implemented. No collections have been created. No deployment has been performed.

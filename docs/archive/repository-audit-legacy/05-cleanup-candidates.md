@@ -28,7 +28,7 @@ These are active and should remain in Git.
 | `prospectProgress` explicit rules | Backend references collection; rules do not explicitly mention it. | If backend-only, add explicit client deny for documentation; if client access is planned, design rules first. |
 | `dzrvisit.html` Drive placeholder | Contains `YOUR_IPP_FOLDER_LINK`. | Replace with a real intended link or hide that link. |
 | `my-dashboard.html` WhatsApp placeholder | Contains placeholder WhatsApp group URL. | Replace, remove, or gate behind configured value. |
-| Cleanup report destination | `docs/repository-audit/` did not exist before this audit. | Created by this audit. |
+| Cleanup report destination | `docs/archive/repository-audit-legacy/` did not exist before this audit. | Created by this audit. |
 
 False-positive missing reference notes:
 

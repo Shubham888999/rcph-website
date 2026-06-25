@@ -8,9 +8,9 @@ Documentation groups reviewed: 8.
 
 Reviewed groups:
 
-1. `docs/visit-submission-system/**`
+1. `docs/archive/visit-submission-system-design-legacy/**`
 2. `docs/visit-submissions/**`
-3. `docs/repository-audit/**`
+3. `docs/archive/repository-audit-legacy/**`
 4. `docs/repository-organization-audit.md`
 5. `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
 6. Root `README.md`
@@ -24,8 +24,8 @@ Dependency `README.md` files under `node_modules/**` and `functions/node_modules
 | Documentation group | Classification | Recommended action | Evidence | Notes |
 | --- | --- | --- | --- | --- |
 | `docs/visit-submissions/**` | Current authoritative documentation | Keep as-is; use as the primary Visit Submission implementation docs. | Contains backend foundation, frontend contract, upload architecture, lifecycle, Drive folder model, security, UI flow, Firebase HTTP uploader, and live checklist. References the current Firebase HTTPS uploader architecture. | This set should preserve completion proof validation, folder locks, upload tickets, My Drive integration, and the three Visit root-folder mappings. |
-| `docs/visit-submission-system/**` | Historical design documentation | Candidate for archive or merge after manual review. | README states it is phase 1 proposed BOD Visit Submission System documentation and references a recommended Apps Script structure. | Do not revive obsolete Apps Script Visit upload architecture. Useful as historical design context only. |
-| `docs/repository-audit/**` | Audit-only documentation | Candidate for merge into current repository organization audit or archive under `docs/archive/`. | Contains earlier file inventory, reference map, security audit, Firebase audit, cleanup candidates, and recommended structure. Some findings mention older working-tree artifacts that no longer appear. | Keep until the current audit and Phase 2A docs are accepted. |
+| `docs/archive/visit-submission-system-design-legacy/**` | Historical design documentation | Candidate for archive or merge after manual review. | README states it is phase 1 proposed BOD Visit Submission System documentation and references a recommended Apps Script structure. | Do not revive obsolete Apps Script Visit upload architecture. Useful as historical design context only. |
+| `docs/archive/repository-audit-legacy/**` | Audit-only documentation | Candidate for merge into current repository organization audit or archive under `docs/archive/`. | Contains earlier file inventory, reference map, security audit, Firebase audit, cleanup candidates, and recommended structure. Some findings mention older working-tree artifacts that no longer appear. | Keep until the current audit and Phase 2A docs are accepted. |
 | `docs/repository-organization-audit.md` | Current authoritative repository organization audit | Keep as-is after Phase 2A correction. | Created from full repository inspection and now corrected for secretary image false positives and permanent vs temporary root retention. | Use as source of truth for future cleanup phases. |
 | `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` | Superseded documentation | Keep archived. | Generated 2026-05-26; includes older reference-map findings and mentions files/logs that were not found in the current pass. | Do not delete yet. It may preserve useful historical audit context. |
 | Root `README.md` | Superseded or incomplete project overview | Candidate for merge/update, not deletion. | Describes the site as fully static/GitHub Pages hosted, while current repository includes Firebase Hosting, Firebase Functions, Firestore rules, internal systems, and Google Drive integration. | Keep until a replacement README accurately covers Firebase production architecture and safe local setup. |
@@ -49,18 +49,18 @@ Dependency `README.md` files under `node_modules/**` and `functions/node_modules
 - Firebase HTTP uploader
 - Live HTTP upload checklist
 
-`docs/visit-submission-system/**` should be retained for historical context, but it should not be used to reintroduce the old Apps Script upload architecture. If useful material remains in this older folder, merge it into the newer `docs/visit-submissions/**` set with explicit notes marking old assumptions as superseded.
+`docs/archive/visit-submission-system-design-legacy/**` should be retained for historical context, but it should not be used to reintroduce the old Apps Script upload architecture. If useful material remains in this older folder, merge it into the newer `docs/visit-submissions/**` set with explicit notes marking old assumptions as superseded.
 
 ### Repository Audit Documentation
 
-`docs/repository-audit/**` appears to be an earlier audit set. The newer `docs/repository-organization-audit.md`, `docs/hosting-ignore-review.md`, `docs/generated-artifact-cleanup-plan.md`, and this plan should become the active cleanup planning package after review.
+`docs/archive/repository-audit-legacy/**` appears to be an earlier audit set. The newer `docs/repository-organization-audit.md`, `docs/hosting-ignore-review.md`, `docs/generated-artifact-cleanup-plan.md`, and this plan should become the active cleanup planning package after review.
 
 Recommended future consolidation:
 
 1. Keep `docs/repository-organization-audit.md` as the top-level current audit.
 2. Keep `docs/hosting-ignore-review.md` as the Hosting protection plan.
 3. Keep `docs/generated-artifact-cleanup-plan.md` as the Phase 2 cleanup checklist.
-4. Move or archive `docs/repository-audit/**` only after confirming no unique security/Firebase findings are missing from the current audit package.
+4. Move or archive `docs/archive/repository-audit-legacy/**` only after confirming no unique security/Firebase findings are missing from the current audit package.
 
 ### Root Documentation
 
@@ -78,9 +78,9 @@ Root `README.md` is useful but stale. It should eventually be updated to mention
 
 | Candidate | Action | Risk | Required verification |
 | --- | --- | --- | --- |
-| `docs/visit-submission-system/**` | Archive or merge selected still-useful design notes into `docs/visit-submissions/**`. | Medium. Could lose historical rationale if archived too aggressively. | Manual read-through by Visit Submission owner; confirm no current Firebase HTTP uploader details are missing from newer docs. |
+| `docs/archive/visit-submission-system-design-legacy/**` | Archive or merge selected still-useful design notes into `docs/visit-submissions/**`. | Medium. Could lose historical rationale if archived too aggressively. | Manual read-through by Visit Submission owner; confirm no current Firebase HTTP uploader details are missing from newer docs. |
 | `docs/visit-submissions/**` | Keep as-is. | Low. | Confirm it remains aligned with current Functions and frontend implementation after future code changes. |
-| `docs/repository-audit/**` | Archive after comparing unique findings with current audit package. | Low to medium. | Confirm no unique security or Firebase findings are lost. |
+| `docs/archive/repository-audit-legacy/**` | Archive after comparing unique findings with current audit package. | Low to medium. | Confirm no unique security or Firebase findings are lost. |
 | `docs/repository-organization-audit.md` | Keep as current source of truth. | Low. | Keep corrected when later cleanup phases change repository structure. |
 | `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` | Keep archived. | Low. | Confirm no future public URL or external reference expects it at root. |
 | `README.md` | Merge/update later. | Medium. | Update only in a separate documentation phase with accurate Firebase and internal-system setup notes. |

@@ -8,7 +8,7 @@ Scope:
 
 - Inspect existing project.
 - Recommend schema, permissions, upload/delete architecture, UI placement, and migration plan.
-- Create documentation only under `docs/visit-submission-system/`.
+- Create documentation only under `docs/archive/visit-submission-system-design-legacy/`.
 
 Out of scope:
 
