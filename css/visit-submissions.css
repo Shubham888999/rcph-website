@@ -58,7 +58,20 @@ body {
   flex-wrap: wrap;
   align-items: center;
 }
-
+.visit-topbar .visit-actions .btn {
+  width: 128px;
+  min-height: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
 .visit-actions.inline {
   margin-top: 16px;
 }

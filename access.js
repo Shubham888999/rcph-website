@@ -9,7 +9,7 @@ const els = {
   accessCards: document.getElementById('accessCards'),
   profileName: document.getElementById('profileName'),
   profileEmail: document.getElementById('profileEmail'),
-  roleChip: document.getElementById('roleChip'),
+  signedInAs: document.getElementById('signedInAs'),
   accessIntro: document.getElementById('accessIntro'),
   signOutBtn: document.getElementById('signOutBtn')
 };
@@ -23,7 +23,7 @@ const PANEL_DEFS = [
   {
     key: 'dashboard',
     title: 'My Member Dashboard',
-    description: 'View your attendance, upcoming events, avenue breakdowns and club-level stats.',
+    description: 'View your attendance, upcoming events and club-level stats.',
     href: 'my-dashboard.html',
     roles: ['prospect', 'gbm', 'bod', 'admin', 'president']
   },
@@ -48,13 +48,13 @@ const PANEL_DEFS = [
   {
     key: 'bod',
     title: 'BOD Event Manager',
-    description: 'Submit and review avenue event records..',
+    description: 'Submit and review avenue event records.',
     href: 'BOD%20Event%20manager/bodlogin.html',
     roles: ['bod', 'admin', 'president']
   },
   {
     key: 'visit-submissions',
-    title: 'Visit Submissions',
+    title: 'Club Visits',
     description: 'Prepare and manage documents for Club Assembly, DZR Visit, and DRR Visit.',
     href: 'visit-submissions.html',
     roles: ['bod', 'admin', 'president']
@@ -144,7 +144,7 @@ function renderHub(user, access, role) {
   const profile = access?.user || {};
   els.profileName.textContent = profile.name || user.displayName || user.email || 'RCPH Member';
   els.profileEmail.textContent = profile.email || user.email || '';
-  els.roleChip.textContent = roleLabel(role);
+  els.signedInAs.textContent = `Signed in as ${roleLabel(role)}`;
   els.accessIntro.textContent = role === 'prospect'
     ? 'Prospect account approved. Complete your onboarding steps to become an official RCPH member.'
     : `Approved ${roleLabel(role)} account. Choose an available panel.`;

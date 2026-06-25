@@ -48,7 +48,20 @@ body {
   flex-wrap: wrap;
   align-items: center;
 }
-
+.access-topbar .access-actions .btn {
+  width: 104px;
+  min-height: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
 .access-actions.inline {
   margin-top: 16px;
 }
@@ -77,18 +90,6 @@ body {
 @keyframes pulseDot {
   0%, 100% { transform: scale(0.8); opacity: 0.55; }
   50% { transform: scale(1.15); opacity: 1; }
-}
-
-.access-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(96,195,196,0.14);
-  color: #8fe9e7;
-  border: 1px solid rgba(96,195,196,0.45);
-  font-weight: 800;
 }
 
 .access-grid {

@@ -59,7 +59,6 @@ const imageUploader = document.getElementById('imageUploader');
 const loader = document.getElementById('loader');
 const loaderText = document.getElementById('loaderText');
 
-const whoami      = document.getElementById('whoami');
 const signOutBtn  = document.getElementById('signOutBtn');
 
 const form        = document.getElementById('bodEventForm');
@@ -102,7 +101,6 @@ let CURRENT_DISPLAY_NAME = '';
 
 // Lock UI helpers
 const lockBodEventsBtn   = document.getElementById('lockBodEventsBtn');
-const lockBodEventsState = document.getElementById('lockBodEventsState');
 
 function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
   return db.collection('locks').doc(panelKey).onSnapshot(snap => {
@@ -125,8 +123,7 @@ async function toggleLock(panelKey) {
   const cur = snap.exists && !!snap.data().locked;
 
   // optimistic UI
-  lockBodEventsState.textContent = cur ? 'Unlocked' : 'Locked';
-  lockBodEventsBtn.textContent   = cur ? '🔒' : '🔓';
+lockBodEventsBtn.textContent = cur ? '🔒' : '🔓';
 
   await ref.set({ locked: !cur }, { merge: true });
 }
@@ -607,11 +604,9 @@ if (goDZRBtn) {
       conductedByInput.value = signedInName;
       updateEventPreview();
     }
-    if (whoami) whoami.textContent = `Signed in as ${signedInName}`;
 
     // start the lock watcher *after* we know IS_PRESIDENT
-    watchLock('bodEvents', lockBodEventsBtn, lockBodEventsState, (locked) => {
-      BOD_EVENTS_LOCKED = !!locked;
+watchLock('bodEvents', lockBodEventsBtn, null, (locked) => {      BOD_EVENTS_LOCKED = !!locked;
       const disableForm = locked && !IS_PRESIDENT;
       document
         .querySelectorAll('#bodEventForm input, #bodEventForm select, #bodEventForm textarea, #bodEventForm button')
@@ -628,7 +623,6 @@ if (goDZRBtn) {
     await loadItems();
   } catch (err) {
     console.error('Initial BOD load failed:', err);
-    if (whoami) whoami.textContent = 'Signed in';
   }
 });
 

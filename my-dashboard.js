@@ -12,8 +12,6 @@ const els = {
   dashboardTitle: document.getElementById('dashboardTitle'),
   welcomeName: document.getElementById('welcomeName'),
   memberLinkNote: document.getElementById('memberLinkNote'),
-  roleChip: document.getElementById('roleChip'),
-  positionChip: document.getElementById('positionChip'),
   adminPanelBtn: document.getElementById('adminPanelBtn'),
   bodPanelBtn: document.getElementById('bodPanelBtn'),
   signOutBtn: document.getElementById('signOutBtn'),
@@ -62,6 +60,16 @@ function roleLabel(role) {
     president: 'President'
   };
   return labels[String(role || '').toLowerCase()] || 'Member';
+}
+
+function formatMemberHeading(name, position, role) {
+  const cleanName = String(name || 'Member')
+    .replace(/^Rtr\.\s*/i, '')
+    .trim();
+
+  const designation = String(position || roleLabel(role) || 'Member').trim();
+
+return `Rtr. ${cleanName} (${designation})`;
 }
 
 function avenueText(avenue) {
@@ -236,11 +244,11 @@ function renderMemberDashboard(data) {
   document.title = 'My RCPH Dashboard';
   els.dashboardTitle.textContent = 'My RCPH Dashboard';
   setDashboardMode(false);
-  els.welcomeName.textContent = `Welcome, ${displayName}`;
-  els.roleChip.textContent = roleLabel(profile.role);
-  els.positionChip.hidden = !position;
-  els.positionChip.textContent = position;
-
+els.welcomeName.textContent = formatMemberHeading(
+  displayName,
+  position,
+  profile.role
+);
   if (!profile.memberName) {
     els.memberLinkNote.textContent = 'Your profile is created, but attendance has not been linked yet. Please contact admin.';
   } else if (!my.totalCounted) {
@@ -304,10 +312,11 @@ function renderProspectDashboard(data) {
   document.title = 'My Dashboard';
   els.dashboardTitle.textContent = 'My Dashboard';
   setDashboardMode(true);
-  els.welcomeName.textContent = `Welcome, ${displayName}`;
-  els.roleChip.textContent = 'Prospect';
-  els.positionChip.hidden = true;
-  els.positionChip.setAttribute('hidden', '');
+els.welcomeName.textContent = formatMemberHeading(
+  displayName,
+  '',
+  profile.role || 'prospect'
+);
   els.memberLinkNote.textContent = 'You are currently a Prospect Member. Complete the onboarding criteria below to become an official RCPH member.';
   els.adminPanelBtn.hidden = true;
   els.bodPanelBtn.hidden = true;

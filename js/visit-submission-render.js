@@ -163,7 +163,7 @@ Select a visit to manage position folders and documents.
         <div class="visit-panel__head">
           <div>
             <h2>${escapeHtml(visit.displayTitle || 'Visit')}</h2>
-            <p class="visit-muted">${escapeHtml(visit.description || 'Position folders for this visit.')}</p>
+            <p class="visit-muted">${escapeHtml(visit.description || 'Folders for this visit.')}</p>
             ${dateLine('Visit date', visit.visitDate)}
             ${dateLine('Deadline', visit.submissionDeadline)}
           </div>
@@ -171,10 +171,7 @@ Select a visit to manage position folders and documents.
             ${access.canManage ? `<button class="btn btn-outline" type="button" data-manage-visit="${escapeHtml(visit.visitType)}">Visit settings</button>` : ''}
           </div>
         </div>
-        <div class="visit-status-banner ${closed ? 'is-warning' : ''}">
-          ${closed ? 'This visit is not currently open for all submissions.' : 'This visit is open according to the current backend configuration.'}
-          ${visit.instructions ? `<div>${escapeHtml(visit.instructions)}</div>` : ''}
-        </div>
+
         ${folders.length ? `
           <div class="visit-folder-grid">
             ${folders.map(folder => renderFolderCard(folder, access)).join('')}
