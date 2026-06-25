@@ -73,3 +73,59 @@ Likely redundant after approval and after retaining or externally archiving the 
 4. Confirm `firebase.json` Hosting ignore is updated to exclude `reports/**` and `*.zip` before the next deploy.
 5. Run `git status --short --ignored` to confirm only ignored generated report directories are being considered.
 6. Delete only after explicit approval, in a separate commit from any source-code or Firebase configuration changes.
+
+## Phase 2C Cleanup Completed
+
+Completion date: 2026-06-25.
+
+Deleted redundant ignored report directories:
+
+- `reports/multi-position-migration/2026-06-24_21-24-41`
+- `reports/multi-position-migration/2026-06-24_21-25-28`
+- `reports/multi-position-migration/2026-06-24_21-25-46`
+- `reports/multi-position-migration/2026-06-24_21-35-57`
+- `reports/multi-position-migration/2026-06-24_21-36-29`
+- `reports/riy-clean-slate/2026-06-24_22-04-19`
+- `reports/riy-clean-slate-executions/2026-06-24_22-57-04`
+- `reports/riy-clean-slate-executions/2026-06-24_22-59-19`
+- `reports/riy-clean-slate-executions/2026-06-24_23-14-05`
+- `reports/riy-clean-slate-executions/2026-06-24_23-16-32`
+- `reports/riy-clean-slate-manifests/2026-06-24_22-28-26`
+
+Retained report directories:
+
+- `reports/multi-position-migration/2026-06-24_21-45-59`
+- `reports/riy-clean-slate/2026-06-24_22-09-38`
+- `reports/riy-clean-slate-executions/2026-06-24_23-19-10`
+- `reports/riy-clean-slate-manifests/2026-06-24_22-40-17`
+
+Local archive location:
+
+- `.local-audit-archive/2026-06-24/`
+
+File-count comparison:
+
+| Retained source | Source files | Archive files | Bytes |
+| --- | ---: | ---: | ---: |
+| `reports/multi-position-migration/2026-06-24_21-45-59` | 10 | 10 | 65,392 |
+| `reports/riy-clean-slate/2026-06-24_22-09-38` | 8 | 8 | 142,415 |
+| `reports/riy-clean-slate-executions/2026-06-24_23-19-10` | 9 | 9 | 29,717 |
+| `reports/riy-clean-slate-manifests/2026-06-24_22-40-17` | 7 | 7 | 26,645 |
+| Total | 34 | 34 | 264,169 |
+
+Checksum result:
+
+- SHA-256 checksums were generated for every retained source file and copied archive file.
+- Checksum mismatches: 0.
+
+Disk space reclaimed:
+
+- Deleted files: 97.
+- Reclaimed bytes: 343,975.
+
+Confirmations:
+
+- `position-migration-report.zip` was untouched.
+- No source code changed.
+- No production operation, migration, clean-slate execution, deployment, package installation, staging, commit, or push occurred.
+- `_archive/**` and `functions/scripts/fixtures/**` were untouched.

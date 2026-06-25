@@ -83,6 +83,7 @@ reports/multi-position-migration/
 reports/riy-clean-slate/
 reports/riy-clean-slate-manifests/
 reports/riy-clean-slate-executions/
+.local-audit-archive/
 
 # Operating-system files
 .DS_Store
