@@ -53,7 +53,7 @@ Currently deployable unless blocked elsewhere:
 | --- | --- | --- |
 | `reports/**` | No | Ignored by Git, but not ignored by Hosting. Generated migration and clean-slate outputs may contain operational details and should not be served. |
 | `_archive/**` | Usually no | Archived old pages/assets are currently tracked and deployable. Keep locally, but do not serve unless there is an explicit public need. |
-| `PROJECT_CLEANUP_REPORT.md` | No | Root Markdown audit artifact is deployable because only `docs/**` is ignored. |
+| `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` | No | Archived Markdown audit artifact; protected by `docs/**` and `*.md`. |
 | `README.md` | Probably no | Repository documentation, not production site content. |
 | `position-migration-report.zip` | No | Root generated archive/report artifact is deployable. |
 | `firestore.rules` | No | Required at root for Firebase CLI, but should not be static Hosting content. |
@@ -76,7 +76,7 @@ Currently deployable unless blocked elsewhere:
 | `.firebase/**` | Covered by dotfile ignore. Keep ignored. | Low. Local Firebase cache only. |
 | `*.log` and Firebase debug logs | Already ignored. Keep ignored. | Low. Logs should not be served. |
 | Root generated archives such as `position-migration-report.zip` | Add `*.zip` or explicit file ignore. | Low. Confirm no public download is intended. |
-| Root repository Markdown such as `README.md` and `PROJECT_CLEANUP_REPORT.md` | Add `*.md` or explicit file ignores. | Low. Confirm `llms.txt` remains available; it is not Markdown and would not be affected by `*.md`. |
+| Root repository Markdown such as `README.md` | Add `*.md` or explicit file ignores. | Low. Confirm `llms.txt` remains available; it is not Markdown and would not be affected by `*.md`. |
 | Build and Firebase config files | Add explicit ignores for `postcss.config.js`, `tailwind.config.js`, `firestore.rules`, and `firestore.indexes.json`. | Low for Hosting. Firebase CLI still reads these files from the repository; Hosting ignore only affects static deploy contents. |
 
 ## Active Production Folders Not To Broadly Ignore

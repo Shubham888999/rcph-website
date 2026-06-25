@@ -18,9 +18,17 @@
     "docs/**",
     "scripts/**",
     "apps-script/**",
+    "reports/**",
+    "_archive/**",
     "*.log",
+    "*.md",
+    "*.zip",
     "package.json",
-    "package-lock.json"
+    "package-lock.json",
+    "postcss.config.js",
+    "tailwind.config.js",
+    "firestore.rules",
+    "firestore.indexes.json"
   ]
 }
 }

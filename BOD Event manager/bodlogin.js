@@ -251,8 +251,9 @@ function collaborationBlockHtml(eventData) {
         <div>
           <strong>Collaborators:</strong>
           <span class="collab-partners">
-            ${collaborators.map(c => `<span class="collab-chip">${escapeHtml(c.name)}</span>`).join('')}
-          </span>
+${collaborators
+  .map(c => `<span class="collab-name">${escapeHtml(c.name)}</span>`)
+  .join('<span class="collab-separator">•</span>')}          </span>
         </div>
       ` : ''}
     </div>
@@ -876,23 +877,55 @@ if (avFilter) {
       const canSync = IS_ADMIN || IS_PRESIDENT;
       const syncedId = r.syncedEventId || r.syncedMeetingId || r.syncedDistrictEventId || r.id;
       const canEditClubEvent = type === 'clubEvent';
-
-      const chips = (Array.isArray(r.avenue) ? r.avenue : (r.avenue ? [r.avenue] : []))
-        .map(av => `<span class="pill avenue-chip ${avenueClassName(av)}"><span class="avenue-dot" aria-hidden="true"></span>${String(av).toUpperCase()}</span>`)
-        .join(' ');
+const avenueText = (
+  Array.isArray(r.avenue)
+    ? r.avenue
+    : (r.avenue ? [r.avenue] : [])
+)
+  .map(av => `
+    <span class="event-highlight event-highlight--avenue ${avenueClassName(av)}">
+      ${escapeHtml(String(av).toUpperCase())}
+    </span>
+  `)
+  .join('<span class="event-highlight-separator">•</span>');
       
       return `
         <div class="card">
 ${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-lightbox-src="${imgUrl}">` : ''}
-          <div class="card__header">
-            <span class="chipset">${chips}</span>
-            <span class="sync-chip">${bodEventTypeLabel(type)}</span>
-            <span class="sync-chip">${visibility}</span>
-            <span class="sync-chip ${isSynced ? 'is-synced' : ''}">${syncLabel}</span>
-            <span class="timepill">${createdStr}</span>
-            <button class="iconbtn" data-edit="${r.id}" title="Edit">✏️</button>
-            <button class="iconbtn" data-del="${r.id}" title="Delete">🗑️</button>
-          </div>
+<div class="card__header">
+  <div class="event-card-highlights">
+    <span class="event-avenue-list">${avenueText}</span>
+
+    <span class="event-highlight-separator">•</span>
+
+    <span class="event-highlight event-highlight--type">
+      ${escapeHtml(bodEventTypeLabel(type))}
+    </span>
+
+    <span class="event-highlight-separator">•</span>
+
+    <span class="event-highlight event-highlight--visibility">
+      ${escapeHtml(visibility)}
+    </span>
+
+    <span class="event-highlight-separator">•</span>
+
+    <span class="event-highlight ${isSynced ? 'event-highlight--synced' : 'event-highlight--unsynced'}">
+      ${escapeHtml(syncLabel)}
+    </span>
+  </div>
+
+  <div class="event-card-tools">
+    ${createdStr ? `
+      <span class="event-created-time">
+        ${escapeHtml(createdStr)}
+      </span>
+    ` : ''}
+
+    <button class="iconbtn" data-edit="${r.id}" title="Edit" aria-label="Edit event">✏️</button>
+    <button class="iconbtn" data-del="${r.id}" title="Archive" aria-label="Archive event">🗑️</button>
+  </div>
+</div>
           <div class="card__title">${escapeHtml(r.name || '')}</div>
           <div class="card__meta">
             ${r.eventStart ? escapeHtml(r.eventStart) : ''}
@@ -904,8 +937,11 @@ ${imgUrl ? `<img src="${imgUrl}" class="card__image" alt="Event Preview" data-li
           ${collaborationBlockHtml(r)}
           <div class="card-actions">
             ${driveUrl ? `<a class="btn btn-outline" href="${driveUrl}" target="_blank">Open Drive folder</a>` : ''}
-            ${syncedId ? `<span class="pill">Event ID: ${escapeHtml(syncedId)}</span>` : ''}
-            ${canSync && !isSynced ? `<button class="btn btn-outline" data-sync="${r.id}">Sync to Attendance</button>` : ''}
+${syncedId ? `
+  <span class="event-id-text">
+    <strong>Event ID:</strong> ${escapeHtml(syncedId)}
+  </span>
+` : ''}            ${canSync && !isSynced ? `<button class="btn btn-outline" data-sync="${r.id}">Sync to Attendance</button>` : ''}
           </div>
         </div>
       `;

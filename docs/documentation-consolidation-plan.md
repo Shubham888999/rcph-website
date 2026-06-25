@@ -12,7 +12,7 @@ Reviewed groups:
 2. `docs/visit-submissions/**`
 3. `docs/repository-audit/**`
 4. `docs/repository-organization-audit.md`
-5. `PROJECT_CLEANUP_REPORT.md`
+5. `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
 6. Root `README.md`
 7. Other current domain documentation under `docs/multi-position-role-system/**`
 8. Other current domain documentation under `docs/riy-clean-slate/**`
@@ -27,7 +27,7 @@ Dependency `README.md` files under `node_modules/**` and `functions/node_modules
 | `docs/visit-submission-system/**` | Historical design documentation | Candidate for archive or merge after manual review. | README states it is phase 1 proposed BOD Visit Submission System documentation and references a recommended Apps Script structure. | Do not revive obsolete Apps Script Visit upload architecture. Useful as historical design context only. |
 | `docs/repository-audit/**` | Audit-only documentation | Candidate for merge into current repository organization audit or archive under `docs/archive/`. | Contains earlier file inventory, reference map, security audit, Firebase audit, cleanup candidates, and recommended structure. Some findings mention older working-tree artifacts that no longer appear. | Keep until the current audit and Phase 2A docs are accepted. |
 | `docs/repository-organization-audit.md` | Current authoritative repository organization audit | Keep as-is after Phase 2A correction. | Created from full repository inspection and now corrected for secretary image false positives and permanent vs temporary root retention. | Use as source of truth for future cleanup phases. |
-| `PROJECT_CLEANUP_REPORT.md` | Superseded documentation | Candidate for archive under `docs/archive/` after approval. | Generated 2026-05-26; includes older reference-map findings and mentions files/logs that were not found in the current pass. | Do not delete yet. It may preserve useful historical audit context. |
+| `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` | Superseded documentation | Keep archived. | Generated 2026-05-26; includes older reference-map findings and mentions files/logs that were not found in the current pass. | Do not delete yet. It may preserve useful historical audit context. |
 | Root `README.md` | Superseded or incomplete project overview | Candidate for merge/update, not deletion. | Describes the site as fully static/GitHub Pages hosted, while current repository includes Firebase Hosting, Firebase Functions, Firestore rules, internal systems, and Google Drive integration. | Keep until a replacement README accurately covers Firebase production architecture and safe local setup. |
 | `docs/multi-position-role-system/**` | Current/historical domain documentation | Keep as-is. | Covers assumptions, schema, approval UI, attendance impact, permissions, migration, test checklist, and dry-run guide for multi-position roles. | Relevant to roles, admin, attendance, BOD/Treasury behavior, and migration history. |
 | `docs/riy-clean-slate/**` | Current/historical operational documentation | Keep as-is. | Covers current state, preservation policy, preview, execution design, backup/manifest, approved policies, pre-execution, executor, and verification. | Relevant to clean-slate scripts and generated report interpretation. |
@@ -72,7 +72,7 @@ Root `README.md` is useful but stale. It should eventually be updated to mention
 - Access Hub, dashboards, admin, BOD Event Manager, Visit Submission, and Google Drive upload architecture
 - Local safety rules for `.env` files and ignored generated reports
 
-`PROJECT_CLEANUP_REPORT.md` should not remain at repository root long term. It is better suited for `docs/archive/` after approval because it is historical and not production content.
+`docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` is now archived under `docs/archive/` because it is historical and not production content.
 
 ## Candidate Actions
 
@@ -82,7 +82,7 @@ Root `README.md` is useful but stale. It should eventually be updated to mention
 | `docs/visit-submissions/**` | Keep as-is. | Low. | Confirm it remains aligned with current Functions and frontend implementation after future code changes. |
 | `docs/repository-audit/**` | Archive after comparing unique findings with current audit package. | Low to medium. | Confirm no unique security or Firebase findings are lost. |
 | `docs/repository-organization-audit.md` | Keep as current source of truth. | Low. | Keep corrected when later cleanup phases change repository structure. |
-| `PROJECT_CLEANUP_REPORT.md` | Archive under docs after approval. | Low. | Confirm no public URL or external reference expects it at root. |
+| `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` | Keep archived. | Low. | Confirm no future public URL or external reference expects it at root. |
 | `README.md` | Merge/update later. | Medium. | Update only in a separate documentation phase with accurate Firebase and internal-system setup notes. |
 | `docs/multi-position-role-system/**` | Keep as-is. | Low. | Revisit only after position migration work is complete. |
 | `docs/riy-clean-slate/**` | Keep as-is. | Low. | Revisit only after clean-slate operations and retention decisions are complete. |

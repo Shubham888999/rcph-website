@@ -1058,3 +1058,124 @@ body {
     flex: 1 1 150px;
   }
 }
+
+/* ===== Event card highlighted text instead of pills ===== */
+
+.card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.event-card-highlights {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.event-avenue-list {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.event-highlight {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #d8e2e4;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.event-highlight-separator {
+  color: rgba(212, 164, 55, 0.7);
+  font-size: 0.74rem;
+  line-height: 1;
+}
+
+.event-highlight--avenue {
+  color: #dffafa;
+  text-shadow: 0 0 13px rgba(96, 195, 196, 0.25);
+}
+
+.event-highlight--type {
+  color: #f1d481;
+}
+
+.event-highlight--visibility {
+  color: #cdd6d8;
+}
+
+.event-highlight--synced {
+  color: #8ee0aa;
+  text-shadow: 0 0 12px rgba(120, 217, 154, 0.18);
+}
+
+.event-highlight--unsynced {
+  color: #e2b96b;
+}
+
+.event-card-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.event-created-time {
+  color: #9facaf;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.event-id-text {
+  color: #9facaf;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.event-id-text strong {
+  color: #d8e2e4;
+}
+
+.collab-partners {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.collab-name {
+  color: #dffafa;
+  font-weight: 700;
+}
+
+.collab-separator {
+  color: rgba(212, 164, 55, 0.72);
+  font-size: 0.72rem;
+}
+.card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.card-actions .event-id-text {
+  margin-left: 2px;
+}

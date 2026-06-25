@@ -165,7 +165,7 @@ Unreferenced but may be intentionally retained:
 - `fragments/calendar.html`
 - `fragments/projects.html`
 - `_archive/*`
-- `PROJECT_CLEANUP_REPORT.md`
+- `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
 - `events/template.html`
 
 Do not remove any of these without owner confirmation or a second pass that checks external links and deployment history.

@@ -65,7 +65,7 @@ Do not delete `_archive/*`, `admin.js`, `router.js`, or `fragments/*.html` witho
 - Whether `admin.js` is definitely obsolete.
 - Whether `router.js` has any external/manual loader.
 - Whether `fragments/calendar.html` and `fragments/projects.html` are still part of a planned include workflow.
-- Whether `PROJECT_CLEANUP_REPORT.md` should remain at root or move under `docs/`.
+- Whether the archived `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` should be retained long term.
 - Whether Firebase Hosting should stay absent because GitHub Pages is the static host.
 - What real URLs should replace the DZR Drive and dashboard WhatsApp placeholders.
 

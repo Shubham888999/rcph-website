@@ -43,7 +43,7 @@ Important ignored local file:
 | `postcss.config.js` | Build config | PostCSS/Tailwind build pipeline. | Tracked | Used by CSS build scripts. | Active. |
 | `tailwind.config.js` | Build config | Tailwind content and theme config. | Tracked | Used by Tailwind build. | Active. |
 | `README.md` | Documentation | Project overview and GitHub Pages deployment notes. | Tracked | Human reference. | Active. |
-| `PROJECT_CLEANUP_REPORT.md` | Documentation | Older cleanup notes. | Tracked | Not runtime referenced. | Legacy documentation; retain or archive after review. |
+| `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` | Documentation | Older cleanup notes. | Tracked | Not runtime referenced. | Legacy documentation; retain or archive after review. |
 | `robots.txt` | Web metadata | Search crawler directives. | Tracked | Browser/crawler root file. | Active. |
 | `sitemap.xml` | Web metadata | Search engine sitemap. | Tracked | Browser/crawler root file. | Active. |
 | `site.webmanifest` | PWA/web metadata | Manifest and icons. | Tracked | Linked from public pages. | Active. |

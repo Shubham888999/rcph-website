@@ -57,7 +57,7 @@ False-positive missing reference notes:
 | `fragments/calendar.html` | No current loader found. | Could be source material for future static includes. | Confirm with owner. |
 | `fragments/projects.html` | No current loader found. | Could be source material for future static includes. | Confirm with owner. |
 | `_archive/*` | Explicit archive folder, no active references. | Archives can be intentionally retained. | Decide whether repo should keep archives or move them to external storage. |
-| `PROJECT_CLEANUP_REPORT.md` | Old cleanup documentation. | Could still be useful context. | Keep or move into `docs/` after review. |
+| `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md` | Old cleanup documentation. | Could still be useful context. | Keep or move into `docs/` after review. |
 | `events/template.html` | Template with placeholders and noindex. | Useful if event pages are still created manually. | Retain if template workflow is active; otherwise archive. |
 | `scripts/import-historical-events.js` | Manual service-account import script. | Useful but sensitive. | Keep with stronger README/dry-run instructions or move to private ops repo. |
 | `scripts/cleanup-users-keep-president.js` | Manual destructive script. | High-impact but may be needed. | Require explicit owner confirmation, add dry-run guard, or move out of app repo. |
