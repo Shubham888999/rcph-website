@@ -871,8 +871,8 @@ Preserve at minimum: `/`, `/access.html`, `/my-dashboard.html`, `/visit-submissi
 | `functions/.env` | Not tracked/ignored/local | High if real credentials or tokens; do not print contents | Keep ignored; confirm never committed; rotate if exposed |
 | `functions/.env.example` | Tracked | Low; example only if no real values | Keep sanitized example tracked |
 | `functions/.env.rcph-admin` | Not tracked/ignored/local | High if real credentials or tokens; do not print contents | Keep ignored; confirm never committed; rotate if exposed |
-| `images/secretary.png` | Tracked | High if real credentials or tokens; do not print contents | Keep ignored; confirm never committed; rotate if exposed |
-| `images/secretary.webp` | Tracked | High if real credentials or tokens; do not print contents | Keep ignored; confirm never committed; rotate if exposed |
+
+Correction: `images/secretary.png` and `images/secretary.webp` were filename false positives from the word "secretary." They are ordinary BOD image assets, not secret or credential files, and should not be modified, moved, archived, or deleted as part of secret cleanup.
 
 Confirmed ignore policy: `.gitignore` ignores `.env`, `functions/.env`, `functions/.env.*`, `serviceAccountKey.json`, `*.serviceAccountKey.json`, Firebase debug logs, logs, caches, dependencies, and generated report folders. It explicitly allows `functions/.env.example`.
 
@@ -952,6 +952,8 @@ firebase emulators:exec --only firestore,functions,hosting "node scripts/full-sm
 - Admin/BOD/Event Manager assets only with exact path and browser-flow updates.
 
 ### C. Should remain in the root
+
+#### Permanently required in root
 - `.firebaserc`
 - `.gitignore`
 - `404.html`
@@ -964,7 +966,6 @@ firebase emulators:exec --only firestore,functions,hosting "node scripts/full-sm
 - `dzrvisit.html`
 - `events.html`
 - `faq.html`
-- `firebase-init.js`
 - `firebase.json`
 - `firestore.indexes.json`
 - `firestore.rules`
@@ -973,20 +974,35 @@ firebase emulators:exec --only firestore,functions,hosting "node scripts/full-sm
 - `llms.txt`
 - `login.html`
 - `madhushala.html`
-- `mobile.css`
 - `my-dashboard.html`
 - `package-lock.json`
 - `package.json`
 - `postcss.config.js`
 - `projects.html`
 - `robots.txt`
-- `rotary_wheel.png`
-- `script.js`
 - `site.webmanifest`
 - `sitemap.xml`
-- `style.css`
 - `tailwind.config.js`
 - `visit-submissions.html`
+
+These files are root-required either because Firebase/Git/build tooling expects them there, because SEO/browser discovery expects a root URL, or because current root HTML pages have production URLs that must remain unchanged unless Firebase Hosting rewrites/redirects are introduced later.
+
+#### Temporarily retained in root
+- `style.css`
+- `mobile.css`
+- `script.js`
+- `firebase-init.js`
+- `router.js`
+- `access.css`
+- `access.js`
+- `my-dashboard.css`
+- `my-dashboard.js`
+- `admin.js`
+- `dzrvisit.js`
+- `madhushala.css`
+- `rotary_wheel.png`
+
+These active root assets are not permanently root-bound. They should stay in place for now because moving them requires coordinated reference updates and regression testing across public pages, Access Hub, dashboards, admin, Visit Submission, DZR Visit, BOD/Treasury workflows, and authentication redirects.
 
 ### D. Possible deletion candidates requiring manual approval
 - Ignored generated `reports/**` snapshots.
