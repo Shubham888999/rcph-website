@@ -114,10 +114,25 @@
   async function canCurrentUserInitialize() {
     try {
       const callable = firebase.functions().httpsCallable('getMyAccess');
-      const result = await callable({});
-      const role = String(result?.data?.user?.role || result?.data?.role?.role || '').toLowerCase();
-      const status = String(result?.data?.user?.status || result?.data?.role?.status || '').toLowerCase();
-      return status === 'approved' && (role === 'admin' || role === 'president');
+const result = await callable({});
+const accessData = result?.data || {};
+
+const roleData = accessData.role || null;
+const userData = accessData.user || null;
+
+const role = String(roleData?.role || '').toLowerCase();
+const roleStatus = String(roleData?.status || '').toLowerCase();
+const userStatus = String(userData?.status || '').toLowerCase();
+
+const hasPresidentAuthority =
+  accessData.authority?.hasPresidentAuthority === true;
+
+return roleStatus === 'approved'
+  && userStatus === 'approved'
+  && (
+    role === 'admin'
+    || hasPresidentAuthority
+  );
     } catch {
       return false;
     }

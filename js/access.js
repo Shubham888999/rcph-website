@@ -87,15 +87,10 @@ function roleLabel(role) {
 
 function getApprovedRole(access) {
   const roleDoc = access?.role || null;
-  const roleStatus = String(roleDoc?.status || 'approved').toLowerCase();
+  const roleStatus = String(roleDoc?.status || '').toLowerCase();
+
   if (roleDoc?.role && roleStatus === 'approved') {
     return String(roleDoc.role).toLowerCase();
-  }
-
-  const userDoc = access?.user || null;
-  const userStatus = String(userDoc?.status || '').toLowerCase();
-  if (userDoc?.role && userStatus === 'approved') {
-    return String(userDoc.role).toLowerCase();
   }
 
   return '';
@@ -112,14 +107,28 @@ function getAccountStatus(access) {
   return '';
 }
 
+function getAuthority(access, role) {
+  const authority = access?.authority || {};
+  return {
+    isPresidentRole: authority.isPresidentRole === true || role === 'president',
+    hasWebsiteDirectorPosition: authority.hasWebsiteDirectorPosition === true,
+    hasPresidentAuthority: authority.hasPresidentAuthority === true || role === 'president',
+  };
+}
+
+function canAccessPanel(panel, role, authority) {
+  return panel.roles.includes(role)
+    || (authority.hasPresidentAuthority && panel.roles.includes('president'));
+}
+
 function showMessage(title, message) {
   els.messageTitle.textContent = title;
   els.messageText.textContent = message;
   setState('message');
 }
 
-function renderCards(role) {
-  const allowed = PANEL_DEFS.filter(panel => panel.roles.includes(role));
+function renderCards(role, authority) {
+  const allowed = PANEL_DEFS.filter(panel => canAccessPanel(panel, role, authority));
   els.accessCards.innerHTML = allowed.map(panel => {
     const isProspectDashboard = role === 'prospect' && panel.key === 'dashboard';
     const title = isProspectDashboard ? 'My Dashboard' : panel.title;
@@ -141,6 +150,7 @@ function renderCards(role) {
 }
 
 function renderHub(user, access, role) {
+  const authority = getAuthority(access, role);
   const profile = access?.user || {};
   els.profileName.textContent = profile.name || user.displayName || user.email || 'RCPH Member';
   els.profileEmail.textContent = profile.email || user.email || '';
@@ -148,7 +158,7 @@ function renderHub(user, access, role) {
   els.accessIntro.textContent = role === 'prospect'
     ? 'Prospect account approved. Complete your onboarding steps to become an official RCPH member.'
     : `Approved ${roleLabel(role)} account. Choose an available panel.`;
-  renderCards(role);
+  renderCards(role, authority);
   setState('hub');
 }
 

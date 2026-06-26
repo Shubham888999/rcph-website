@@ -6,12 +6,19 @@ auth.onAuthStateChanged(async (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
 
   try {
-    const [roleSnap, userSnap] = await Promise.all([
+    const accessCallable = callableFunction('getMyAccess');
+    const [roleSnap, userSnap, accessResult] = await Promise.all([
       db.collection('roles').doc(user.uid).get(),
-      db.collection('users').doc(user.uid).get().catch(() => null)
+      db.collection('users').doc(user.uid).get().catch(() => null),
+      accessCallable({})
     ]);
 
     const roleData = roleSnap.exists ? roleSnap.data() : null;
+    const accessData = accessResult?.data || null;
+
+    if (!accessData) {
+      throw new Error('Trusted authority context could not be loaded.');
+    }
     const roleStatus = String(roleData?.status || 'approved').toLowerCase();
     const role = roleData && roleStatus === 'approved'
       ? String(roleData.role || '').toLowerCase()
@@ -28,20 +35,41 @@ auth.onAuthStateChanged(async (user) => {
       return;
     }
 
-    CURRENT_ROLE = role || '';
-    IS_PRESIDENT = (role === 'president');
-    IS_ADMIN = (role === 'admin' || role === 'president');
+    const trustedRoleData = accessData.role || null;
+    const trustedRoleStatus = String(
+      trustedRoleData?.status || ''
+    ).toLowerCase();
+
+    const trustedRole = trustedRoleStatus === 'approved'
+      ? String(trustedRoleData?.role || '').toLowerCase()
+      : '';
+
+    if (!trustedRole || trustedRole !== role) {
+      throw new Error(
+        'Role and trusted authority context do not match.'
+      );
+    }
+
+    CURRENT_ROLE = trustedRole;
+    IS_PRESIDENT = trustedRole === 'president';
+    HAS_PRESIDENT_AUTHORITY =
+      accessData.authority?.hasPresidentAuthority === true;
+    IS_ADMIN =
+      trustedRole === 'admin' || HAS_PRESIDENT_AUTHORITY;
     
     const goDZRBtn = document.getElementById('goDZRBtn');
     if (goDZRBtn) {
-        if (IS_PRESIDENT) {
+        if (HAS_PRESIDENT_AUTHORITY) {
             goDZRBtn.style.display = 'inline-block';
             goDZRBtn.onclick = () => location.href = 'dzrvisit.html';
         } else {
             goDZRBtn.style.display = 'none';
         }
     }
-    if (role === 'bod') {
+    if (
+      trustedRole === 'bod'
+      && !HAS_PRESIDENT_AUTHORITY
+    ) {
       window.location.href = 'BOD%20Event%20manager/bodlogin.html';
       return;
     }
@@ -67,7 +95,7 @@ function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
     const locked = snap.exists && !!snap.data().locked;
     if (badgeEl) badgeEl.textContent = locked ? 'Locked' : 'Unlocked';
     if (btnEl) {
-      btnEl.disabled = !IS_PRESIDENT;           
+      btnEl.disabled = !HAS_PRESIDENT_AUTHORITY;
       btnEl.textContent = locked ? '🔓' : '🔒'; 
     }
     onLockedChange?.(locked);
@@ -98,7 +126,7 @@ function startLockWatchers() {
 }
 
 async function toggleLock(panelKey) {
-  if (!IS_PRESIDENT) return; 
+  if (!HAS_PRESIDENT_AUTHORITY) return;
   const ref = db.collection('locks').doc(panelKey);
   const snap = await ref.get();
   const cur = snap.exists && !!snap.data().locked;
@@ -122,7 +150,11 @@ function accountFunction(name) {
   return callableFunction(name);
 }
 
-const ACCOUNT_ASSIGNABLE_ROLES = ['gbm', 'bod', 'admin', 'president'];
+function accountAssignableRoles() {
+  return HAS_PRESIDENT_AUTHORITY
+    ? ['gbm', 'bod', 'admin', 'president']
+    : ['gbm', 'bod', 'admin'];
+}
 let pendingJointSubmission = null;
 
 function attachUserRequestListener() {
@@ -141,11 +173,34 @@ function attachUserRequestListener() {
 
 function accountRoleOptions(selectedRole) {
   const selected = String(selectedRole || '').toLowerCase();
-  return ACCOUNT_ASSIGNABLE_ROLES.map(role => (
-    `<option value="${role}" ${role === selected ? 'selected' : ''}>${roleLabel(role)}</option>`
+  const roles = accountAssignableRoles();
+
+  // An ordinary Admin may see an existing President account,
+  // but cannot assign the President role.
+  if (
+    selected === 'president'
+    && !roles.includes('president')
+  ) {
+    roles.push('president');
+  }
+
+  return roles.map(role => (
+    `<option
+      value="${role}"
+      ${role === selected ? 'selected' : ''}
+      ${
+        role === 'president'
+        && !HAS_PRESIDENT_AUTHORITY
+          ? 'disabled'
+          : ''
+      }
+    >${roleLabel(role)}</option>`
   )).join('');
 }
-
+function isProtectedPresidentAccount(role) {
+  return role === 'president'
+    && !HAS_PRESIDENT_AUTHORITY;
+}
 function accountRoleValue(user, fallbackRole) {
   return String(user.role || fallbackRole || user.requestedRole || 'gbm').toLowerCase();
 }
@@ -313,7 +368,12 @@ function accountPositionControl(user, role, options = {}) {
 }
 
 function accountApprovalActions(user, requested) {
-  const role = ACCOUNT_ASSIGNABLE_ROLES.includes(requested) ? requested : 'gbm';
+  const allowedRoles = accountAssignableRoles();
+
+  const role = allowedRoles.includes(requested)
+    ? requested
+    : 'gbm';
+
   return `
     <div class="account-access-editor" data-account-editor="${escapeHtml(user.id)}" data-account-mode="approval">
       <div class="account-access-editor__row">
@@ -336,26 +396,72 @@ function accountApprovalActions(user, requested) {
 }
 
 function accountMaintenanceActions(user) {
-  const role = ACCOUNT_ASSIGNABLE_ROLES.includes(accountRoleValue(user)) ? accountRoleValue(user) : 'gbm';
+  const currentRole = accountRoleValue(user);
+  const allowedRoles = accountAssignableRoles();
+
+  const role = allowedRoles.includes(currentRole)
+    ? currentRole
+    : (
+      currentRole === 'president'
+        ? 'president'
+        : 'gbm'
+    );
+
+  const protectedPresident =
+    isProtectedPresidentAccount(role);
+
   return `
-    <div class="account-access-editor" data-account-editor="${escapeHtml(user.id)}" data-account-mode="maintenance">
+    <div
+      class="account-access-editor"
+      data-account-editor="${escapeHtml(user.id)}"
+      data-account-mode="maintenance"
+    >
       <div class="account-access-editor__row">
         <label class="account-access-editor__role">
           <span>Access role</span>
-          <select data-account-role="${escapeHtml(user.id)}" aria-label="Access role for ${escapeHtml(user.name || user.email || 'user')}">
+          <select
+            data-account-role="${escapeHtml(user.id)}"
+            aria-label="Access role for ${escapeHtml(
+              user.name || user.email || 'user'
+            )}"
+            ${protectedPresident ? 'disabled' : ''}
+          >
             ${accountRoleOptions(role)}
           </select>
         </label>
-        ${accountPositionControl(user, role, { defaultPresident: false })}
+
+        ${accountPositionControl(
+          user,
+          role,
+          { defaultPresident: false }
+        )}
       </div>
-      <p class="account-access-editor__message" data-account-message="${escapeHtml(user.id)}" role="alert"></p>
+
+      ${
+        protectedPresident
+          ? `<p class="account-access-editor__message">
+              President authority is required to modify this account.
+            </p>`
+          : `<p
+              class="account-access-editor__message"
+              data-account-message="${escapeHtml(user.id)}"
+              role="alert"
+            ></p>`
+      }
+
       <div class="account-access-editor__actions">
-        <button class="btn" type="button" data-account-save="${escapeHtml(user.id)}">Save access</button>
+        <button
+          class="btn"
+          type="button"
+          data-account-save="${escapeHtml(user.id)}"
+          ${protectedPresident ? 'disabled' : ''}
+        >
+          Save access
+        </button>
       </div>
     </div>
   `;
 }
-
 function accountElementByData(attributeName, uid) {
   return Array.from(document.querySelectorAll(`[${attributeName}]`))
     .find(el => el.getAttribute(attributeName) === uid);

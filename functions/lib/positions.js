@@ -248,6 +248,7 @@ const POSITION_KEYS = Object.freeze(
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((definition) => definition.key)
 );
+const WEBSITE_DIRECTOR_POSITION_KEY = 'cwd';
 
 const SORT_ORDER_BY_KEY = POSITION_KEYS.reduce((map, key, index) => {
   map[key] = POSITION_CATALOG[key].sortOrder || index + 1;
@@ -326,6 +327,12 @@ function getPositionDefinition(key) {
   return cloneDefinition(POSITION_CATALOG[normalizedKey]);
 }
 
+function isActivePositionKey(key) {
+  const normalizedKey = normalizePositionKey(key);
+  const definition = normalizedKey ? POSITION_CATALOG[normalizedKey] : null;
+  return !!definition && definition.active === true;
+}
+
 function derivePositionMetadata(positionKeys) {
   const normalized = normalizePositionKeys(positionKeys);
   const inactiveKeys = [];
@@ -352,6 +359,27 @@ function derivePositionMetadata(positionKeys) {
   if (inactiveKeys.length) result.inactiveKeys = inactiveKeys;
 
   return result;
+}
+
+function hasWebsiteDirectorPosition(positionKeys) {
+  const metadata = derivePositionMetadata(positionKeys);
+  return metadata.positionKeys.includes(WEBSITE_DIRECTOR_POSITION_KEY)
+    && !(metadata.unknownValues && metadata.unknownValues.length)
+    && !(metadata.inactiveKeys && metadata.inactiveKeys.length);
+}
+
+function buildPresidentAuthority(role, positionKeys) {
+  const normalizedRole = normalizeRole(role);
+  const positionCapableRole = normalizedRole === 'bod'
+    || normalizedRole === 'admin'
+    || normalizedRole === 'president';
+  const isPresidentRole = normalizedRole === 'president';
+  const hasWebsiteDirector = positionCapableRole && hasWebsiteDirectorPosition(positionKeys);
+  return {
+    isPresidentRole,
+    hasWebsiteDirectorPosition: hasWebsiteDirector,
+    hasPresidentAuthority: isPresidentRole || hasWebsiteDirector,
+  };
 }
 
 function normalizeRole(role) {
@@ -503,10 +531,14 @@ module.exports = {
   POSITION_CATALOG,
   POSITION_KEYS,
   POSITION_GROUPS,
+  WEBSITE_DIRECTOR_POSITION_KEY,
   normalizePositionKey,
   normalizePositionKeys,
   getPositionDefinition,
+  isActivePositionKey,
   derivePositionMetadata,
+  hasWebsiteDirectorPosition,
+  buildPresidentAuthority,
   validateRolePositionCombination,
   resolvePositionKeysFromRecords,
 };

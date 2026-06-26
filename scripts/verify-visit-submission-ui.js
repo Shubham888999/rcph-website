@@ -110,6 +110,7 @@ assert(!/formData\.append\('action', 'uploadVisitSubmissionFile'\)/.test(sources
 assert(!/DRIVE_UPLOAD_SHARED_SECRET|private_key|service-account|OAuth token|client_secret/i.test(combinedVisitJs + sources['visit-submissions.html'] + sources['js/runtime-config.js']), 'No shared secret appears in frontend source.');
 assert(!/firebase deploy|functions:deploy|deploy --/.test(combinedVisitJs), 'No deploy command introduced.');
 assert(!/localStorage/.test(combinedVisitJs), 'No direct role authorization from localStorage.');
+assert(/authority\?\.hasPresidentAuthority/.test(sources['js/visit-submissions.js']), 'Visit UI uses getMyAccess President authority.');
 assert(sources['js/access.js'].includes('visit-submissions.html'), 'Access Hub links to Visit Submissions.');
 assert(/roles:\s*\['bod', 'admin', 'president'\]/.test(sources['js/access.js']), 'Access Hub Visit card is limited to BOD/Admin/President.');
 assert(!/visit-submissions[^\n]+roles:\s*\[[^\]]*(gbm|prospect)/i.test(sources['js/access.js']), 'Access Hub Visit card excludes GBM/prospect.');

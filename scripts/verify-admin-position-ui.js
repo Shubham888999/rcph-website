@@ -26,6 +26,14 @@ test('search by avenue code works', () => {
   assert.deepStrictEqual(results.map(item => item.key), ['wrwc']);
 });
 
+test('Website Director remains a distinct active position', () => {
+  const websiteDirector = positions.POSITION_CATALOG.find(item => item.key === 'cwd');
+  assert(websiteDirector, 'cwd exists in frontend catalog');
+  assert.strictEqual(websiteDirector.displayTitle, 'Website Director');
+  assert.strictEqual(websiteDirector.active, true);
+  assert(!positions.formatPositionSummary(['cwd']).includes('President'));
+});
+
 test('selected keys are deduplicated', () => {
   assert.deepStrictEqual(
     positions.sortPositionKeys(['rrro', 'secretary', 'rrro']),

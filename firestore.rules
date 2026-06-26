@@ -10,6 +10,14 @@ service cloud.firestore {
       return /databases/$(database)/documents/roles/$(request.auth.uid);
     }
 
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function websiteDirectorOccupancyPath() {
+      return /databases/$(database)/documents/bodPositionOccupancy/cwd;
+    }
+
     function hasRole(role) {
       return signedIn()
         && exists(rolePath())
@@ -17,12 +25,36 @@ service cloud.firestore {
         && get(rolePath()).data.get('status', 'approved') == 'approved';
     }
 
-    function isPresident() {
+    function hasAnyRole(roles) {
+      return signedIn()
+        && exists(rolePath())
+        && get(rolePath()).data.role in roles
+        && get(rolePath()).data.get('status', 'approved') == 'approved';
+    }
+
+    function isPresidentRole() {
       return hasRole('president');
     }
 
+    function hasWebsiteDirectorPosition() {
+      return signedIn()
+        && hasAnyRole(['bod', 'admin', 'president'])
+        && exists(userPath())
+        && get(userPath()).data.get('status', '') == 'approved'
+        && get(userPath()).data.get('active', true) != false
+        && get(userPath()).data.get('positionKeys', []).hasAny(['cwd'])
+        && exists(websiteDirectorOccupancyPath())
+        && get(websiteDirectorOccupancyPath()).data.positionKey == 'cwd'
+        && get(websiteDirectorOccupancyPath()).data.active == true
+        && get(websiteDirectorOccupancyPath()).data.get('holderUids', []).hasAny([request.auth.uid]);
+    }
+
+    function hasPresidentAuthority() {
+      return isPresidentRole() || hasWebsiteDirectorPosition();
+    }
+
     function isAdmin() {
-      return hasRole('admin') || isPresident();
+      return hasRole('admin') || hasPresidentAuthority();
     }
 
     function isApprovedBod() {
@@ -140,7 +172,7 @@ service cloud.firestore {
 
     match /locks/{panelId} {
       allow read: if signedIn();
-      allow create, update, delete: if isPresident();
+      allow create, update, delete: if hasPresidentAuthority();
     }
 
     match /passwordResets/{resetId} {

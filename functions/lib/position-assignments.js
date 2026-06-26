@@ -442,13 +442,14 @@ function createPositionAssignmentService(deps) {
     const targetUid = toSafeText(options?.targetUid, 128);
     const actorUid = toSafeText(options?.actorUid, 128);
     const actorRole = normalizeRoleValue(options?.actorRole);
+    const actorHasPresidentAuthority = options?.actorHasPresidentAuthority === true || actorRole === 'president';
     const role = normalizeRoleValue(options?.role);
     const operationSource = toSafeText(options?.operationSource, 80);
 
     if (!targetUid || targetUid.includes('/') || !actorUid || actorUid.includes('/')) {
       throwSyncError('invalid-argument', 'Valid actor and target users are required.');
     }
-    if (actorRole !== 'admin' && actorRole !== 'president') {
+    if (actorRole !== 'admin' && actorRole !== 'president' && !actorHasPresidentAuthority) {
       throwSyncError('permission-denied', 'Admin or president access required.');
     }
     if (!MANAGEABLE_ROLES.has(role)) {
@@ -568,6 +569,64 @@ function createPositionAssignmentService(deps) {
       }
       if (!plan.ok) throwFromPlan(plan);
 
+      const oldRole = normalizeRoleValue(roleData.role || userData.role);
+
+      const websiteDirectorKey =
+        positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY;
+
+      const changesWebsiteDirector =
+        websiteDirectorKey
+        && (
+          plan.addedPositionKeys.includes(websiteDirectorKey)
+          || plan.removedPositionKeys.includes(websiteDirectorKey)
+        );
+
+      if (
+        changesWebsiteDirector
+        && !actorHasPresidentAuthority
+      ) {
+        throwSyncError(
+          'permission-denied',
+          'President authority is required to assign or remove Website Director.'
+        );
+      }
+
+      if (
+        changesWebsiteDirector
+        && targetUid === actorUid
+        && actorRole !== 'president'
+      ) {
+        throwSyncError(
+          'permission-denied',
+          'Only the President role may change its own Website Director assignment.'
+        );
+      }
+
+      const changesPresidentRole =
+        oldRole === 'president'
+        || plan.role === 'president';
+
+      if (
+        changesPresidentRole
+        && !actorHasPresidentAuthority
+      ) {
+        throwSyncError(
+          'permission-denied',
+          'President authority is required to assign or remove the President role.'
+        );
+      }
+
+      if (
+        changesPresidentRole
+        && targetUid === actorUid
+        && actorRole !== 'president'
+      ) {
+        throwSyncError(
+          'permission-denied',
+          'Only the President role may change its own President role assignment.'
+        );
+      }
+
       const assignmentRefsByKey = {};
       const assignmentSnaps = await Promise.all(plan.affectedPositionKeys.map(positionKey => {
         const ref = db.collection('bodPositionAssignments').doc(assignmentIdFor(positionKey, targetUid));
@@ -580,7 +639,6 @@ function createPositionAssignmentService(deps) {
       });
 
       const profile = profileFromRecords(targetUid, userData, memberData, bodMemberData);
-      const oldRole = normalizeRoleValue(roleData.role || userData.role);
       const userPayload = buildUserPositionPayload({
         role: plan.role,
         metadata: plan.metadata,

@@ -258,8 +258,9 @@ els.welcomeName.textContent = formatMemberHeading(
   }
 
   const role = String(profile.role || '').toLowerCase();
-  els.adminPanelBtn.hidden = !(role === 'admin' || role === 'president');
-  els.bodPanelBtn.hidden = !(role === 'bod' || role === 'admin' || role === 'president');
+  const hasPresidentAuthority = profile.authority?.hasPresidentAuthority === true || role === 'president';
+  els.adminPanelBtn.hidden = !(role === 'admin' || hasPresidentAuthority);
+  els.bodPanelBtn.hidden = !(role === 'bod' || role === 'admin' || hasPresidentAuthority);
 
   els.kpiAttendance.textContent = `${my.percentage || 0}%`;
   els.kpiPresent.textContent = Number(my.present || 0);

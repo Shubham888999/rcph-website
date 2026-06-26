@@ -82,15 +82,45 @@ auth.onAuthStateChanged(async (user) => {
   try {
     const snap = await db.collection('roles').doc(user.uid).get();
     const role = snap.exists ? String(snap.data().role || '').toLowerCase() : '';
+const accessResult = await firebase.functions()
+  .httpsCallable('getMyAccess')({});
+
+const accessData = accessResult?.data || null;
+
+if (!accessData) {
+  throw new Error('Trusted authority context could not be loaded.');
+}
+
+const trustedRoleData = accessData.role || null;
+const trustedRoleStatus = String(
+  trustedRoleData?.status || ''
+).toLowerCase();
+
+const trustedRole = trustedRoleStatus === 'approved'
+  ? String(trustedRoleData?.role || '').toLowerCase()
+  : '';
+
+if (!trustedRole || trustedRole !== role) {
+  throw new Error(
+    'Role and trusted authority context do not match.'
+  );
+}
+
+const hasPresidentAuthority =
+  accessData.authority?.hasPresidentAuthority === true;
 
     const goAdminBtn = document.getElementById('goAdminBtn');
     const goBodBtn   = document.getElementById('goBodBtn');
 
     // Allow only dzr / president / admin
-    if (role === 'dzr' || role === 'president' || role === 'admin') {
-
+if (
+  trustedRole === 'dzr'
+  || trustedRole === 'president'
+  || trustedRole === 'admin'
+  || hasPresidentAuthority
+) {
       // Navigation buttons: only president gets cross-panel jumps
-      if (role === 'president') {
+      if (hasPresidentAuthority) {
         if (goAdminBtn) {
           goAdminBtn.style.display = 'inline-block';
           goAdminBtn.onclick = () => location.href = 'admin.html';
@@ -111,8 +141,10 @@ auth.onAuthStateChanged(async (user) => {
     }
 
     // ❌ Any other role is not allowed here
-    if (role === 'bod') {
-      location.href = 'BOD%20Event%20manager/bodlogin.html';
+if (
+  trustedRole === 'bod'
+  && !hasPresidentAuthority
+) {      location.href = 'BOD%20Event%20manager/bodlogin.html';
     } else {
       location.href = 'login.html';
     }

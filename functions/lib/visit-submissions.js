@@ -362,6 +362,7 @@ function resolveAccessContextFromRecords(uid, records, positionHelpers = default
   const userData = records?.user || null;
   const roleData = records?.role || null;
   const bodMemberData = records?.bodMember || null;
+  const websiteDirectorAssignment = records?.websiteDirectorAssignment || null;
   if (!userData) {
     throw makeVisitSubmissionError('permission-denied', 'Approved Visit Submission access required.');
   }
@@ -379,17 +380,36 @@ function resolveAccessContextFromRecords(uid, records, positionHelpers = default
     throw makeVisitSubmissionError('permission-denied', 'Approved Visit Submission access required.');
   }
 
-  if (roleData) {
-    if (roleDocRole !== userRole) {
-      throw makeVisitSubmissionError('failed-precondition', 'User role and role document do not match.');
-    }
-    if (roleStatus !== 'approved') {
-      throw makeVisitSubmissionError('permission-denied', 'Approved Visit Submission access required.');
-    }
+  if (!roleData) {
+    throw makeVisitSubmissionError(
+      'permission-denied',
+      'Approved Visit Submission access required.'
+    );
+  }
+
+  if (roleDocRole !== userRole) {
+    throw makeVisitSubmissionError(
+      'failed-precondition',
+      'User role and role document do not match.'
+    );
+  }
+
+  if (roleStatus !== 'approved') {
+    throw makeVisitSubmissionError(
+      'permission-denied',
+      'Approved Visit Submission access required.'
+    );
   }
 
   const positionResolution = resolvePositionKeysFromIdentity(userData, bodMemberData, uid, positionHelpers);
-  const isManager = VISIT_ADMIN_ROLE_SET.has(userRole);
+  const positionAuthority = positionHelpers.buildPresidentAuthority(userRole, positionResolution.positionKeys);
+  const hasActiveWebsiteDirectorAssignment = websiteDirectorAssignment
+    && websiteDirectorAssignment.active === true
+    && websiteDirectorAssignment.uid === uid
+    && websiteDirectorAssignment.positionKey === positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY;
+  const hasPresidentAuthority = positionAuthority.isPresidentRole
+    || (positionAuthority.hasWebsiteDirectorPosition && hasActiveWebsiteDirectorAssignment);
+  const isManager = VISIT_ADMIN_ROLE_SET.has(userRole) || hasPresidentAuthority;
   const canAccessVisitSystem = isManager || (userRole === 'bod' && positionResolution.positionKeys.length > 0);
 
   if (!canAccessVisitSystem) {
@@ -403,6 +423,11 @@ function resolveAccessContextFromRecords(uid, records, positionHelpers = default
     positionKeys: positionResolution.positionKeys.slice(),
     positionSource: positionResolution.source,
     positionWarnings: positionResolution.warnings.slice(),
+    authority: {
+      isPresidentRole: positionAuthority.isPresidentRole,
+      hasWebsiteDirectorPosition: positionAuthority.hasWebsiteDirectorPosition && hasActiveWebsiteDirectorAssignment,
+      hasPresidentAuthority,
+    },
     isApproved: true,
     canAccessVisitSystem,
     canManageVisitSystem: isManager,
@@ -926,15 +951,17 @@ function createVisitSubmissionService(options) {
 
   async function resolveAccessContext(uid) {
     if (!uid) throw makeVisitSubmissionError('unauthenticated', 'Sign in required.');
-    const [userSnap, roleSnap, bodMemberSnap] = await Promise.all([
+    const [userSnap, roleSnap, bodMemberSnap, cwdAssignmentSnap] = await Promise.all([
       adapter.getDoc('users', uid),
       adapter.getDoc('roles', uid),
       adapter.getDoc('bodMembers', uid),
+      adapter.getDoc('bodPositionAssignments', `${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`),
     ]);
     return resolveAccessContextFromRecords(uid, {
       user: userSnap.exists ? userSnap.data : null,
       role: roleSnap.exists ? roleSnap.data : null,
       bodMember: bodMemberSnap.exists ? bodMemberSnap.data : null,
+      websiteDirectorAssignment: cwdAssignmentSnap.exists ? cwdAssignmentSnap.data : null,
     }, positionHelpers);
   }
 

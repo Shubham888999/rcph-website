@@ -295,6 +295,7 @@ let unsubUsers = null;
 
 let IS_PRESIDENT = false;
 let IS_ADMIN = false;
+let HAS_PRESIDENT_AUTHORITY = false;
 let CURRENT_ROLE = '';
 
 

@@ -10,6 +10,8 @@ const {
   derivePositionMetadata,
   validateRolePositionCombination,
   resolvePositionKeysFromRecords,
+  buildPresidentAuthority,
+  WEBSITE_DIRECTOR_POSITION_KEY,
 } = require('../lib/positions');
 
 function assertDeepEqual(actual, expected, message) {
@@ -84,6 +86,14 @@ assertEqual(validateRolePositionCombination('president', []).ok, true, 'presiden
 assertEqual(validateRolePositionCombination('gbm', ['secretary']).ok, false, 'gbm with positions should fail');
 assertEqual(validateRolePositionCombination('unknown-role', []).ok, false, 'unknown role should fail');
 assertEqual(validateRolePositionCombination('bod', ['unknown']).code, 'unknown-position', 'unknown positions should fail validation');
+assertEqual(WEBSITE_DIRECTOR_POSITION_KEY, 'cwd', 'Website Director authority key should be cwd');
+assertEqual(buildPresidentAuthority('president', []).hasPresidentAuthority, true, 'President role has President authority');
+assertEqual(buildPresidentAuthority('admin', ['cwd']).hasPresidentAuthority, true, 'Admin plus cwd has President authority');
+assertEqual(buildPresidentAuthority('bod', ['cwd']).hasPresidentAuthority, true, 'BOD plus cwd has President authority');
+assertEqual(buildPresidentAuthority('admin', []).hasPresidentAuthority, false, 'Admin without cwd has no President authority');
+assertEqual(buildPresidentAuthority('bod', ['secretary']).hasPresidentAuthority, false, 'BOD without cwd has no President authority');
+assertEqual(buildPresidentAuthority('gbm', ['cwd']).hasPresidentAuthority, false, 'GBM cannot gain President authority from cwd-like data');
+assertDeepEqual(derivePositionMetadata(['cwd']).positionTitles, ['Website Director'], 'cwd displays as Website Director');
 
 assertDeepEqual(
   resolvePositionKeysFromRecords({

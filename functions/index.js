@@ -401,28 +401,107 @@ async function getActiveRole(uid) {
   return { role, data };
 }
 
-async function assertAdminOrPresident(uid) {
-  const active = await getActiveRole(uid);
-  if (!active || (active.role !== 'admin' && active.role !== 'president')) {
-    throw new HttpsError('permission-denied', 'Admin or president access required.');
-  }
-  return active.role;
+function isApprovedActiveUserRecord(data) {
+  return data
+    && String(data.status || '').toLowerCase() === 'approved'
+    && data.active !== false;
 }
 
-async function assertPresident(uid) {
-  const active = await getActiveRole(uid);
-  if (!active || active.role !== 'president') {
-    throw new HttpsError('permission-denied', 'President access required.');
+function isActiveWebsiteDirectorAssignment(uid, snap) {
+  if (!snap || !snap.exists) return false;
+  const data = snap.data() || {};
+  return data.active === true
+    && data.uid === uid
+    && data.positionKey === positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY;
+}
+
+async function getAuthorityContext(uid, preloaded = {}) {
+  const active = preloaded.activeRole || await getActiveRole(uid);
+  const base = {
+    uid,
+    role: active?.role || '',
+    status: active ? 'approved' : '',
+    positionKeys: [],
+    positionSource: null,
+    authority: {
+      isPresidentRole: active?.role === 'president',
+      hasWebsiteDirectorPosition: false,
+      hasPresidentAuthority: active?.role === 'president',
+    },
+  };
+
+  if (!active) return base;
+
+  const cwdDefinition = positionHelpers.getPositionDefinition(positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY);
+  const canHoldWebsiteDirectorAuthority = ['bod', 'admin', 'president'].includes(active.role)
+    && cwdDefinition?.active === true;
+
+  if (!canHoldWebsiteDirectorAuthority && active.role !== 'president') return base;
+
+  const userSnap = preloaded.userSnap || await db.collection('users').doc(uid).get();
+  const userData = userSnap.exists ? (userSnap.data() || {}) : null;
+  const resolved = positionHelpers.resolvePositionKeysFromRecords({
+    users: userData,
+    roles: active.data,
+  });
+  const metadata = positionHelpers.derivePositionMetadata(resolved.positionKeys);
+  const positionKeysAreWellFormed = !(metadata.unknownValues && metadata.unknownValues.length)
+    && !(metadata.inactiveKeys && metadata.inactiveKeys.length);
+
+  let hasWebsiteDirectorPosition = false;
+  if (
+    canHoldWebsiteDirectorAuthority
+    && isApprovedActiveUserRecord(userData)
+    && positionKeysAreWellFormed
+    && metadata.positionKeys.includes(positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY)
+  ) {
+    const assignmentSnap = preloaded.cwdAssignmentSnap
+      || await db.collection('bodPositionAssignments').doc(`${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`).get();
+    hasWebsiteDirectorPosition = isActiveWebsiteDirectorAssignment(uid, assignmentSnap);
   }
-  return active.role;
+
+  return {
+    ...base,
+    positionKeys: metadata.positionKeys.slice(),
+    positionSource: resolved.source,
+    authority: {
+      isPresidentRole: active.role === 'president',
+      hasWebsiteDirectorPosition,
+      hasPresidentAuthority: active.role === 'president' || hasWebsiteDirectorPosition,
+    },
+  };
+}
+
+async function assertAdminOrPresident(uid) {
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || (authority.role !== 'admin' && !authority.authority.hasPresidentAuthority)) {
+    throw new HttpsError('permission-denied', 'Admin or president access required.');
+  }
+  return authority.role;
+}
+
+async function assertAdminOrPresidentAuthority(uid) {
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || (authority.role !== 'admin' && !authority.authority.hasPresidentAuthority)) {
+    throw new HttpsError('permission-denied', 'Admin or president access required.');
+  }
+  return authority;
+}
+
+async function assertPresidentAuthority(uid) {
+  const authority = await getAuthorityContext(uid);
+  if (!authority.authority.hasPresidentAuthority) {
+    throw new HttpsError('permission-denied', 'President authority required.');
+  }
+  return authority;
 }
 
 async function assertBodAdminOrPresident(uid) {
-  const active = await getActiveRole(uid);
-  if (!active || !['bod', 'admin', 'president'].includes(active.role)) {
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || !['bod', 'admin', 'president'].includes(authority.role)) {
     throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
   }
-  return active.role;
+  return authority.role;
 }
 
 function inviteCodeMatches(inputCode, expectedCode) {
@@ -999,10 +1078,17 @@ function normalizeDistrictEventPayload(raw) {
   };
 }
 
-async function assertBodEventsUnlockedForRole(role) {
+function hasPresidentAuthorityValue(roleOrAuthority) {
+  if (roleOrAuthority && typeof roleOrAuthority === 'object') {
+    return roleOrAuthority.authority?.hasPresidentAuthority === true;
+  }
+  return roleOrAuthority === 'president';
+}
+
+async function assertBodEventsUnlockedForRole(roleOrAuthority) {
   const lockSnap = await db.collection('locks').doc('bodEvents').get();
   const locked = lockSnap.exists && lockSnap.data()?.locked === true;
-  if (locked && role !== 'president') {
+  if (locked && !hasPresidentAuthorityValue(roleOrAuthority)) {
     throw new HttpsError('failed-precondition', 'BOD event submissions are locked.');
   }
 }
@@ -1016,10 +1102,10 @@ async function assertBodEventRecordIsClubEvent(eventId) {
   }
 }
 
-async function assertPanelUnlockedForRole(panelKey, role, label) {
+async function assertPanelUnlockedForRole(panelKey, roleOrAuthority, label) {
   const lockSnap = await db.collection('locks').doc(panelKey).get();
   const locked = lockSnap.exists && lockSnap.data()?.locked === true;
-  if (locked && role !== 'president') {
+  if (locked && !hasPresidentAuthorityValue(roleOrAuthority)) {
     throw new HttpsError('failed-precondition', `${label || panelKey} is locked.`);
   }
 }
@@ -1767,7 +1853,8 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
 
 exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const approverUid = requireAuth(request);
-  const approverRole = await assertAdminOrPresident(approverUid);
+  const approverAuthority = await assertAdminOrPresidentAuthority(approverUid);
+  const approverRole = approverAuthority.role;
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -1780,6 +1867,7 @@ exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const syncOptions = {
     actorUid: approverUid,
     actorRole: approverRole,
+    actorHasPresidentAuthority: approverAuthority.authority.hasPresidentAuthority,
     targetUid,
     role: approvedRole,
     confirmJointPositionKeys: data.confirmJointPositionKeys || [],
@@ -1809,7 +1897,8 @@ exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
-  const actorRole = await assertAdminOrPresident(actorUid);
+  const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
+  const actorRole = actorAuthority.role;
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -1823,6 +1912,7 @@ exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) 
   const result = await syncUserAccessAndPositionsWithAttendance({
     actorUid,
     actorRole,
+    actorHasPresidentAuthority: actorAuthority.authority.hasPresidentAuthority,
     targetUid,
     role,
     positionKeys: data.positionKeys,
@@ -1893,7 +1983,8 @@ exports.rejectUserRoleRequest = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
-  const actorRole = await assertAdminOrPresident(actorUid);
+  const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
+  const actorRole = actorAuthority.role;
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -1906,6 +1997,7 @@ exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const result = await syncUserAccessAndPositionsWithAttendance({
     actorUid,
     actorRole,
+    actorHasPresidentAuthority: actorAuthority.authority.hasPresidentAuthority,
     targetUid,
     role,
     positionKeys: data.positionKeys,
@@ -2082,16 +2174,30 @@ exports.uploadVisitSubmissionFile = onRequest({
 
 exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const [userSnap, roleSnap] = await Promise.all([
+  const [userSnap, roleSnap, cwdAssignmentSnap] = await Promise.all([
     db.collection('users').doc(uid).get(),
     db.collection('roles').doc(uid).get(),
+    db.collection('bodPositionAssignments').doc(`${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`).get(),
   ]);
+  const roleData = roleSnap.exists ? (roleSnap.data() || {}) : null;
+  const role = roleData && String(roleData.status || 'approved').toLowerCase() === 'approved'
+    ? normalizeRole(roleData.role)
+    : '';
+  const activeRole = role && ACTIVE_ROLES.has(role) ? { role, data: roleData } : null;
+  const authorityContext = await getAuthorityContext(uid, {
+    activeRole,
+    userSnap,
+    cwdAssignmentSnap,
+  });
 
   return {
     ok: true,
     uid,
     user: userSnap.exists ? userSnap.data() : null,
     role: roleSnap.exists ? roleSnap.data() : null,
+    positionKeys: authorityContext.positionKeys,
+    positionSource: authorityContext.positionSource,
+    authority: authorityContext.authority,
   };
 });
 
@@ -2398,6 +2504,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     districtEventsSnap,
     membersSnap,
     allAttendanceSnap,
+    cwdAssignmentSnap,
   ] = await Promise.all([
     db.collection('users').doc(uid).get(),
     db.collection('members').doc(uid).get(),
@@ -2407,10 +2514,16 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     db.collection('districtEvents').get(),
     db.collection('members').get(),
     db.collection('attendance').get(),
+    db.collection('bodPositionAssignments').doc(`${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`).get(),
   ]);
 
   const userData = userSnap.exists ? (userSnap.data() || {}) : {};
   const memberData = memberSnap.exists ? (memberSnap.data() || {}) : {};
+  const authorityContext = await getAuthorityContext(uid, {
+    activeRole: active,
+    userSnap,
+    cwdAssignmentSnap,
+  });
   const myAttendanceData = myAttendanceSnap.exists ? (myAttendanceSnap.data() || {}) : {};
   const districtAttendanceData = districtAttendanceSnap.exists ? (districtAttendanceSnap.data() || {}) : {};
 
@@ -2503,6 +2616,8 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
       clubPosition: userData.clubPosition || '',
       memberName: memberData.name || '',
       memberPosition: memberData.position || '',
+      positionKeys: authorityContext.positionKeys,
+      authority: authorityContext.authority,
     },
     myAttendance: {
       ...attendanceSummary,
@@ -2589,8 +2704,11 @@ exports.syncExistingRolesToUsers = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.createBodUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertBodAdminOrPresident(uid);
-  await assertBodEventsUnlockedForRole(role);
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || !['bod', 'admin', 'president'].includes(authority.role)) {
+    throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
+  }
+  await assertBodEventsUnlockedForRole(authority);
 
   const data = request.data || {};
   const fileName = normalizeUploadFileName(data.fileName);
@@ -2603,7 +2721,7 @@ exports.createBodUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const { ticket, expiresAtMillis } = await createDriveUploadTicketDoc({
     uid,
-    role,
+    role: authority.role,
     uploadType: 'bod',
     limit: 30,
     metadata: {
@@ -2635,8 +2753,8 @@ exports.createBodUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.createTreasuryUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('treasury', role, 'Treasury');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('treasury', authority, 'Treasury');
 
   const data = request.data || {};
   const fileName = normalizeUploadFileName(data.fileName);
@@ -2650,7 +2768,7 @@ exports.createTreasuryUploadTicket = onCall(CALLABLE_OPTIONS, async (request) =>
 
   const { ticket, expiresAtMillis } = await createDriveUploadTicketDoc({
     uid,
-    role,
+    role: authority.role,
     uploadType: 'treasury',
     limit: 20,
     metadata: {
@@ -2841,8 +2959,11 @@ exports.completeVisitSubmissionDriveUpload = onRequest({
 
 exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertBodAdminOrPresident(uid);
-  await assertBodEventsUnlockedForRole(role);
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || !['bod', 'admin', 'president'].includes(authority.role)) {
+    throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
+  }
+  await assertBodEventsUnlockedForRole(authority);
 
   const data = request.data || {};
   const eventId = validateEventDocId(data.eventId) || db.collection('events').doc().id;
@@ -2916,8 +3037,11 @@ exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertBodAdminOrPresident(uid);
-  await assertBodEventsUnlockedForRole(role);
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || !['bod', 'admin', 'president'].includes(authority.role)) {
+    throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
+  }
+  await assertBodEventsUnlockedForRole(authority);
 
   const eventId = validateEventDocId(request.data?.eventId);
   if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
@@ -2939,8 +3063,11 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.archiveBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertBodAdminOrPresident(uid);
-  await assertBodEventsUnlockedForRole(role);
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || !['bod', 'admin', 'president'].includes(authority.role)) {
+    throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
+  }
+  await assertBodEventsUnlockedForRole(authority);
 
   const eventId = validateEventDocId(request.data?.eventId);
   if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
@@ -2968,8 +3095,8 @@ exports.archiveBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.createAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('attendance', role, 'Attendance Manager');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('attendance', authority, 'Attendance Manager');
 
   const userProfile = await getCallableUserProfile(uid, request);
   const payload = normalizeClubEventPayload(request.data || {}, userProfile, 'adminAttendanceManager');
@@ -2990,8 +3117,8 @@ exports.createAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.updateAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('attendance', role, 'Attendance Manager');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('attendance', authority, 'Attendance Manager');
 
   const eventId = validateEventDocId(request.data?.eventId);
   if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
@@ -3007,8 +3134,8 @@ exports.updateAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.archiveAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('attendance', role, 'Attendance Manager');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('attendance', authority, 'Attendance Manager');
 
   const eventId = validateEventDocId(request.data?.eventId);
   if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
@@ -3034,8 +3161,8 @@ exports.archiveAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.createBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('bodAttendance', role, 'BOD Attendance');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('bodAttendance', authority, 'BOD Attendance');
 
   const meetingId = validateEventDocId(request.data?.meetingId) || db.collection('bodMeetings').doc().id;
   const payload = normalizeBodMeetingPayload(request.data || {});
@@ -3049,8 +3176,8 @@ exports.createBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.updateBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('bodAttendance', role, 'BOD Attendance');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('bodAttendance', authority, 'BOD Attendance');
 
   const meetingId = validateEventDocId(request.data?.meetingId);
   if (!meetingId) throw new HttpsError('invalid-argument', 'Meeting ID is required.');
@@ -3066,8 +3193,8 @@ exports.updateBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.archiveBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('bodAttendance', role, 'BOD Attendance');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('bodAttendance', authority, 'BOD Attendance');
 
   const meetingId = validateEventDocId(request.data?.meetingId);
   if (!meetingId) throw new HttpsError('invalid-argument', 'Meeting ID is required.');
@@ -3093,8 +3220,8 @@ exports.archiveBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
 
 exports.createDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('attendance', role, 'District Attendance');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('attendance', authority, 'District Attendance');
 
   const districtEventId = validateEventDocId(request.data?.districtEventId) || db.collection('districtEvents').doc().id;
   const payload = normalizeDistrictEventPayload(request.data || {});
@@ -3108,8 +3235,8 @@ exports.createDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => 
 
 exports.updateDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('attendance', role, 'District Attendance');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('attendance', authority, 'District Attendance');
 
   const districtEventId = validateEventDocId(request.data?.districtEventId);
   if (!districtEventId) throw new HttpsError('invalid-argument', 'District event ID is required.');
@@ -3125,8 +3252,8 @@ exports.updateDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => 
 
 exports.archiveDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const role = await assertAdminOrPresident(uid);
-  await assertPanelUnlockedForRole('attendance', role, 'District Attendance');
+  const authority = await assertAdminOrPresidentAuthority(uid);
+  await assertPanelUnlockedForRole('attendance', authority, 'District Attendance');
 
   const districtEventId = validateEventDocId(request.data?.districtEventId);
   if (!districtEventId) throw new HttpsError('invalid-argument', 'District event ID is required.');
@@ -3202,7 +3329,7 @@ async function deleteTopLevelCollection(collectionName) {
 // President-only reset helper for RIY rollover. Use only after an external backup.
 exports.cleanSlateForNewRiy = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
-  await assertPresident(actorUid);
+  await assertPresidentAuthority(actorUid);
 
   const data = request.data || {};
   const confirmText = normalizeText(data.confirmText, 80);

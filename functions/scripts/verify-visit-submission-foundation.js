@@ -129,12 +129,17 @@ function assertVisitRuleDenyBlock(rules, collection) {
   await rejectsWithCode(() => first.service.getDashboard('pending-bod'), 'permission-denied', 'unapproved user denied');
   await rejectsWithCode(() => first.service.getDashboard('bod-malformed'), 'failed-precondition', 'malformed position keys rejected safely');
 
-  const noRoleDocSeed = JSON.parse(JSON.stringify(fixture));
-  delete noRoleDocSeed.roles['admin-uid'];
-  const noRoleDocEnv = createEnv(noRoleDocSeed);
-  await noRoleDocEnv.service.initializeStructure('president-uid');
-  const adminWithoutRoleDoc = await noRoleDocEnv.service.getDashboard('admin-uid');
-  assert.strictEqual(adminWithoutRoleDoc.access.role, 'admin', 'approved user doc may carry access without roles doc');
+const noRoleDocSeed = JSON.parse(JSON.stringify(fixture));
+delete noRoleDocSeed.roles['admin-uid'];
+
+const noRoleDocEnv = createEnv(noRoleDocSeed);
+await noRoleDocEnv.service.initializeStructure('president-uid');
+
+await rejectsWithCode(
+  () => noRoleDocEnv.service.getDashboard('admin-uid'),
+  'permission-denied',
+  'approved user without matching role document is denied'
+);
 
   const presidentDashboard = await first.service.getDashboard('president-uid');
   assert.strictEqual(presidentDashboard.access.role, 'president', 'approved President resolves');
