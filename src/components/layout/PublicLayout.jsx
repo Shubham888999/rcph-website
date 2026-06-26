@@ -1,28 +1,151 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
-export default function PublicLayout() {
-  return (
-    <div className="site-shell">
-      <header className="site-header">
-        <NavLink className="brand" to="/" aria-label="RCPH home">
-          <span className="brand-mark">R</span>
-          <span>
-            <strong>RCPH</strong>
-            <small>React Migration</small>
-          </span>
-        </NavLink>
+const navigationItems = [
+  { label: "Home", to: "/" },
+  { label: "About", to: "/about" },
+  { label: "Events", to: "/events" },
+  { label: "Projects", to: "/projects" },
+  { label: "Join", to: "/join" },
+  { label: "Board", to: "/bod" },
+  { label: "FAQ", to: "/faq" },
+  { label: "Contact", to: "/contact" },
+];
 
-        <nav className="site-nav" aria-label="Primary navigation">
-          <NavLink to="/">Home</NavLink>
-          <NavLink to="/login">Login</NavLink>
-        </nav>
+export default function PublicLayout() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const closeMenu = () => {
+    setMenuOpen(false);
+  };
+
+  return (
+    <div className="public-site-shell">
+      <div className="public-logo-strip" aria-label="RCPH affiliations">
+        <img
+          src="/images/logo1.png"
+          alt="Rotaract annual theme"
+          className="public-affiliation-logo"
+        />
+
+        <img
+          src="/images/logo2.png"
+          alt="Rotaract District 3131"
+          className="public-affiliation-logo public-affiliation-logo-wide"
+        />
+
+        <img
+          src="/images/logo3.webp"
+          alt="Rotaract Club of Pune Heritage"
+          className="public-affiliation-logo"
+        />
+      </div>
+
+      <header className="public-header">
+        <div className="public-header-inner">
+          <NavLink className="public-brand" to="/" aria-label="RCPH home" onClick={closeMenu}>
+            <img
+              src="/images/logo3.webp"
+              alt=""
+              className="public-brand-logo"
+              aria-hidden="true"
+            />
+
+            <span className="public-brand-copy">
+              <strong>RCPH</strong>
+              <small>Rotaract Club of Pune Heritage</small>
+            </span>
+          </NavLink>
+
+          <nav
+            id="primary-navigation"
+            className={`public-navigation ${menuOpen ? "is-open" : ""}`}
+            aria-label="Primary navigation"
+          >
+            {navigationItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={closeMenu}
+                className={({ isActive }) =>
+                  isActive ? "public-nav-link is-active" : "public-nav-link"
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+
+            <NavLink className="public-login-link" to="/login" onClick={closeMenu}>
+              Login
+            </NavLink>
+
+            <NavLink className="public-join-link" to="/join" onClick={closeMenu}>
+              Join RCPH
+            </NavLink>
+          </nav>
+
+          <button
+            className="public-menu-toggle"
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls="primary-navigation"
+            aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+            onClick={() => setMenuOpen((current) => !current)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        </div>
       </header>
 
-      <Outlet />
+      <div className="public-page-content">
+        <Outlet />
+      </div>
 
-      <footer className="site-footer">
-        <p>Rotaract Club of Pune Heritage</p>
-        <span>React migration workspace</span>
+      <footer className="public-footer">
+        <div className="public-footer-inner">
+          <div className="public-footer-identity">
+            <img
+              src="/images/logo3.webp"
+              alt="Rotaract Club of Pune Heritage"
+              className="public-footer-logo"
+            />
+
+            <div>
+              <strong>Rotaract Club of Pune Heritage</strong>
+              <p>RID 3131 · Zone 4 · Pune</p>
+            </div>
+          </div>
+
+          <div className="public-footer-links">
+            <NavLink to="/about">About</NavLink>
+            <NavLink to="/projects">Projects</NavLink>
+            <NavLink to="/join">Join</NavLink>
+            <NavLink to="/contact">Contact</NavLink>
+          </div>
+
+          <div className="public-footer-contact">
+            <a href="mailto:rcpuneheritage3131@gmail.com">
+              rcpuneheritage3131@gmail.com
+            </a>
+
+            <a
+              href="https://instagram.com/rc_pune_heritage/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              @rc_pune_heritage
+            </a>
+          </div>
+        </div>
+
+        <div className="public-footer-bottom">
+          <span>
+            © {new Date().getFullYear()} Rotaract Club of Pune Heritage
+          </span>
+          <span>Create · Connect · Contribute</span>
+        </div>
       </footer>
     </div>
   );
