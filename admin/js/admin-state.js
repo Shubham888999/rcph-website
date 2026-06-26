@@ -217,6 +217,17 @@ const accountRequestsBody   = document.getElementById('accountRequestsBody');
 const accountRequestsBadge  = document.getElementById('accountRequestsBadge');
 const accountRequestFilter  = document.getElementById('accountRequestFilter');
 
+const clubRankingForm      = document.getElementById('clubRankingForm');
+const clubRankingEnabled   = document.getElementById('clubRankingEnabled');
+const clubRankingValue     = document.getElementById('clubRankingValue');
+const clubRankingSubtitle  = document.getElementById('clubRankingSubtitle');
+const clubRankingSaveBtn   = document.getElementById('clubRankingSaveBtn');
+const clubRankingMessage   = document.getElementById('clubRankingMessage');
+const clubRankingPreviewHidden = document.getElementById('clubRankingPreviewHidden');
+const clubRankingPreviewContent = document.getElementById('clubRankingPreviewContent');
+const clubRankingPreviewValue = document.getElementById('clubRankingPreviewValue');
+const clubRankingPreviewSubtitle = document.getElementById('clubRankingPreviewSubtitle');
+
 const prospectMembersBody       = document.getElementById('prospectMembersBody');
 const prospectMembersToggle     = document.getElementById('prospectMembersToggle');
 const prospectMembersBadge      = document.getElementById('prospectMembersBadge');

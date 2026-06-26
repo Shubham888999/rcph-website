@@ -57,9 +57,10 @@
           <span>Events Missed</span>
           <strong id="kpiAbsent">0</strong>
         </article>
-        <article class="kpi-card">
-          <span>My Club Rank</span>
-          <strong id="kpiRank">-</strong>
+        <article id="clubRankingKpiCard" class="kpi-card" hidden>
+          <span>Club Ranking</span>
+          <strong id="kpiRank"></strong>
+          <small id="kpiRankSubtitle" class="subtle" hidden></small>
         </article>
       </section>
 
@@ -125,6 +126,14 @@
       </div>
 
       <div id="prospectDashboardSections" class="prospect-dashboard" hidden>
+        <section id="prospectClubRankingSection" class="prospect-ranking-section" hidden>
+          <article class="kpi-card prospect-ranking-card">
+            <span>Club Ranking</span>
+            <strong id="prospectClubRankingValue"></strong>
+            <small id="prospectClubRankingSubtitle" class="subtle" hidden></small>
+          </article>
+        </section>
+
         <section class="prospect-grid">
           <article class="dashboard-card prospect-whatsapp-card">
             <p class="eyebrow">Stay connected</p>

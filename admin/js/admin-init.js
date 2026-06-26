@@ -140,6 +140,15 @@ if (addDistEventBtn) addDistEventBtn.onclick = () => openModal('addDistEventModa
 
 if (accountRequestFilter) accountRequestFilter.addEventListener('change', renderAccountRequests);
 
+if (clubRankingForm) {
+  clubRankingForm.addEventListener('submit', saveClubRankingSettings);
+}
+
+[clubRankingEnabled, clubRankingValue, clubRankingSubtitle].forEach(el => {
+  if (el) el.addEventListener('input', renderClubRankingPreview);
+  if (el) el.addEventListener('change', renderClubRankingPreview);
+});
+
 if (prospectMembersToggle && prospectMembersBody) {
   prospectMembersToggle.addEventListener('click', () => {
     const willOpen = prospectMembersBody.hidden;

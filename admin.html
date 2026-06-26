@@ -54,6 +54,7 @@
             <a class="admin-nav__link" href="my-dashboard.html" data-admin-quick-nav hidden>My Dashboard</a>
             <a class="admin-nav__link" href="BOD%20Event%20manager/bodlogin.html" data-admin-quick-nav hidden>BOD Panel</a>
             <a class="admin-nav__link" href="visit-submissions.html" data-admin-quick-nav hidden>Visit Submissions</a>
+            <a class="admin-nav__link" href="#clubRankingSettings" data-admin-section-link>Club Ranking</a>
             <a class="admin-nav__link" href="#districtAttendance" data-admin-section-link>District</a>
             <a class="admin-nav__link" href="#bod" data-admin-section-link>BOD Attendance</a>
             <a class="admin-nav__link" href="#fines" data-admin-section-link>Fines</a>
@@ -161,6 +162,51 @@
       </table>
     </div>
   </div>
+
+  <section class="admin-card club-ranking-panel" id="clubRankingSettings" style="margin-bottom:20px;">
+    <div class="topbar club-ranking-panel__header">
+      <div>
+        <h2>Club Ranking</h2>
+        <p class="club-ranking-panel__subtitle">Set the club-wide ranking shown on every approved member and prospect dashboard.</p>
+      </div>
+      <span class="badge">Shared</span>
+    </div>
+
+    <form id="clubRankingForm" class="adm-form club-ranking-form" autocomplete="off" novalidate>
+      <label class="club-ranking-toggle">
+        <input id="clubRankingEnabled" type="checkbox">
+        <span>Show club ranking on dashboards</span>
+      </label>
+
+      <div class="club-ranking-form__grid">
+        <label class="adm-field">
+          <span>Ranking value</span>
+          <input id="clubRankingValue" type="text" maxlength="80" placeholder="#12" aria-describedby="clubRankingMessage">
+        </label>
+
+        <label class="adm-field">
+          <span>Subtitle</span>
+          <input id="clubRankingSubtitle" type="text" maxlength="120" placeholder="Rotaract District 3131" aria-describedby="clubRankingMessage">
+        </label>
+      </div>
+
+      <div class="club-ranking-preview" aria-live="polite">
+        <div class="club-ranking-preview__eyebrow">Dashboard Preview</div>
+        <div id="clubRankingPreviewHidden" class="club-ranking-preview__hidden" hidden>Club ranking hidden</div>
+        <div id="clubRankingPreviewContent" class="club-ranking-preview__content">
+          <span>Club Ranking</span>
+          <strong id="clubRankingPreviewValue">#12</strong>
+          <small id="clubRankingPreviewSubtitle">Rotaract District 3131</small>
+        </div>
+      </div>
+
+      <p id="clubRankingMessage" class="club-ranking-message" role="status">Loading club ranking...</p>
+
+      <div class="adm-actions">
+        <button id="clubRankingSaveBtn" class="btn" type="submit">Save Club Ranking</button>
+      </div>
+    </form>
+  </section>
 
   <div class="admin-card" id="attendance">
       <div class="topbar">

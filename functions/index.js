@@ -156,6 +156,13 @@ const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury', VISIT_UPLOAD_TYPE]);
 const PROSPECT_CRITERIA = PROSPECT_CRITERIA_V2;
 const PROSPECT_GENDERS = new Set(['woman', 'man', 'non-binary', 'self-describe', 'prefer-not-to-say']);
 const PROSPECT_AVENUES = new Set(['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI']);
+const CLUB_SETTINGS_COLLECTION = 'clubSettings';
+const PUBLIC_DASHBOARD_SETTINGS_DOC = 'publicDashboard';
+const CLUB_RANKING_DEFAULT = Object.freeze({
+  enabled: false,
+  value: '',
+  subtitle: '',
+});
 
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
@@ -167,6 +174,69 @@ function normalizeText(value, max = 300) {
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function hasPlainTextControlChars(value) {
+  return /[\u0000-\u001f\u007f]/.test(value);
+}
+
+function hasMarkupLikeCharacters(value) {
+  return /[<>]/.test(value);
+}
+
+function normalizeClubRanking(raw = {}, options = {}) {
+  const strict = options.strict === true;
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const enabled = source.enabled;
+  const value = source.value;
+  const subtitle = source.subtitle;
+
+  if (strict && typeof enabled !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'enabled must be a boolean.');
+  }
+  if (strict && (Array.isArray(value) || (value && typeof value === 'object'))) {
+    throw new HttpsError('invalid-argument', 'value must be plain text.');
+  }
+  if (strict && (Array.isArray(subtitle) || (subtitle && typeof subtitle === 'object'))) {
+    throw new HttpsError('invalid-argument', 'subtitle must be plain text.');
+  }
+  if (strict && value !== undefined && value !== null && typeof value !== 'string') {
+    throw new HttpsError('invalid-argument', 'value must be a string.');
+  }
+  if (strict && subtitle !== undefined && subtitle !== null && typeof subtitle !== 'string') {
+    throw new HttpsError('invalid-argument', 'subtitle must be a string.');
+  }
+
+  const normalizedEnabled = typeof enabled === 'boolean' ? enabled : CLUB_RANKING_DEFAULT.enabled;
+  let normalizedValue = typeof value === 'string' ? value.trim() : '';
+  let normalizedSubtitle = typeof subtitle === 'string' ? subtitle.trim() : '';
+
+  if (strict && (hasPlainTextControlChars(normalizedValue) || hasMarkupLikeCharacters(normalizedValue))) {
+    throw new HttpsError('invalid-argument', 'value must be plain text.');
+  }
+  if (strict && (hasPlainTextControlChars(normalizedSubtitle) || hasMarkupLikeCharacters(normalizedSubtitle))) {
+    throw new HttpsError('invalid-argument', 'subtitle must be plain text.');
+  }
+  if (strict && normalizedValue.length > 80) {
+    throw new HttpsError('invalid-argument', 'value must be 80 characters or fewer.');
+  }
+  if (strict && normalizedSubtitle.length > 120) {
+    throw new HttpsError('invalid-argument', 'subtitle must be 120 characters or fewer.');
+  }
+  if (strict && normalizedEnabled && !normalizedValue) {
+    throw new HttpsError('invalid-argument', 'value is required when club ranking is enabled.');
+  }
+
+  if (!strict) {
+    normalizedValue = normalizedValue.replace(/[\u0000-\u001f\u007f<>]/g, '').slice(0, 80);
+    normalizedSubtitle = normalizedSubtitle.replace(/[\u0000-\u001f\u007f<>]/g, '').slice(0, 120);
+  }
+
+  return {
+    enabled: normalizedEnabled,
+    value: normalizedValue,
+    subtitle: normalizedSubtitle,
+  };
 }
 
 function normalizeBoolean(value) {
@@ -405,6 +475,32 @@ function isApprovedActiveUserRecord(data) {
   return data
     && String(data.status || '').toLowerCase() === 'approved'
     && data.active !== false;
+}
+
+async function assertApprovedActiveCallableAccount(uid) {
+  const [authRecord, userSnap] = await Promise.all([
+    admin.auth().getUser(uid),
+    db.collection('users').doc(uid).get(),
+  ]);
+  const userData = userSnap.exists ? (userSnap.data() || {}) : null;
+  if (authRecord.disabled === true || !isApprovedActiveUserRecord(userData)) {
+    throw new HttpsError('permission-denied', 'Approved active account required.');
+  }
+  return { authRecord, userData };
+}
+
+async function getPublicDashboardClubRanking() {
+  try {
+    const snap = await db
+      .collection(CLUB_SETTINGS_COLLECTION)
+      .doc(PUBLIC_DASHBOARD_SETTINGS_DOC)
+      .get();
+    const data = snap.exists ? (snap.data() || {}) : {};
+    return normalizeClubRanking(data.clubRanking || {}, { strict: false });
+  } catch (err) {
+    console.warn('Could not load public dashboard club ranking', err?.message || String(err));
+    return { ...CLUB_RANKING_DEFAULT };
+  }
 }
 
 function isActiveWebsiteDirectorAssignment(uid, snap) {
@@ -2560,12 +2656,37 @@ exports.promoteProspectToGbm = onCall(CALLABLE_OPTIONS, async (request) => {
   return { ok: true, uid, role: 'gbm', status: 'promoted' };
 });
 
+exports.updateClubRanking = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertAdminOrPresidentAuthority(actorUid);
+  await assertApprovedActiveCallableAccount(actorUid);
+
+  const clubRanking = normalizeClubRanking(request.data || {}, { strict: true });
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await db
+    .collection(CLUB_SETTINGS_COLLECTION)
+    .doc(PUBLIC_DASHBOARD_SETTINGS_DOC)
+    .set({
+      clubRanking: {
+        ...clubRanking,
+        updatedAt: now,
+        updatedBy: actorUid,
+      },
+    }, { merge: true });
+
+  return {
+    success: true,
+    clubRanking,
+  };
+});
+
 exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const active = await getActiveRole(uid);
   if (!active || !ACTIVE_ROLES.has(active.role)) {
     throw new HttpsError('failed-precondition', 'Approved account required.');
   }
+  const clubRanking = await getPublicDashboardClubRanking();
 
   if (active.role === 'prospect') {
     const [userSnap, eventsSnap] = await Promise.all([
@@ -2595,6 +2716,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     return {
       ok: true,
       mode: 'prospect',
+      clubRanking,
       profile: {
         uid,
         name: userData.name || request.auth?.token?.name || '',
@@ -2748,6 +2870,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
 
   return {
     ok: true,
+    clubRanking,
     profile: {
       uid,
       name: userData.name || memberData.name || request.auth?.token?.name || '',

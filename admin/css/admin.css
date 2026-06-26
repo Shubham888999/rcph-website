@@ -1193,6 +1193,99 @@ section.admin-card[id]{ scroll-margin-top:76px; }
   text-transform: uppercase;
 }
 
+/* Club ranking settings */
+.club-ranking-panel__header {
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.club-ranking-panel__header h2 {
+  margin: 0;
+}
+
+.club-ranking-panel__subtitle {
+  margin: 6px 0 0;
+  color: #aebbbb;
+}
+
+.club-ranking-form {
+  gap: 14px;
+}
+
+.club-ranking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  color: #e4eeee;
+  font-weight: 800;
+}
+
+.club-ranking-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #60c3c4;
+}
+
+.club-ranking-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.club-ranking-preview {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(96,195,196,.25);
+  border-radius: 10px;
+  background: rgba(96,195,196,.06);
+}
+
+.club-ranking-preview__eyebrow {
+  color: #9da9a9;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.club-ranking-preview__content {
+  display: grid;
+  gap: 4px;
+}
+
+.club-ranking-preview__content span,
+.club-ranking-preview__hidden {
+  color: #b9c5c5;
+}
+
+.club-ranking-preview__content strong {
+  color: #f4d98a;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.club-ranking-preview__content small {
+  color: #d8e6e6;
+  font-size: 13px;
+}
+
+.club-ranking-message {
+  min-height: 20px;
+  margin: 0;
+  color: #b9c5c5;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.club-ranking-message.is-error {
+  color: #ff9aa6;
+}
+
+.club-ranking-message.is-success {
+  color: #c9f5d5;
+}
+
 @media (max-width: 1100px) {
   .prospect-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1220,6 +1313,10 @@ section.admin-card[id]{ scroll-margin-top:76px; }
   .prospect-toolbar input,
   .prospect-toolbar select {
     width: 100%;
+  }
+
+  .club-ranking-form__grid {
+    grid-template-columns: 1fr;
   }
 }
 

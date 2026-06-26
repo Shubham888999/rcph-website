@@ -844,6 +844,138 @@ async function rejectAccountRequest(uid) {
   }
 }
 
+function safeClubRanking() {
+  return { enabled: false, value: '', subtitle: '' };
+}
+
+function setClubRankingMessage(message, state = 'neutral') {
+  if (!clubRankingMessage) return;
+  const normalizedState = ['neutral', 'success', 'error'].includes(state) ? state : 'neutral';
+  clubRankingMessage.textContent = message || '';
+  clubRankingMessage.classList.toggle('is-error', !!message && normalizedState === 'error');
+  clubRankingMessage.classList.toggle('is-success', !!message && normalizedState === 'success');
+}
+
+function setClubRankingFormDisabled(disabled) {
+  [clubRankingEnabled, clubRankingValue, clubRankingSubtitle, clubRankingSaveBtn]
+    .filter(Boolean)
+    .forEach(el => { el.disabled = !!disabled; });
+}
+
+function setClubRankingSaving(saving) {
+  if (!clubRankingSaveBtn) return;
+  clubRankingSaveBtn.disabled = !!saving;
+  clubRankingSaveBtn.textContent = saving ? 'Saving...' : 'Save Club Ranking';
+}
+
+function setClubRankingFormValues(ranking = safeClubRanking()) {
+  if (clubRankingEnabled) clubRankingEnabled.checked = ranking.enabled === true;
+  if (clubRankingValue) clubRankingValue.value = String(ranking.value || '');
+  if (clubRankingSubtitle) clubRankingSubtitle.value = String(ranking.subtitle || '');
+  renderClubRankingPreview();
+}
+
+function safeClubRankingErrorMessage(err, fallback) {
+  const message = err?.message || err?.details?.message || fallback;
+  if (typeof message === 'string' && message.trim()) return message.trim();
+  return fallback;
+}
+
+function renderClubRankingPreview() {
+  const enabled = clubRankingEnabled?.checked === true;
+  const value = String(clubRankingValue?.value || '').trim();
+  const subtitle = String(clubRankingSubtitle?.value || '').trim();
+
+  if (clubRankingPreviewHidden) clubRankingPreviewHidden.hidden = enabled;
+  if (clubRankingPreviewContent) clubRankingPreviewContent.hidden = !enabled;
+  if (clubRankingPreviewValue) clubRankingPreviewValue.textContent = value || '#12';
+  if (clubRankingPreviewSubtitle) {
+    clubRankingPreviewSubtitle.textContent = subtitle || 'Rotaract District 3131';
+    clubRankingPreviewSubtitle.hidden = !subtitle;
+  }
+}
+
+function getClubRankingFormPayload() {
+  const enabled = clubRankingEnabled?.checked === true;
+  const value = String(clubRankingValue?.value || '').trim();
+  const subtitle = String(clubRankingSubtitle?.value || '').trim();
+
+  if (typeof enabled !== 'boolean') {
+    return { ok: false, message: 'Show club ranking must be true or false.' };
+  }
+  if (/[<>]/.test(value) || /[<>]/.test(subtitle)) {
+    return { ok: false, message: 'Use plain text only. Remove < or > characters.' };
+  }
+  if (value.length > 80) {
+    return { ok: false, message: 'Ranking value must be 80 characters or fewer.' };
+  }
+  if (subtitle.length > 120) {
+    return { ok: false, message: 'Subtitle must be 120 characters or fewer.' };
+  }
+  if (enabled && !value) {
+    return { ok: false, message: 'Ranking value is required when club ranking is shown.' };
+  }
+
+  return {
+    ok: true,
+    payload: { enabled, value, subtitle },
+  };
+}
+
+async function loadClubRankingSettings() {
+  if (!clubRankingForm || !IS_ADMIN) return;
+  setClubRankingFormDisabled(true);
+  setClubRankingMessage('Loading club ranking...', 'neutral');
+
+  try {
+    const result = await callableFunction('getMyDashboardStats')({});
+    const ranking = result?.data?.clubRanking || safeClubRanking();
+    setClubRankingFormValues({
+      enabled: ranking.enabled === true,
+      value: String(ranking.value || ''),
+      subtitle: String(ranking.subtitle || ''),
+    });
+    setClubRankingMessage('', 'neutral');
+  } catch (err) {
+    console.error('Club ranking load failed:', err);
+    setClubRankingFormValues(safeClubRanking());
+    setClubRankingMessage(safeClubRankingErrorMessage(err, 'Could not load the saved club ranking.'), 'error');
+  } finally {
+    setClubRankingFormDisabled(false);
+  }
+}
+
+async function saveClubRankingSettings(event) {
+  event?.preventDefault();
+  if (!clubRankingForm || !IS_ADMIN || clubRankingSaveBtn?.disabled) return;
+
+  const validation = getClubRankingFormPayload();
+  if (!validation.ok) {
+    setClubRankingMessage(validation.message, 'error');
+    renderClubRankingPreview();
+    return;
+  }
+
+  setClubRankingSaving(true);
+  setClubRankingMessage('Saving...', 'neutral');
+
+  try {
+    const result = await callableFunction('updateClubRanking')(validation.payload);
+    const ranking = result?.data?.clubRanking || validation.payload;
+    setClubRankingFormValues({
+      enabled: ranking.enabled === true,
+      value: String(ranking.value || ''),
+      subtitle: String(ranking.subtitle || ''),
+    });
+    setClubRankingMessage('Club ranking saved successfully.', 'success');
+  } catch (err) {
+    console.error('Club ranking save failed:', err);
+    setClubRankingMessage(safeClubRankingErrorMessage(err, 'Could not save club ranking.'), 'error');
+  } finally {
+    setClubRankingSaving(false);
+  }
+}
+
 document.addEventListener('click', (event) => {
   const positionTrigger = event.target.closest('[data-position-trigger]');
   if (positionTrigger) {
@@ -1195,6 +1327,7 @@ async function loadData(){
   attSnap.forEach(d => { ATT[d.id] = d.data() || {}; });
   renderGrid();
   renderInsightsPanel();
+  await loadClubRankingSettings();
   buildCollaborationFilters();
   renderCollaborationReports();
   if (distHead && distBody) {

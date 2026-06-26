@@ -150,7 +150,7 @@ body {
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -172,6 +172,13 @@ body {
   color: #fff;
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   line-height: 1;
+}
+
+.kpi-card small {
+  display: block;
+  margin-top: 8px;
+  font-size: .86rem;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-grid {
@@ -345,6 +352,15 @@ body {
 .prospect-dashboard {
   display: grid;
   gap: 14px;
+}
+
+.prospect-ranking-section {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px);
+}
+
+.prospect-ranking-card {
+  min-width: 0;
 }
 
 .prospect-grid {
@@ -557,6 +573,7 @@ body {
 
   .kpi-grid,
   .dashboard-grid,
+  .prospect-ranking-section,
   .prospect-grid {
     grid-template-columns: 1fr;
   }

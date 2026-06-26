@@ -17,7 +17,9 @@ const els = {
   kpiAttendance: document.getElementById('kpiAttendance'),
   kpiPresent: document.getElementById('kpiPresent'),
   kpiAbsent: document.getElementById('kpiAbsent'),
+  clubRankingKpiCard: document.getElementById('clubRankingKpiCard'),
   kpiRank: document.getElementById('kpiRank'),
+  kpiRankSubtitle: document.getElementById('kpiRankSubtitle'),
   attendanceProgress: document.getElementById('attendanceProgress'),
   countedNote: document.getElementById('countedNote'),
   attendanceSummaryText: document.getElementById('attendanceSummaryText'),
@@ -41,6 +43,9 @@ const els = {
   prospectAvenueValue: document.getElementById('prospectAvenueValue'),
   prospectCriteriaMessage: document.getElementById('prospectCriteriaMessage'),
   prospectQualifyingEvents: document.getElementById('prospectQualifyingEvents'),
+  prospectClubRankingSection: document.getElementById('prospectClubRankingSection'),
+  prospectClubRankingValue: document.getElementById('prospectClubRankingValue'),
+  prospectClubRankingSubtitle: document.getElementById('prospectClubRankingSubtitle'),
   prospectUpcomingEvents: document.getElementById('prospectUpcomingEvents')
 };
 
@@ -170,13 +175,77 @@ function renderClubStats(stats) {
     ['Total public club events', stats.totalEvents ?? 0],
     ['Most active avenue', stats.mostActiveAvenue || '-'],
     ['Club average attendance', `${stats.clubAverageAttendance || 0}%`],
-    ['Ranked members', stats.rankedMemberCount ?? 0]
   ].map(([label, value]) => `
     <div class="stat-item">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
     </div>
   `).join('');
+}
+
+function normalizeDashboardClubRanking(raw) {
+  if (!raw || raw.enabled !== true || typeof raw.value !== 'string') {
+    return { enabled: false, value: '', subtitle: '' };
+  }
+
+  const value = raw.value.trim();
+  const subtitle = typeof raw.subtitle === 'string' ? raw.subtitle.trim() : '';
+  const hasUnsafeText = /[<>]/.test(value) || /[<>]/.test(subtitle);
+
+  if (!value || hasUnsafeText) {
+    return { enabled: false, value: '', subtitle: '' };
+  }
+
+  return {
+    enabled: true,
+    value: value.slice(0, 80),
+    subtitle: subtitle.slice(0, 120),
+  };
+}
+
+function setClubRankingCard(card, valueEl, subtitleEl, ranking) {
+  if (!card || !valueEl) return;
+
+  if (!ranking.enabled) {
+    card.hidden = true;
+    card.setAttribute('hidden', '');
+    valueEl.textContent = '';
+    if (subtitleEl) {
+      subtitleEl.textContent = '';
+      subtitleEl.hidden = true;
+      subtitleEl.setAttribute('hidden', '');
+    }
+    return;
+  }
+
+  card.hidden = false;
+  card.removeAttribute('hidden');
+  valueEl.textContent = ranking.value;
+
+  if (subtitleEl) {
+    subtitleEl.textContent = ranking.subtitle;
+    subtitleEl.hidden = !ranking.subtitle;
+    if (ranking.subtitle) {
+      subtitleEl.removeAttribute('hidden');
+    } else {
+      subtitleEl.setAttribute('hidden', '');
+    }
+  }
+}
+
+function renderClubRanking(rawRanking, mode) {
+  const ranking = normalizeDashboardClubRanking(rawRanking);
+  if (mode === 'prospect') {
+    setClubRankingCard(
+      els.prospectClubRankingSection,
+      els.prospectClubRankingValue,
+      els.prospectClubRankingSubtitle,
+      ranking
+    );
+    return;
+  }
+
+  setClubRankingCard(els.clubRankingKpiCard, els.kpiRank, els.kpiRankSubtitle, ranking);
 }
 
 function renderEventsByAvenue(rows) {
@@ -264,7 +333,7 @@ els.welcomeName.textContent = formatMemberHeading(
   els.kpiAttendance.textContent = `${my.percentage || 0}%`;
   els.kpiPresent.textContent = Number(my.present || 0);
   els.kpiAbsent.textContent = Number(my.absent || 0);
-  els.kpiRank.textContent = club.myRank ? `#${club.myRank}` : '-';
+  renderClubRanking(data.clubRanking, 'member');
   els.attendanceProgress.style.width = `${Math.max(0, Math.min(100, Number(my.percentage || 0)))}%`;
   els.countedNote.textContent = `${Number(my.totalCounted || 0)} counted events. NA events are excluded.`;
   els.attendanceSummaryText.textContent = `${Number(my.present || 0)} present, ${Number(my.absent || 0)} absent, ${Number(my.na || 0)} NA.`;
@@ -303,7 +372,7 @@ function prospectCriteriaMessage(progress) {
   if (progress.attendanceRequirementMet) {
     return 'Attendance requirement complete. Membership dues are now payable at your 4th eligible club activity.';
   }
-  return 'Attend 3 eligible club meetings or events consecutively. Missing an Event/meeting resets the count  .';
+  return 'Attend 3 eligible club meetings or events consecutively. Missing an eligible meeting or event resets the active streak.';
 }
 
 function renderProspectQualifyingEvents(events) {
@@ -356,6 +425,7 @@ els.welcomeName.textContent =
   els.memberLinkNote.textContent = 'You are currently a Prospect Member. Complete the membership criteria below to become an official RCPH member.';
   els.adminPanelBtn.hidden = true;
   els.bodPanelBtn.hidden = true;
+  renderClubRanking(data.clubRanking, 'prospect');
 
   els.prospectProgressStatus.textContent = progressStatus({ ...progress, ready, attendanceRequirementMet, currentConsecutiveAttendance: currentStreak });
   els.prospectProgressPercent.textContent = `${attendanceProgressCount} / ${requiredConsecutive}`;
