@@ -121,7 +121,7 @@ function renderBodGrid(){
 
   const headRow = document.createElement('tr');
   headRow.innerHTML =
-    `<th class="sticky-col">Directors \\ Meeting<br><small>Position</small></th>` +
+    `<th class="sticky-col">BOD \\ Meeting<br><small>Position</small></th>` +
     BODMEET.map(mt => `
 <th title="${mt.date || ''}">
   <div class="bulk-wrap">
@@ -201,8 +201,7 @@ function renderBodGrid(){
     bodBody.appendChild(tr);
   });
 
-  if (bodCountBadge) bodCountBadge.textContent = `${activeBodRosterMembers().length} BOD · ${BODMEET.length} meetings`;
-  renderBodInsights();
+if (bodCountBadge) bodCountBadge.textContent = `${activeBodRosterMembers().length} Directors · ${BODMEET.length} meetings`;  renderBodInsights();
 }
 
 function renderBodInsights(){
