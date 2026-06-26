@@ -130,7 +130,7 @@ function renderDistrictGrid() {
   });
 
   if (distCountBadge) {
-    distCountBadge.textContent = `${members.length} members · ${events.length} district events`;
+    distCountBadge.textContent = `${members.length} Members · ${events.length} district events`;
   }
 
   renderDistrictInsights(members, events);

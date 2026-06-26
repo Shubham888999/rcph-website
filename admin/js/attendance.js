@@ -232,7 +232,7 @@ return `
   });
 
   const prospectCount = members.filter(member => member._isProspect).length;
-  countBadge.textContent = `${members.length} people${prospectCount ? ` (${prospectCount} prospects)` : ''} · ${events.length} events`;
+  countBadge.textContent = `${members.length} Members${prospectCount ? ` (${prospectCount} prospects)` : ''} · ${events.length} events`;
   renderAttendanceInsights();
 }
 
