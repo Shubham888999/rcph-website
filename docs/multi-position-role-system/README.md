@@ -178,8 +178,8 @@ Recommended Access Hub UX:
 - `admin/js/admin-init.js`
 - `admin/js/attendance.js`
 - `admin/js/bod-attendance.js`
-- `access.js`
-- `my-dashboard.js`
+- `js/access.js`
+- `js/my-dashboard.js`
 - `login.html`, copy only if signup messaging needs clarification
 - future Visit Submission files from Phase 2 or later
 

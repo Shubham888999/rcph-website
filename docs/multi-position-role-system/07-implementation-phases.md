@@ -88,8 +88,8 @@ Status: only the targeted BOD Attendance position display/edit guard is implemen
 
 Update UI surfaces:
 
-- `my-dashboard.js`: show multiple position chips
-- `access.js`: make future position-owned cards position-aware
+- `js/my-dashboard.js`: show multiple position chips
+- `js/access.js`: make future position-owned cards position-aware
 - `admin/js/attendance.js`: avoid duplicate UID/manual person rows where possible
 - `admin/js/bod-attendance.js`: show multi-position labels and active/inactive BOD person state
 

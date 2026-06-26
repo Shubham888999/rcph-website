@@ -94,7 +94,7 @@ body {
     min-height: 100vh;
     background:
       linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
-      url('images/group.webp') top/cover no-repeat;
+      url('../images/group.webp') top/cover no-repeat;
     padding: 0 20px;
   }
   .hero-content {
@@ -737,7 +737,7 @@ a.join-btn:hover {
   top: 0;
   z-index: 999;
   padding: 10px 20px;
-  background: url('images/golden_navbar_crop.jpeg') center/cover no-repeat;
+  background: url('../images/golden_navbar_crop.jpeg') center/cover no-repeat;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
@@ -1566,9 +1566,9 @@ a.button-link:hover {
 }
 .legend { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
 .att-icon { width:18px; height:18px; display:inline-block; background-size:contain; background-repeat:no-repeat; vertical-align:-3px; }
-.att-p  { background-image: url('assets/icons/check.png'); }   /* same used in admin */
-.att-a  { background-image: url('assets/icons/cross.png'); }
-.att-na { background-image: url('assets/icons/NA_Button.png'); }
+.att-p  { background-image: url('../assets/icons/check.png'); }   /* same used in admin */
+.att-a  { background-image: url('../assets/icons/cross.png'); }
+.att-na { background-image: url('../assets/icons/NA_Button.png'); }
 
 /* === Coffee Widget === */
 
@@ -2585,7 +2585,7 @@ body[data-rcph-page="home"] .hero-banner::after {
 
 body[data-rcph-page="home"] .hero-banner::before {
   z-index: 0;
-  background: url('images/group.webp') top/cover no-repeat;
+  background: url('../images/group.webp') top/cover no-repeat;
   transform: translate3d(0, var(--rcph-hero-bg-y), 0) scale(var(--rcph-hero-bg-scale));
   transform-origin: center top;
   will-change: transform;

@@ -111,8 +111,8 @@ node -e "<local ignore inspection for named production files and active folders>
 Regression checks:
 
 ```powershell
-node --check access.js
-node --check my-dashboard.js
+node --check js/access.js
+node --check js/my-dashboard.js
 node --check "BOD Event manager/bodlogin.js"
 node --check js/runtime-config.js
 node --check js/visit-submission-render.js
@@ -145,8 +145,8 @@ Passed:
 - `firebase.json` JSON parse check: `firebase.json valid`
 - `firebase hosting:channel:list`: succeeded; listed the live Hosting channel without deploying
 - Local Hosting ignore inspection: named production files remain deployable and active folders are not broadly ignored
-- `node --check access.js`
-- `node --check my-dashboard.js`
+- `node --check js/access.js`
+- `node --check js/my-dashboard.js`
 - `node --check "BOD Event manager/bodlogin.js"`
 - `node --check js/runtime-config.js`
 - `node --check js/visit-submission-render.js`

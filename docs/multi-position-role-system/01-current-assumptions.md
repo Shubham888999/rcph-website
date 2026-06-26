@@ -14,10 +14,10 @@ This audit inspected the current role, approval, access, attendance, dashboard, 
 - `admin/js/admin-init.js`
 - `admin/js/attendance.js`
 - `admin/js/bod-attendance.js`
-- `access.js`
-- `my-dashboard.js`
+- `js/access.js`
+- `js/my-dashboard.js`
 - `dzrvisit.html`
-- `dzrvisit.js`
+- `js/dzrvisit.js`
 
 The collections `users`, `roles`, `members`, `attendance`, `bodMembers`, and `bodAttendance` were inspected through the code paths that create, read, and update them. No live Firestore export was read in this phase.
 
@@ -123,11 +123,11 @@ Current single-position assumptions appear in:
 - `admin/js/admin-core.js`: account approval and role update controls read one `data-account-position` value.
 - `admin/js/bod-attendance.js`: BOD member rows display and edit one `position` string.
 - `admin/js/attendance.js`: member rows are person-based and do not understand BOD position arrays.
-- `my-dashboard.js`: the profile chip displays one `memberPosition` or `clubPosition`.
-- `access.js`: access cards are role-based and do not currently use club positions.
+- `js/my-dashboard.js`: the profile chip displays one `memberPosition` or `clubPosition`.
+- `js/access.js`: access cards are role-based and do not currently use club positions.
 - `firestore.rules`: role checks read `roles/{uid}.role`; no rule checks position ownership.
 - `dzrvisit.html`: the legacy DZR page hardcodes individual BOD position panels.
-- `dzrvisit.js`: reporting reads member and BOD member person records; it does not resolve multi-position authority.
+- `js/dzrvisit.js`: reporting reads member and BOD member person records; it does not resolve multi-position authority.
 
 ## Member and attendance record creation
 

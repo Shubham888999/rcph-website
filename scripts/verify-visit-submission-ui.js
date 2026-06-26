@@ -13,7 +13,7 @@ const frontendFiles = [
   'js/visit-submission-render.js',
   'js/visit-submission-upload.js',
   'js/visit-submissions.js',
-  'access.js',
+  'js/access.js',
   'admin.html',
 ];
 
@@ -110,11 +110,11 @@ assert(!/formData\.append\('action', 'uploadVisitSubmissionFile'\)/.test(sources
 assert(!/DRIVE_UPLOAD_SHARED_SECRET|private_key|service-account|OAuth token|client_secret/i.test(combinedVisitJs + sources['visit-submissions.html'] + sources['js/runtime-config.js']), 'No shared secret appears in frontend source.');
 assert(!/firebase deploy|functions:deploy|deploy --/.test(combinedVisitJs), 'No deploy command introduced.');
 assert(!/localStorage/.test(combinedVisitJs), 'No direct role authorization from localStorage.');
-assert(sources['access.js'].includes('visit-submissions.html'), 'Access Hub links to Visit Submissions.');
-assert(/roles:\s*\['bod', 'admin', 'president'\]/.test(sources['access.js']), 'Access Hub Visit card is limited to BOD/Admin/President.');
-assert(!/visit-submissions[^\n]+roles:\s*\[[^\]]*(gbm|prospect)/i.test(sources['access.js']), 'Access Hub Visit card excludes GBM/prospect.');
+assert(sources['js/access.js'].includes('visit-submissions.html'), 'Access Hub links to Visit Submissions.');
+assert(/roles:\s*\['bod', 'admin', 'president'\]/.test(sources['js/access.js']), 'Access Hub Visit card is limited to BOD/Admin/President.');
+assert(!/visit-submissions[^\n]+roles:\s*\[[^\]]*(gbm|prospect)/i.test(sources['js/access.js']), 'Access Hub Visit card excludes GBM/prospect.');
 assert(sources['admin.html'].includes('href="visit-submissions.html"'), 'Admin quick nav points to Visit Submissions.');
-assert((sources['access.js'].match(/visit-submissions\.html/g) || []).length === 1, 'Access Hub has no duplicate Visit Submission card URL.');
+assert((sources['js/access.js'].match(/visit-submissions\.html/g) || []).length === 1, 'Access Hub has no duplicate Visit Submission card URL.');
 assert((sources['admin.html'].match(/visit-submissions\.html/g) || []).length === 1, 'Admin nav has no duplicate Visit Submission URL.');
 assert(!/href="visit-submissions\.html#[^"]+"/.test(sources['visit-submissions.html']), 'No unfinished hash links in Visit page.');
 assert(/item\.canWithdraw === true/.test(sources['js/visit-submission-render.js']), 'Withdraw uses server canWithdraw flag.');

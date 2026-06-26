@@ -129,7 +129,7 @@ Future implementation will likely touch:
 - `admin/js/admin-init.js`: event wiring for new controls if needed
 - `functions/index.js`: approval, role update, assignment validation, member sync, and migration helpers
 - `firestore.rules`: preserve role access and add any required read constraints for assignment documents
-- `my-dashboard.js`: display multiple position chips
-- `access.js`: route position-owned cards and upcoming visit submission cards
+- `js/my-dashboard.js`: display multiple position chips
+- `js/access.js`: route position-owned cards and upcoming visit submission cards
 
 `login.html` does not need position selection for the preferred first implementation, though copy may need to clarify that positions are assigned after verification.
