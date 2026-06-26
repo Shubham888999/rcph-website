@@ -402,6 +402,13 @@ body {
   line-height: 1;
 }
 
+.prospect-criteria-message {
+  margin: 12px 0 0;
+  color: var(--member-muted);
+  font-size: .88rem;
+  line-height: 1.5;
+}
+
 .prospect-checklist {
   display: grid;
   gap: 10px;
@@ -461,6 +468,46 @@ body {
 .prospect-checklist li.is-complete .criteria-check::after {
   content: "✓";
   font-weight: 900;
+}
+
+.prospect-qualifying-events {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(120,217,154,.28);
+  border-radius: 12px;
+  background: rgba(120,217,154,.06);
+}
+
+.prospect-qualifying-events[hidden] {
+  display: none !important;
+}
+
+.prospect-qualifying-events strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--member-good);
+}
+
+.prospect-qualifying-events ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prospect-qualifying-events li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--member-text);
+  font-size: .86rem;
+  line-height: 1.4;
+}
+
+.prospect-qualifying-events span {
+  color: var(--member-muted);
+  white-space: nowrap;
 }
 
 .prospect-upcoming-card {

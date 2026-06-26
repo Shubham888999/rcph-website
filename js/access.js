@@ -40,7 +40,7 @@ const PANEL_DEFS = [
   {
     key: 'membership-progress',
     title: 'Membership Progress',
-    description: 'Complete 2 GBMs, 2 avenue events, and dues payment to become an official member.',
+    description: 'Complete 3 consecutive eligible meetings or events, then dues payment, to become an official member.',
     href: 'my-dashboard.html',
     actionLabel: 'View Progress',
     roles: ['prospect']

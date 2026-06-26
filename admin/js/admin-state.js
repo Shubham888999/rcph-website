@@ -227,9 +227,8 @@ const prospectManagementMessage = document.getElementById('prospectManagementMes
 const prospectCards             = document.getElementById('prospectCards');
 const prospectTotalKpi          = document.getElementById('prospectTotalKpi');
 const prospectReadyKpi          = document.getElementById('prospectReadyKpi');
-const prospectNeedGbmKpi        = document.getElementById('prospectNeedGbmKpi');
-const prospectNeedAvenueKpi     = document.getElementById('prospectNeedAvenueKpi');
-const prospectNeedDuesKpi       = document.getElementById('prospectNeedDuesKpi');
+const prospectAttendanceCompleteKpi = document.getElementById('prospectAttendanceCompleteKpi');
+const prospectDuesPendingKpi    = document.getElementById('prospectDuesPendingKpi');
 
 const collaborationReports        = document.getElementById('collaborationReports');
 const collaborationReportsCard    = document.getElementById('collaborationReportsCard');
@@ -275,9 +274,9 @@ let PROSPECT_SUMMARY = {
   active: 0,
   ready: 0,
   promoted: 0,
-  needGbm: 0,
-  needAvenue: 0,
-  needDues: 0,
+  attendanceComplete: 0,
+  duesPending: 0,
+  duesNotYetDue: 0,
 };
 let PROSPECTS_LOADED = false;
 

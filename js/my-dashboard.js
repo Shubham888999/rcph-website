@@ -1,8 +1,7 @@
 const auth = window.auth;
 const db = window.db;
 const dashboardFunction = firebase.functions().httpsCallable('getMyDashboardStats');
-const REQUIRED_GBM = 2;
-const REQUIRED_AVENUE_EVENTS = 2;
+const REQUIRED_CONSECUTIVE_ATTENDANCE = 3;
 
 const els = {
   loading: document.getElementById('loadingState'),
@@ -40,8 +39,8 @@ const els = {
   prospectGbmValue: document.getElementById('prospectGbmValue'),
   prospectAvenueItem: document.getElementById('prospectAvenueItem'),
   prospectAvenueValue: document.getElementById('prospectAvenueValue'),
-  prospectDuesItem: document.getElementById('prospectDuesItem'),
-  prospectDuesValue: document.getElementById('prospectDuesValue'),
+  prospectCriteriaMessage: document.getElementById('prospectCriteriaMessage'),
+  prospectQualifyingEvents: document.getElementById('prospectQualifyingEvents'),
   prospectUpcomingEvents: document.getElementById('prospectUpcomingEvents')
 };
 
@@ -280,10 +279,10 @@ els.welcomeName.textContent = formatMemberHeading(
   showDashboard();
 }
 
-function progressStatus(percent) {
-  if (percent >= 100) return 'Ready for Review';
-  if (percent >= 67) return 'Almost There';
-  if (percent > 0) return 'In Progress';
+function progressStatus(progress) {
+  if (progress.ready) return 'Ready for Induction';
+  if (progress.attendanceRequirementMet) return 'Dues Pending';
+  if (Number(progress.currentConsecutiveAttendance || 0) > 0) return 'In Progress';
   return 'Getting Started';
 }
 
@@ -291,23 +290,58 @@ function setCriterionState(item, complete) {
   item.classList.toggle('is-complete', complete);
 }
 
+function prospectDuesStatus(progress) {
+  if (progress.duesPaid) return 'Paid';
+  if (progress.duesDue || progress.attendanceRequirementMet) return 'Pending';
+  return 'Not yet due';
+}
+
+function prospectCriteriaMessage(progress) {
+  if (progress.ready) {
+    return 'All membership criteria are complete. Your induction is pending club approval.';
+  }
+  if (progress.attendanceRequirementMet) {
+    return 'Attendance requirement complete. Membership dues are now payable at your 4th eligible club activity.';
+  }
+  return 'Attend 3 eligible club meetings or events consecutively. Missing an Event/meeting resets the count  .';
+}
+
+function renderProspectQualifyingEvents(events) {
+  if (!els.prospectQualifyingEvents) return;
+  const list = Array.isArray(events) ? events : [];
+  if (!list.length) {
+    els.prospectQualifyingEvents.hidden = true;
+    els.prospectQualifyingEvents.innerHTML = '';
+    return;
+  }
+  els.prospectQualifyingEvents.hidden = false;
+  els.prospectQualifyingEvents.innerHTML = `
+    <strong>Qualifying activities</strong>
+    <ul>
+      ${list.map(event => `
+        <li>
+          <span>${escapeHtml(event.name || 'Club activity')}</span>
+          <span>${escapeHtml(formatDate(event.date))}</span>
+        </li>
+      `).join('')}
+    </ul>
+  `;
+}
+
 function renderProspectDashboard(data) {
   const profile = data.profile || {};
   const progress = data.prospectProgress || {};
   const criteria = progress.criteria || {};
-  const requiredGbm = Math.max(1, Number(criteria.requiredGbm) || REQUIRED_GBM);
-  const requiredAvenueEvents = Math.max(1, Number(criteria.requiredAvenueEvents) || REQUIRED_AVENUE_EVENTS);
-  const gbmAttended = Math.max(0, Number(progress.gbmAttended) || 0);
-  const avenueEventsAttended = Math.max(0, Number(progress.avenueEventsAttended) || 0);
+  const requiredConsecutive = Math.max(1, Number(progress.requiredConsecutiveAttendance || criteria.requiredConsecutiveAttendance) || REQUIRED_CONSECUTIVE_ATTENDANCE);
+  const currentStreak = Math.max(0, Number(progress.currentConsecutiveAttendance) || 0);
+  const attendanceRequirementMet = progress.attendanceRequirementMet === true;
   const duesPaid = progress.duesPaid === true;
-  const gbmComplete = gbmAttended >= requiredGbm;
-  const avenueComplete = avenueEventsAttended >= requiredAvenueEvents;
-  const completedFallback = [gbmComplete, avenueComplete, duesPaid].filter(Boolean).length;
-  const completedCount = Math.max(0, Number(progress.completedCount) || completedFallback);
-  const totalCount = Math.max(1, Number(progress.totalCount) || 3);
-  const calculatedPercent = Math.round((completedCount / totalCount) * 100);
-  const suppliedPercent = Number(progress.percent);
-  const percent = Math.max(0, Math.min(100, Number.isFinite(suppliedPercent) ? suppliedPercent : calculatedPercent));
+  const ready = progress.ready === true;
+  const attendanceProgressCount = attendanceRequirementMet
+    ? requiredConsecutive
+    : Math.min(currentStreak, requiredConsecutive);
+  const percent = Math.max(0, Math.min(100, Math.round((attendanceProgressCount / requiredConsecutive) * 100)));
+  const duesStatus = prospectDuesStatus(progress);
   const displayName = profile.name || 'Prospect';
 
   document.title = 'My Dashboard';
@@ -318,21 +352,22 @@ els.welcomeName.textContent = formatMemberHeading(
   '',
   profile.role || 'prospect'
 );
-  els.memberLinkNote.textContent = 'You are currently a Prospect Member. Complete the onboarding criteria below to become an official RCPH member.';
+  els.memberLinkNote.textContent = 'You are currently a Prospect Member. Complete the membership criteria below to become an official RCPH member.';
   els.adminPanelBtn.hidden = true;
   els.bodPanelBtn.hidden = true;
 
-  els.prospectProgressStatus.textContent = progressStatus(percent);
-  els.prospectProgressPercent.textContent = `${percent}%`;
-  els.prospectProgressCount.textContent = `${completedCount} of ${totalCount} criteria complete`;
+  els.prospectProgressStatus.textContent = progressStatus({ ...progress, ready, attendanceRequirementMet, currentConsecutiveAttendance: currentStreak });
+  els.prospectProgressPercent.textContent = `${attendanceProgressCount} / ${requiredConsecutive}`;
+  els.prospectProgressCount.textContent = `Progress: ${attendanceProgressCount} / ${requiredConsecutive}`;
   els.prospectProgressFill.style.width = `${percent}%`;
   els.prospectProgressTrack.setAttribute('aria-valuenow', String(percent));
-  els.prospectGbmValue.textContent = `${gbmAttended} / ${requiredGbm} attended`;
-  els.prospectAvenueValue.textContent = `${avenueEventsAttended} / ${requiredAvenueEvents} attended`;
-  els.prospectDuesValue.textContent = duesPaid ? 'Paid' : 'Not paid';
-  setCriterionState(els.prospectGbmItem, gbmComplete);
-  setCriterionState(els.prospectAvenueItem, avenueComplete);
-  setCriterionState(els.prospectDuesItem, duesPaid);
+els.prospectGbmValue.textContent =
+  `Current streak: ${attendanceProgressCount} / ${requiredConsecutive}`;
+    els.prospectAvenueValue.textContent = duesStatus;
+  if (els.prospectCriteriaMessage) els.prospectCriteriaMessage.textContent = prospectCriteriaMessage({ ...progress, ready, attendanceRequirementMet });
+  setCriterionState(els.prospectGbmItem, attendanceRequirementMet);
+  setCriterionState(els.prospectAvenueItem, duesPaid);
+  renderProspectQualifyingEvents(attendanceRequirementMet ? progress.qualifyingEvents : []);
   renderUpcoming(els.prospectUpcomingEvents, data.upcomingEvents || []);
   showDashboard();
 }

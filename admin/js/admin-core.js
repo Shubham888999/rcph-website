@@ -938,9 +938,9 @@ function setProspectManagementMessage(message, isError = false) {
 
 function prospectStatusLabel(prospect) {
   if (prospect.status === 'promoted') return 'Promoted';
-  if (prospect.ready) return 'Ready for Promotion';
-  if (Number(prospect.percent || 0) >= 67) return 'Almost There';
-  if (Number(prospect.percent || 0) > 0) return 'In Progress';
+  if (prospect.ready) return 'Ready for Induction';
+  if (prospect.attendanceRequirementMet) return 'Dues Pending';
+  if (Number(prospect.currentConsecutiveAttendance || 0) > 0) return 'In Progress';
   return 'Getting Started';
 }
 
@@ -953,13 +953,53 @@ function prospectStatusClass(prospect) {
 function renderProspectSummary() {
   const summary = PROSPECT_SUMMARY || {};
   if (prospectMembersBadge) {
-    prospectMembersBadge.textContent = `${Number(summary.total || 0)} prospects · ${Number(summary.ready || 0)} ready`;
+    prospectMembersBadge.textContent = `${Number(summary.active ?? summary.total ?? 0)} prospects - ${Number(summary.ready || 0)} ready`;
   }
-  if (prospectTotalKpi) prospectTotalKpi.textContent = Number(summary.total || 0);
+  if (prospectTotalKpi) prospectTotalKpi.textContent = Number(summary.active ?? summary.total ?? 0);
+  if (prospectAttendanceCompleteKpi) prospectAttendanceCompleteKpi.textContent = Number(summary.attendanceComplete || 0);
+  if (prospectDuesPendingKpi) prospectDuesPendingKpi.textContent = Number(summary.duesPending || 0);
   if (prospectReadyKpi) prospectReadyKpi.textContent = Number(summary.ready || 0);
-  if (prospectNeedGbmKpi) prospectNeedGbmKpi.textContent = Number(summary.needGbm || 0);
-  if (prospectNeedAvenueKpi) prospectNeedAvenueKpi.textContent = Number(summary.needAvenue || 0);
-  if (prospectNeedDuesKpi) prospectNeedDuesKpi.textContent = Number(summary.needDues || 0);
+}
+
+function formatProspectEventDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '-';
+  const parsed = new Date(`${raw.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return raw.slice(0, 10);
+  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function prospectDuesStatus(prospect) {
+  if (prospect.duesPaid) return 'Paid';
+  if (prospect.duesDue || prospect.attendanceRequirementMet) return 'Pending';
+  return 'Not yet due';
+}
+
+function prospectPromotionHelp(prospect) {
+  if (prospect.ready) return 'Attendance and dues are complete. This prospect is ready for induction.';
+  if (!prospect.attendanceRequirementMet) {
+    return 'Needs 3 consecutive eligible club meetings or events. Missing an eligible activity resets the active streak.';
+  }
+  if (!prospect.duesPaid) return 'Attendance requirement complete. Dues are pending.';
+  return 'Prospect is not ready for induction yet.';
+}
+
+function renderProspectQualifyingEvents(prospect) {
+  if (!prospect.attendanceRequirementMet) return '';
+  const events = Array.isArray(prospect.qualifyingEvents) ? prospect.qualifyingEvents : [];
+  if (!events.length) return '<p class="prospect-card__note">Qualifying activities are complete.</p>';
+  const items = events.map(event => `
+    <li>
+      <strong>${escapeHtml(event.name || 'Club activity')}</strong>
+      <span>${escapeHtml(formatProspectEventDate(event.date))}</span>
+    </li>
+  `).join('');
+  return `
+    <div>
+      <p class="prospect-card__note"><strong>Qualifying activities</strong></p>
+      <ul class="prospect-card__qualifying">${items}</ul>
+    </div>
+  `;
 }
 
 function getFilteredProspects() {
@@ -989,15 +1029,20 @@ function renderProspectCards() {
   }
 
   prospectCards.innerHTML = rows.map(prospect => {
-    const criteria = prospect.criteria || {};
-    const requiredGbm = Number(criteria.requiredGbm || 2);
-    const requiredAvenue = Number(criteria.requiredAvenueEvents || 2);
+    const requiredConsecutive = Math.max(1, Number(prospect.requiredConsecutiveAttendance || prospect.criteria?.requiredConsecutiveAttendance) || 3);
+    const currentStreak = Math.max(0, Number(prospect.currentConsecutiveAttendance) || 0);
+    const highestStreak = Math.max(0, Number(prospect.maximumConsecutiveAttendance) || 0);
+    const attendanceProgressCount = prospect.attendanceRequirementMet
+      ? requiredConsecutive
+      : Math.min(currentStreak, requiredConsecutive);
     const percent = Math.max(0, Math.min(100, Number(prospect.percent || 0)));
     const promoted = prospect.status === 'promoted';
     const statusClass = prospectStatusClass(prospect);
-    const promotionHelp = prospect.ready
-      ? 'All criteria are complete. This prospect can be promoted.'
-      : `Needs${prospect.gbmAttended < requiredGbm ? ' GBM attendance,' : ''}${prospect.avenueEventsAttended < requiredAvenue ? ' avenue attendance,' : ''}${!prospect.duesPaid ? ' dues payment,' : ''}`.replace(/,$/, '.');
+    const duesStatus = prospectDuesStatus(prospect);
+    const promotionHelp = prospectPromotionHelp(prospect);
+    const fourthActivityText = prospect.fourthEligibleActivityDate
+      ? `Dues payable at the 4th eligible activity (${formatProspectEventDate(prospect.fourthEligibleActivityDate)}).`
+      : 'Dues payable at the 4th eligible activity.';
     return `
       <article class="prospect-card ${statusClass}">
         <div class="prospect-card__head">
@@ -1017,12 +1062,16 @@ function renderProspectCards() {
         </div>
 
         <div class="prospect-card__progress">
-          <div class="prospect-card__progress-row"><span>GBM progress</span><strong>${Number(prospect.gbmAttended || 0)} / ${requiredGbm}</strong></div>
-          <div class="prospect-card__progress-row"><span>Avenue progress</span><strong>${Number(prospect.avenueEventsAttended || 0)} / ${requiredAvenue}</strong></div>
-          <div class="prospect-card__progress-row"><span>Total progress</span><strong>${percent}%</strong></div>
+          <div class="prospect-card__progress-row"><span>Current streak</span><strong>${attendanceProgressCount} / ${requiredConsecutive}</strong></div>
+          <div class="prospect-card__progress-row"><span>Highest streak</span><strong>${highestStreak}</strong></div>
+          <div class="prospect-card__progress-row"><span>Attendance requirement</span><strong>${prospect.attendanceRequirementMet ? 'Complete' : 'In Progress'}</strong></div>
+          <div class="prospect-card__progress-row"><span>Dues status</span><strong>${escapeHtml(duesStatus)}</strong></div>
+          <div class="prospect-card__progress-row"><span>Ready for induction</span><strong>${prospect.ready ? 'Yes' : 'No'}</strong></div>
           <div class="prospect-progress-track" role="progressbar" aria-label="${escapeHtml(prospect.name || 'Prospect')} onboarding progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
             <div class="prospect-progress-fill" style="width:${percent}%"></div>
           </div>
+          <p class="prospect-card__note">${escapeHtml(fourthActivityText)}</p>
+          ${renderProspectQualifyingEvents(prospect)}
         </div>
 
         <label class="prospect-card__dues">
@@ -1249,7 +1298,3 @@ unsubTre = db.collection('treasury').orderBy('date','desc').onSnapshot(snap => {
 });
   }
 }
-
-
-
-

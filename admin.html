@@ -355,7 +355,7 @@
   <div class="topbar prospect-panel__header">
     <div>
       <h2>Prospect Members <span id="prospectMembersBadge" class="badge">0 prospects · 0 ready</span></h2>
-      <p class="prospect-panel__subtitle">Track onboarding attendance, dues, and promotion readiness.</p>
+      <p class="prospect-panel__subtitle">Track consecutive attendance, dues, and induction readiness.</p>
     </div>
     <button id="prospectMembersToggle" class="btn btn-outline" type="button" aria-expanded="false" aria-controls="prospectMembersBody">Show Prospects</button>
   </div>
@@ -363,10 +363,9 @@
   <div id="prospectMembersBody" hidden>
     <div class="prospect-kpis" aria-label="Prospect onboarding summary">
       <div class="kpi"><div class="kpi-label">Total Prospects</div><div class="kpi-value" id="prospectTotalKpi">0</div></div>
-      <div class="kpi"><div class="kpi-label">Ready for Promotion</div><div class="kpi-value" id="prospectReadyKpi">0</div></div>
-      <div class="kpi"><div class="kpi-label">Need GBM</div><div class="kpi-value" id="prospectNeedGbmKpi">0</div></div>
-      <div class="kpi"><div class="kpi-label">Need Avenue</div><div class="kpi-value" id="prospectNeedAvenueKpi">0</div></div>
-      <div class="kpi"><div class="kpi-label">Need Dues</div><div class="kpi-value" id="prospectNeedDuesKpi">0</div></div>
+      <div class="kpi"><div class="kpi-label">Attendance Complete</div><div class="kpi-value" id="prospectAttendanceCompleteKpi">0</div></div>
+      <div class="kpi"><div class="kpi-label">Dues Pending</div><div class="kpi-value" id="prospectDuesPendingKpi">0</div></div>
+      <div class="kpi"><div class="kpi-label">Ready for Induction</div><div class="kpi-value" id="prospectReadyKpi">0</div></div>
     </div>
 
     <div class="toolbar prospect-toolbar">
@@ -374,7 +373,7 @@
       <select id="prospectFilter" aria-label="Filter prospects">
         <option value="all">All</option>
         <option value="in_progress">In Progress</option>
-        <option value="ready">Ready for Promotion</option>
+        <option value="ready">Ready for Induction</option>
         <option value="promoted">Promoted</option>
       </select>
       <button id="prospectRefreshBtn" class="btn btn-outline" type="button">Refresh Progress</button>

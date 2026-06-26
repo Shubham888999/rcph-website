@@ -15,6 +15,10 @@ const {
   createFirestoreFolderLockManager,
   createVisitHttpUploadHandler,
 } = require('./lib/visit-drive');
+const {
+  PROSPECT_CRITERIA_V2,
+  calculateProspectMembershipProgress,
+} = require('./lib/prospect-membership-criteria');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -149,11 +153,7 @@ const DRIVE_UPLOAD_ALLOWED_MIME_TYPES = new Set([
   'image/webp',
 ]);
 const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury', VISIT_UPLOAD_TYPE]);
-const PROSPECT_CRITERIA = Object.freeze({
-  requiredGbm: 2,
-  requiredAvenueEvents: 2,
-  duesRequired: true,
-});
+const PROSPECT_CRITERIA = PROSPECT_CRITERIA_V2;
 const PROSPECT_GENDERS = new Set(['woman', 'man', 'non-binary', 'self-describe', 'prefer-not-to-say']);
 const PROSPECT_AVENUES = new Set(['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI']);
 
@@ -255,7 +255,7 @@ function getSignupNotificationSubject(userData) {
 function getSignupNotificationHighlight(userData) {
   const role = normalizeRole(userData.requestedRole || userData.role);
   if (role === 'prospect') {
-    return 'Prospect Member auto-approved. Onboarding criteria: 2 GBMs, 2 Avenue Events, and Dues Paid.';
+    return 'Prospect Member auto-approved. Onboarding criteria: 3 consecutive eligible meetings/events, then dues paid.';
   }
   if (role === 'gbm') return 'GBM auto-approved.';
   if (role === 'bod' || role === 'admin') {
@@ -1457,91 +1457,166 @@ function isAvenueEvent(event) {
   return Array.from(PROSPECT_AVENUES).some(avenue => avenues.has(avenue));
 }
 
-function prospectCompletion(gbmAttended, avenueEventsAttended, duesPaid, criteria = PROSPECT_CRITERIA) {
-  const requiredGbm = Math.max(1, Number(criteria.requiredGbm) || PROSPECT_CRITERIA.requiredGbm);
-  const requiredAvenueEvents = Math.max(1, Number(criteria.requiredAvenueEvents) || PROSPECT_CRITERIA.requiredAvenueEvents);
-  const duesRequired = criteria.duesRequired !== false;
-  const checks = [
-    gbmAttended >= requiredGbm,
-    avenueEventsAttended >= requiredAvenueEvents,
-  ];
-  const progressParts = [
-    Math.min(gbmAttended / requiredGbm, 1),
-    Math.min(avenueEventsAttended / requiredAvenueEvents, 1),
-  ];
-  if (duesRequired) {
-    checks.push(duesPaid === true);
-    progressParts.push(duesPaid === true ? 1 : 0);
-  }
-  const completedCount = checks.filter(Boolean).length;
-  const totalCount = checks.length;
-  const percent = progressParts.length
-    ? Math.round((progressParts.reduce((sum, value) => sum + value, 0) / progressParts.length) * 100)
-    : 0;
+const PROSPECT_PROGRESS_LOGICAL_FIELDS = [
+  'uid',
+  'criteriaVersion',
+  'criteria',
+  'gbmAttended',
+  'avenueEventsAttended',
+  'duesPaid',
+  'duesDue',
+  'ready',
+  'status',
+  'completedCount',
+  'totalCount',
+  'percent',
+  'currentConsecutiveAttendance',
+  'maximumConsecutiveAttendance',
+  'requiredConsecutiveAttendance',
+  'attendanceProgressCount',
+  'attendanceRequirementMet',
+  'qualifyingEventIds',
+  'qualifyingEvents',
+  'attendanceRequirementMetAt',
+  'fourthEligibleActivityId',
+  'fourthEligibleActivityDate',
+  'whatsappJoined',
+];
 
-  return {
-    criteria: { requiredGbm, requiredAvenueEvents, duesRequired },
-    completedCount,
-    totalCount,
-    percent,
-    ready: completedCount === totalCount,
-  };
+function comparableProspectProgress(data = {}) {
+  return PROSPECT_PROGRESS_LOGICAL_FIELDS.reduce((out, field) => {
+    out[field] = data[field] === undefined ? null : data[field];
+    return out;
+  }, {});
+}
+
+function prospectProgressChanged(current, next) {
+  return JSON.stringify(comparableProspectProgress(current)) !== JSON.stringify(comparableProspectProgress(next));
+}
+
+function isPromotedProspectRecord(user = {}, progress = {}) {
+  return normalizeRole(progress.status) === 'promoted'
+    || user.promotedFromProspect === true
+    || Boolean(progress.promotedAt);
+}
+
+function isActiveProspectRecord(user = {}) {
+  const role = normalizeRole(user.role);
+  const memberType = normalizeRole(user.memberType);
+  const status = normalizeRole(user.status);
+  return (role === 'prospect' || memberType === 'prospect')
+    && status !== 'pending'
+    && status !== 'rejected'
+    && status !== 'declined';
 }
 
 async function recalcProspectProgress(uid, options = {}) {
   const progressRef = db.collection('prospectProgress').doc(uid);
   const attendanceRef = db.collection('attendance').doc(uid);
-  const [eventsSnap, attendanceSnap, progressSnap] = await Promise.all([
+  const userRef = db.collection('users').doc(uid);
+  const [eventsSnap, attendanceSnap, progressSnap, userSnap] = await Promise.all([
     options.eventsSnap ? Promise.resolve(options.eventsSnap) : db.collection('events').get(),
     attendanceRef.get(),
     progressRef.get(),
+    options.user ? Promise.resolve(null) : userRef.get(),
   ]);
   const attendance = attendanceSnap.exists ? (attendanceSnap.data() || {}) : {};
   const current = progressSnap.exists ? (progressSnap.data() || {}) : {};
-  let gbmAttended = 0;
-  let avenueEventsAttended = 0;
-
-  eventsSnap.docs.forEach(doc => {
-    if (attendance[doc.id] !== true) return;
-    const event = doc.data() || {};
-    if (String(event.type || 'clubEvent') !== 'clubEvent') return;
-    if (isGbmEvent(event)) gbmAttended += 1;
-    if (isAvenueEvent(event)) avenueEventsAttended += 1;
+  const user = options.user || (userSnap?.exists ? (userSnap.data() || {}) : {});
+  const events = Array.isArray(options.events)
+    ? options.events
+    : (eventsSnap?.docs || []).map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const calculation = calculateProspectMembershipProgress({
+    uid,
+    user,
+    currentProgress: current,
+    attendance,
+    events,
+    now: options.now || new Date(),
   });
 
-  const duesPaid = current.duesPaid === true;
-  const completion = prospectCompletion(gbmAttended, avenueEventsAttended, duesPaid, current.criteria);
-  const promoted = String(current.status || '').toLowerCase() === 'promoted';
+  const promoted = isPromotedProspectRecord(user, current);
   const now = admin.firestore.FieldValue.serverTimestamp();
   const update = {
-    uid,
-    gbmAttended,
-    avenueEventsAttended,
-    duesPaid,
+    ...calculation,
     whatsappJoined: current.whatsappJoined === true,
-    criteria: completion.criteria,
-    completedCount: completion.completedCount,
-    totalCount: completion.totalCount,
-    percent: completion.percent,
-    ready: completion.ready,
-    status: promoted ? 'promoted' : (completion.ready ? 'ready' : 'in_progress'),
+    status: promoted ? 'promoted' : (calculation.ready ? 'ready' : 'in_progress'),
     createdAt: current.createdAt || now,
     updatedAt: now,
+    recalculatedAt: now,
   };
-  await progressRef.set(update, { merge: true });
+  const changed = prospectProgressChanged(current, update);
+  if (changed || options.forceWrite === true) {
+    await progressRef.set(update, { merge: true });
+  }
   return {
-    uid,
-    gbmAttended,
-    avenueEventsAttended,
-    duesPaid,
+    ...calculation,
     whatsappJoined: update.whatsappJoined,
-    criteria: completion.criteria,
-    completedCount: completion.completedCount,
-    totalCount: completion.totalCount,
-    percent: completion.percent,
-    ready: completion.ready,
     status: update.status,
+    changed,
   };
+}
+
+async function loadProspectUserAndProgressMaps() {
+  const [roleProspectsSnap, typeProspectsSnap, progressSnap] = await Promise.all([
+    db.collection('users').where('role', '==', 'prospect').get(),
+    db.collection('users').where('memberType', '==', 'prospect').get(),
+    db.collection('prospectProgress').get(),
+  ]);
+  const usersByUid = new Map();
+  [...roleProspectsSnap.docs, ...typeProspectsSnap.docs].forEach(doc => {
+    usersByUid.set(doc.id, { id: doc.id, ...(doc.data() || {}) });
+  });
+  const progressByUid = new Map(progressSnap.docs.map(doc => [doc.id, doc.data() || {}]));
+  return { usersByUid, progressByUid, progressSnap };
+}
+
+async function recalcAllActiveProspects(options = {}) {
+  const eventsSnap = options.eventsSnap || (await db.collection('events').get());
+  const { usersByUid, progressByUid } = await loadProspectUserAndProgressMaps();
+  const summary = {
+    processed: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+    ready: 0,
+    attendanceComplete: 0,
+    duesPending: 0,
+    skippedPromoted: 0,
+    skippedInactive: 0,
+    failures: [],
+  };
+
+  for (const user of usersByUid.values()) {
+    const progress = progressByUid.get(user.id) || {};
+    if (isPromotedProspectRecord(user, progress)) {
+      summary.skippedPromoted += 1;
+      continue;
+    }
+    if (!isActiveProspectRecord(user)) {
+      summary.skippedInactive += 1;
+      continue;
+    }
+
+    try {
+      const result = await recalcProspectProgress(user.id, { eventsSnap, user });
+      summary.processed += 1;
+      if (result.changed) summary.updated += 1;
+      else summary.unchanged += 1;
+      if (result.ready) summary.ready += 1;
+      if (result.attendanceRequirementMet) summary.attendanceComplete += 1;
+      if (result.duesDue && !result.duesPaid) summary.duesPending += 1;
+    } catch (err) {
+      summary.processed += 1;
+      summary.failed += 1;
+      summary.failures.push({
+        uid: user.id,
+        message: err?.message || 'Unknown recalculation error',
+      });
+    }
+  }
+
+  return summary;
 }
 
 function isDashboardClubEvent(event) {
@@ -1754,12 +1829,31 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
         gbmAttended: Math.max(0, Number(currentProgress.gbmAttended) || 0),
         avenueEventsAttended: Math.max(0, Number(currentProgress.avenueEventsAttended) || 0),
         duesPaid: currentProgress.duesPaid === true,
+        duesDue: currentProgress.attendanceRequirementMet === true,
+        ready: currentProgress.attendanceRequirementMet === true && currentProgress.duesPaid === true,
         whatsappJoined: currentProgress.whatsappJoined === true,
+        criteriaVersion: PROSPECT_CRITERIA.criteriaVersion,
         criteria: {
-          requiredGbm: Math.max(1, Number(currentCriteria.requiredGbm) || PROSPECT_CRITERIA.requiredGbm),
-          requiredAvenueEvents: Math.max(1, Number(currentCriteria.requiredAvenueEvents) || PROSPECT_CRITERIA.requiredAvenueEvents),
+          ...PROSPECT_CRITERIA,
+          ...(currentCriteria || {}),
+          criteriaVersion: PROSPECT_CRITERIA.criteriaVersion,
+          requiredConsecutiveAttendance: PROSPECT_CRITERIA.requiredConsecutiveAttendance,
           duesRequired: currentCriteria.duesRequired !== false,
         },
+        currentConsecutiveAttendance: Math.max(0, Number(currentProgress.currentConsecutiveAttendance) || 0),
+        maximumConsecutiveAttendance: Math.max(0, Number(currentProgress.maximumConsecutiveAttendance) || 0),
+        requiredConsecutiveAttendance: PROSPECT_CRITERIA.requiredConsecutiveAttendance,
+        attendanceProgressCount: Math.max(0, Number(currentProgress.attendanceProgressCount) || 0),
+        attendanceRequirementMet: currentProgress.attendanceRequirementMet === true,
+        qualifyingEventIds: Array.isArray(currentProgress.qualifyingEventIds) ? currentProgress.qualifyingEventIds : [],
+        qualifyingEvents: Array.isArray(currentProgress.qualifyingEvents) ? currentProgress.qualifyingEvents : [],
+        attendanceRequirementMetAt: currentProgress.attendanceRequirementMetAt || null,
+        fourthEligibleActivityId: currentProgress.fourthEligibleActivityId || null,
+        fourthEligibleActivityDate: currentProgress.fourthEligibleActivityDate || null,
+        completedCount: [currentProgress.attendanceRequirementMet === true, currentProgress.duesPaid === true].filter(Boolean).length,
+        totalCount: 2,
+        percent: Math.max(0, Math.min(100, Number(currentProgress.percent) || 0)),
+        status: currentProgress.attendanceRequirementMet === true && currentProgress.duesPaid === true ? 'ready' : 'in_progress',
         createdAt: currentProgress.createdAt || now,
         updatedAt: now,
       }, { merge: true });
@@ -2205,24 +2299,15 @@ exports.getProspectManagementData = onCall(CALLABLE_OPTIONS, async (request) => 
   const actorUid = requireAuth(request);
   await assertAdminOrPresident(actorUid);
 
-  const [roleProspectsSnap, typeProspectsSnap, initialProgressSnap, eventsSnap] = await Promise.all([
-    db.collection('users').where('role', '==', 'prospect').get(),
-    db.collection('users').where('memberType', '==', 'prospect').get(),
-    db.collection('prospectProgress').get(),
-    db.collection('events').get(),
-  ]);
-  const usersByUid = new Map();
-  [...roleProspectsSnap.docs, ...typeProspectsSnap.docs].forEach(doc => {
-    usersByUid.set(doc.id, { id: doc.id, ...(doc.data() || {}) });
-  });
+  const eventsSnap = await db.collection('events').get();
+  const initial = await loadProspectUserAndProgressMaps();
+  const activeProspectUsers = Array.from(initial.usersByUid.values())
+    .filter(user => isActiveProspectRecord(user) && !isPromotedProspectRecord(user, initial.progressByUid.get(user.id) || {}));
+  await Promise.all(activeProspectUsers.map(user => recalcProspectProgress(user.id, { eventsSnap, user })));
 
-  const activeProspectUids = Array.from(usersByUid.values())
-    .filter(user => normalizeRole(user.role) === 'prospect' || normalizeRole(user.memberType) === 'prospect')
-    .map(user => user.id);
-  await Promise.all(activeProspectUids.map(uid => recalcProspectProgress(uid, { eventsSnap })));
-
+  const { usersByUid } = await loadProspectUserAndProgressMaps();
   const refreshedProgressSnap = await db.collection('prospectProgress').get();
-  const progressDocs = refreshedProgressSnap.docs.length ? refreshedProgressSnap.docs : initialProgressSnap.docs;
+  const progressDocs = refreshedProgressSnap.docs;
   const missingUserUids = progressDocs
     .map(doc => doc.id)
     .filter(uid => !usersByUid.has(uid));
@@ -2240,15 +2325,27 @@ exports.getProspectManagementData = onCall(CALLABLE_OPTIONS, async (request) => 
       const progress = progressByUid.get(uid) || {};
       const promoted = String(progress.status || '').toLowerCase() === 'promoted'
         || user.promotedFromProspect === true;
-      const activeProspect = normalizeRole(user.role) === 'prospect'
-        || normalizeRole(user.memberType) === 'prospect';
+      const activeProspect = isActiveProspectRecord(user);
       if (!activeProspect && !promoted) return null;
 
       const gbmAttended = Math.max(0, Number(progress.gbmAttended) || 0);
       const avenueEventsAttended = Math.max(0, Number(progress.avenueEventsAttended) || 0);
       const duesPaid = progress.duesPaid === true;
-      const completion = prospectCompletion(gbmAttended, avenueEventsAttended, duesPaid, progress.criteria);
-      const status = promoted ? 'promoted' : (completion.ready ? 'ready' : 'in_progress');
+      const attendanceRequirementMet = progress.attendanceRequirementMet === true;
+      const duesDue = progress.duesDue === true || attendanceRequirementMet;
+      const ready = attendanceRequirementMet === true && duesPaid === true;
+      const status = promoted ? 'promoted' : (ready ? 'ready' : 'in_progress');
+      const requiredConsecutiveAttendance = Math.max(
+        1,
+        Number(progress.requiredConsecutiveAttendance || progress.criteria?.requiredConsecutiveAttendance)
+          || PROSPECT_CRITERIA.requiredConsecutiveAttendance
+      );
+      const currentConsecutiveAttendance = Math.max(0, Number(progress.currentConsecutiveAttendance) || 0);
+      const maximumConsecutiveAttendance = Math.max(0, Number(progress.maximumConsecutiveAttendance) || 0);
+      const attendanceProgressCount = attendanceRequirementMet
+        ? requiredConsecutiveAttendance
+        : Math.min(currentConsecutiveAttendance, requiredConsecutiveAttendance);
+      const percent = Math.max(0, Math.min(100, Number(progress.percent) || Math.round((attendanceProgressCount / requiredConsecutiveAttendance) * 100)));
       return {
         uid,
         name: normalizeText(user.name || user.email || uid, 160),
@@ -2264,12 +2361,29 @@ exports.getProspectManagementData = onCall(CALLABLE_OPTIONS, async (request) => 
         gbmAttended,
         avenueEventsAttended,
         duesPaid,
+        duesDue,
         whatsappJoined: progress.whatsappJoined === true,
-        criteria: completion.criteria,
-        completedCount: completion.completedCount,
-        totalCount: completion.totalCount,
-        percent: completion.percent,
-        ready: !promoted && completion.ready,
+        criteriaVersion: Number(progress.criteriaVersion) || PROSPECT_CRITERIA.criteriaVersion,
+        criteria: {
+          ...PROSPECT_CRITERIA,
+          ...(progress.criteria || {}),
+          criteriaVersion: PROSPECT_CRITERIA.criteriaVersion,
+          requiredConsecutiveAttendance,
+        },
+        currentConsecutiveAttendance,
+        maximumConsecutiveAttendance,
+        requiredConsecutiveAttendance,
+        attendanceProgressCount,
+        attendanceRequirementMet,
+        qualifyingEventIds: Array.isArray(progress.qualifyingEventIds) ? progress.qualifyingEventIds : [],
+        qualifyingEvents: Array.isArray(progress.qualifyingEvents) ? progress.qualifyingEvents : [],
+        attendanceRequirementMetAt: progress.attendanceRequirementMetAt || null,
+        fourthEligibleActivityId: progress.fourthEligibleActivityId || null,
+        fourthEligibleActivityDate: progress.fourthEligibleActivityDate || null,
+        completedCount: Math.max(0, Number(progress.completedCount) || [attendanceRequirementMet, duesPaid].filter(Boolean).length),
+        totalCount: Math.max(1, Number(progress.totalCount) || 2),
+        percent,
+        ready: !promoted && ready,
         promotedAt: progress.promotedAt || user.promotedAt || null,
         createdAt: user.createdAt || progress.createdAt || null,
       };
@@ -2285,11 +2399,18 @@ exports.getProspectManagementData = onCall(CALLABLE_OPTIONS, async (request) => 
       active: prospects.filter(item => item.status !== 'promoted').length,
       ready: prospects.filter(item => item.ready).length,
       promoted: prospects.filter(item => item.status === 'promoted').length,
-      needGbm: prospects.filter(item => item.status !== 'promoted' && item.gbmAttended < item.criteria.requiredGbm).length,
-      needAvenue: prospects.filter(item => item.status !== 'promoted' && item.avenueEventsAttended < item.criteria.requiredAvenueEvents).length,
-      needDues: prospects.filter(item => item.status !== 'promoted' && !item.duesPaid).length,
+      attendanceComplete: prospects.filter(item => item.status !== 'promoted' && item.attendanceRequirementMet).length,
+      duesPending: prospects.filter(item => item.status !== 'promoted' && item.duesDue && !item.duesPaid).length,
+      duesNotYetDue: prospects.filter(item => item.status !== 'promoted' && !item.duesDue && !item.duesPaid).length,
     },
   };
+});
+
+exports.recalculateAllProspectProgress = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertAdminOrPresident(actorUid);
+  const summary = await recalcAllActiveProspects();
+  return { ok: true, summary };
 });
 
 exports.updateProspectDues = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -2303,7 +2424,7 @@ exports.updateProspectDues = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const userSnap = await db.collection('users').doc(uid).get();
   const user = userSnap.exists ? (userSnap.data() || {}) : null;
-  if (!user || (normalizeRole(user.role) !== 'prospect' && normalizeRole(user.memberType) !== 'prospect')) {
+  if (!user || !isActiveProspectRecord(user)) {
     throw new HttpsError('failed-precondition', 'Active prospect account required.');
   }
 
@@ -2312,7 +2433,7 @@ exports.updateProspectDues = onCall(CALLABLE_OPTIONS, async (request) => {
     duesPaid,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
-  const progress = await recalcProspectProgress(uid);
+  const progress = await recalcProspectProgress(uid, { user });
   return { ok: true, uid, progress };
 });
 
@@ -2324,10 +2445,10 @@ exports.recalculateProspectProgress = onCall(CALLABLE_OPTIONS, async (request) =
 
   const userSnap = await db.collection('users').doc(uid).get();
   const user = userSnap.exists ? (userSnap.data() || {}) : null;
-  if (!user || (normalizeRole(user.role) !== 'prospect' && normalizeRole(user.memberType) !== 'prospect')) {
+  if (!user || !isActiveProspectRecord(user)) {
     throw new HttpsError('failed-precondition', 'Active prospect account required.');
   }
-  const progress = await recalcProspectProgress(uid);
+  const progress = await recalcProspectProgress(uid, { user });
   return { ok: true, uid, progress };
 });
 
@@ -2337,7 +2458,22 @@ exports.promoteProspectToGbm = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = normalizeText(request.data?.uid, 128);
   if (!uid) throw new HttpsError('invalid-argument', 'Prospect uid is required.');
 
-  await recalcProspectProgress(uid);
+  const initialUserSnap = await db.collection('users').doc(uid).get();
+  const initialProgressSnap = await db.collection('prospectProgress').doc(uid).get();
+  const initialUser = initialUserSnap.exists ? (initialUserSnap.data() || {}) : null;
+  const initialProgress = initialProgressSnap.exists ? (initialProgressSnap.data() || {}) : {};
+  if (initialUser && isPromotedProspectRecord(initialUser, initialProgress)) {
+    return { ok: true, uid, role: normalizeRole(initialUser.role) || 'gbm', status: 'promoted', alreadyPromoted: true };
+  }
+  if (!initialUser || !isActiveProspectRecord(initialUser)) {
+    throw new HttpsError('failed-precondition', 'Active prospect account required.');
+  }
+
+  const recalculated = await recalcProspectProgress(uid, { user: initialUser });
+  if (!(recalculated.attendanceRequirementMet === true && recalculated.duesPaid === true && recalculated.ready === true)) {
+    throw new HttpsError('failed-precondition', 'Prospect has not completed the attendance requirement and dues payment.');
+  }
+
   const [eventMap, districtEventMap] = await Promise.all([
     buildNaMapFromCollection('events'),
     buildNaMapFromCollection('districtEvents'),
@@ -2365,18 +2501,17 @@ exports.promoteProspectToGbm = onCall(CALLABLE_OPTIONS, async (request) => {
     const role = roleSnap.exists ? (roleSnap.data() || {}) : null;
     const progress = progressSnap.exists ? (progressSnap.data() || {}) : {};
     const activeProspect = user
-      && (normalizeRole(user.role) === 'prospect' || normalizeRole(user.memberType) === 'prospect')
+      && isActiveProspectRecord(user)
       && (!role || normalizeRole(role.role) === 'prospect');
     if (!activeProspect) {
       throw new HttpsError('failed-precondition', 'Active prospect account required.');
     }
 
-    const gbmAttended = Math.max(0, Number(progress.gbmAttended) || 0);
-    const avenueEventsAttended = Math.max(0, Number(progress.avenueEventsAttended) || 0);
+    const attendanceRequirementMet = progress.attendanceRequirementMet === true;
     const duesPaid = progress.duesPaid === true;
-    const completion = prospectCompletion(gbmAttended, avenueEventsAttended, duesPaid, progress.criteria);
-    if (!completion.ready) {
-      throw new HttpsError('failed-precondition', 'Prospect has not completed all promotion criteria.');
+    const ready = progress.ready === true;
+    if (!(attendanceRequirementMet && duesPaid && ready)) {
+      throw new HttpsError('failed-precondition', 'Prospect has not completed the attendance requirement and dues payment.');
     }
 
     const profile = {
@@ -2410,8 +2545,11 @@ exports.promoteProspectToGbm = onCall(CALLABLE_OPTIONS, async (request) => {
     tx.set(progressRef, {
       status: 'promoted',
       ready: true,
-      completedCount: completion.completedCount,
-      totalCount: completion.totalCount,
+      attendanceRequirementMet,
+      duesPaid,
+      duesDue: true,
+      completedCount: Math.max(0, Number(progress.completedCount) || 2),
+      totalCount: Math.max(1, Number(progress.totalCount) || 2),
       percent: 100,
       promotedAt: now,
       promotedBy: actorUid,
@@ -2430,23 +2568,12 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   }
 
   if (active.role === 'prospect') {
-    const [userSnap, progressSnap, eventsSnap] = await Promise.all([
+    const [userSnap, eventsSnap] = await Promise.all([
       db.collection('users').doc(uid).get(),
-      db.collection('prospectProgress').doc(uid).get(),
       db.collection('events').get(),
     ]);
     const userData = userSnap.exists ? (userSnap.data() || {}) : {};
-    const progressData = progressSnap.exists ? (progressSnap.data() || {}) : {};
-    const storedCriteria = progressData.criteria || {};
-    const criteria = {
-      requiredGbm: Math.max(1, Number(storedCriteria.requiredGbm) || PROSPECT_CRITERIA.requiredGbm),
-      requiredAvenueEvents: Math.max(1, Number(storedCriteria.requiredAvenueEvents) || PROSPECT_CRITERIA.requiredAvenueEvents),
-      duesRequired: storedCriteria.duesRequired !== false,
-    };
-    const gbmAttended = Math.max(0, Number(progressData.gbmAttended) || 0);
-    const avenueEventsAttended = Math.max(0, Number(progressData.avenueEventsAttended) || 0);
-    const duesPaid = progressData.duesPaid === true;
-    const completion = prospectCompletion(gbmAttended, avenueEventsAttended, duesPaid, criteria);
+    const progressData = await recalcProspectProgress(uid, { user: userData, eventsSnap });
     const today = new Date().toISOString().slice(0, 10);
     const upcomingEvents = eventsSnap.docs
       .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
@@ -2482,14 +2609,27 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
         previousRotaractDetails: userData.previousRotaractDetails || 'N/A',
       },
       prospectProgress: {
-        gbmAttended,
-        avenueEventsAttended,
-        duesPaid,
+        criteriaVersion: progressData.criteriaVersion,
+        criteria: progressData.criteria,
+        gbmAttended: progressData.gbmAttended,
+        avenueEventsAttended: progressData.avenueEventsAttended,
+        currentConsecutiveAttendance: progressData.currentConsecutiveAttendance,
+        maximumConsecutiveAttendance: progressData.maximumConsecutiveAttendance,
+        requiredConsecutiveAttendance: progressData.requiredConsecutiveAttendance,
+        attendanceProgressCount: progressData.attendanceProgressCount,
+        attendanceRequirementMet: progressData.attendanceRequirementMet,
+        qualifyingEventIds: progressData.qualifyingEventIds,
+        qualifyingEvents: progressData.qualifyingEvents,
+        attendanceRequirementMetAt: progressData.attendanceRequirementMetAt,
+        fourthEligibleActivityId: progressData.fourthEligibleActivityId,
+        fourthEligibleActivityDate: progressData.fourthEligibleActivityDate,
+        duesDue: progressData.duesDue,
+        duesPaid: progressData.duesPaid,
+        ready: progressData.ready,
         whatsappJoined: progressData.whatsappJoined === true,
-        criteria: completion.criteria,
-        completedCount: completion.completedCount,
-        totalCount: completion.totalCount,
-        percent: completion.percent,
+        completedCount: progressData.completedCount,
+        totalCount: progressData.totalCount,
+        percent: progressData.percent,
       },
       upcomingEvents,
     };
@@ -2979,12 +3119,14 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     now,
   });
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
+  const prospectProgressSummary = await recalcAllActiveProspects();
 
   return {
     ok: true,
     eventId,
     attendanceRowsUpdated,
     eventCreated,
+    prospectProgressSummary,
   };
 });
 
@@ -3026,12 +3168,14 @@ exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
     now,
   });
   const attendanceRowsUpdated = await initializeAttendanceForEvent(bodEventId, now);
+  const prospectProgressSummary = await recalcAllActiveProspects();
 
   return {
     ok: true,
     eventId: bodEventId,
     attendanceRowsUpdated,
     eventCreated,
+    prospectProgressSummary,
   };
 });
 
@@ -3053,11 +3197,13 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
   await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
+  const prospectProgressSummary = await recalcAllActiveProspects();
 
   return {
     ok: true,
     eventId,
     attendanceRowsUpdated,
+    prospectProgressSummary,
   };
 });
 
@@ -3089,8 +3235,9 @@ exports.archiveBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     updatedAt: now,
   }, { merge: true });
   await batch.commit();
+  const prospectProgressSummary = await recalcAllActiveProspects();
 
-  return { ok: true, eventId };
+  return { ok: true, eventId, prospectProgressSummary };
 });
 
 exports.createAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -3111,8 +3258,9 @@ exports.createAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     now,
   });
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
+  const prospectProgressSummary = await recalcAllActiveProspects();
 
-  return { ok: true, eventId, eventCreated, attendanceRowsUpdated };
+  return { ok: true, eventId, eventCreated, attendanceRowsUpdated, prospectProgressSummary };
 });
 
 exports.updateAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -3129,7 +3277,8 @@ exports.updateAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
   await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
-  return { ok: true, eventId, attendanceRowsUpdated };
+  const prospectProgressSummary = await recalcAllActiveProspects();
+  return { ok: true, eventId, attendanceRowsUpdated, prospectProgressSummary };
 });
 
 exports.archiveAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -3156,7 +3305,8 @@ exports.archiveAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     updatedAt: now,
   }, { merge: true });
   await batch.commit();
-  return { ok: true, eventId };
+  const prospectProgressSummary = await recalcAllActiveProspects();
+  return { ok: true, eventId, prospectProgressSummary };
 });
 
 exports.createBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {

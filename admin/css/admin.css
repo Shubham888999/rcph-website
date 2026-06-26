@@ -998,7 +998,7 @@ section.admin-card[id]{ scroll-margin-top:76px; }
 
 .prospect-kpis {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-top: 16px;
 }
@@ -1098,6 +1098,37 @@ section.admin-card[id]{ scroll-margin-top:76px; }
 .prospect-card__progress {
   display: grid;
   gap: 8px;
+}
+
+.prospect-card__note {
+  margin: 0;
+  color: #b9c5c5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.prospect-card__qualifying {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prospect-card__qualifying li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255,255,255,.07);
+  color: #d6e3e3;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.prospect-card__qualifying span {
+  color: #9da9a9;
+  white-space: nowrap;
 }
 
 .prospect-progress-track {

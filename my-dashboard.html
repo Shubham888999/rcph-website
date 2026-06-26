@@ -142,35 +142,30 @@
               <strong id="prospectProgressStatus" class="prospect-status-text">Getting Started</strong>
             </div>
             <div class="prospect-progress-summary">
-              <strong id="prospectProgressPercent">0%</strong>
-              <span id="prospectProgressCount" class="subtle">0 of 3 criteria complete</span>
+              <strong id="prospectProgressPercent">0 / 3</strong>
+              <span id="prospectProgressCount" class="subtle">Progress: 0 / 3</span>
             </div>
             <div id="prospectProgressTrack" class="progress-track" role="progressbar" aria-label="Membership onboarding progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
               <div id="prospectProgressFill" class="progress-fill"></div>
             </div>
+            <p id="prospectCriteriaMessage" class="prospect-criteria-message">Attend 3 eligible club meetings or events consecutively. Missing an eligible activity resets the active streak.</p>
             <ul class="prospect-checklist" aria-label="Membership criteria checklist">
               <li id="prospectGbmItem">
                 <span class="criteria-check" aria-hidden="true"></span>
                 <div>
-                  <strong>Attend 2 General Body Meetings</strong>
-                  <span id="prospectGbmValue">0 / 2 attended</span>
+                  <strong>Attend 3 consecutive meetings/events</strong>
+                  <span id="prospectGbmValue">Current streak: 0 / 3</span>
                 </div>
               </li>
               <li id="prospectAvenueItem">
                 <span class="criteria-check" aria-hidden="true"></span>
                 <div>
-                  <strong>Attend 2 Avenue Events</strong>
-                  <span id="prospectAvenueValue">0 / 2 attended</span>
-                </div>
-              </li>
-              <li id="prospectDuesItem">
-                <span class="criteria-check" aria-hidden="true"></span>
-                <div>
-                  <strong>Pay Membership Dues</strong>
-                  <span id="prospectDuesValue">Not paid</span>
+                  <strong>Dues status</strong>
+                  <span id="prospectAvenueValue">Not yet due</span>
                 </div>
               </li>
             </ul>
+            <div id="prospectQualifyingEvents" class="prospect-qualifying-events" hidden></div>
           </article>
         </section>
 

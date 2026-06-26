@@ -391,6 +391,7 @@ async function removeEvent(eventId){
   if (!confirm(`Archive event "${ev?.name || eventId}"? Attendance values will be preserved.`)) return;
   try{
     await callableFunction('archiveAdminClubEvent')({ eventId });
+    await loadProspectManagementData({ showLoading: false, renderAttendance: false });
   }catch(err){
     alert('Failed to archive event: ' + err.message);
   }
@@ -427,6 +428,7 @@ if (editEventForm) {
     if (!id || !name || !date) return;
     try {
       await callableFunction('updateAdminClubEvent')({ eventId: id, name, date, endDate, desc, avenue: avenues });
+      await loadProspectManagementData({ showLoading: false, renderAttendance: false });
       closeModal('editEventModal');
     } catch (err) { alert('Failed to save event: ' + err.message); }
   });
@@ -456,6 +458,7 @@ if (addEventForm) {
     if (!name || !date) return;
     try {
       await callableFunction('createAdminClubEvent')({ name, date, endDate, desc, avenue: avenues });
+      await loadProspectManagementData({ showLoading: false, renderAttendance: false });
       closeModal('addEventModal');
     } catch (err) {
       alert('Failed to add event: ' + err.message);
