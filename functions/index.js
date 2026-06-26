@@ -163,6 +163,23 @@ const CLUB_RANKING_DEFAULT = Object.freeze({
   value: '',
   subtitle: '',
 });
+const ANNOUNCEMENTS_COLLECTION = 'announcements';
+const ANNOUNCEMENT_DELIVERIES_COLLECTION = 'announcementDeliveries';
+const ANNOUNCEMENT_TARGET_ROLES = new Set(['all', 'prospect', 'gbm', 'bod', 'admin', 'president']);
+const ANNOUNCEMENT_ACCOUNT_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
+const ANNOUNCEMENT_PRIORITIES = new Set(['normal', 'important', 'urgent']);
+const ANNOUNCEMENT_EMAIL_SUMMARY_DEFAULT = Object.freeze({
+  attempted: 0,
+  sent: 0,
+  failed: 0,
+});
+const ANNOUNCEMENT_MAX_EXPLICIT_USERS = 200;
+const ANNOUNCEMENT_MAX_TARGET_ROLES = 6;
+const ANNOUNCEMENT_MAX_ID_LENGTH = 128;
+const ANNOUNCEMENT_DELIVERY_BATCH_SIZE = 450;
+const ANNOUNCEMENT_AUTH_LOOKUP_CHUNK_SIZE = 100;
+const ANNOUNCEMENT_EXPIRY_MAX_MS = 365 * 24 * 60 * 60 * 1000;
+const ANNOUNCEMENT_EMAIL_MAX_RECIPIENTS = 500;
 
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
@@ -239,6 +256,648 @@ function normalizeClubRanking(raw = {}, options = {}) {
   };
 }
 
+function hasUnsafeAnnouncementBodyControlChars(value) {
+  return /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
+}
+
+function normalizeAnnouncementTextField(value, {
+  field,
+  max,
+  required = false,
+  allowLineBreaks = false,
+} = {}) {
+  if (Array.isArray(value) || (value && typeof value === 'object')) {
+    throw new HttpsError('invalid-argument', `${field} must be plain text.`);
+  }
+  if (value === undefined || value === null) {
+    if (required) throw new HttpsError('invalid-argument', `${field} is required.`);
+    return '';
+  }
+  if (typeof value !== 'string') {
+    throw new HttpsError('invalid-argument', `${field} must be a string.`);
+  }
+
+  const normalized = value.trim();
+  if (required && !normalized) {
+    throw new HttpsError('invalid-argument', `${field} is required.`);
+  }
+  if (normalized.length > max) {
+    throw new HttpsError('invalid-argument', `${field} must be ${max} characters or fewer.`);
+  }
+  const hasUnsafeControls = allowLineBreaks
+    ? hasUnsafeAnnouncementBodyControlChars(normalized)
+    : hasPlainTextControlChars(normalized);
+  if (hasUnsafeControls || hasMarkupLikeCharacters(normalized)) {
+    throw new HttpsError('invalid-argument', `${field} must be plain text.`);
+  }
+  return normalized;
+}
+
+function normalizeAnnouncementPriority(value) {
+  if (value === undefined || value === null || value === '') return 'normal';
+  if (typeof value !== 'string' || Array.isArray(value)) {
+    throw new HttpsError('invalid-argument', 'priority must be a string.');
+  }
+  const priority = value.trim().toLowerCase();
+  if (!priority) return 'normal';
+  if (!ANNOUNCEMENT_PRIORITIES.has(priority)) {
+    throw new HttpsError('invalid-argument', 'priority must be normal, important, or urgent.');
+  }
+  return priority;
+}
+
+function normalizeAnnouncementAction(raw = {}) {
+  const actionText = normalizeAnnouncementTextField(raw.actionText, {
+    field: 'actionText',
+    max: 80,
+    required: false,
+  });
+  const actionUrl = normalizeAnnouncementTextField(raw.actionUrl, {
+    field: 'actionUrl',
+    max: 1000,
+    required: false,
+  });
+
+  if ((actionText && !actionUrl) || (!actionText && actionUrl)) {
+    throw new HttpsError('invalid-argument', 'actionText and actionUrl must be supplied together.');
+  }
+  if (!actionText && !actionUrl) {
+    return { actionText: '', actionUrl: '' };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(actionUrl);
+  } catch {
+    throw new HttpsError('invalid-argument', 'actionUrl must be a valid absolute https URL.');
+  }
+  if (parsed.protocol !== 'https:' || !parsed.hostname) {
+    throw new HttpsError('invalid-argument', 'actionUrl must be a valid absolute https URL.');
+  }
+
+  return { actionText, actionUrl: parsed.toString() };
+}
+
+function normalizeAnnouncementTargets(raw = {}) {
+  const rawRoles = raw.targetRoles === undefined || raw.targetRoles === null ? [] : raw.targetRoles;
+  const rawUserIds = raw.targetUserIds === undefined || raw.targetUserIds === null ? [] : raw.targetUserIds;
+
+  if (!Array.isArray(rawRoles)) {
+    throw new HttpsError('invalid-argument', 'targetRoles must be an array.');
+  }
+  if (!Array.isArray(rawUserIds)) {
+    throw new HttpsError('invalid-argument', 'targetUserIds must be an array.');
+  }
+  if (rawRoles.length > ANNOUNCEMENT_MAX_TARGET_ROLES) {
+    throw new HttpsError('invalid-argument', 'targetRoles contains too many values.');
+  }
+  if (rawUserIds.length > ANNOUNCEMENT_MAX_EXPLICIT_USERS) {
+    throw new HttpsError('invalid-argument', 'targetUserIds contains too many values.');
+  }
+
+  const targetRoles = [];
+  const roleSeen = new Set();
+  for (const item of rawRoles) {
+    if (typeof item !== 'string') {
+      throw new HttpsError('invalid-argument', 'targetRoles must contain strings only.');
+    }
+    const role = item.trim().toLowerCase();
+    if (!role || !ANNOUNCEMENT_TARGET_ROLES.has(role)) {
+      throw new HttpsError('invalid-argument', 'targetRoles contains an unsupported role.');
+    }
+    if (!roleSeen.has(role)) {
+      roleSeen.add(role);
+      targetRoles.push(role);
+    }
+  }
+  const normalizedRoles = roleSeen.has('all') ? ['all'] : targetRoles;
+
+  const targetUserIds = [];
+  const uidSeen = new Set();
+  for (const item of rawUserIds) {
+    const uid = validateAnnouncementDocId(item, 'targetUserIds');
+    if (uid.includes('@')) {
+      throw new HttpsError('invalid-argument', 'targetUserIds must contain UIDs, not email addresses.');
+    }
+    if (!uidSeen.has(uid)) {
+      uidSeen.add(uid);
+      targetUserIds.push(uid);
+    }
+  }
+
+  if (!normalizedRoles.length && !targetUserIds.length) {
+    throw new HttpsError('invalid-argument', 'At least one target role or target user is required.');
+  }
+
+  return {
+    targetRoles: normalizedRoles,
+    targetUserIds,
+  };
+}
+
+function normalizeAnnouncementExpiry(value, nowMillis = Date.now()) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new HttpsError('invalid-argument', 'expiresAt must be an ISO date-time string or null.');
+  }
+  const expiresMillis = Date.parse(value);
+  if (!Number.isFinite(expiresMillis)) {
+    throw new HttpsError('invalid-argument', 'expiresAt must be a valid ISO date-time string.');
+  }
+  if (expiresMillis <= nowMillis) {
+    throw new HttpsError('invalid-argument', 'expiresAt must be in the future.');
+  }
+  if (expiresMillis > nowMillis + ANNOUNCEMENT_EXPIRY_MAX_MS) {
+    throw new HttpsError('invalid-argument', 'expiresAt must be no more than one year in the future.');
+  }
+  return admin.firestore.Timestamp.fromMillis(expiresMillis);
+}
+
+function normalizeAnnouncementSendEmail(value) {
+  if (value === undefined || value === null) return false;
+  if (typeof value !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'sendEmail must be a boolean when supplied.');
+  }
+  return value;
+}
+
+function normalizeAnnouncementPayload(raw = {}) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  if (source !== raw) {
+    throw new HttpsError('invalid-argument', 'Announcement payload must be an object.');
+  }
+  const { targetRoles, targetUserIds } = normalizeAnnouncementTargets(source);
+  const action = normalizeAnnouncementAction(source);
+  return {
+    title: normalizeAnnouncementTextField(source.title, {
+      field: 'title',
+      max: 160,
+      required: true,
+    }),
+    body: normalizeAnnouncementTextField(source.body, {
+      field: 'body',
+      max: 5000,
+      required: true,
+      allowLineBreaks: true,
+    }),
+    priority: normalizeAnnouncementPriority(source.priority),
+    actionText: action.actionText,
+    actionUrl: action.actionUrl,
+    targetRoles,
+    targetUserIds,
+    expiresAt: normalizeAnnouncementExpiry(source.expiresAt),
+    emailRequested: normalizeAnnouncementSendEmail(source.sendEmail),
+  };
+}
+
+function validateAnnouncementDocId(value, field = 'announcementId') {
+  if (typeof value !== 'string') {
+    throw new HttpsError('invalid-argument', `${field} must be a string.`);
+  }
+  const id = value.trim();
+  if (!id) throw new HttpsError('invalid-argument', `${field} is required.`);
+  if (id.length > ANNOUNCEMENT_MAX_ID_LENGTH) {
+    throw new HttpsError('invalid-argument', `${field} is too long.`);
+  }
+  if (id.includes('/') || hasPlainTextControlChars(id)) {
+    throw new HttpsError('invalid-argument', `${field} is invalid.`);
+  }
+  return id;
+}
+
+function announcementDeliveryId(announcementId, uid) {
+  const safeAnnouncementId = validateAnnouncementDocId(announcementId, 'announcementId');
+  const safeUid = validateAnnouncementDocId(uid, 'uid');
+  return `${safeAnnouncementId}_${safeUid}`;
+}
+
+function timestampToMillis(value) {
+  if (!value) return null;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function timestampToIso(value) {
+  const millis = timestampToMillis(value);
+  return millis ? new Date(millis).toISOString() : null;
+}
+
+function normalizeNonNegativeInteger(value, fallback = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(0, Math.floor(number));
+}
+
+function isAnnouncementExpired(expiresAt, nowMillis = Date.now()) {
+  const expiresMillis = timestampToMillis(expiresAt);
+  return expiresMillis !== null && expiresMillis <= nowMillis;
+}
+
+function normalizePublishedAnnouncementForDashboard(id, announcement, delivery, nowMillis = Date.now()) {
+  if (!announcement || announcement.status !== 'published') return null;
+  if (isAnnouncementExpired(announcement.expiresAt || delivery.expiresAt, nowMillis)) return null;
+
+  const title = typeof announcement.title === 'string'
+    ? announcement.title.trim().replace(/[\u0000-\u001f\u007f<>]/g, '').slice(0, 160)
+    : '';
+  const body = typeof announcement.body === 'string'
+    ? announcement.body.trim().replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f<>]/g, '').slice(0, 5000)
+    : '';
+  if (!title || !body) return null;
+
+  const priority = ANNOUNCEMENT_PRIORITIES.has(String(announcement.priority || '').toLowerCase())
+    ? String(announcement.priority).toLowerCase()
+    : 'normal';
+  const actionText = typeof announcement.actionText === 'string'
+    ? announcement.actionText.trim().replace(/[\u0000-\u001f\u007f<>]/g, '').slice(0, 80)
+    : '';
+  const actionUrl = typeof announcement.actionUrl === 'string'
+    ? announcement.actionUrl.trim()
+    : '';
+  let safeActionUrl = '';
+  if (actionText && actionUrl) {
+    try {
+      const parsed = new URL(actionUrl);
+      if (parsed.protocol === 'https:' && parsed.hostname) safeActionUrl = parsed.toString();
+    } catch {
+      safeActionUrl = '';
+    }
+  }
+
+  return {
+    id,
+    title,
+    body,
+    priority,
+    actionText: safeActionUrl ? actionText : '',
+    actionUrl: safeActionUrl,
+    publishedAt: timestampToIso(announcement.publishedAt || delivery.publishedAt),
+    expiresAt: timestampToIso(announcement.expiresAt || delivery.expiresAt),
+    read: delivery.dashboardStatus === 'read'
+      || delivery.dashboardStatus === 'dismissed'
+      || !!delivery.readAt,
+  };
+}
+
+function normalizeAnnouncementHistoryRequest(raw = {}) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  if (source !== raw) {
+    throw new HttpsError('invalid-argument', 'History request must be an object.');
+  }
+  const allowedFields = new Set(['limit', 'cursor']);
+  Object.keys(source).forEach(key => {
+    if (!allowedFields.has(key)) {
+      throw new HttpsError('invalid-argument', 'Unsupported history request field.');
+    }
+  });
+
+  let limit = 20;
+  if (source.limit !== undefined && source.limit !== null) {
+    if (!Number.isInteger(source.limit)) {
+      throw new HttpsError('invalid-argument', 'limit must be an integer.');
+    }
+    if (source.limit < 1 || source.limit > 50) {
+      throw new HttpsError('invalid-argument', 'limit must be between 1 and 50.');
+    }
+    limit = source.limit;
+  }
+
+  let cursor = null;
+  if (source.cursor !== undefined && source.cursor !== null && source.cursor !== '') {
+    cursor = validateAnnouncementDocId(source.cursor, 'cursor');
+  }
+
+  return { limit, cursor };
+}
+
+function normalizeAnnouncementHistoryStatus(value) {
+  const status = String(value || '').trim().toLowerCase();
+  if (['published', 'failed', 'publishing'].includes(status)) return status;
+  return 'unknown';
+}
+
+function normalizeAnnouncementHistoryBodyPreview(value) {
+  if (typeof value !== 'string') return '';
+  const normalized = value
+    .trim()
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f<>]/g, '')
+    .replace(/\s+/g, ' ');
+  if (normalized.length <= 240) return normalized;
+  return `${normalized.slice(0, 240).trimEnd()}...`;
+}
+
+function normalizeAnnouncementHistoryRoles(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const roles = [];
+  value.forEach(item => {
+    if (typeof item !== 'string') return;
+    const role = item.trim().toLowerCase();
+    if (!ANNOUNCEMENT_TARGET_ROLES.has(role) || seen.has(role)) return;
+    seen.add(role);
+    roles.push(role);
+  });
+  return seen.has('all') ? ['all'] : roles;
+}
+
+function normalizeAnnouncementHistoryEmailSummary(raw = {}) {
+  const attempted = normalizeNonNegativeInteger(raw?.attempted, 0);
+  const sent = Math.min(normalizeNonNegativeInteger(raw?.sent, 0), attempted);
+  const failed = Math.min(normalizeNonNegativeInteger(raw?.failed, 0), Math.max(0, attempted - sent));
+  return { attempted, sent, failed };
+}
+
+function normalizeAnnouncementHistoryItem(id, data, dashboardSummary = {}) {
+  let safeId;
+  try {
+    safeId = validateAnnouncementDocId(id, 'announcementId');
+  } catch {
+    return null;
+  }
+
+  const title = typeof data?.title === 'string'
+    ? data.title.trim().replace(/[\u0000-\u001f\u007f<>]/g, '').slice(0, 160)
+    : '';
+  if (!title) return null;
+
+  const priorityValue = String(data?.priority || '').trim().toLowerCase();
+  const priority = ANNOUNCEMENT_PRIORITIES.has(priorityValue) ? priorityValue : 'normal';
+  const status = normalizeAnnouncementHistoryStatus(data?.status);
+  const targetRoles = normalizeAnnouncementHistoryRoles(data?.targetRoles);
+  const explicitRecipientCount = Array.isArray(data?.targetUserIds)
+    ? Math.min(data.targetUserIds.length, ANNOUNCEMENT_MAX_EXPLICIT_USERS)
+    : 0;
+  const recipientCount = normalizeNonNegativeInteger(data?.recipientCount, 0);
+  const unread = normalizeNonNegativeInteger(dashboardSummary.unread, 0);
+  const read = normalizeNonNegativeInteger(dashboardSummary.read, 0);
+  const dismissed = normalizeNonNegativeInteger(dashboardSummary.dismissed, 0);
+  const dashboardTotal = unread + read + dismissed;
+  const scale = recipientCount > 0 && dashboardTotal > recipientCount ? recipientCount / dashboardTotal : 1;
+
+  return {
+    id: safeId,
+    title,
+    bodyPreview: normalizeAnnouncementHistoryBodyPreview(data?.body),
+    priority,
+    status,
+    targetRoles,
+    explicitRecipientCount,
+    recipientCount,
+    dashboardSummary: {
+      unread: Math.floor(unread * scale),
+      read: Math.floor(read * scale),
+      dismissed: Math.floor(dismissed * scale),
+    },
+    emailRequested: data?.emailRequested === true,
+    emailSummary: normalizeAnnouncementHistoryEmailSummary(data?.emailSummary || {}),
+    publishedAt: timestampToIso(data?.publishedAt),
+    expiresAt: timestampToIso(data?.expiresAt),
+    createdAt: timestampToIso(data?.createdAt),
+  };
+}
+
+async function getAnnouncementDashboardSummaries(announcementIds) {
+  const summaries = new Map();
+  announcementIds.forEach(id => {
+    summaries.set(id, { unread: 0, read: 0, dismissed: 0 });
+  });
+
+  for (const chunk of chunkArray(announcementIds, 10)) {
+    if (!chunk.length) continue;
+    const snap = await db
+      .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+      .where('announcementId', 'in', chunk)
+      .get();
+    snap.forEach(doc => {
+      const data = doc.data() || {};
+      const announcementId = data.announcementId;
+      if (!summaries.has(announcementId)) return;
+      const status = String(data.dashboardStatus || 'unread').toLowerCase();
+      if (!['unread', 'read', 'dismissed'].includes(status)) return;
+      summaries.get(announcementId)[status] += 1;
+    });
+  }
+
+  return summaries;
+}
+
+function chunkArray(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+async function getFirestoreDocsById(collectionName, ids) {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  const result = new Map();
+  for (const chunk of chunkArray(uniqueIds, ANNOUNCEMENT_DELIVERY_BATCH_SIZE)) {
+    const refs = chunk.map(id => db.collection(collectionName).doc(id));
+    const snaps = await db.getAll(...refs);
+    snaps.forEach(snap => result.set(snap.id, snap));
+  }
+  return result;
+}
+
+async function getAuthUsersById(ids) {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  const result = new Map();
+  for (const chunk of chunkArray(uniqueIds, ANNOUNCEMENT_AUTH_LOOKUP_CHUNK_SIZE)) {
+    const response = await admin.auth().getUsers(chunk.map(uid => ({ uid })));
+    response.users.forEach(user => result.set(user.uid, user));
+  }
+  return result;
+}
+
+function roleMatchesAnnouncementTarget(role, targetRoles) {
+  return targetRoles.includes('all') || targetRoles.includes(role);
+}
+
+function buildEligibleAnnouncementRecipient(uid, { authRecord, userSnap, roleSnap }) {
+  if (!authRecord || authRecord.disabled === true || !userSnap?.exists || !roleSnap?.exists) return null;
+  const userData = userSnap.data() || {};
+  const roleData = roleSnap.data() || {};
+  const role = normalizeRole(roleData.role);
+  const roleStatus = String(roleData.status || 'approved').toLowerCase();
+  if (!isApprovedActiveUserRecord(userData)) return null;
+  if (!ANNOUNCEMENT_ACCOUNT_ROLES.has(role) || roleStatus !== 'approved') return null;
+
+  return {
+    uid,
+    name: normalizeText(userData.name || authRecord.displayName || authRecord.email || uid, 160),
+    email: normalizeEmail(userData.email || authRecord.email || ''),
+    role,
+  };
+}
+
+async function getEligibleAnnouncementRecipientsForUids(candidateIds) {
+  const uniqueIds = Array.from(new Set(candidateIds.filter(Boolean)));
+  if (!uniqueIds.length) return [];
+
+  const [userSnapsByUid, roleSnapsByUid, authUsersByUid] = await Promise.all([
+    getFirestoreDocsById('users', uniqueIds),
+    getFirestoreDocsById('roles', uniqueIds),
+    getAuthUsersById(uniqueIds),
+  ]);
+
+  const recipients = [];
+  for (const uid of uniqueIds) {
+    const recipient = buildEligibleAnnouncementRecipient(uid, {
+      authRecord: authUsersByUid.get(uid),
+      userSnap: userSnapsByUid.get(uid),
+      roleSnap: roleSnapsByUid.get(uid),
+    });
+    if (recipient) recipients.push(recipient);
+  }
+  return recipients;
+}
+
+async function getAllEligibleAnnouncementRecipients() {
+  const rolesSnap = await db.collection('roles').get();
+  const candidateUids = [];
+  rolesSnap.forEach(doc => {
+    const data = doc.data() || {};
+    const role = normalizeRole(data.role);
+    const status = String(data.status || 'approved').toLowerCase();
+    if (!ANNOUNCEMENT_ACCOUNT_ROLES.has(role) || status !== 'approved') return;
+    candidateUids.push(doc.id);
+  });
+  return getEligibleAnnouncementRecipientsForUids(candidateUids);
+}
+
+function sortAnnouncementRecipientsForDirectory(recipients) {
+  return recipients
+    .slice()
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))
+      || String(a.email || '').localeCompare(String(b.email || ''))
+      || String(a.uid || '').localeCompare(String(b.uid || '')));
+}
+
+async function resolveAnnouncementRecipients({ targetRoles, targetUserIds }) {
+  const explicitUidSet = new Set(targetUserIds);
+  const candidateUids = new Set(targetUserIds);
+  const hasRoleTarget = targetRoles.length > 0;
+
+  if (hasRoleTarget) {
+    const rolesSnap = await db.collection('roles').get();
+    rolesSnap.forEach(doc => {
+      const data = doc.data() || {};
+      const role = normalizeRole(data.role);
+      const status = String(data.status || 'approved').toLowerCase();
+      if (!ANNOUNCEMENT_ACCOUNT_ROLES.has(role) || status !== 'approved') return;
+      if (!roleMatchesAnnouncementTarget(role, targetRoles)) return;
+      candidateUids.add(doc.id);
+    });
+  }
+
+  const recipients = await getEligibleAnnouncementRecipientsForUids(Array.from(candidateUids));
+  return recipients
+    .filter(recipient => explicitUidSet.has(recipient.uid)
+      || roleMatchesAnnouncementTarget(recipient.role, targetRoles))
+    .sort((a, b) => a.uid.localeCompare(b.uid));
+}
+
+async function writeAnnouncementDeliveries({ announcementId, announcement, recipients, timestamp }) {
+  let batch = db.batch();
+  let ops = 0;
+  const emailStatus = announcement.emailRequested ? 'pending' : 'not_requested';
+
+  async function commitIfNeeded(force = false) {
+    if (ops > 0 && (force || ops >= ANNOUNCEMENT_DELIVERY_BATCH_SIZE)) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+
+  for (const recipient of recipients) {
+    const deliveryRef = db
+      .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+      .doc(announcementDeliveryId(announcementId, recipient.uid));
+    batch.set(deliveryRef, {
+      announcementId,
+      uid: recipient.uid,
+      title: announcement.title,
+      priority: announcement.priority,
+      publishedAt: timestamp,
+      expiresAt: announcement.expiresAt || null,
+      dashboardStatus: 'unread',
+      readAt: null,
+      dismissedAt: null,
+      emailStatus,
+      emailSentAt: null,
+      emailErrorCode: '',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }, { merge: false });
+    ops += 1;
+    await commitIfNeeded();
+  }
+
+  await commitIfNeeded(true);
+}
+
+async function getDashboardAnnouncementsForUser(uid) {
+  try {
+    const nowMillis = Date.now();
+    const deliveriesSnap = await db
+      .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+      .where('uid', '==', uid)
+      .get();
+
+    const deliveries = [];
+    deliveriesSnap.forEach(doc => {
+      const data = doc.data() || {};
+      if (data.uid !== uid) return;
+      if (data.dashboardStatus === 'dismissed') return;
+      if (!data.announcementId || typeof data.announcementId !== 'string') return;
+      if (isAnnouncementExpired(data.expiresAt, nowMillis)) return;
+      deliveries.push({ id: doc.id, ...data });
+    });
+
+    if (!deliveries.length) return [];
+
+    const announcementIds = deliveries
+      .map(delivery => delivery.announcementId)
+      .filter(id => {
+        try {
+          validateAnnouncementDocId(id, 'announcementId');
+          return true;
+        } catch {
+          return false;
+        }
+      });
+    const announcementSnapsById = await getFirestoreDocsById(ANNOUNCEMENTS_COLLECTION, announcementIds);
+    const rendered = [];
+
+    deliveries.forEach(delivery => {
+      const snap = announcementSnapsById.get(delivery.announcementId);
+      if (!snap?.exists) return;
+      const item = normalizePublishedAnnouncementForDashboard(
+        snap.id,
+        snap.data() || {},
+        delivery,
+        nowMillis
+      );
+      if (item) rendered.push(item);
+    });
+
+    return rendered
+      .sort((a, b) => (timestampToMillis(b.publishedAt) || 0) - (timestampToMillis(a.publishedAt) || 0)
+        || String(b.id).localeCompare(String(a.id)))
+      .slice(0, 5);
+  } catch (err) {
+    console.warn('Could not load dashboard announcements', uid, err?.message || String(err));
+    return [];
+  }
+}
+
 function normalizeBoolean(value) {
   if (typeof value === 'boolean') return value;
   return ['true', 'yes', '1'].includes(String(value || '').trim().toLowerCase());
@@ -292,6 +951,261 @@ function escapeEmailHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function normalizeAnnouncementEmailAddress(value) {
+  const email = normalizeEmail(value);
+  if (!email) return { ok: false, email: '', code: 'missing_email' };
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)) {
+    return { ok: false, email: '', code: 'invalid_email' };
+  }
+  return { ok: true, email, code: '' };
+}
+
+function announcementPriorityEmailPrefix(priority) {
+  if (priority === 'urgent') return '[URGENT][RCPH]';
+  if (priority === 'important') return '[IMPORTANT][RCPH]';
+  return '[RCPH]';
+}
+
+function announcementPriorityEmailLabel(priority) {
+  if (priority === 'urgent') return 'Urgent';
+  if (priority === 'important') return 'Important';
+  return 'Normal';
+}
+
+function formatAnnouncementEmailDate(value) {
+  if (!value) return '';
+  const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata',
+  });
+}
+
+function buildAnnouncementEmailSubject(announcement) {
+  return `${announcementPriorityEmailPrefix(announcement.priority)} ${announcement.title}`;
+}
+
+function buildAnnouncementEmailText(announcement) {
+  const lines = [
+    'Rotaract Club of Pune Heritage',
+    '',
+    `Priority: ${announcementPriorityEmailLabel(announcement.priority)}`,
+    '',
+    announcement.title,
+    '',
+    announcement.body,
+  ];
+  if (announcement.actionText && announcement.actionUrl) {
+    lines.push('', `${announcement.actionText}: ${announcement.actionUrl}`);
+  }
+  const expires = formatAnnouncementEmailDate(announcement.expiresAt);
+  if (expires) {
+    lines.push('', `Expires: ${expires}`);
+  }
+  lines.push('', 'This announcement is also available on your RCPH dashboard.');
+  return lines.join('\n');
+}
+
+function buildAnnouncementEmailHtml(announcement) {
+  const priorityLabel = escapeEmailHtml(announcementPriorityEmailLabel(announcement.priority));
+  const title = escapeEmailHtml(announcement.title);
+  const body = escapeEmailHtml(announcement.body).replace(/\r?\n/g, '<br>');
+  const expires = formatAnnouncementEmailDate(announcement.expiresAt);
+  const action = announcement.actionText && announcement.actionUrl
+    ? `<p style="margin:22px 0;"><a href="${escapeEmailHtml(announcement.actionUrl)}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:700;">${escapeEmailHtml(announcement.actionText)}</a></p>`
+    : '';
+  const expiryHtml = expires
+    ? `<p style="margin:14px 0 0;color:#596364;font-size:14px;">Expires: ${escapeEmailHtml(expires)}</p>`
+    : '';
+
+  return `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#172124;background:#f6fbfb;padding:24px;">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #dce8e8;border-radius:12px;padding:24px;">
+        <p style="margin:0 0 10px;color:#0f766e;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">Rotaract Club of Pune Heritage</p>
+        <p style="margin:0 0 14px;color:#7a5b12;font-weight:800;">${priorityLabel}</p>
+        <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;color:#111827;">${title}</h1>
+        <div style="font-size:16px;color:#243133;">${body}</div>
+        ${action}
+        ${expiryHtml}
+        <p style="margin:22px 0 0;color:#596364;font-size:14px;">This announcement is also available on your RCPH dashboard.</p>
+      </div>
+    </div>
+  `;
+}
+
+async function updateAnnouncementDeliveryEmailStatus(announcementId, uid, fields) {
+  await db
+    .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+    .doc(announcementDeliveryId(announcementId, uid))
+    .set({
+      ...fields,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+}
+
+function safeAnnouncementLogId(value) {
+  const text = String(value || '');
+  if (text.length <= 12) return text;
+  return `${text.slice(0, 6)}...${text.slice(-4)}`;
+}
+
+async function tryUpdateAnnouncementDeliveryEmailStatus(announcementId, uid, fields) {
+  try {
+    await updateAnnouncementDeliveryEmailStatus(announcementId, uid, fields);
+    return true;
+  } catch (err) {
+    console.warn('Announcement email delivery status could not be persisted', {
+      announcementId,
+      uid: safeAnnouncementLogId(uid),
+      intendedStatus: fields?.emailStatus || '',
+      message: err?.message || String(err),
+    });
+    return false;
+  }
+}
+
+async function markAnnouncementEmailFailures(announcementId, recipients, code, options = {}) {
+  const pendingOnly = options.pendingOnly === true;
+  let batch = db.batch();
+  let ops = 0;
+  for (const recipient of recipients) {
+    const deliveryRef = db
+      .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+      .doc(announcementDeliveryId(announcementId, recipient.uid));
+    if (pendingOnly) {
+      const snap = await deliveryRef.get();
+      if (!snap.exists || snap.data()?.emailStatus !== 'pending') {
+        continue;
+      }
+    }
+    batch.set(
+      deliveryRef,
+      {
+        emailStatus: 'failed',
+        emailSentAt: null,
+        emailErrorCode: code,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    ops += 1;
+    if (ops >= ANNOUNCEMENT_DELIVERY_BATCH_SIZE) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+  if (ops) await batch.commit();
+}
+
+async function tryMarkAnnouncementEmailFailures(announcementId, recipients, code, options = {}) {
+  try {
+    await markAnnouncementEmailFailures(announcementId, recipients, code, options);
+    return true;
+  } catch (err) {
+    console.warn('Announcement bulk email failure status could not be persisted', {
+      announcementId,
+      recipientCount: recipients.length,
+      intendedStatus: 'failed',
+      code,
+      message: err?.message || String(err),
+    });
+    return false;
+  }
+}
+
+async function sendAnnouncementEmails({ announcementId, announcement, recipients }) {
+  const summary = { attempted: recipients.length, sent: 0, failed: 0 };
+  if (!recipients.length) return summary;
+
+  if (recipients.length > ANNOUNCEMENT_EMAIL_MAX_RECIPIENTS) {
+    await tryMarkAnnouncementEmailFailures(announcementId, recipients, 'email_recipient_limit');
+    summary.failed = recipients.length;
+    return summary;
+  }
+
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    await tryMarkAnnouncementEmailFailures(announcementId, recipients, 'email_not_configured');
+    summary.failed = recipients.length;
+    console.warn('Announcement email skipped: EMAIL_USER/EMAIL_PASS (or SMTP_USER/SMTP_PASS) is not configured.', {
+      announcementId,
+      recipientCount: recipients.length,
+    });
+    return summary;
+  }
+
+  const subject = buildAnnouncementEmailSubject(announcement);
+  const text = buildAnnouncementEmailText(announcement);
+  const html = buildAnnouncementEmailHtml(announcement);
+
+  for (const recipient of recipients) {
+    const email = normalizeAnnouncementEmailAddress(recipient.email);
+    if (!email.ok) {
+      summary.failed += 1;
+      await tryUpdateAnnouncementDeliveryEmailStatus(announcementId, recipient.uid, {
+        emailStatus: 'failed',
+        emailSentAt: null,
+        emailErrorCode: email.code,
+      });
+      continue;
+    }
+
+    let smtpSent = false;
+    try {
+      await transporter.sendMail({
+        from: `"RCPH Platform" <${EMAIL_USER}>`,
+        to: email.email,
+        subject,
+        text,
+        html,
+      });
+      smtpSent = true;
+    } catch (err) {
+      summary.failed += 1;
+      await tryUpdateAnnouncementDeliveryEmailStatus(announcementId, recipient.uid, {
+        emailStatus: 'failed',
+        emailSentAt: null,
+        emailErrorCode: 'smtp_failed',
+      });
+    }
+
+    if (smtpSent) {
+      summary.sent += 1;
+      const persisted = await tryUpdateAnnouncementDeliveryEmailStatus(announcementId, recipient.uid, {
+        emailStatus: 'sent',
+        emailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        emailErrorCode: '',
+      });
+      if (!persisted) {
+        console.warn('Announcement email sent but delivery status could not be persisted', {
+          announcementId,
+          uid: safeAnnouncementLogId(recipient.uid),
+        });
+      }
+    }
+  }
+
+  const accounted = summary.sent + summary.failed;
+  if (accounted < summary.attempted) {
+    summary.failed += summary.attempted - accounted;
+  } else if (accounted > summary.attempted) {
+    summary.failed = Math.max(0, summary.attempted - summary.sent);
+  }
+
+  console.info('Announcement email summary', {
+    announcementId,
+    recipientCount: recipients.length,
+    sent: summary.sent,
+    failed: summary.failed,
+  });
+  return summary;
 }
 
 function signupEmailValue(value, fallback = 'N/A') {
@@ -2680,6 +3594,254 @@ exports.updateClubRanking = onCall(CALLABLE_OPTIONS, async (request) => {
   };
 });
 
+exports.getAnnouncementRecipientOptions = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertAdminOrPresidentAuthority(actorUid);
+  await assertApprovedActiveCallableAccount(actorUid);
+
+  const recipients = sortAnnouncementRecipientsForDirectory(
+    await getAllEligibleAnnouncementRecipients()
+  );
+
+  return {
+    success: true,
+    recipients: recipients.map(recipient => ({
+      uid: recipient.uid,
+      name: recipient.name,
+      email: recipient.email,
+      role: recipient.role,
+    })),
+  };
+});
+
+exports.getAnnouncementHistory = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertAdminOrPresidentAuthority(actorUid);
+  await assertApprovedActiveCallableAccount(actorUid);
+
+  const { limit, cursor } = normalizeAnnouncementHistoryRequest(request.data || {});
+  let query = db
+    .collection(ANNOUNCEMENTS_COLLECTION)
+    .orderBy('createdAt', 'desc')
+    .limit(limit + 1);
+
+  if (cursor) {
+    const cursorSnap = await db.collection(ANNOUNCEMENTS_COLLECTION).doc(cursor).get();
+    if (!cursorSnap.exists) {
+      throw new HttpsError('invalid-argument', 'History cursor was not found.');
+    }
+    query = db
+      .collection(ANNOUNCEMENTS_COLLECTION)
+      .orderBy('createdAt', 'desc')
+      .startAfter(cursorSnap)
+      .limit(limit + 1);
+  }
+
+  const snap = await query.get();
+  const pageDocs = snap.docs.slice(0, limit);
+  const announcementIds = pageDocs
+    .map(doc => doc.id)
+    .filter(id => {
+      try {
+        validateAnnouncementDocId(id, 'announcementId');
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  const summaries = await getAnnouncementDashboardSummaries(announcementIds);
+  const announcements = [];
+
+  pageDocs.forEach(doc => {
+    const item = normalizeAnnouncementHistoryItem(
+      doc.id,
+      doc.data() || {},
+      summaries.get(doc.id) || {}
+    );
+    if (item) announcements.push(item);
+  });
+
+  return {
+    success: true,
+    announcements,
+    nextCursor: snap.docs.length > limit && pageDocs.length
+      ? pageDocs[pageDocs.length - 1].id
+      : null,
+  };
+});
+
+exports.publishAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertAdminOrPresidentAuthority(actorUid);
+  await assertApprovedActiveCallableAccount(actorUid);
+
+  const announcement = normalizeAnnouncementPayload(request.data || {});
+  const announcementRef = db.collection(ANNOUNCEMENTS_COLLECTION).doc();
+  const announcementId = announcementRef.id;
+  const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+  await announcementRef.set({
+    title: announcement.title,
+    body: announcement.body,
+    priority: announcement.priority,
+    actionText: announcement.actionText,
+    actionUrl: announcement.actionUrl,
+    targetRoles: announcement.targetRoles,
+    targetUserIds: announcement.targetUserIds,
+    status: 'publishing',
+    recipientCount: 0,
+    publishedAt: timestamp,
+    expiresAt: announcement.expiresAt,
+    createdBy: actorUid,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    emailRequested: announcement.emailRequested,
+    emailSummary: { ...ANNOUNCEMENT_EMAIL_SUMMARY_DEFAULT },
+  });
+
+  try {
+    const recipients = await resolveAnnouncementRecipients({
+      targetRoles: announcement.targetRoles,
+      targetUserIds: announcement.targetUserIds,
+    });
+
+    if (!recipients.length) {
+      await announcementRef.set({
+        status: 'failed',
+        failureReason: 'no_eligible_recipients',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      throw new HttpsError('failed-precondition', 'No eligible announcement recipients found.');
+    }
+
+    await writeAnnouncementDeliveries({
+      announcementId,
+      announcement,
+      recipients,
+      timestamp,
+    });
+
+    await announcementRef.set({
+      status: 'published',
+      recipientCount: recipients.length,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    let emailSummary = { ...ANNOUNCEMENT_EMAIL_SUMMARY_DEFAULT };
+    if (announcement.emailRequested) {
+      try {
+        emailSummary = await sendAnnouncementEmails({
+          announcementId,
+          announcement,
+          recipients,
+        });
+      } catch (emailErr) {
+        console.warn('Announcement email processing failed after dashboard publish', {
+          announcementId,
+          recipientCount: recipients.length,
+          message: emailErr?.message || String(emailErr),
+        });
+        emailSummary = {
+          attempted: recipients.length,
+          sent: 0,
+          failed: recipients.length,
+        };
+        await tryMarkAnnouncementEmailFailures(announcementId, recipients, 'smtp_failed', { pendingOnly: true });
+      }
+      await announcementRef.set({
+        emailRequested: true,
+        emailSummary,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }).catch(summaryErr => {
+        console.warn('Could not update announcement email summary', announcementId, summaryErr?.message || String(summaryErr));
+      });
+    }
+
+    return {
+      success: true,
+      announcementId,
+      recipientCount: recipients.length,
+      announcement: {
+        title: announcement.title,
+        body: announcement.body,
+        priority: announcement.priority,
+        actionText: announcement.actionText,
+        actionUrl: announcement.actionUrl,
+        targetRoles: announcement.targetRoles,
+        targetUserIds: announcement.targetUserIds,
+        status: 'published',
+        emailRequested: announcement.emailRequested,
+      },
+      emailSummary,
+    };
+  } catch (err) {
+    if (!(err instanceof HttpsError && err.code === 'failed-precondition')) {
+      await announcementRef.set({
+        status: 'failed',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }).catch(markErr => {
+        console.warn('Could not mark announcement publish failure', announcementId, markErr?.message || String(markErr));
+      });
+    }
+    throwCallableServiceError(err, 'Could not publish announcement.');
+  }
+});
+
+exports.markAnnouncementRead = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const announcementId = validateAnnouncementDocId(request.data?.announcementId, 'announcementId');
+  const deliveryRef = db
+    .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+    .doc(announcementDeliveryId(announcementId, uid));
+
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(deliveryRef);
+    if (!snap.exists || snap.data()?.uid !== uid) {
+      throw new HttpsError('not-found', 'Announcement delivery not found.');
+    }
+    const data = snap.data() || {};
+    if (data.dashboardStatus === 'dismissed') return;
+    if (data.dashboardStatus === 'read' && data.readAt) return;
+
+    tx.set(deliveryRef, {
+      dashboardStatus: 'read',
+      readAt: data.readAt || admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+
+  return { success: true };
+});
+
+exports.dismissAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const announcementId = validateAnnouncementDocId(request.data?.announcementId, 'announcementId');
+  const deliveryRef = db
+    .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+    .doc(announcementDeliveryId(announcementId, uid));
+
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(deliveryRef);
+    if (!snap.exists || snap.data()?.uid !== uid) {
+      throw new HttpsError('not-found', 'Announcement delivery not found.');
+    }
+    const data = snap.data() || {};
+    if (data.dashboardStatus === 'dismissed') return;
+
+    const update = {
+      dashboardStatus: 'dismissed',
+      dismissedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (!data.readAt) {
+      update.readAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+    tx.set(deliveryRef, update, { merge: true });
+  });
+
+  return { success: true };
+});
+
 exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const active = await getActiveRole(uid);
@@ -2687,6 +3849,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     throw new HttpsError('failed-precondition', 'Approved account required.');
   }
   const clubRanking = await getPublicDashboardClubRanking();
+  const announcements = await getDashboardAnnouncementsForUser(uid);
 
   if (active.role === 'prospect') {
     const [userSnap, eventsSnap] = await Promise.all([
@@ -2717,6 +3880,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
       ok: true,
       mode: 'prospect',
       clubRanking,
+      announcements,
       profile: {
         uid,
         name: userData.name || request.auth?.token?.name || '',
@@ -2871,6 +4035,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   return {
     ok: true,
     clubRanking,
+    announcements,
     profile: {
       uid,
       name: userData.name || memberData.name || request.auth?.token?.name || '',

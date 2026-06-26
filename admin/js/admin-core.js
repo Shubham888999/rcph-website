@@ -976,6 +976,573 @@ async function saveClubRankingSettings(event) {
   }
 }
 
+const ANNOUNCEMENT_ROLE_LABELS = {
+  all: 'All approved users',
+  prospect: 'Prospects',
+  gbm: 'GBM',
+  bod: 'BOD',
+  admin: 'Admin',
+  president: 'President',
+};
+const ANNOUNCEMENT_PRIORITIES = new Set(['normal', 'important', 'urgent']);
+let ANNOUNCEMENT_RECIPIENT_OPTIONS = [];
+let ANNOUNCEMENT_SELECTED_RECIPIENTS = new Map();
+let announcementRecipientsLoaded = false;
+let ANNOUNCEMENT_HISTORY_ITEMS = [];
+let announcementHistoryCursor = null;
+let announcementHistoryLoading = false;
+
+function setAnnouncementMessage(message, state = 'neutral') {
+  if (!announcementMessage) return;
+  const normalizedState = ['neutral', 'success', 'error'].includes(state) ? state : 'neutral';
+  announcementMessage.textContent = message || '';
+  announcementMessage.classList.toggle('is-error', !!message && normalizedState === 'error');
+  announcementMessage.classList.toggle('is-success', !!message && normalizedState === 'success');
+}
+
+function safeAnnouncementErrorMessage(err, fallback) {
+  const message = err?.message || err?.details?.message || fallback;
+  if (typeof message === 'string' && message.trim()) return message.trim();
+  return fallback;
+}
+
+function setAnnouncementPublishing(publishing) {
+  if (!announcementPublishBtn) return;
+  announcementPublishBtn.disabled = !!publishing;
+  announcementPublishBtn.textContent = publishing ? 'Publishing...' : 'Publish Announcement';
+}
+
+function announcementText(value) {
+  return String(value || '').trim();
+}
+
+function getAnnouncementTargetRoles() {
+  const checked = announcementRoleCheckboxes
+    .filter(box => box.checked)
+    .map(box => String(box.value || '').trim().toLowerCase())
+    .filter(Boolean);
+  return checked.includes('all') ? ['all'] : checked;
+}
+
+function syncAnnouncementRoleCheckboxes() {
+  const allBox = announcementRoleCheckboxes.find(box => box.value === 'all');
+  const allSelected = allBox?.checked === true;
+  announcementRoleCheckboxes.forEach(box => {
+    if (box.value === 'all') return;
+    box.disabled = allSelected;
+    if (allSelected) box.checked = false;
+  });
+  renderAnnouncementPreview();
+}
+
+function announcementRecipientSummary() {
+  const roles = getAnnouncementTargetRoles();
+  const selectedCount = ANNOUNCEMENT_SELECTED_RECIPIENTS.size;
+  const roleText = roles.map(role => ANNOUNCEMENT_ROLE_LABELS[role] || role).join(', ');
+  if (roleText && selectedCount) return `${roleText} + ${selectedCount} specific users`;
+  if (roleText) return roleText;
+  if (selectedCount) return `${selectedCount} specific users`;
+  return 'No recipients selected';
+}
+
+function formatAnnouncementExpiryPreview(value) {
+  if (!value) return 'No expiry';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Invalid expiry';
+  return `Expires ${parsed.toLocaleString()}`;
+}
+
+function renderAnnouncementPreview() {
+  if (!announcementForm) return;
+  const priority = announcementText(announcementPriority?.value || 'normal').toLowerCase() || 'normal';
+  const title = announcementText(announcementTitle?.value) || 'Announcement title';
+  const body = announcementText(announcementBody?.value) || 'Announcement message preview will appear here.';
+  const actionText = announcementText(announcementActionText?.value);
+
+  if (announcementPreviewPriority) {
+    announcementPreviewPriority.textContent = ANNOUNCEMENT_ROLE_LABELS[priority] || priority.charAt(0).toUpperCase() + priority.slice(1);
+    announcementPreviewPriority.dataset.priority = ANNOUNCEMENT_PRIORITIES.has(priority) ? priority : 'normal';
+  }
+  if (announcementPreviewTitle) announcementPreviewTitle.textContent = title;
+  if (announcementPreviewBody) announcementPreviewBody.textContent = body;
+  if (announcementPreviewAction) {
+    announcementPreviewAction.textContent = actionText || 'View details';
+    announcementPreviewAction.hidden = !actionText;
+  }
+  if (announcementPreviewExpiry) announcementPreviewExpiry.textContent = formatAnnouncementExpiryPreview(announcementExpiresAt?.value || '');
+  if (announcementPreviewDelivery) announcementPreviewDelivery.textContent = announcementSendEmail?.checked === true ? 'Dashboard + Email' : 'Dashboard only';
+  if (announcementPreviewRecipients) announcementPreviewRecipients.textContent = announcementRecipientSummary();
+}
+
+function renderAnnouncementSelectedRecipients() {
+  if (!announcementSelectedRecipients || !announcementSelectedCount) return;
+  const recipients = Array.from(ANNOUNCEMENT_SELECTED_RECIPIENTS.values())
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')) || String(a.email || '').localeCompare(String(b.email || '')));
+  announcementSelectedCount.textContent = `${recipients.length} selected`;
+  announcementSelectedRecipients.innerHTML = recipients.map(recipient => `
+    <span class="announcement-recipient-chip">
+      <span>${escapeHtml(recipient.name || recipient.email || recipient.uid)}</span>
+      <button type="button" data-announcement-remove="${escapeHtml(recipient.uid)}" aria-label="Remove ${escapeHtml(recipient.name || recipient.email || 'recipient')}">x</button>
+    </span>
+  `).join('');
+  renderAnnouncementPreview();
+}
+
+function filteredAnnouncementRecipients() {
+  const query = announcementText(announcementRecipientSearch?.value).toLowerCase();
+  const roleFilter = announcementText(announcementRecipientRoleFilter?.value).toLowerCase();
+  return ANNOUNCEMENT_RECIPIENT_OPTIONS.filter(recipient => {
+    if (roleFilter && recipient.role !== roleFilter) return false;
+    if (!query) return true;
+    const haystack = `${recipient.name || ''} ${recipient.email || ''}`.toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function renderAnnouncementRecipientOptions() {
+  if (!announcementRecipientList || !announcementRecipientEmpty) return;
+  const recipients = filteredAnnouncementRecipients();
+  announcementRecipientEmpty.hidden = recipients.length > 0 || !announcementRecipientsLoaded;
+  if (!announcementRecipientsLoaded) {
+    announcementRecipientList.innerHTML = '<p class="announcement-help">Loading eligible recipients...</p>';
+    return;
+  }
+  if (!recipients.length) {
+    announcementRecipientList.innerHTML = '';
+    return;
+  }
+  announcementRecipientList.innerHTML = recipients.map(recipient => {
+    const selected = ANNOUNCEMENT_SELECTED_RECIPIENTS.has(recipient.uid);
+    return `
+      <article class="announcement-recipient-row">
+        <div>
+          <strong>${escapeHtml(recipient.name || recipient.email || recipient.uid)}</strong>
+          <span>${escapeHtml(recipient.email || '-')}</span>
+          <small>${escapeHtml(ANNOUNCEMENT_ROLE_LABELS[recipient.role] || recipient.role)}</small>
+        </div>
+        <button class="btn ${selected ? 'btn-outline' : ''}" type="button" data-announcement-select="${escapeHtml(recipient.uid)}">
+          ${selected ? 'Selected' : 'Select'}
+        </button>
+      </article>
+    `;
+  }).join('');
+}
+
+async function loadAnnouncementRecipientOptions() {
+  if (!announcementForm || !IS_ADMIN) return;
+  announcementRecipientsLoaded = false;
+  if (announcementRecipientRetryBtn) announcementRecipientRetryBtn.hidden = true;
+  setAnnouncementMessage('Loading eligible recipients...', 'neutral');
+  renderAnnouncementRecipientOptions();
+
+  try {
+    const result = await callableFunction('getAnnouncementRecipientOptions')({});
+    const recipients = Array.isArray(result?.data?.recipients) ? result.data.recipients : [];
+    const seen = new Set();
+    ANNOUNCEMENT_RECIPIENT_OPTIONS = recipients
+      .map(recipient => ({
+        uid: announcementText(recipient.uid),
+        name: announcementText(recipient.name),
+        email: announcementText(recipient.email).toLowerCase(),
+        role: announcementText(recipient.role).toLowerCase(),
+      }))
+      .filter(recipient => {
+        if (!recipient.uid || seen.has(recipient.uid)) return false;
+        seen.add(recipient.uid);
+        return true;
+      })
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')) || String(a.email || '').localeCompare(String(b.email || '')));
+    announcementRecipientsLoaded = true;
+    setAnnouncementMessage('', 'neutral');
+  } catch (err) {
+    console.error('Announcement recipient load failed:', err);
+    ANNOUNCEMENT_RECIPIENT_OPTIONS = [];
+    announcementRecipientsLoaded = true;
+    if (announcementRecipientRetryBtn) announcementRecipientRetryBtn.hidden = false;
+    setAnnouncementMessage(safeAnnouncementErrorMessage(err, 'Could not load eligible recipients.'), 'error');
+  }
+
+  renderAnnouncementRecipientOptions();
+  renderAnnouncementSelectedRecipients();
+}
+
+function selectAnnouncementRecipient(uid) {
+  const recipient = ANNOUNCEMENT_RECIPIENT_OPTIONS.find(item => item.uid === uid);
+  if (!recipient) return;
+  if (ANNOUNCEMENT_SELECTED_RECIPIENTS.has(uid)) {
+    ANNOUNCEMENT_SELECTED_RECIPIENTS.delete(uid);
+  } else {
+    ANNOUNCEMENT_SELECTED_RECIPIENTS.set(uid, recipient);
+  }
+  renderAnnouncementSelectedRecipients();
+  renderAnnouncementRecipientOptions();
+}
+
+function removeAnnouncementRecipient(uid) {
+  ANNOUNCEMENT_SELECTED_RECIPIENTS.delete(uid);
+  renderAnnouncementSelectedRecipients();
+  renderAnnouncementRecipientOptions();
+}
+
+function getAnnouncementPayload() {
+  const title = announcementText(announcementTitle?.value);
+  const body = announcementText(announcementBody?.value);
+  const priority = announcementText(announcementPriority?.value || 'normal').toLowerCase() || 'normal';
+  const actionText = announcementText(announcementActionText?.value);
+  const actionUrl = announcementText(announcementActionUrl?.value);
+  const targetRoles = getAnnouncementTargetRoles();
+  const targetUserIds = Array.from(ANNOUNCEMENT_SELECTED_RECIPIENTS.keys());
+  const expiresValue = announcementExpiresAt?.value || '';
+  const sendEmail = announcementSendEmail?.checked === true;
+
+  if (!title) return { ok: false, message: 'Announcement title is required.' };
+  if (title.length > 160) return { ok: false, message: 'Announcement title must be 160 characters or fewer.' };
+  if (!body) return { ok: false, message: 'Announcement message is required.' };
+  if (body.length > 5000) return { ok: false, message: 'Announcement message must be 5000 characters or fewer.' };
+  if (!ANNOUNCEMENT_PRIORITIES.has(priority)) return { ok: false, message: 'Choose a valid priority.' };
+  if (actionText.length > 80) return { ok: false, message: 'Action button text must be 80 characters or fewer.' };
+  if (actionUrl.length > 1000) return { ok: false, message: 'Action URL must be 1000 characters or fewer.' };
+  if (/[<>]/.test(title) || /[<>]/.test(body) || /[<>]/.test(actionText)) {
+    return { ok: false, message: 'Use plain text only. Remove < or > characters.' };
+  }
+  if ((actionText && !actionUrl) || (!actionText && actionUrl)) {
+    return { ok: false, message: 'Action text and URL must be supplied together.' };
+  }
+  if (actionUrl && !actionUrl.startsWith('https://')) {
+    return { ok: false, message: 'Action URL must start with https://.' };
+  }
+  if (actionUrl) {
+    try {
+      const parsed = new URL(actionUrl);
+      if (parsed.protocol !== 'https:' || !parsed.hostname) {
+        return { ok: false, message: 'Action URL must be a valid https URL.' };
+      }
+    } catch {
+      return { ok: false, message: 'Action URL must be a valid https URL.' };
+    }
+  }
+  if (!targetRoles.length && !targetUserIds.length) {
+    return { ok: false, message: 'Select at least one recipient group or specific recipient.' };
+  }
+
+  let expiresAt = null;
+  if (expiresValue) {
+    const parsed = new Date(expiresValue);
+    if (Number.isNaN(parsed.getTime())) return { ok: false, message: 'Choose a valid expiry date and time.' };
+    if (parsed.getTime() <= Date.now()) return { ok: false, message: 'Expiry must be in the future.' };
+    expiresAt = parsed.toISOString();
+  }
+
+  return {
+    ok: true,
+    payload: {
+      title,
+      body,
+      priority,
+      actionText,
+      actionUrl,
+      targetRoles,
+      targetUserIds,
+      expiresAt,
+      sendEmail,
+    },
+  };
+}
+
+function announcementPublishSuccessMessage(resultData) {
+  const count = Number(resultData?.recipientCount || 0);
+  const emailRequested = resultData?.announcement?.emailRequested === true;
+  const summary = resultData?.emailSummary || {};
+  const attempted = Number(summary.attempted || 0);
+  const sent = Number(summary.sent || 0);
+  const failed = Number(summary.failed || 0);
+
+  if (!emailRequested) {
+    return `Announcement published to ${count} recipients.`;
+  }
+  if (attempted > 0 && failed === 0 && sent === attempted) {
+    return `Announcement published to ${count} recipients and emailed to ${sent}.`;
+  }
+  if (attempted > 0 && sent === 0 && failed === attempted) {
+    return `Announcement published to ${count} recipients, but email delivery failed for all ${failed}.`;
+  }
+  return `Announcement published to ${count} recipients. Email sent to ${sent}; ${failed} failed.`;
+}
+
+function setAnnouncementHistoryMessage(message, state = 'neutral') {
+  if (!announcementHistoryMessage) return;
+  const normalizedState = ['neutral', 'success', 'error'].includes(state) ? state : 'neutral';
+  announcementHistoryMessage.textContent = message || '';
+  announcementHistoryMessage.classList.toggle('is-error', !!message && normalizedState === 'error');
+  announcementHistoryMessage.classList.toggle('is-success', !!message && normalizedState === 'success');
+}
+
+function setAnnouncementHistoryLoading(loading, mode = 'initial') {
+  announcementHistoryLoading = !!loading;
+  if (announcementHistoryRefreshBtn) announcementHistoryRefreshBtn.disabled = announcementHistoryLoading;
+  if (announcementHistoryLoadMoreBtn) {
+    announcementHistoryLoadMoreBtn.disabled = announcementHistoryLoading;
+    announcementHistoryLoadMoreBtn.textContent = announcementHistoryLoading && mode === 'more' ? 'Loading...' : 'Load More';
+  }
+}
+
+function safeHistoryText(value, max = 240) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/[<>]/g, '').slice(0, max);
+}
+
+function normalizeHistoryInteger(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
+}
+
+function normalizeAnnouncementHistoryItem(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const id = safeHistoryText(raw.id, 128);
+  const title = safeHistoryText(raw.title, 160);
+  if (!id || id.includes('/') || !title) return null;
+  const priority = ANNOUNCEMENT_PRIORITIES.has(String(raw.priority || '').toLowerCase())
+    ? String(raw.priority).toLowerCase()
+    : 'normal';
+  const status = ['published', 'failed', 'publishing', 'unknown'].includes(String(raw.status || '').toLowerCase())
+    ? String(raw.status).toLowerCase()
+    : 'unknown';
+  const targetRoles = Array.isArray(raw.targetRoles)
+    ? raw.targetRoles
+        .map(role => safeHistoryText(role, 40).toLowerCase())
+        .filter(role => ANNOUNCEMENT_ROLE_LABELS[role])
+    : [];
+  const dashboardSummary = raw.dashboardSummary || {};
+  const emailSummary = raw.emailSummary || {};
+  const emailAttempted = normalizeHistoryInteger(emailSummary.attempted);
+  const emailSent = Math.min(normalizeHistoryInteger(emailSummary.sent), emailAttempted);
+  const emailFailed = Math.min(normalizeHistoryInteger(emailSummary.failed), Math.max(0, emailAttempted - emailSent));
+
+  return {
+    id,
+    title,
+    bodyPreview: safeHistoryText(raw.bodyPreview, 260),
+    priority,
+    status,
+    targetRoles: targetRoles.includes('all') ? ['all'] : Array.from(new Set(targetRoles)),
+    explicitRecipientCount: normalizeHistoryInteger(raw.explicitRecipientCount),
+    recipientCount: normalizeHistoryInteger(raw.recipientCount),
+    dashboardSummary: {
+      unread: normalizeHistoryInteger(dashboardSummary.unread),
+      read: normalizeHistoryInteger(dashboardSummary.read),
+      dismissed: normalizeHistoryInteger(dashboardSummary.dismissed),
+    },
+    emailRequested: raw.emailRequested === true,
+    emailSummary: {
+      attempted: emailAttempted,
+      sent: emailSent,
+      failed: emailFailed,
+    },
+    publishedAt: safeHistoryText(raw.publishedAt, 80),
+    expiresAt: safeHistoryText(raw.expiresAt, 80),
+    createdAt: safeHistoryText(raw.createdAt, 80),
+  };
+}
+
+function formatAnnouncementHistoryDate(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function announcementHistoryStatusLabel(status) {
+  if (status === 'published') return 'Published';
+  if (status === 'failed') return 'Failed';
+  if (status === 'publishing') return 'Publishing';
+  return 'Unknown';
+}
+
+function announcementHistoryPriorityLabel(priority) {
+  if (priority === 'urgent') return 'Urgent';
+  if (priority === 'important') return 'Important';
+  return 'Normal';
+}
+
+function announcementHistoryTargetSummary(item) {
+  const roles = item.targetRoles.map(role => ANNOUNCEMENT_ROLE_LABELS[role] || role).join(', ');
+  const specific = item.explicitRecipientCount;
+  if (roles && specific) return `${roles} + ${specific} specific users`;
+  if (roles) return roles;
+  if (specific) return `${specific} specific users`;
+  return 'No targets recorded';
+}
+
+function createAnnouncementHistoryElement(tagName, className, text) {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  if (text !== undefined && text !== null) element.textContent = text;
+  return element;
+}
+
+function appendAnnouncementHistoryMetric(grid, label, value) {
+  const item = createAnnouncementHistoryElement('div', 'announcement-history-metric');
+  item.append(
+    createAnnouncementHistoryElement('span', '', label),
+    createAnnouncementHistoryElement('strong', '', value)
+  );
+  grid.appendChild(item);
+}
+
+function renderAnnouncementHistory() {
+  if (!announcementHistoryList) return;
+  announcementHistoryList.replaceChildren();
+
+  if (!ANNOUNCEMENT_HISTORY_ITEMS.length) {
+    const hasErrorMessage = announcementHistoryMessage?.classList.contains('is-error');
+    if (!announcementHistoryLoading && !hasErrorMessage) {
+      setAnnouncementHistoryMessage('No announcements have been published yet.', 'neutral');
+    }
+    if (announcementHistoryLoadMoreBtn) announcementHistoryLoadMoreBtn.hidden = true;
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  ANNOUNCEMENT_HISTORY_ITEMS.forEach(item => {
+    const card = createAnnouncementHistoryElement('article', `announcement-history-card announcement-history-card--${item.priority}`);
+    const header = createAnnouncementHistoryElement('div', 'announcement-history-card__header');
+    const badge = createAnnouncementHistoryElement('span', 'announcement-history-card__badge', announcementHistoryPriorityLabel(item.priority));
+    badge.dataset.priority = item.priority;
+    const status = createAnnouncementHistoryElement('span', 'announcement-history-card__status', announcementHistoryStatusLabel(item.status));
+    status.dataset.status = item.status;
+    header.append(badge, status);
+
+    const title = createAnnouncementHistoryElement('h3', '', item.title);
+    const body = createAnnouncementHistoryElement('p', 'announcement-history-card__body', item.bodyPreview || 'No preview available.');
+    const metrics = createAnnouncementHistoryElement('div', 'announcement-history-metrics');
+    appendAnnouncementHistoryMetric(metrics, 'Targets', announcementHistoryTargetSummary(item));
+    appendAnnouncementHistoryMetric(metrics, 'Dashboard recipients', String(item.recipientCount));
+    appendAnnouncementHistoryMetric(
+      metrics,
+      'Dashboard status',
+      `Unread ${item.dashboardSummary.unread} · Read ${item.dashboardSummary.read} · Dismissed ${item.dashboardSummary.dismissed}`
+    );
+    appendAnnouncementHistoryMetric(
+      metrics,
+      'Email',
+      item.emailRequested
+        ? `${item.emailSummary.sent} sent · ${item.emailSummary.failed} failed`
+        : 'Not requested'
+    );
+
+    const meta = createAnnouncementHistoryElement('div', 'announcement-history-card__meta');
+    const published = formatAnnouncementHistoryDate(item.publishedAt);
+    const created = formatAnnouncementHistoryDate(item.createdAt);
+    const expires = formatAnnouncementHistoryDate(item.expiresAt);
+    if (published) meta.appendChild(createAnnouncementHistoryElement('span', '', `Published ${published}`));
+    else if (created) meta.appendChild(createAnnouncementHistoryElement('span', '', `Created ${created}`));
+    if (expires) meta.appendChild(createAnnouncementHistoryElement('span', '', `Expires ${expires}`));
+
+    card.append(header, title, body, metrics);
+    if (meta.childNodes.length) card.appendChild(meta);
+    fragment.appendChild(card);
+  });
+
+  announcementHistoryList.appendChild(fragment);
+  if (announcementHistoryLoadMoreBtn) announcementHistoryLoadMoreBtn.hidden = !announcementHistoryCursor;
+}
+
+async function loadAnnouncementHistory({ reset = false, silent = false, mode = 'initial' } = {}) {
+  if (!announcementHistoryList || announcementHistoryLoading || !IS_ADMIN) return;
+  if (reset) announcementHistoryCursor = null;
+  const cursor = reset ? null : announcementHistoryCursor;
+  setAnnouncementHistoryLoading(true, mode);
+  if (announcementHistoryRetryBtn) announcementHistoryRetryBtn.hidden = true;
+  if (!silent) {
+    setAnnouncementHistoryMessage(mode === 'more' ? 'Loading more announcements...' : 'Loading announcement history...', 'neutral');
+  }
+
+  try {
+    const result = await callableFunction('getAnnouncementHistory')({
+      limit: 20,
+      cursor,
+    });
+    const rawItems = Array.isArray(result?.data?.announcements) ? result.data.announcements : [];
+    const normalizedItems = rawItems
+      .map(normalizeAnnouncementHistoryItem)
+      .filter(Boolean);
+    announcementHistoryCursor = result?.data?.nextCursor || null;
+
+    if (reset) {
+      ANNOUNCEMENT_HISTORY_ITEMS = normalizedItems;
+    } else {
+      const seen = new Set(ANNOUNCEMENT_HISTORY_ITEMS.map(item => item.id));
+      normalizedItems.forEach(item => {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          ANNOUNCEMENT_HISTORY_ITEMS.push(item);
+        }
+      });
+    }
+
+    setAnnouncementHistoryLoading(false, mode);
+    setAnnouncementHistoryMessage('', 'neutral');
+    renderAnnouncementHistory();
+  } catch (err) {
+    console.error('Announcement history load failed:', err);
+    setAnnouncementHistoryLoading(false, mode);
+    setAnnouncementHistoryMessage(safeAnnouncementErrorMessage(err, 'Could not load announcement history.'), 'error');
+    if (announcementHistoryRetryBtn && !ANNOUNCEMENT_HISTORY_ITEMS.length) announcementHistoryRetryBtn.hidden = false;
+    renderAnnouncementHistory();
+  } finally {
+    if (announcementHistoryLoadMoreBtn) announcementHistoryLoadMoreBtn.hidden = !announcementHistoryCursor;
+  }
+}
+
+function resetAnnouncementForm() {
+  if (announcementForm) announcementForm.reset();
+  announcementRoleCheckboxes.forEach(box => {
+    box.checked = false;
+    box.disabled = false;
+  });
+  ANNOUNCEMENT_SELECTED_RECIPIENTS = new Map();
+  if (announcementPriority) announcementPriority.value = 'normal';
+  renderAnnouncementSelectedRecipients();
+  renderAnnouncementRecipientOptions();
+  renderAnnouncementPreview();
+}
+
+async function publishAnnouncementFromAdmin(event) {
+  event?.preventDefault();
+  if (!announcementForm || !IS_ADMIN || announcementPublishBtn?.disabled) return;
+
+  const validation = getAnnouncementPayload();
+  if (!validation.ok) {
+    setAnnouncementMessage(validation.message, 'error');
+    renderAnnouncementPreview();
+    return;
+  }
+
+  setAnnouncementPublishing(true);
+  setAnnouncementMessage('Publishing...', 'neutral');
+
+  try {
+    const result = await callableFunction('publishAnnouncement')(validation.payload);
+    const successMessage = announcementPublishSuccessMessage(result?.data || {});
+    resetAnnouncementForm();
+    setAnnouncementMessage(successMessage, 'success');
+    loadAnnouncementHistory({ reset: true, silent: true }).catch(err => {
+      console.warn('Announcement history refresh after publish failed:', err?.message || String(err));
+    });
+  } catch (err) {
+    console.error('Announcement publish failed:', err);
+    setAnnouncementMessage(safeAnnouncementErrorMessage(err, 'Could not publish announcement.'), 'error');
+  } finally {
+    setAnnouncementPublishing(false);
+  }
+}
+
 document.addEventListener('click', (event) => {
   const positionTrigger = event.target.closest('[data-position-trigger]');
   if (positionTrigger) {
@@ -1328,6 +1895,8 @@ async function loadData(){
   renderGrid();
   renderInsightsPanel();
   await loadClubRankingSettings();
+  await loadAnnouncementRecipientOptions();
+  await loadAnnouncementHistory({ reset: true });
   buildCollaborationFilters();
   renderCollaborationReports();
   if (distHead && distBody) {

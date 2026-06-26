@@ -149,6 +149,58 @@ if (clubRankingForm) {
   if (el) el.addEventListener('change', renderClubRankingPreview);
 });
 
+if (announcementForm) {
+  announcementForm.addEventListener('submit', publishAnnouncementFromAdmin);
+}
+
+[
+  announcementTitle,
+  announcementBody,
+  announcementPriority,
+  announcementActionText,
+  announcementActionUrl,
+  announcementExpiresAt,
+  announcementSendEmail,
+].forEach(el => {
+  if (el) el.addEventListener('input', renderAnnouncementPreview);
+  if (el) el.addEventListener('change', renderAnnouncementPreview);
+});
+
+announcementRoleCheckboxes.forEach(box => {
+  box.addEventListener('change', syncAnnouncementRoleCheckboxes);
+});
+
+if (announcementRecipientSearch) {
+  announcementRecipientSearch.addEventListener('input', renderAnnouncementRecipientOptions);
+}
+if (announcementRecipientRoleFilter) {
+  announcementRecipientRoleFilter.addEventListener('change', renderAnnouncementRecipientOptions);
+}
+if (announcementRecipientRetryBtn) {
+  announcementRecipientRetryBtn.addEventListener('click', loadAnnouncementRecipientOptions);
+}
+if (announcementRecipientList) {
+  announcementRecipientList.addEventListener('click', event => {
+    const button = event.target.closest('[data-announcement-select]');
+    if (button) selectAnnouncementRecipient(button.dataset.announcementSelect);
+  });
+}
+if (announcementSelectedRecipients) {
+  announcementSelectedRecipients.addEventListener('click', event => {
+    const button = event.target.closest('[data-announcement-remove]');
+    if (button) removeAnnouncementRecipient(button.dataset.announcementRemove);
+  });
+}
+if (announcementHistoryRefreshBtn) {
+  announcementHistoryRefreshBtn.addEventListener('click', () => loadAnnouncementHistory({ reset: true }));
+}
+if (announcementHistoryRetryBtn) {
+  announcementHistoryRetryBtn.addEventListener('click', () => loadAnnouncementHistory({ reset: true }));
+}
+if (announcementHistoryLoadMoreBtn) {
+  announcementHistoryLoadMoreBtn.addEventListener('click', () => loadAnnouncementHistory({ reset: false, mode: 'more' }));
+}
+
 if (prospectMembersToggle && prospectMembersBody) {
   prospectMembersToggle.addEventListener('click', () => {
     const willOpen = prospectMembersBody.hidden;

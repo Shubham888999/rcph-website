@@ -1,7 +1,14 @@
 const auth = window.auth;
 const db = window.db;
 const dashboardFunction = firebase.functions().httpsCallable('getMyDashboardStats');
+const markAnnouncementReadFunction = firebase.functions().httpsCallable('markAnnouncementRead');
+const dismissAnnouncementFunction = firebase.functions().httpsCallable('dismissAnnouncement');
 const REQUIRED_CONSECUTIVE_ATTENDANCE = 3;
+const ANNOUNCEMENT_PRIORITIES = new Set(['normal', 'important', 'urgent']);
+
+let dashboardAnnouncements = [];
+const dashboardAnnouncementBusy = new Set();
+const dashboardAnnouncementErrors = new Map();
 
 const els = {
   loading: document.getElementById('loadingState'),
@@ -11,6 +18,9 @@ const els = {
   dashboardTitle: document.getElementById('dashboardTitle'),
   welcomeName: document.getElementById('welcomeName'),
   memberLinkNote: document.getElementById('memberLinkNote'),
+  dashboardAnnouncements: document.getElementById('dashboardAnnouncements'),
+  dashboardAnnouncementCount: document.getElementById('dashboardAnnouncementCount'),
+  dashboardAnnouncementList: document.getElementById('dashboardAnnouncementList'),
   adminPanelBtn: document.getElementById('adminPanelBtn'),
   bodPanelBtn: document.getElementById('bodPanelBtn'),
   signOutBtn: document.getElementById('signOutBtn'),
@@ -248,6 +258,270 @@ function renderClubRanking(rawRanking, mode) {
   setClubRankingCard(els.clubRankingKpiCard, els.kpiRank, els.kpiRankSubtitle, ranking);
 }
 
+function safeTrimmedString(value, maxLength) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, maxLength);
+}
+
+function parseDashboardDate(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const parsed = new Date(value);
+  const ms = parsed.getTime();
+  if (Number.isNaN(ms)) return null;
+  return { date: parsed, ms, iso: parsed.toISOString() };
+}
+
+function formatDashboardDateTime(value) {
+  const parsed = parseDashboardDate(value);
+  if (!parsed) return '';
+  return parsed.date.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+function normalizeDashboardAction(raw) {
+  const actionText = safeTrimmedString(raw?.actionText, 80);
+  const actionUrl = safeTrimmedString(raw?.actionUrl, 1000);
+
+  if (!actionText || !actionUrl || /[<>]/.test(actionText)) {
+    return { actionText: '', actionUrl: '' };
+  }
+
+  try {
+    const parsed = new URL(actionUrl);
+    if (parsed.protocol !== 'https:') {
+      return { actionText: '', actionUrl: '' };
+    }
+    return { actionText, actionUrl: parsed.href };
+  } catch (err) {
+    return { actionText: '', actionUrl: '' };
+  }
+}
+
+function normalizeDashboardAnnouncements(raw) {
+  if (!Array.isArray(raw)) return [];
+
+  const seen = new Set();
+  const now = Date.now();
+  const normalized = [];
+
+  raw.forEach(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+
+    const id = safeTrimmedString(item.id, 160);
+    if (!id || id.includes('/') || seen.has(id)) return;
+
+    const title = safeTrimmedString(item.title, 160);
+    const body = safeTrimmedString(item.body, 5000);
+    if (!title || !body || /[<>]/.test(title) || /[<>]/.test(body)) return;
+
+    const priorityValue = safeTrimmedString(item.priority, 24).toLowerCase();
+    const priority = ANNOUNCEMENT_PRIORITIES.has(priorityValue) ? priorityValue : 'normal';
+    const publishedAt = parseDashboardDate(item.publishedAt);
+    const expiresAt = parseDashboardDate(item.expiresAt);
+    if (expiresAt && expiresAt.ms <= now) return;
+
+    const action = normalizeDashboardAction(item);
+    seen.add(id);
+    normalized.push({
+      id,
+      title,
+      body,
+      priority,
+      actionText: action.actionText,
+      actionUrl: action.actionUrl,
+      publishedAt: publishedAt ? publishedAt.iso : '',
+      publishedAtMs: publishedAt ? publishedAt.ms : 0,
+      expiresAt: expiresAt ? expiresAt.iso : '',
+      read: item.read === true
+    });
+  });
+
+  return normalized
+    .sort((a, b) => b.publishedAtMs - a.publishedAtMs)
+    .slice(0, 5);
+}
+
+function announcementPriorityLabel(priority) {
+  if (priority === 'urgent') return 'Urgent';
+  if (priority === 'important') return 'Important';
+  return 'Normal';
+}
+
+function createTextElement(tagName, className, text) {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  element.textContent = text;
+  return element;
+}
+
+function setDashboardAnnouncementError(id, message) {
+  if (message) {
+    dashboardAnnouncementErrors.set(id, message);
+  } else {
+    dashboardAnnouncementErrors.delete(id);
+  }
+}
+
+function setDashboardAnnouncementBusy(id, busy) {
+  if (busy) {
+    dashboardAnnouncementBusy.add(id);
+  } else {
+    dashboardAnnouncementBusy.delete(id);
+  }
+}
+
+function safeAnnouncementActionError(error, fallback) {
+  const message = error?.message || error?.details?.message || fallback;
+  return typeof message === 'string' && message.trim() ? message.trim() : fallback;
+}
+
+function renderDashboardAnnouncementCard(announcement) {
+  const isBusy = dashboardAnnouncementBusy.has(announcement.id);
+  const errorMessage = dashboardAnnouncementErrors.get(announcement.id) || '';
+  const card = document.createElement('article');
+  card.className = `dashboard-announcement dashboard-announcement--${announcement.priority}${announcement.read ? ' is-read' : ''}`;
+  card.dataset.announcementId = announcement.id;
+
+  const header = document.createElement('div');
+  header.className = 'dashboard-announcement__header';
+  const badge = createTextElement('span', 'dashboard-announcement__priority', announcementPriorityLabel(announcement.priority));
+  const readStatus = createTextElement('span', 'dashboard-announcement__read-status', announcement.read ? 'Read' : 'Unread');
+  header.append(badge, readStatus);
+
+  const title = createTextElement('h3', '', announcement.title);
+  const body = createTextElement('p', 'dashboard-announcement__body', announcement.body);
+
+  const meta = document.createElement('div');
+  meta.className = 'dashboard-announcement__meta';
+  const published = formatDashboardDateTime(announcement.publishedAt);
+  const expires = formatDashboardDateTime(announcement.expiresAt);
+  if (published) meta.appendChild(createTextElement('span', '', `Published ${published}`));
+  if (expires) meta.appendChild(createTextElement('span', '', `Expires ${expires}`));
+
+  const actions = document.createElement('div');
+  actions.className = 'dashboard-announcement__actions';
+
+  if (announcement.actionText && announcement.actionUrl) {
+    const actionLink = document.createElement('a');
+    actionLink.className = 'btn btn-outline dashboard-announcement__action';
+    actionLink.href = announcement.actionUrl;
+    actionLink.target = '_blank';
+    actionLink.rel = 'noopener noreferrer';
+    actionLink.textContent = announcement.actionText;
+    if (isBusy) {
+      actionLink.setAttribute('aria-disabled', 'true');
+      actionLink.tabIndex = -1;
+    }
+    actions.appendChild(actionLink);
+  }
+
+  if (!announcement.read) {
+    const readButton = document.createElement('button');
+    readButton.type = 'button';
+    readButton.className = 'btn btn-outline';
+    readButton.dataset.announcementRead = announcement.id;
+    readButton.textContent = 'Mark as read';
+    readButton.disabled = isBusy;
+    actions.appendChild(readButton);
+  }
+
+  const dismissButton = document.createElement('button');
+  dismissButton.type = 'button';
+  dismissButton.className = 'btn btn-primary';
+  dismissButton.dataset.announcementDismiss = announcement.id;
+  dismissButton.textContent = 'Dismiss';
+  dismissButton.disabled = isBusy;
+  actions.appendChild(dismissButton);
+
+  const message = createTextElement('p', 'dashboard-announcement__message', errorMessage);
+  message.setAttribute('role', 'status');
+  message.setAttribute('aria-live', 'polite');
+  message.hidden = !errorMessage;
+
+  card.append(header, title, body);
+  if (meta.childNodes.length) card.appendChild(meta);
+  card.append(actions, message);
+  return card;
+}
+
+function renderDashboardAnnouncementList() {
+  if (!els.dashboardAnnouncements || !els.dashboardAnnouncementList) return;
+
+  els.dashboardAnnouncementList.replaceChildren();
+
+  if (!dashboardAnnouncements.length) {
+    els.dashboardAnnouncements.hidden = true;
+    els.dashboardAnnouncements.setAttribute('hidden', '');
+    if (els.dashboardAnnouncementCount) els.dashboardAnnouncementCount.textContent = '';
+    return;
+  }
+
+  els.dashboardAnnouncements.hidden = false;
+  els.dashboardAnnouncements.removeAttribute('hidden');
+  if (els.dashboardAnnouncementCount) {
+    const count = dashboardAnnouncements.length;
+    els.dashboardAnnouncementCount.textContent = `${count} announcement${count === 1 ? '' : 's'}`;
+  }
+
+  const fragment = document.createDocumentFragment();
+  dashboardAnnouncements.forEach(announcement => {
+    fragment.appendChild(renderDashboardAnnouncementCard(announcement));
+  });
+  els.dashboardAnnouncementList.appendChild(fragment);
+}
+
+function renderDashboardAnnouncements(rawAnnouncements) {
+  dashboardAnnouncements = normalizeDashboardAnnouncements(rawAnnouncements);
+  dashboardAnnouncementBusy.clear();
+  dashboardAnnouncementErrors.clear();
+  renderDashboardAnnouncementList();
+}
+
+async function markDashboardAnnouncementRead(id) {
+  const announcement = dashboardAnnouncements.find(item => item.id === id);
+  if (!announcement || dashboardAnnouncementBusy.has(id)) return;
+
+  setDashboardAnnouncementBusy(id, true);
+  setDashboardAnnouncementError(id, '');
+  renderDashboardAnnouncementList();
+
+  try {
+    await markAnnouncementReadFunction({ announcementId: id });
+    announcement.read = true;
+    setDashboardAnnouncementBusy(id, false);
+    renderDashboardAnnouncementList();
+  } catch (error) {
+    setDashboardAnnouncementBusy(id, false);
+    setDashboardAnnouncementError(id, safeAnnouncementActionError(error, 'Could not mark this announcement as read.'));
+    renderDashboardAnnouncementList();
+  }
+}
+
+async function dismissDashboardAnnouncement(id) {
+  if (!dashboardAnnouncements.some(item => item.id === id) || dashboardAnnouncementBusy.has(id)) return;
+
+  setDashboardAnnouncementBusy(id, true);
+  setDashboardAnnouncementError(id, '');
+  renderDashboardAnnouncementList();
+
+  try {
+    await dismissAnnouncementFunction({ announcementId: id });
+    dashboardAnnouncements = dashboardAnnouncements.filter(item => item.id !== id);
+    dashboardAnnouncementBusy.delete(id);
+    dashboardAnnouncementErrors.delete(id);
+    renderDashboardAnnouncementList();
+  } catch (error) {
+    setDashboardAnnouncementBusy(id, false);
+    setDashboardAnnouncementError(id, safeAnnouncementActionError(error, 'Could not dismiss this announcement.'));
+    renderDashboardAnnouncementList();
+  }
+}
+
 function renderEventsByAvenue(rows) {
   if (!rows || !rows.length) {
     els.eventsByAvenue.innerHTML = '<p class="subtle">No public club events yet.</p>';
@@ -444,6 +718,7 @@ els.prospectGbmValue.textContent =
 }
 
 function renderDashboard(data) {
+  renderDashboardAnnouncements(data.announcements);
   if (data.mode === 'prospect') {
     renderProspectDashboard(data);
     return;
@@ -469,6 +744,24 @@ els.signOutBtn.addEventListener('click', async () => {
   await auth.signOut();
   location.href = 'login.html';
 });
+
+if (els.dashboardAnnouncementList) {
+  els.dashboardAnnouncementList.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const readButton = target.closest('[data-announcement-read]');
+    if (readButton) {
+      markDashboardAnnouncementRead(readButton.dataset.announcementRead);
+      return;
+    }
+
+    const dismissButton = target.closest('[data-announcement-dismiss]');
+    if (dismissButton) {
+      dismissDashboardAnnouncement(dismissButton.dataset.announcementDismiss);
+    }
+  });
+}
 
 auth.onAuthStateChanged(async user => {
   if (!user) {

@@ -55,6 +55,8 @@
             <a class="admin-nav__link" href="BOD%20Event%20manager/bodlogin.html" data-admin-quick-nav hidden>BOD Panel</a>
             <a class="admin-nav__link" href="visit-submissions.html" data-admin-quick-nav hidden>Visit Submissions</a>
             <a class="admin-nav__link" href="#clubRankingSettings" data-admin-section-link>Club Ranking</a>
+            <a class="admin-nav__link" href="#announcementComposer" data-admin-section-link>Announcements</a>
+            <a class="admin-nav__link" href="#announcementHistory" data-admin-section-link>Announcement History</a>
             <a class="admin-nav__link" href="#districtAttendance" data-admin-section-link>District</a>
             <a class="admin-nav__link" href="#bod" data-admin-section-link>BOD Attendance</a>
             <a class="admin-nav__link" href="#fines" data-admin-section-link>Fines</a>
@@ -163,50 +165,7 @@
     </div>
   </div>
 
-  <section class="admin-card club-ranking-panel" id="clubRankingSettings" style="margin-bottom:20px;">
-    <div class="topbar club-ranking-panel__header">
-      <div>
-        <h2>Club Ranking</h2>
-        <p class="club-ranking-panel__subtitle">Set the club-wide ranking shown on every approved member and prospect dashboard.</p>
-      </div>
-      <span class="badge">Shared</span>
-    </div>
 
-    <form id="clubRankingForm" class="adm-form club-ranking-form" autocomplete="off" novalidate>
-      <label class="club-ranking-toggle">
-        <input id="clubRankingEnabled" type="checkbox">
-        <span>Show club ranking on dashboards</span>
-      </label>
-
-      <div class="club-ranking-form__grid">
-        <label class="adm-field">
-          <span>Ranking value</span>
-          <input id="clubRankingValue" type="text" maxlength="80" placeholder="#12" aria-describedby="clubRankingMessage">
-        </label>
-
-        <label class="adm-field">
-          <span>Subtitle</span>
-          <input id="clubRankingSubtitle" type="text" maxlength="120" placeholder="Rotaract District 3131" aria-describedby="clubRankingMessage">
-        </label>
-      </div>
-
-      <div class="club-ranking-preview" aria-live="polite">
-        <div class="club-ranking-preview__eyebrow">Dashboard Preview</div>
-        <div id="clubRankingPreviewHidden" class="club-ranking-preview__hidden" hidden>Club ranking hidden</div>
-        <div id="clubRankingPreviewContent" class="club-ranking-preview__content">
-          <span>Club Ranking</span>
-          <strong id="clubRankingPreviewValue">#12</strong>
-          <small id="clubRankingPreviewSubtitle">Rotaract District 3131</small>
-        </div>
-      </div>
-
-      <p id="clubRankingMessage" class="club-ranking-message" role="status">Loading club ranking...</p>
-
-      <div class="adm-actions">
-        <button id="clubRankingSaveBtn" class="btn" type="submit">Save Club Ranking</button>
-      </div>
-    </form>
-  </section>
 
   <div class="admin-card" id="attendance">
       <div class="topbar">
@@ -551,6 +510,188 @@
   </table>
 </div>
 </div>-->
+
+  <section class="admin-card club-ranking-panel" id="clubRankingSettings" style="margin-bottom:20px;">
+    <div class="topbar club-ranking-panel__header">
+      <div>
+        <h2>Club Ranking</h2>
+        <p class="club-ranking-panel__subtitle">Set the club-wide ranking shown on every approved member and prospect dashboard.</p>
+      </div>
+      <span class="badge">Shared</span>
+    </div>
+
+    <form id="clubRankingForm" class="adm-form club-ranking-form" autocomplete="off" novalidate>
+      <label class="club-ranking-toggle">
+        <input id="clubRankingEnabled" type="checkbox">
+        <span>Show club ranking on dashboards</span>
+      </label>
+
+      <div class="club-ranking-form__grid">
+        <label class="adm-field">
+          <span>Ranking value</span>
+          <input id="clubRankingValue" type="text" maxlength="80" placeholder="#12" aria-describedby="clubRankingMessage">
+        </label>
+
+        <label class="adm-field">
+          <span>Subtitle</span>
+          <input id="clubRankingSubtitle" type="text" maxlength="120" placeholder="Rotaract District 3131" aria-describedby="clubRankingMessage">
+        </label>
+      </div>
+
+      <div class="club-ranking-preview" aria-live="polite">
+        <div class="club-ranking-preview__eyebrow">Dashboard Preview</div>
+        <div id="clubRankingPreviewHidden" class="club-ranking-preview__hidden" hidden>Club ranking hidden</div>
+        <div id="clubRankingPreviewContent" class="club-ranking-preview__content">
+          <span>Club Ranking</span>
+          <strong id="clubRankingPreviewValue">#12</strong>
+          <small id="clubRankingPreviewSubtitle">Rotaract District 3131</small>
+        </div>
+      </div>
+
+      <p id="clubRankingMessage" class="club-ranking-message" role="status">Loading club ranking...</p>
+
+      <div class="adm-actions">
+        <button id="clubRankingSaveBtn" class="btn" type="submit">Save Club Ranking</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-card announcement-panel" id="announcementComposer" style="margin-bottom:20px;">
+    <div class="topbar announcement-panel__header">
+      <div>
+        <h2>Announcements</h2>
+        <p class="announcement-panel__subtitle">Publish targeted dashboard announcements to selected account groups or individual users.</p>
+      </div>
+      <span class="badge">Dashboard</span>
+    </div>
+
+    <form id="announcementForm" class="adm-form announcement-form" autocomplete="off" novalidate>
+      <div class="announcement-layout">
+        <div class="announcement-form__main">
+          <div class="announcement-form__grid">
+            <label class="adm-field">
+              <span>Announcement title</span>
+              <input id="announcementTitle" type="text" maxlength="160" required aria-describedby="announcementMessage">
+            </label>
+
+            <label class="adm-field">
+              <span>Priority</span>
+              <select id="announcementPriority" aria-describedby="announcementMessage">
+                <option value="normal" selected>Normal</option>
+                <option value="important">Important</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="adm-field">
+            <span>Announcement message</span>
+            <textarea id="announcementBody" rows="6" maxlength="5000" required aria-describedby="announcementMessage"></textarea>
+          </label>
+
+          <div class="announcement-form__grid">
+            <label class="adm-field">
+              <span>Action button text</span>
+              <input id="announcementActionText" type="text" maxlength="80" placeholder="View details" aria-describedby="announcementActionHelp announcementMessage">
+            </label>
+
+            <label class="adm-field">
+              <span>Action URL</span>
+              <input id="announcementActionUrl" type="url" maxlength="1000" placeholder="https://rcph3131.org/events.html" aria-describedby="announcementActionHelp announcementMessage">
+            </label>
+          </div>
+          <p id="announcementActionHelp" class="announcement-help">Action text and URL must either both be provided or both remain empty.</p>
+
+          <label class="adm-field announcement-expiry-field">
+            <span>Expires at</span>
+            <input id="announcementExpiresAt" type="datetime-local" aria-describedby="announcementMessage">
+          </label>
+
+          <label class="announcement-email-option">
+            <input id="announcementSendEmail" type="checkbox" aria-describedby="announcementEmailHelp announcementMessage">
+            <span>Also send this announcement by email</span>
+          </label>
+          <p id="announcementEmailHelp" class="announcement-help">Email will be sent only to the same eligible users receiving this dashboard announcement.</p>
+
+          <fieldset class="announcement-recipient-groups">
+            <legend>Recipient groups</legend>
+            <label><input type="checkbox" value="all" data-announcement-role> <span>All approved users</span></label>
+            <label><input type="checkbox" value="prospect" data-announcement-role> <span>Prospects</span></label>
+            <label><input type="checkbox" value="gbm" data-announcement-role> <span>GBM</span></label>
+            <label><input type="checkbox" value="bod" data-announcement-role> <span>BOD</span></label>
+            <label><input type="checkbox" value="admin" data-announcement-role> <span>Admin</span></label>
+            <label><input type="checkbox" value="president" data-announcement-role> <span>President</span></label>
+          </fieldset>
+
+          <section class="announcement-recipient-picker" aria-labelledby="announcementRecipientPickerTitle">
+            <div class="announcement-recipient-picker__head">
+              <div>
+                <h3 id="announcementRecipientPickerTitle">Specific recipients</h3>
+                <p class="announcement-help">Search eligible approved users. Selected people are submitted by UID only.</p>
+              </div>
+              <span id="announcementSelectedCount" class="badge">0 selected</span>
+            </div>
+            <div class="announcement-recipient-tools">
+              <input id="announcementRecipientSearch" type="search" placeholder="Search by name or email" aria-label="Search announcement recipients">
+              <select id="announcementRecipientRoleFilter" aria-label="Filter announcement recipients by role">
+                <option value="">All roles</option>
+                <option value="prospect">Prospects</option>
+                <option value="gbm">GBM</option>
+                <option value="bod">BOD</option>
+                <option value="admin">Admin</option>
+                <option value="president">President</option>
+              </select>
+              <button id="announcementRecipientRetryBtn" class="btn btn-outline" type="button" hidden>Retry</button>
+            </div>
+            <div id="announcementSelectedRecipients" class="announcement-selected-list" aria-label="Selected announcement recipients"></div>
+            <div id="announcementRecipientList" class="announcement-recipient-list" aria-live="polite">
+              <p class="announcement-help">Loading eligible recipients...</p>
+            </div>
+            <p id="announcementRecipientEmpty" class="announcement-help" hidden>No eligible recipients match your search.</p>
+          </section>
+        </div>
+
+        <aside class="announcement-preview" aria-live="polite">
+          <div class="announcement-preview__eyebrow">Dashboard Preview</div>
+          <span id="announcementPreviewPriority" class="announcement-preview__priority">Normal</span>
+          <h3 id="announcementPreviewTitle">Announcement title</h3>
+          <p id="announcementPreviewBody">Announcement message preview will appear here.</p>
+          <button id="announcementPreviewAction" class="btn btn-outline" type="button" hidden>View details</button>
+          <small id="announcementPreviewExpiry" class="announcement-preview__meta">No expiry</small>
+          <small id="announcementPreviewDelivery" class="announcement-preview__meta">Dashboard only</small>
+          <small id="announcementPreviewRecipients" class="announcement-preview__meta">No recipients selected</small>
+        </aside>
+      </div>
+
+      <p class="announcement-help">Publish to selected dashboards, with optional email delivery to the same eligible recipients.</p>
+      <p id="announcementMessage" class="announcement-message" role="status">Loading eligible recipients...</p>
+
+      <div class="adm-actions">
+        <button id="announcementPublishBtn" class="btn" type="submit">Publish Announcement</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-card announcement-history-panel" id="announcementHistory" aria-labelledby="announcementHistoryTitle" style="margin-bottom:20px;">
+    <div class="topbar announcement-history-panel__header">
+      <div>
+        <h2 id="announcementHistoryTitle">Announcement History</h2>
+        <p class="announcement-panel__subtitle">Review previously published announcements and their dashboard and email delivery summaries.</p>
+      </div>
+      <div class="toolbar" style="margin:0;">
+        <button id="announcementHistoryRefreshBtn" class="btn btn-outline" type="button">Refresh History</button>
+      </div>
+    </div>
+
+    <p id="announcementHistoryMessage" class="announcement-message" role="status" aria-live="polite">Loading announcement history...</p>
+    <button id="announcementHistoryRetryBtn" class="btn btn-outline" type="button" hidden>Retry</button>
+
+    <div id="announcementHistoryList" class="announcement-history-list" aria-live="polite"></div>
+
+    <div class="announcement-history-actions">
+      <button id="announcementHistoryLoadMoreBtn" class="btn btn-outline" type="button" hidden>Load More</button>
+    </div>
+  </section>
 
   <div class="admin-card collaboration-reports-card is-collapsed" id="collaborationReports" style="margin-top:20px;">
     <div id="collaborationReportsCard" class="collaboration-reports-header">
