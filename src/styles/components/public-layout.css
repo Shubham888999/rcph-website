@@ -2,6 +2,10 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(244, 180, 58, 0.1), transparent 28%),
+    radial-gradient(circle at 88% 18%, rgba(96, 195, 196, 0.06), transparent 30%),
+    linear-gradient(180deg, var(--color-bg-deep), var(--color-bg) 48%, #100f0c);
 }
 
 .public-logo-strip {
@@ -15,10 +19,11 @@
   background:
     linear-gradient(
       90deg,
-      rgba(229, 185, 92, 0.05),
-      rgba(57, 198, 181, 0.04)
+      rgba(244, 180, 58, 0.1),
+      rgba(153, 40, 87, 0.045) 52%,
+      rgba(96, 195, 196, 0.07)
     ),
-    rgba(6, 15, 23, 0.96);
+    rgba(5, 5, 5, 0.97);
 }
 
 .public-affiliation-logo {
@@ -37,8 +42,9 @@
   top: 0;
   z-index: 50;
   border-bottom: 1px solid var(--color-border);
-  background: rgba(7, 16, 24, 0.88);
+  background: var(--color-glass);
   backdrop-filter: blur(18px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
 }
 
 .public-header-inner {
@@ -110,7 +116,7 @@
   left: 0;
   height: 2px;
   border-radius: 2px;
-  background: var(--color-teal);
+  background: linear-gradient(90deg, var(--color-teal), var(--color-pink));
   transform: scaleX(0);
   transform-origin: center;
   transition: transform 180ms ease;
@@ -136,10 +142,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(229, 185, 92, 0.55);
+  border: 1px solid rgba(244, 180, 58, 0.74);
   border-radius: var(--radius-md);
-  color: #161005;
-  background: var(--color-gold);
+  color: var(--color-button-text);
+  background: linear-gradient(135deg, var(--color-gold), var(--color-gold-soft));
+  box-shadow: var(--shadow-gold);
   font-size: 0.84rem;
   font-weight: 800;
   text-decoration: none;
@@ -155,7 +162,7 @@
   place-items: center;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(244, 180, 58, 0.06);
   cursor: pointer;
 }
 
@@ -178,7 +185,9 @@
 .public-footer {
   margin-top: auto;
   border-top: 1px solid var(--color-border);
-  background: rgba(5, 12, 18, 0.98);
+  background:
+    linear-gradient(145deg, rgba(244, 180, 58, 0.045), transparent 38%),
+    rgba(5, 5, 5, 0.98);
 }
 
 .public-footer-inner {
@@ -263,7 +272,8 @@
     gap: 0;
     border: 1px solid transparent;
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    background: rgba(8, 18, 27, 0.98);
+    background: rgba(18, 18, 18, 0.98);
+    box-shadow: var(--shadow-md);
     opacity: 0;
     pointer-events: none;
     transition:
