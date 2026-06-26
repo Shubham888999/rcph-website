@@ -347,11 +347,12 @@ function renderProspectDashboard(data) {
   document.title = 'My Dashboard';
   els.dashboardTitle.textContent = 'My Dashboard';
   setDashboardMode(true);
-els.welcomeName.textContent = formatMemberHeading(
-  displayName,
-  '',
-  profile.role || 'prospect'
-);
+const cleanProspectName = String(displayName || 'Prospect')
+  .replace(/^Rtr\.\s*/i, '')
+  .trim();
+
+els.welcomeName.textContent =
+  `${cleanProspectName} (Prospect)`;
   els.memberLinkNote.textContent = 'You are currently a Prospect Member. Complete the membership criteria below to become an official RCPH member.';
   els.adminPanelBtn.hidden = true;
   els.bodPanelBtn.hidden = true;
