@@ -31,7 +31,7 @@
       labels: [
         ['International', 'Service'],
         ['Club', 'Service'],
-        ['Professional', 'Service'],
+        ['Professional', 'Development'],
         ['Community', 'Service']
       ]
     },
