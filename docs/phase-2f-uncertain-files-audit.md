@@ -259,3 +259,19 @@ Safety confirmations:
 - No environment files or secrets were touched.
 - No deployment occurred.
 - No stage, commit, push, install, or package upgrade occurred.
+
+## Phase 2G Outcome Note
+
+Phase 2G approved and completed the archive/removal actions proposed by this audit:
+
+- `admin.js` moved to `_archive/old-code/admin.js`.
+- `router.js` moved to `_archive/old-code/router.js`.
+- `fragments/calendar.html` moved to `_archive/old-pages/fragments/calendar.html`.
+- `fragments/projects.html` moved to `_archive/old-pages/fragments/projects.html`.
+- Empty `fragments/` directory removed.
+- `rotary_wheel.png` moved to `_archive/assets-review/rotary_wheel.png`.
+- `animations/gif-animation-data.json` moved to `_archive/animations-review/gif-animation-data.json`.
+- `position-migration-report.zip` was backed up to `.local-audit-archive/2026-06-24/position-migration-report.zip`, verified by matching size and SHA-256, then removed from the repository root.
+- Ignored, untracked `firebase-debug.log` was deleted locally.
+
+No active runtime logic, Firebase configuration, Firestore configuration, package files, environment files, or production data were changed during Phase 2G.
