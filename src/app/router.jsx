@@ -1,18 +1,16 @@
+import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
+import RouteLoader from "../components/feedback/RouteLoader";
 import PublicLayout from "../components/layout/PublicLayout";
 import ProtectedRoute from "../features/auth/ProtectedRoute";
-import HomePage from "../pages/public/HomePage";
-import LoginPage from "../pages/auth/LoginPage";
-import DashboardPage from "../pages/dashboard/DashboardPage";
-import AdminPage from "../pages/admin/AdminPage";
-import NotFoundPage from "../pages/public/NotFoundPage";
-import AboutPage from "../pages/public/AboutPage";
-import EventsPage from "../pages/public/EventsPage";
-import ProjectsPage from "../pages/public/ProjectsPage";
-import JoinPage from "../pages/public/JoinPage";
-import BodPage from "../pages/public/BodPage";
-import FaqPage from "../pages/public/FaqPage";
-import ContactPage from "../pages/public/ContactPage";
+
+function lazyRoute(Page) {
+  return (
+    <Suspense fallback={<RouteLoader />}>
+      <Page />
+    </Suspense>
+  );
+}
 
 export const router = createBrowserRouter([
   {
@@ -20,19 +18,19 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <HomePage />,
+        element: lazyRoute(lazy(() => import("../pages/public/HomePage"))),
       },
       {
         path: "/login",
-        element: <LoginPage />,
+        element: lazyRoute(lazy(() => import("../pages/auth/LoginPage"))),
       },
-      { path: "/about", element: <AboutPage /> },
-      { path: "/events", element: <EventsPage /> },
-      { path: "/projects", element: <ProjectsPage /> },
-      { path: "/join", element: <JoinPage /> },
-      { path: "/bod", element: <BodPage /> },
-      { path: "/faq", element: <FaqPage /> },
-      { path: "/contact", element: <ContactPage /> },
+      { path: "/about", element: lazyRoute(lazy(() => import("../pages/public/AboutPage"))) },
+      { path: "/events", element: lazyRoute(lazy(() => import("../pages/public/EventsPage"))) },
+      { path: "/projects", element: lazyRoute(lazy(() => import("../pages/public/ProjectsPage"))) },
+      { path: "/join", element: lazyRoute(lazy(() => import("../pages/public/JoinPage"))) },
+      { path: "/bod", element: lazyRoute(lazy(() => import("../pages/public/BodPage"))) },
+      { path: "/faq", element: lazyRoute(lazy(() => import("../pages/public/FaqPage"))) },
+      { path: "/contact", element: lazyRoute(lazy(() => import("../pages/public/ContactPage"))) },
     ],
   },
   {
@@ -40,16 +38,16 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/dashboard",
-        element: <DashboardPage />,
+        element: lazyRoute(lazy(() => import("../pages/dashboard/DashboardPage"))),
       },
       {
         path: "/admin",
-        element: <AdminPage />,
+        element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))),
       },
     ],
   },
   {
     path: "*",
-    element: <NotFoundPage />,
+    element: lazyRoute(lazy(() => import("../pages/public/NotFoundPage"))),
   },
 ]);
