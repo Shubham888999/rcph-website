@@ -1,0 +1,249 @@
+.bod-page-react {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 10% 4%, rgba(244, 180, 58, 0.11), transparent 25%),
+    radial-gradient(circle at 92% 16%, rgba(96, 195, 196, 0.07), transparent 28%);
+}
+
+.bod-hero-react,
+.bod-section-react {
+  width: min(1180px, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.bod-hero-react {
+  min-height: min(620px, calc(100vh - 164px));
+  padding-block: clamp(4rem, 10vw, 8rem);
+  display: flex;
+  align-items: center;
+}
+
+.bod-hero-react h1 {
+  max-width: 950px;
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(3rem, 8vw, 6.5rem);
+  line-height: 0.97;
+  letter-spacing: -0.055em;
+  text-shadow: 0 0 28px rgba(244, 180, 58, 0.1);
+}
+
+.bod-hero-react > div > p:not(.bod-kicker) {
+  max-width: 680px;
+  margin: var(--space-6) 0 0;
+  color: var(--color-muted);
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  line-height: 1.75;
+}
+
+.bod-kicker {
+  margin: 0 0 var(--space-3);
+  color: var(--color-teal);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bod-section-react {
+  padding-block: clamp(4.5rem, 9vw, 8rem);
+}
+
+.bod-section-react + .bod-section-react {
+  border-top: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, rgba(244, 180, 58, 0.46), rgba(96, 195, 196, 0.18), transparent) 1;
+}
+
+.bod-section-react__heading {
+  margin-bottom: clamp(2rem, 5vw, 3.5rem);
+}
+
+.bod-section-react h2 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 4.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.bod-grid-react {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.bod-card-react {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(153, 40, 87, 0.07), transparent 34%),
+    linear-gradient(145deg, var(--color-surface-soft), var(--color-surface));
+  box-shadow: var(--shadow-sm);
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+
+.bod-card-react:hover,
+.bod-card-react:focus-within {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-brand);
+  transform: translateY(-3px);
+}
+
+.bod-card-react__portrait {
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--color-bg-deep);
+}
+
+.bod-card-react__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease, filter 300ms ease;
+}
+
+.bod-card-react:hover .bod-card-react__portrait img,
+.bod-card-react:focus-within .bod-card-react__portrait img {
+  transform: scale(1.02);
+  filter: saturate(1.04);
+}
+
+.bod-card-react__content {
+  padding: var(--space-5);
+}
+
+.bod-card-react__role {
+  margin: 0 0 var(--space-2);
+  color: var(--color-gold-soft);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.bod-card-react h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.35rem;
+}
+
+.bod-card-react__bio,
+.bod-card-react__context {
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+.bod-card-react__context {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+}
+
+.bod-card-react a,
+.bod-contact-react a {
+  color: var(--color-teal);
+  font-weight: 750;
+  text-underline-offset: 0.3em;
+  overflow-wrap: anywhere;
+}
+
+.bod-council-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.bod-council-groups > section > h3 {
+  margin: 0 0 var(--space-5);
+  color: var(--color-gold-soft);
+  font-size: 1.35rem;
+}
+
+.bod-grid-react--council {
+  grid-template-columns: 1fr;
+}
+
+.bod-contact-react {
+  width: min(1280px, calc(100% - 2rem));
+  margin-bottom: clamp(4rem, 8vw, 7rem);
+  padding-inline: clamp(1.5rem, 6vw, 5rem);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  gap: clamp(2rem, 6vw, 5rem);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, rgba(244, 180, 58, 0.13), transparent 48%), var(--color-surface);
+  box-shadow: var(--shadow-brand);
+}
+
+.bod-contact-react__leaders,
+.bod-contact-react__links {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.bod-contact-react__leaders div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.bod-contact-react__leaders strong {
+  color: var(--color-gold-soft);
+}
+
+.bod-contact-react__leaders span {
+  color: var(--color-muted);
+}
+
+.bod-contact-react__links {
+  font-style: normal;
+}
+
+.bod-page-react a:focus-visible {
+  outline: 3px solid var(--color-gold);
+  outline-offset: 4px;
+}
+
+@media (max-width: 900px) {
+  .bod-grid-react {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bod-council-groups,
+  .bod-contact-react {
+    grid-template-columns: 1fr;
+  }
+
+  .bod-grid-react--council {
+    grid-template-columns: minmax(0, 420px);
+  }
+}
+
+@media (max-width: 620px) {
+  .bod-hero-react {
+    min-height: auto;
+  }
+
+  .bod-hero-react h1 {
+    font-size: clamp(2.8rem, 14vw, 4.4rem);
+  }
+
+  .bod-grid-react {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bod-card-react,
+  .bod-card-react__portrait img {
+    transition: none;
+  }
+
+  .bod-card-react:hover,
+  .bod-card-react:focus-within,
+  .bod-card-react:hover .bod-card-react__portrait img,
+  .bod-card-react:focus-within .bod-card-react__portrait img {
+    transform: none;
+  }
+}
