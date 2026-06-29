@@ -1,11 +1,18 @@
 import {
+  GoogleAuthProvider,
   getRedirectResult,
   onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../app/firebase";
 import { createTrustedAccessCache } from "./trustedAccessCache";
+
+const googleProvider = new GoogleAuthProvider();
+let googleRedirectResultPromise = null;
 
 export function observeAuthState(callback, onError) {
   return onAuthStateChanged(auth, callback, onError);
@@ -14,6 +21,25 @@ export function observeAuthState(callback, onError) {
 export async function signOutUser() {
   clearTrustedAccessCache();
   await signOut(auth);
+}
+
+export function signInWithEmailPassword(email, password) {
+  return signInWithEmailAndPassword(auth, email, password);
+}
+
+export async function signInWithGoogle() {
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    if (
+      error?.code === "auth/popup-blocked"
+      || error?.code === "auth/operation-not-supported-in-this-environment"
+    ) {
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
+    throw error;
+  }
 }
 
 export function clearTrustedAccessCache(uid) {
@@ -40,5 +66,8 @@ export function getTrustedAccess(options = {}) {
 }
 
 export function completeGoogleRedirectResult() {
-  return getRedirectResult(auth);
+  if (!googleRedirectResultPromise) {
+    googleRedirectResultPromise = getRedirectResult(auth);
+  }
+  return googleRedirectResultPromise;
 }

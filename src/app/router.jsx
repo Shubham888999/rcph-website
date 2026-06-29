@@ -22,10 +22,6 @@ export const router = createBrowserRouter([
         path: "/",
         element: lazyRoute(lazy(() => import("../pages/public/HomePage"))),
       },
-      {
-        path: "/login",
-        element: lazyRoute(lazy(() => import("../pages/auth/LoginPage"))),
-      },
       { path: "/about", element: lazyRoute(lazy(() => import("../pages/public/AboutPage"))) },
       { path: "/events", element: lazyRoute(lazy(() => import("../pages/public/EventsPage"))) },
       { path: "/calendar", element: lazyRoute(lazy(() => import("../pages/public/CalendarPage"))) },
@@ -35,6 +31,18 @@ export const router = createBrowserRouter([
       { path: "/faq", element: lazyRoute(lazy(() => import("../pages/public/FaqPage"))) },
       { path: "/contact", element: lazyRoute(lazy(() => import("../pages/public/ContactPage"))) },
     ],
+  },
+  {
+    path: "/login",
+    element: lazyRoute(lazy(() => import("../pages/auth/LoginPage"))),
+  },
+  {
+    path: "/signup",
+    element: lazyRoute(lazy(() => import("../pages/auth/SignupPage"))),
+  },
+  {
+    path: "/forgot-password",
+    element: lazyRoute(lazy(() => import("../pages/auth/ForgotPasswordPage"))),
   },
   {
     element: <AuthenticatedRoute />,

@@ -40,10 +40,14 @@ const STATE_COPY = {
   },
 };
 
-export default function AuthStateScreen({ state = "loading" }) {
+export default function AuthStateScreen({ state = "loading", onSignOut }) {
   const { isAuthenticated, refreshAccess, signOut } = useAuth();
   const copy = STATE_COPY[state] || STATE_COPY.unauthorized;
   const loading = state === "loading";
+  const handleSignOut = async () => {
+    await signOut();
+    onSignOut?.();
+  };
 
   return (
     <main className="auth-access-page">
@@ -64,7 +68,7 @@ export default function AuthStateScreen({ state = "loading" }) {
           ) : null}
           <Link className="button button-secondary" to="/">Public homepage</Link>
           {isAuthenticated && !loading ? (
-            <button className="auth-signout-button" type="button" onClick={signOut}>
+            <button className="auth-signout-button" type="button" onClick={handleSignOut}>
               Sign out
             </button>
           ) : null}
