@@ -1,0 +1,135 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  createDeniedAccess,
+  getAccountState,
+  hasCapability,
+  normalizeTrustedAccess,
+} from "./accessModel.js";
+
+function approved(role, authority = {}) {
+  return normalizeTrustedAccess({
+    ok: true,
+    uid: "user-1",
+    user: { name: "Test Member", status: "approved" },
+    role: { role, status: "approved" },
+    positionKeys: [],
+    authority,
+  });
+}
+
+test("approved Prospect gets member and prospect access only", () => {
+  const access = approved("prospect");
+  assert.equal(hasCapability(access, "memberDashboard"), true);
+  assert.equal(hasCapability(access, "prospectDashboard"), true);
+  assert.equal(hasCapability(access, "adminTools"), false);
+});
+
+test("approved GBM gets member access but not Admin", () => {
+  const access = approved("gbm");
+  assert.equal(access.canAccessMemberDashboard, true);
+  assert.equal(access.canAccessAdminTools, false);
+});
+
+test("approved BOD gets BOD access but not Admin", () => {
+  const access = approved("bod");
+  assert.equal(access.canAccessBodTools, true);
+  assert.equal(access.canAccessAdminTools, false);
+});
+
+test("approved Admin gets Admin access", () => {
+  assert.equal(approved("admin").canAccessAdminTools, true);
+});
+
+test("approved President gets Admin and President access", () => {
+  const access = approved("president");
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessPresidentControls, true);
+});
+
+test("BOD with trusted Website Director authority gets delegated Admin access", () => {
+  const access = approved("bod", {
+    hasWebsiteDirectorPosition: true,
+    hasPresidentAuthority: true,
+  });
+  assert.equal(access.hasWebsiteDirectorPosition, true);
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessPresidentControls, true);
+});
+
+test("pending BOD request grants no protected capability", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "pending",
+    user: { status: "pending", requestedRole: "bod" },
+    role: null,
+  });
+  assert.equal(access.isPending, true);
+  assert.equal(access.canAccessMemberDashboard, false);
+  assert.equal(access.canAccessAdminTools, false);
+});
+
+test("rejected account grants no protected capability", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "rejected",
+    user: { status: "rejected" },
+    role: null,
+  });
+  assert.equal(access.isRejected, true);
+  assert.equal(access.canAccessMemberDashboard, false);
+});
+
+test("explicit rejection takes presentation precedence over pending", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "conflicted",
+    user: { status: "rejected" },
+    role: { role: "bod", status: "pending" },
+  });
+  assert.equal(access.isRejected, true);
+  assert.equal(access.isPending, false);
+  assert.equal(access.accountStatus, "rejected");
+  assert.equal(getAccountState(access), "rejected");
+  assert.equal(access.canAccessMemberDashboard, false);
+});
+
+test("missing role document is profile-missing and denied", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "missing-role",
+    user: { status: "approved" },
+    role: null,
+  });
+  assert.equal(access.isProfileMissing, true);
+  assert.equal(access.isApproved, false);
+});
+
+test("malformed callable response is rejected", () => {
+  assert.throws(() => normalizeTrustedAccess({ ok: false }), /invalid/i);
+});
+
+test("absent authority booleans remain false", () => {
+  const access = approved("bod");
+  assert.equal(access.isPresidentRole, false);
+  assert.equal(access.hasWebsiteDirectorPosition, false);
+  assert.equal(access.hasPresidentAuthority, false);
+});
+
+test("role status other than approved is inactive and denied", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "inactive",
+    user: { status: "approved" },
+    role: { role: "admin", status: "disabled" },
+    authority: { hasPresidentAuthority: true },
+  });
+  assert.equal(access.isInactive, true);
+  assert.equal(access.canAccessAdminTools, false);
+});
+
+test("callable failure fallback grants no access", () => {
+  const access = createDeniedAccess();
+  assert.equal(hasCapability(access, "memberDashboard"), false);
+  assert.equal(hasCapability(access, "adminTools"), false);
+});

@@ -2,7 +2,9 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import RouteLoader from "../components/feedback/RouteLoader";
 import PublicLayout from "../components/layout/PublicLayout";
-import ProtectedRoute from "../features/auth/ProtectedRoute";
+import ApprovedRoute from "../features/auth/ApprovedRoute";
+import AuthenticatedRoute from "../features/auth/AuthenticatedRoute";
+import RoleRoute from "../features/auth/RoleRoute";
 
 function lazyRoute(Page) {
   return (
@@ -35,15 +37,34 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    element: <ProtectedRoute />,
+    element: <AuthenticatedRoute />,
     children: [
       {
-        path: "/dashboard",
-        element: lazyRoute(lazy(() => import("../pages/dashboard/DashboardPage"))),
-      },
-      {
-        path: "/admin",
-        element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))),
+        element: <ApprovedRoute />,
+        children: [
+          {
+            path: "/access",
+            element: lazyRoute(lazy(() => import("../pages/protected/AccessPage"))),
+          },
+          {
+            element: <RoleRoute capability="memberDashboard" />,
+            children: [
+              {
+                path: "/dashboard",
+                element: lazyRoute(lazy(() => import("../pages/dashboard/DashboardPage"))),
+              },
+            ],
+          },
+          {
+            element: <RoleRoute capability="adminTools" />,
+            children: [
+              {
+                path: "/admin",
+                element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))),
+              },
+            ],
+          },
+        ],
       },
     ],
   },
