@@ -14,7 +14,7 @@ import { getSafeLoginDestination } from "../../features/auth/loginRedirect";
 import useAuth from "../../hooks/useAuth";
 import "../../styles/components/login.css";
 
-function LoginVerificationState({ message = "Verifying your trusted RCPH access&" }) {
+function LoginVerificationState({ message = "Verifying your trusted RCPH access…" }) {
   return (
     <main className="login-page-react">
       <section className="login-verification" role="status" aria-live="polite">
@@ -92,7 +92,7 @@ export default function LoginPage() {
       if (result?.user) {
         setAwaitingTrustedAccess(true);
       } else {
-        setNotice({ tone: "info", message: "Redirecting to Google sign-in&" });
+        setNotice({ tone: "info", message: "Redirecting to Google sign-in…" });
       }
     } catch (error) {
       attemptInFlightRef.current = false;
@@ -108,7 +108,7 @@ export default function LoginPage() {
     setNotice(null);
   }, []);
 
-  if (authLoading) return <LoginVerificationState message="Checking your current sign-in state&" />;
+  if (authLoading) return <LoginVerificationState message="Checking your current sign-in state…" />;
   if (isAuthenticated) {
     if (accountState === "approved" || accountState === "access-loading") {
       return <LoginVerificationState />;
@@ -124,10 +124,10 @@ export default function LoginPage() {
         <section className="login-brand-panel" aria-labelledby="login-brand-title">
           <Link className="login-brand" to="/" aria-label="RCPH public homepage">
             <img src="/images/logo3.webp" alt="Rotaract Club of Pune Heritage" />
-            <span><strong>RCPH</strong><small>RID 3131 � Zone 4</small></span>
+            <span><strong>RCPH</strong><small>RID 3131 · Zone 4</small></span>
           </Link>
           <div>
-            <p className="login-kicker">Create � Connect � Contribute</p>
+            <p className="login-kicker">CREATE · CONNECT · CONTRIBUTE</p>
             <h1 id="login-brand-title">Your club, one secure doorway.</h1>
             <p>Access member resources and trusted club tools through your approved RCPH account.</p>
           </div>

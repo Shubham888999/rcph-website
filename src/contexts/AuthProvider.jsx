@@ -3,6 +3,7 @@ import { getAccountState, normalizeTrustedAccess } from "../features/auth/access
 import { getSafeAuthError } from "../features/auth/authErrors";
 import {
   clearTrustedAccessCache,
+  getTrustedAccessDiagnostic,
   getTrustedAccess,
   observeAuthState,
   signOutUser,
@@ -40,7 +41,12 @@ export default function AuthProvider({ children }) {
         || currentUidRef.current !== uid
         || requestVersionRef.current !== requestVersion
       ) return;
-      if (import.meta.env.DEV) console.error("Trusted access resolution failed.", error);
+      if (import.meta.env.DEV) {
+        console.error(
+          "Trusted access resolution failed.",
+          getTrustedAccessDiagnostic(error, refresh ? "retry" : "initial"),
+        );
+      }
       setAccess(null);
       setAccessError(getSafeAuthError(error));
     } finally {
@@ -76,7 +82,12 @@ export default function AuthProvider({ children }) {
         resolveAccess(currentUser.uid);
       },
       (error) => {
-        if (import.meta.env.DEV) console.error("Firebase authentication state failed.", error);
+        if (import.meta.env.DEV) {
+          console.error(
+            "Firebase authentication state failed.",
+            getTrustedAccessDiagnostic(error, "initial"),
+          );
+        }
         currentUidRef.current = "";
         requestVersionRef.current += 1;
         setUser(null);

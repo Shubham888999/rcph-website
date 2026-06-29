@@ -13,6 +13,7 @@ import { createTrustedAccessCache } from "./trustedAccessCache";
 
 const googleProvider = new GoogleAuthProvider();
 let googleRedirectResultPromise = null;
+const explicitlyConfiguredFunctionsRegion = null;
 
 export function observeAuthState(callback, onError) {
   return onAuthStateChanged(auth, callback, onError);
@@ -60,9 +61,33 @@ async function requestTrustedAccess(uid) {
 const trustedAccessCache = createTrustedAccessCache(requestTrustedAccess);
 
 export function getTrustedAccess(options = {}) {
-  const uid = options.uid || auth.currentUser?.uid || "";
+  const currentUid = auth.currentUser?.uid || "";
+  const uid = options.uid || currentUid;
   const refresh = options.refresh === true;
+  if (!currentUid || uid !== currentUid) {
+    return Promise.reject(new Error("An authenticated user is required."));
+  }
   return trustedAccessCache.get({ uid, refresh });
+}
+
+export function getTrustedAccessDiagnostic(error, phase) {
+  const currentUid = auth.currentUser?.uid || "";
+  const diagnostic = {
+    code: typeof error?.code === "string" && error.code.trim()
+      ? error.code.trim().toLowerCase()
+      : "unknown",
+    authCurrentUserExists: Boolean(auth.currentUser),
+    uidSuffix: currentUid.length > 4
+      ? `…${currentUid.slice(-4)}`
+      : currentUid
+        ? "…redacted"
+        : null,
+    phase: phase === "retry" ? "retry" : "initial",
+  };
+  if (explicitlyConfiguredFunctionsRegion) {
+    diagnostic.functionsRegion = explicitlyConfiguredFunctionsRegion;
+  }
+  return diagnostic;
 }
 
 export function completeGoogleRedirectResult() {
