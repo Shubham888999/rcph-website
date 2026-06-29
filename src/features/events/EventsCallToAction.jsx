@@ -22,6 +22,7 @@ export default function EventsCallToAction() {
         </p>
       </div>
       <nav className="events-cta__links" aria-label="Events next steps">
+        <Link to="/calendar">Open Event Calendar</Link>
         <Link to="/join">Join RCPH</Link>
         <Link to="/projects">Browse Projects</Link>
         <Link to="/faq">Read the FAQ</Link>

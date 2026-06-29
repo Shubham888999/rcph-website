@@ -4,6 +4,7 @@ import { getPublicEvents, reloadPublicEvents } from "./eventsService";
 
 const initialState = {
   status: "loading",
+  events: [],
   upcomingEvents: [],
   recentEvents: [],
   error: null,
@@ -18,7 +19,7 @@ export default function usePublicEvents() {
       .then((events) => {
         if (!mountedRef.current) return;
         const { upcomingEvents, recentEvents } = classifyEvents(events);
-        setState({ status: "success", upcomingEvents, recentEvents, error: null });
+        setState({ status: "success", events, upcomingEvents, recentEvents, error: null });
       })
       .catch((error) => {
         if (!mountedRef.current) return;

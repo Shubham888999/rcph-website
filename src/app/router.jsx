@@ -26,6 +26,7 @@ export const router = createBrowserRouter([
       },
       { path: "/about", element: lazyRoute(lazy(() => import("../pages/public/AboutPage"))) },
       { path: "/events", element: lazyRoute(lazy(() => import("../pages/public/EventsPage"))) },
+      { path: "/calendar", element: lazyRoute(lazy(() => import("../pages/public/CalendarPage"))) },
       { path: "/projects", element: lazyRoute(lazy(() => import("../pages/public/ProjectsPage"))) },
       { path: "/join", element: lazyRoute(lazy(() => import("../pages/public/JoinPage"))) },
       { path: "/bod", element: lazyRoute(lazy(() => import("../pages/public/BodPage"))) },
