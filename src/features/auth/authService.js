@@ -10,6 +10,10 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../app/firebase";
 import { createTrustedAccessCache } from "./trustedAccessCache";
+import {
+  createPasswordResetPayload,
+  normalizeRecoveryEmail,
+} from "./passwordRecoveryModel";
 
 const googleProvider = new GoogleAuthProvider();
 let googleRedirectResultPromise = null;
@@ -26,6 +30,18 @@ export async function signOutUser() {
 
 export function signInWithEmailPassword(email, password) {
   return signInWithEmailAndPassword(auth, email, password);
+}
+
+export async function requestPasswordOtp(email) {
+  const callable = httpsCallable(functions, "requestPasswordOtp");
+  const result = await callable({ email: normalizeRecoveryEmail(email) });
+  return result?.data;
+}
+
+export async function resetPasswordWithOtp(email, otp, newPassword) {
+  const callable = httpsCallable(functions, "resetPasswordWithOtp");
+  const result = await callable(createPasswordResetPayload(email, otp, newPassword));
+  return result?.data;
 }
 
 export async function signInWithGoogle() {

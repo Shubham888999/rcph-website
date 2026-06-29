@@ -19,6 +19,35 @@ const SAFE_ERROR_MESSAGES = {
 
 export const DEFAULT_SIGN_IN_ERROR = "Sign-in could not be completed. Please try again.";
 
+const RECOVERY_ERROR_MESSAGES = {
+  "functions/failed-precondition": "Please request a new verification code.",
+  "functions/resource-exhausted": "Too many verification attempts. Please request a new code.",
+  "functions/permission-denied": "The verification code is invalid.",
+  "functions/deadline-exceeded": "The verification code has expired. Please request a new code.",
+  "functions/unauthenticated": "Password recovery is temporarily unavailable. Please try again.",
+  "functions/unavailable": "Password recovery is temporarily unavailable. Please try again.",
+  "auth/network-request-failed": "A network problem prevented password recovery. Check your connection and try again.",
+  "functions/internal": "Password recovery is temporarily unavailable. Please try again.",
+};
+
+export function getPasswordRecoveryError(error, stage = "reset") {
+  const code = getErrorCode(error);
+  if (stage === "request") {
+    if (code === "auth/network-request-failed") return RECOVERY_ERROR_MESSAGES[code];
+    if (code === "functions/unavailable" || code === "functions/deadline-exceeded") {
+      return "The verification service is temporarily unavailable. Please try again.";
+    }
+    if (code === "functions/invalid-argument") return "Enter a valid email address.";
+    return "A verification code could not be sent right now. Please try again.";
+  }
+  if (code === "functions/invalid-argument" || code === "auth/invalid-password") {
+    return "Check the verification code and use a password with at least 6 characters.";
+  }
+  if (code === "functions/not-found") return "Please request a new verification code.";
+  return RECOVERY_ERROR_MESSAGES[code]
+    || "Password recovery could not be completed. Please request a new code and try again.";
+}
+
 export function getErrorCode(error) {
   return typeof error?.code === "string" ? error.code : "";
 }
