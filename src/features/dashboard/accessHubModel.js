@@ -35,7 +35,7 @@ export function getAccessHubCards(access) {
     cards.push({ key: "prospect", title: "Membership Progress", href: "/dashboard", available: true });
   }
   if (access.canAccessBodTools) {
-    cards.push({ key: "bod", title: "BOD Tools", href: null, available: false });
+    cards.push({ key: "bod", title: "BOD Tools", href: "/bod-tools", available: true });
   }
   if (access.canAccessAdminTools) {
     cards.push({ key: "admin", title: "Admin Tools", href: "/admin", available: true });

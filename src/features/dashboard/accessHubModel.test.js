@@ -22,10 +22,11 @@ test("dashboard fetch requires UID and approved capability", () => {
 });
 test("Prospect sees dashboard and progress", () => assert.deepEqual(getAccessHubCards(access("prospect")).map((x) => x.key), ["dashboard", "prospect"]));
 test("GBM sees member dashboard only", () => assert.deepEqual(getAccessHubCards(access("gbm")).map((x) => x.key), ["dashboard"]));
-test("BOD sees dashboard and unavailable BOD capability", () => {
+test("BOD sees dashboard and the protected BOD tools route", () => {
   const cards = getAccessHubCards(access("bod"));
   assert.deepEqual(cards.map((x) => x.key), ["dashboard", "bod"]);
-  assert.equal(cards[1].href, null);
+  assert.equal(cards[1].href, "/bod-tools");
+  assert.equal(cards[1].available, true);
 });
 test("Admin sees member, BOD, and Admin", () => assert.deepEqual(getAccessHubCards(access("admin")).map((x) => x.key), ["dashboard", "bod", "admin"]));
 test("President sees President controls without fake link", () => {

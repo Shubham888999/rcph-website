@@ -64,6 +64,15 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            element: <RoleRoute capability="bodTools" />,
+            children: [
+              {
+                path: "/bod-tools",
+                element: lazyRoute(lazy(() => import("../pages/bod/BodToolsPage"))),
+              },
+            ],
+          },
+          {
             element: <RoleRoute capability="adminTools" />,
             children: [
               {

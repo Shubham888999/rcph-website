@@ -9,6 +9,7 @@ import {
   signOutUser,
 } from "../features/auth/authService";
 import { clearDashboardDataCache } from "../features/dashboard/dashboardService";
+import { clearBodEventCache } from "../features/bod-tools/bodEventService";
 import { AuthContext } from "./auth-context";
 
 export default function AuthProvider({ children }) {
@@ -70,6 +71,7 @@ export default function AuthProvider({ children }) {
         if (previousUid && previousUid !== nextUid) {
           clearTrustedAccessCache(previousUid);
           clearDashboardDataCache(previousUid);
+          clearBodEventCache(previousUid);
         }
         currentUidRef.current = nextUid;
         requestVersionRef.current += 1;
@@ -81,6 +83,7 @@ export default function AuthProvider({ children }) {
         if (!currentUser) {
           setAccessLoading(false);
           clearTrustedAccessCache();
+          clearBodEventCache();
           return;
         }
         resolveAccess(currentUser.uid);
@@ -117,6 +120,7 @@ export default function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     clearDashboardDataCache(currentUidRef.current);
+    clearBodEventCache(currentUidRef.current);
     await signOutUser();
   }, []);
 
