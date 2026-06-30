@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
 const navigationItems = [
@@ -14,10 +14,27 @@ const navigationItems = [
 
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef(null);
 
   const closeMenu = () => {
     setMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return undefined;
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [menuOpen]);
 
   return (
     <div className="public-site-shell">
@@ -85,6 +102,7 @@ export default function PublicLayout() {
           </nav>
 
           <button
+            ref={menuButtonRef}
             className="public-menu-toggle"
             type="button"
             aria-expanded={menuOpen}

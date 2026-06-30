@@ -7,13 +7,13 @@ import CalendarEventDialog from "./CalendarEventDialog";
 function CalendarSkeleton() {
   return (
     <div className="calendar-skeleton" role="status" aria-live="polite">
-      <span>Loading the public event calendar&</span>
+      <span>Loading the public event calendar…</span>
       <div aria-hidden="true" />
     </div>
   );
 }
 
-export default function CalendarView({ events, status, reload }) {
+export default function CalendarView({ events, status, reload, preserveCalendarOnError = false }) {
   const [selection, setSelection] = useState(null);
   const keyboardHandlers = useRef(new Map());
   const initialView = useMemo(
@@ -67,7 +67,7 @@ export default function CalendarView({ events, status, reload }) {
           <button type="button" className="button button-primary" onClick={reload}>Retry</button>
         </div>
       ) : null}
-      {status === "success" ? (
+      {status === "success" || (status === "error" && preserveCalendarOnError) ? (
         <>
           <FullCalendar
             plugins={[dayGridPlugin, listPlugin]}
@@ -82,7 +82,7 @@ export default function CalendarView({ events, status, reload }) {
             eventDidMount={eventDidMount}
             eventWillUnmount={eventWillUnmount}
           />
-          {events.length === 0 ? (
+          {status === "success" && events.length === 0 ? (
             <p className="calendar-state calendar-state--empty">No public events are currently available.</p>
           ) : null}
         </>

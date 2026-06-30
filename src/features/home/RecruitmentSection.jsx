@@ -1,14 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 
-const opportunities = [
-  "Community service",
-  "Leadership",
-  "Professional development",
-  "Fellowship",
-  "Collaboration",
-];
-
 export default function RecruitmentSection() {
   const reduceMotion = useReducedMotion();
 
@@ -22,25 +14,41 @@ export default function RecruitmentSection() {
       transition={{ duration: reduceMotion ? 0 : 0.5 }}
     >
       <div className="home-recruitment__content">
-        <p className="home-kicker">Find your place at RCPH</p>
-        <h2 id="recruitment-title">Membership for RIY 2026 - 2027 is Open</h2>
+        <h2 id="recruitment-title">
+          Membership for RIY 2026 - 2027 is Open
+        </h2>
+
+        <div className="home-recruitment__divider" aria-hidden="true" />
+
         <p>
-          RCPH welcomes students and young professionals ready to serve their
-          community, grow as leaders, build professional skills, form lasting
-          friendships, and collaborate on meaningful projects across Pune.
+          Rotaract Club of Pune Heritage is welcoming students and young
+          professionals who want to be part of community service, leadership,
+          professional development, fellowship, and meaningful collaborations
+          in Pune.
         </p>
 
-        <ul className="home-opportunity-list" aria-label="Membership opportunities">
-          {opportunities.map((opportunity) => (
-            <li key={opportunity}>{opportunity}</li>
-          ))}
-        </ul>
+        <p>
+          If you want to join a youth-led service club, volunteer for impactful
+          projects, build friendships, or explore leadership opportunities,
+          this is the right time to connect with RCPH.
+        </p>
 
         <div className="home-actions">
-          <Link className="button button-primary" to="/join">Join RCPH</Link>
-          <Link className="button button-secondary" to="/contact">Contact Us</Link>
-          <Link className="button button-secondary" to="/faq">Read FAQ</Link>
-          <Link className="button button-secondary" to="/projects">Explore Projects</Link>
+          <Link className="button button-primary" to="/join">
+            Join RCPH
+          </Link>
+
+          <Link className="button button-secondary" to="/contact">
+            Contact Us
+          </Link>
+
+          <Link className="button button-secondary" to="/faq">
+            Read FAQ
+          </Link>
+
+          <Link className="button button-secondary" to="/projects">
+            Explore Projects
+          </Link>
         </div>
       </div>
     </motion.section>

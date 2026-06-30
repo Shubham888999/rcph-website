@@ -1,34 +1,67 @@
 :root {
-  --color-bg: #090909;
+  color-scheme: dark;
+
+  /* Core palette */
+  --color-bg: #0b0a09;
   --color-bg-deep: #050505;
-  --color-surface: #121212;
-  --color-surface-soft: #1a1712;
-  --color-surface-raised: #1a1a1a;
-  --color-border: rgba(244, 180, 58, 0.24);
-  --color-border-strong: rgba(244, 180, 58, 0.42);
-  --color-text: #f8f4e6;
-  --color-muted: #bdb5a2;
-  --color-gold: #f4b43a;
-  --color-gold-soft: #ffd76b;
-  --color-gold-deep: #b98213;
+  --color-surface: #151311;
+  --color-surface-soft: #1b1814;
+  --color-surface-raised: #211d18;
+  --color-border: rgba(229, 194, 104, 0.2);
+  --color-border-strong: rgba(229, 194, 104, 0.42);
+  --color-text: #f7f1e6;
+  --color-text-muted: #c8c0b1;
+  --color-muted: var(--color-text-muted);
+  --color-gold: #e5c268;
+  --color-gold-soft: #f2d98f;
+  --color-gold-deep: #a87622;
   --color-teal: #60c3c4;
-  --color-pink: #992857;
-  --color-pink-deep: #721847;
-  --color-button-text: #121212;
-  --color-danger: #f06d7d;
-  --color-glass: rgba(18, 18, 18, 0.82);
+  --color-pink: #d85b96;
+  --color-pink-deep: #932653;
+  --color-button-text: #181006;
+  --color-danger: #ff829a;
+  --color-success: #75c997;
+  --color-glass: rgba(15, 13, 11, 0.82);
 
+  /* Layout */
+  --content-max-width: 74rem;
+  --content-wide-max-width: 86rem;
+  --text-max-width: 44rem;
+  --page-gutter: clamp(1rem, 3vw, 2rem);
+  --section-padding: clamp(4.5rem, 8vw, 7rem);
+  --section-padding-mobile: 3.5rem;
+  --header-height: 4.75rem;
+
+  /* Shape */
   --radius-sm: 0.5rem;
-  --radius-md: 0.9rem;
-  --radius-lg: 1.4rem;
-  --radius-xl: 2rem;
+  --radius-md: 0.8rem;
+  --radius-lg: 1.15rem;
+  --radius-xl: 1.6rem;
+  --radius-card-sm: 0.8rem;
+  --radius-card-md: 1.15rem;
+  --radius-card-lg: 1.6rem;
+  --radius-input: 0.75rem;
+  --radius-button: 0.75rem;
 
-  --shadow-sm: 0 10px 26px rgba(0, 0, 0, 0.28);
-  --shadow-md: 0 18px 42px rgba(0, 0, 0, 0.34);
-  --shadow-gold: 0 12px 30px rgba(244, 180, 58, 0.18);
-  --shadow-brand: 0 18px 44px rgba(0, 0, 0, 0.36),
-    0 0 22px rgba(244, 180, 58, 0.12);
+  /* Depth and interaction */
+  --shadow-sm: 0 0.35rem 1rem rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 1rem 2.5rem rgba(0, 0, 0, 0.38);
+  --shadow-elevated: 0 1.5rem 4rem rgba(0, 0, 0, 0.52);
+  --shadow-gold: 0 0.8rem 2.2rem rgba(181, 128, 29, 0.2);
+  --shadow-brand:
+    0 1rem 2.4rem rgba(0, 0, 0, 0.38),
+    0 0 2.25rem rgba(57, 180, 177, 0.09);
+  --focus-ring:
+    0 0 0 0.125rem var(--color-bg-deep),
+    0 0 0 0.25rem rgba(96, 195, 196, 0.82);
+  --transition-fast: 160ms ease;
+  --transition-standard: 260ms cubic-bezier(0.2, 0.75, 0.25, 1);
 
+  /* Layering */
+  --z-header: 50;
+  --z-dialog: 1000;
+
+  /* Legacy spacing scale retained for existing components */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;

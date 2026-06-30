@@ -1,10 +1,12 @@
 import { AVENUES } from "./avenues.js";
 
-export default function CalendarLegend() {
+export default function CalendarLegend({ headingLevel = "h2" }) {
+  const Heading = headingLevel;
+
   return (
     <aside className="calendar-legend" aria-labelledby="calendar-legend-title">
       <p className="calendar-kicker">Color guide</p>
-      <h2 id="calendar-legend-title">Event avenues</h2>
+      <Heading id="calendar-legend-title">Event avenues</Heading>
       <ul>
         {AVENUES.map((avenue) => (
           <li key={avenue.code}>
