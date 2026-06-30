@@ -100,13 +100,173 @@ export function MembersModule({ members, uid, onNotice }) {
   const { busy, run } = useAdminMutation({ uid, module: "members", onNotice });
   function add(event) { event.preventDefault(); run("add-member", () => addRosterMember("members", { name: name.trim() }), "Member added.").then((result) => { if (result) setName(""); }); }
   function saveEdit(event) { event.preventDefault(); run("rename-member", () => updateRosterMember("members", editing.id, { name: editing.name.trim() }), "Member updated.").then((result) => { if (result !== null) setEditing(null); }); }
-  return <>
-    <AdminModuleHeader title="Member Roster" description="Production roster records used by club and district attendance." />
-    <form className="admin-form admin-form--inline" onSubmit={add}><label>Full name<input value={name} onChange={(event) => setName(event.target.value)} required /></label><button disabled={busy}>Add member</button></form>
-    <div className="admin-card-grid">{members.map((member) => <article className="admin-record-card" key={member.id}><h3>{member.name}</h3><p>{member.email || "No email in roster"}</p><p>{member.active ? "Active" : "Inactive"}</p><div className="admin-actions"><button onClick={() => setEditing({ id: member.id, name: member.name })}>Rename</button><button className="danger" onClick={() => setTarget(member)}>Remove</button></div></article>)}</div>
+return (
+  <>
+    <AdminModuleHeader
+      title="Club Members"
+    />
+
+    <section className="member-roster-summary" aria-label="Member roster summary">
+      <article>
+        <span>Total members</span>
+        <strong>{members.length}</strong>
+      </article>
+
+      <article>
+        <span>Active members</span>
+        <strong>
+          {members.filter((member) => member.active).length}
+        </strong>
+      </article>
+
+      <article>
+        <span>Inactive members</span>
+        <strong>
+          {members.filter((member) => !member.active).length}
+        </strong>
+      </article>
+    </section>
+
+    <section className="member-roster-add">
+      <form
+        className="member-roster-add__form"
+        onSubmit={add}
+      >
+        <label>
+          <span>Full name</span>
+
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Enter member name"
+            required
+          />
+        </label>
+
+        <button disabled={busy}>Add member</button>
+      </form>
+    </section>
+
+    <section className="member-roster-list" aria-label="Club members">
+      <header className="member-roster-list__header">
+        <div>
+          <p className="admin-kicker">Club directory</p>
+          <h3>Current Members</h3>
+        </div>
+
+        <span>
+          {members.length} {members.length === 1 ? "member" : "members"}
+        </span>
+      </header>
+
+      <div className="member-roster-list__rows">
+        {members.map((member) => {
+          const initials = member.name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part[0]?.toUpperCase())
+            .join("");
+
+          return (
+            <article
+              className="member-roster-row"
+              key={member.id}
+            >
+              <div
+                className="member-roster-row__initials"
+                aria-hidden="true"
+              >
+                {initials || "M"}
+              </div>
+
+              <div className="member-roster-row__identity">
+                <h3>{member.name}</h3>
+
+                <p>
+                  {member.email || "No email in roster"}
+                </p>
+              </div>
+
+              <div className="member-roster-row__status">
+                <span
+                  className={
+                    member.active
+                      ? "member-status member-status--active"
+                      : "member-status member-status--inactive"
+                  }
+                >
+                  {member.active ? "Active" : "Inactive"}
+                </span>
+              </div>
+
+              <div className="member-roster-row__actions">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditing({
+                      id: member.id,
+                      name: member.name,
+                    })
+                  }
+                >
+                  Rename
+                </button>
+
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => setTarget(member)}
+                >
+                  Remove
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
     {editing ? <AdminDialog title={`Rename ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><form className="admin-form" onSubmit={saveEdit}><label>Full name<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} required autoFocus /></label><div className="admin-actions"><button type="button" onClick={() => setEditing(null)}>Cancel</button><button disabled={busy}>Save</button></div></form></AdminDialog> : null}
-    {target ? <AdminDialog title={`Remove ${target.name}?`} busy={busy} onClose={() => setTarget(null)}><p>This permanently removes the production member roster document and its attendance document, matching current production behavior.</p><div className="admin-actions"><button onClick={() => setTarget(null)}>Cancel</button><button className="danger" onClick={() => run("delete-member", () => deleteRosterMember("members", "attendance", target.id), "Member and attendance row removed.").then((result) => { if (result !== null) setTarget(null); })}>Permanently remove</button></div></AdminDialog> : null}
-  </>;
+    {target ? (
+      <AdminDialog
+        title={`Remove ${target.name}?`}
+        busy={busy}
+        onClose={() => setTarget(null)}
+      >
+        <p>
+          This permanently removes the production member roster document and
+          its attendance document, matching current production behavior.
+        </p>
+
+        <div className="admin-actions">
+          <button onClick={() => setTarget(null)}>
+            Cancel
+          </button>
+
+          <button
+            className="danger"
+            onClick={() =>
+              run(
+                "delete-member",
+                () =>
+                  deleteRosterMember(
+                    "members",
+                    "attendance",
+                    target.id
+                  ),
+                "Member and attendance row removed."
+              ).then((result) => {
+                if (result !== null) setTarget(null);
+              })
+            }
+          >
+            Permanently remove
+          </button>
+        </div>
+      </AdminDialog>
+    ) : null}
+  </>
+);
 }
 
 export function ReportsModule({ events }) {
