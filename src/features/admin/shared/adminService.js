@@ -1,6 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { auth, db, functions } from "../../../app/firebase";
+import { auth, functions } from "../../../app/firebase";
+import { db } from "../../../app/firestore";
 import { createAdminCache } from "./adminCache";
 import { registerAdminCacheClear } from "./adminCacheRegistry";
 import { attendancePatch } from "./adminModel";

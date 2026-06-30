@@ -23,7 +23,7 @@ export default function AboutValues() {
     <AboutReveal className="about-section" labelledBy="about-theme-title">
       <div className="about-theme-header">
         <div className="about-theme-header__mark" aria-hidden="true">
-          <img src="/images/logo3.webp" alt="" />
+          <img src="/images/logo3.webp" alt="" loading="lazy" decoding="async" />
         </div>
         <div>
           <p className="about-kicker">Create · Connect · Contribute</p>

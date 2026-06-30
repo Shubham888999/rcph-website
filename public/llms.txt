@@ -1,0 +1,17 @@
+# Rotaract Club of Pune Heritage
+
+Official public website for Rotaract Club of Pune Heritage, a community-based Rotaract club in Pune under Rotaract District 3131.
+
+## Public pages
+
+- Home: https://rcph3131.org/
+- About: https://rcph3131.org/about
+- Events: https://rcph3131.org/events
+- Calendar: https://rcph3131.org/calendar
+- Projects: https://rcph3131.org/projects
+- Join: https://rcph3131.org/join
+- Board of Directors: https://rcph3131.org/bod
+- FAQ: https://rcph3131.org/faq
+- Contact: https://rcph3131.org/contact
+
+Authentication, dashboards, BOD tools, and Admin routes are private and should not be crawled or summarized.

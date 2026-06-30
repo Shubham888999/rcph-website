@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 export default function EventStories() {
   const reduceMotion = useReducedMotion();
@@ -26,12 +27,12 @@ export default function EventStories() {
             resources and meaningful interaction.
           </p>
         </div>
-        <a
+        <Link
           className="button button-secondary"
-          href="https://rcph3131.org/events/pages-of-hope.html"
+          to="/projects"
         >
           Read Event Report
-        </a>
+        </Link>
       </article>
     </motion.section>
   );

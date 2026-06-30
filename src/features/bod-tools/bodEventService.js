@@ -1,7 +1,9 @@
 import { collection, doc, getDocs, onSnapshot, orderBy, query } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { auth, db, functions } from "../../app/firebase";
+import { auth, functions } from "../../app/firebase";
+import { db } from "../../app/firestore";
 import { createBodEventCache } from "./bodEventCache";
+import { registerBodCacheClear } from "./bodCacheRegistry";
 import { normalizeBodEvent } from "./bodEventModel";
 
 function requireCurrentUser(uid = "") {
@@ -42,6 +44,7 @@ export function refreshBodEvents(uid) {
 export function clearBodEventCache(uid) {
   listCache.clear(uid);
 }
+registerBodCacheClear(clearBodEventCache);
 
 export function subscribeBodEventLock(callback, onError) {
   requireCurrentUser();

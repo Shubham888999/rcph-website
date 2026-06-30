@@ -8,8 +8,8 @@ import {
   observeAuthState,
   signOutUser,
 } from "../features/auth/authService";
-import { clearDashboardDataCache } from "../features/dashboard/dashboardService";
-import { clearBodEventCache } from "../features/bod-tools/bodEventService";
+import { clearDashboardClientCache } from "../features/dashboard/dashboardCacheRegistry";
+import { clearBodClientCache } from "../features/bod-tools/bodCacheRegistry";
 import { clearAdminClientCaches } from "../features/admin/shared/adminCacheRegistry";
 import { AuthContext } from "./auth-context";
 
@@ -71,8 +71,8 @@ export default function AuthProvider({ children }) {
         const nextUid = currentUser?.uid || "";
         if (previousUid && previousUid !== nextUid) {
           clearTrustedAccessCache(previousUid);
-          clearDashboardDataCache(previousUid);
-          clearBodEventCache(previousUid);
+          clearDashboardClientCache(previousUid);
+          clearBodClientCache(previousUid);
           clearAdminClientCaches(previousUid);
         }
         currentUidRef.current = nextUid;
@@ -85,19 +85,25 @@ export default function AuthProvider({ children }) {
         if (!currentUser) {
           setAccessLoading(false);
           clearTrustedAccessCache();
-          clearBodEventCache();
+          clearDashboardClientCache();
+          clearBodClientCache();
           clearAdminClientCaches();
           return;
         }
         resolveAccess(currentUser.uid);
       },
       (error) => {
+        const previousUid = currentUidRef.current;
         if (import.meta.env.DEV) {
           console.error(
             "Firebase authentication state failed.",
             getTrustedAccessDiagnostic(error, "initial"),
           );
         }
+        clearTrustedAccessCache(previousUid);
+        clearDashboardClientCache(previousUid);
+        clearBodClientCache(previousUid);
+        clearAdminClientCaches(previousUid);
         currentUidRef.current = "";
         requestVersionRef.current += 1;
         setUser(null);
@@ -122,8 +128,8 @@ export default function AuthProvider({ children }) {
   }, [resolveAccess]);
 
   const signOut = useCallback(async () => {
-    clearDashboardDataCache(currentUidRef.current);
-    clearBodEventCache(currentUidRef.current);
+    clearDashboardClientCache(currentUidRef.current);
+    clearBodClientCache(currentUidRef.current);
     clearAdminClientCaches(currentUidRef.current);
     await signOutUser();
   }, []);

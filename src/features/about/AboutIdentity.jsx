@@ -8,6 +8,8 @@ export default function AboutIdentity() {
           <img
             src="/images/about/aboutuslogo.png"
             alt="RCPH heritage logo with a red Marathi Tilak Pagdi"
+            loading="lazy"
+            decoding="async"
           />
         </div>
         <div className="about-feature-card__copy">

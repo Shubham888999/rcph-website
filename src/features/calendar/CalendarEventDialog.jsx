@@ -81,7 +81,7 @@ export default function CalendarEventDialog({ selection, onClose }) {
           onClick={onClose}
           aria-label="Close event details"
         >
-          �
+          ×
         </button>
         <p className="calendar-kicker">Event details</p>
         <h2 id={titleId}>{event.name}</h2>

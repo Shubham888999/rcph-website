@@ -70,7 +70,7 @@ export default function FeaturedProjects() {
             variants={reduceMotion ? undefined : cardVariants}
           >
             <div className="home-project-card__image">
-              <img src={project.image} alt={project.alt} />
+              <img src={project.image} alt={project.alt} loading="lazy" decoding="async" />
             </div>
             <div className="home-project-card__copy">
               <h3>{project.title}</h3>

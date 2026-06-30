@@ -1,0 +1,9 @@
+{
+  "name": "Rotaract Club of Pune Heritage",
+  "short_name": "RCPH",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#f4b43a",
+  "icons": [{ "src": "/images/logo3.webp", "sizes": "any", "type": "image/webp" }]
+}

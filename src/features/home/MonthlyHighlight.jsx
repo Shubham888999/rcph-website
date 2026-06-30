@@ -22,6 +22,8 @@ export default function MonthlyHighlight() {
           <img
             src="/images/DC.webp"
             alt="18th Annual Rotaract District Conference AURION event artwork"
+            loading="lazy"
+            decoding="async"
           />
         </div>
         <div className="home-highlight-card__copy">

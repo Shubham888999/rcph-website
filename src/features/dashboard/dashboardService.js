@@ -2,6 +2,7 @@ import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../app/firebase";
 import { normalizeDashboardResponse } from "./dashboardModel";
 import { createDashboardRequestCache } from "./dashboardRequestCache";
+import { registerDashboardCacheClear } from "./dashboardCacheRegistry";
 
 async function requestDashboard(uid) {
   if (!auth.currentUser || auth.currentUser.uid !== uid) {
@@ -25,6 +26,7 @@ export function reloadDashboardData(uid) {
 export function clearDashboardDataCache(uid) {
   cache.clear(uid);
 }
+registerDashboardCacheClear(clearDashboardDataCache);
 
 export function getDashboardErrorDiagnostic(error) {
   return { code: typeof error?.code === "string" ? error.code : "unknown" };

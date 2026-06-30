@@ -1,5 +1,5 @@
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { db } from "../../app/firebase";
+import { db } from "../../app/firestore";
 import { isPublicDisplayEvent, normalizeEvent } from "./eventModel";
 
 let cachedEventsPromise = null;
