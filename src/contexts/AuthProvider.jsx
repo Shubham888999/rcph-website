@@ -10,6 +10,7 @@ import {
 } from "../features/auth/authService";
 import { clearDashboardDataCache } from "../features/dashboard/dashboardService";
 import { clearBodEventCache } from "../features/bod-tools/bodEventService";
+import { clearAdminClientCaches } from "../features/admin/shared/adminCacheRegistry";
 import { AuthContext } from "./auth-context";
 
 export default function AuthProvider({ children }) {
@@ -72,6 +73,7 @@ export default function AuthProvider({ children }) {
           clearTrustedAccessCache(previousUid);
           clearDashboardDataCache(previousUid);
           clearBodEventCache(previousUid);
+          clearAdminClientCaches(previousUid);
         }
         currentUidRef.current = nextUid;
         requestVersionRef.current += 1;
@@ -84,6 +86,7 @@ export default function AuthProvider({ children }) {
           setAccessLoading(false);
           clearTrustedAccessCache();
           clearBodEventCache();
+          clearAdminClientCaches();
           return;
         }
         resolveAccess(currentUser.uid);
@@ -121,6 +124,7 @@ export default function AuthProvider({ children }) {
   const signOut = useCallback(async () => {
     clearDashboardDataCache(currentUidRef.current);
     clearBodEventCache(currentUidRef.current);
+    clearAdminClientCaches(currentUidRef.current);
     await signOutUser();
   }, []);
 

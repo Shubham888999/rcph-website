@@ -1,0 +1,4 @@
+export function AdminLoading({ label = "Loading protected Admin data…" }) { return <div className="admin-state" role="status" aria-live="polite"><p>{label}</p><div className="admin-skeleton" /></div>; }
+export function AdminError({ message, onRetry }) { return <div className="admin-state admin-state--error" role="alert"><h2>Admin data unavailable</h2><p>{message || "The protected data could not be loaded."}</p>{onRetry ? <button type="button" onClick={onRetry}>Retry</button> : null}</div>; }
+export function AdminEmpty({ message }) { return <div className="admin-state"><p>{message}</p></div>; }
+export function AdminNotice({ notice, onDismiss }) { if (!notice?.message) return null; return <div className={`admin-notice admin-notice--${notice.type || "info"}`} role={notice.type === "error" ? "alert" : "status"} aria-live="polite"><span>{notice.message}</span><button type="button" onClick={onDismiss} aria-label="Dismiss notice">×</button></div>; }

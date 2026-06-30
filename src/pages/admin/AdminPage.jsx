@@ -1,26 +1,43 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { useLocation } from "react-router-dom";
+import AdminShell from "../../features/admin/AdminShell";
+import { BodOperationsModule, ClubAttendanceModule, DistrictModule } from "../../features/admin/modules/AttendanceModules";
+import { AccountsModule, CommandCenter, MembersModule, ReportsModule } from "../../features/admin/modules/CoreModules";
+import DzrVisitModule from "../../features/admin/modules/DzrVisitModule";
+import { AnnouncementsModule, ProspectsModule } from "../../features/admin/modules/EngagementModules";
+import { FinesModule, TreasuryModule } from "../../features/admin/modules/FinanceModules";
+import LocksModule from "../../features/admin/modules/LocksModule";
+import { AdminError, AdminLoading, AdminNotice } from "../../features/admin/shared/AdminStates";
+import { clearAdminCaches } from "../../features/admin/shared/adminService";
+import useAdminData from "../../features/admin/shared/useAdminData";
+import VisitSubmissionsModule from "../../features/admin/visit/VisitSubmissionsModule";
+import { clearBodEventCache } from "../../features/bod-tools/bodEventService";
+import { clearDashboardDataCache } from "../../features/dashboard/dashboardService";
 import useAuth from "../../hooks/useAuth";
-import "../../styles/components/auth-access.css";
+import "../../styles/components/admin.css";
 
 export default function AdminPage() {
-  const { access } = useAuth();
-  const delegated = !["admin", "president"].includes(access.storedRole)
-    && access.hasPresidentAuthority;
-  const verificationMessage = delegated
-    ? access.hasWebsiteDirectorPosition
-      ? "Admin access is delegated by trusted Website Director president authority."
-      : "Admin access is delegated by trusted president authority."
-    : `Admin access is verified from the approved ${access.storedRole} role.`;
-
-  return (
-    <main className="auth-access-page">
-      <section className="verified-placeholder">
-        <p className="auth-access-kicker">Trusted admin access</p>
-        <h1>Admin foundation</h1>
-        <p>{verificationMessage}</p>
-        <p>No administrative reads, writes, or operations are implemented here yet.</p>
-        <Link className="button button-primary" to="/access">Back to Access Hub</Link>
-      </section>
-    </main>
-  );
+  const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools) }); const segment = location.pathname.replace(/^\/admin\/?/, "");
+  const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members"], attendance: ["members", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "districtEvents", "districtAttendance"], fines: ["members", "fines"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
+  const state = moduleState(...(requirements[segment] || []));
+  async function handleSignOut() { clearAdminCaches(uid); clearBodEventCache(uid); clearDashboardDataCache(uid); await signOut(); }
+  let content;
+  if (state.status === "loading") content = <AdminLoading />;
+  else if (state.status === "error") content = <AdminError message={state.error} />;
+  else if (segment === "") content = <CommandCenter data={data} access={access} uid={uid} onNotice={setNotice} />;
+  else if (segment === "requests") content = <AccountsModule users={data.users} access={access} uid={uid} onNotice={setNotice} />;
+  else if (segment === "members") content = <MembersModule members={data.members} uid={uid} onNotice={setNotice} />;
+  else if (segment === "attendance") content = <ClubAttendanceModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;
+  else if (segment === "bod") content = <BodOperationsModule data={data} lock={locks.bodAttendance} uid={uid} onNotice={setNotice} />;
+  else if (segment === "district") content = <DistrictModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;
+  else if (segment === "prospects") content = <ProspectsModule uid={uid} onNotice={setNotice} />;
+  else if (segment === "announcements") content = <AnnouncementsModule uid={uid} onNotice={setNotice} />;
+  else if (segment === "fines") content = <FinesModule fines={data.fines} members={data.members} lock={locks.fines} uid={uid} onNotice={setNotice} />;
+  else if (segment === "treasury") content = <TreasuryModule transactions={data.treasury} members={data.members} lock={locks.treasury} uid={uid} onNotice={setNotice} />;
+  else if (segment === "locks") content = <LocksModule locks={locks} access={access} uid={uid} onNotice={setNotice} />;
+  else if (segment === "reports") content = <ReportsModule events={data.events} />;
+  else if (segment === "visit-submissions") content = <VisitSubmissionsModule onNotice={setNotice} />;
+  else if (segment === "dzr-visit") content = <DzrVisitModule data={data} />;
+  else content = <AdminError message="This Admin module does not exist." />;
+  return <main className="admin-page"><AdminShell access={access} displayName={access?.user?.name || user?.displayName || "RCPH Admin"} onSignOut={handleSignOut}><AdminNotice notice={notice} onDismiss={() => setNotice(null)} />{content}</AdminShell></main>;
 }

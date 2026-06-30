@@ -1,0 +1,1 @@
+export default function AdminModuleHeader({ kicker = "Admin module", title, description, action }) { return <header className="admin-module-header"><div><p className="admin-kicker">{kicker}</p><h2>{title}</h2><p>{description}</p></div>{action}</header>; }

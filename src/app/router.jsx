@@ -76,7 +76,7 @@ export const router = createBrowserRouter([
             element: <RoleRoute capability="adminTools" />,
             children: [
               {
-                path: "/admin",
+                path: "/admin/*",
                 element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))),
               },
             ],
