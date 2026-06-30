@@ -1,17 +1,22 @@
+import {
+  isValidAuthEmail,
+  normalizeAuthEmail,
+  validateAuthEmail,
+} from "./emailModel.js";
+
 export const PASSWORD_MIN_LENGTH = 6;
 export const RESEND_COOLDOWN_SECONDS = 60;
 export const REQUEST_CODE_SUCCESS_MESSAGE =
   "If an account exists for that email, a verification code has been sent.";
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_PATTERN = /^\d{6}$/;
 
 export function normalizeRecoveryEmail(value) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
+  return normalizeAuthEmail(value);
 }
 
 export function isValidRecoveryEmail(value) {
-  return EMAIL_PATTERN.test(normalizeRecoveryEmail(value));
+  return isValidAuthEmail(value);
 }
 
 export function normalizeRecoveryOtp(value) {
@@ -35,10 +40,7 @@ export function createPasswordResetPayload(email, otp, newPassword) {
 }
 
 export function validateRecoveryEmail(value) {
-  const email = normalizeRecoveryEmail(value);
-  if (!email) return { email, error: "Enter your email address." };
-  if (!isValidRecoveryEmail(email)) return { email, error: "Enter a valid email address." };
-  return { email, error: "" };
+  return validateAuthEmail(value);
 }
 
 export function validateRecoveryReset({ otp, newPassword, confirmPassword }) {

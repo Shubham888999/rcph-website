@@ -1,4 +1,6 @@
 import {
+  createUserWithEmailAndPassword,
+  deleteUser,
   GoogleAuthProvider,
   getRedirectResult,
   onAuthStateChanged,
@@ -6,6 +8,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   signOut,
+  updateProfile,
 } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../app/firebase";
@@ -30,6 +33,31 @@ export async function signOutUser() {
 
 export function signInWithEmailPassword(email, password) {
   return signInWithEmailAndPassword(auth, email, password);
+}
+
+export async function createPasswordSignupAccount({ email, password, name }) {
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  if (name) await updateProfile(credential.user, { displayName: name });
+  return credential;
+}
+
+export function signInOrCreateGoogleSignup() {
+  // Signup questionnaires remain in memory, so signup intentionally does not redirect.
+  return signInWithPopup(auth, googleProvider);
+}
+
+export async function createUserProfileAfterSignup(payload) {
+  const callable = httpsCallable(functions, "createUserProfileAfterSignup");
+  const result = await callable(payload);
+  return result?.data;
+}
+
+export async function deleteCurrentAuthUserForFailedSignup(expectedUid) {
+  const currentUser = auth.currentUser;
+  if (!currentUser || (expectedUid && currentUser.uid !== expectedUid)) {
+    throw new Error("The partial signup account is no longer current.");
+  }
+  await deleteUser(currentUser);
 }
 
 export async function requestPasswordOtp(email) {

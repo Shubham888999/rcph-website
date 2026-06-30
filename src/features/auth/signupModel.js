@@ -1,0 +1,235 @@
+import {
+  isValidAuthEmail,
+  normalizeAuthEmail,
+} from "./emailModel.js";
+
+export const SIGNUP_PATHS = {
+  CHOICE: "choice",
+  PROSPECT: "prospect",
+  EXISTING_MEMBER: "existing-member",
+};
+
+export const SIGNUP_ROLES = ["gbm", "bod", "admin"];
+export const SIGNUP_GENDERS = [
+  "woman",
+  "man",
+  "non-binary",
+  "self-describe",
+  "prefer-not-to-say",
+];
+export const SIGNUP_PASSWORD_MIN_LENGTH = 6;
+
+export function createSignupForm() {
+  return {
+    path: SIGNUP_PATHS.CHOICE,
+    name: "",
+    phone: "",
+    email: "",
+    gender: "",
+    genderSelfDescribe: "",
+    password: "",
+    confirmPassword: "",
+    requestedRole: "gbm",
+    inviteCode: "",
+    hobbies: "",
+    previousRotaract: "",
+    previousRotaractDetails: "",
+    joinReason: "",
+    referred: "",
+    referredBy: "",
+  };
+}
+
+export function normalizeSignupName(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function normalizeSignupPhone(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function normalizeSignupEmail(value) {
+  return normalizeAuthEmail(value);
+}
+
+export function normalizeSignupPassword(value) {
+  return typeof value === "string" ? value : "";
+}
+
+export function selectSignupPath(form, path) {
+  const base = {
+    ...form,
+    path: [SIGNUP_PATHS.PROSPECT, SIGNUP_PATHS.EXISTING_MEMBER].includes(path)
+      ? path
+      : SIGNUP_PATHS.CHOICE,
+    password: "",
+    confirmPassword: "",
+    inviteCode: "",
+  };
+  if (base.path === SIGNUP_PATHS.PROSPECT) {
+    return { ...base, requestedRole: "prospect" };
+  }
+  if (base.path === SIGNUP_PATHS.EXISTING_MEMBER) {
+    return {
+      ...base,
+      requestedRole: SIGNUP_ROLES.includes(form.requestedRole) ? form.requestedRole : "gbm",
+      hobbies: "",
+      previousRotaract: "",
+      previousRotaractDetails: "",
+      joinReason: "",
+      referred: "",
+      referredBy: "",
+    };
+  }
+  return createSignupForm();
+}
+
+export function updateSignupField(form, field, value) {
+  if (!Object.hasOwn(form, field) || field === "path") return form;
+  const next = { ...form, [field]: value };
+  if (field === "gender" && value !== "self-describe") next.genderSelfDescribe = "";
+  if (field === "previousRotaract" && value !== "yes") next.previousRotaractDetails = "";
+  if (field === "referred" && value !== "yes") next.referredBy = "";
+  if (field === "requestedRole" && value !== "admin") next.inviteCode = "";
+  return next;
+}
+
+export function validateSignup(form, options = {}) {
+  const errors = {};
+  const requireCredentials = options.requireCredentials !== false;
+  const minimalProfileCompletion = options.profileCompletion === true
+    && form.path === SIGNUP_PATHS.EXISTING_MEMBER;
+  const name = normalizeSignupName(form.name);
+  const phone = normalizeSignupPhone(form.phone);
+  const email = normalizeSignupEmail(options.identityEmail || form.email);
+  const password = normalizeSignupPassword(form.password);
+  const confirmation = normalizeSignupPassword(form.confirmPassword);
+
+  if (!name) errors.name = "Enter your full name.";
+  if (!minimalProfileCompletion && !phone) errors.phone = "Enter your phone number.";
+  if (!email) errors.email = "Enter your email address.";
+  else if (!isValidAuthEmail(email)) errors.email = "Enter a valid email address.";
+  if (!minimalProfileCompletion && !SIGNUP_GENDERS.includes(form.gender)) {
+    errors.gender = "Select a gender option.";
+  }
+  if (!minimalProfileCompletion && form.gender === "self-describe" && !normalizeSignupName(form.genderSelfDescribe)) {
+    errors.genderSelfDescribe = "Please describe your gender.";
+  }
+
+  if (form.path === SIGNUP_PATHS.PROSPECT) {
+    if (!normalizeSignupName(form.hobbies)) errors.hobbies = "Tell us about your hobbies or interests.";
+    if (!["yes", "no"].includes(form.previousRotaract)) {
+      errors.previousRotaract = "Select whether you have been part of Rotaract before.";
+    }
+    if (form.previousRotaract === "yes" && !normalizeSignupName(form.previousRotaractDetails)) {
+      errors.previousRotaractDetails = "Describe your previous Rotaract experience.";
+    }
+    if (!normalizeSignupName(form.joinReason)) errors.joinReason = "Tell us why you want to join RCPH.";
+    if (!["yes", "no"].includes(form.referred)) {
+      errors.referred = "Select whether someone referred you.";
+    }
+    if (form.referred === "yes" && !normalizeSignupName(form.referredBy)) {
+      errors.referredBy = "Enter the name of the person who referred you.";
+    }
+  } else if (form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
+    if (!SIGNUP_ROLES.includes(form.requestedRole)) errors.requestedRole = "Choose GBM, BOD, or Admin.";
+    if (form.requestedRole === "admin" && !normalizeSignupName(form.inviteCode)) {
+      errors.inviteCode = "Enter the Admin invite code.";
+    }
+  } else {
+    errors.path = "Choose an account type.";
+  }
+
+  if (requireCredentials) {
+    if (!password) errors.password = "Enter a password.";
+    else if (password.length < SIGNUP_PASSWORD_MIN_LENGTH) {
+      errors.password = `Use at least ${SIGNUP_PASSWORD_MIN_LENGTH} characters.`;
+    }
+    if (!confirmation) errors.confirmPassword = "Confirm your password.";
+    else if (password !== confirmation) errors.confirmPassword = "Passwords do not match.";
+  }
+
+  return {
+    errors,
+    values: { name, phone, email, password },
+    valid: Object.keys(errors).length === 0,
+  };
+}
+
+export function buildSignupPayload(form, options = {}) {
+  const provider = options.provider === "google" ? "google" : "password";
+  if (options.profileCompletion === true && form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
+    return {
+      name: normalizeSignupName(form.name),
+      requestedRole: form.requestedRole,
+      provider,
+      ...(form.requestedRole === "admin"
+        ? { inviteCode: normalizeSignupName(form.inviteCode) }
+        : {}),
+    };
+  }
+  const base = {
+    name: normalizeSignupName(form.name),
+    phone: normalizeSignupPhone(form.phone),
+    email: normalizeSignupEmail(options.identityEmail || form.email),
+    requestedRole: form.path === SIGNUP_PATHS.PROSPECT ? "prospect" : form.requestedRole,
+    provider,
+    gender: SIGNUP_GENDERS.includes(form.gender) ? form.gender : "",
+    genderSelfDescribe: form.gender === "self-describe"
+      ? normalizeSignupName(form.genderSelfDescribe)
+      : "",
+  };
+
+  if (form.path === SIGNUP_PATHS.PROSPECT) {
+    return {
+      ...base,
+      signupType: "prospect",
+      requestedRole: "prospect",
+      hobbies: normalizeSignupName(form.hobbies),
+      previousRotaract: form.previousRotaract === "yes",
+      previousRotaractDetails: form.previousRotaract === "yes"
+        ? normalizeSignupName(form.previousRotaractDetails)
+        : "N/A",
+      joinReason: normalizeSignupName(form.joinReason),
+      referred: form.referred === "yes",
+      referredBy: form.referred === "yes" ? normalizeSignupName(form.referredBy) : "N/A",
+    };
+  }
+
+  return {
+    ...base,
+    ...(form.requestedRole === "admin"
+      ? { inviteCode: normalizeSignupName(form.inviteCode) }
+      : {}),
+  };
+}
+
+export function classifySignupOutcome(result) {
+  const status = typeof result?.status === "string" ? result.status.trim().toLowerCase() : "";
+  const role = typeof result?.role === "string" ? result.role.trim().toLowerCase() : "";
+  if (status === "approved" && ["prospect", "gbm", "bod", "admin", "president"].includes(role)) {
+    return { kind: "approved", role, existing: result?.existing === true, refreshTrustedAccess: true };
+  }
+  if (status === "pending") {
+    return {
+      kind: "pending",
+      role: "pending",
+      requestedRole: typeof result?.requestedRole === "string"
+        ? result.requestedRole.trim().toLowerCase()
+        : "",
+      signOut: true,
+    };
+  }
+  return { kind: "unresolved", refreshTrustedAccess: false };
+}
+
+export function clearSignupSensitiveFields(form) {
+  return { ...form, password: "", confirmPassword: "", inviteCode: "" };
+}
+
+export function clearSignupFieldError(errors, field) {
+  if (!errors?.[field]) return errors;
+  const next = { ...errors };
+  delete next[field];
+  return next;
+}

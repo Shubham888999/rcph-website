@@ -66,6 +66,11 @@ export default function AuthStateScreen({ state = "loading", onSignOut }) {
               Retry access
             </button>
           ) : null}
+          {state === "profile-missing" ? (
+            <Link className="button button-primary" to="/signup">
+              Complete account setup
+            </Link>
+          ) : null}
           <Link className="button button-secondary" to="/">Public homepage</Link>
           {isAuthenticated && !loading ? (
             <button className="auth-signout-button" type="button" onClick={handleSignOut}>

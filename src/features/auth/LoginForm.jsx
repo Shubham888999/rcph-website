@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { validateAuthEmail } from "./emailModel";
 
 export default function LoginForm({ busy, onSubmit }) {
   const [email, setEmail] = useState("");
@@ -13,10 +12,9 @@ export default function LoginForm({ busy, onSubmit }) {
   async function handleSubmit(event) {
     event.preventDefault();
     if (busy) return;
-    const trimmedEmail = email.trim();
+    const emailValidation = validateAuthEmail(email);
     const nextErrors = {};
-    if (!trimmedEmail) nextErrors.email = "Enter your email address.";
-    else if (!EMAIL_PATTERN.test(trimmedEmail)) nextErrors.email = "Enter a valid email address.";
+    if (emailValidation.error) nextErrors.email = emailValidation.error;
     if (!password) nextErrors.password = "Enter your password.";
     setErrors(nextErrors);
 
@@ -28,7 +26,7 @@ export default function LoginForm({ busy, onSubmit }) {
       passwordRef.current?.focus();
       return;
     }
-    await onSubmit({ email: trimmedEmail, password });
+    await onSubmit({ email: emailValidation.email, password });
   }
 
   return (
