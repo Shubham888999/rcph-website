@@ -4,7 +4,7 @@ const values = [
   {
     title: "Create",
     description:
-      "This stands for innovation, leadership, and fresh ideas. As Rotaractors, we are creators of change—building impactful projects, nurturing team spirit, and shaping a better future through creativity and purpose.",
+      "This stands for innovation, leadership, and fresh ideas. As Rotaractors, we are creators of change, building impactful projects, nurturing team spirit, and shaping a better future through creativity and purpose.",
   },
   {
     title: "Connect",
@@ -14,7 +14,7 @@ const values = [
   {
     title: "Contribute",
     description:
-      "Our ultimate goal is to give back—to society, to our club, and to ourselves. Whether it is time, effort, knowledge, or service, every contribution matters. Together, we make a difference.",
+      "Our ultimate goal is to give back to society, to our club, and to ourselves. Whether it is time, effort, knowledge, or service, every contribution matters. Together, we make a difference.",
   },
 ];
 

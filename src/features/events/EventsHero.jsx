@@ -11,7 +11,6 @@ export default function EventsHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       >
-        <p className="events-kicker">Rotaract events Pune</p>
         <h1 id="events-page-title">Events by Rotaract Club of Pune Heritage</h1>
         <p>
           Our events range from service drives and General Meetings to workshops,

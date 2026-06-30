@@ -243,44 +243,59 @@ export default function SignupPage() {
     return <AuthStateScreen state={accountState} />;
   }
 
-  return (
-    <main className="login-page-react signup-page">
-      <div className="signup-shell">
-        <header className="signup-brand-header">
-          <Link className="login-brand" to="/" aria-label="RCPH public homepage">
-            <img src="/images/logo3.webp" alt="Rotaract Club of Pune Heritage" />
-            <span><strong>RCPH</strong><small>RID 3131 - Zone 4</small></span>
-          </Link>
-          <div>
-            <p className="login-kicker">CREATE - CONNECT - CONTRIBUTE</p>
-            <h1>Create your RCPH account</h1>
-            <p>Join as a Prospect or request trusted access for your existing club role.</p>
-          </div>
-        </header>
-        <section className="signup-card">
-          {form.path === SIGNUP_PATHS.CHOICE ? <SignupChoice onSelect={choosePath} /> : null}
-          {form.path === SIGNUP_PATHS.PROSPECT ? (
-            <ProspectSignupForm
-              {...formProps}
-              onTogglePasswords={() => setShowPasswords((current) => !current)}
-              onChange={handleFieldChange}
-              onSubmit={handleSignup}
-              onGoogle={() => handleSignup("google")}
-              onBack={handleBack}
-            />
-          ) : null}
-          {form.path === SIGNUP_PATHS.EXISTING_MEMBER ? (
-            <ExistingMemberSignupForm
-              {...formProps}
-              onTogglePasswords={() => setShowPasswords((current) => !current)}
-              onChange={handleFieldChange}
-              onSubmit={handleSignup}
-              onGoogle={() => handleSignup("google")}
-              onBack={handleBack}
-            />
-          ) : null}
-        </section>
-      </div>
-    </main>
-  );
+return (
+  <main className="login-page-react signup-page">
+    <div
+      className={`signup-shell ${
+        form.path === SIGNUP_PATHS.CHOICE ? "signup-shell--choice" : ""
+      }`}
+    >
+      <header className="signup-brand-header">
+        <Link className="login-brand" to="/" aria-label="RCPH public homepage">
+          <img
+            src="/images/logo3.webp"
+            alt="Rotaract Club of Pune Heritage"
+          />
+          <span>
+            <strong>RCPH</strong>
+            <small>RID 3131 - Zone 4</small>
+          </span>
+        </Link>
+
+        <div>
+          <p className="login-kicker">CREATE - CONNECT - CONTRIBUTE</p>
+          <h1>Create your RCPH account</h1>
+        </div>
+      </header>
+
+<section className="signup-card">
+  {form.path === SIGNUP_PATHS.CHOICE ? (
+    <SignupChoice onSelect={choosePath} />
+  ) : null}
+
+  {form.path === SIGNUP_PATHS.PROSPECT ? (
+    <ProspectSignupForm
+      {...formProps}
+      onTogglePasswords={() => setShowPasswords((current) => !current)}
+      onChange={handleFieldChange}
+      onSubmit={handleSignup}
+      onGoogle={() => handleSignup("google")}
+      onBack={handleBack}
+    />
+  ) : null}
+
+  {form.path === SIGNUP_PATHS.EXISTING_MEMBER ? (
+    <ExistingMemberSignupForm
+      {...formProps}
+      onTogglePasswords={() => setShowPasswords((current) => !current)}
+      onChange={handleFieldChange}
+      onSubmit={handleSignup}
+      onGoogle={() => handleSignup("google")}
+      onBack={handleBack}
+    />
+  ) : null}
+</section>
+    </div>
+  </main>
+);
 }

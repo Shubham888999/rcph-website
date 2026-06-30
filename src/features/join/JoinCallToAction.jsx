@@ -8,8 +8,7 @@ export default function JoinCallToAction() {
         <p className="join-kicker">Choose your next step</p>
         <h2 id="join-cta-title">Ready to Connect?</h2>
         <p>
-          Start with the option that fits you best. No information is submitted
-          from this page.
+          Start with the option that fits you best.
         </p>
       </div>
       <div className="join-cta__actions">

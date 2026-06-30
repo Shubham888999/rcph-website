@@ -15,7 +15,7 @@ export default function FaqOfficialAnswer() {
       <p className="faq-kicker">The short answer</p>
       <h2 id="faq-official-title">What is Rotaract Club of Pune Heritage?</h2>
       <p>
-        Rotaract Club of Pune Heritage, also known as RCPH, is a community-based
+        Rotaract Club of Pune Heritage, or RCPH, is a community-based
         Rotaract club in Pune under Rotaract District 3131, Zone 4. Chartered in
         2015 and sponsored by Rotary Club of Pune Heritage, RCPH brings together
         students and young professionals for community service, leadership,

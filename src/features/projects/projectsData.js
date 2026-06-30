@@ -5,7 +5,7 @@ export const projects = [
     image: "/images/Edureach1.jpg",
     alt: "Project EduReach education support initiative by Rotaract Club of Pune Heritage",
     description:
-      "Through Project EduReach, RCPH supported SSC students with e-learning kits and encouragement before their board examinations. The goal was simple—help students feel a little more prepared and a little more supported.",
+      "Through Project EduReach, RCPH supported SSC students with e-learning kits and encouragement before their board examinations. The goal was simple, help students feel a little more prepared and a little more supported.",
   },
   {
     title: "Sports RYLA",
@@ -21,7 +21,7 @@ export const projects = [
     image: "/images/projects/potluck.jpg",
     alt: "Members sharing food and fellowship during the RCPH PotLuck project",
     description:
-      "PotLuck was one of those simple fellowship moments that make a club feel like a club—food, conversations, laughter, and members getting to know each other better.",
+      "PotLuck was one of those simple fellowship moments that make a club feel like a club food, conversations, laughter, and members getting to know each other better.",
   },
   {
     title: "Cultural Exchange",

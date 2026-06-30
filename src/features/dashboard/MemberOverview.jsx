@@ -14,10 +14,10 @@ export default function MemberOverview({ data }) {
       </section>
       <AttendanceSummary attendance={data.myAttendance} districtAttendance={data.districtAttendance} />
       <section className="member-metric-grid" aria-label="Club statistics">
-        <DashboardMetricCard label="Total Public Club Events" value={stats.totalEvents} />
+        <DashboardMetricCard label="Total Club Events" value={stats.totalEvents} />
         <DashboardMetricCard label="Most Active Avenue" value={stats.mostActiveAvenue || null} />
-        <DashboardMetricCard label="Club Average Attendance" value={stats.clubAverageAttendance === null ? null : stats.clubAverageAttendance + "%"} />
-        <DashboardMetricCard label="My Attendance Rank" value={stats.myRank === null ? null : stats.myRank + " of " + (stats.rankedMemberCount ?? "?")} />
+        {/*<DashboardMetricCard label="Club Average Attendance" value={stats.clubAverageAttendance === null ? null : stats.clubAverageAttendance + "%"} />*/}
+        {/*<DashboardMetricCard label="My Attendance Rank" value={stats.myRank === null ? null : stats.myRank + " of " + (stats.rankedMemberCount ?? "?")} />*/}
         {data.clubRanking.enabled ? <DashboardMetricCard label="Club Ranking" value={data.clubRanking.value} detail={data.clubRanking.subtitle} /> : null}
       </section>
       <EventParticipationSummary recent={data.myAttendance.recent} districtRecent={data.districtAttendance.recent} upcoming={data.upcomingEvents} />

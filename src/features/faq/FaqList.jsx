@@ -24,7 +24,6 @@ export default function FaqList() {
       <div className="faq-section__heading">
         <p className="faq-kicker">Everything in one place</p>
         <h2 id="faq-list-title">RCPH Questions and Answers</h2>
-        <p>The first answer is open by default. Select any question to expand or collapse it.</p>
       </div>
 
       <div className="faq-list-react">

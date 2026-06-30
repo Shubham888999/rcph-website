@@ -35,12 +35,12 @@ export default function VisitSubmissionsModule({ onNotice }) {
     try { const data = await visitCalls.folder(visitType, positionKey); setRoute({ visit: visitType, position: positionKey }); setState((current) => ({ ...current, status: "success", detail: { visit: normalizeVisit(data.visit), folder: normalizeFolder(data.folder), access: data.access || {}, submissions: (data.submissions || []).map(normalizeSubmission).filter(Boolean) } })); }
     catch (error) { setState((current) => ({ ...current, status: "error", error: safeAdminError(error) })); }
   }
-  if (state.status === "loading") return <AdminLoading label="Loading Visit Submission workspace…" />;
+  if (state.status === "loading") return <AdminLoading label="Loading Club Visit workspace…" />;
   if (state.status === "error") return <AdminError message={state.error} onRetry={() => route.position ? openFolder(route.visit, route.position) : route.visit ? openVisit(route.visit) : loadDashboard()} />;
   const access = state.dashboard?.access || state.folders?.access || state.detail?.access || {};
   const reload = () => route.position ? openFolder(route.visit, route.position) : route.visit ? openVisit(route.visit) : loadDashboard();
   return <>
-    <AdminModuleHeader title="Visit Submissions" description="Club Assembly, DZR Visit, and DRR Visit document workflows." action={route.visit ? <button onClick={() => { setRoute({ visit: "", position: "" }); loadDashboard(); }}>Submission dashboard</button> : null} />
+    <AdminModuleHeader title="Club Visits" description="Club Assembly, DZR Visit, and DRR Visit document workflows." action={route.visit ? <button onClick={() => { setRoute({ visit: "", position: "" }); loadDashboard(); }}>Submission dashboard</button> : null} />
     {!route.visit ? <VisitDashboard data={state.dashboard} access={access} openVisit={openVisit} busy={busy} mutate={mutate} setDialog={setDialog} load={loadDashboard} /> : route.position ? <FolderDetail data={state.detail} busy={busy} mutate={mutate} reload={reload} setDialog={setDialog} /> : <VisitFolders data={state.folders} openFolder={openFolder} setDialog={setDialog} />}
     {dialog ? <VisitDialog dialog={dialog} visits={state.dashboard?.visits || []} busy={busy} mutate={mutate} onClose={() => setDialog(null)} reload={reload} /> : null}
   </>;

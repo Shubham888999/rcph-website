@@ -121,18 +121,41 @@ export default function LoginPage() {
   return (
     <main className="login-page-react">
       <div className="login-shell">
-        <section className="login-brand-panel" aria-labelledby="login-brand-title">
-          <Link className="login-brand" to="/" aria-label="RCPH public homepage">
-            <img src="/images/logo3.webp" alt="Rotaract Club of Pune Heritage" />
-            <span><strong>RCPH</strong><small>RID 3131 · Zone 4</small></span>
-          </Link>
-          <div>
-            <p className="login-kicker">CREATE · CONNECT · CONTRIBUTE</p>
-            <h1 id="login-brand-title">Your club, one secure doorway.</h1>
-            <p>Access member resources and trusted club tools through your approved RCPH account.</p>
-          </div>
-          <p className="login-brand-note">Rotaract Club of Pune Heritage</p>
-        </section>
+<section className="login-brand-panel" aria-labelledby="login-brand-title">
+  <Link
+    className="login-brand login-brand--portal"
+    to="/"
+    aria-label="RCPH public homepage"
+  >
+    <img
+      src="/images/logo3.webp"
+      alt="Rotaract Club of Pune Heritage"
+    />
+
+    <span>
+      <strong>Rotaract Club of Pune Heritage</strong>
+      <small>RID 3131 | Zone 4</small>
+    </span>
+  </Link>
+
+  <div className="login-brand-panel__main">
+    <h1 id="login-brand-title">
+      <span>RCPH</span>
+      <span>Account</span>
+      <span>Portal</span>
+    </h1>
+  </div>
+
+  <div className="login-brand-panel__footer">
+    <div className="login-brand-panel__values" aria-label="Club values">
+      <span>Create</span>
+      <span>Connect</span>
+      <span>Contribute</span>
+    </div>
+
+
+  </div>
+</section>
 
         <section className="login-card" aria-labelledby="login-title">
           <p className="login-kicker">Member access</p>
@@ -150,7 +173,7 @@ export default function LoginPage() {
             <Link to="/signup">Create an account</Link>
             <Link to="/forgot-password">Forgot password?</Link>
           </nav>
-          <Link className="login-home-link" to="/">Return to public homepage</Link>
+          <Link className="login-home-link" to="/">Return to Home</Link>
         </section>
       </div>
     </main>

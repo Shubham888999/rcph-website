@@ -12,7 +12,6 @@ export default function JoinHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       >
-        <p className="join-kicker">Join Rotaract in Pune</p>
         <h1 id="join-page-title">Join Rotaract Club of Pune Heritage</h1>
         <p>
           Rotaract Club of Pune Heritage welcomes students and young

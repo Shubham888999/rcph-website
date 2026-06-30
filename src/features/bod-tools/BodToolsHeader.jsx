@@ -6,11 +6,11 @@ export default function BodToolsHeader({ access, displayName, onSignOut }) {
   return (
     <header className="bod-tools-header">
       <div>
-        <p className="bod-tools-kicker">Protected operations</p>
+        <p className="bod-tools-kicker">Rotaract Club of Pune Heritage</p>
         <h1>BOD Event Manager</h1>
         <p>Welcome, {displayName}. Approved role: {ROLE_LABELS[access.storedRole] || "Member"}.</p>
         {access.hasWebsiteDirectorPosition && access.hasPresidentAuthority ? (
-          <p className="bod-tools-authority">Server-verified Website Director president authority is active.</p>
+          <p className="bod-tools-authority">Website Director authority is active.</p>
         ) : null}
       </div>
       <nav aria-label="BOD tools links" className="bod-tools-header__links">

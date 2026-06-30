@@ -12,7 +12,6 @@ export default function ProjectsHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       >
-        <p className="projects-kicker">Community service Pune</p>
         <h1 id="projects-page-title">Projects by Rotaract Club of Pune Heritage</h1>
         <p>
           Every RCPH project starts with a simple idea: bring people together

@@ -34,7 +34,7 @@ export function CommandCenter({ data, access, uid, onNotice }) {
     run("update-ranking", () => adminCalls.updateRanking(ranking), "Club ranking saved.");
   }
   return <>
-    <AdminModuleHeader title="Admin Command Center" description="Verified operational totals from the current protected collections." />
+    <AdminModuleHeader title="Admin Command Center" />
     <section className="admin-metric-grid">
       <Metric label="Active members" value={data.members.filter((member) => member.active).length} />
       <Metric label="Club events" value={data.events.filter((event) => !event.archived).length} />
@@ -51,7 +51,7 @@ export function CommandCenter({ data, access, uid, onNotice }) {
         <button disabled={busy}>Save ranking</button>
       </form>
     </section>
-    <section className="admin-panel"><h3>Authority</h3><p>{access.canAccessPresidentControls ? "Server-verified President controls are available." : "President-only controls remain unavailable."}</p></section>
+    <section className="admin-panel"><h3>Authority</h3><p>{access.canAccessPresidentControls ? "All module controls are available." : "President-only controls remain unavailable."}</p></section>
   </>;
 }
 
@@ -79,7 +79,7 @@ export function AccountsModule({ users, access, uid, onNotice }) {
   }
   const protectedPresident = editor?.user.role === "president" && !access.canAccessPresidentControls;
   return <>
-    <AdminModuleHeader title="Accounts & Roles" description="Approve requests and maintain role/position assignments through server-authoritative Functions." />
+    <AdminModuleHeader title="Accounts & Roles" description="Approve requests and maintain role/position assignments through this page." />
     <div className="admin-filterbar"><label>Search<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label>Status<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="all">All</option></select></label></div>
     {rows.length ? <div className="admin-table-wrap"><table><caption>Account requests and approved access</caption><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Positions</th><th>Action</th></tr></thead><tbody>{rows.map((user) => <tr key={user.id}><td>{user.name}</td><td>{user.email || "Unavailable"}</td><td>{user.status === "pending" ? user.requestedRole : user.role}</td><td>{user.status}</td><td>{user.positionKeys.join(", ") || user.clubPosition || "None"}</td><td><button type="button" onClick={() => open(user)}>Manage</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No account records match this view." />}
     {editor ? <AdminDialog title={`Manage ${editor.user.name}`} busy={busy} onClose={() => setEditor(null)}><div className="admin-form">

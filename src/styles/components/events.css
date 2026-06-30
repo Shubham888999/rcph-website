@@ -209,14 +209,11 @@
 }
 
 .event-avenue-card > span {
-  color: var(--color-gold-deep);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  display: none;
 }
 
 .event-avenue-card h3 {
-  margin-top: var(--space-4);
+  margin-top: 0;
 }
 
 .events-cta {

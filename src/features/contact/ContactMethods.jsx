@@ -11,7 +11,7 @@ export default function ContactMethods() {
       <div className="contact-methods-card">
         <div className="contact-methods-card__identity">
           <p className="contact-kicker">Rotaract Club of Pune Heritage</p>
-          <h3>RID 3131, Pune, Maharashtra</h3>
+          <h3>RID 3131, Pune</h3>
           <p>
             Reach the club directly by email or follow RCPH on Instagram for
             public updates.

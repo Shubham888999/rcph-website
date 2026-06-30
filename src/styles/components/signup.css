@@ -7,9 +7,34 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
+  align-items: start;
   gap: clamp(1rem, 3vw, 2.5rem);
 }
+.signup-shell--choice {
+  align-items: stretch;
+}
 
+.signup-shell--choice .signup-brand-header,
+.signup-shell--choice .signup-card {
+  height: 100%;
+}
+
+.signup-shell--choice .signup-brand-header {
+  position: static;
+  align-self: stretch;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.signup-shell--choice .signup-brand-header > div {
+  align-self: center;
+}
+
+.signup-shell--choice .signup-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 .signup-brand-header,
 .signup-card,
 .signup-success {
@@ -23,22 +48,37 @@
 }
 
 .signup-brand-header {
-  min-height: 560px;
+  min-height: 0;
   padding: clamp(1.5rem, 4vw, 3rem);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
+  gap: clamp(2.5rem, 5vw, 4rem);
   position: sticky;
   top: 1rem;
+  align-self: start;
+}
+.signup-brand-header > .login-brand {
+  align-self: start;
+}
+
+.signup-brand-header > div {
+  display: grid;
+  gap: 1rem;
 }
 
 .signup-brand-header h1 {
-  max-width: 10ch;
+  max-width: 9ch;
   margin: 0;
   color: var(--color-gold-soft);
-  font-size: clamp(2.6rem, 5vw, 4.8rem);
-  line-height: 0.98;
+  font-size: clamp(2.4rem, 4.5vw, 4.2rem);
+  line-height: 0.96;
   letter-spacing: -0.05em;
+}
+.signup-brand-header > div > p:last-child {
+  max-width: 30ch;
+  margin: 0;
+}
+.signup-brand-header {
+  border-top: 2px solid var(--color-gold);
 }
 
 .signup-brand-header > div > p:last-child,
@@ -318,15 +358,25 @@
   }
 
   .signup-brand-header {
-    min-height: 330px;
+    min-height: 0;
     position: static;
+    gap: 2rem;
   }
 
   .signup-brand-header h1 {
     max-width: 13ch;
+    font-size: clamp(2.5rem, 9vw, 4rem);
   }
+
+  .signup-shell--choice .signup-brand-header,
+.signup-shell--choice .signup-card {
+  height: auto;
 }
 
+.signup-shell--choice .signup-card {
+  display: block;
+}
+}
 @media (max-width: 620px) {
   .signup-choice-grid,
   .signup-fieldset {

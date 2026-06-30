@@ -21,7 +21,7 @@ const CARD_COPY = {
   prospect: "Track your consecutive attendance, dues status, and induction readiness.",
   bod: "Create and manage synchronized club events through your trusted BOD capability.",
   admin: "Open the protected Admin shell available to your trusted account.",
-  president: "The server granted president-level authority. Control modules remain migration-pending.",
+  president: "The all module authority. Control modules remain migration-pending.",
 };
 
 export default function AccessPage() {
@@ -42,7 +42,7 @@ export default function AccessPage() {
       <section className="access-hub access-hub--complete" aria-labelledby="access-hub-title">
         <header className="access-hub__header">
           <div>
-            <p className="auth-access-kicker">Trusted access verified</p>
+            <h2 className="auth-access-kicker">Rotaract Club of Pune Heritage</h2>
             <h1 id="access-hub-title">Welcome, {displayName}</h1>
             {email ? <p>{email}</p> : null}
           </div>
@@ -50,10 +50,10 @@ export default function AccessPage() {
         </header>
 
         <dl className="access-summary">
-          <div><dt>Approved role</dt><dd>{ROLE_LABELS[access.storedRole] || "Member"}</dd></div>
-          {positionLabels.length ? <div><dt>Trusted positions</dt><dd>{positionLabels.join(", ")}</dd></div> : null}
+          <div><dt>Role</dt><dd>{ROLE_LABELS[access.storedRole] || "Member"}</dd></div>
+          {positionLabels.length ? <div><dt>Approved Positions</dt><dd>{positionLabels.join(", ")}</dd></div> : null}
           {access.hasWebsiteDirectorPosition && access.hasPresidentAuthority ? (
-            <div><dt>Delegated authority</dt><dd>Website Director with server-verified President authority</dd></div>
+            <div><dt>Delegated authority</dt><dd>Website Director</dd></div>
           ) : null}
         </dl>
 
@@ -63,11 +63,11 @@ export default function AccessPage() {
               <p className="auth-access-kicker">{card.available ? "Available" : "Migration pending"}</p>
               <h2>{card.title}</h2>
               <p>{CARD_COPY[card.key]}</p>
-              {card.href ? <Link to={card.href}>Open {card.title}</Link> : <span className="access-unavailable">Not available in React yet</span>}
+              {card.href ? <Link to={card.href}>Open {card.title}</Link> : <span className="access-unavailable">Not available yet</span>}
             </article>
           ))}
         </div>
-        <Link className="access-home-link" to="/">Return to public homepage</Link>
+        <Link className="access-home-link" to="/">Return to Home</Link>
       </section>
     </main>
   );

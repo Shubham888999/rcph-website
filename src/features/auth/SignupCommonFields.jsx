@@ -52,7 +52,6 @@ export default function SignupCommonFields({
             aria-describedby={errors.phone ? "signup-phone-error" : "signup-phone-help"}
             onChange={(event) => onChange("phone", event.target.value)}
           />
-          <p id="signup-phone-help" className="signup-help">Indian and international formats are accepted.</p>
           <FieldError id="signup-phone-error" message={errors.phone} />
         </div>
       ) : null}

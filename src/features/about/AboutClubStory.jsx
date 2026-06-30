@@ -19,7 +19,7 @@ export default function AboutClubStory() {
         <p>
           Our Charter President, Rtr. Parth Jaokar, went on to serve as the
           District Rotaract Representative (DRR) of RI District 3131 for Rotary
-          Year 2021–22—a proud milestone in the club’s journey.
+          Year 2021-22, a proud milestone in the club’s journey.
         </p>
         <p>
           Over the years, the club has built its identity through service

@@ -20,7 +20,7 @@ export default function ProspectSignupForm(props) {
       <button className="signup-back-button" type="button" disabled={busy} onClick={onBack}>Back to account type</button>
       <p className="login-kicker">Prospect application</p>
       <h2 ref={headingRef} tabIndex={-1}>Join RCPH as a Prospect</h2>
-      <p className="signup-intro">Tell us about yourself and create your secure account.</p>
+      <p className="signup-intro">Tell us about yourself and create your account.</p>
       <AuthNotice message={notice?.message} tone={notice?.tone} />
       <form className="signup-form" onSubmit={(event) => { event.preventDefault(); onSubmit("password"); }} noValidate aria-busy={busy}>
         <SignupCommonFields

@@ -2,6 +2,7 @@ export const boardMembers = [
   {
     name: "Rtr. Aneesh Ladkat",
     role: "President",
+    responsibility: "Leads the club's vision, culture, and annual direction.",
     image: "/images/bod/president.png",
     bio: "From planning events to last-minute edits, I’m always on the ground making sure things get done right—leading with energy, building bonds, and keeping the club buzzing with action.",
     instagram: "https://instagram.com/ladkat_aneesshx/",
@@ -10,6 +11,7 @@ export const boardMembers = [
   {
     name: "Rtr. Nikita Palshikar",
     role: "Secretary",
+    responsibility: "Manages records, communication, and core club administration workflows.",
     image: "/images/bod/secretary.webp",
     bio: "Third-year B.Pharm student who blends a love for service with creativity and teamwork, dedicated to making every RCPH initiative impactful.",
     instagram: "https://instagram.com/nikita_palshikar.23/",
@@ -18,6 +20,7 @@ export const boardMembers = [
   {
     name: "Rtr. Soham Naik",
     role: "Treasurer",
+    responsibility: "Oversees club finances, reporting, and responsible financial discipline.",
     image: "/images/bod/treasurer.jpg",
     bio: "Hey, I’m this year’s Treasurer. I love working with amazing people to create meaningful impact and memorable events!",
     instagram: "https://instagram.com/soham_naik_365/",
@@ -26,6 +29,7 @@ export const boardMembers = [
   {
     name: "Rtr. Saiee Belitkar",
     role: "Vice President & World Rotaract Week Chairperson",
+    responsibility: "Supports board execution and coordinates World Rotaract Week initiatives.",
     image: "/images/bod/vicepresident.webp",
     bio: "As Vice President, I lead community initiatives, support member growth, and inspire my team to create lasting impact.",
     instagram: "https://instagram.com/saiee_b",
@@ -34,6 +38,7 @@ export const boardMembers = [
   {
     name: "Rtr. Prathamesh Shejwalkar",
     role: "Professional Development Director",
+    responsibility: "Creates opportunities for members to build practical professional skills.",
     image: "/images/bod/pdd2.jpg",
     bio: "I’m a curious and ambitious engineer who loves turning ideas into impactful experiences. As a PDD, I create programs that build skills and open doors to new opportunities.",
     instagram: "https://instagram.com/prathamesh_0310/",
@@ -42,6 +47,7 @@ export const boardMembers = [
   {
     name: "Rtr. Avani Joshi",
     role: "Club Service Director",
+    responsibility: "Strengthens member engagement, fellowship, and the club experience.",
     image: "/images/bod/csd.webp",
     bio: "An extrovert by nature, wanderer at heart, and connector by choice. I believe every person we meet adds a new perspective and a story worth sharing.",
     instagram: "https://instagram.com/_avanijoshi7/",
@@ -50,6 +56,7 @@ export const boardMembers = [
   {
     name: "Rtr. Nupura Danait",
     role: "Community Service Director",
+    responsibility: "Guides community service initiatives from planning through delivery.",
     image: "/images/bod/cmd.jpg",
     bio: "Hello all! I am the CMD of RCPH RIY 25–26. I study filmmaking and always look forward to gaining new experiences.",
     instagram: "https://instagram.com/nupuraaa_danait/",
@@ -58,6 +65,7 @@ export const boardMembers = [
   {
     name: "Rtr. Yashali Shirodkar",
     role: "International Service Director",
+    responsibility: "Builds international understanding through cross-club exchanges and collaboration.",
     image: "/images/bod/isd.jpg",
     instagram: "https://instagram.com/yashaa_li/",
     handle: "@yashaa_li",
@@ -65,6 +73,7 @@ export const boardMembers = [
   {
     name: "Rtr. Ishita Chaubal",
     role: "Immediate Past President & Rotary Rotaract Relations Officer",
+    responsibility: "Advises club leadership and strengthens collaborative Rotary-Rotaract relationships.",
     image: "/images/bod/ipp1.jpg",
     instagram: "https://instagram.com/ishita_chaubal?igsh=bHlvMWhnajc2N3E0",
     handle: "@ishita_chaubal",
@@ -72,6 +81,7 @@ export const boardMembers = [
   {
     name: "Rtr. Omkar Tonde",
     role: "Club Sports Representative",
+    responsibility: "Coordinates sporting activities that encourage participation and fellowship.",
     image: "/images/bod/sportsdirector.png",
     bio: "A computer engineering graduate who has been serving in Rotaract since 2021. Loves playing badminton and table tennis.",
     instagram: "https://instagram.com/omkar_.008/",
@@ -80,6 +90,7 @@ export const boardMembers = [
   {
     name: "Rtr. Harshal Nikam",
     role: "Club Editor",
+    responsibility: "Shapes the club's visual stories, recaps, and creative communication.",
     image: "/images/bod/editor.jpg",
     bio: "Harshal Nikam, the visual mind behind RCPH’s reels and recaps, turns raw footage into stories that speak louder than words.",
     instagram: "https://instagram.com/harshalnikam.5/",
@@ -88,6 +99,7 @@ export const boardMembers = [
   {
     name: "Rtr. Riya Chandavale",
     role: "Public Relations Officer & Sergeant at Arms",
+    responsibility: "Leads public communication while supporting meeting order and protocol.",
     image: "/images/bod/pro.jpg",
     bio: "Turning moments into memories, and actions into stories.",
     instagram: "https://instagram.com/amoriyya._?igsh=MXhpemltZXNiZzZ5Mg==",
@@ -96,6 +108,7 @@ export const boardMembers = [
   {
     name: "Rtr. Shubham Deshpande",
     role: "Website Director",
+    responsibility: "Builds and maintains the club's digital platforms and systems.",
     image: "/images/bod/clubwebsitedirector.jpg",
     bio: "Blending digital skills with a heart for service—committed to creating impact through Rotaract.",
     instagram: "https://instagram.com/_shubham_deshpande/",
@@ -104,6 +117,7 @@ export const boardMembers = [
   {
     name: "Rtr. Shivani Kulkarni",
     role: "Diversity, Equity, Inclusivity Director",
+    responsibility: "Promotes inclusive participation, equity, and belonging across club activities.",
     image: "/images/bod/dei2.jpg",
     bio: "Hello all! I am a psychology student who loves to explore different perspectives and grow through experiences.",
     instagram: "https://instagram.com/shivanikulkarni05?igsh=aW1sYmhhaDdmbXo=",
@@ -112,6 +126,7 @@ export const boardMembers = [
   {
     name: "Rtr. Tanishka Patekar",
     role: "World Rotaract Week Chairperson",
+    responsibility: "Plans initiatives celebrating Rotaract's purpose, people, and global movement.",
     image: "/images/bod/WRWC.jpg",
     instagram: "https://instagram.com/tanishka_patekar/",
     handle: "@tanishka_patekar",
@@ -125,6 +140,7 @@ export const councilGroups = [
       {
         name: "Rtr. Ishita Chaubal",
         role: "District Sergeant-at-Arms",
+        responsibility: "Supports district event protocol, order, and participant coordination.",
         image: "/images/bod/dsaa.webp",
         context: "Rotaract District 3131 · RIY 2025–26",
       },
@@ -136,6 +152,7 @@ export const councilGroups = [
       {
         name: "PHF PDRR Parth Jaokar",
         role: "Joint Secretary, SEARIC MDIO",
+        responsibility: "Supports council records, coordination, and clear organizational communication.",
         image: "/images/bod/searic1.jpg",
         context: "South East Asian Rotaract Information Center · RIY 2025–26",
       },

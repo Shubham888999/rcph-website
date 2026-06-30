@@ -11,10 +11,9 @@ export default function FaqHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       >
-        <p className="faq-kicker">RCPH FAQ</p>
         <h1 id="faq-page-title">Frequently Asked Questions</h1>
         <p>
-          Find clear answers about Rotaract Club of Pune Heritage, our identity,
+          Find answers about Rotaract Club of Pune Heritage, our identity,
           district, sponsor club, events, projects, membership, and how to get involved.
         </p>
         <div className="faq-actions">

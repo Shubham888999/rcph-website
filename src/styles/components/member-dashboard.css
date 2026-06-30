@@ -166,10 +166,14 @@
 
 .attendance-status {
   align-self: start;
-  padding: 0.25rem 0.5rem;
-  border-radius: 999px;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid currentColor;
+  border-left-width: 3px;
+  border-radius: 0.25rem;
   font-size: 0.76rem;
   font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .attendance-status--present { color: #bdf7d2; background: rgba(39, 174, 96, 0.18); }

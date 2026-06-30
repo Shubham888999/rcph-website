@@ -5,7 +5,7 @@ export const faqItems = [
   {
     id: "what-is-rcph",
     question: "What is Rotaract Club of Pune Heritage?",
-    answer: [text("Rotaract Club of Pune Heritage, also known as RCPH, is a community-based Rotaract club in Pune under Rotaract District 3131, Zone 4. The club brings together students and young professionals who want to serve the community, develop leadership skills, build friendships, and contribute through meaningful projects and events.")],
+    answer: [text("Rotaract Club of Pune Heritage, or RCPH, is a community-based Rotaract club in Pune under Rotaract District 3131, Zone 4. The club brings together students and young professionals who want to serve the community, develop leadership skills, build friendships, and contribute through meaningful projects and events.")],
   },
   {
     id: "official-website",
@@ -78,11 +78,6 @@ export const faqItems = [
       link("Contact page", "/contact"),
       text("."),
     ],
-  },
-  {
-    id: "member-access",
-    question: "Does the website have member login and dashboards?",
-    answer: [text("Yes. The website includes a secure login system for approved members. General Body Members can access their personal dashboard, BOD members can manage events, and admins can manage attendance, approvals, fines, treasury, and insights.")],
   },
   {
     id: "motto",
