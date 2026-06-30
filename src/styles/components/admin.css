@@ -47,10 +47,8 @@
 .admin-table-wrap thead th { position:sticky; top:0; z-index:1; color:var(--color-gold-soft); background:var(--color-surface-raised); }
 .admin-attendance-grid th:first-child { position:sticky; left:0; z-index:2; background:var(--color-surface-raised); }
 .admin-attendance-grid th small { display:block; color:var(--color-muted); }
-.attendance-cell { width:3rem; padding:.35rem!important; }
-.attendance-cell--present { border-color:var(--color-teal)!important; background:rgba(96,195,196,.15)!important; }
-.attendance-cell--absent { border-color:var(--color-danger)!important; background:rgba(153,40,87,.2)!important; }
-.attendance-cell--na { color:var(--color-muted)!important; }
+.attendance-cell { width:3rem; min-height:2.4rem; padding:.25rem!important; display:inline-flex; align-items:center; justify-content:center; border-color:rgba(229,194,104,.18)!important; background:transparent!important; }
+.attendance-cell--present,.attendance-cell--absent,.attendance-cell--na { color:inherit!important; }
 .admin-lock-banner,.admin-notice { display:flex; justify-content:space-between; gap:1rem; margin-bottom:1rem; padding:.8rem 1rem; border:1px solid rgba(96,195,196,.45); border-radius:var(--radius-sm); background:rgba(96,195,196,.08); }
 .admin-lock-banner.is-locked,.admin-notice--error,.admin-state--error { border-color:rgba(240,109,125,.5); background:rgba(153,40,87,.16); }
 .admin-notice--success { border-color:rgba(96,195,196,.55); }

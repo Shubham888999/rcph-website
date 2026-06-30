@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { copyRevealLeft, copyRevealRight, headingReveal, staggerContainer } from "./homeMotion";
 
 export default function ClubIntroduction() {
   const reduceMotion = useReducedMotion();
@@ -8,26 +9,26 @@ export default function ClubIntroduction() {
     <motion.section
       className="home-section home-introduction"
       aria-labelledby="club-introduction-title"
-      initial={reduceMotion ? false : { opacity: 1, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      variants={reduceMotion ? undefined : staggerContainer}
+      initial={reduceMotion ? false : "hidden"}
+      whileInView={reduceMotion ? undefined : "visible"}
       viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: reduceMotion ? 0 : 0.5 }}
     >
-      <h2 id="club-introduction-title">
+      <motion.h2 variants={reduceMotion ? undefined : headingReveal} id="club-introduction-title">
         Rotaract Club of Pune Heritage
-      </h2>
+      </motion.h2>
 
       <div className="home-introduction__copy">
-        <p>
+        <motion.p variants={reduceMotion ? undefined : copyRevealLeft}>
           <strong>Rotaract Club of Pune Heritage</strong>, or RCPH, is a
           community-based Rotaract club in Pune under{" "}
           <strong>Rotaract District 3131, Zone 4</strong>. We bring together
           students and young professionals who want to do more than just attend
           events - we plan projects, learn together, build friendships, and
           serve the community.
-        </p>
+        </motion.p>
 
-        <p>
+        <motion.p variants={reduceMotion ? undefined : copyRevealRight}>
           From education drives and awareness sessions to fellowships, district
           events, professional development activities, and collaborations with
           Rotary, RCPH gives members a space to create, connect, and contribute
@@ -36,7 +37,7 @@ export default function ClubIntroduction() {
           <Link to="/join">Join page</Link>, explore our{" "}
           <Link to="/projects">projects</Link>, or read the{" "}
           <Link to="/faq">RCPH FAQ</Link>.
-        </p>
+        </motion.p>
       </div>
     </motion.section>
   );

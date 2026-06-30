@@ -164,21 +164,10 @@
   color: var(--color-muted);
 }
 
-.attendance-status {
+.dashboard-event-list .attendance-mark {
   align-self: start;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid currentColor;
-  border-left-width: 3px;
-  border-radius: 0.25rem;
-  font-size: 0.76rem;
-  font-weight: 800;
-  line-height: 1.2;
-  text-transform: uppercase;
+  flex: 0 0 auto;
 }
-
-.attendance-status--present { color: #bdf7d2; background: rgba(39, 174, 96, 0.18); }
-.attendance-status--absent { color: #ffd7dc; background: rgba(153, 40, 87, 0.2); }
-.attendance-status--na { color: var(--color-muted); background: rgba(255, 255, 255, 0.06); }
 
 .announcement-list {
   margin-top: var(--space-4);

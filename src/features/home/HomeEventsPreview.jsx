@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { copyReveal, headingReveal, staggerContainer } from "./homeMotion";
 
 const HomeCalendarEmbed = lazy(() => import("./HomeCalendarEmbed"));
 
@@ -40,22 +41,26 @@ export default function HomeEventsPreview() {
   }, []);
 
   return (
-    <motion.section
+    <section
       ref={sectionRef}
       className="home-section home-calendar-section"
       aria-labelledby="home-calendar-title"
-      initial={reduceMotion ? false : { opacity: 1, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.08 }}
-      transition={{ duration: reduceMotion ? 0 : 0.45 }}
     >
-      <div className="home-section__heading home-section__heading--split">
-        <div>
+      <motion.div
+        className="home-section__heading home-section__heading--split"
+        variants={reduceMotion ? undefined : staggerContainer}
+        initial={reduceMotion ? false : "hidden"}
+        whileInView={reduceMotion ? undefined : "visible"}
+        viewport={{ once: true, amount: 0.25 }}
+      >
+        <motion.div variants={reduceMotion ? undefined : headingReveal}>
           <p className="home-kicker">What&apos;s next</p>
           <h2 id="home-calendar-title">Event Calendar</h2>
-        </div>
-        <p>Explore public RCPH events by month or switch to the list view for a compact schedule.</p>
-      </div>
+        </motion.div>
+        <motion.p variants={reduceMotion ? undefined : copyReveal}>
+          Explore public RCPH events by month or switch to the list view for a compact schedule.
+        </motion.p>
+      </motion.div>
 
       <div className="home-calendar-panel">
         {shouldLoadCalendar ? (
@@ -65,10 +70,17 @@ export default function HomeEventsPreview() {
         ) : <HomeCalendarLoading />}
       </div>
 
-      <nav className="home-calendar-actions" aria-label="More event links">
+      <motion.nav
+        className="home-calendar-actions"
+        aria-label="More event links"
+        variants={reduceMotion ? undefined : copyReveal}
+        initial={reduceMotion ? false : "hidden"}
+        whileInView={reduceMotion ? undefined : "visible"}
+        viewport={{ once: true, amount: 0.8 }}
+      >
         <Link to="/events">View all events</Link>
         <Link to="/calendar">Full calendar page</Link>
-      </nav>
-    </motion.section>
+      </motion.nav>
+    </section>
   );
 }

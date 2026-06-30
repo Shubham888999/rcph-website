@@ -1,4 +1,5 @@
 import AdminModuleHeader from "../AdminModuleHeader";
+import AttendanceMark from "../../../components/status/AttendanceMark";
 import { formatInr, normalizeAttendance } from "../shared/adminModel";
 
 const PANELS = [
@@ -38,4 +39,4 @@ export default function DzrVisitModule({ data }) {
 }
 
 function Metric({ label, value }) { return <article className="admin-metric"><span>{label}</span><strong>{value}</strong></article>; }
-function ReadOnlyAttendance({ title, members, events, attendance }) { return <section className="admin-panel"><h3>{title}</h3><div className="admin-table-wrap"><table><caption>{title}, view only</caption><thead><tr><th>Member</th>{events.map((event) => <th key={event.id}>{event.name}</th>)}</tr></thead><tbody>{members.map((member) => <tr key={member.id}><th>{member.name}</th>{events.map((event) => { const value = normalizeAttendance(attendance[member.id]?.[event.id]); return <td key={event.id}>{value === true ? "Present" : value === false ? "Absent" : "NA"}</td>; })}</tr>)}</tbody></table></div></section>; }
+function ReadOnlyAttendance({ title, members, events, attendance }) { return <section className="admin-panel"><h3>{title}</h3><div className="admin-table-wrap"><table><caption>{title}, view only</caption><thead><tr><th>Member</th>{events.map((event) => <th key={event.id}>{event.name}</th>)}</tr></thead><tbody>{members.map((member) => <tr key={member.id}><th>{member.name}</th>{events.map((event) => { const value = normalizeAttendance(attendance[member.id]?.[event.id]); return <td key={event.id}><AttendanceMark value={value} size="small" /></td>; })}</tr>)}</tbody></table></div></section>; }

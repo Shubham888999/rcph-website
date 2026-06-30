@@ -1,4 +1,5 @@
 import { formatDashboardDate } from "./dashboardModel";
+import AttendanceMark from "../../components/status/AttendanceMark";
 
 export function EventList({ events, emptyText, attendance = false }) {
   if (!events.length) return <p className="dashboard-empty">{emptyText}</p>;
@@ -11,7 +12,7 @@ export function EventList({ events, emptyText, attendance = false }) {
             <span>{formatDashboardDate(event.date)}{event.endDate ? " - " + formatDashboardDate(event.endDate) : ""}</span>
             <span>{event.avenues.length ? event.avenues.join(", ") : "Other"}</span>
           </div>
-          {attendance ? <span className={"attendance-status attendance-status--" + event.label.toLowerCase()}>{event.label}</span> : null}
+          {attendance ? <AttendanceMark value={event.label} size="small" /> : null}
         </li>
       ))}
     </ul>

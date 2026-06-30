@@ -19,25 +19,43 @@ export default function HomeHero() {
 
       <div className="home-hero__overlay" aria-hidden="true" />
 
-      <motion.div
-  className="home-hero__content"
-  initial={reduceMotion ? false : { opacity: 1, y: 14 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{
-    duration: reduceMotion ? 0 : 0.6,
-    ease: "easeOut",
-  }}
->
-  <h1 id="home-hero-title">Rotaract Club of Pune Heritage</h1>
+      <div className="home-hero__content">
+        <div className="home-hero__title-stage">
+          <motion.span
+            className="home-hero__light"
+            aria-hidden="true"
+            initial={reduceMotion ? false : { opacity: 0.55, scaleX: 0.18 }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            transition={{ duration: reduceMotion ? 0 : 0.68, ease: [0.22, 1, 0.36, 1] }}
+          />
+          <motion.h1
+            id="home-hero-title"
+            initial={reduceMotion ? false : { opacity: 1, filter: "blur(2px)", letterSpacing: "-0.065em" }}
+            animate={{ opacity: 1, filter: "blur(0px)", letterSpacing: "-0.05em" }}
+            transition={{ duration: reduceMotion ? 0 : 0.55, delay: reduceMotion ? 0 : 0.16 }}
+          >
+            Rotaract Club of Pune Heritage
+          </motion.h1>
+        </div>
 
-  <p className="home-kicker home-hero__kicker">
-    RID 3131 <span aria-hidden="true">|</span> ZONE 4
-  </p>
+        <motion.p
+          className="home-kicker home-hero__kicker"
+          initial={reduceMotion ? false : { opacity: 1, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.4, delay: reduceMotion ? 0 : 0.48 }}
+        >
+          RID 3131 <span aria-hidden="true">|</span> ZONE 4
+        </motion.p>
 
-  <p className="home-hero__motto">
-    Create. Connect. Contribute.
-  </p>
-</motion.div>
+        <motion.p
+          className="home-hero__motto"
+          initial={reduceMotion ? false : { opacity: 1, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.4, delay: reduceMotion ? 0 : 0.66 }}
+        >
+          Create. Connect. Contribute.
+        </motion.p>
+      </div>
     </section>
   );
 }

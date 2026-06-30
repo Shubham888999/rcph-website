@@ -373,6 +373,47 @@ select { color-scheme: dark; }
   color: var(--color-teal);
 }
 
+.attendance-mark {
+  --attendance-mark-size: 2.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  color: var(--color-text);
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.attendance-mark img {
+  width: var(--attendance-mark-size);
+  height: var(--attendance-mark-size);
+  display: block;
+  flex: 0 0 var(--attendance-mark-size);
+  object-fit: contain;
+}
+
+.attendance-mark--small { --attendance-mark-size: 1.65rem; }
+.attendance-mark--medium { --attendance-mark-size: 2.15rem; }
+.attendance-mark--large { --attendance-mark-size: 2.65rem; }
+
+.attendance-mark__label {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.attendance-mark__fallback {
+  padding: 0.22rem 0.38rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.78rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
 .site-footer {
   padding-block: var(--space-5);
   display: flex;

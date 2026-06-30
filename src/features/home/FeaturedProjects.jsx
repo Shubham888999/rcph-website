@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { cardReveal, copyReveal, headingReveal, imageSettle, staggerContainer } from "./homeMotion";
 
 const projects = [
   {
@@ -25,16 +26,6 @@ const projects = [
   },
 ];
 
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.12 } },
-};
-
-const cardVariants = {
-  hidden: { opacity: 1, y: 22 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45 } },
-};
-
 export default function FeaturedProjects() {
   const reduceMotion = useReducedMotion();
 
@@ -42,23 +33,23 @@ export default function FeaturedProjects() {
     <section className="home-section home-projects" aria-labelledby="featured-projects-title">
       <motion.div
         className="home-section__heading home-section__heading--split"
-        initial={reduceMotion ? false : { opacity: 1, y: 18 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        variants={reduceMotion ? undefined : staggerContainer}
+        initial={reduceMotion ? false : "hidden"}
+        whileInView={reduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.3 }}
-        transition={{ duration: reduceMotion ? 0 : 0.45 }}
       >
-        <div>
+        <motion.div variants={reduceMotion ? undefined : headingReveal}>
           <p className="home-kicker">Service in action</p>
           <h2 id="featured-projects-title">Featured Projects</h2>
-        </div>
-        <p>
+        </motion.div>
+        <motion.p variants={reduceMotion ? undefined : copyReveal}>
           A glimpse of the learning, service, and collaboration that shape RCPH.
-        </p>
+        </motion.p>
       </motion.div>
 
       <motion.div
         className="home-project-grid"
-        variants={reduceMotion ? undefined : containerVariants}
+        variants={reduceMotion ? undefined : staggerContainer}
         initial={reduceMotion ? false : "hidden"}
         whileInView={reduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.15 }}
@@ -67,11 +58,11 @@ export default function FeaturedProjects() {
           <motion.article
             className="home-project-card"
             key={project.title}
-            variants={reduceMotion ? undefined : cardVariants}
+            variants={reduceMotion ? undefined : cardReveal}
           >
-            <div className="home-project-card__image">
+            <motion.div className="home-project-card__image" variants={reduceMotion ? undefined : imageSettle}>
               <img src={project.image} alt={project.alt} loading="lazy" decoding="async" />
-            </div>
+            </motion.div>
             <div className="home-project-card__copy">
               <h3>{project.title}</h3>
               <p>{project.description}</p>
