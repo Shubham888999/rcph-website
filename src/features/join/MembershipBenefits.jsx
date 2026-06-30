@@ -51,13 +51,12 @@ export default function MembershipBenefits() {
         whileInView={reduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.12 }}
       >
-        {benefits.map((benefit, index) => (
+        {benefits.map((benefit) => (
           <motion.article
             className="join-benefit-card"
             key={benefit.title}
             variants={reduceMotion ? undefined : cardVariants}
           >
-            <span aria-hidden="true">0{index + 1}</span>
             <h3>{benefit.title}</h3>
             <p>{benefit.description}</p>
           </motion.article>

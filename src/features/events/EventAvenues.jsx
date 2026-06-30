@@ -42,13 +42,12 @@ export default function EventAvenues() {
         whileInView={reduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.12 }}
       >
-        {avenues.map((avenue, index) => (
+        {avenues.map((avenue) => (
           <motion.article
             className="event-avenue-card"
             key={avenue.title}
             variants={reduceMotion ? undefined : cardVariants}
           >
-            <span aria-hidden="true">0{index + 1}</span>
             <h3>{avenue.title}</h3>
             <p>{avenue.description}</p>
           </motion.article>

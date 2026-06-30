@@ -381,3 +381,20 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Editorial public-page treatment */
+.calendar-page { position:relative; isolation:isolate; background:linear-gradient(180deg,#090a0a,#0a100f 46%,#090909); }
+.calendar-hero { min-height:auto; padding-block:clamp(4rem,8vw,6rem); position:relative; }
+.calendar-hero::after { content:""; position:absolute; right:0; top:50%; width:min(29vw,310px); height:190px; transform:translateY(-50%); border-top:1px solid rgba(229,194,104,.28); border-right:1px solid rgba(96,195,196,.24); background:repeating-linear-gradient(0deg,transparent 0 37px,rgba(96,195,196,.08) 37px 38px),repeating-linear-gradient(90deg,transparent 0 50px,rgba(229,194,104,.08) 50px 51px); pointer-events:none; }
+.calendar-hero > div { position:relative; z-index:1; max-width:78%; }
+.calendar-kicker::before { content:""; display:inline-block; width:2rem; height:1px; margin-right:.65rem; vertical-align:middle; background:linear-gradient(90deg,var(--color-gold),var(--color-teal)); }
+.calendar-section { position:relative; isolation:isolate; padding-block:clamp(4.5rem,8vw,7rem); border-top:0; }
+.calendar-section::before,.calendar-cta::before { content:""; position:absolute; top:0; left:5%; width:90%; height:2px; background:linear-gradient(90deg,transparent,rgba(96,195,196,.35),rgba(229,194,104,.8),rgba(255,248,224,.36),transparent); }
+.calendar-section::after { content:""; position:absolute; z-index:-1; inset:10% -15%; background:radial-gradient(ellipse at 90% 45%,rgba(96,195,196,.055),transparent 42%); pointer-events:none; }
+.calendar-legend,.calendar-view { border-radius:var(--radius-sm); border-color:rgba(229,194,104,.16); background:linear-gradient(155deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); box-shadow:none; }
+.calendar-legend { border-top:2px solid rgba(96,195,196,.5); }
+.calendar-view { border-top:2px solid rgba(229,194,104,.45); }
+.calendar-cta { position:relative; padding:clamp(4rem,8vw,7rem) 0; border:0; border-radius:0; background:radial-gradient(ellipse at 50% 45%,rgba(229,194,104,.075),transparent 60%); box-shadow:none; }
+.calendar-cta nav a { padding:.72rem 0; border:0; border-bottom:1px solid rgba(96,195,196,.22); border-radius:0; background:transparent; }
+@media (max-width:850px) { .calendar-hero > div { max-width:100%; } .calendar-hero::after { width:38%; height:130px; top:auto; bottom:1rem; transform:none; opacity:.42; } }
+@media (max-width:699px) { .calendar-hero { padding-block:3.5rem 4.5rem; } .calendar-section::before,.calendar-cta::before { left:0; width:100%; } .calendar-layout { gap:var(--space-4); } .calendar-view { padding:.65rem; } }

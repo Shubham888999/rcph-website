@@ -325,3 +325,29 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Editorial public-page treatment */
+.about-page { position: relative; isolation: isolate; background: linear-gradient(180deg, #090909, #10100f 44%, #090a0a); }
+.about-hero { min-height: auto; padding-block: clamp(4rem, 8vw, 6.5rem); grid-template-columns: minmax(0, 1.35fr) minmax(240px, .65fr); }
+.about-hero__emblem { position: relative; aspect-ratio: auto; min-height: 330px; padding: clamp(2rem, 5vw, 4rem); border-radius: var(--radius-md); border-color: rgba(229,194,104,.28); background: linear-gradient(145deg, rgba(229,194,104,.09), transparent 45%), rgba(16,16,15,.64); box-shadow: 22px 22px 0 rgba(96,195,196,.035); }
+.about-hero__emblem::before,.about-hero__emblem::after { content:""; position:absolute; pointer-events:none; }
+.about-hero__emblem::before { inset:1rem -1rem -1rem 1rem; z-index:-1; border-right:1px solid rgba(96,195,196,.38); border-bottom:1px solid rgba(96,195,196,.38); }
+.about-hero__emblem::after { width:44%; height:2px; left:-10%; top:22%; background:linear-gradient(90deg,transparent,var(--color-gold-soft)); }
+.about-section { position:relative; isolation:isolate; padding-block:clamp(4.5rem,8vw,7rem); }
+.about-section + .about-section { border-top:0; border-image:none; }
+.about-section + .about-section::before { content:""; position:absolute; top:0; left:5%; width:90%; height:2px; background:linear-gradient(90deg,transparent,rgba(96,195,196,.28),rgba(229,194,104,.8),rgba(255,248,224,.42),transparent); transform-origin:center; }
+.about-section::after { content:""; position:absolute; z-index:-1; inset:12% -18%; pointer-events:none; background:radial-gradient(ellipse at 18% 40%,rgba(229,194,104,.055),transparent 42%),radial-gradient(ellipse at 85% 60%,rgba(96,195,196,.04),transparent 40%); }
+.about-kicker::before { content:""; display:inline-block; width:2rem; height:1px; margin-right:.65rem; vertical-align:middle; background:linear-gradient(90deg,var(--color-gold),var(--color-teal)); }
+.about-story { grid-template-columns:minmax(0,.78fr) minmax(320px,1.22fr); }
+.about-story__copy { padding-left:clamp(1.5rem,4vw,3rem); border-left:1px solid transparent; border-image:linear-gradient(180deg,var(--color-gold-soft),rgba(96,195,196,.22),transparent) 1; }
+.about-story__copy > p:first-child { color:var(--color-text); font-size:clamp(1.08rem,2vw,1.28rem); }
+.about-feature-card { padding:0; grid-template-columns:minmax(240px,.65fr) minmax(0,1.35fr); border:0; border-radius:0; background:transparent; box-shadow:none; }
+.about-feature-card__media { min-height:390px; border-radius:var(--radius-md); border-color:rgba(229,194,104,.24); background:linear-gradient(145deg,rgba(153,40,87,.08),rgba(5,5,5,.52)); }
+.about-feature-card__copy { padding:clamp(1rem,4vw,3.5rem); border-left:2px solid rgba(229,194,104,.55); }
+.about-theme-header__mark { border-radius:var(--radius-sm); }
+.about-value-card,.about-network-card { position:relative; border-color:rgba(229,194,104,.12); border-radius:var(--radius-sm); background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); box-shadow:none; }
+.about-value-card::before,.about-network-card::before { content:""; position:absolute; top:0; left:0; width:38%; height:2px; background:linear-gradient(90deg,var(--color-gold),var(--color-teal),transparent); }
+.about-contact-card { padding:clamp(1rem,4vw,3rem) 0; border:0; border-radius:0; background:radial-gradient(ellipse at 50% 50%,rgba(229,194,104,.08),transparent 62%); box-shadow:none; }
+@media (hover:hover) and (pointer:fine) { .about-value-card { transition:transform .24s ease,border-color .24s ease; } .about-value-card:hover { transform:translateY(-5px); border-color:rgba(229,194,104,.35); } }
+@media (max-width:900px) { .about-hero__emblem { width:min(100%,440px); min-height:280px; } .about-feature-card__copy,.about-story__copy { padding-left:0; border-left:0; } }
+@media (max-width:620px) { .about-hero { padding-block:3.5rem 4.5rem; } .about-hero__emblem { min-height:230px; } .about-section + .about-section::before { left:0; width:100%; } }

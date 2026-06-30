@@ -51,13 +51,12 @@ export default function CollaborationOptions() {
         whileInView={reduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.12 }}
       >
-        {options.map((option, index) => (
+        {options.map((option) => (
           <motion.article
             className="contact-option-card"
             key={option.title}
             variants={reduceMotion ? undefined : cardVariants}
           >
-            <span aria-hidden="true">0{index + 1}</span>
             <h3>{option.title}</h3>
             <p>{option.description}</p>
           </motion.article>

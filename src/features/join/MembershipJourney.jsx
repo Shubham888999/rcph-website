@@ -27,9 +27,8 @@ export default function MembershipJourney() {
       </div>
 
       <ol className="join-journey-list">
-        {steps.map((step, index) => (
+        {steps.map((step) => (
           <li key={step.title}>
-            <span aria-hidden="true">{index + 1}</span>
             <div>
               <h3>{step.title}</h3>
               <p>{step.description}</p>

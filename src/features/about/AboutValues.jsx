@@ -32,9 +32,8 @@ export default function AboutValues() {
       </div>
 
       <div className="about-values-grid">
-        {values.map((value, index) => (
+        {values.map((value) => (
           <article className="about-value-card" key={value.title}>
-            <span aria-hidden="true">0{index + 1}</span>
             <h3>{value.title}</h3>
             <p>{value.description}</p>
           </article>
