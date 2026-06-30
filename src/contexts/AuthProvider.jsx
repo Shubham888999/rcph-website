@@ -8,6 +8,7 @@ import {
   observeAuthState,
   signOutUser,
 } from "../features/auth/authService";
+import { clearDashboardDataCache } from "../features/dashboard/dashboardService";
 import { AuthContext } from "./auth-context";
 
 export default function AuthProvider({ children }) {
@@ -66,7 +67,10 @@ export default function AuthProvider({ children }) {
       (currentUser) => {
         const previousUid = currentUidRef.current;
         const nextUid = currentUser?.uid || "";
-        if (previousUid && previousUid !== nextUid) clearTrustedAccessCache(previousUid);
+        if (previousUid && previousUid !== nextUid) {
+          clearTrustedAccessCache(previousUid);
+          clearDashboardDataCache(previousUid);
+        }
         currentUidRef.current = nextUid;
         requestVersionRef.current += 1;
         setUser(currentUser);
@@ -112,6 +116,7 @@ export default function AuthProvider({ children }) {
   }, [resolveAccess]);
 
   const signOut = useCallback(async () => {
+    clearDashboardDataCache(currentUidRef.current);
     await signOutUser();
   }, []);
 

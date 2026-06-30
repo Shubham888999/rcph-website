@@ -1,0 +1,23 @@
+.access-hub--complete {
+  position: relative;
+  overflow: hidden;
+}
+
+.access-hub--complete::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-gold), var(--color-teal), var(--color-magenta));
+}
+
+.access-card--pending {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.access-unavailable {
+  color: var(--color-muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
