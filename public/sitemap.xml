@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://rcph3131.org/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://rcph3131.org/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://rcph3131.org/events</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://rcph3131.org/calendar</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://rcph3131.org/projects</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://rcph3131.org/join</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://rcph3131.org/bod</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://rcph3131.org/faq</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://rcph3131.org/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://rcph3131.org/</loc></url>
+  <url><loc>https://rcph3131.org/about</loc></url>
+  <url><loc>https://rcph3131.org/events</loc></url>
+  <url><loc>https://rcph3131.org/calendar</loc></url>
+  <url><loc>https://rcph3131.org/projects</loc></url>
+  <url><loc>https://rcph3131.org/join</loc></url>
+  <url><loc>https://rcph3131.org/contact</loc></url>
+  <url><loc>https://rcph3131.org/faq</loc></url>
+  <url><loc>https://rcph3131.org/bod</loc></url>
 </urlset>

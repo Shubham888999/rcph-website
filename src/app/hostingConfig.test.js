@@ -16,3 +16,10 @@ test("legacy public routes redirect to React routes", () => {
   assert.equal(redirects.get("/admin.html"), "/admin");
   assert.equal(redirects.get("/dzrvisit.html"), "/admin/dzr-visit");
 });
+
+test("known private routes receive an HTTP noindex header", () => {
+  const rules = config.hosting.headers.filter((entry) => entry.headers.some((header) => header.key === "X-Robots-Tag"));
+  assert.ok(rules.some((entry) => entry.source.includes("login")));
+  assert.ok(rules.some((entry) => entry.source.includes("admin")));
+  assert.ok(rules.every((entry) => entry.headers.some((header) => header.value === "noindex, nofollow")));
+});
