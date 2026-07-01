@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canRequestDashboard, getAccessHubCards, getPositionLabels } from "./accessHubModel.js";
+import {
+  canRequestDashboard,
+  getAccessHubDestinations,
+  getAccessHubViewModel,
+  getPositionLabels,
+} from "./accessHubModel.js";
 
 function access(role, extras = {}) {
   return {
     isApproved: true,
     storedRole: role,
+    positionKeys: [],
     canAccessMemberDashboard: true,
     canAccessProspectDashboard: role === "prospect",
     canAccessBodTools: ["bod", "admin", "president"].includes(role),
@@ -20,22 +26,56 @@ test("dashboard fetch requires UID and approved capability", () => {
   assert.equal(canRequestDashboard("uid", { ...access("gbm"), isApproved: false }), false);
   assert.equal(canRequestDashboard("uid", access("gbm")), true);
 });
-test("Prospect sees dashboard and progress", () => assert.deepEqual(getAccessHubCards(access("prospect")).map((x) => x.key), ["dashboard", "prospect"]));
-test("GBM sees member dashboard only", () => assert.deepEqual(getAccessHubCards(access("gbm")).map((x) => x.key), ["dashboard"]));
-test("BOD sees dashboard and the protected BOD tools route", () => {
-  const cards = getAccessHubCards(access("bod"));
-  assert.deepEqual(cards.map((x) => x.key), ["dashboard", "bod"]);
-  assert.equal(cards[1].href, "/bod-tools");
-  assert.equal(cards[1].available, true);
+
+test("Prospect receives one primary journey and no BOD or Admin tools", () => {
+  const model = getAccessHubViewModel(access("prospect"));
+  assert.equal(model.primary.key, "prospect");
+  assert.equal(model.primary.href, "/dashboard");
+  assert.match(model.primary.description, /membership criteria/i);
+  assert.equal(model.secondary.some(({ key }) => ["bod", "admin", "dashboard"].includes(key)), false);
 });
-test("Admin sees member, BOD, and Admin", () => assert.deepEqual(getAccessHubCards(access("admin")).map((x) => x.key), ["dashboard", "bod", "admin"]));
-test("President sees President controls without fake link", () => {
-  const card = getAccessHubCards(access("president")).find((x) => x.key === "president");
-  assert.equal(card.href, null);
+
+test("GBM receives the member dashboard as primary", () => {
+  const model = getAccessHubViewModel(access("gbm"));
+  assert.equal(model.primary.key, "dashboard");
+  assert.equal(model.secondary.some(({ key }) => key === "bod"), false);
 });
-test("delegated Website Director authority does not change stored role", () => {
-  const delegated = access("bod", { canAccessAdminTools: true, canAccessPresidentControls: true, hasWebsiteDirectorPosition: true });
+
+test("BOD and Admin destinations are included only by trusted capability", () => {
+  assert.deepEqual(getAccessHubDestinations(access("bod")).map(({ key }) => key), ["dashboard", "bod", "calendar", "home"]);
+  assert.deepEqual(getAccessHubDestinations(access("admin")).map(({ key }) => key), ["dashboard", "bod", "admin", "calendar", "home"]);
+  const denied = getAccessHubDestinations(access("gbm", { canAccessAdminTools: false }));
+  assert.equal(denied.some(({ key }) => key === "admin"), false);
+});
+
+test("destinations remain unique and secondary ordering is deterministic", () => {
+  const destinations = getAccessHubDestinations(access("admin"));
+  assert.equal(new Set(destinations.map(({ href }) => href)).size, destinations.length);
+  assert.deepEqual(destinations.filter(({ primary }) => !primary).map(({ key }) => key), ["bod", "admin", "calendar", "home"]);
+});
+
+test("multiple positions format cleanly and missing positions have a fallback", () => {
+  assert.deepEqual(getPositionLabels(["vice-president", "cwd"]), ["Vice President", "Website Director"]);
+  assert.equal(getAccessHubViewModel(access("bod", { positionKeys: ["vice-president", "cwd"] })).positionSummary, "Vice President · Website Director");
+  assert.equal(getAccessHubViewModel(access("gbm")).positionSummary, "No approved club position");
+});
+
+test("delegated Website Director authority keeps BOD role and exposes only trusted capabilities", () => {
+  const delegated = access("bod", {
+    canAccessAdminTools: true,
+    canAccessPresidentControls: true,
+    hasWebsiteDirectorPosition: true,
+    hasPresidentAuthority: true,
+    positionKeys: ["cwd"],
+  });
+  const model = getAccessHubViewModel(delegated);
   assert.equal(delegated.storedRole, "bod");
-  assert.ok(getAccessHubCards(delegated).some((x) => x.key === "admin"));
-  assert.deepEqual(getPositionLabels(["cwd"]), ["Website Director"]);
+  assert.equal(model.role, "Board of Directors");
+  assert.equal(model.hasDelegatedWebsiteAuthority, true);
+  assert.ok(model.secondary.some(({ key }) => key === "admin"));
+  assert.ok(model.capabilityLabels.includes("President Controls"));
+});
+
+test("unapproved access produces no destinations", () => {
+  assert.deepEqual(getAccessHubDestinations({ isApproved: false }), []);
 });

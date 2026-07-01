@@ -13,7 +13,7 @@ function formatDateTime(value) {
 export default function MemberAnnouncements({ announcements }) {
   if (!announcements.length) return null;
   return (
-    <section className="member-dashboard-section" aria-labelledby="announcements-title">
+    <section className="member-dashboard-section dashboard-announcements" aria-labelledby="announcements-title">
       <div className="dashboard-section-heading">
         <div><p className="auth-access-kicker">Updates</p><h2 id="announcements-title">Announcements</h2></div>
         <span>{announcements.length} active</span>

@@ -16,7 +16,7 @@ export default function BodToolsHeader({ access, displayName, onSignOut }) {
       <nav aria-label="BOD tools links" className="bod-tools-header__links">
         <Link to="/access">Access Hub</Link>
         <Link to="/dashboard">Dashboard</Link>
-        <Link to="/">Public homepage</Link>
+        <Link to="/">Home</Link>
         <button type="button" onClick={onSignOut}>Sign out</button>
       </nav>
     </header>

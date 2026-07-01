@@ -32,8 +32,9 @@ export default function DashboardPage() {
     <main className="member-dashboard-page">
       <div className="member-dashboard-shell">
         <DashboardHeader
-          title={prospect ? "My Dashboard" : "My RCPH Dashboard"}
-          subtitle={prospect ? "Your Prospect membership journey." : "Your membership overview."}
+          profile={data.profile}
+          mode={data.mode}
+          access={access}
           onSignOut={handleSignOut}
         />
         <MemberAnnouncements announcements={data.announcements} />
