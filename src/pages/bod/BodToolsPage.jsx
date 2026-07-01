@@ -100,7 +100,7 @@ export default function BodToolsPage() {
         <BodLockNotice lock={lock} canBypass={access.canAccessPresidentControls} />
         <BodEventMutationNotice notice={notice} onDismiss={() => setNotice(null)} />
         <section className="bod-tools-actions" aria-labelledby="bod-actions-title">
-          <div><p className="bod-tools-kicker">Club operations</p><h2 id="bod-actions-title">Manage synchronized events</h2><p>Meetings and district events remain visible but read-only here.</p></div>
+          <div><p className="bod-tools-kicker">Club operations</p><h2 id="bod-actions-title">Manage & Create Club Events</h2></div>
           <button type="button" className="bod-button--primary" disabled={!canMutate} onClick={() => { setMutationError(""); setForm({ event: null }); }}>Create club event</button>
         </section>
         {status === "loading" ? <BodToolsSkeleton /> : null}

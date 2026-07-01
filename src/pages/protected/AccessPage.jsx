@@ -19,8 +19,8 @@ const ROLE_LABELS = {
 const CARD_COPY = {
   dashboard: "View your attendance, upcoming events, announcements, and verified club statistics.",
   prospect: "Track your consecutive attendance, dues status, and induction readiness.",
-  bod: "Create and manage synchronized club events through your trusted BOD capability.",
-  admin: "Open the protected Admin shell available to your trusted account.",
+  bod: "Create and manage club events through your trusted BOD capability.",
+  admin: "Open the protected Admin Panel available to your account.",
   president: "The all module authority. Control modules remain migration-pending.",
 };
 
