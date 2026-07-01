@@ -28,7 +28,7 @@ export default function DashboardHeader({ profile, mode, access, onSignOut }) {
         <motion.p className="dashboard-masthead__role" variants={reduceMotion ? undefined : mastheadItem}>{identity}</motion.p>
         <motion.p className="dashboard-masthead__context" variants={reduceMotion ? undefined : mastheadItem}>
           {mode === "prospect"
-            ? "Your path to becoming an RCPH member—one verified step at a time."
+            ? "Your path to becoming an RCPH member,one step at a time."
             : "Your attendance, activity, and upcoming club events in one personal view."}
         </motion.p>
         {access?.hasWebsiteDirectorPosition && access?.hasPresidentAuthority ? (

@@ -39,7 +39,7 @@ export function normalizeProspectProgress(raw) {
     : [];
 
   let status = "Getting Started";
-  let nextStep = "Attend 3 eligible club meetings or events consecutively. Missing an eligible activity resets the active streak.";
+  let nextStep = "Attend 3 eligible club meetings or events consecutively. Missing an event/meeting resets the streak.";
   if (ready) {
     status = "Ready for Induction";
     nextStep = "All membership criteria are complete. Your induction is pending club approval.";
