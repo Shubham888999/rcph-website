@@ -1185,6 +1185,68 @@
     font-size: 2.2rem;
   }
 }
+
+.admin-position-picker {
+  min-width: 0;
+  padding: 1rem;
+  display: grid;
+  gap: .85rem;
+  background: rgba(0, 0, 0, .16);
+}
+
+.admin-position-picker__help,
+.admin-position-picker__selected p,
+.admin-position-picker__warning p,
+.admin-position-picker__role-note {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
+.admin-position-picker__selected {
+  padding: .75rem;
+  border-left: 2px solid var(--color-teal);
+  background: rgba(96, 195, 196, .06);
+}
+
+.admin-position-picker__selected > strong { color: var(--color-teal); }
+.admin-position-picker__selected ul { margin: .55rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; }
+.admin-position-picker__selected li { padding: .35rem .55rem; border: 1px solid rgba(96, 195, 196, .28); border-radius: .2rem; color: var(--color-text); background: rgba(96, 195, 196, .08); font-size: .86rem; font-weight: 750; }
+
+.admin-position-picker__search { display: grid; gap: .3rem; }
+.admin-position-picker__options { max-height: min(42vh, 390px); overflow-y: auto; overscroll-behavior: contain; padding-right: .3rem; display: grid; gap: .85rem; }
+.admin-position-picker__options section { display: grid; gap: .35rem; }
+.admin-position-picker__options h3 { margin: 0; color: var(--color-gold-soft); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+
+.admin-position-option { min-height: 2.9rem; padding: .55rem .65rem; display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem !important; border: 1px solid rgba(255, 255, 255, .08); border-radius: .2rem; color: var(--color-text) !important; background: rgba(255, 255, 255, .025); cursor: pointer; }
+.admin-position-option:hover { border-color: rgba(229, 194, 104, .3); }
+.admin-position-option:focus-within { outline: 3px solid var(--color-gold); outline-offset: 2px; }
+.admin-position-option.is-selected { border-color: rgba(96, 195, 196, .5); background: rgba(96, 195, 196, .1); }
+.admin-position-option.is-restricted { cursor: not-allowed; opacity: .7; }
+.admin-position-option input { width: 1.1rem !important; height: 1.1rem; margin: 0; accent-color: var(--color-gold); }
+.admin-position-option > span { min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+.admin-position-option strong { overflow-wrap: anywhere; }
+.admin-position-option small { color: var(--color-teal); font-weight: 800; }
+.admin-position-option em { max-width: 9rem; color: var(--color-muted); font-size: .72rem; font-style: normal; text-align: right; }
+
+.admin-position-picker__warning,.admin-position-picker__error,.admin-position-conflict { padding: .8rem; border: 1px solid rgba(240, 109, 125, .42); border-radius: .2rem; background: rgba(153, 40, 87, .12); }
+.admin-position-picker__warning strong,.admin-position-picker__error,.admin-position-conflict h3 { color: #ffd7dc; }
+.admin-position-picker__error { margin: 0; }
+.admin-position-picker__role-note { padding: .75rem; border-left: 2px solid var(--color-gold); background: rgba(229, 194, 104, .06); }
+.admin-position-picker__empty { margin: 0; padding: .75rem; color: var(--color-muted); }
+
+.admin-position-conflict { display: grid; gap: .75rem; }
+.admin-position-conflict h3,.admin-position-conflict p { margin: 0; }
+.admin-position-conflict > ul { margin: 0; padding-left: 1.2rem; display: grid; gap: .65rem; }
+.admin-position-conflict li > span { display: block; color: var(--color-muted); }
+.admin-position-conflict li ul { margin-top: .25rem; color: var(--color-muted); }
+
+@media (max-width: 560px) {
+  .admin-position-picker { padding: .75rem; }
+  .admin-position-picker__selected ul { display: grid; }
+  .admin-position-option { grid-template-columns: auto minmax(0, 1fr); }
+  .admin-position-option em { grid-column: 2; max-width: none; text-align: left; }
+}
 /* =========================================
    Modern attendance workspace
    ========================================= */
