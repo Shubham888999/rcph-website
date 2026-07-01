@@ -79,7 +79,6 @@ export default function HomeEventsPreview() {
         viewport={{ once: true, amount: 0.8 }}
       >
         <Link to="/events">View all events</Link>
-        <Link to="/calendar">Full calendar page</Link>
       </motion.nav>
     </section>
   );
