@@ -1,5 +1,4 @@
-export default function FaqSearch({ query, onChange, resultCount }) {
-  return (
+export default function FaqSearch({ query, onChange }) {  return (
     <section className="faq-search" aria-labelledby="faq-search-label">
       <label id="faq-search-label" htmlFor="faq-search-input">Search the guide</label>
       <div>

@@ -5,7 +5,8 @@ import { clearDashboardDataCache } from "../../features/dashboard/dashboardServi
 import useAuth from "../../hooks/useAuth";
 import "../../styles/components/auth-access.css";
 import "../../styles/components/access-hub.css";
-
+import ProspectWhatsAppGroup from "../../features/prospect/ProspectWhatsAppGroup";
+import "../../styles/components/member-dashboard.css";
 const revealItem = {
   hidden: { opacity: 1, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] } },
@@ -18,7 +19,7 @@ export default function AccessPage() {
   const displayName = profile.name || user?.displayName || user?.email || "RCPH Member";
   const email = profile.email || user?.email || "";
   const hub = getAccessHubViewModel(access);
-
+  const isProspect = access?.canAccessProspectDashboard === true;
   async function handleSignOut() {
     clearDashboardDataCache(user?.uid);
     await signOut();
@@ -75,7 +76,14 @@ export default function AccessPage() {
             <p>Your trusted account is approved, but no personal dashboard capability is currently available.</p>
           </motion.section>
         )}
-
+{isProspect ? (
+  <motion.div
+    className="access-hub__prospect-whatsapp"
+    variants={reduceMotion ? undefined : revealItem}
+  >
+    <ProspectWhatsAppGroup />
+  </motion.div>
+) : null}
         <nav className="access-hub__destinations" aria-labelledby="access-destinations-title">
           <motion.header variants={reduceMotion ? undefined : revealItem}>
             <p className="access-hub__eyebrow">Available areas</p>

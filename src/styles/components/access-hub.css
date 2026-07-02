@@ -463,3 +463,11 @@
     transition-duration: 0.01ms !important;
   }
 }
+.access-hub__prospect-whatsapp {
+  min-width: 0;
+}
+
+.access-hub__prospect-whatsapp .prospect-whatsapp {
+  width: 100%;
+  margin: 0;
+}

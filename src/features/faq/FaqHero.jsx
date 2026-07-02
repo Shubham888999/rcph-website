@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 
-export default function FaqHero({ questionCount }) {
+export default function FaqHero() {
   const reduceMotion = useReducedMotion();
   return (
     <motion.section
