@@ -1,6 +1,9 @@
-import BodGrid from "./BodGrid";
 import BodReveal from "./BodReveal";
+import CouncilInteractiveGrid from "./CouncilInteractiveGrid";
 import { councilGroups } from "./bodData";
+import { getCouncilMembers } from "./councilGridModel";
+
+const councilMembers = getCouncilMembers(councilGroups);
 
 export default function BodCouncil() {
   return (
@@ -10,14 +13,7 @@ export default function BodCouncil() {
         <h2 id="bod-council-title">Council Members</h2>
       </div>
 
-      <div className="bod-council-groups">
-        {councilGroups.map((group) => (
-          <section key={group.title} aria-labelledby={`bod-${group.title.toLowerCase().replaceAll(" ", "-")}`}>
-            <h3 id={`bod-${group.title.toLowerCase().replaceAll(" ", "-")}`}>{group.title}</h3>
-            <BodGrid members={group.members} council />
-          </section>
-        ))}
-      </div>
+      <CouncilInteractiveGrid members={councilMembers} />
     </BodReveal>
   );
 }

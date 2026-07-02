@@ -1,4 +1,4 @@
-import BodGrid from "./BodGrid";
+import BodInteractiveGrid from "./BodInteractiveGrid";
 import BodReveal from "./BodReveal";
 import { boardMembers } from "./bodData";
 
@@ -16,7 +16,7 @@ export default function BodLeadership() {
         <h2 id="bod-leadership-title">Club Leadership</h2>
       </div>
 
-      <BodGrid members={boardMembers} />
+      <BodInteractiveGrid members={boardMembers} />
     </BodReveal>
   );
 }
