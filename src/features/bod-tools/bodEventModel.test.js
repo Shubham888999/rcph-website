@@ -3,7 +3,10 @@ import test from "node:test";
 import {
   BOD_EVENT_SOURCE,
   buildBodEventPayload,
+  getBodEventAttachments,
   getBodEventPermissions,
+  getDriveFileId,
+  getDriveThumbnailUrl,
   isValidDateOnly,
   normalizeBodEvent,
   safeExternalUrl,
@@ -49,6 +52,30 @@ test("strict dates accept leap day and reject invalid dates and reversed ranges"
 test("safe links accept only HTTP(S)", () => {
   assert.equal(safeExternalUrl("javascript:alert(1)"), "");
   assert.equal(safeExternalUrl("https://example.com/folder"), "https://example.com/folder");
+});
+
+test("Drive file helpers derive IDs and thumbnail URLs without changing stored links", () => {
+  const viewUrl = "https://drive.google.com/file/d/image_ABC-123/view?usp=sharing";
+  assert.equal(getDriveFileId(viewUrl), "image_ABC-123");
+  assert.equal(getDriveFileId("https://drive.google.com/open?id=query_123"), "query_123");
+  assert.equal(getDriveFileId("https://example.com/file/d/nope/view"), "");
+  assert.equal(getDriveThumbnailUrl(viewUrl), "https://drive.google.com/thumbnail?id=image_ABC-123&sz=w1000");
+});
+
+test("event attachments merge, deduplicate, and preview only image-designated links", () => {
+  const imageUrl = "https://drive.google.com/file/d/image123/view";
+  const pdfUrl = "https://drive.google.com/file/d/pdf123/view";
+  const attachments = getBodEventAttachments({
+    previewLink: imageUrl,
+    imageLinks: [imageUrl],
+    driveLinks: [imageUrl, pdfUrl],
+  });
+  assert.equal(attachments.length, 2);
+  assert.equal(attachments[0].thumbnailUrl, "https://drive.google.com/thumbnail?id=image123&sz=w1000");
+  assert.equal(attachments[0].image, true);
+  assert.equal(attachments[1].thumbnailUrl, "");
+  assert.equal(attachments[1].image, false);
+  assert.equal(attachments[1].url, pdfUrl);
 });
 
 test("permissions allow active club mutations and capability-gated sync only", () => {

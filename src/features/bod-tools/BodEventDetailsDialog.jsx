@@ -1,4 +1,5 @@
 import useAccessibleDialog from "./useAccessibleDialog";
+import { getBodEventAttachments } from "./bodEventModel";
 
 const TYPE_LABELS = { clubEvent: "Club Event", bodMeeting: "BOD Meeting", districtEvent: "District Event", unknown: "Unknown type" };
 const ROLE_LABELS = { host: "Host", cohost: "Co-host", collaborator: "Collaborator", participant: "Participant" };
@@ -6,7 +7,7 @@ const ROLE_LABELS = { host: "Host", cohost: "Co-host", collaborator: "Collaborat
 export default function BodEventDetailsDialog({ event, onClose }) {
   const dialogRef = useAccessibleDialog({ open: Boolean(event), onClose });
   if (!event) return null;
-  const images = [...new Set([event.previewLink, ...event.imageLinks].filter(Boolean))];
+  const attachments = getBodEventAttachments(event);
   const driveUrl = event.driveFolder || (/^[a-zA-Z0-9_-]+$/.test(event.driveFolderId) ? `https://drive.google.com/drive/folders/${event.driveFolderId}` : "");
   const created = event.createdAt ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.createdAt)) : "Unavailable";
   return (
@@ -29,7 +30,28 @@ export default function BodEventDetailsDialog({ event, onClose }) {
         <section><h3>Description</h3><p>{event.description || "No description supplied."}</p></section>
         {event.collaborationNotes ? <section><h3>Collaboration notes</h3><p>{event.collaborationNotes}</p></section> : null}
         {driveUrl ? <a href={driveUrl} target="_blank" rel="noopener noreferrer">Open Drive folder <span className="sr-only">(opens in a new tab)</span></a> : null}
-        {images.length ? <ul className="bod-detail-images" aria-label="Event images">{images.map((url) => <li key={url}><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={`${event.name} supporting material`} loading="lazy" decoding="async" /></a></li>)}</ul> : null}
+        {attachments.length ? (
+          <section className="bod-detail-files" aria-labelledby="bod-detail-files-title">
+            <h3 id="bod-detail-files-title">Event files</h3>
+            <ul>
+              {attachments.map((attachment) => (
+                <li key={attachment.url}>
+                  {attachment.thumbnailUrl ? (
+                    <img
+                      src={attachment.thumbnailUrl}
+                      alt={`${event.name} — ${attachment.label} preview`}
+                      loading="lazy"
+                      decoding="async"
+                      onError={(imageEvent) => { imageEvent.currentTarget.hidden = true; }}
+                    />
+                  ) : <span className="bod-detail-files__type" aria-hidden="true">FILE</span>}
+                  <div><strong>{attachment.label}</strong><span>{attachment.image ? "Image attachment" : "File attachment"}</span></div>
+                  <a href={attachment.url} target="_blank" rel="noopener noreferrer">Open file <span className="sr-only">(opens in a new tab)</span></a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </section>
     </div>
   );

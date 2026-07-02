@@ -5,6 +5,13 @@ import { db } from "../../../app/firestore";
 import { createAdminCache } from "./adminCache";
 import { registerAdminCacheClear } from "./adminCacheRegistry";
 import { attendancePatch } from "./adminModel";
+import {
+  buildTreasuryAppsScriptPayload,
+  buildTreasuryUploadTicketPayload,
+  normalizeTreasuryUploadResponse,
+  validateTreasuryUploadEndpoint,
+  validateTreasuryUploadFile,
+} from "../treasury/treasuryUploadModel";
 
 const QUERY_CONFIG = {
   users: ["users", "createdAt", "desc"], members: ["members", "name", "asc"], events: ["events", "date", "desc"], attendance: ["attendance"],
@@ -68,9 +75,42 @@ export async function uploadVisitFile(file, session, approved) {
   const response = await fetch("https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile", { method: "POST", body: form }); const data = await response.json().catch(() => ({})); if (!response.ok || !data.completionProof) throw new Error("Visit file upload failed."); return data;
 }
 
-const TREASURY_UPLOAD_URL = "https://script.google.com/macros/s/AKfycbyiB-ao2xmNH7aVe-ECfZnBDZLbq8i4sN-83p8r-GnHYz6-G1whNTyhC33ghb2gQhEheg/exec";
-export async function uploadTreasuryBill(file, transaction, transactionId) {
-  const ticket = await adminCalls.treasuryTicket({ fileName: file.name, mimeType: file.type, sizeBytes: file.size, transactionId, transactionDate: transaction.date, transactionPurpose: transaction.purpose, transactionType: transaction.type, transactionAmount: transaction.amount });
-  const bytes = new Uint8Array(await file.arrayBuffer()); let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  const response = await fetch(TREASURY_UPLOAD_URL, { method: "POST", body: JSON.stringify({ ticket: ticket.ticket, transactionId: ticket.transactionId, fileName: file.name, mimeType: file.type, fileData: btoa(binary) }) }); const data = await response.json().catch(() => ({})); if (!response.ok || !data.fileUrl) throw new Error("Treasury bill upload failed."); return { billUrl: data.fileUrl, billFileName: data.fileName || file.name, billFileId: data.fileId || "", billFolderId: data.folderId || "", billFolderName: data.folderName || "", billUploadedAt: serverTimestamp() };
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The selected file could not be read."));
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const marker = result.indexOf(",");
+      if (marker < 0 || !result.slice(marker + 1)) reject(new Error("The selected file could not be read."));
+      else resolve(result.slice(marker + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function uploadTreasuryBill(file, transaction, transactionId, onStatus) {
+  const validationError = validateTreasuryUploadFile(file);
+  if (validationError) throw new Error(validationError);
+  const endpoint = validateTreasuryUploadEndpoint(import.meta.env.VITE_TREASURY_UPLOAD_WEB_APP_URL);
+  if (!endpoint) throw new Error("Treasury upload is not configured.");
+  onStatus?.("requesting");
+  const approved = await adminCalls.treasuryTicket(buildTreasuryUploadTicketPayload(file, transaction, transactionId));
+  if (!approved.ticket || !approved.transactionId || !approved.fileName || !approved.mimeType || !Number.isSafeInteger(approved.sizeBytes)) {
+    throw new Error("Upload authorization was incomplete.");
+  }
+  onStatus?.("uploading");
+  const base64 = await readFileAsBase64(file);
+  onStatus?.("processing");
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(buildTreasuryAppsScriptPayload(file, approved, base64)),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error("The upload service did not accept the file.");
+  return {
+    ...normalizeTreasuryUploadResponse(data, approved, file.name),
+    billUploadedAt: serverTimestamp(),
+  };
 }

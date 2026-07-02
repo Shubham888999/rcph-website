@@ -1,4 +1,8 @@
 import { useMemo, useState } from "react";
+import BodEventFileUploader from "./BodEventFileUploader";
+import { updateBodEvent } from "./bodEventService";
+import { uploadBodEventFile } from "./bodUploadService";
+import { getSafeBodUploadError } from "./bodUploadModel";
 import { BOD_AVENUES, buildBodEventPayload } from "./bodEventModel";
 import useAccessibleDialog from "./useAccessibleDialog";
 
@@ -19,11 +23,16 @@ function initialDraft(event, displayName) {
   };
 }
 
-export default function BodEventForm({ event, displayName, busy, mutationError, onClose, onSubmit }) {
+export default function BodEventForm({ event, displayName, busy, mutationError, onClose, onSubmit, onComplete }) {
   const seed = useMemo(() => initialDraft(event, displayName), [displayName, event]);
   const [draft, setDraft] = useState(seed);
   const [errors, setErrors] = useState({});
-  const dialogRef = useAccessibleDialog({ open: true, onClose });
+  const [uploadState, setUploadState] = useState({ files: [], selectionErrors: [] });
+  const [uploadError, setUploadError] = useState("");
+  const [working, setWorking] = useState(false);
+  const [savedEventId, setSavedEventId] = useState(event?.id || "");
+  const formBusy = Boolean(busy || working);
+  const dialogRef = useAccessibleDialog({ open: true, onClose: () => { if (!formBusy) onClose(); } });
 
   function update(key, value) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -42,24 +51,126 @@ export default function BodEventForm({ event, displayName, busy, mutationError, 
     update("collaborators", draft.collaborators.filter((_, itemIndex) => itemIndex !== index));
   }
 
-  function handleSubmit(submitEvent) {
+  function updateUploadFile(localId, patch) {
+    setUploadState((current) => ({
+      ...current,
+      files: current.files.map((item) => item.localId === localId ? { ...item, ...patch } : item),
+    }));
+  }
+
+  async function handleSubmit(submitEvent) {
     submitEvent.preventDefault();
-    if (busy) return;
-    const result = buildBodEventPayload(draft, event?.id || "");
+    if (formBusy) return;
+    const result = buildBodEventPayload(draft, savedEventId);
     if (!result.payload) {
       setErrors(result.errors);
       const first = Object.keys(result.errors)[0];
       submitEvent.currentTarget.querySelector(`[name="${first}"]`)?.focus();
       return;
     }
-    onSubmit(result.payload);
+    setUploadError("");
+    setWorking(true);
+    try {
+      const saved = await onSubmit(result.payload);
+      const eventId = saved?.eventId || savedEventId;
+      if (!eventId) throw new Error("The saved event did not return an event ID.");
+      setSavedEventId(eventId);
+
+      let uploadGroupId = uploadState.files.find((item) => item.uploaded)?.uploaded?.uploadGroupId || "";
+      const completed = uploadState.files.filter((item) => item.uploaded).map((item) => item.uploaded);
+      let failures = 0;
+      for (const item of uploadState.files) {
+        if (item.uploaded) continue;
+        try {
+const uploaded = await uploadBodEventFile(
+  item,
+  {
+    eventId,
+    name: result.payload.name,
+    eventDate: result.payload.startDate || result.payload.date,
+    uploadGroupId,
+  },
+  (status) =>
+    updateUploadFile(item.localId, {
+      status,
+      error: "",
+    }),
+);
+          uploadGroupId = uploaded.uploadGroupId;
+          completed.push(uploaded);
+          updateUploadFile(item.localId, { status: "uploaded", uploaded, file: null, error: "" });
+        } catch (error) {
+          failures += 1;
+          updateUploadFile(item.localId, { status: "failed", error: getSafeBodUploadError(error) });
+        }
+      }
+
+if (completed.length) {
+  const existingImageLinks = Array.isArray(event?.imageLinks)
+    ? event.imageLinks
+    : [];
+
+  const existingDriveLinks = Array.isArray(event?.driveLinks)
+    ? event.driveLinks
+    : [];
+
+  const uploadedImageUrls = completed
+    .filter((item) => item.mimeType?.startsWith("image/"))
+    .map((item) => item.fileUrl);
+
+  const uploadedDriveUrls = completed.map((item) => item.fileUrl);
+
+  const driveFolder =
+    completed.find((item) => item.folderUrl)?.folderUrl ||
+    draft.driveFolder;
+
+  const attachmentUpdate = await updateBodEvent({
+    ...result.payload,
+    eventId,
+    imageLinks: [
+      ...new Set([
+        ...existingImageLinks,
+        ...uploadedImageUrls,
+      ]),
+    ],
+    driveLinks: [
+      ...new Set([
+        ...existingDriveLinks,
+        ...uploadedDriveUrls,
+      ]),
+    ],
+    driveFolder,
+  });
+
+  if (attachmentUpdate?.ok !== true) {
+    throw new Error("Uploaded file metadata could not be saved.");
+  }
+
+  if (driveFolder) {
+    setDraft((current) => ({
+      ...current,
+      driveFolder,
+    }));
+  }
+}
+
+      if (failures) {
+        setUploadError(`The event was saved, but ${failures} file${failures === 1 ? "" : "s"} failed to upload. Retry failed files without reselecting successful uploads.`);
+        return;
+      }
+      onComplete(saved);
+    } catch {
+      setUploadError("The event or its files could not be saved. Review the message above and try again.");
+    } finally {
+      setWorking(false);
+    }
   }
 
   const described = (key) => errors[key] ? `bod-${key}-error` : undefined;
   return (
-    <div className="bod-dialog-backdrop" onMouseDown={(e) => { if (!busy && e.target === e.currentTarget) onClose(); }}>
+    <div className="bod-dialog-backdrop" onMouseDown={(e) => { if (!formBusy && e.target === e.currentTarget) onClose(); }}>
       <section ref={dialogRef} className="bod-dialog bod-dialog--form" role="dialog" aria-modal="true" aria-labelledby="bod-form-title" tabIndex="-1">
-        <button type="button" className="bod-dialog__close" onClick={onClose} disabled={busy} aria-label="Close event form">×</button>
+        <button type="button" className="bod-dialog__close" onClick={onClose} disabled={formBusy} aria-label="Close event form">×</button>
         <p className="bod-tools-kicker">Club event</p>
         <h2 id="bod-form-title">{event ? "Edit event" : "Create event"}</h2>
         <form onSubmit={handleSubmit} noValidate>
@@ -76,9 +187,11 @@ export default function BodEventForm({ event, displayName, busy, mutationError, 
           <label>Host club<input value={draft.hostClub} onChange={(e) => update("hostClub", e.target.value)} maxLength="180" /></label>
           <fieldset><legend>Collaborators</legend>{draft.collaborators.map((collaborator, index) => <div className="bod-collaborator-row" key={index}><label><span className="sr-only">Collaborator {index + 1}</span><input value={collaborator.name} onChange={(e) => updateCollaborator(index, e.target.value)} placeholder="Club or organization name" /></label><button type="button" onClick={() => removeCollaborator(index)} disabled={draft.collaborators.length === 1}>Remove</button></div>)}<button type="button" className="bod-button--quiet" onClick={() => update("collaborators", [...draft.collaborators, { name: "" }])}>Add collaborator</button></fieldset>
           <label>Collaboration notes<textarea value={draft.collaborationNotes} onChange={(e) => update("collaborationNotes", e.target.value)} maxLength="1000" rows="3" /></label>
-          <label>Drive folder URL<input type="url" value={draft.driveFolder} onChange={(e) => update("driveFolder", e.target.value)} placeholder="https://drive.google.com/drive/folders/…" /></label>
+          <BodEventFileUploader items={uploadState} disabled={formBusy} onChange={setUploadState} />
+          <label>Drive folder URL<input type="url" value={draft.driveFolder} readOnly={uploadState.files.some((item) => item.uploaded)} onChange={(e) => update("driveFolder", e.target.value)} placeholder="Automatically created after the first successful upload" /><span className="bod-upload__help">Legacy events may keep a manually entered Drive folder. An uploaded folder URL is read-only.</span></label>
+          {uploadError ? <p className="bod-form-error" role="alert">{uploadError}</p> : null}
           {mutationError ? <p className="bod-form-error" role="alert">{mutationError}</p> : null}
-          <div className="bod-dialog__actions"><button type="button" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" className="bod-button--primary" disabled={busy} aria-busy={busy}>{busy ? "Saving…" : event ? "Save changes" : "Create event"}</button></div>
+          <div className="bod-dialog__actions"><button type="button" onClick={onClose} disabled={formBusy}>Cancel</button><button type="submit" className="bod-button--primary" disabled={formBusy} aria-busy={formBusy}>{formBusy ? "Saving and uploading…" : savedEventId || event ? "Save changes" : "Create event"}</button></div>
         </form>
       </section>
     </div>

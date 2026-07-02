@@ -35,6 +35,49 @@ export function safeExternalUrl(value) {
   }
 }
 
+export function getDriveFileId(value) {
+  const candidate = safeExternalUrl(value);
+  if (!candidate) return "";
+  try {
+    const url = new URL(candidate);
+    if (url.hostname !== "drive.google.com") return "";
+    const pathMatch = url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    const queryId = url.searchParams.get("id");
+    const fileId = pathMatch?.[1] || (/^[a-zA-Z0-9_-]+$/.test(queryId || "") ? queryId : "");
+    return fileId;
+  } catch {
+    return "";
+  }
+}
+
+export function getDriveThumbnailUrl(value) {
+  const fileId = getDriveFileId(value);
+  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : "";
+}
+
+export function getBodEventAttachments(event) {
+  const imageUrls = new Set([
+    safeExternalUrl(event?.previewLink),
+    ...(Array.isArray(event?.imageLinks) ? event.imageLinks.map(safeExternalUrl) : []),
+  ].filter(Boolean));
+  const merged = [
+    event?.previewLink,
+    ...(Array.isArray(event?.imageLinks) ? event.imageLinks : []),
+    ...(Array.isArray(event?.driveLinks) ? event.driveLinks : []),
+  ].map(safeExternalUrl).filter(Boolean);
+
+  return [...new Set(merged)].map((url, index) => {
+    const image = imageUrls.has(url);
+    const driveThumbnail = image ? getDriveThumbnailUrl(url) : "";
+    return {
+      url,
+      image,
+      thumbnailUrl: image ? (driveThumbnail || url) : "",
+      label: image ? `Event image ${index + 1}` : `Event file ${index + 1}`,
+    };
+  });
+}
+
 function timestampToIso(value) {
   try {
     const date = typeof value?.toDate === "function" ? value.toDate() : value instanceof Date ? value : null;

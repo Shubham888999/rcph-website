@@ -72,9 +72,32 @@ export default function BodToolsPage() {
     }
   }
 
-  function submitForm(payload) {
-    const editing = Boolean(form?.event);
-    runMutation(editing ? "update" : "create", () => editing ? updateBodEvent(payload) : submitBodEvent(payload), editing ? "Event changes synchronized." : "Event created and synchronized.", () => setForm(null));
+  async function submitForm(payload) {
+    if (mutationLockRef.current || !canMutate) throw new Error("Event changes are currently unavailable.");
+    mutationLockRef.current = true;
+    setBusy(true);
+    setMutationError("");
+    const editing = Boolean(payload.eventId);
+    try {
+      const result = await (editing ? updateBodEvent(payload) : submitBodEvent(payload));
+      if (result.ok !== true) throw new Error("Invalid mutation response.");
+      return result;
+    } catch (error) {
+      if (import.meta.env.DEV) console.error("BOD event operation failed.", getBodEventDiagnostic(error, editing ? "update" : "create", uid));
+      setMutationError(getSafeBodEventError(error));
+      throw error;
+    } finally {
+      setBusy(false);
+      mutationLockRef.current = false;
+    }
+  }
+
+  function completeForm(result) {
+    setForm(null);
+    setMutationError("");
+    const rows = result?.attendanceRowsUpdated;
+    setNotice({ type: "success", message: `Event saved and synchronized.${rows === null ? "" : ` Attendance initialized for ${rows} member rows.`}` });
+    reload();
   }
 
   function confirmMutation() {
@@ -108,7 +131,7 @@ export default function BodToolsPage() {
         {status === "success" ? <><BodEventFilters filters={filters} onChange={setFilters} onReset={() => setFilters(DEFAULT_FILTERS)} avenues={avenues} months={months} resultCount={visibleEvents.length} /><BodEventList events={visibleEvents} access={access} lockState={lockState} onDetails={setDetails} onEdit={(event) => { setMutationError(""); setForm({ event }); }} onArchive={(event) => { setMutationError(""); setConfirmation({ event, mode: "archive" }); }} onSync={(event) => { setMutationError(""); setConfirmation({ event, mode: "sync" }); }} onReset={() => setFilters(DEFAULT_FILTERS)} /></> : null}
       </BodToolsShell>
       <BodEventDetailsDialog event={details} onClose={() => setDetails(null)} />
-      {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} /> : null}
+      {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
       <BodEventArchiveDialog event={confirmation?.event || null} mode={confirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmMutation} />
     </main>
   );
