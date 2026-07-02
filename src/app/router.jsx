@@ -26,6 +26,8 @@ export const router = createBrowserRouter([{
         { path: "/bod", element: lazyRoute(lazy(() => import("../pages/public/BodPage"))) },
         { path: "/faq", element: lazyRoute(lazy(() => import("../pages/public/FaqPage"))) },
         { path: "/contact", element: lazyRoute(lazy(() => import("../pages/public/ContactPage"))) },
+        { path: "/terms", element: lazyRoute(lazy(() => import("../pages/public/TermsPage"))) },
+        { path: "/privacy", element: lazyRoute(lazy(() => import("../pages/public/PrivacyPage"))) },
       ],
     },
     { path: "/login", element: lazyRoute(lazy(() => import("../pages/auth/LoginPage"))) },

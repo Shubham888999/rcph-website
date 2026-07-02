@@ -2,6 +2,10 @@ import {
   isValidAuthEmail,
   normalizeAuthEmail,
 } from "./emailModel.js";
+import {
+  LEGAL_EFFECTIVE_DATE,
+  LEGAL_VERSIONS,
+} from "../legal/legalConstants.js";
 
 export const SIGNUP_PATHS = {
   CHOICE: "choice",
@@ -37,6 +41,8 @@ export function createSignupForm() {
     joinReason: "",
     referred: "",
     referredBy: "",
+    legalAccepted: false,
+    communicationsOptIn: false,
   };
 }
 
@@ -149,6 +155,10 @@ export function validateSignup(form, options = {}) {
     else if (password !== confirmation) errors.confirmPassword = "Passwords do not match.";
   }
 
+  if (form.legalAccepted !== true) {
+    errors.legalAccepted = "You must accept the Terms and Conditions and Privacy Notice to create an account.";
+  }
+
   return {
     errors,
     values: { name, phone, email, password },
@@ -158,11 +168,25 @@ export function validateSignup(form, options = {}) {
 
 export function buildSignupPayload(form, options = {}) {
   const provider = options.provider === "google" ? "google" : "password";
+  const consentSource = form.path === SIGNUP_PATHS.PROSPECT
+    ? "prospect-signup"
+    : "member-signup";
+  const consent = {
+    termsAccepted: form.legalAccepted === true,
+    termsVersion: LEGAL_VERSIONS.terms,
+    privacyAccepted: form.legalAccepted === true,
+    privacyVersion: LEGAL_VERSIONS.privacy,
+    communicationsOptIn: form.communicationsOptIn === true,
+    communicationsVersion: LEGAL_VERSIONS.communications,
+    consentSource,
+    legalEffectiveDate: LEGAL_EFFECTIVE_DATE,
+  };
   if (options.profileCompletion === true && form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
     return {
       name: normalizeSignupName(form.name),
       requestedRole: form.requestedRole,
       provider,
+      ...consent,
       ...(form.requestedRole === "admin"
         ? { inviteCode: normalizeSignupName(form.inviteCode) }
         : {}),
@@ -178,6 +202,7 @@ export function buildSignupPayload(form, options = {}) {
     genderSelfDescribe: form.gender === "self-describe"
       ? normalizeSignupName(form.genderSelfDescribe)
       : "",
+    ...consent,
   };
 
   if (form.path === SIGNUP_PATHS.PROSPECT) {

@@ -141,6 +141,8 @@ export default function PublicLayout() {
             <NavLink to="/projects">Projects</NavLink>
             <NavLink to="/join">Join</NavLink>
             <NavLink to="/contact">Contact</NavLink>
+            <NavLink to="/terms">Terms</NavLink>
+            <NavLink to="/privacy">Privacy</NavLink>
           </div>
 
           <div className="public-footer-contact">

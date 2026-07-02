@@ -12,6 +12,8 @@ export const PUBLIC_ROUTES = Object.freeze([
   "/contact",
   "/faq",
   "/bod",
+  "/terms",
+  "/privacy",
 ]);
 
 const PUBLIC_METADATA = Object.freeze({
@@ -59,6 +61,16 @@ const PUBLIC_METADATA = Object.freeze({
     title: "Board of Directors | RCPH",
     description: "Meet the Board of Directors and club leadership of Rotaract Club of Pune Heritage, including executive, service, and communications roles.",
     breadcrumb: "Board of Directors",
+  },
+  "/terms": {
+    title: "Terms and Conditions | RCPH",
+    description: "Read the RCPH terms for accounts, prospect participation, membership administration, meetings, conduct, dues, and club activities.",
+    breadcrumb: "Terms and Conditions",
+  },
+  "/privacy": {
+    title: "Privacy Notice | RCPH",
+    description: "Read how RCPH collects, uses, stores, shares, and manages personal data for prospect and member accounts and club administration.",
+    breadcrumb: "Privacy Notice",
   },
 });
 

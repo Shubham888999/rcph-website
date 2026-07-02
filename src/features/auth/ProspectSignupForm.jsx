@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AuthNotice from "./AuthNotice";
 import GoogleSignupButton from "./GoogleSignupButton";
 import SignupCommonFields from "./SignupCommonFields";
+import SignupConsents from "./SignupConsents";
 
 function ErrorText({ id, children }) {
   return children ? <p id={id} className="signup-field-error" role="alert">{children}</p> : null;
@@ -74,6 +75,7 @@ export default function ProspectSignupForm(props) {
             </div>
           ) : null}
         </fieldset>
+        <SignupConsents form={form} errors={errors} disabled={busy} onChange={onChange} />
         <button className="signup-primary-button" type="submit" disabled={busy}>{busy ? "Creating account..." : profileCompletion ? "Complete account setup" : "Create Prospect account"}</button>
       </form>
       {!profileCompletion ? (

@@ -28,13 +28,3 @@ export const juneNominations = [
   { id: "best-professional-development-initiative", title: "Best Professional Development Initiative", detail: "Madhushala 4.0" },
 ];
 
-const featuredAwardIds = new Set([
-  "gold-citation",
-  "best-editor",
-  "best-public-relations-officer",
-  "best-flagship-event",
-  "best-rotaractor",
-]);
-
-export const visibleJuneAwards = juneAwards.filter(({ id }) => featuredAwardIds.has(id));
-export const additionalJuneAwards = juneAwards.filter(({ id }) => !featuredAwardIds.has(id));

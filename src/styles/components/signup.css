@@ -191,6 +191,56 @@
   font-weight: 850;
 }
 
+.signup-consents {
+  margin: 0;
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid rgba(244, 180, 58, 0.25);
+  border-radius: var(--radius-lg);
+}
+
+.signup-consents legend {
+  padding: 0 var(--space-2);
+  color: var(--color-gold-soft);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.signup-consent-row {
+  min-width: 0;
+  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.signup-consent-row.has-error { border-color: var(--color-danger); }
+
+.signup-consent-row input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.2rem 0 0;
+  accent-color: var(--color-gold);
+  cursor: pointer;
+}
+
+.signup-consent-row label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.65;
+  cursor: pointer;
+}
+
+.signup-consent-row label a { color: var(--color-teal); font-weight: 800; }
+.signup-consent-status { display: block; margin-bottom: 0.35rem; color: var(--color-gold-soft); font-size: 0.73rem; font-weight: 900; letter-spacing: 0.09em; text-transform: uppercase; }
+.signup-consent-row .signup-help, .signup-consent-row .signup-field-error { margin-top: var(--space-2); }
+
 .signup-field {
   display: grid;
   align-content: start;

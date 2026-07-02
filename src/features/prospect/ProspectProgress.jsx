@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import DashboardMetricRail from "../dashboard/DashboardMetricRail";
 import { DashboardEmptyState, EventList } from "../dashboard/EventParticipationSummary";
 import { getProspectJourney, getProspectNextAction } from "../dashboard/dashboardPresentationModel";
+import ProspectWhatsAppGroup from "./ProspectWhatsAppGroup";
 
 export default function ProspectProgress({ data }) {
   const reduceMotion = useReducedMotion();
@@ -59,6 +60,8 @@ export default function ProspectProgress({ data }) {
         </ol>
       </section>
 
+      <ProspectWhatsAppGroup />
+
       {progress.qualifyingEvents.length ? (
         <section className="dashboard-qualifying-events" aria-labelledby="qualifying-events-title">
           <div><p className="dashboard-eyebrow">Verified activity</p><h2 id="qualifying-events-title">Qualifying activities</h2></div>
@@ -92,11 +95,9 @@ export default function ProspectProgress({ data }) {
 
       <section className="prospect-support" aria-labelledby="prospect-support-title">
         <div><p className="dashboard-eyebrow">Need support?</p><h2 id="prospect-support-title">Stay connected with RCPH</h2></div>
-        {progress.hasWhatsAppLink ? null : (
-          <DashboardEmptyState title="Contact the club team" href="/contact" linkText="Contact RCPH">
-            No verified WhatsApp invitation is currently available. The club team can help with membership questions.
-          </DashboardEmptyState>
-        )}
+        <DashboardEmptyState title="Contact the club team" href="/contact" linkText="Contact RCPH">
+          The club team can help with membership questions and account support.
+        </DashboardEmptyState>
       </section>
     </>
   );

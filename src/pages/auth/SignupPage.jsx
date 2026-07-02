@@ -184,12 +184,17 @@ export default function SignupPage() {
     } catch (error) {
       const requestedRole = form.path === SIGNUP_PATHS.PROSPECT ? "prospect" : form.requestedRole;
       let cleanupFailed = false;
+      let cleanupAttempted = false;
       const shouldCleanup = Boolean(
         newlyCreatedPasswordUser
-        && requestedRole === "admin"
-        && error?.code === "functions/permission-denied"
+        && stage === "profile"
+        && (
+          ["functions/failed-precondition", "functions/invalid-argument"].includes(error?.code)
+          || (requestedRole === "admin" && error?.code === "functions/permission-denied")
+        )
       );
       if (shouldCleanup) {
+        cleanupAttempted = true;
         const cleanup = await cleanupFailedAdminPasswordSignup({
           shouldCleanup,
           uid: newlyCreatedPasswordUser.uid,
@@ -208,7 +213,7 @@ export default function SignupPage() {
       const baseMessage = getSignupError(error, { requestedRole });
       setNotice({
         tone: "error",
-        message: cleanupFailed || (newlyCreatedPasswordUser && stage === "profile" && error?.code !== "functions/permission-denied")
+        message: cleanupFailed || (newlyCreatedPasswordUser && !cleanupAttempted && stage === "profile" && error?.code !== "functions/permission-denied")
           ? `${baseMessage} ${PARTIAL_PROFILE_MESSAGE}`
           : baseMessage,
       });

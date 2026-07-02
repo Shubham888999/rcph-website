@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AuthNotice from "./AuthNotice";
 import GoogleSignupButton from "./GoogleSignupButton";
 import SignupCommonFields from "./SignupCommonFields";
+import SignupConsents from "./SignupConsents";
 
 export default function ExistingMemberSignupForm(props) {
   const headingRef = useRef(null);
@@ -49,6 +50,7 @@ export default function ExistingMemberSignupForm(props) {
             </div>
           ) : null}
         </fieldset>
+        <SignupConsents form={form} errors={errors} disabled={busy} onChange={onChange} />
         <button className="signup-primary-button" type="submit" disabled={Boolean(busy)}>{busy ? "Submitting request..." : profileCompletion ? "Complete account setup" : "Create member account"}</button>
       </form>
       {!profileCompletion ? (

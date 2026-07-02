@@ -30,6 +30,7 @@ function validProspect() {
     previousRotaract: "no",
     joinReason: "Community service",
     referred: "no",
+    legalAccepted: true,
   };
 }
 
@@ -44,11 +45,14 @@ function validMember(role = "gbm") {
     confirmPassword: "secret",
     requestedRole: role,
     inviteCode: role === "admin" ? "invite-value" : "",
+    legalAccepted: true,
   };
 }
 
 test("initial state starts at chooser", () => {
   assert.equal(createSignupForm().path, "choice");
+  assert.equal(createSignupForm().legalAccepted, false);
+  assert.equal(createSignupForm().communicationsOptIn, false);
 });
 test("selecting Prospect clears member credentials and forces role", () => {
   const next = selectSignupPath({ ...validMember("admin"), password: "x", inviteCode: "code" }, "prospect");
@@ -101,6 +105,14 @@ test("required common fields are rejected", () => {
   const result = validateSignup(selectSignupPath(createSignupForm(), "existing-member"));
   assert.ok(result.errors.name && result.errors.phone && result.errors.email && result.errors.gender);
 });
+test("mandatory legal acceptance blocks signup", () => {
+  const result = validateSignup({ ...validMember(), legalAccepted: false });
+  assert.match(result.errors.legalAccepted, /must accept/i);
+});
+test("optional communications choice never blocks signup", () => {
+  assert.equal(validateSignup({ ...validMember(), communicationsOptIn: false }).valid, true);
+  assert.equal(validateSignup({ ...validMember(), communicationsOptIn: true }).valid, true);
+});
 test("password normalization preserves exact text", () => {
   assert.equal(normalizeSignupPassword(" secret "), " secret ");
 });
@@ -125,6 +137,7 @@ test("Prospect role and signup type are forced in payload", () => {
   const payload = buildSignupPayload({ ...validProspect(), requestedRole: "president" });
   assert.equal(payload.requestedRole, "prospect");
   assert.equal(payload.signupType, "prospect");
+  assert.equal(payload.consentSource, "prospect-signup");
 });
 test("previous Rotaract details are conditionally required", () => {
   const result = validateSignup({ ...validProspect(), previousRotaract: "yes", previousRotaractDetails: "" });
@@ -165,7 +178,20 @@ test("switching away from Admin clears invite code", () => {
   assert.equal(next.inviteCode, "");
 });
 test("existing-member payload uses requested role exactly", () => {
-  assert.equal(buildSignupPayload(validMember("bod")).requestedRole, "bod");
+  const payload = buildSignupPayload(validMember("bod"));
+  assert.equal(payload.requestedRole, "bod");
+  assert.equal(payload.consentSource, "member-signup");
+});
+test("versioned consent payload normalizes optional choice strictly", () => {
+  const payload = buildSignupPayload({ ...validMember(), communicationsOptIn: "true" });
+  assert.equal(payload.termsAccepted, true);
+  assert.equal(payload.privacyAccepted, true);
+  assert.equal(payload.termsVersion, "1.0");
+  assert.equal(payload.privacyVersion, "1.0");
+  assert.equal(payload.communicationsVersion, "1.0");
+  assert.equal(payload.communicationsOptIn, false);
+  assert.equal(payload.legalEffectiveDate, "2026-07-02");
+  assert.equal("acceptedAt" in payload, false);
 });
 test("existing-member payload excludes Prospect fields", () => {
   const payload = buildSignupPayload({ ...validMember(), hobbies: "hidden", joinReason: "hidden" });
@@ -211,6 +237,14 @@ test("existing-member profile completion uses the legacy minimal callable payloa
     name: "Ravi Member",
     requestedRole: "bod",
     provider: "password",
+    termsAccepted: true,
+    termsVersion: "1.0",
+    privacyAccepted: true,
+    privacyVersion: "1.0",
+    communicationsOptIn: false,
+    communicationsVersion: "1.0",
+    consentSource: "member-signup",
+    legalEffectiveDate: "2026-07-02",
   });
 });
 test("Prospect approved outcome requests trusted refresh", () => {
