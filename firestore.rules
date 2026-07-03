@@ -19,7 +19,7 @@ service cloud.firestore {
     }
 
     function presidentAssignmentPath() {
-      return /databases/$(database)/documents/bodPositionAssignments/president_$(request.auth.uid);
+      return /databases/$(database)/documents/bodPositionAssignments/$(("president_" + request.auth.uid));
     }
 
     function hasRole(role) {
@@ -224,3 +224,4 @@ service cloud.firestore {
     }
   }
 }
+
