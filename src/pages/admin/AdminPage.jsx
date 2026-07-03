@@ -7,6 +7,7 @@ import DzrVisitModule from "../../features/admin/modules/DzrVisitModule";
 import { AnnouncementsModule, ProspectsModule } from "../../features/admin/modules/EngagementModules";
 import { FinesModule, TreasuryModule } from "../../features/admin/modules/FinanceModules";
 import LocksModule from "../../features/admin/modules/LocksModule";
+import ResolutionsModule from "../../features/admin/resolutions/ResolutionsModule";
 import { AdminError, AdminLoading, AdminNotice } from "../../features/admin/shared/AdminStates";
 import { clearAdminCaches } from "../../features/admin/shared/adminService";
 import useAdminData from "../../features/admin/shared/useAdminData";
@@ -17,7 +18,7 @@ import useAuth from "../../hooks/useAuth";
 import "../../styles/components/admin.css";
 
 export default function AdminPage() {
-  const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools) }); const segment = location.pathname.replace(/^\/admin\/?/, "");
+  const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, ""); const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools) });
   const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members"], attendance: ["members", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "districtEvents", "districtAttendance"], fines: ["members", "fines"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
   const state = moduleState(...(requirements[segment] || []));
   async function handleSignOut() { clearAdminCaches(uid); clearBodEventCache(uid); clearDashboardDataCache(uid); await signOut(); }
@@ -32,6 +33,7 @@ export default function AdminPage() {
   else if (segment === "district") content = <DistrictModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;
   else if (segment === "prospects") content = <ProspectsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "announcements") content = <AnnouncementsModule uid={uid} onNotice={setNotice} />;
+  else if (segment === "resolutions") content = <ResolutionsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "fines") content = <FinesModule fines={data.fines} members={data.members} lock={locks.fines} uid={uid} onNotice={setNotice} />;
   else if (segment === "treasury") content = <TreasuryModule transactions={data.treasury} members={data.members} lock={locks.treasury} uid={uid} onNotice={setNotice} />;
   else if (segment === "locks") content = <LocksModule locks={locks} access={access} uid={uid} onNotice={setNotice} />;

@@ -76,6 +76,12 @@ test("delegated Website Director authority keeps BOD role and exposes only trust
   assert.ok(model.capabilityLabels.includes("President Controls"));
 });
 
+test("Secretary resolution capability links only to the dedicated tool", () => {
+  const model = getAccessHubViewModel(access("bod", { positionKeys: ["secretary"], canAccessResolutionTools: true }));
+  assert.equal(model.secondary.find((item) => item.key === "resolutions")?.href, "/admin/resolutions");
+  assert.ok(model.capabilityLabels.includes("Resolution Tools"));
+});
+
 test("unapproved access produces no destinations", () => {
   assert.deepEqual(getAccessHubDestinations({ isApproved: false }), []);
 });

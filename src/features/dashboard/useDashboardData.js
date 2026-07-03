@@ -40,5 +40,25 @@ export default function useDashboardData({ uid, enabled }) {
     }
   }, [enabled, resolve, uid]);
 
-  return { ...state, reload };
+  const updateAnnouncements = useCallback((updater) => {
+    setState((current) => {
+      if (current.status !== "success" || !current.data) return current;
+      const next = typeof updater === "function" ? updater(current.data.announcements) : updater;
+      return Array.isArray(next)
+        ? { ...current, data: { ...current.data, announcements: next } }
+        : current;
+    });
+  }, []);
+
+  const updateOpenResolutions = useCallback((updater) => {
+    setState((current) => {
+      if (current.status !== "success" || !current.data) return current;
+      const next = typeof updater === "function" ? updater(current.data.openResolutions) : updater;
+      return Array.isArray(next)
+        ? { ...current, data: { ...current.data, openResolutions: next } }
+        : current;
+    });
+  }, []);
+
+  return { ...state, reload, updateAnnouncements, updateOpenResolutions };
 }

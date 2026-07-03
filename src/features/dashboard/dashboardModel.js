@@ -1,4 +1,5 @@
 import { normalizeProspectProgress } from "../prospect/prospectModel.js";
+import { normalizeDashboardResolutions } from "../resolutions/resolutionModel.js";
 
 const ROLES = new Set(["prospect", "gbm", "bod", "admin", "president"]);
 const PRIORITIES = new Set(["normal", "important", "urgent"]);
@@ -172,6 +173,7 @@ export function normalizeDashboardResponse(raw, now = Date.now()) {
     profile,
     clubRanking: normalizeRanking(raw.clubRanking),
     announcements: normalizeDashboardAnnouncements(raw.announcements, now),
+    openResolutions: normalizeDashboardResolutions(raw.openResolutions),
     upcomingEvents,
   };
   if (mode === "prospect") {

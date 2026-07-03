@@ -29,6 +29,7 @@ export function createDeniedAccess() {
     canAccessProspectDashboard: false,
     canAccessBodTools: false,
     canAccessAdminTools: false,
+    canAccessResolutionTools: false,
     canAccessPresidentControls: false,
   };
 }
@@ -61,6 +62,7 @@ export function normalizeTrustedAccess(payload) {
   const isPresidentRole = authority.isPresidentRole === true;
   const hasWebsiteDirectorPosition = authority.hasWebsiteDirectorPosition === true;
   const hasPresidentAuthority = authority.hasPresidentAuthority === true;
+  const resolutionManager = payload.resolutionManager === true;
   const isMemberRole = ACTIVE_ROLES.has(storedRole);
 
   return {
@@ -76,6 +78,7 @@ export function normalizeTrustedAccess(payload) {
     isPresidentRole,
     hasWebsiteDirectorPosition,
     hasPresidentAuthority,
+    resolutionManager,
     isApproved,
     isPending,
     isRejected,
@@ -86,6 +89,7 @@ export function normalizeTrustedAccess(payload) {
     canAccessBodTools: isApproved && ["bod", "admin", "president"].includes(storedRole),
     canAccessAdminTools: isApproved
       && (["admin", "president"].includes(storedRole) || hasPresidentAuthority),
+    canAccessResolutionTools: isApproved && resolutionManager,
     canAccessPresidentControls: isApproved
       && (storedRole === "president" || hasPresidentAuthority),
   };
@@ -106,6 +110,7 @@ export function hasCapability(access, capability) {
     prospectDashboard: "canAccessProspectDashboard",
     bodTools: "canAccessBodTools",
     adminTools: "canAccessAdminTools",
+    resolutionTools: "canAccessResolutionTools",
     presidentControls: "canAccessPresidentControls",
   };
   const field = capabilityFields[capability];

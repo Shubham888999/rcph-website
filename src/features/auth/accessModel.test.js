@@ -7,7 +7,7 @@ import {
   normalizeTrustedAccess,
 } from "./accessModel.js";
 
-function approved(role, authority = {}) {
+function approved(role, authority = {}, resolutionManager = false) {
   return normalizeTrustedAccess({
     ok: true,
     uid: "user-1",
@@ -15,6 +15,7 @@ function approved(role, authority = {}) {
     role: { role, status: "approved" },
     positionKeys: [],
     authority,
+    resolutionManager,
   });
 }
 
@@ -42,9 +43,22 @@ test("approved Admin gets Admin access", () => {
 });
 
 test("approved President gets Admin and President access", () => {
-  const access = approved("president");
+  const access = approved("president", {}, true);
   assert.equal(access.canAccessAdminTools, true);
   assert.equal(access.canAccessPresidentControls, true);
+  assert.equal(access.canAccessResolutionTools, true);
+});
+
+test("Secretary receives only the dedicated resolution capability", () => {
+  const access = approved("bod", {}, true);
+  assert.equal(access.canAccessResolutionTools, true);
+  assert.equal(access.canAccessAdminTools, false);
+  assert.equal(hasCapability(access, "resolutionTools"), true);
+});
+
+test("technical Admin and Website Director do not gain resolution authority", () => {
+  assert.equal(approved("admin").canAccessResolutionTools, false);
+  assert.equal(approved("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true }).canAccessResolutionTools, false);
 });
 
 test("BOD with trusted Website Director authority gets delegated Admin access", () => {

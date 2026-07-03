@@ -61,6 +61,9 @@ export function getAccessHubDestinations(access) {
   if (access.canAccessAdminTools) {
     destinations.push({ key: "admin", category: "Administration", title: "Admin Tools", description: "Manage protected club operations available to your account.", href: "/admin", primary: false });
   }
+  if (access.canAccessResolutionTools) {
+    destinations.push({ key: "resolutions", category: "BOD governance", title: "Resolutions", description: "Create, manage, and finalize meeting-linked BOD resolutions.", href: "/admin/resolutions", primary: false });
+  }
   destinations.push({ key: "calendar", category: "Club calendar", title: "Public Event Calendar", description: "See upcoming RCPH activities and district opportunities.", href: "/calendar", primary: false });
   destinations.push({ key: "home", category: "Public website", title: "RCPH Homepage", description: "Return to the public club website.", href: "/", primary: false });
   return destinations;
@@ -73,6 +76,7 @@ export function getAccessHubViewModel(access) {
   else if (access?.canAccessMemberDashboard) capabilityLabels.push("Member Dashboard");
   if (access?.canAccessBodTools) capabilityLabels.push("BOD Tools");
   if (access?.canAccessAdminTools) capabilityLabels.push("Admin Tools");
+  if (access?.canAccessResolutionTools) capabilityLabels.push("Resolution Tools");
   if (access?.canAccessPresidentControls) capabilityLabels.push("President Controls");
   const positions = getPositionLabels(access?.positionKeys);
   return {

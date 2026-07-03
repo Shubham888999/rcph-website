@@ -86,3 +86,8 @@ test("announcement normalization excludes targeting and delivery internals", () 
   assert.equal("targetUserIds" in item, false);
   assert.equal("delivery" in item, false);
 });
+test("dashboard exposes only open eligible resolution payloads", () => {
+  const model = normalizeDashboardResponse(memberResponse({ openResolutions: [{ id: "r1", status: "open", resolutionNumber: "R/1", title: "Vote now", currentVote: "approve" }, { id: "r2", status: "passed", resolutionNumber: "R/2", title: "Closed" }] }));
+  assert.deepEqual(model.openResolutions.map((item) => item.id), ["r1"]);
+  assert.equal(model.openResolutions[0].currentVote, "approve");
+});
