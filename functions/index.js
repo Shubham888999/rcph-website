@@ -19,6 +19,7 @@ const {
   PROSPECT_CRITERIA_V2,
   calculateProspectMembershipProgress,
 } = require('./lib/prospect-membership-criteria');
+const resolutionModel = require('./lib/resolutions');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -180,6 +181,8 @@ const ANNOUNCEMENT_DELIVERY_BATCH_SIZE = 450;
 const ANNOUNCEMENT_AUTH_LOOKUP_CHUNK_SIZE = 100;
 const ANNOUNCEMENT_EXPIRY_MAX_MS = 365 * 24 * 60 * 60 * 1000;
 const ANNOUNCEMENT_EMAIL_MAX_RECIPIENTS = 500;
+const RESOLUTIONS_COLLECTION = 'resolutions';
+const RESOLUTION_NUMBER_INDEX_COLLECTION = 'resolutionNumberIndex';
 
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
@@ -1512,6 +1515,201 @@ async function assertBodAdminOrPresident(uid) {
     throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
   }
   return authority.role;
+}
+
+function isActiveResolutionPositionAssignment(uid, snap, positionKey) {
+  if (!snap?.exists) return false;
+  const data = snap.data() || {};
+  return data.active === true && data.uid === uid && data.positionKey === positionKey;
+}
+
+async function getResolutionManagerContext(uid) {
+  const [active, account, secretaryAssignment, presidentAssignment] = await Promise.all([
+    getActiveRole(uid),
+    assertApprovedActiveCallableAccount(uid),
+    db.collection('bodPositionAssignments').doc(`secretary_${uid}`).get(),
+    db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
+  ]);
+  const role = active?.role || '';
+  const secretary = isActiveResolutionPositionAssignment(uid, secretaryAssignment, 'secretary');
+  const presidentPosition = isActiveResolutionPositionAssignment(uid, presidentAssignment, 'president');
+  const allowed = resolutionModel.canManageResolutions({
+    role,
+    userActive: account.userData.active !== false,
+    userApproved: String(account.userData.status || '').toLowerCase() === 'approved',
+    secretaryAssignmentActive: secretary || presidentPosition,
+  });
+  if (!allowed) throw new HttpsError('permission-denied', 'President or Secretary authority required.');
+  return {
+    uid,
+    role,
+    name: normalizeText(account.userData.name || account.authRecord.displayName || account.authRecord.email, 160),
+    position: role === 'president' || presidentPosition ? 'President' : 'Secretary',
+  };
+}
+
+async function hasResolutionManagerAuthority(uid, preloaded = {}) {
+  try {
+    const active = preloaded.activeRole || await getActiveRole(uid);
+    const userSnap = preloaded.userSnap || await db.collection('users').doc(uid).get();
+    const userData = userSnap.exists ? (userSnap.data() || {}) : {};
+    if (!active || !isApprovedActiveUserRecord(userData)) return false;
+    if (active.role === 'president') return true;
+    const [secretarySnap, presidentSnap] = await Promise.all([
+      db.collection('bodPositionAssignments').doc(`secretary_${uid}`).get(),
+      db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
+    ]);
+    return isActiveResolutionPositionAssignment(uid, secretarySnap, 'secretary')
+      || isActiveResolutionPositionAssignment(uid, presidentSnap, 'president');
+  } catch {
+    return false;
+  }
+}
+
+function resolutionNumberIndexId(number) {
+  return crypto.createHash('sha256').update(String(number || '').trim().toLowerCase()).digest('hex');
+}
+
+function resolutionTimestamp() {
+  return admin.firestore.Timestamp.now();
+}
+
+function resolutionAuditPayload(action, actor, timestamp, options = {}) {
+  return {
+    action,
+    actorUid: actor.uid,
+    actorName: actor.name,
+    actorPosition: actor.position,
+    timestamp,
+    previousValue: options.previousValue ?? null,
+    newValue: options.newValue ?? null,
+    metadata: options.metadata && typeof options.metadata === 'object' ? options.metadata : {},
+  };
+}
+
+function setResolutionAudit(tx, resolutionRef, action, actor, timestamp, options) {
+  tx.set(resolutionRef.collection('audit').doc(), resolutionAuditPayload(action, actor, timestamp, options));
+}
+
+async function loadActiveResolutionVoters() {
+  const assignmentsSnap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
+  const byUid = new Map();
+  assignmentsSnap.forEach(snap => {
+    const data = snap.data() || {};
+    const uid = normalizeText(data.uid, 128);
+    const positionKey = normalizeText(data.positionKey, 80).toLowerCase();
+    const definition = positionHelpers.getPositionDefinition(positionKey);
+    if (!uid || !definition?.active || data.active !== true) return;
+    const current = byUid.get(uid) || { uid, positions: new Map() };
+    current.positions.set(definition.key, definition);
+    byUid.set(uid, current);
+  });
+  const uids = Array.from(byUid.keys()).sort();
+  if (!uids.length) return [];
+  const [userSnaps, roleSnaps, bodMemberSnaps] = await Promise.all([
+    db.getAll(...uids.map(uid => db.collection('users').doc(uid))),
+    db.getAll(...uids.map(uid => db.collection('roles').doc(uid))),
+    db.getAll(...uids.map(uid => db.collection('bodMembers').doc(uid))),
+  ]);
+  const voters = [];
+  uids.forEach((uid, index) => {
+    const user = userSnaps[index]?.exists ? (userSnaps[index].data() || {}) : {};
+    const roleData = roleSnaps[index]?.exists ? (roleSnaps[index].data() || {}) : {};
+    const bodMember = bodMemberSnaps[index]?.exists ? (bodMemberSnaps[index].data() || {}) : {};
+    const role = normalizeRole(roleData.role);
+    if (!isApprovedActiveUserRecord(user)
+      || String(roleData.status || 'approved').toLowerCase() !== 'approved'
+      || !['bod', 'admin', 'president'].includes(role)) return;
+    const positions = Array.from(byUid.get(uid).positions.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+    const name = normalizeText(user.name || bodMember.name, 160);
+    if (!name || !positions.length) return;
+    voters.push({
+      uid,
+      name,
+      position: positions.map(item => item.displayTitle).join(', '),
+      positionKeys: positions.map(item => item.key),
+    });
+  });
+  return voters.sort((a, b) => a.position.localeCompare(b.position) || a.name.localeCompare(b.name));
+}
+
+function validateResolutionCustomCount(payload, eligibleCount) {
+  if (payload.votingRule === 'custom_approval_count'
+    && (!Number.isInteger(payload.customApprovalCount)
+      || payload.customApprovalCount < 1
+      || payload.customApprovalCount > eligibleCount)) {
+    throw new HttpsError('invalid-argument', 'Custom approval count must not exceed the eligible voter count.');
+  }
+}
+
+function publicResolutionFields(id, data) {
+  return {
+    id,
+    resolutionNumber: normalizeText(data.resolutionNumber, 80),
+    title: normalizeText(data.title, 220),
+    body: typeof data.body === 'string' ? data.body.slice(0, 20000) : '',
+    notes: typeof data.notes === 'string' ? data.notes.slice(0, 10000) : '',
+    meetingId: normalizeText(data.meetingId, 160),
+    meetingTitle: normalizeText(data.meetingTitle, 220),
+    meetingDate: normalizeText(data.meetingDate, 20),
+    proposedByUid: normalizeText(data.proposedByUid, 128),
+    proposedByName: normalizeText(data.proposedByName, 160),
+    proposedByPosition: normalizeText(data.proposedByPosition, 240),
+    secondedByUid: normalizeText(data.secondedByUid, 128),
+    secondedByName: normalizeText(data.secondedByName, 160),
+    secondedByPosition: normalizeText(data.secondedByPosition, 240),
+    status: resolutionModel.normalizeResolutionStatus(data.status),
+    votingRule: resolutionModel.normalizeVotingRule(data.votingRule),
+    customApprovalCount: Number.isInteger(data.customApprovalCount) ? data.customApprovalCount : null,
+    eligibleVoterCount: Array.isArray(data.eligibleVoterUids) ? data.eligibleVoterUids.length : 0,
+    approveCount: Math.max(0, Number(data.approveCount) || 0),
+    rejectCount: Math.max(0, Number(data.rejectCount) || 0),
+    abstainCount: Math.max(0, Number(data.abstainCount) || 0),
+    votesReceivedCount: Math.max(0, Number(data.votesReceivedCount) || 0),
+    result: resolutionModel.normalizeResolutionStatus(data.result),
+    createdAt: timestampToIso(data.createdAt),
+    updatedAt: timestampToIso(data.updatedAt),
+    openedAt: timestampToIso(data.openedAt),
+    closedAt: timestampToIso(data.closedAt),
+    cancelledAt: timestampToIso(data.cancelledAt),
+    openedByName: normalizeText(data.openedByName, 160),
+    closedByName: normalizeText(data.closedByName, 160),
+    cancelledByName: normalizeText(data.cancelledByName, 160),
+  };
+}
+
+function countResolutionVotes(votes) {
+  const choices = (Array.isArray(votes) ? votes : []).map(vote => resolutionModel.normalizeVoteChoice(vote?.choice)).filter(Boolean);
+  return {
+    approveCount: choices.filter(choice => choice === 'approve').length,
+    rejectCount: choices.filter(choice => choice === 'reject').length,
+    abstainCount: choices.filter(choice => choice === 'abstain').length,
+    votesReceivedCount: choices.length,
+  };
+}
+
+async function getOpenResolutionsForUser(uid) {
+  const snap = await db.collection(RESOLUTIONS_COLLECTION)
+    .where('eligibleVoterUids', 'array-contains', uid)
+    .get();
+  const rows = await Promise.all(snap.docs.map(async resolutionSnap => {
+    const data = resolutionSnap.data() || {};
+    if (data.status !== 'open' || !Array.isArray(data.eligibleVoterUids) || !data.eligibleVoterUids.includes(uid)) return null;
+    const voter = (Array.isArray(data.eligibleVoters) ? data.eligibleVoters : []).find(item => item?.uid === uid);
+    if (!voter) return null;
+    const voteSnap = await resolutionSnap.ref.collection('votes').doc(uid).get();
+    const vote = voteSnap.exists ? (voteSnap.data() || {}) : {};
+    const fields = publicResolutionFields(resolutionSnap.id, data);
+    delete fields.proposedByUid;
+    delete fields.secondedByUid;
+    return {
+      ...fields,
+      currentVote: resolutionModel.normalizeVoteChoice(vote.choice),
+      submittedAt: timestampToIso(vote.submittedAt),
+      voteUpdatedAt: timestampToIso(vote.updatedAt),
+    };
+  }));
+  return rows.filter(Boolean).sort((a, b) => String(b.openedAt).localeCompare(String(a.openedAt)) || b.id.localeCompare(a.id));
 }
 
 function inviteCodeMatches(inputCode, expectedCode) {
@@ -3293,6 +3491,7 @@ exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
     userSnap,
     cwdAssignmentSnap,
   });
+  const resolutionManager = await hasResolutionManagerAuthority(uid, { activeRole, userSnap });
 
   return {
     ok: true,
@@ -3302,6 +3501,7 @@ exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
     positionKeys: authorityContext.positionKeys,
     positionSource: authorityContext.positionSource,
     authority: authorityContext.authority,
+    resolutionManager,
   };
 });
 
@@ -3813,6 +4013,32 @@ exports.markAnnouncementRead = onCall(CALLABLE_OPTIONS, async (request) => {
   return { success: true };
 });
 
+exports.markAnnouncementUnread = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const announcementId = validateAnnouncementDocId(request.data?.announcementId, 'announcementId');
+  const deliveryRef = db
+    .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+    .doc(announcementDeliveryId(announcementId, uid));
+
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(deliveryRef);
+    if (!snap.exists || snap.data()?.uid !== uid) {
+      throw new HttpsError('not-found', 'Announcement delivery not found.');
+    }
+    const data = snap.data() || {};
+    if (data.dashboardStatus === 'dismissed') return;
+    if (data.dashboardStatus === 'unread' && !data.readAt) return;
+
+    tx.set(deliveryRef, {
+      dashboardStatus: 'unread',
+      readAt: null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+
+  return { success: true };
+});
+
 exports.dismissAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const announcementId = validateAnnouncementDocId(request.data?.announcementId, 'announcementId');
@@ -3842,14 +4068,348 @@ exports.dismissAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
   return { success: true };
 });
 
+async function prepareResolutionDraftInput(raw) {
+  const validation = resolutionModel.validateDraftInput(raw || {});
+  if (!validation.ok) throw new HttpsError('invalid-argument', validation.errors[0], { errors: validation.errors });
+  const payload = validation.payload;
+  const [meetingSnap, voters] = await Promise.all([
+    db.collection('bodMeetings').doc(payload.meetingId).get(),
+    loadActiveResolutionVoters(),
+  ]);
+  if (!meetingSnap.exists || meetingSnap.data()?.archived === true) {
+    throw new HttpsError('not-found', 'Linked BOD meeting not found.');
+  }
+  if (!voters.length) throw new HttpsError('failed-precondition', 'No UID-linked active BOD voters are available.');
+  validateResolutionCustomCount(payload, voters.length);
+  const voterByUid = new Map(voters.map(voter => [voter.uid, voter]));
+  const proposer = voterByUid.get(payload.proposedByUid);
+  const seconder = voterByUid.get(payload.secondedByUid);
+  if (!proposer || !seconder) throw new HttpsError('failed-precondition', 'Proposer and seconder must be active UID-linked BOD members.');
+  const meeting = meetingSnap.data() || {};
+  if (!normalizeText(meeting.name, 220) || !/^\d{4}-\d{2}-\d{2}$/.test(String(meeting.date || ''))) {
+    throw new HttpsError('failed-precondition', 'Linked BOD meeting is incomplete.');
+  }
+  return {
+    payload,
+    meeting: { id: meetingSnap.id, title: normalizeText(meeting.name, 220), date: String(meeting.date) },
+    proposer,
+    seconder,
+  };
+}
+
+exports.createResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const prepared = await prepareResolutionDraftInput(request.data || {});
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc();
+  const numberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(prepared.payload.resolutionNumber));
+  const now = resolutionTimestamp();
+  await db.runTransaction(async tx => {
+    const numberSnap = await tx.get(numberRef);
+    if (numberSnap.exists) throw new HttpsError('already-exists', 'Resolution number already exists.');
+    tx.set(resolutionRef, {
+      ...prepared.payload,
+      meetingTitle: prepared.meeting.title,
+      meetingDate: prepared.meeting.date,
+      proposedByName: prepared.proposer.name,
+      proposedByPosition: prepared.proposer.position,
+      secondedByName: prepared.seconder.name,
+      secondedByPosition: prepared.seconder.position,
+      status: 'draft',
+      eligibleVoters: [],
+      eligibleVoterUids: [],
+      openedAt: null,
+      openedByUid: null,
+      openedByName: null,
+      openedByPosition: null,
+      closedAt: null,
+      closedByUid: null,
+      closedByName: null,
+      closedByPosition: null,
+      result: null,
+      approveCount: 0,
+      rejectCount: 0,
+      abstainCount: 0,
+      votesReceivedCount: 0,
+      createdAt: now,
+      createdByUid: actor.uid,
+      createdByName: actor.name,
+      updatedAt: now,
+    });
+    tx.set(numberRef, { resolutionId: resolutionRef.id, resolutionNumber: prepared.payload.resolutionNumber, createdAt: now });
+    setResolutionAudit(tx, resolutionRef, 'resolution_created', actor, now, { newValue: { status: 'draft' } });
+  });
+  return { ok: true, resolutionId: resolutionRef.id };
+});
+
+exports.updateResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const prepared = await prepareResolutionDraftInput(request.data || {});
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const now = resolutionTimestamp();
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(resolutionRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    const existing = snap.data() || {};
+    if (existing.status !== 'draft') throw new HttpsError('failed-precondition', 'Only draft resolutions may be edited.');
+    const oldNumberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(existing.resolutionNumber));
+    const newNumberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(prepared.payload.resolutionNumber));
+    const numberChanged = oldNumberRef.id !== newNumberRef.id;
+    if (numberChanged) {
+      const newNumberSnap = await tx.get(newNumberRef);
+      if (newNumberSnap.exists && newNumberSnap.data()?.resolutionId !== resolutionId) {
+        throw new HttpsError('already-exists', 'Resolution number already exists.');
+      }
+      tx.delete(oldNumberRef);
+      tx.set(newNumberRef, { resolutionId, resolutionNumber: prepared.payload.resolutionNumber, createdAt: existing.createdAt || now, updatedAt: now });
+    }
+    tx.update(resolutionRef, {
+      ...prepared.payload,
+      meetingTitle: prepared.meeting.title,
+      meetingDate: prepared.meeting.date,
+      proposedByName: prepared.proposer.name,
+      proposedByPosition: prepared.proposer.position,
+      secondedByName: prepared.seconder.name,
+      secondedByPosition: prepared.seconder.position,
+      updatedAt: now,
+    });
+    setResolutionAudit(tx, resolutionRef, 'draft_edited', actor, now, {
+      previousValue: { resolutionNumber: existing.resolutionNumber, title: existing.title, meetingId: existing.meetingId },
+      newValue: { resolutionNumber: prepared.payload.resolutionNumber, title: prepared.payload.title, meetingId: prepared.payload.meetingId },
+    });
+  });
+  return { ok: true, resolutionId };
+});
+
+exports.openResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const [voters, meetingCheck] = await Promise.all([
+    loadActiveResolutionVoters(),
+    db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId).get(),
+  ]);
+  if (!meetingCheck.exists) throw new HttpsError('not-found', 'Resolution not found.');
+  const before = meetingCheck.data() || {};
+  const linkedMeeting = await db.collection('bodMeetings').doc(String(before.meetingId || '')).get();
+  if (!linkedMeeting.exists || linkedMeeting.data()?.archived === true) throw new HttpsError('failed-precondition', 'Linked BOD meeting is unavailable.');
+  if (!voters.length) throw new HttpsError('failed-precondition', 'No UID-linked active BOD voters are available.');
+  validateResolutionCustomCount(before, voters.length);
+  const resolutionRef = meetingCheck.ref;
+  const now = resolutionTimestamp();
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(resolutionRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    const data = snap.data() || {};
+    if (data.status !== 'draft') throw new HttpsError('failed-precondition', 'Only a draft resolution may be opened.');
+    tx.update(resolutionRef, {
+      status: 'open',
+      eligibleVoters: voters.map(voter => ({ uid: voter.uid, name: voter.name, position: voter.position })),
+      eligibleVoterUids: voters.map(voter => voter.uid),
+      openedAt: now,
+      openedByUid: actor.uid,
+      openedByName: actor.name,
+      openedByPosition: actor.position,
+      updatedAt: now,
+    });
+    setResolutionAudit(tx, resolutionRef, 'voting_opened', actor, now, {
+      previousValue: { status: 'draft' },
+      newValue: { status: 'open' },
+      metadata: { eligibleVoterCount: voters.length },
+    });
+  });
+  return { ok: true, resolutionId, eligibleVoterCount: voters.length };
+});
+
+exports.submitResolutionVote = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const choice = resolutionModel.normalizeVoteChoice(request.data?.choice);
+  if (!choice) throw new HttpsError('invalid-argument', 'Vote must be approve, reject, or abstain.');
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const voteRef = resolutionRef.collection('votes').doc(uid);
+  const now = resolutionTimestamp();
+  let responseVote = null;
+  await db.runTransaction(async tx => {
+    const [resolutionSnap, voteSnap] = await Promise.all([tx.get(resolutionRef), tx.get(voteRef)]);
+    if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    const resolution = resolutionSnap.data() || {};
+    if (resolution.status !== 'open') throw new HttpsError('failed-precondition', 'Voting is closed.');
+    const voter = (Array.isArray(resolution.eligibleVoters) ? resolution.eligibleVoters : []).find(item => item?.uid === uid);
+    if (!voter || !Array.isArray(resolution.eligibleVoterUids) || !resolution.eligibleVoterUids.includes(uid)) {
+      throw new HttpsError('permission-denied', 'You are not an eligible voter for this resolution.');
+    }
+    const previous = voteSnap.exists ? (voteSnap.data() || {}) : {};
+    const previousChoice = resolutionModel.normalizeVoteChoice(previous.choice);
+    tx.set(voteRef, {
+      voterUid: uid,
+      voterName: normalizeText(voter.name, 160),
+      voterPosition: normalizeText(voter.position, 240),
+      choice,
+      submittedAt: previous.submittedAt || now,
+      updatedAt: now,
+    }, { merge: false });
+    setResolutionAudit(tx, resolutionRef, previousChoice ? 'vote_changed' : 'vote_submitted', {
+      uid,
+      name: normalizeText(voter.name, 160),
+      position: normalizeText(voter.position, 240),
+    }, now, {
+      previousValue: previousChoice || null,
+      newValue: choice,
+    });
+    responseVote = { choice, submittedAt: timestampToIso(previous.submittedAt || now), updatedAt: timestampToIso(now) };
+  });
+  return { ok: true, resolutionId, vote: responseVote };
+});
+
+exports.getMyOpenResolutions = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const active = await getActiveRole(uid);
+  if (!active || !ACTIVE_ROLES.has(active.role)) throw new HttpsError('failed-precondition', 'Approved account required.');
+  return { ok: true, openResolutions: await getOpenResolutionsForUser(uid) };
+});
+
+exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const now = resolutionTimestamp();
+  let finalResult = null;
+  await db.runTransaction(async tx => {
+    const resolutionSnap = await tx.get(resolutionRef);
+    if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    const resolution = resolutionSnap.data() || {};
+    if (resolution.status !== 'open') throw new HttpsError('failed-precondition', 'Only an open resolution may be closed.');
+    const votesSnap = await tx.get(resolutionRef.collection('votes'));
+    const votes = votesSnap.docs.map(snap => snap.data() || {});
+    finalResult = resolutionModel.calculateResolutionResult({
+      votingRule: resolution.votingRule,
+      customApprovalCount: resolution.customApprovalCount,
+      eligibleVoterCount: Array.isArray(resolution.eligibleVoterUids) ? resolution.eligibleVoterUids.length : 0,
+      votes,
+    });
+    tx.update(resolutionRef, {
+      ...finalResult,
+      status: finalResult.status,
+      result: finalResult.result,
+      closedAt: now,
+      closedByUid: actor.uid,
+      closedByName: actor.name,
+      closedByPosition: actor.position,
+      updatedAt: now,
+    });
+    setResolutionAudit(tx, resolutionRef, 'voting_closed', actor, now, {
+      previousValue: { status: 'open' },
+      newValue: { status: finalResult.status, result: finalResult.result },
+      metadata: {
+        approveCount: finalResult.approveCount,
+        rejectCount: finalResult.rejectCount,
+        abstainCount: finalResult.abstainCount,
+        votesReceivedCount: finalResult.votesReceivedCount,
+      },
+    });
+    setResolutionAudit(tx, resolutionRef, 'result_finalized', actor, now, { newValue: { result: finalResult.result } });
+  });
+  return { ok: true, resolutionId, ...finalResult, closedAt: timestampToIso(now) };
+});
+
+exports.cancelResolution = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const now = resolutionTimestamp();
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(resolutionRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    const data = snap.data() || {};
+    if (!['draft', 'open'].includes(data.status)) throw new HttpsError('failed-precondition', 'Finalized or cancelled resolutions cannot be cancelled.');
+    tx.update(resolutionRef, {
+      status: 'cancelled',
+      result: null,
+      cancelledAt: now,
+      cancelledByUid: actor.uid,
+      cancelledByName: actor.name,
+      cancelledByPosition: actor.position,
+      updatedAt: now,
+    });
+    setResolutionAudit(tx, resolutionRef, 'resolution_cancelled', actor, now, {
+      previousValue: { status: data.status },
+      newValue: { status: 'cancelled' },
+    });
+  });
+  return { ok: true, resolutionId };
+});
+
+exports.getAdminResolutions = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  await getResolutionManagerContext(uid);
+  const [resolutionsSnap, meetingsSnap, voters] = await Promise.all([
+    db.collection(RESOLUTIONS_COLLECTION).orderBy('createdAt', 'desc').limit(100).get(),
+    db.collection('bodMeetings').orderBy('date', 'desc').limit(100).get(),
+    loadActiveResolutionVoters(),
+  ]);
+  const resolutions = await Promise.all(resolutionsSnap.docs.map(async snap => {
+    const data = snap.data() || {};
+    const fields = publicResolutionFields(snap.id, data);
+    if (data.status !== 'open') return fields;
+    const votesSnap = await snap.ref.collection('votes').get();
+    return { ...fields, ...countResolutionVotes(votesSnap.docs.map(vote => vote.data() || {})) };
+  }));
+  return {
+    ok: true,
+    resolutions,
+    meetings: meetingsSnap.docs.map(snap => ({ id: snap.id, name: normalizeText(snap.data()?.name, 220), date: normalizeText(snap.data()?.date, 20), archived: snap.data()?.archived === true })).filter(item => item.name && item.date),
+    roster: voters.map(voter => ({ uid: voter.uid, name: voter.name, position: voter.position })),
+  };
+});
+
+exports.getResolutionDetails = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const [resolutionSnap, votesSnap, auditSnap] = await Promise.all([
+    resolutionRef.get(),
+    resolutionRef.collection('votes').orderBy('updatedAt', 'asc').get(),
+    resolutionRef.collection('audit').orderBy('timestamp', 'asc').get(),
+  ]);
+  if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+  const data = resolutionSnap.data() || {};
+  const voteData = votesSnap.docs.map(snap => ({ id: snap.id, data: snap.data() || {} }));
+  const liveCounts = data.status === 'open' ? countResolutionVotes(voteData.map(item => item.data)) : {};
+  return {
+    ok: true,
+    resolution: {
+      ...publicResolutionFields(resolutionId, data),
+      ...liveCounts,
+      eligibleVoters: Array.isArray(data.eligibleVoters) ? data.eligibleVoters.map(voter => ({ uid: normalizeText(voter?.uid, 128), name: normalizeText(voter?.name, 160), position: normalizeText(voter?.position, 240) })).filter(voter => voter.uid) : [],
+    },
+    votes: voteData.map(item => {
+      const vote = item.data;
+      return { voterUid: item.id, voterName: normalizeText(vote.voterName, 160), voterPosition: normalizeText(vote.voterPosition, 240), choice: resolutionModel.normalizeVoteChoice(vote.choice), submittedAt: timestampToIso(vote.submittedAt), updatedAt: timestampToIso(vote.updatedAt) };
+    }),
+    audit: auditSnap.docs.map(snap => {
+      const audit = snap.data() || {};
+      return { id: snap.id, action: normalizeText(audit.action, 80), actorName: normalizeText(audit.actorName, 160), actorPosition: normalizeText(audit.actorPosition, 240), timestamp: timestampToIso(audit.timestamp), previousValue: audit.previousValue ?? null, newValue: audit.newValue ?? null, metadata: audit.metadata && typeof audit.metadata === 'object' ? audit.metadata : {} };
+    }),
+  };
+});
+
 exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const active = await getActiveRole(uid);
   if (!active || !ACTIVE_ROLES.has(active.role)) {
     throw new HttpsError('failed-precondition', 'Approved account required.');
   }
-  const clubRanking = await getPublicDashboardClubRanking();
-  const announcements = await getDashboardAnnouncementsForUser(uid);
+  const [clubRanking, announcements, openResolutions] = await Promise.all([
+    getPublicDashboardClubRanking(),
+    getDashboardAnnouncementsForUser(uid),
+    getOpenResolutionsForUser(uid),
+  ]);
 
   if (active.role === 'prospect') {
     const [userSnap, eventsSnap] = await Promise.all([
@@ -3881,6 +4441,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
       mode: 'prospect',
       clubRanking,
       announcements,
+      openResolutions,
       profile: {
         uid,
         name: userData.name || request.auth?.token?.name || '',
@@ -4036,6 +4597,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     ok: true,
     clubRanking,
     announcements,
+    openResolutions,
     profile: {
       uid,
       name: userData.name || memberData.name || request.auth?.token?.name || '',

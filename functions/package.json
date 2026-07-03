@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test:resolutions": "node scripts/verify-resolutions.js"
+  },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",
     "bcryptjs": "^3.0.2",

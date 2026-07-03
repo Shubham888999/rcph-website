@@ -191,6 +191,22 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /resolutions/{resolutionId} {
+      allow read, write: if false;
+
+      match /votes/{voterUid} {
+        allow read, write: if false;
+      }
+
+      match /audit/{auditId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /resolutionNumberIndex/{indexId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
