@@ -1420,12 +1420,9 @@ async function getPublicDashboardClubRanking() {
   }
 }
 
-function isActiveWebsiteDirectorAssignment(uid, snap) {
+function isActivePositionAssignment(uid, positionKey, snap) {
   if (!snap || !snap.exists) return false;
-  const data = snap.data() || {};
-  return data.active === true
-    && data.uid === uid
-    && data.positionKey === positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY;
+  return positionHelpers.isActivePositionAssignment(uid, positionKey, snap.data() || {});
 }
 
 async function getAuthorityContext(uid, preloaded = {}) {
@@ -1439,7 +1436,7 @@ async function getAuthorityContext(uid, preloaded = {}) {
     authority: {
       isPresidentRole: active?.role === 'president',
       hasWebsiteDirectorPosition: false,
-      hasPresidentAuthority: active?.role === 'president',
+      hasPresidentAuthority: false,
     },
   };
 
@@ -1449,7 +1446,10 @@ async function getAuthorityContext(uid, preloaded = {}) {
   const canHoldWebsiteDirectorAuthority = ['bod', 'admin', 'president'].includes(active.role)
     && cwdDefinition?.active === true;
 
-  if (!canHoldWebsiteDirectorAuthority && active.role !== 'president') return base;
+  const presidentDefinition = positionHelpers.getPositionDefinition('president');
+  const canHoldPresidentAuthority = ['bod', 'admin', 'president'].includes(active.role)
+    && presidentDefinition?.active === true;
+  if (!canHoldWebsiteDirectorAuthority && !canHoldPresidentAuthority) return base;
 
   const userSnap = preloaded.userSnap || await db.collection('users').doc(uid).get();
   const userData = userSnap.exists ? (userSnap.data() || {}) : null;
@@ -1470,7 +1470,23 @@ async function getAuthorityContext(uid, preloaded = {}) {
   ) {
     const assignmentSnap = preloaded.cwdAssignmentSnap
       || await db.collection('bodPositionAssignments').doc(`${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`).get();
-    hasWebsiteDirectorPosition = isActiveWebsiteDirectorAssignment(uid, assignmentSnap);
+    hasWebsiteDirectorPosition = isActivePositionAssignment(
+      uid,
+      positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY,
+      assignmentSnap
+    );
+  }
+
+  let hasPresidentPosition = false;
+  if (
+    canHoldPresidentAuthority
+    && isApprovedActiveUserRecord(userData)
+    && positionKeysAreWellFormed
+    && metadata.positionKeys.includes('president')
+  ) {
+    const assignmentSnap = preloaded.presidentAssignmentSnap
+      || await db.collection('bodPositionAssignments').doc(`president_${uid}`).get();
+    hasPresidentPosition = isActivePositionAssignment(uid, 'president', assignmentSnap);
   }
 
   return {
@@ -1480,7 +1496,7 @@ async function getAuthorityContext(uid, preloaded = {}) {
     authority: {
       isPresidentRole: active.role === 'president',
       hasWebsiteDirectorPosition,
-      hasPresidentAuthority: active.role === 'president' || hasWebsiteDirectorPosition,
+      hasPresidentAuthority: hasPresidentPosition || hasWebsiteDirectorPosition,
     },
   };
 }
@@ -3476,10 +3492,11 @@ exports.uploadVisitSubmissionFile = onRequest({
 
 exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const [userSnap, roleSnap, cwdAssignmentSnap] = await Promise.all([
+  const [userSnap, roleSnap, cwdAssignmentSnap, presidentAssignmentSnap] = await Promise.all([
     db.collection('users').doc(uid).get(),
     db.collection('roles').doc(uid).get(),
     db.collection('bodPositionAssignments').doc(`${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`).get(),
+    db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
   ]);
   const roleData = roleSnap.exists ? (roleSnap.data() || {}) : null;
   const role = roleData && String(roleData.status || 'approved').toLowerCase() === 'approved'
@@ -3490,6 +3507,7 @@ exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
     activeRole,
     userSnap,
     cwdAssignmentSnap,
+    presidentAssignmentSnap,
   });
   const resolutionManager = await hasResolutionManagerAuthority(uid, { activeRole, userSnap });
 

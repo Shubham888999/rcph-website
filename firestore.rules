@@ -18,6 +18,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/bodPositionOccupancy/cwd;
     }
 
+    function presidentAssignmentPath() {
+      return /databases/$(database)/documents/bodPositionAssignments/president_$(request.auth.uid);
+    }
+
     function hasRole(role) {
       return signedIn()
         && exists(rolePath())
@@ -32,8 +36,16 @@ service cloud.firestore {
         && get(rolePath()).data.get('status', 'approved') == 'approved';
     }
 
-    function isPresidentRole() {
-      return hasRole('president');
+    function hasActivePresidentAssignment() {
+      return hasAnyRole(['bod', 'admin', 'president'])
+        && exists(userPath())
+        && get(userPath()).data.get('status', '') == 'approved'
+        && get(userPath()).data.get('active', true) != false
+        && get(userPath()).data.get('positionKeys', []).hasAny(['president'])
+        && exists(presidentAssignmentPath())
+        && get(presidentAssignmentPath()).data.positionKey == 'president'
+        && get(presidentAssignmentPath()).data.uid == request.auth.uid
+        && get(presidentAssignmentPath()).data.active == true;
     }
 
     function hasWebsiteDirectorPosition() {
@@ -50,7 +62,7 @@ service cloud.firestore {
     }
 
     function hasPresidentAuthority() {
-      return isPresidentRole() || hasWebsiteDirectorPosition();
+      return hasActivePresidentAssignment() || hasWebsiteDirectorPosition();
     }
 
     function isAdmin() {

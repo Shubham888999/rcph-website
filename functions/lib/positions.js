@@ -368,6 +368,17 @@ function hasWebsiteDirectorPosition(positionKeys) {
     && !(metadata.inactiveKeys && metadata.inactiveKeys.length);
 }
 
+function isActivePositionAssignment(uid, positionKey, assignment) {
+  const normalizedUid = typeof uid === 'string' ? uid.trim() : '';
+  const normalizedPositionKey = normalizePositionKey(positionKey);
+  return !!normalizedUid
+    && !!normalizedPositionKey
+    && !!assignment
+    && assignment.active === true
+    && assignment.uid === normalizedUid
+    && assignment.positionKey === normalizedPositionKey;
+}
+
 function buildPresidentAuthority(role, positionKeys) {
   const normalizedRole = normalizeRole(role);
   const positionCapableRole = normalizedRole === 'bod'
@@ -538,6 +549,7 @@ module.exports = {
   isActivePositionKey,
   derivePositionMetadata,
   hasWebsiteDirectorPosition,
+  isActivePositionAssignment,
   buildPresidentAuthority,
   validateRolePositionCombination,
   resolvePositionKeysFromRecords,

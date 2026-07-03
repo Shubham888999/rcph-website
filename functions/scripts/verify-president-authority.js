@@ -210,6 +210,21 @@ test('approved president role has President authority', () => {
   assert.strictEqual(authority.hasPresidentAuthority, true);
 });
 
+test('canonical President assignment validator rejects inactive, mismatched, and label-only records', () => {
+  assert.strictEqual(positionHelpers.isActivePositionAssignment('uid', 'president', {
+    uid: 'uid', positionKey: 'president', active: true,
+  }), true);
+  assert.strictEqual(positionHelpers.isActivePositionAssignment('uid', 'president', {
+    uid: 'uid', positionKey: 'president', active: false,
+  }), false);
+  assert.strictEqual(positionHelpers.isActivePositionAssignment('uid', 'president', {
+    uid: 'other', positionKey: 'president', active: true,
+  }), false);
+  assert.strictEqual(positionHelpers.isActivePositionAssignment('uid', 'president', {
+    uid: 'uid', displayTitle: 'President', active: true,
+  }), false);
+});
+
 test('approved admin plus cwd has President authority in Visit backend', () => {
   const result = access('uid', {
     user: user('admin', ['cwd']),
@@ -311,6 +326,8 @@ test('Website Director display title remains Website Director', () => {
 test('Firestore rules centralize President authority and block client assignment writes', () => {
   const rules = fs.readFileSync(path.join(__dirname, '..', '..', 'firestore.rules'), 'utf8');
   assert(rules.includes('function hasPresidentAuthority()'), 'rules define hasPresidentAuthority');
+  assert(rules.includes('function hasActivePresidentAssignment()'), 'rules define canonical active President assignment authority');
+  assert(rules.includes('bodPositionAssignments/president_$(request.auth.uid)'), 'rules use canonical President assignment');
   assert(rules.includes('bodPositionOccupancy/cwd'), 'rules use server-maintained cwd occupancy');
   assert(/match \/bodPositionAssignments\/\{assignmentId\}[\s\S]*allow write: if false;/.test(rules), 'clients cannot write assignments');
   assert(/match \/bodPositionOccupancy\/\{positionKey\}[\s\S]*allow write: if false;/.test(rules), 'clients cannot write occupancy');
