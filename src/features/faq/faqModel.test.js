@@ -3,7 +3,7 @@ import test from "node:test";
 import { faqCategories, faqItems } from "./faqData.js";
 import { filterFaqItems, getFeaturedFaqs, groupFaqByCategory, normalizeFaqQuery } from "./faqModel.js";
 
-test("FAQ content has 16 stable unique IDs and no duplicate questions", () => {
+test("FAQ content have unique IDs", () => {
   assert.equal(faqItems.length, 16);
   assert.equal(new Set(faqItems.map(({ id }) => id)).size, faqItems.length);
   assert.equal(new Set(faqItems.map(({ question }) => question.toLowerCase())).size, faqItems.length);

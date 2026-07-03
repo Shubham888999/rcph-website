@@ -139,4 +139,26 @@ export const faqItems = [
     question: "How can I contact Rotaract Club of Pune Heritage?",
     answer: [text("You can contact RCPH through the "), link("Contact page", "/contact"), text(" on rcph3131.org for membership, collaboration, volunteering, event, or sponsorship enquiries.")],
   },
+{
+  id: "meeting-locations",
+  category: "events",
+  keywords: [
+    "meeting",
+    "meetings",
+    "location",
+    "venue",
+    "karvenagar",
+    "kothrud",
+    "sahakarnagar",
+    "gbm",
+    "bod meeting",
+  ],
+  question: "Where does RCPH usually conduct its meetings?",
+  answer: [
+    text(
+      "RCPH meetings are generally conducted in and around Karvenagar, Kothrud, and Sahakarnagar. The exact venue may vary depending on availability, convenience, and the nature of the meeting, and is communicated to members in advance."
+    ),
+  ],
+},
+  
 ];
