@@ -49,6 +49,8 @@ https://rcph3131.org
 https://www.rcph3131.org
 http://127.0.0.1:5500
 http://localhost:5500
+http://127.0.0.1:5173
+http://localhost:5173
 ```
 
 The endpoint handles `OPTIONS` preflight and allows `POST` only. Upload authorization comes from the one-use ticket, not frontend role claims.

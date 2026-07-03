@@ -13,6 +13,8 @@ const VISIT_UPLOAD_ALLOWED_ORIGINS = Object.freeze([
   'https://rcph-admin.firebaseapp.com',
   'http://127.0.0.1:5500',
   'http://localhost:5500',
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
 ]);
 const FORBIDDEN_BROWSER_AUTHORITY_FIELDS = Object.freeze([
   'driveFolderId',

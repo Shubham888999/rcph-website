@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const {
   VISIT_HTTP_UPLOAD_MAX_BYTES,
+  VISIT_UPLOAD_ALLOWED_ORIGINS,
   createHttpUploadError,
   createGoogleDriveClient,
   createVisitHttpUploadHandler,
@@ -287,6 +288,8 @@ async function runHandler({
 }
 
 async function main() {
+  assert(VISIT_UPLOAD_ALLOWED_ORIGINS.includes('http://localhost:5173'), 'React Vite origin is allowed');
+  assert(VISIT_UPLOAD_ALLOWED_ORIGINS.includes('http://127.0.0.1:5173'), 'React Vite loopback origin is allowed');
   let result = await runHandler();
   assert.strictEqual(result.res.statusCode, 200, 'POST multipart succeeds');
   assert.strictEqual(result.json.ok, true);
