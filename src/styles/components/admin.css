@@ -1792,6 +1792,124 @@
 .admin-dialog-backdrop { position:fixed; z-index:2000; inset:0; display:grid; place-items:center; padding:1rem; background:rgba(0,0,0,.8); backdrop-filter:blur(5px); }
 .admin-dialog { width:min(680px,100%); max-height:calc(100vh - 2rem); overflow:auto; padding:1.2rem; border:1px solid var(--color-border-strong); border-radius:var(--radius-lg); background:var(--color-surface); box-shadow:var(--shadow-brand); }
 .admin-dialog--wide { width:min(960px,100%); }
+
+.attendance-export-launcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.attendance-export-launcher h3,
+.attendance-export-launcher p {
+  margin: 0.2rem 0;
+}
+
+.attendance-export__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+}
+
+.attendance-export__filters label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.attendance-export__filters input,
+.attendance-export__filters select {
+  width: 100%;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.attendance-export__selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.attendance-export__events {
+  max-height: min(48vh, 520px);
+  margin: 1rem 0;
+  padding: 0.8rem;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.attendance-export__events legend {
+  padding: 0 0.35rem;
+  color: var(--color-gold-soft);
+  font-weight: 800;
+}
+
+.attendance-export__events ul {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attendance-export__events label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.attendance-export__events label:focus-within {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+.attendance-export__events input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-gold);
+}
+
+.attendance-export__events span {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.attendance-export__events strong,
+.attendance-export__events small {
+  overflow-wrap: anywhere;
+}
+
+.attendance-export__events small {
+  color: var(--color-muted);
+}
+
+.attendance-export__error {
+  color: var(--color-danger, #e87575);
+}
+
+.attendance-export__download {
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .attendance-export-launcher {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
 .admin-dialog > header { display:flex; justify-content:space-between; gap:1rem; align-items:center; }
 .admin-dialog > header h2 { margin-top:0; }
 .admin-dialog > header button { font-size:1.3rem; }
