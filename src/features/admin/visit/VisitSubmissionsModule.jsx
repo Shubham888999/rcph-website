@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminDialog from "../shared/AdminDialog";
 import AdminModuleHeader from "../AdminModuleHeader";
-import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
+import { AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
 import { normalizeFolder, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
+import VisitSubmissionFiles from "./VisitSubmissionFiles";
+import {
+  addVisitFiles,
+  formatVisitFileSize,
+  safeVisitUploadError,
+  validateVisitUploadEndpoint,
+  VISIT_FILE_ACCEPT,
+} from "./visitUploadModel";
 
 export default function VisitSubmissionsModule({ onNotice }) {
   const [route, setRoute] = useState({ visit: "", position: "" });
@@ -56,29 +64,169 @@ function VisitFolders({ data, openFolder, setDialog }) {
 }
 
 function FolderDetail({ data, busy, mutate, reload, setDialog }) {
-  const [files, setFiles] = useState([]);
+  const [queue, setQueue] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   const folder = data.folder;
-  async function upload() {
-    const selected = files.slice(0, folder.maxFilesPerSelection);
-    const invalid = selected.find((file) => validateVisitFile(file, folder));
-    if (!selected.length || invalid) return;
-    await mutate("upload", async () => {
-      const descriptors = selected.map((file, index) => ({ clientFileId: `react-${Date.now()}-${index}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }));
-      const session = await visitCalls.createSession({ visitType: folder.visitType, positionKey: folder.positionKey, files: descriptors });
-      const approved = new Map((session.files || []).map((item) => [item.clientFileId, item]));
+  const uploadConfigured = Boolean(validateVisitUploadEndpoint(import.meta.env.VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT));
+
+  function patchItem(clientFileId, patch) {
+    setQueue((current) => current.map((item) => (
+      item.clientFileId === clientFileId ? { ...item, ...patch } : item
+    )));
+  }
+
+  function selectFiles(fileList) {
+    const result = addVisitFiles(
+      queue,
+      fileList,
+      folder,
+      () => `react-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    );
+    setQueue(result.queue);
+    const notices = [];
+    if (result.duplicateCount) notices.push(`${result.duplicateCount} duplicate file${result.duplicateCount === 1 ? " was" : "s were"} skipped.`);
+    if (result.overflowCount) notices.push(`${result.overflowCount} file${result.overflowCount === 1 ? " exceeds" : "s exceed"} the selection limit.`);
+    setAnnouncement(notices.join(" ") || `${result.queue.length} file${result.queue.length === 1 ? "" : "s"} selected.`);
+  }
+
+  async function finalizePending(item) {
+    patchItem(item.clientFileId, { status: "Processing in Drive", message: "Saving the trusted Drive result." });
+    const result = await visitCalls.finalize({
+      sessionId: item.sessionId,
+      clientFileId: item.clientFileId,
+      ticket: item.ticket,
+      completionProof: item.completionProof,
+    });
+    patchItem(item.clientFileId, {
+      status: "Uploaded",
+      message: "Upload finalized.",
+      submissionId: result.submissionId || "",
+    });
+  }
+
+  async function upload(retryFailed = false) {
+    if (uploading) return;
+    const candidates = queue.filter((item) => !item.validationError && (
+      item.status === "Ready" || (retryFailed && item.status === "Failed")
+    ));
+    if (!candidates.length) return;
+    setUploading(true);
+    setAnnouncement("Requesting upload authorization.");
+    let completed = 0;
+    let failed = 0;
+
+    const metadataOnly = candidates.filter((item) => item.completionProof && item.sessionId && item.ticket);
+    for (const item of metadataOnly) {
       try {
-        for (let index = 0; index < selected.length; index += 1) {
-          const item = approved.get(descriptors[index].clientFileId);
-          if (!item) throw new Error("Upload session omitted a file.");
-          const proof = await uploadVisitFile(selected[index], session, item);
-          await visitCalls.finalize({ sessionId: session.sessionId, clientFileId: item.clientFileId, ticket: item.ticket, completionProof: proof.completionProof });
+        await finalizePending(item);
+        completed += 1;
+      } catch (error) {
+        failed += 1;
+        patchItem(item.clientFileId, { status: "Failed", message: safeVisitUploadError(error) });
+      }
+    }
+
+    if (failed) {
+      setUploading(false);
+      setAnnouncement("Drive upload succeeded, but saving its file record still needs a retry.");
+      return;
+    }
+
+    if (metadataOnly.length) {
+      const priorSessionIds = [...new Set(metadataOnly.map((item) => item.sessionId))];
+      await Promise.all(priorSessionIds.map((sessionId) => visitCalls.cancelSession(sessionId).catch(() => null)));
+    }
+
+    const transport = candidates.filter((item) => !item.completionProof);
+    if (transport.length) {
+      transport.forEach((item) => patchItem(item.clientFileId, { status: "Requesting authorization", message: "Preparing a one-time upload ticket." }));
+      let session;
+      try {
+        session = await visitCalls.createSession({
+          visitType: folder.visitType,
+          positionKey: folder.positionKey,
+          files: transport.map((item) => ({
+            clientFileId: item.clientFileId,
+            fileName: item.file.name,
+            mimeType: item.file.type,
+            sizeBytes: item.file.size,
+          })),
+        });
+      } catch (error) {
+        const message = safeVisitUploadError(error);
+        transport.forEach((item) => patchItem(item.clientFileId, { status: "Failed", message }));
+        setUploading(false);
+        setAnnouncement(message);
+        return;
+      }
+
+      const approved = new Map((session.files || []).map((item) => [item.clientFileId, item]));
+      let needsCancellation = false;
+      let hasMetadataFailure = false;
+      for (const item of transport) {
+        const authorization = approved.get(item.clientFileId);
+        if (!authorization) {
+          failed += 1;
+          needsCancellation = true;
+          patchItem(item.clientFileId, { status: "Failed", message: "The upload session did not authorize this file." });
+          continue;
         }
-      } catch (error) { await visitCalls.cancelSession(session.sessionId).catch(() => {}); throw error; }
-    }, "Visit files uploaded and finalized.", () => { setFiles([]); return reload(); });
+        patchItem(item.clientFileId, { sessionId: session.sessionId, ticket: authorization.ticket });
+        let completionProof = "";
+        try {
+          const trusted = await uploadVisitFile(item.file, session, authorization, (stage) => {
+            patchItem(item.clientFileId, stage === "processing"
+              ? { status: "Processing in Drive", message: "Drive is processing the uploaded file." }
+              : { status: "Uploading", message: "Uploading file bytes securely." });
+          });
+          completionProof = trusted.completionProof;
+          patchItem(item.clientFileId, {
+            completionProof: trusted.completionProof,
+            status: "Processing in Drive",
+            message: "Saving the trusted Drive result.",
+          });
+          await finalizePending({
+            ...item,
+            sessionId: session.sessionId,
+            ticket: authorization.ticket,
+            completionProof: trusted.completionProof,
+          });
+          completed += 1;
+        } catch (error) {
+          failed += 1;
+          const message = safeVisitUploadError(error);
+          const currentHasProof = Boolean(completionProof);
+          hasMetadataFailure = hasMetadataFailure || currentHasProof;
+          needsCancellation = needsCancellation || !currentHasProof;
+          patchItem(item.clientFileId, {
+            status: "Failed",
+            message,
+            sessionId: session.sessionId,
+            ticket: authorization.ticket,
+            completionProof,
+          });
+        }
+      }
+      if (needsCancellation && !hasMetadataFailure) {
+        await visitCalls.cancelSession(session.sessionId).catch(() => {});
+      }
+    }
+
+    setUploading(false);
+    if (completed) await reload();
+    setAnnouncement(`${completed} file${completed === 1 ? "" : "s"} uploaded${failed ? `; ${failed} failed and can be retried` : ""}.`);
+  }
+
+  async function cancelRemaining() {
+    const sessionIds = [...new Set(queue.filter((item) => item.status !== "Uploaded").map((item) => item.sessionId).filter(Boolean))];
+    await Promise.all(sessionIds.map((sessionId) => visitCalls.cancelSession(sessionId).catch(() => null)));
+    setQueue((current) => current.map((item) => item.status === "Uploaded" ? item : { ...item, status: "Cancelled", message: "Upload cancelled." }));
+    setAnnouncement("Remaining upload reservations were cancelled.");
   }
   return <><section className="admin-panel"><h3>{data.visit?.displayTitle} · {folder.positionTitle}</h3><p>{folder.locked ? `Locked: ${folder.lockReason}` : `${folder.activeFileCount} of ${folder.maxActiveFiles} active files`}</p><p>Up to {folder.maxFilesPerSelection} files per selection, {Math.round(folder.maxFileSizeBytes / 1048576)} MB each.</p><div className="admin-actions">{data.access.canManage ? <button onClick={() => setDialog({ type: "folder-settings", folder })}>Folder settings</button> : null}{data.access.canManage ? <button onClick={() => mutate("reconcile", () => visitCalls.reconcile(folder.visitType, folder.positionKey), "Folder counts reconciled.", reload)}>Reconcile counts</button> : null}</div></section>
-    {folder.canUpload ? <section className="admin-panel"><h3>Upload Files</h3><input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx,.pptx" onChange={(event) => setFiles([...event.target.files])} /><p>{files.length} selected · maximum {folder.maxFilesPerSelection}</p><button disabled={busy || !files.length} onClick={upload}>Start sequential upload</button></section> : <p className="admin-lock-banner is-locked">Uploads are unavailable for this folder.</p>}
-    <section className="admin-panel"><h3>Active submissions</h3>{data.submissions.length ? <div className="admin-card-grid">{data.submissions.map((item) => <article className="admin-record-card" key={item.submissionId}><h4>{item.fileName}</h4><p>{item.status} · {item.uploadedByName || "Member"}</p>{item.fileUrl ? <a href={item.fileUrl} target="_blank" rel="noopener noreferrer">Open file</a> : null}<div className="admin-actions">{item.canReplace ? <button onClick={() => setDialog({ type: "replace", item, folder })}>Replace</button> : null}{item.canWithdraw ? <button onClick={() => setDialog({ type: "withdraw", item })}>Withdraw</button> : null}{item.canRemove ? <button className="danger" onClick={() => setDialog({ type: "remove", item })}>Remove</button> : null}</div></article>)}</div> : <AdminEmpty message="No active files in this folder." />}</section>
+    {folder.canUpload ? <section className="admin-panel visit-upload" aria-labelledby="visit-upload-title"><h3 id="visit-upload-title">Supporting files</h3><p>Upload invitation letters, visit reports, photographs, attendance sheets, or other supporting documents for this Club Visit.</p>{!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload is not configured for this build.</p> : null}<label className="visit-upload__label" htmlFor="visit-supporting-files">Choose supporting files</label><input id="visit-supporting-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={uploading || !uploadConfigured} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} /><p>{queue.length} selected · maximum {folder.maxFilesPerSelection}</p><p className="sr-only" aria-live="polite">{announcement}</p>{queue.length ? <ul className="visit-upload__queue">{queue.map((item) => <li key={item.clientFileId}><div><strong>{item.file.name}</strong><span>{item.file.type || "Unknown type"} · {formatVisitFileSize(item.file.size)}</span><span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span></div>{!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}</li>)}</ul> : null}<div className="admin-actions"><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>{queue.some((item) => item.sessionId && item.status !== "Uploaded") ? <button type="button" disabled={uploading} onClick={cancelRemaining}>Cancel remaining uploads</button> : null}</div></section> : <p className="admin-lock-banner is-locked">Uploads are unavailable for this folder.</p>}
+    <section className="admin-panel" aria-labelledby="visit-active-files"><h3 id="visit-active-files">Supporting files</h3><VisitSubmissionFiles submissions={data.submissions} onReplace={(item) => setDialog({ type: "replace", item, folder })} onWithdraw={(item) => setDialog({ type: "withdraw", item })} onRemove={(item) => setDialog({ type: "remove", item })} /></section>
   </>;
 }
 
@@ -89,7 +237,7 @@ function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {
   if (dialog.type === "visit-settings") return <AdminDialog title="Visit settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-visit", () => visitCalls.updateVisit({ visitType: form.visitType, description: form.description || "", enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, visitDate: toCallableDate(form.visitDate), submissionDeadline: toCallableDate(form.submissionDeadline), instructions: form.instructions || "" }), "Visit settings saved.", reload); }}><label>Description<textarea value={form.description || ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label><label>Visit date<input type="datetime-local" value={form.visitDate || ""} onChange={(event) => setForm({ ...form, visitDate: event.target.value })} /></label><label>Submission deadline<input type="datetime-local" value={form.submissionDeadline || ""} onChange={(event) => setForm({ ...form, submissionDeadline: event.target.value })} /></label><label>Instructions<textarea value={form.instructions || ""} onChange={(event) => setForm({ ...form, instructions: event.target.value })} /></label><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Submissions open</label><button disabled={busy}>Save</button></form></AdminDialog>;
   if (dialog.type === "folder-settings") return <AdminDialog title="Folder settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-folder", () => visitCalls.updateFolder({ visitType: form.visitType, positionKey: form.positionKey, enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, locked: form.locked === true, lockReason: form.lockReason || "", maxActiveFiles: Number(form.maxActiveFiles), maxFilesPerSelection: Number(form.maxFilesPerSelection), maxFileSizeBytes: Math.round(Number(form.maxFileSizeMb) * 1048576) }), "Folder settings saved.", reload); }}><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Open</label><label><input type="checkbox" checked={form.locked === true} onChange={(event) => setForm({ ...form, locked: event.target.checked })} /> Locked</label><label>Reason<input value={form.lockReason || ""} onChange={(event) => setForm({ ...form, lockReason: event.target.value })} /></label><label>Max active files<input type="number" min="1" max="100" value={form.maxActiveFiles} onChange={(event) => setForm({ ...form, maxActiveFiles: event.target.value })} /></label><label>Max files per selection<input type="number" min="1" max="10" value={form.maxFilesPerSelection} onChange={(event) => setForm({ ...form, maxFilesPerSelection: event.target.value })} /></label><label>Max file size (MB)<input type="number" min="1" max="25" value={form.maxFileSizeMb ?? Math.round(Number(form.maxFileSizeBytes) / 1048576)} onChange={(event) => setForm({ ...form, maxFileSizeMb: event.target.value })} /></label><button disabled={busy}>Save</button></form></AdminDialog>;
   if (dialog.type === "moderation") return <AdminDialog title="Visit moderation" busy={busy} onClose={onClose} className="admin-dialog--wide"><Moderation visits={visits} /></AdminDialog>;
-  if (dialog.type === "replace") return <AdminDialog title={`Replace ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx,.pptx" onChange={(event) => setFile(event.target.files?.[0] || null)} /><button disabled={!file || busy} onClick={() => mutate("replace", async () => { const error = validateVisitFile(file, dialog.folder); if (error) throw new Error(error); const descriptor = { clientFileId: `replace-${Date.now()}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }; const session = await visitCalls.replace(dialog.item.submissionId, [descriptor]); const approved = session.files?.[0]; if (!approved) throw new Error("Replacement session failed."); const proof = await uploadVisitFile(file, session, approved); return visitCalls.finalize({ sessionId: session.sessionId, clientFileId: approved.clientFileId, ticket: approved.ticket, completionProof: proof.completionProof }); }, "Submission replaced.", reload)}>Replace file</button></AdminDialog>;
+  if (dialog.type === "replace") return <AdminDialog title={`Replace ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><label htmlFor="visit-replacement-file">Choose replacement file</label><input id="visit-replacement-file" type="file" accept={VISIT_FILE_ACCEPT} onChange={(event) => setFile(event.target.files?.[0] || null)} />{file ? <p>{file.name} · {formatVisitFileSize(file.size)}</p> : null}<button disabled={!file || busy} onClick={() => mutate("replace", async () => { const error = validateVisitFile(file, dialog.folder); if (error) throw new Error(error); const descriptor = { clientFileId: `replace-${Date.now()}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }; const session = await visitCalls.replace(dialog.item.submissionId, [descriptor]); const approved = session.files?.[0]; if (!approved) throw new Error("Replacement session failed."); const proof = await uploadVisitFile(file, session, approved); return visitCalls.finalize({ sessionId: session.sessionId, clientFileId: approved.clientFileId, ticket: approved.ticket, completionProof: proof.completionProof }); }, "Submission replaced.", reload)}>Replace file</button></AdminDialog>;
   const remove = dialog.type === "remove";
   return <AdminDialog title={`${remove ? "Remove" : "Withdraw"} ${dialog.item.fileName}?`} busy={busy} onClose={onClose}>{remove ? <label>Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></label> : <p>The submission will be withdrawn and its active reservation released.</p>}<div className="admin-actions"><button onClick={onClose}>Cancel</button><button className="danger" disabled={busy || (remove && !reason.trim())} onClick={() => mutate(dialog.type, () => remove ? visitCalls.remove(dialog.item.submissionId, reason.trim()) : visitCalls.withdraw(dialog.item.submissionId), `Submission ${remove ? "removed" : "withdrawn"}.`, reload)}>Confirm</button></div></AdminDialog>;
 }

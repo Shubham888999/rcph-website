@@ -30,6 +30,7 @@ export function createDeniedAccess() {
     canAccessBodTools: false,
     canAccessAdminTools: false,
     canAccessResolutionTools: false,
+    canAccessVisitSubmissions: false,
     canAccessPresidentControls: false,
   };
 }
@@ -90,6 +91,9 @@ export function normalizeTrustedAccess(payload) {
     canAccessAdminTools: isApproved
       && (["admin", "president"].includes(storedRole) || hasPresidentAuthority),
     canAccessResolutionTools: isApproved && resolutionManager,
+    canAccessVisitSubmissions: isApproved
+      && (["admin", "president"].includes(storedRole)
+        || (storedRole === "bod" && cleanPositionKeys(payload.positionKeys).length > 0)),
     canAccessPresidentControls: isApproved
       && hasPresidentAuthority,
   };
@@ -111,6 +115,7 @@ export function hasCapability(access, capability) {
     bodTools: "canAccessBodTools",
     adminTools: "canAccessAdminTools",
     resolutionTools: "canAccessResolutionTools",
+    visitSubmissions: "canAccessVisitSubmissions",
     presidentControls: "canAccessPresidentControls",
   };
   const field = capabilityFields[capability];

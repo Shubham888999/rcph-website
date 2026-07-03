@@ -82,6 +82,12 @@ test("Secretary resolution capability links only to the dedicated tool", () => {
   assert.ok(model.capabilityLabels.includes("Resolution Tools"));
 });
 
+test("positioned BOD receives the dedicated Club Visits destination", () => {
+  const model = getAccessHubViewModel(access("bod", { positionKeys: ["secretary"], canAccessVisitSubmissions: true }));
+  assert.equal(model.secondary.find((item) => item.key === "club-visits")?.href, "/admin/visit-submissions");
+  assert.ok(model.capabilityLabels.includes("Club Visits"));
+});
+
 test("unapproved access produces no destinations", () => {
   assert.deepEqual(getAccessHubDestinations({ isApproved: false }), []);
 });

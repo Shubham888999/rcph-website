@@ -58,6 +58,9 @@ export function getAccessHubDestinations(access) {
   if (access.canAccessBodTools) {
     destinations.push({ key: "bod", category: "Leadership access", title: "BOD Tools", description: "Create and manage club events through your approved BOD capability.", href: "/bod-tools", primary: false });
   }
+  if (access.canAccessVisitSubmissions) {
+    destinations.push({ key: "club-visits", category: "Club reporting", title: "Club Visits", description: "Upload and manage supporting files for Club Assembly, DZR Visit, and DRR Visit.", href: "/admin/visit-submissions", primary: false });
+  }
   if (access.canAccessAdminTools) {
     destinations.push({ key: "admin", category: "Administration", title: "Admin Tools", description: "Manage protected club operations available to your account.", href: "/admin", primary: false });
   }
@@ -77,6 +80,7 @@ export function getAccessHubViewModel(access) {
   if (access?.canAccessBodTools) capabilityLabels.push("BOD Tools");
   if (access?.canAccessAdminTools) capabilityLabels.push("Admin Tools");
   if (access?.canAccessResolutionTools) capabilityLabels.push("Resolution Tools");
+  if (access?.canAccessVisitSubmissions) capabilityLabels.push("Club Visits");
   if (access?.canAccessPresidentControls) capabilityLabels.push("President Controls");
   const positions = getPositionLabels(access?.positionKeys);
   return {

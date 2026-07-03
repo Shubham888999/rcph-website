@@ -12,6 +12,10 @@ import {
   validateTreasuryUploadEndpoint,
   validateTreasuryUploadFile,
 } from "../treasury/treasuryUploadModel";
+import {
+  normalizeVisitUploadResponse,
+  validateVisitUploadEndpoint,
+} from "../visit/visitUploadModel";
 
 const QUERY_CONFIG = {
   users: ["users", "createdAt", "desc"], members: ["members", "name", "asc"], events: ["events", "date", "desc"], attendance: ["attendance"],
@@ -70,9 +74,16 @@ export const visitCalls = {
   moderation: (payload) => callable("getVisitSubmissionModerationData", payload), reconcile: (visitType, positionKey) => callable("reconcileVisitSubmissionFolderCount", { visitType, positionKey }), cleanup: () => callable("cleanupExpiredVisitUploadSessions", { limit: 25 }),
 };
 
-export async function uploadVisitFile(file, session, approved) {
+export async function uploadVisitFile(file, session, approved, onStage) {
+  const endpoint = validateVisitUploadEndpoint(import.meta.env.VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT);
+  if (!endpoint) throw new Error("Club Visits upload is not configured.");
   const form = new FormData(); form.append("ticket", approved.ticket); form.append("sessionId", session.sessionId); form.append("clientFileId", approved.clientFileId); form.append("fileName", approved.fileName); form.append("mimeType", approved.mimeType); form.append("sizeBytes", String(approved.sizeBytes)); form.append("file", file, file.name);
-  const response = await fetch("https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile", { method: "POST", body: form }); const data = await response.json().catch(() => ({})); if (!response.ok || !data.completionProof) throw new Error("Visit file upload failed."); return data;
+  onStage?.("uploading");
+  const response = await fetch(endpoint, { method: "POST", body: form });
+  onStage?.("processing");
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error("The trusted Club Visits uploader rejected the file.");
+  return normalizeVisitUploadResponse(data);
 }
 
 function readFileAsBase64(file) {

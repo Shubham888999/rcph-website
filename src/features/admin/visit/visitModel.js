@@ -1,4 +1,5 @@
 import { safeUrl, text } from "../shared/adminModel.js";
+import { validateVisitUploadFile } from "./visitUploadModel.js";
 
 export const VISIT_TYPES = ["clubAssembly", "dzrVisit", "drrVisit"];
 export const VISIT_STATUSES = ["active", "replaced", "admin-removed", "archived"];
@@ -69,6 +70,7 @@ export function normalizeSubmission(value) {
     sizeBytes: Math.max(0, Number(value.sizeBytes) || 0),
     status: text(value.status, 40) || "active",
     fileUrl: safeUrl(value.fileUrl || value.webViewLink),
+    folderUrl: safeUrl(value.folderUrl),
     uploadedByName: text(value.uploadedByName, 160),
     canReplace: value.canReplace === true,
     canWithdraw: value.canWithdraw === true,
@@ -76,8 +78,5 @@ export function normalizeSubmission(value) {
   };
 }
 export function validateVisitFile(file, folder) {
-  if (!file) return "Choose a file.";
-  if (file.size <= 0 || file.size > folder.maxFileSizeBytes) return "File size is outside the permitted limit.";
-  const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation"];
-  return allowed.includes(file.type) ? "" : "This file type is not supported.";
+  return validateVisitUploadFile(file, folder?.maxFileSizeBytes);
 }

@@ -38,6 +38,23 @@ test("approved BOD gets BOD access but not Admin", () => {
   assert.equal(access.canAccessAdminTools, false);
 });
 
+test("approved positioned BOD gets Club Visits without unrelated Admin access", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "bod-secretary",
+    user: { status: "approved" },
+    role: { role: "bod", status: "approved" },
+    positionKeys: ["secretary"],
+  });
+  assert.equal(access.canAccessVisitSubmissions, true);
+  assert.equal(access.canAccessAdminTools, false);
+  assert.equal(hasCapability(access, "visitSubmissions"), true);
+});
+
+test("BOD without a canonical position cannot enter Club Visits", () => {
+  assert.equal(approved("bod").canAccessVisitSubmissions, false);
+});
+
 test("approved Admin gets Admin access", () => {
   assert.equal(approved("admin").canAccessAdminTools, true);
 });
