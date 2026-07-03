@@ -4,7 +4,7 @@ import { faqCategories, faqItems } from "./faqData.js";
 import { filterFaqItems, getFeaturedFaqs, groupFaqByCategory, normalizeFaqQuery } from "./faqModel.js";
 
 test("FAQ content have unique IDs", () => {
-  assert.equal(faqItems.length, 16);
+  assert.equal(faqItems.length, 17);
   assert.equal(new Set(faqItems.map(({ id }) => id)).size, faqItems.length);
   assert.equal(new Set(faqItems.map(({ question }) => question.toLowerCase())).size, faqItems.length);
 });

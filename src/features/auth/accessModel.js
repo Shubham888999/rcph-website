@@ -91,7 +91,7 @@ export function normalizeTrustedAccess(payload) {
       && (["admin", "president"].includes(storedRole) || hasPresidentAuthority),
     canAccessResolutionTools: isApproved && resolutionManager,
     canAccessPresidentControls: isApproved
-      && (storedRole === "president" || hasPresidentAuthority),
+      && hasPresidentAuthority,
   };
 }
 

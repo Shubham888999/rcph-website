@@ -42,11 +42,23 @@ test("approved Admin gets Admin access", () => {
   assert.equal(approved("admin").canAccessAdminTools, true);
 });
 
-test("approved President gets Admin and President access", () => {
-  const access = approved("president", {}, true);
+test("approved President with canonical authority gets Admin and President access", () => {
+  const access = approved("president", { isPresidentRole: true, hasPresidentAuthority: true }, true);
   assert.equal(access.canAccessAdminTools, true);
   assert.equal(access.canAccessPresidentControls, true);
   assert.equal(access.canAccessResolutionTools, true);
+});
+
+test("President role label without canonical authority gets no President controls", () => {
+  const access = approved("president", { isPresidentRole: true });
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessPresidentControls, false);
+});
+
+test("BOD role with canonical active President authority gets President controls", () => {
+  const access = approved("bod", { hasPresidentAuthority: true });
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessPresidentControls, true);
 });
 
 test("Secretary receives only the dedicated resolution capability", () => {
