@@ -20,6 +20,7 @@ const {
   calculateProspectMembershipProgress,
 } = require('./lib/prospect-membership-criteria');
 const resolutionModel = require('./lib/resolutions');
+const bodAvenueReport = require('./lib/bod-avenue-report');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -65,6 +66,8 @@ const CALLABLE_OPTIONS = {
     'http://localhost:5000',
     'http://localhost:5500',
     'http://127.0.0.1:5500',
+    /^http:\/\/localhost:\d+$/,
+    /^http:\/\/127\.0\.0\.1:\d+$/,
   ],
 };
 
@@ -4995,6 +4998,51 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     attendanceRowsUpdated,
     eventCreated,
     prospectProgressSummary,
+  };
+});
+
+exports.getBodAvenueReportDirectors = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  await Promise.all([
+    assertBodAdminOrPresident(uid),
+    assertApprovedActiveCallableAccount(uid),
+  ]);
+  const avenueCode = bodAvenueReport.normalizeReportAvenueCode(request.data?.avenueCode);
+  if (!avenueCode) throw new HttpsError('invalid-argument', 'A valid report avenue is required.');
+
+  const assignmentsSnap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
+  const assignments = assignmentsSnap.docs.map(doc => doc.data() || {});
+  const candidateUids = Array.from(new Set(assignments
+    .filter(assignment => {
+      const definition = positionHelpers.getPositionDefinition(assignment.positionKey);
+      return definition?.active === true && definition.avenueCode === avenueCode;
+    })
+    .map(assignment => normalizeText(assignment.uid, 128))
+    .filter(Boolean)));
+  const [userSnaps, roleSnaps] = candidateUids.length ? await Promise.all([
+    db.getAll(...candidateUids.map(candidateUid => db.collection('users').doc(candidateUid))),
+    db.getAll(...candidateUids.map(candidateUid => db.collection('roles').doc(candidateUid))),
+  ]) : [[], []];
+  const usersByUid = new Map(candidateUids.map((candidateUid, index) => [
+    candidateUid,
+    userSnaps[index]?.exists ? (userSnaps[index].data() || {}) : null,
+  ]));
+  const rolesByUid = new Map(candidateUids.map((candidateUid, index) => [
+    candidateUid,
+    roleSnaps[index]?.exists ? (roleSnaps[index].data() || {}) : null,
+  ]));
+
+  return {
+    ok: true,
+    avenueCode,
+    assignmentBasis: 'current-active',
+    directors: bodAvenueReport.buildSafeAvenueDirectorRows({
+      avenueCode,
+      assignments,
+      usersByUid,
+      rolesByUid,
+      positionHelpers,
+    }),
   };
 });
 
