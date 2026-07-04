@@ -1,5 +1,7 @@
 'use strict';
 
+const resolutionSections = require('./resolution-sections');
+
 const RESOLUTION_STATUSES = Object.freeze([
   'draft',
   'open',
@@ -54,6 +56,7 @@ function validateDraftInput(raw) {
   const customApprovalCount = source.customApprovalCount === '' || source.customApprovalCount == null
     ? null
     : Number(source.customApprovalCount);
+  const layout = resolutionSections.validateLayout(source);
   const payload = {
     meetingId: validId(source.meetingId),
     resolutionNumber: text(source.resolutionNumber, 80),
@@ -64,8 +67,9 @@ function validateDraftInput(raw) {
     secondedByUid: validId(source.secondedByUid),
     votingRule,
     customApprovalCount: votingRule === 'custom_approval_count' ? customApprovalCount : null,
+    ...layout.payload,
   };
-  const errors = [];
+  const errors = [...layout.errors];
   if (!payload.meetingId) errors.push('A valid BOD meeting is required.');
   if (!payload.resolutionNumber) errors.push('Resolution number is required.');
   if (!payload.title) errors.push('Resolution title is required.');
@@ -141,5 +145,7 @@ module.exports = {
   normalizeResolutionStatus,
   normalizeVoteChoice,
   normalizeVotingRule,
+  normalizePdfSections: resolutionSections.normalizeSections,
+  validatePdfLayout: resolutionSections.validateLayout,
   validateDraftInput,
 };

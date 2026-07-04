@@ -1694,6 +1694,10 @@ function publicResolutionFields(id, data) {
     openedByName: normalizeText(data.openedByName, 160),
     closedByName: normalizeText(data.closedByName, 160),
     cancelledByName: normalizeText(data.cancelledByName, 160),
+    pdfLayoutMode: data.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
+    pdfSections: resolutionModel.normalizePdfSections(data.pdfSections),
+    finalizedPdfLayoutMode: data.finalizedPdfLayoutMode === 'custom' ? 'custom' : data.finalizedPdfLayoutMode === 'standard' ? 'standard' : '',
+    finalizedPdfSectionsSnapshot: resolutionModel.normalizePdfSections(data.finalizedPdfSectionsSnapshot),
   };
 }
 
@@ -1721,6 +1725,9 @@ async function getOpenResolutionsForUser(uid) {
     const fields = publicResolutionFields(resolutionSnap.id, data);
     delete fields.proposedByUid;
     delete fields.secondedByUid;
+    delete fields.pdfSections;
+    delete fields.finalizedPdfSectionsSnapshot;
+    delete fields.finalizedPdfLayoutMode;
     return {
       ...fields,
       currentVote: resolutionModel.normalizeVoteChoice(vote.choice),
@@ -4204,6 +4211,28 @@ exports.updateResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
   return { ok: true, resolutionId };
 });
 
+exports.updateResolutionPdfLayout = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const validation = resolutionModel.validatePdfLayout(request.data || {});
+  if (!validation.ok) throw new HttpsError('invalid-argument', validation.errors[0], { errors: validation.errors });
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const now = resolutionTimestamp();
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(resolutionRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    const existing = snap.data() || {};
+    if (!['draft', 'open'].includes(existing.status)) throw new HttpsError('failed-precondition', 'Only draft or open resolution layouts may be edited.');
+    tx.update(resolutionRef, { ...validation.payload, updatedAt: now });
+    setResolutionAudit(tx, resolutionRef, 'pdf_layout_edited', actor, now, {
+      previousValue: { pdfLayoutMode: existing.pdfLayoutMode === 'custom' ? 'custom' : 'standard' },
+      newValue: { pdfLayoutMode: validation.payload.pdfLayoutMode, sectionCount: validation.payload.pdfSections.length },
+    });
+  });
+  return { ok: true, resolutionId };
+});
+
 exports.openResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const actor = await getResolutionManagerContext(uid);
@@ -4320,6 +4349,8 @@ exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
       closedByUid: actor.uid,
       closedByName: actor.name,
       closedByPosition: actor.position,
+      finalizedPdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
+      finalizedPdfSectionsSnapshot: resolution.pdfLayoutMode === 'custom' ? resolutionModel.normalizePdfSections(resolution.pdfSections) : [],
       updatedAt: now,
     });
     setResolutionAudit(tx, resolutionRef, 'voting_closed', actor, now, {
@@ -4393,10 +4424,11 @@ exports.getResolutionDetails = onCall(CALLABLE_OPTIONS, async (request) => {
   await getResolutionManagerContext(uid);
   const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
   const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
-  const [resolutionSnap, votesSnap, auditSnap] = await Promise.all([
+  const [resolutionSnap, votesSnap, auditSnap, canonicalVoters] = await Promise.all([
     resolutionRef.get(),
     resolutionRef.collection('votes').orderBy('updatedAt', 'asc').get(),
     resolutionRef.collection('audit').orderBy('timestamp', 'asc').get(),
+    loadActiveResolutionVoters(),
   ]);
   if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
   const data = resolutionSnap.data() || {};
@@ -4417,6 +4449,7 @@ exports.getResolutionDetails = onCall(CALLABLE_OPTIONS, async (request) => {
       const audit = snap.data() || {};
       return { id: snap.id, action: normalizeText(audit.action, 80), actorName: normalizeText(audit.actorName, 160), actorPosition: normalizeText(audit.actorPosition, 240), timestamp: timestampToIso(audit.timestamp), previousValue: audit.previousValue ?? null, newValue: audit.newValue ?? null, metadata: audit.metadata && typeof audit.metadata === 'object' ? audit.metadata : {} };
     }),
+    canonicalVoters: canonicalVoters.map(voter => ({ uid: voter.uid, name: voter.name, position: voter.position })),
   };
 });
 

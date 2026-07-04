@@ -6,6 +6,8 @@ const {
   canManageResolutions,
   normalizeResolutionStatus,
   normalizeVoteChoice,
+  normalizePdfSections,
+  validatePdfLayout,
   validateDraftInput,
 } = require('../lib/resolutions');
 
@@ -29,6 +31,20 @@ assert.equal(invalid.ok, false);
 assert.ok(invalid.errors.length >= 6);
 assert.equal(validateDraftInput({ meetingId: 'm1', resolutionNumber: 'R/1', title: 'Title', body: 'Body', proposedByUid: 'u1', secondedByUid: 'u2', votingRule: 'simple_majority' }).ok, true);
 assert.equal(validateDraftInput({ meetingId: 'm1', resolutionNumber: 'R/1', title: 'Title', body: 'Body', proposedByUid: 'u1', secondedByUid: 'u2', votingRule: 'custom_approval_count', customApprovalCount: 0 }).ok, false);
+
+assert.deepEqual(validatePdfLayout({}).payload, { pdfLayoutMode: 'standard', pdfSections: [] });
+const customLayout = validatePdfLayout({
+  pdfLayoutMode: 'custom',
+  pdfSections: [
+    { id: 'heading', type: 'heading', text: 'RESOLUTION', style: { fontFamily: 'Helvetica', fontSize: 14, alignment: 'center' } },
+    { id: 'votes', type: 'votesTable', columns: { name: true, vote: true }, options: { voterScope: 'all' }, style: {} },
+  ],
+});
+assert.equal(customLayout.ok, true);
+assert.equal(customLayout.payload.pdfSections.length, 2);
+assert.equal(normalizePdfSections(customLayout.payload.pdfSections)[1].columns.signature, false);
+assert.equal(validatePdfLayout({ pdfLayoutMode: 'invalid', pdfSections: [] }).ok, false);
+assert.equal(validatePdfLayout({ pdfLayoutMode: 'custom', pdfSections: [{ id: 'votes', type: 'votesTable', columns: {}, options: {}, style: {} }] }).ok, false);
 
 assert.equal(canManageResolutions({ role: 'admin', userActive: true, userApproved: true, secretaryAssignmentActive: false }), false);
 assert.equal(canManageResolutions({ role: 'bod', userActive: true, userApproved: true, secretaryAssignmentActive: true }), true);
