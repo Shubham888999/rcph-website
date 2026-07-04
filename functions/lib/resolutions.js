@@ -147,6 +147,8 @@ module.exports = {
   normalizeVoteChoice,
   normalizeVotingRule,
   normalizePdfSections: resolutionSections.normalizeSections,
+  normalizeDocumentSourceMode: resolutionSections.normalizeSourceMode,
+  normalizeUploadedVotesTableConfig: resolutionSections.normalizeUploadedVotesTableConfig,
   validatePdfLayout: resolutionSections.validateLayout,
   validateDraftInput,
 };

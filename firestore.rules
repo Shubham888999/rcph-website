@@ -219,6 +219,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /resolutionPdfUploadSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /resolutionPdfUploadRateLimits/{limitId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

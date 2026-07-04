@@ -1,6 +1,7 @@
 'use strict';
 
 const MODES = Object.freeze(['standard', 'custom']);
+const SOURCE_MODES = Object.freeze(['standard', 'custom', 'uploadedPdf']);
 const TYPES = Object.freeze(['heading', 'paragraph', 'table', 'votesTable', 'spacer']);
 const FONTS = Object.freeze(['Helvetica', 'Times Roman', 'Courier']);
 const ALIGNMENTS = Object.freeze(['left', 'center', 'right']);
@@ -129,6 +130,23 @@ function normalizeSections(raw) {
   });
 }
 
+function normalizeSourceMode(value, pdfLayoutMode = 'standard') {
+  if (SOURCE_MODES.includes(value)) return value;
+  return pdfLayoutMode === 'custom' ? 'custom' : 'standard';
+}
+
+function normalizeUploadedVotesTableConfig(raw = {}) {
+  const columns = Object.fromEntries(VOTE_COLUMNS.map(key => [key, typeof raw.columns?.[key] === 'boolean' ? raw.columns[key] : key !== 'signature']));
+  if (!VOTE_COLUMNS.some(key => columns[key])) columns.name = true;
+  return {
+    columns,
+    voterScope: choice(raw.voterScope, ['submitted', 'all'], 'submitted'),
+    showTitle: raw.showTitle !== false,
+    repeatHeader: raw.repeatHeader !== false,
+    showResultSummary: raw.showResultSummary !== false,
+  };
+}
+
 function textCharacterCount(sections) {
   return sections.reduce((total, section) => {
     let count = typeof section?.text === 'string' ? section.text.length : 0;
@@ -143,9 +161,11 @@ function textCharacterCount(sections) {
 
 function validateLayout(raw = {}) {
   const requestedMode = raw.pdfLayoutMode == null || raw.pdfLayoutMode === '' ? 'standard' : text(raw.pdfLayoutMode, 20).toLowerCase();
+  const requestedSourceMode = raw.documentSourceMode == null || raw.documentSourceMode === '' ? null : text(raw.documentSourceMode, 30);
   const source = Array.isArray(raw.pdfSections) ? raw.pdfSections : [];
   const errors = [];
   if (!MODES.includes(requestedMode)) errors.push('A valid PDF layout mode is required.');
+  if (requestedSourceMode && !SOURCE_MODES.includes(requestedSourceMode)) errors.push('A valid Resolution document source is required.');
   if (source.length > LIMITS.sections) errors.push(`A custom layout may contain at most ${LIMITS.sections} sections.`);
   if (textCharacterCount(source) > LIMITS.characters) errors.push(`Custom layout text may contain at most ${LIMITS.characters} characters.`);
   const seen = new Set();
@@ -168,7 +188,10 @@ function validateLayout(raw = {}) {
   const pdfSections = normalizeSections(source);
   try { assertNoNestedArrays(pdfSections, 'pdfSections'); }
   catch (error) { errors.push(error.message); }
-  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode: MODES.includes(requestedMode) ? requestedMode : 'standard', pdfSections } };
+  const pdfLayoutMode = MODES.includes(requestedMode) ? requestedMode : 'standard';
+  const documentSourceMode = normalizeSourceMode(requestedSourceMode, pdfLayoutMode);
+  const uploadedVotesTableConfig = normalizeUploadedVotesTableConfig(raw.uploadedVotesTableConfig);
+  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode, pdfSections, documentSourceMode, uploadedVotesTableConfig } };
 }
 
 function assertNoNestedArrays(value, path = 'value') {
@@ -183,4 +206,4 @@ function assertNoNestedArrays(value, path = 'value') {
   return true;
 }
 
-module.exports = { LIMITS, MODES, TYPES, VOTE_COLUMNS, assertNoNestedArrays, normalizeSections, validateLayout };
+module.exports = { LIMITS, MODES, SOURCE_MODES, TYPES, VOTE_COLUMNS, assertNoNestedArrays, normalizeSections, normalizeSourceMode, normalizeUploadedVotesTableConfig, validateLayout };

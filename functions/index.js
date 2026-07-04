@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
@@ -20,10 +21,12 @@ const {
   calculateProspectMembershipProgress,
 } = require('./lib/prospect-membership-criteria');
 const resolutionModel = require('./lib/resolutions');
+const { createResolutionUploadService } = require('./lib/resolution-upload');
 const bodAvenueReport = require('./lib/bod-avenue-report');
 
 admin.initializeApp();
 const db = admin.firestore();
+const storageBucket = admin.storage().bucket();
 const rolePositionAssignments = createPositionAssignmentService({
   db,
   admin,
@@ -70,6 +73,15 @@ const CALLABLE_OPTIONS = {
     /^http:\/\/127\.0\.0\.1:\d+$/,
   ],
 };
+const RESOLUTION_PDF_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: '1GiB' };
+const resolutionUploads = createResolutionUploadService({
+  db,
+  admin,
+  bucket: storageBucket,
+  getManagerContext: getResolutionManagerContext,
+  logger: console,
+  uploadEndpoint: 'https://us-central1-rcph-admin.cloudfunctions.net/uploadResolutionSourcePdf',
+});
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -1662,6 +1674,11 @@ function validateResolutionCustomCount(payload, eligibleCount) {
 }
 
 function publicResolutionFields(id, data) {
+  const documentSourceMode = resolutionUploads.sourceMode(data);
+  const uploadedSource = resolutionUploads.reportSafeSource(data.uploadedSource);
+  const merge = resolutionUploads.reportSafeMerge(data.merge, data.finalizedMergedPdf);
+  const isDraft = data.status === 'draft';
+  const isFinal = ['passed', 'rejected', 'closed_without_decision'].includes(data.status);
   return {
     id,
     resolutionNumber: normalizeText(data.resolutionNumber, 80),
@@ -1698,6 +1715,16 @@ function publicResolutionFields(id, data) {
     pdfSections: resolutionModel.normalizePdfSections(data.pdfSections),
     finalizedPdfLayoutMode: data.finalizedPdfLayoutMode === 'custom' ? 'custom' : data.finalizedPdfLayoutMode === 'standard' ? 'standard' : '',
     finalizedPdfSectionsSnapshot: resolutionModel.normalizePdfSections(data.finalizedPdfSectionsSnapshot),
+    documentSourceMode,
+    uploadedVotesTableConfig: resolutionModel.normalizeUploadedVotesTableConfig(data.uploadedVotesTableConfig),
+    uploadedSource,
+    merge,
+    canUpload: isDraft && documentSourceMode === 'uploadedPdf',
+    canReplace: isDraft && documentSourceMode === 'uploadedPdf' && Boolean(uploadedSource),
+    canRemove: isDraft && documentSourceMode === 'uploadedPdf' && Boolean(uploadedSource),
+    canPreviewSource: documentSourceMode === 'uploadedPdf' && Boolean(uploadedSource),
+    canRetryMerge: isFinal && documentSourceMode === 'uploadedPdf' && ['pending', 'failed'].includes(merge.status),
+    canDownloadFinal: isFinal && documentSourceMode === 'uploadedPdf' && merge.status === 'ready',
   };
 }
 
@@ -1709,6 +1736,27 @@ function countResolutionVotes(votes) {
     abstainCount: choices.filter(choice => choice === 'abstain').length,
     votesReceivedCount: choices.length,
   };
+}
+
+function buildFinalizedVoteRows(resolution, votes, config) {
+  const voteByUid = new Map((Array.isArray(votes) ? votes : []).map(vote => [normalizeText(vote?.voterUid, 128), vote]));
+  if (config.voterScope === 'all') {
+    return (Array.isArray(resolution.eligibleVoters) ? resolution.eligibleVoters : []).map(voter => {
+      const vote = voteByUid.get(normalizeText(voter?.uid, 128));
+      return {
+        name: normalizeText(vote?.voterName || voter?.name || 'Not available', 160),
+        position: normalizeText(vote?.voterPosition || voter?.position || 'Not available', 240),
+        vote: resolutionModel.normalizeVoteChoice(vote?.choice) || 'didNotVote',
+        submittedAt: vote?.submittedAt || null,
+      };
+    });
+  }
+  return (Array.isArray(votes) ? votes : []).map(vote => ({
+    name: normalizeText(vote?.voterName || 'Not available', 160),
+    position: normalizeText(vote?.voterPosition || 'Not available', 240),
+    vote: resolutionModel.normalizeVoteChoice(vote?.choice) || 'didNotVote',
+    submittedAt: vote?.submittedAt || null,
+  }));
 }
 
 async function getOpenResolutionsForUser(uid) {
@@ -1728,6 +1776,15 @@ async function getOpenResolutionsForUser(uid) {
     delete fields.pdfSections;
     delete fields.finalizedPdfSectionsSnapshot;
     delete fields.finalizedPdfLayoutMode;
+    delete fields.uploadedSource;
+    delete fields.uploadedVotesTableConfig;
+    delete fields.merge;
+    delete fields.canUpload;
+    delete fields.canReplace;
+    delete fields.canRemove;
+    delete fields.canPreviewSource;
+    delete fields.canRetryMerge;
+    delete fields.canDownloadFinal;
     return {
       ...fields,
       currentVote: resolutionModel.normalizeVoteChoice(vote.choice),
@@ -4191,6 +4248,11 @@ exports.updateResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
     if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
     const existing = snap.data() || {};
     if (existing.status !== 'draft') throw new HttpsError('failed-precondition', 'Only draft resolutions may be edited.');
+    if (resolutionUploads.sourceMode(existing) === 'uploadedPdf'
+      && prepared.payload.documentSourceMode !== 'uploadedPdf'
+      && existing.uploadedSource?.status === 'ready') {
+      throw new HttpsError('failed-precondition', 'Remove the uploaded source PDF before changing the document source.');
+    }
     const oldNumberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(existing.resolutionNumber));
     const newNumberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(prepared.payload.resolutionNumber));
     const numberChanged = oldNumberRef.id !== newNumberRef.id;
@@ -4234,6 +4296,15 @@ exports.updateResolutionPdfLayout = onCall(CALLABLE_OPTIONS, async (request) => 
     if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
     const existing = snap.data() || {};
     if (!['draft', 'open'].includes(existing.status)) throw new HttpsError('failed-precondition', 'Only draft or open resolution layouts may be edited.');
+    if (existing.status === 'draft'
+      && resolutionUploads.sourceMode(existing) === 'uploadedPdf'
+      && validation.payload.documentSourceMode !== 'uploadedPdf'
+      && existing.uploadedSource?.status === 'ready') {
+      throw new HttpsError('failed-precondition', 'Remove the uploaded source PDF before changing the document source.');
+    }
+    if (existing.status === 'open' && resolutionUploads.sourceMode(existing) !== validation.payload.documentSourceMode) {
+      throw new HttpsError('failed-precondition', 'The Resolution PDF source cannot change after voting opens.');
+    }
     tx.update(resolutionRef, { ...validation.payload, updatedAt: now });
     setResolutionAudit(tx, resolutionRef, 'pdf_layout_edited', actor, now, {
       previousValue: { pdfLayoutMode: existing.pdfLayoutMode === 'custom' ? 'custom' : 'standard' },
@@ -4253,6 +4324,12 @@ exports.openResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
   ]);
   if (!meetingCheck.exists) throw new HttpsError('not-found', 'Resolution not found.');
   const before = meetingCheck.data() || {};
+  if (resolutionUploads.sourceMode(before) === 'uploadedPdf') {
+    if (before.uploadedSource?.status !== 'ready') throw new HttpsError('failed-precondition', 'A ready uploaded PDF is required before voting can open.');
+    await resolutionUploads.assertSourceObject(before.uploadedSource).catch(error => {
+      throw new HttpsError('failed-precondition', error.message || 'The uploaded PDF is unavailable.');
+    });
+  }
   const linkedMeeting = await db.collection('bodMeetings').doc(String(before.meetingId || '')).get();
   if (!linkedMeeting.exists || linkedMeeting.data()?.archived === true) throw new HttpsError('failed-precondition', 'Linked BOD meeting is unavailable.');
   if (!voters.length) throw new HttpsError('failed-precondition', 'No UID-linked active BOD voters are available.');
@@ -4331,13 +4408,15 @@ exports.getMyOpenResolutions = onCall(CALLABLE_OPTIONS, async (request) => {
   return { ok: true, openResolutions: await getOpenResolutionsForUser(uid) };
 });
 
-exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
+exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const actor = await getResolutionManagerContext(uid);
   const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
   const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
   const now = resolutionTimestamp();
+  const finalizationId = crypto.randomUUID();
   let finalResult = null;
+  let uploadedMode = false;
   await db.runTransaction(async tx => {
     const resolutionSnap = await tx.get(resolutionRef);
     if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
@@ -4353,6 +4432,13 @@ exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
     });
     const finalizedPdfSectionsSnapshot = resolution.pdfLayoutMode === 'custom' ? resolutionModel.normalizePdfSections(resolution.pdfSections) : [];
     assertFirestoreSafeResolutionSections(finalizedPdfSectionsSnapshot, 'finalizedPdfSectionsSnapshot');
+    uploadedMode = resolutionUploads.sourceMode(resolution) === 'uploadedPdf';
+    const uploadedFinalization = uploadedMode ? {
+      finalizedUploadedSourceSnapshot: { ...resolution.uploadedSource },
+      finalizedVotesTableConfigSnapshot: resolutionModel.normalizeUploadedVotesTableConfig(resolution.uploadedVotesTableConfig),
+      finalizedVoteRowsSnapshot: buildFinalizedVoteRows(resolution, votes, resolutionModel.normalizeUploadedVotesTableConfig(resolution.uploadedVotesTableConfig)),
+      merge: { status: 'pending', finalizationId, attemptCount: 0, lastErrorCode: '', createdAt: now, updatedAt: now },
+    } : {};
     tx.update(resolutionRef, {
       ...finalResult,
       status: finalResult.status,
@@ -4363,6 +4449,7 @@ exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
       closedByPosition: actor.position,
       finalizedPdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
       finalizedPdfSectionsSnapshot,
+      ...uploadedFinalization,
       updatedAt: now,
     });
     setResolutionAudit(tx, resolutionRef, 'voting_closed', actor, now, {
@@ -4377,7 +4464,12 @@ exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
     });
     setResolutionAudit(tx, resolutionRef, 'result_finalized', actor, now, { newValue: { result: finalResult.result } });
   });
-  return { ok: true, resolutionId, ...finalResult, closedAt: timestampToIso(now) };
+  let merge = null;
+  if (uploadedMode) {
+    try { merge = await resolutionUploads.processMerge(resolutionId); }
+    catch (error) { merge = { ok: false, status: 'failed', code: error.code || 'merge-failed' }; }
+  }
+  return { ok: true, resolutionId, ...finalResult, closedAt: timestampToIso(now), merge };
 });
 
 exports.cancelResolution = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -4464,6 +4556,37 @@ exports.getResolutionDetails = onCall(CALLABLE_OPTIONS, async (request) => {
     canonicalVoters: canonicalVoters.map(voter => ({ uid: voter.uid, name: voter.name, position: voter.position })),
   };
 });
+
+function throwResolutionUploadCallableError(error) {
+  const allowed = new Set(['invalid-argument', 'not-found', 'already-exists', 'failed-precondition', 'permission-denied', 'unauthenticated', 'resource-exhausted', 'aborted', 'unavailable']);
+  const code = allowed.has(error?.code) ? error.code : 'internal';
+  throw new HttpsError(code, error?.message || 'The Resolution PDF request failed.');
+}
+
+exports.createResolutionPdfUploadSession = onCall(CALLABLE_OPTIONS, async request => {
+  try { return await resolutionUploads.createUploadSession(requireAuth(request), request.data || {}); }
+  catch (error) { throwResolutionUploadCallableError(error); }
+});
+
+exports.finalizeResolutionPdfUpload = onCall(CALLABLE_OPTIONS, async request => {
+  try { return await resolutionUploads.finalizeUpload(requireAuth(request), request.data || {}); }
+  catch (error) { throwResolutionUploadCallableError(error); }
+});
+
+exports.removeResolutionSourcePdf = onCall(CALLABLE_OPTIONS, async request => {
+  try { return await resolutionUploads.removeSource(requireAuth(request), request.data || {}); }
+  catch (error) { throwResolutionUploadCallableError(error); }
+});
+
+exports.retryResolutionPdfMerge = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async request => {
+  try { return await resolutionUploads.retryMerge(requireAuth(request), request.data || {}); }
+  catch (error) { throwResolutionUploadCallableError(error); }
+});
+
+exports.uploadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', maxInstances: 5, concurrency: 10 }, (req, res) => resolutionUploads.uploadHttp(req, res));
+exports.downloadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20 }, (req, res) => resolutionUploads.streamSourcePdf(req, res));
+exports.downloadFinalizedResolutionPdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20 }, (req, res) => resolutionUploads.streamFinalPdf(req, res));
+exports.cleanupResolutionPdfUploads = onSchedule({ region: 'us-central1', schedule: 'every day 03:30', timeZone: 'Asia/Kolkata', timeoutSeconds: 300, memory: '256MiB' }, () => resolutionUploads.cleanupExpiredSessions());
 
 exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);

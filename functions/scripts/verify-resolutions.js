@@ -33,7 +33,15 @@ assert.ok(invalid.errors.length >= 6);
 assert.equal(validateDraftInput({ meetingId: 'm1', resolutionNumber: 'R/1', title: 'Title', body: 'Body', proposedByUid: 'u1', secondedByUid: 'u2', votingRule: 'simple_majority' }).ok, true);
 assert.equal(validateDraftInput({ meetingId: 'm1', resolutionNumber: 'R/1', title: 'Title', body: 'Body', proposedByUid: 'u1', secondedByUid: 'u2', votingRule: 'custom_approval_count', customApprovalCount: 0 }).ok, false);
 
-assert.deepEqual(validatePdfLayout({}).payload, { pdfLayoutMode: 'standard', pdfSections: [] });
+assert.deepEqual(validatePdfLayout({}).payload, {
+  pdfLayoutMode: 'standard', pdfSections: [], documentSourceMode: 'standard',
+  uploadedVotesTableConfig: { columns: { name: true, position: true, vote: true, timestamp: true, signature: false }, voterScope: 'submitted', showTitle: true, repeatHeader: true, showResultSummary: true },
+});
+const uploadedLayout = validatePdfLayout({ documentSourceMode: 'uploadedPdf', uploadedVotesTableConfig: { columns: { name: true, signature: true }, voterScope: 'all', showTitle: false, showResultSummary: false } });
+assert.equal(uploadedLayout.ok, true);
+assert.equal(uploadedLayout.payload.documentSourceMode, 'uploadedPdf');
+assert.equal(uploadedLayout.payload.uploadedVotesTableConfig.columns.signature, true);
+assert.equal(uploadedLayout.payload.uploadedVotesTableConfig.voterScope, 'all');
 const customLayout = validatePdfLayout({
   pdfLayoutMode: 'custom',
   pdfSections: [
