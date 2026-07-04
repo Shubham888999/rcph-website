@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import BodEventArchiveDialog from "../../features/bod-tools/BodEventArchiveDialog";
+import BodAvenueReportPanel from "../../features/bod-tools/BodAvenueReportPanel";
 import BodEventDetailsDialog from "../../features/bod-tools/BodEventDetailsDialog";
 import BodEventFilters from "../../features/bod-tools/BodEventFilters";
 import BodEventForm from "../../features/bod-tools/BodEventForm";
@@ -128,7 +129,7 @@ export default function BodToolsPage() {
         </section>
         {status === "loading" ? <BodToolsSkeleton /> : null}
         {status === "error" ? <BodToolsErrorState onRetry={reload} onSignOut={handleSignOut} /> : null}
-        {status === "success" ? <><BodEventFilters filters={filters} onChange={setFilters} onReset={() => setFilters(DEFAULT_FILTERS)} avenues={avenues} months={months} resultCount={visibleEvents.length} /><BodEventList events={visibleEvents} access={access} lockState={lockState} onDetails={setDetails} onEdit={(event) => { setMutationError(""); setForm({ event }); }} onArchive={(event) => { setMutationError(""); setConfirmation({ event, mode: "archive" }); }} onSync={(event) => { setMutationError(""); setConfirmation({ event, mode: "sync" }); }} onReset={() => setFilters(DEFAULT_FILTERS)} /></> : null}
+        {status === "success" ? <><BodAvenueReportPanel events={events} onNotice={setNotice} /><BodEventFilters filters={filters} onChange={setFilters} onReset={() => setFilters(DEFAULT_FILTERS)} avenues={avenues} months={months} resultCount={visibleEvents.length} /><BodEventList events={visibleEvents} access={access} lockState={lockState} onDetails={setDetails} onEdit={(event) => { setMutationError(""); setForm({ event }); }} onArchive={(event) => { setMutationError(""); setConfirmation({ event, mode: "archive" }); }} onSync={(event) => { setMutationError(""); setConfirmation({ event, mode: "sync" }); }} onReset={() => setFilters(DEFAULT_FILTERS)} /></> : null}
       </BodToolsShell>
       <BodEventDetailsDialog event={details} onClose={() => setDetails(null)} />
       {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}

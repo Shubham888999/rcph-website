@@ -50,8 +50,9 @@ test("draft and open resolutions cannot generate a final PDF", async () => {
 
 test("completed resolution creates a multi-page-safe PDF document", () => {
   const details = { resolution: { status: "passed", resolutionNumber: "R/1", title: "Title", body: "Long text ".repeat(1000), eligibleVoters: [], eligibleVoterCount: 0, votesReceivedCount: 0, approveCount: 0, rejectCount: 0, abstainCount: 0 }, votes: [] };
-  const pdf = buildResolutionPdfDocument(details);
-  assert.match(pdf, /^%PDF-1\.4/);
-  assert.match(pdf, /\/Count [2-9]/);
-  assert.match(pdf, /System-generated resolution record/);
+  const pdf = buildResolutionPdfDocument(details, { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), width: 1, height: 1 });
+  const text = new TextDecoder("latin1").decode(pdf);
+  assert.match(text, /^%PDF-1\.4/);
+  assert.match(text, /\/Count [2-9]/);
+  assert.match(text, /System-generated resolution record/);
 });

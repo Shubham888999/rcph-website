@@ -87,3 +87,9 @@ export function archiveBodEvent(eventId) {
 export function syncBodEventToAttendance(bodEventId) {
   return call("syncBodEventToAttendance", { bodEventId });
 }
+
+export async function fetchBodAvenueReportDirectors(avenueCode) {
+  requireCurrentUser();
+  const result = await httpsCallable(functions, "getBodAvenueReportDirectors")({ avenueCode });
+  return result?.data && typeof result.data === "object" ? result.data : {};
+}

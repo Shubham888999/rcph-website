@@ -44,7 +44,10 @@ export function validateResolutionDraft(draft, eligibleVoterCount = 0) {
     votingRule: normalizeVotingRule(draft?.votingRule),
     customApprovalCount: draft?.customApprovalCount === "" || draft?.customApprovalCount == null ? null : Number(draft.customApprovalCount),
   };
-  const errors = [];
+  const layout = validateResolutionPdfLayout(draft);
+  payload.pdfLayoutMode = layout.payload.pdfLayoutMode;
+  payload.pdfSections = layout.payload.pdfSections;
+  const errors = [...layout.errors];
   if (!payload.meetingId) errors.push("Choose a BOD meeting.");
   if (!payload.resolutionNumber) errors.push("Enter a resolution number.");
   if (!payload.title) errors.push("Enter a resolution title.");
@@ -118,6 +121,10 @@ export function normalizeResolution(raw) {
     currentVote: normalizeVoteChoice(raw.currentVote),
     submittedAt: iso(raw.submittedAt),
     voteUpdatedAt: iso(raw.voteUpdatedAt),
+    pdfLayoutMode: normalizePdfLayoutMode(raw.pdfLayoutMode),
+    pdfSections: normalizeResolutionSections(raw.pdfSections),
+    finalizedPdfLayoutMode: raw.finalizedPdfLayoutMode ? normalizePdfLayoutMode(raw.finalizedPdfLayoutMode) : "",
+    finalizedPdfSectionsSnapshot: normalizeResolutionSections(raw.finalizedPdfSectionsSnapshot),
   };
 }
 
@@ -137,7 +144,8 @@ export function normalizeResolutionDetails(raw) {
   const eligibleVoters = Array.isArray(raw.resolution?.eligibleVoters) ? raw.resolution.eligibleVoters.map((item) => ({ uid: text(item?.uid, 128), name: text(item?.name, 160), position: text(item?.position, 240) })).filter((item) => item.uid) : [];
   const votes = Array.isArray(raw.votes) ? raw.votes.map((item) => ({ voterUid: text(item?.voterUid, 128), voterName: text(item?.voterName, 160), voterPosition: text(item?.voterPosition, 240), choice: normalizeVoteChoice(item?.choice), submittedAt: iso(item?.submittedAt), updatedAt: iso(item?.updatedAt) })).filter((item) => item.voterUid && item.choice) : [];
   const audit = Array.isArray(raw.audit) ? raw.audit.map((item) => ({ id: text(item?.id, 160), action: text(item?.action, 80), actorName: text(item?.actorName, 160), actorPosition: text(item?.actorPosition, 240), timestamp: iso(item?.timestamp), previousValue: item?.previousValue ?? null, newValue: item?.newValue ?? null, metadata: item?.metadata && typeof item.metadata === "object" ? item.metadata : {} })).filter((item) => item.id && item.action) : [];
-  return { resolution: { ...resolution, eligibleVoters }, votes, audit };
+  const canonicalVoters = Array.isArray(raw.canonicalVoters) ? raw.canonicalVoters.map((item) => ({ uid: text(item?.uid, 128), name: text(item?.name, 160), position: text(item?.position, 240) })).filter((item) => item.uid) : [];
+  return { resolution: { ...resolution, eligibleVoters }, votes, audit, canonicalVoters };
 }
 
 export function normalizeDashboardResolutions(raw) {
@@ -149,3 +157,4 @@ export function getResolutionPdfFilename(number) {
   const safe = text(number, 80).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return `${safe || "RCPH-Resolution"}.pdf`;
 }
+import { normalizePdfLayoutMode, normalizeResolutionSections, validateResolutionPdfLayout } from "./resolutionSectionsModel.js";

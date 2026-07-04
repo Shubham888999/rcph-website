@@ -1,0 +1,101 @@
+import {
+  addResolutionSection,
+  createDefaultResolutionSections,
+  deleteResolutionSection,
+  describeResolutionSection,
+  duplicateResolutionSection,
+  moveResolutionSection,
+  normalizeResolutionSection,
+  RESOLUTION_ALIGNMENTS,
+  RESOLUTION_FONTS,
+  RESOLUTION_SECTION_TYPES,
+  updateResolutionSection,
+  VOTES_TABLE_COLUMNS,
+} from "../../resolutions/resolutionSectionsModel";
+
+const TYPE_LABELS = { heading: "Heading", paragraph: "Paragraph", table: "Table", votesTable: "Votes Table", spacer: "Spacer / Page Break" };
+const COLUMN_LABELS = { name: "Name", position: "Position", vote: "Vote", timestamp: "Timestamp", signature: "Signature" };
+
+function NumberField({ label, value, min, max, step = 1, onChange }) {
+  return <label>{label}<input type="number" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+}
+
+function TextStyleEditor({ style, onChange, paragraph = false }) {
+  const set = (key, value) => onChange({ ...style, [key]: value });
+  return <div className="resolution-builder__style admin-form-grid">
+    <label>Font<select value={style.fontFamily} onChange={(event) => set("fontFamily", event.target.value)}>{RESOLUTION_FONTS.map((font) => <option key={font}>{font}</option>)}</select></label>
+    <NumberField label="Font size" min={8} max={20} value={style.fontSize} onChange={(value) => set("fontSize", value)} />
+    <label>Alignment<select value={style.alignment} onChange={(event) => set("alignment", event.target.value)}>{RESOLUTION_ALIGNMENTS.map((alignment) => <option key={alignment}>{alignment}</option>)}</select></label>
+    {paragraph ? <NumberField label="Line spacing" min={1} max={2} step={0.05} value={style.lineSpacing} onChange={(value) => set("lineSpacing", value)} /> : null}
+    <NumberField label="Space before" min={0} max={72} value={style.spaceBefore} onChange={(value) => set("spaceBefore", value)} />
+    <NumberField label="Space after" min={0} max={72} value={style.spaceAfter} onChange={(value) => set("spaceAfter", value)} />
+    <div className="resolution-builder__checks">
+      {[["bold", "Bold"], ["italic", "Italic"], ["underline", "Underline"]].map(([key, label]) => <label key={key}><input type="checkbox" checked={style[key]} onChange={(event) => set(key, event.target.checked)} /> {label}</label>)}
+    </div>
+  </div>;
+}
+
+function TableEditor({ section, onChange }) {
+  const set = (changes) => onChange(normalizeResolutionSection({ ...section, ...changes }, section.id));
+  const setCell = (rowIndex, columnIndex, value) => {
+    const rows = section.rows.map((row, index) => index === rowIndex ? row.map((cell, cellIndex) => cellIndex === columnIndex ? value : cell) : row);
+    set({ rows });
+  };
+  const addRow = () => section.rows.length < 200 && set({ rows: [...section.rows, Array(section.columns.length).fill("")] });
+  const removeRow = () => section.rows.length > 1 && set({ rows: section.rows.slice(0, -1) });
+  const addColumn = () => section.columns.length < 20 && set({ columns: [...section.columns, { id: `column_${section.columns.length + 1}`, width: 1, alignment: "left" }], rows: section.rows.map((row) => [...row, ""]) });
+  const removeColumn = () => section.columns.length > 1 && set({ columns: section.columns.slice(0, -1), rows: section.rows.map((row) => row.slice(0, -1)) });
+  return <div className="resolution-builder__table-editor">
+    <div className="admin-actions"><button type="button" onClick={addRow} disabled={section.rows.length >= 200}>Add row</button><button type="button" onClick={removeRow} disabled={section.rows.length <= 1}>Remove row</button><button type="button" onClick={addColumn} disabled={section.columns.length >= 20}>Add column</button><button type="button" onClick={removeColumn} disabled={section.columns.length <= 1}>Remove column</button></div>
+    <div className="admin-table-wrap"><table><caption>Custom table cells</caption><thead><tr>{section.columns.map((column, index) => <th key={column.id}><span>Column {index + 1}</span><select aria-label={`Column ${index + 1} alignment`} value={column.alignment} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, alignment: event.target.value } : item) })}>{RESOLUTION_ALIGNMENTS.map((alignment) => <option key={alignment}>{alignment}</option>)}</select><input aria-label={`Column ${index + 1} width percentage`} type="number" min="1" max="100" value={Number(column.width.toFixed(2))} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, width: Number(event.target.value) } : item) })} /></th>)}</tr></thead><tbody>{section.rows.map((row, rowIndex) => <tr key={`${section.id}_row_${rowIndex}`}>{row.map((cell, columnIndex) => <td key={`${section.columns[columnIndex].id}_${rowIndex}`}><textarea aria-label={`Row ${rowIndex + 1}, column ${columnIndex + 1}`} rows="2" value={cell} onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)} /></td>)}</tr>)}</tbody></table></div>
+    <div className="resolution-builder__checks">
+      <label><input type="checkbox" checked={section.options.hasHeaderRow} onChange={(event) => set({ options: { ...section.options, hasHeaderRow: event.target.checked } })} /> Header row</label>
+      <label><input type="checkbox" checked={section.options.repeatHeader} onChange={(event) => set({ options: { ...section.options, repeatHeader: event.target.checked } })} /> Repeat header</label>
+      <label><input type="checkbox" checked={section.options.showBorders} onChange={(event) => set({ options: { ...section.options, showBorders: event.target.checked } })} /> Borders</label>
+      <label><input type="checkbox" checked={section.style.boldHeader} onChange={(event) => set({ style: { ...section.style, boldHeader: event.target.checked } })} /> Bold header</label>
+    </div>
+    <div className="admin-form-grid"><label>Font<select value={section.style.fontFamily} onChange={(event) => set({ style: { ...section.style, fontFamily: event.target.value } })}>{RESOLUTION_FONTS.map((font) => <option key={font}>{font}</option>)}</select></label><NumberField label="Font size" min={8} max={20} value={section.style.fontSize} onChange={(value) => set({ style: { ...section.style, fontSize: value } })} /><NumberField label="Cell padding" min={1} max={12} value={section.style.cellPadding} onChange={(value) => set({ style: { ...section.style, cellPadding: value } })} /><NumberField label="Space before" min={0} max={72} value={section.style.spaceBefore} onChange={(value) => set({ style: { ...section.style, spaceBefore: value } })} /><NumberField label="Space after" min={0} max={72} value={section.style.spaceAfter} onChange={(value) => set({ style: { ...section.style, spaceAfter: value } })} /></div>
+  </div>;
+}
+
+function VotesTableEditor({ section, onChange }) {
+  const set = (changes) => onChange(normalizeResolutionSection({ ...section, ...changes }, section.id));
+  return <div className="resolution-builder__votes">
+    <label>Table title<input value={section.title} maxLength="200" onChange={(event) => set({ title: event.target.value })} /></label>
+    <fieldset><legend>Include columns</legend><div className="resolution-builder__checks">{VOTES_TABLE_COLUMNS.map((key) => <label key={key}><input type="checkbox" checked={section.columns[key]} onChange={(event) => set({ columns: { ...section.columns, [key]: event.target.checked } })} /> {COLUMN_LABELS[key]}</label>)}</div></fieldset>
+    <fieldset><legend>Voters</legend><label><input type="radio" name={`${section.id}_scope`} checked={section.options.voterScope === "submitted"} onChange={() => set({ options: { ...section.options, voterScope: "submitted" } })} /> Only submitted votes</label><label><input type="radio" name={`${section.id}_scope`} checked={section.options.voterScope === "all"} onChange={() => set({ options: { ...section.options, voterScope: "all" } })} /> All eligible voters</label></fieldset>
+    <div className="resolution-builder__checks"><label><input type="checkbox" checked={section.options.showTitle} onChange={(event) => set({ options: { ...section.options, showTitle: event.target.checked } })} /> Show table title</label><label><input type="checkbox" checked={section.options.repeatHeader} onChange={(event) => set({ options: { ...section.options, repeatHeader: event.target.checked } })} /> Repeat header</label><label><input type="checkbox" checked={section.options.showResultSummary} onChange={(event) => set({ options: { ...section.options, showResultSummary: event.target.checked } })} /> Show final result</label></div>
+    <div className="admin-form-grid"><label>Font<select value={section.style.fontFamily} onChange={(event) => set({ style: { ...section.style, fontFamily: event.target.value } })}>{RESOLUTION_FONTS.map((font) => <option key={font}>{font}</option>)}</select></label><NumberField label="Font size" min={8} max={20} value={section.style.fontSize} onChange={(value) => set({ style: { ...section.style, fontSize: value } })} /><NumberField label="Header size" min={8} max={20} value={section.style.headerFontSize} onChange={(value) => set({ style: { ...section.style, headerFontSize: value } })} /><NumberField label="Cell padding" min={1} max={12} value={section.style.cellPadding} onChange={(value) => set({ style: { ...section.style, cellPadding: value } })} /></div>
+  </div>;
+}
+
+function SectionEditor({ section, index, total, onUpdate, onDelete, onDuplicate, onMove }) {
+  const setStyle = (style) => onUpdate({ style });
+  return <details className="resolution-builder__section" open>
+    <summary><span>{index + 1}. {TYPE_LABELS[section.type]}</span><small>{describeResolutionSection(section)}</small></summary>
+    <div className="resolution-builder__section-body">
+      {section.type === "heading" || section.type === "paragraph" ? <><label>{section.type === "heading" ? "Heading text" : "Paragraph text"}<textarea rows={section.type === "heading" ? 2 : 6} value={section.text} onChange={(event) => onUpdate({ text: event.target.value })} /></label>{section.type === "paragraph" ? <label>List style<select value={section.listStyle} onChange={(event) => onUpdate({ listStyle: event.target.value })}><option value="none">None</option><option value="bullet">Bullet</option><option value="numbered">Numbered</option></select></label> : null}<TextStyleEditor style={section.style} paragraph={section.type === "paragraph"} onChange={setStyle} /></> : null}
+      {section.type === "table" ? <TableEditor section={section} onChange={(next) => onUpdate(next)} /> : null}
+      {section.type === "votesTable" ? <VotesTableEditor section={section} onChange={(next) => onUpdate(next)} /> : null}
+      {section.type === "spacer" ? <label>Spacing<select value={section.mode} onChange={(event) => onUpdate({ mode: event.target.value })}><option value="small">Small (6 pt)</option><option value="medium">Medium (12 pt)</option><option value="large">Large (24 pt)</option><option value="pageBreak">Forced page break</option></select></label> : null}
+      <div className="resolution-builder__section-actions"><button type="button" aria-label={`Move section ${index + 1} up`} disabled={index === 0} onClick={() => onMove("up")}>Move up</button><button type="button" aria-label={`Move section ${index + 1} down`} disabled={index === total - 1} onClick={() => onMove("down")}>Move down</button><button type="button" onClick={onDuplicate}>Duplicate</button><button type="button" className="danger" onClick={onDelete}>Delete</button></div>
+    </div>
+  </details>;
+}
+
+export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview }) {
+  const mode = value.pdfLayoutMode || "standard";
+  const sections = value.pdfSections || [];
+  const setSections = (pdfSections) => onChange({ ...value, pdfSections });
+  return <fieldset className="resolution-builder" disabled={disabled}>
+    <legend>Resolution PDF format</legend>
+    <div className="resolution-builder__modes"><label><input type="radio" name={`pdf-mode-${value.id || "new"}`} checked={mode === "standard"} onChange={() => onChange({ ...value, pdfLayoutMode: "standard" })} /> Standard Resolution Format</label><label><input type="radio" name={`pdf-mode-${value.id || "new"}`} checked={mode === "custom"} onChange={() => onChange({ ...value, pdfLayoutMode: "custom" })} /> Custom Section Layout</label></div>
+    {mode === "custom" ? <div className="resolution-builder__custom">
+      <div className="admin-actions resolution-builder__add">{RESOLUTION_SECTION_TYPES.map((type) => <button type="button" key={type} disabled={sections.length >= 100} onClick={() => setSections(addResolutionSection(sections, type))}>Add {TYPE_LABELS[type]}</button>)}<button type="button" onClick={() => setSections(createDefaultResolutionSections())}>Use starter template</button><button type="button" onClick={() => setSections([])}>Start empty</button></div>
+      <p className="admin-help">{sections.length}/100 sections. Votes Table rows are resolved from authoritative voting data when the PDF is generated.</p>
+      <div className="resolution-builder__sections">{sections.map((section, index) => <SectionEditor key={section.id} section={section} index={index} total={sections.length} onUpdate={(changes) => setSections(updateResolutionSection(sections, section.id, changes))} onDelete={() => setSections(deleteResolutionSection(sections, section.id))} onDuplicate={() => setSections(duplicateResolutionSection(sections, section.id))} onMove={(direction) => setSections(moveResolutionSection(sections, section.id, direction))} />)}</div>
+      {!sections.length ? <p className="admin-empty">This custom layout is empty. Add a section or use the starter template.</p> : null}
+      <section className="resolution-builder__preview" aria-label="Ordered PDF section preview"><h4>Preview summary</h4><ol>{sections.map((section) => <li key={section.id}><strong>{TYPE_LABELS[section.type]}</strong><span>{describeResolutionSection(section)}</span></li>)}</ol>{onPreview ? <button type="button" onClick={onPreview}>Download Preview PDF</button> : null}</section>
+    </div> : <p className="admin-help">Uses the existing standard Resolution PDF layout.</p>}
+  </fieldset>;
+}

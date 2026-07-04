@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const panel = readFileSync(new URL("./BodAvenueReportPanel.jsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("../../pages/bod/BodToolsPage.jsx", import.meta.url), "utf8");
+const service = readFileSync(new URL("./bodEventService.js", import.meta.url), "utf8");
+const styles = readFileSync(new URL("../../styles/components/bod-tools.css", import.meta.url), "utf8");
+
+test("authorized BOD Tools page mounts the monthly avenue report without changing route policy", () => {
+  assert.match(page, /<BodAvenueReportPanel events=\{events\}/);
+  assert.match(page, /useBodEvents\(\{ uid, enabled: Boolean\(uid && access\?\.canAccessBodTools\) \}\)/);
+});
+
+test("report UI exposes labeled filters, selection, preview, lazy PDF download, and live feedback", () => {
+  for (const text of ["Monthly Avenue Report", "Select all events", "Clear selection", "Preview report", "Download PDF", "No reportable events were found"]) assert.match(panel, new RegExp(text));
+  assert.match(panel, /htmlFor="bod-report-month"/);
+  assert.match(panel, /htmlFor="bod-report-avenue"/);
+  assert.match(panel, /type="checkbox"/);
+  assert.match(panel, /aria-live="polite"/);
+  assert.match(panel, /await import\("\.\/bodAvenueReportPdf\.js"\)/);
+  assert.doesNotMatch(page, /bodAvenueReportPdf/);
+});
+
+test("director lookup uses one trusted callable and does not accept a target UID", () => {
+  assert.match(service, /httpsCallable\(functions, "getBodAvenueReportDirectors"\)\(\{ avenueCode \}\)/);
+  assert.doesNotMatch(service, /getBodAvenueReportDirectors[\s\S]{0,180}uid/);
+});
+
+test("report controls and preview stack at mobile widths without horizontal grids", () => {
+  assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.bod-avenue-report__filters[\s\S]*grid-template-columns: 1fr/);
+  assert.match(styles, /\.bod-avenue-report__events \{[^}]*overflow: auto/);
+});

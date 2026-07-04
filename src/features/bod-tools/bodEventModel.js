@@ -133,6 +133,7 @@ export function normalizeBodEvent(id, raw) {
     rcphRole: RCPH_ROLES.has(rcphRole) ? rcphRole : "host",
     hostClub: cleanString(raw.hostClub, "Rotaract Club of Pune Heritage"),
     collaborators: normalizeCollaborators(raw.collaborators),
+    collaboratorsKnown: Array.isArray(raw.collaborators),
     collaborationNotes: cleanString(raw.collaborationNotes),
     driveFolder: safeExternalUrl(raw.driveFolder),
     driveFolderId: cleanString(raw.driveFolderId),

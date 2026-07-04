@@ -32,6 +32,10 @@ export async function updateResolutionDraft(resolutionId, payload) {
   return call("updateResolutionDraft", { resolutionId, ...payload });
 }
 
+export async function updateResolutionPdfLayout(resolutionId, payload) {
+  return call("updateResolutionPdfLayout", { resolutionId, ...payload });
+}
+
 export async function openResolutionVoting(resolutionId) {
   const result = await call("openResolutionVoting", { resolutionId });
   clearDashboardDataCache();
