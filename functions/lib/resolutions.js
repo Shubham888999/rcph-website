@@ -142,6 +142,7 @@ module.exports = {
   VOTING_RULES,
   calculateResolutionResult,
   canManageResolutions,
+  assertNoNestedArrays: resolutionSections.assertNoNestedArrays,
   normalizeResolutionStatus,
   normalizeVoteChoice,
   normalizeVotingRule,

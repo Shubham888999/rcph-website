@@ -4100,6 +4100,7 @@ async function prepareResolutionDraftInput(raw) {
   const validation = resolutionModel.validateDraftInput(raw || {});
   if (!validation.ok) throw new HttpsError('invalid-argument', validation.errors[0], { errors: validation.errors });
   const payload = validation.payload;
+  assertFirestoreSafeResolutionSections(payload.pdfSections, 'pdfSections');
   const [meetingSnap, voters] = await Promise.all([
     db.collection('bodMeetings').doc(payload.meetingId).get(),
     loadActiveResolutionVoters(),
@@ -4123,6 +4124,14 @@ async function prepareResolutionDraftInput(raw) {
     proposer,
     seconder,
   };
+}
+
+function assertFirestoreSafeResolutionSections(value, path) {
+  try {
+    resolutionModel.assertNoNestedArrays(value, path);
+  } catch (error) {
+    throw new HttpsError('invalid-argument', error.message);
+  }
 }
 
 exports.createResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -4217,6 +4226,7 @@ exports.updateResolutionPdfLayout = onCall(CALLABLE_OPTIONS, async (request) => 
   const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
   const validation = resolutionModel.validatePdfLayout(request.data || {});
   if (!validation.ok) throw new HttpsError('invalid-argument', validation.errors[0], { errors: validation.errors });
+  assertFirestoreSafeResolutionSections(validation.payload.pdfSections, 'pdfSections');
   const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
   const now = resolutionTimestamp();
   await db.runTransaction(async tx => {
@@ -4341,6 +4351,8 @@ exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
       eligibleVoterCount: Array.isArray(resolution.eligibleVoterUids) ? resolution.eligibleVoterUids.length : 0,
       votes,
     });
+    const finalizedPdfSectionsSnapshot = resolution.pdfLayoutMode === 'custom' ? resolutionModel.normalizePdfSections(resolution.pdfSections) : [];
+    assertFirestoreSafeResolutionSections(finalizedPdfSectionsSnapshot, 'finalizedPdfSectionsSnapshot');
     tx.update(resolutionRef, {
       ...finalResult,
       status: finalResult.status,
@@ -4350,7 +4362,7 @@ exports.closeResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
       closedByName: actor.name,
       closedByPosition: actor.position,
       finalizedPdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
-      finalizedPdfSectionsSnapshot: resolution.pdfLayoutMode === 'custom' ? resolutionModel.normalizePdfSections(resolution.pdfSections) : [],
+      finalizedPdfSectionsSnapshot,
       updatedAt: now,
     });
     setResolutionAudit(tx, resolutionRef, 'voting_closed', actor, now, {

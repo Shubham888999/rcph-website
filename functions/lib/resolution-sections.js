@@ -44,6 +44,19 @@ function widths(values, count) {
   return source.map(value => Number(((value / total) * 100).toFixed(4)));
 }
 
+function legacyRowValues(row) {
+  if (Array.isArray(row)) return row;
+  if (Array.isArray(row?.cells)) return row.cells.map(cell => typeof cell === 'object' ? cell?.value ?? cell?.text : cell);
+  return null;
+}
+
+function cellValue(row, column, index) {
+  const legacy = legacyRowValues(row);
+  if (legacy) return legacy[index];
+  if (row?.cells && typeof row.cells === 'object') return row.cells[column.id];
+  return '';
+}
+
 function normalizeSection(raw, fallbackId) {
   if (!raw || typeof raw !== 'object' || !TYPES.includes(raw.type)) return null;
   const sectionId = id(raw.id, fallbackId);
@@ -76,13 +89,23 @@ function normalizeSection(raw, fallbackId) {
     };
   }
   const rawRows = Array.isArray(raw.rows) ? raw.rows.slice(0, LIMITS.rows) : [];
-  const count = Math.max(1, Math.min(LIMITS.columns, Array.isArray(raw.columns) ? raw.columns.length : Math.max(0, ...rawRows.map(row => Array.isArray(row) ? row.length : 0))));
-  const normalizedWidths = widths((raw.columns || []).map(column => column?.width), count);
+  const count = Math.max(1, Math.min(LIMITS.columns, Array.isArray(raw.columns) ? raw.columns.length : Math.max(0, ...rawRows.map(row => legacyRowValues(row)?.length || 0))));
+  const normalizedWidths = widths((raw.columns || []).map(column => column?.widthPercent ?? column?.width), count);
+  const columns = Array.from({ length: count }, (_, index) => ({
+    id: id(raw.columns?.[index]?.id, `column_${index + 1}`),
+    label: text(raw.columns?.[index]?.label, 200),
+    widthPercent: normalizedWidths[index],
+    alignment: choice(raw.columns?.[index]?.alignment, ALIGNMENTS, 'left'),
+  }));
+  const sourceRows = rawRows.length ? rawRows : [{ id: 'row_1', cells: {} }];
   return {
     id: sectionId,
     type: raw.type,
-    columns: Array.from({ length: count }, (_, index) => ({ id: id(raw.columns?.[index]?.id, `column_${index + 1}`), width: normalizedWidths[index], alignment: choice(raw.columns?.[index]?.alignment, ALIGNMENTS, 'left') })),
-    rows: (rawRows.length ? rawRows : [Array(count).fill('')]).map(row => Array.from({ length: count }, (_, index) => text(row?.[index], 5000))),
+    columns,
+    rows: sourceRows.map((row, rowIndex) => ({
+      id: id(row?.id, `row_${rowIndex + 1}`),
+      cells: Object.fromEntries(columns.map((column, columnIndex) => [column.id, text(cellValue(row, column, columnIndex), 5000)])),
+    })),
     options: { hasHeaderRow: raw.options?.hasHeaderRow !== false, repeatHeader: raw.options?.repeatHeader !== false, showBorders: raw.options?.showBorders !== false },
     style: {
       fontFamily: choice(raw.style?.fontFamily, FONTS, 'Helvetica'),
@@ -110,7 +133,10 @@ function textCharacterCount(sections) {
   return sections.reduce((total, section) => {
     let count = typeof section?.text === 'string' ? section.text.length : 0;
     if (typeof section?.title === 'string') count += section.title.length;
-    if (Array.isArray(section?.rows)) count += section.rows.flat().reduce((sum, cell) => sum + (typeof cell === 'string' ? cell.length : 0), 0);
+    if (Array.isArray(section?.rows)) count += section.rows.reduce((rowTotal, row) => {
+      const values = legacyRowValues(row) || (row?.cells && typeof row.cells === 'object' ? Object.values(row.cells) : []);
+      return rowTotal + values.reduce((sum, cell) => sum + (typeof cell === 'string' ? cell.length : 0), 0);
+    }, 0);
     return total + count;
   }, 0);
 }
@@ -139,7 +165,22 @@ function validateLayout(raw = {}) {
     }
     if (section?.type === 'votesTable' && !VOTE_COLUMNS.some(key => section.columns?.[key] === true)) errors.push(`Section ${index + 1} must include a Votes Table column.`);
   });
-  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode: MODES.includes(requestedMode) ? requestedMode : 'standard', pdfSections: normalizeSections(source) } };
+  const pdfSections = normalizeSections(source);
+  try { assertNoNestedArrays(pdfSections, 'pdfSections'); }
+  catch (error) { errors.push(error.message); }
+  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode: MODES.includes(requestedMode) ? requestedMode : 'standard', pdfSections } };
 }
 
-module.exports = { LIMITS, MODES, TYPES, VOTE_COLUMNS, normalizeSections, validateLayout };
+function assertNoNestedArrays(value, path = 'value') {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      if (Array.isArray(item)) throw new TypeError(`${path}[${index}] contains an array directly nested inside an array.`);
+      assertNoNestedArrays(item, `${path}[${index}]`);
+    });
+    return true;
+  }
+  if (value && typeof value === 'object') Object.entries(value).forEach(([key, item]) => assertNoNestedArrays(item, `${path}.${key}`));
+  return true;
+}
+
+module.exports = { LIMITS, MODES, TYPES, VOTE_COLUMNS, assertNoNestedArrays, normalizeSections, validateLayout };
