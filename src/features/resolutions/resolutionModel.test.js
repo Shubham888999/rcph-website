@@ -29,6 +29,21 @@ test("draft validation requires meeting, content, parties, and valid custom coun
   assert.equal(validateResolutionDraft({ ...base, votingRule: "custom_approval_count", customApprovalCount: 4 }, 3).ok, false);
 });
 
+test("create and update draft payloads serialize custom tables without nested arrays", () => {
+  const base = { meetingId: "m1", resolutionNumber: "R/1", title: "Title", body: "Body", proposedByUid: "u1", secondedByUid: "u2", votingRule: "simple_majority" };
+  const result = validateResolutionDraft({ ...base, pdfLayoutMode: "custom", pdfSections: [
+    { id: "heading", type: "heading", text: "Resolution", style: { fontFamily: "Helvetica", fontSize: 14, alignment: "center" } },
+    { id: "paragraph", type: "paragraph", text: "Details", style: { fontFamily: "Helvetica", fontSize: 10, alignment: "left" } },
+    { id: "table", type: "table", columns: [{ id: "column_1", width: 50 }, { id: "column_2", width: 50 }], rows: [["A", "B"], ["C", "D"]], options: {}, style: {} },
+  ] }, 3);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.payload.pdfSections[2].rows, [
+    { id: "row_1", cells: { column_1: "A", column_2: "B" } },
+    { id: "row_2", cells: { column_1: "C", column_2: "D" } },
+  ]);
+  assert.doesNotMatch(JSON.stringify(result.payload.pdfSections), /\[\s*\[[^\]]/);
+});
+
 test("dashboard includes only open resolutions and filename is sanitized", () => {
   const rows = normalizeDashboardResolutions([{ id: "o", status: "open", resolutionNumber: "R/1", title: "Open" }, { id: "c", status: "passed", resolutionNumber: "R/2", title: "Closed" }]);
   assert.deepEqual(rows.map((row) => row.id), ["o"]);

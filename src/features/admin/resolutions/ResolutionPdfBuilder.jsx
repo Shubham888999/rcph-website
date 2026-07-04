@@ -37,17 +37,29 @@ function TextStyleEditor({ style, onChange, paragraph = false }) {
 
 function TableEditor({ section, onChange }) {
   const set = (changes) => onChange(normalizeResolutionSection({ ...section, ...changes }, section.id));
-  const setCell = (rowIndex, columnIndex, value) => {
-    const rows = section.rows.map((row, index) => index === rowIndex ? row.map((cell, cellIndex) => cellIndex === columnIndex ? value : cell) : row);
+  const setCell = (rowId, columnId, value) => {
+    const rows = section.rows.map((row) => row.id === rowId ? { ...row, cells: { ...row.cells, [columnId]: value } } : row);
     set({ rows });
   };
-  const addRow = () => section.rows.length < 200 && set({ rows: [...section.rows, Array(section.columns.length).fill("")] });
+  const addRow = () => {
+    if (section.rows.length >= 200) return;
+    const rowNumber = section.rows.length + 1;
+    set({ rows: [...section.rows, { id: `row_${rowNumber}`, cells: Object.fromEntries(section.columns.map((column) => [column.id, ""])) }] });
+  };
   const removeRow = () => section.rows.length > 1 && set({ rows: section.rows.slice(0, -1) });
-  const addColumn = () => section.columns.length < 20 && set({ columns: [...section.columns, { id: `column_${section.columns.length + 1}`, width: 1, alignment: "left" }], rows: section.rows.map((row) => [...row, ""]) });
-  const removeColumn = () => section.columns.length > 1 && set({ columns: section.columns.slice(0, -1), rows: section.rows.map((row) => row.slice(0, -1)) });
+  const addColumn = () => {
+    if (section.columns.length >= 20) return;
+    const columnId = `column_${section.columns.length + 1}`;
+    set({ columns: [...section.columns, { id: columnId, label: "", widthPercent: 1, alignment: "left" }], rows: section.rows.map((row) => ({ ...row, cells: { ...row.cells, [columnId]: "" } })) });
+  };
+  const removeColumn = () => {
+    if (section.columns.length <= 1) return;
+    const removed = section.columns.at(-1).id;
+    set({ columns: section.columns.slice(0, -1), rows: section.rows.map((row) => ({ ...row, cells: Object.fromEntries(Object.entries(row.cells).filter(([key]) => key !== removed)) })) });
+  };
   return <div className="resolution-builder__table-editor">
     <div className="admin-actions"><button type="button" onClick={addRow} disabled={section.rows.length >= 200}>Add row</button><button type="button" onClick={removeRow} disabled={section.rows.length <= 1}>Remove row</button><button type="button" onClick={addColumn} disabled={section.columns.length >= 20}>Add column</button><button type="button" onClick={removeColumn} disabled={section.columns.length <= 1}>Remove column</button></div>
-    <div className="admin-table-wrap"><table><caption>Custom table cells</caption><thead><tr>{section.columns.map((column, index) => <th key={column.id}><span>Column {index + 1}</span><select aria-label={`Column ${index + 1} alignment`} value={column.alignment} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, alignment: event.target.value } : item) })}>{RESOLUTION_ALIGNMENTS.map((alignment) => <option key={alignment}>{alignment}</option>)}</select><input aria-label={`Column ${index + 1} width percentage`} type="number" min="1" max="100" value={Number(column.width.toFixed(2))} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, width: Number(event.target.value) } : item) })} /></th>)}</tr></thead><tbody>{section.rows.map((row, rowIndex) => <tr key={`${section.id}_row_${rowIndex}`}>{row.map((cell, columnIndex) => <td key={`${section.columns[columnIndex].id}_${rowIndex}`}><textarea aria-label={`Row ${rowIndex + 1}, column ${columnIndex + 1}`} rows="2" value={cell} onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)} /></td>)}</tr>)}</tbody></table></div>
+    <div className="admin-table-wrap"><table><caption>Custom table cells</caption><thead><tr>{section.columns.map((column, index) => <th key={column.id}><span>Column {index + 1}</span><input aria-label={`Column ${index + 1} label`} placeholder="Optional label" value={column.label} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /><select aria-label={`Column ${index + 1} alignment`} value={column.alignment} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, alignment: event.target.value } : item) })}>{RESOLUTION_ALIGNMENTS.map((alignment) => <option key={alignment}>{alignment}</option>)}</select><input aria-label={`Column ${index + 1} width percentage`} type="number" min="1" max="100" value={Number(column.widthPercent.toFixed(2))} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, widthPercent: Number(event.target.value) } : item) })} /></th>)}</tr></thead><tbody>{section.rows.map((row, rowIndex) => <tr key={row.id}>{section.columns.map((column, columnIndex) => <td key={`${row.id}_${column.id}`}><textarea aria-label={`Row ${rowIndex + 1}, column ${columnIndex + 1}`} rows="2" value={row.cells[column.id] || ""} onChange={(event) => setCell(row.id, column.id, event.target.value)} /></td>)}</tr>)}</tbody></table></div>
     <div className="resolution-builder__checks">
       <label><input type="checkbox" checked={section.options.hasHeaderRow} onChange={(event) => set({ options: { ...section.options, hasHeaderRow: event.target.checked } })} /> Header row</label>
       <label><input type="checkbox" checked={section.options.repeatHeader} onChange={(event) => set({ options: { ...section.options, repeatHeader: event.target.checked } })} /> Repeat header</label>

@@ -61,16 +61,38 @@ function normalizedWidths(rawWidths, count) {
   return source.map((width) => Number(((width / total) * 100).toFixed(4)));
 }
 
+function tableRowId(value, fallback) {
+  return sectionId(value, fallback);
+}
+
+function legacyRowValues(row) {
+  if (Array.isArray(row)) return row;
+  if (Array.isArray(row?.cells)) return row.cells.map((cell) => typeof cell === "object" ? cell?.value ?? cell?.text : cell);
+  return null;
+}
+
+function cellValue(row, column, index) {
+  const legacy = legacyRowValues(row);
+  if (legacy) return legacy[index];
+  if (row?.cells && typeof row.cells === "object") return row.cells[column.id];
+  return "";
+}
+
 function normalizeTable(raw, id) {
   const rawRows = Array.isArray(raw.rows) ? raw.rows.slice(0, RESOLUTION_PDF_LIMITS.tableRows) : [];
-  const inferredColumns = Math.max(1, Math.min(RESOLUTION_PDF_LIMITS.tableColumns, Array.isArray(raw.columns) ? raw.columns.length : Math.max(0, ...rawRows.map((row) => Array.isArray(row) ? row.length : 0))));
-  const widths = normalizedWidths((raw.columns || []).map((column) => column?.width), inferredColumns);
+  const inferredColumns = Math.max(1, Math.min(RESOLUTION_PDF_LIMITS.tableColumns, Array.isArray(raw.columns) ? raw.columns.length : Math.max(0, ...rawRows.map((row) => legacyRowValues(row)?.length || 0))));
+  const widths = normalizedWidths((raw.columns || []).map((column) => column?.widthPercent ?? column?.width), inferredColumns);
   const columns = Array.from({ length: inferredColumns }, (_, index) => ({
     id: sectionId(raw.columns?.[index]?.id, `column_${index + 1}`),
-    width: widths[index],
+    label: cleanText(raw.columns?.[index]?.label, 200),
+    widthPercent: widths[index],
     alignment: choice(raw.columns?.[index]?.alignment, RESOLUTION_ALIGNMENTS, "left"),
   }));
-  const rows = (rawRows.length ? rawRows : [Array(inferredColumns).fill("")]).map((row) => Array.from({ length: inferredColumns }, (_, index) => cleanText(row?.[index], 5000)));
+  const sourceRows = rawRows.length ? rawRows : [{ id: "row_1", cells: {} }];
+  const rows = sourceRows.map((row, rowIndex) => ({
+    id: tableRowId(row?.id, `row_${rowIndex + 1}`),
+    cells: Object.fromEntries(columns.map((column, columnIndex) => [column.id, cleanText(cellValue(row, column, columnIndex), 5000)])),
+  }));
   return {
     id,
     type: "table",
@@ -145,7 +167,10 @@ function rawTextCharacterCount(sections) {
   return sections.reduce((total, section) => {
     let count = typeof section?.text === "string" ? section.text.length : 0;
     if (typeof section?.title === "string") count += section.title.length;
-    if (Array.isArray(section?.rows)) count += section.rows.flat().reduce((sum, cell) => sum + (typeof cell === "string" ? cell.length : 0), 0);
+    if (Array.isArray(section?.rows)) count += section.rows.reduce((rowTotal, row) => {
+      const values = legacyRowValues(row) || (row?.cells && typeof row.cells === "object" ? Object.values(row.cells) : []);
+      return rowTotal + values.reduce((sum, cell) => sum + (typeof cell === "string" ? cell.length : 0), 0);
+    }, 0);
     return total + count;
   }, 0);
 }
@@ -176,14 +201,28 @@ export function validateResolutionPdfLayout(raw = {}) {
   });
   const pdfLayoutMode = normalizePdfLayoutMode(requestedMode);
   const pdfSections = normalizeResolutionSections(source);
+  try { assertNoNestedArrays(pdfSections, "pdfSections"); }
+  catch (error) { errors.push(error.message); }
   return { ok: errors.length === 0, errors, payload: { pdfLayoutMode, pdfSections } };
+}
+
+export function assertNoNestedArrays(value, path = "value") {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      if (Array.isArray(item)) throw new TypeError(`${path}[${index}] contains an array directly nested inside an array.`);
+      assertNoNestedArrays(item, `${path}[${index}]`);
+    });
+    return true;
+  }
+  if (value && typeof value === "object") Object.entries(value).forEach(([key, item]) => assertNoNestedArrays(item, `${path}.${key}`));
+  return true;
 }
 
 export function createResolutionSection(type, id = createSectionId()) {
   const base = { id, type };
   if (type === "heading") return normalizeResolutionSection({ ...base, text: "Heading", style: { fontFamily: "Helvetica", fontSize: 14, bold: true, alignment: "center" } });
   if (type === "paragraph") return normalizeResolutionSection({ ...base, text: "Paragraph text", listStyle: "none", style: { fontFamily: "Helvetica", fontSize: 10, alignment: "left" } });
-  if (type === "table") return normalizeResolutionSection({ ...base, columns: [{ width: 50 }, { width: 50 }], rows: [["Column 1", "Column 2"], ["", ""]], options: { hasHeaderRow: true, repeatHeader: true, showBorders: true }, style: {} });
+  if (type === "table") return normalizeResolutionSection({ ...base, columns: [{ id: "column_1", label: "", widthPercent: 50 }, { id: "column_2", label: "", widthPercent: 50 }], rows: [{ id: "row_1", cells: { column_1: "Column 1", column_2: "Column 2" } }, { id: "row_2", cells: { column_1: "", column_2: "" } }], options: { hasHeaderRow: true, repeatHeader: true, showBorders: true }, style: {} });
   if (type === "votesTable") return normalizeResolutionSection({ ...base, title: "Voting Record", columns: { name: true, position: true, vote: true, timestamp: true, signature: false }, options: { showTitle: true, repeatHeader: true, voterScope: "submitted", showResultSummary: false }, style: {} });
   return normalizeResolutionSection({ ...base, mode: "medium" });
 }
@@ -220,7 +259,7 @@ export function moveResolutionSection(sections, id, direction) {
 export function createDefaultResolutionSections() {
   return [
     createResolutionSection("heading"),
-    normalizeResolutionSection({ id: createSectionId(), type: "table", columns: [{ width: 35 }, { width: 65 }], rows: [["Subject", ""], ["Date", ""], ["Place", ""], ["No. of Board Members", ""], ["Total No. of Board Members", ""]], options: { hasHeaderRow: false, repeatHeader: false, showBorders: true }, style: {} }),
+    normalizeResolutionSection({ id: createSectionId(), type: "table", columns: [{ id: "column_1", label: "", widthPercent: 35 }, { id: "column_2", label: "", widthPercent: 65 }], rows: [{ id: "row_1", cells: { column_1: "Subject", column_2: "" } }, { id: "row_2", cells: { column_1: "Date", column_2: "" } }, { id: "row_3", cells: { column_1: "Place", column_2: "" } }, { id: "row_4", cells: { column_1: "No. of Board Members", column_2: "" } }, { id: "row_5", cells: { column_1: "Total No. of Board Members", column_2: "" } }], options: { hasHeaderRow: false, repeatHeader: false, showBorders: true }, style: {} }),
     normalizeResolutionSection({ id: createSectionId(), type: "paragraph", text: "Enter the explanatory resolution text.", listStyle: "none", style: { fontFamily: "Helvetica", fontSize: 10, alignment: "left" } }),
     normalizeResolutionSection({ id: createSectionId(), type: "heading", text: "Resolution Details", style: { fontFamily: "Helvetica", fontSize: 12, bold: true, alignment: "left" } }),
     normalizeResolutionSection({ id: createSectionId(), type: "paragraph", text: "Add each item on a separate line.", listStyle: "bullet", style: { fontFamily: "Helvetica", fontSize: 10, alignment: "left" } }),

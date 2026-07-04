@@ -137,7 +137,7 @@ function tableRowModel(values, columns, style, header = false, signature = false
   const fontSize = header && style.headerFontSize ? style.headerFontSize : style.fontSize;
   const rowStyle = { fontFamily: style.fontFamily, fontSize, bold: header ? (style.headerBold ?? style.boldHeader) : false, italic: false, underline: false, alignment: "left", lineSpacing: 1.2 };
   const cells = columns.map((column, index) => {
-    const width = WIDTH * column.width / 100;
+    const width = WIDTH * (column.widthPercent ?? column.width) / 100;
     return { width, alignment: column.alignment || "left", lines: wrap(values[index] || "", width - style.cellPadding * 2, rowStyle) };
   });
   const lineCount = Math.max(1, ...cells.map((cell) => cell.lines.length));
@@ -185,7 +185,8 @@ function renderTable(pager, section, rows, columns, options = {}) {
 }
 
 function renderCustomTable(pager, section) {
-  renderTable(pager, section, section.rows, section.columns, {
+  const rows = section.rows.map((row) => section.columns.map((column) => row.cells[column.id] || ""));
+  renderTable(pager, section, rows, section.columns, {
     headerIndex: section.options.hasHeaderRow ? 0 : -1,
     repeatHeader: section.options.hasHeaderRow && section.options.repeatHeader,
     showBorders: section.options.showBorders,

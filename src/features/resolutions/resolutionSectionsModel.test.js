@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addResolutionSection,
+  assertNoNestedArrays,
   createDefaultResolutionSections,
   deleteResolutionSection,
   duplicateResolutionSection,
@@ -40,7 +41,34 @@ test("normalization supports all text styles, list styles, and normalized table 
   assert.equal(paragraph.listStyle, "numbered");
   assert.equal(paragraph.style.lineSpacing, 1.5);
   const table = normalizeResolutionSection({ id: "t", type: "table", columns: [{ width: 2 }, { width: 1 }], rows: [["a", "b"]], options: {}, style: {} });
-  assert.ok(Math.abs(table.columns.reduce((sum, column) => sum + column.width, 0) - 100) < 0.01);
+  assert.ok(Math.abs(table.columns.reduce((sum, column) => sum + column.widthPercent, 0) - 100) < 0.01);
+  assert.deepEqual(table.rows, [{ id: "row_1", cells: { column_1: "a", column_2: "b" } }]);
+});
+
+test("legacy array rows normalize into Firestore-safe keyed row objects", () => {
+  const table = normalizeResolutionSection({
+    id: "legacy",
+    type: "table",
+    columns: [{ id: "expense", label: "Expense", width: 60 }, { id: "amount", label: "Amount", widthPercent: 40, alignment: "right" }],
+    rows: [["Domain renewal", "₹3,000"], ["Technical support", "₹2,000"]],
+    options: { hasHeaderRow: false },
+    style: {},
+  });
+  assert.deepEqual(table.columns.map(({ id, label, widthPercent, alignment }) => ({ id, label, widthPercent, alignment })), [
+    { id: "expense", label: "Expense", widthPercent: 60, alignment: "left" },
+    { id: "amount", label: "Amount", widthPercent: 40, alignment: "right" },
+  ]);
+  assert.deepEqual(table.rows, [
+    { id: "row_1", cells: { expense: "Domain renewal", amount: "₹3,000" } },
+    { id: "row_2", cells: { expense: "Technical support", amount: "₹2,000" } },
+  ]);
+  assert.equal(assertNoNestedArrays([table], "pdfSections"), true);
+  assert.doesNotThrow(() => JSON.stringify(table));
+});
+
+test("recursive nested-array validation reports the exact unsafe Firestore path", () => {
+  const unsafe = [{ id: "heading" }, { id: "paragraph" }, { type: "table", rows: [["value 1", "value 2"]] }];
+  assert.throws(() => assertNoNestedArrays(unsafe, "pdfSections"), /pdfSections\[2\]\.rows\[0\]/);
 });
 
 test("validation enforces section, table, typography, and Votes Table limits", () => {
@@ -58,4 +86,5 @@ test("duplicate IDs normalize uniquely and starter template is optional and vali
   const template = createDefaultResolutionSections();
   assert.deepEqual(template.map((section) => section.type), ["heading", "table", "paragraph", "heading", "paragraph"]);
   assert.equal(validateResolutionPdfLayout({ pdfLayoutMode: "custom", pdfSections: template }).ok, true);
+  assert.equal(assertNoNestedArrays(template, "pdfSections"), true);
 });
