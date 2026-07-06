@@ -7,31 +7,28 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
-  "storage": {
-    "rules": "storage.rules"
-  },
-"hosting": {
-  "public": ".",
-  "ignore": [
-    "firebase.json",
-    ".firebaserc",
-    "**/.*",
-    "**/node_modules/**",
-    "functions/**",
-    "docs/**",
-    "scripts/**",
-    "apps-script/**",
-    "reports/**",
-    "_archive/**",
-    "*.log",
-    "*.md",
-    "*.zip",
-    "package.json",
-    "package-lock.json",
-    "postcss.config.js",
-    "tailwind.config.js",
-    "firestore.rules",
-    "firestore.indexes.json"
-  ]
-}
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      "functions/**",
+      "docs/**",
+      "scripts/**",
+      "apps-script/**",
+      "reports/**",
+      "_archive/**",
+      "*.log",
+      "*.md",
+      "*.zip",
+      "package.json",
+      "package-lock.json",
+      "postcss.config.js",
+      "tailwind.config.js",
+      "firestore.rules",
+      "firestore.indexes.json"
+    ]
+  }
 }

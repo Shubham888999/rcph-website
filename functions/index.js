@@ -21,12 +21,12 @@ const {
   calculateProspectMembershipProgress,
 } = require('./lib/prospect-membership-criteria');
 const resolutionModel = require('./lib/resolutions');
+const { createResolutionDriveService } = require('./lib/resolution-drive');
 const { createResolutionUploadService } = require('./lib/resolution-upload');
 const bodAvenueReport = require('./lib/bod-avenue-report');
 
 admin.initializeApp();
 const db = admin.firestore();
-const storageBucket = admin.storage().bucket();
 const rolePositionAssignments = createPositionAssignmentService({
   db,
   admin,
@@ -73,11 +73,16 @@ const CALLABLE_OPTIONS = {
     /^http:\/\/127\.0\.0\.1:\d+$/,
   ],
 };
-const RESOLUTION_PDF_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: '1GiB' };
+const RESOLUTION_DRIVE_SECRETS = [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN];
+const RESOLUTION_PDF_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: '1GiB', secrets: RESOLUTION_DRIVE_SECRETS };
+const resolutionDrive = createResolutionDriveService({
+  env: process.env,
+  secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
+});
 const resolutionUploads = createResolutionUploadService({
   db,
   admin,
-  bucket: storageBucket,
+  drive: resolutionDrive,
   getManagerContext: getResolutionManagerContext,
   logger: console,
   uploadEndpoint: 'https://us-central1-rcph-admin.cloudfunctions.net/uploadResolutionSourcePdf',
@@ -4314,7 +4319,7 @@ exports.updateResolutionPdfLayout = onCall(CALLABLE_OPTIONS, async (request) => 
   return { ok: true, resolutionId };
 });
 
-exports.openResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
+exports.openResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const actor = await getResolutionManagerContext(uid);
   const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
@@ -4326,7 +4331,9 @@ exports.openResolutionVoting = onCall(CALLABLE_OPTIONS, async (request) => {
   const before = meetingCheck.data() || {};
   if (resolutionUploads.sourceMode(before) === 'uploadedPdf') {
     if (before.uploadedSource?.status !== 'ready') throw new HttpsError('failed-precondition', 'A ready uploaded PDF is required before voting can open.');
-    await resolutionUploads.assertSourceObject(before.uploadedSource).catch(error => {
+    if (!before.uploadedVotesTableConfig || typeof before.uploadedVotesTableConfig !== 'object') throw new HttpsError('failed-precondition', 'A valid uploaded PDF Votes Table configuration is required.');
+    resolutionModel.normalizeUploadedVotesTableConfig(before.uploadedVotesTableConfig);
+    await resolutionUploads.assertSourceObject(before.uploadedSource, resolutionId).catch(error => {
       throw new HttpsError('failed-precondition', error.message || 'The uploaded PDF is unavailable.');
     });
   }
@@ -4563,17 +4570,17 @@ function throwResolutionUploadCallableError(error) {
   throw new HttpsError(code, error?.message || 'The Resolution PDF request failed.');
 }
 
-exports.createResolutionPdfUploadSession = onCall(CALLABLE_OPTIONS, async request => {
+exports.createResolutionPdfUploadSession = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async request => {
   try { return await resolutionUploads.createUploadSession(requireAuth(request), request.data || {}); }
   catch (error) { throwResolutionUploadCallableError(error); }
 });
 
-exports.finalizeResolutionPdfUpload = onCall(CALLABLE_OPTIONS, async request => {
+exports.finalizeResolutionPdfUpload = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async request => {
   try { return await resolutionUploads.finalizeUpload(requireAuth(request), request.data || {}); }
   catch (error) { throwResolutionUploadCallableError(error); }
 });
 
-exports.removeResolutionSourcePdf = onCall(CALLABLE_OPTIONS, async request => {
+exports.removeResolutionSourcePdf = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async request => {
   try { return await resolutionUploads.removeSource(requireAuth(request), request.data || {}); }
   catch (error) { throwResolutionUploadCallableError(error); }
 });
@@ -4583,10 +4590,10 @@ exports.retryResolutionPdfMerge = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async 
   catch (error) { throwResolutionUploadCallableError(error); }
 });
 
-exports.uploadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', maxInstances: 5, concurrency: 10 }, (req, res) => resolutionUploads.uploadHttp(req, res));
-exports.downloadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20 }, (req, res) => resolutionUploads.streamSourcePdf(req, res));
-exports.downloadFinalizedResolutionPdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20 }, (req, res) => resolutionUploads.streamFinalPdf(req, res));
-exports.cleanupResolutionPdfUploads = onSchedule({ region: 'us-central1', schedule: 'every day 03:30', timeZone: 'Asia/Kolkata', timeoutSeconds: 300, memory: '256MiB' }, () => resolutionUploads.cleanupExpiredSessions());
+exports.uploadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', maxInstances: 5, concurrency: 10, secrets: RESOLUTION_DRIVE_SECRETS }, (req, res) => resolutionUploads.uploadHttp(req, res));
+exports.downloadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20, secrets: RESOLUTION_DRIVE_SECRETS }, (req, res) => resolutionUploads.streamSourcePdf(req, res));
+exports.downloadFinalizedResolutionPdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20, secrets: RESOLUTION_DRIVE_SECRETS }, (req, res) => resolutionUploads.streamFinalPdf(req, res));
+exports.cleanupResolutionPdfUploads = onSchedule({ region: 'us-central1', schedule: 'every day 03:30', timeZone: 'Asia/Kolkata', timeoutSeconds: 300, memory: '256MiB', secrets: RESOLUTION_DRIVE_SECRETS }, () => resolutionUploads.cleanupExpiredSessions());
 
 exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);

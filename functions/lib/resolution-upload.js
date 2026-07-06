@@ -90,14 +90,15 @@ function reportSafeMerge(merge = {}, finalPdf = {}) {
 
 function validateExistingFinalObject({ bytes, metadata = {}, expectedSha256, resolutionId, finalizationId }) {
   const actualSha256 = sha256(bytes);
-  const custom = metadata.metadata || {};
+  const custom = metadata.appProperties || {};
   if (actualSha256 !== expectedSha256
     || custom.sha256 !== expectedSha256
     || custom.resolutionId !== resolutionId
-    || custom.finalizationId !== finalizationId) {
+    || custom.finalizationId !== finalizationId
+    || custom.documentType !== 'resolution-final') {
     throw serviceError('final-object-conflict', 'A conflicting finalized PDF already exists.', 409);
   }
-  return { sha256: actualSha256, generation: String(metadata.generation || ''), sizeBytes: Buffer.byteLength(bytes) };
+  return { sha256: actualSha256, driveFileId: String(metadata.id || ''), sizeBytes: Buffer.byteLength(bytes) };
 }
 
 function setCors(req, res) {
@@ -137,11 +138,15 @@ function parseMultipart(req) {
       if (failed || !file) return reject(serviceError(failed ? 'file-too-large' : 'missing-file', failed ? 'The PDF exceeds the 10 MB limit.' : 'A PDF file is required.'));
       resolve({ fields, file });
     });
-    req.pipe(busboy);
+    if (Buffer.isBuffer(req.rawBody)) {
+      busboy.end(req.rawBody);
+    } else {
+      req.pipe(busboy);
+    }
   });
 }
 
-function createResolutionUploadService({ db, admin, bucket, getManagerContext, logger = console, uploadEndpoint = '' }) {
+function createResolutionUploadService({ db, admin, drive, getManagerContext, logger = console, uploadEndpoint = '' }) {
   const now = () => admin.firestore.Timestamp.now();
 
   function audit(tx, resolutionRef, action, actor, details = {}) {
@@ -182,7 +187,7 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
       tx.set(rateRef, { uid, count: count + 1, windowStartedAt: inWindow ? rate.windowStartedAt : createdAt, updatedAt: createdAt }, { merge: true });
       tx.create(sessionRef, {
         resolutionId, uid, uploadId, proofHash: hashProof(proof), status: 'pending', expected,
-        storagePath: `resolutions/${resolutionId}/source/${uploadId}.pdf`, createdAt, expiresAt, updatedAt: createdAt,
+        driveFolderKey: 'resolutionSource', createdAt, expiresAt, updatedAt: createdAt,
       });
     });
     return { ok: true, sessionId: sessionRef.id, proof, uploadId, uploadEndpoint, expiresAt: expiresAt.toDate().toISOString(), maxSizeBytes: MAX_SOURCE_BYTES };
@@ -193,9 +198,11 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return sendJson(res, 405, { ok: false, code: 'method-not-allowed', message: 'POST required.' });
     let sessionRef;
+    let createdDriveFileId = '';
     try {
       const { fields, file } = await parseMultipart(req);
-      const sessionId = cleanId(fields.sessionId, 'Upload session ID');
+      if (!fields.sessionId && !fields.uploadSessionId) throw serviceError('missing-session', 'Upload session ID is required.');
+      const sessionId = cleanId(fields.sessionId || fields.uploadSessionId, 'Upload session ID');
       const resolutionId = cleanId(fields.resolutionId, 'Resolution ID');
       sessionRef = db.collection(SESSION_COLLECTION).doc(sessionId);
       const sessionSnap = await sessionRef.get();
@@ -218,23 +225,23 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
         if (resolution.status !== 'draft' || sourceMode(resolution) !== 'uploadedPdf') throw serviceError('failed-precondition', 'The resolution can no longer receive this upload.', 409);
         tx.update(sessionRef, { status: 'uploading', updatedAt: now() });
       });
-      const storageFile = bucket.file(session.storagePath);
-      await storageFile.save(file.bytes, {
-        resumable: false,
-        contentType: 'application/pdf',
-        validation: 'crc32c',
-        preconditionOpts: { ifGenerationMatch: 0 },
-        metadata: { cacheControl: 'private, no-store', metadata: { uploadId: session.uploadId, resolutionId, sha256: inspected.sha256, uploaderUid: session.uid } },
-      });
-      const [metadata] = await storageFile.getMetadata();
+      const driveFile = await drive.createSourceFile({ resolutionId, uploadId: session.uploadId, sha256: inspected.sha256, uploaderUid: session.uid, bytes: file.bytes });
+      createdDriveFileId = driveFile.id;
       const uploadedAt = now();
-      await sessionRef.update({
-        status: 'uploaded', objectGeneration: String(metadata.generation), sha256: inspected.sha256,
-        originalFileName: supplied.originalFileName, mimeType: supplied.mimeType, sizeBytes: supplied.sizeBytes,
-        pageCount: inspected.pageCount, uploadedAt, updatedAt: uploadedAt,
-      });
+      try {
+        await sessionRef.update({
+          status: 'uploaded', driveFileId: driveFile.id, driveFolderKey: 'resolutionSource', sha256: inspected.sha256,
+          originalFileName: supplied.originalFileName, mimeType: supplied.mimeType, sizeBytes: supplied.sizeBytes,
+          pageCount: inspected.pageCount, uploadedAt, updatedAt: uploadedAt,
+        });
+      } catch (error) {
+        await drive.deleteFile(driveFile.id).catch(deleteError => logger.warn('Resolution Drive orphan cleanup failed.', { code: deleteError.code || 'drive-delete-failed' }));
+        createdDriveFileId = '';
+        throw error;
+      }
       return sendJson(res, 200, { ok: true, uploadId: session.uploadId, originalFileName: supplied.originalFileName, sizeBytes: supplied.sizeBytes, pageCount: inspected.pageCount, sha256Abbreviation: inspected.sha256.slice(0, 12), uploadedAt: uploadedAt.toDate().toISOString() });
     } catch (error) {
+      if (createdDriveFileId) await drive.deleteFile(createdDriveFileId).catch(deleteError => logger.warn('Resolution Drive orphan cleanup failed.', { code: deleteError.code || 'drive-delete-failed' }));
       if (sessionRef) await sessionRef.set({ status: error.code === 'expired-session' ? 'expired' : 'failed', errorCode: String(error.code || 'upload-failed').slice(0, 80), updatedAt: now() }, { merge: true }).catch(() => {});
       logger.warn('Resolution PDF upload rejected.', { code: error.code || 'upload-failed' });
       return sendJson(res, Number(error.status) || 400, { ok: false, code: error.code || 'upload-failed', message: error.message || 'The PDF upload failed.' });
@@ -251,13 +258,7 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
     if (!preflightSessionSnap.exists) throw serviceError('not-found', 'Resolution upload not found.');
     const preflightSession = preflightSessionSnap.data() || {};
     if (preflightSession.status !== 'uploaded' || preflightSession.uid !== uid || preflightSession.resolutionId !== resolutionId) throw serviceError('failed-precondition', 'The upload is not ready to finalize.');
-    const [objectMetadata] = await bucket.file(preflightSession.storagePath, { generation: preflightSession.objectGeneration }).getMetadata();
-    if (String(objectMetadata.generation) !== String(preflightSession.objectGeneration)
-      || objectMetadata.metadata?.sha256 !== preflightSession.sha256
-      || objectMetadata.metadata?.resolutionId !== resolutionId
-      || objectMetadata.metadata?.uploadId !== preflightSession.uploadId) {
-      throw serviceError('upload-mismatch', 'The stored PDF does not match the upload session.');
-    }
+    await drive.getSourceFile({ driveFileId: preflightSession.driveFileId, resolutionId, uploadId: preflightSession.uploadId, sha256: preflightSession.sha256 });
     let oldSource = null;
     let publicSource;
     await db.runTransaction(async tx => {
@@ -269,7 +270,7 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
       if (session.status !== 'uploaded' || session.uid !== uid || session.resolutionId !== resolutionId) throw serviceError('failed-precondition', 'The upload is not ready to finalize.');
       oldSource = resolution.uploadedSource?.status === 'ready' ? resolution.uploadedSource : null;
       const uploadedSource = {
-        uploadId: session.uploadId, status: 'ready', storagePath: session.storagePath, objectGeneration: session.objectGeneration,
+        uploadId: session.uploadId, status: 'ready', driveFileId: session.driveFileId, driveFolderKey: 'resolutionSource',
         sha256: session.sha256, originalFileName: session.originalFileName, mimeType: 'application/pdf', sizeBytes: session.sizeBytes,
         pageCount: session.pageCount, uploadedByUid: uid, uploadedByName: actor.name, uploadedAt: session.uploadedAt,
       };
@@ -278,10 +279,10 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
       audit(tx, resolutionRef, oldSource ? 'resolution_source_replaced' : 'resolution_source_attached', actor, { metadata: { uploadId: session.uploadId, pageCount: session.pageCount, sizeBytes: session.sizeBytes } });
       publicSource = reportSafeSource(uploadedSource);
     });
-    if (oldSource?.storagePath && oldSource.storagePath !== `resolutions/${resolutionId}/source/${publicSource.uploadId}.pdf`) {
+    if (oldSource?.driveFileId && oldSource.driveFileId !== preflightSession.driveFileId) {
       const oldSessions = await db.collection(SESSION_COLLECTION).where('uploadId', '==', oldSource.uploadId).limit(1).get();
       if (!oldSessions.empty) await oldSessions.docs[0].ref.set({ status: 'cancelled', updatedAt: now() }, { merge: true });
-      await bucket.file(oldSource.storagePath, { generation: oldSource.objectGeneration }).delete({ ignoreNotFound: true }).catch(error => logger.warn('Old draft Resolution source cleanup failed.', { code: error.code || 'storage-delete-failed' }));
+      await drive.deleteSourceFile({ driveFileId: oldSource.driveFileId, resolutionId, uploadId: oldSource.uploadId, sha256: oldSource.sha256 }).catch(error => logger.warn('Old draft Resolution source cleanup failed.', { code: error.code || 'drive-delete-failed' }));
     }
     return { ok: true, uploadedSource: publicSource };
   }
@@ -304,7 +305,7 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
     if (removed?.uploadId) {
       const sessions = await db.collection(SESSION_COLLECTION).where('uploadId', '==', removed.uploadId).limit(1).get();
       if (!sessions.empty) await sessions.docs[0].ref.set({ status: 'cancelled', updatedAt: now() }, { merge: true });
-      await bucket.file(removed.storagePath, { generation: removed.objectGeneration }).delete({ ignoreNotFound: true }).catch(error => logger.warn('Removed draft Resolution source cleanup failed.', { code: error.code || 'storage-delete-failed' }));
+      await drive.deleteSourceFile({ driveFileId: removed.driveFileId, resolutionId, uploadId: removed.uploadId, sha256: removed.sha256 }).catch(error => logger.warn('Removed draft Resolution source cleanup failed.', { code: error.code || 'drive-delete-failed' }));
     }
     return { ok: true, removed: Boolean(removed) };
   }
@@ -328,24 +329,24 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
       if (!snap.exists) throw serviceError('not-found', 'Resolution not found.', 404);
       const resolution = snap.data() || {};
       const reference = finalized ? resolution.finalizedMergedPdf : resolution.uploadedSource;
+      if (sourceMode(resolution) !== 'uploadedPdf') throw serviceError('failed-precondition', 'This resolution does not use an uploaded PDF.', 409);
       if (finalized && (!['passed', 'rejected', 'closed_without_decision'].includes(resolution.status) || resolution.merge?.status !== 'ready')) throw serviceError('not-ready', 'The finalized PDF is not ready.', 409);
-      if (!reference?.storagePath || !reference.objectGeneration) throw serviceError('not-found', 'The PDF is unavailable.', 404);
-      const file = bucket.file(reference.storagePath, { generation: reference.objectGeneration });
+      if (!reference?.driveFileId || !reference.sha256) throw serviceError('not-found', 'The PDF is unavailable.', 404);
+      const downloaded = finalized
+        ? await drive.downloadFinalFile({ driveFileId: reference.driveFileId, resolutionId, finalizationId: reference.finalizationId || resolution.merge?.finalizationId, sha256: reference.sha256 })
+        : await drive.downloadSourceFile({ driveFileId: reference.driveFileId, resolutionId, uploadId: reference.uploadId, sha256: reference.sha256 });
+      if (sha256(downloaded.bytes) !== reference.sha256) throw serviceError('checksum-mismatch', 'The PDF checksum does not match.', 409);
       const fileName = finalized ? `RCPH-${safeFileName(resolution.resolutionNumber, 'Resolution')}-Final.pdf` : safeFileName(reference.originalFileName);
       res.status(200).set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `${finalized ? 'attachment' : 'inline'}; filename="${fileName}"`, 'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' });
-      return file.createReadStream({ validation: true }).on('error', error => { logger.warn('Resolution PDF stream failed.', { code: error.code || 'storage-read-failed' }); if (!res.headersSent) sendJson(res, 404, { ok: false, code: 'not-found', message: 'The PDF is unavailable.' }); else res.destroy(); }).pipe(res);
+      return res.send(downloaded.bytes);
     } catch (error) {
       return sendJson(res, Number(error.status) || 403, { ok: false, code: error.code || 'permission-denied', message: error.message || 'The PDF could not be downloaded.' });
     }
   }
 
-  async function assertSourceObject(source) {
-    if (!source?.storagePath || !source.objectGeneration || !source.sha256) throw serviceError('missing-source', 'A ready uploaded PDF is required.');
-    const file = bucket.file(source.storagePath, { generation: source.objectGeneration });
-    const [exists] = await file.exists();
-    if (!exists) throw serviceError('missing-source', 'The uploaded PDF is unavailable.');
-    const [metadata] = await file.getMetadata();
-    if (String(metadata.generation) !== String(source.objectGeneration) || metadata.metadata?.sha256 !== source.sha256) throw serviceError('source-mismatch', 'The uploaded PDF metadata does not match the draft.');
+  async function assertSourceObject(source, resolutionId) {
+    if (!source?.driveFileId || !source.uploadId || !source.sha256) throw serviceError('missing-source', 'A ready uploaded PDF is required.');
+    await drive.getSourceFile({ driveFileId: source.driveFileId, resolutionId, uploadId: source.uploadId, sha256: source.sha256 });
     return true;
   }
 
@@ -358,7 +359,7 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
       if (!snap.exists) throw serviceError('not-found', 'Resolution not found.');
       const resolution = snap.data() || {};
       if (sourceMode(resolution) !== 'uploadedPdf' || !['passed', 'rejected', 'closed_without_decision'].includes(resolution.status)) throw serviceError('failed-precondition', 'Only a closed uploaded-PDF resolution may be merged.');
-      if (resolution.merge?.status === 'ready' && resolution.finalizedMergedPdf?.storagePath) return;
+      if (resolution.merge?.status === 'ready' && resolution.finalizedMergedPdf?.driveFileId) return;
       const leaseActive = resolution.merge?.status === 'processing' && (resolution.merge?.leaseExpiresAt?.toMillis?.() || 0) > Date.now();
       if (leaseActive) throw serviceError('merge-in-progress', 'The PDF merge is already in progress.');
       frozen = resolution;
@@ -368,10 +369,8 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
     if (!frozen) return { ok: true, status: 'ready' };
     const finalizationId = cleanId(frozen.merge?.finalizationId, 'Finalization ID');
     const source = frozen.finalizedUploadedSourceSnapshot;
-    const finalPath = `resolutions/${resolutionRef.id}/final/${finalizationId}.pdf`;
     try {
-      const sourceFile = bucket.file(source.storagePath, { generation: source.objectGeneration });
-      const [sourceBytes] = await sourceFile.download();
+      const { bytes: sourceBytes } = await drive.downloadSourceFile({ driveFileId: source.driveFileId, resolutionId: resolutionRef.id, uploadId: source.uploadId, sha256: source.sha256 });
       if (sha256(sourceBytes) !== source.sha256) throw serviceError('source-checksum-mismatch', 'The uploaded source checksum does not match.');
       const merged = await mergeResolutionPdf({
         sourceBytes,
@@ -390,15 +389,16 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
         },
       });
       if (merged.sourcePageCount !== Number(source.pageCount)) throw serviceError('source-page-count-mismatch', 'The uploaded source page count does not match.');
-      const finalFile = bucket.file(finalPath);
-      try {
-        await finalFile.save(merged.bytes, { resumable: false, contentType: 'application/pdf', validation: 'crc32c', preconditionOpts: { ifGenerationMatch: 0 }, metadata: { cacheControl: 'private, no-store', metadata: { resolutionId: resolutionRef.id, finalizationId, sha256: merged.sha256 } } });
-      } catch (error) {
-        if (![409, 412].includes(Number(error.code))) throw error;
-        const [[existing], [existingMetadata]] = await Promise.all([finalFile.download(), finalFile.getMetadata()]);
-        validateExistingFinalObject({ bytes: existing, metadata: existingMetadata, expectedSha256: merged.sha256, resolutionId: resolutionRef.id, finalizationId });
+      let matches = await drive.findFinalFiles({ resolutionId: resolutionRef.id, finalizationId });
+      if (matches.length > 1) throw serviceError('final-object-conflict', 'Multiple finalized Drive PDFs exist for this resolution.', 409);
+      if (!matches.length) {
+        await drive.createFinalFile({ resolutionId: resolutionRef.id, resolutionNumber: frozen.resolutionNumber, finalizationId, sha256: merged.sha256, bytes: merged.bytes });
+        matches = await drive.findFinalFiles({ resolutionId: resolutionRef.id, finalizationId });
+        if (matches.length !== 1) throw serviceError('final-object-conflict', 'The finalized Drive PDF could not be uniquely identified.', 409);
       }
-      const [metadata] = await finalFile.getMetadata();
+      const metadata = matches[0];
+      const existing = await drive.downloadFile(metadata.id);
+      validateExistingFinalObject({ bytes: existing, metadata, expectedSha256: merged.sha256, resolutionId: resolutionRef.id, finalizationId });
       const completedAt = now();
       const generatedAt = frozen.merge?.createdAt || frozen.closedAt;
       if (!generatedAt?.toMillis) throw serviceError('missing-finalization-timestamp', 'The frozen finalization timestamp is unavailable.');
@@ -408,7 +408,7 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
         if (current.merge?.finalizationId !== finalizationId || current.merge?.leaseId !== leaseId) throw serviceError('finalization-mismatch', 'The finalization record changed during merge.');
         tx.update(resolutionRef, {
           merge: { ...current.merge, status: 'ready', lastErrorCode: '', leaseId: null, leaseExpiresAt: null, updatedAt: completedAt, generatedAt },
-          finalizedMergedPdf: { storagePath: finalPath, objectGeneration: String(metadata.generation), sha256: merged.sha256, sizeBytes: merged.bytes.length, pageCount: merged.pageCount, sourcePageCount: merged.sourcePageCount, appendixPageCount: merged.appendixPageCount, generatedAt },
+          finalizedMergedPdf: { driveFileId: metadata.id, driveFolderKey: 'resolutionFinal', finalizationId, sha256: merged.sha256, sizeBytes: merged.bytes.length, pageCount: merged.pageCount, sourcePageCount: merged.sourcePageCount, appendixPageCount: merged.appendixPageCount, generatedAt },
           updatedAt: completedAt,
         });
       });
@@ -451,7 +451,13 @@ function createResolutionUploadService({ db, admin, bucket, getManagerContext, l
     for (const doc of snap.docs) {
       const session = doc.data() || {};
       if (['finalized', 'cancelled', 'expired'].includes(session.status)) continue;
-      if (session.storagePath) await bucket.file(session.storagePath, { generation: session.objectGeneration }).delete({ ignoreNotFound: true }).catch(() => {});
+      const resolutionSnap = await db.collection('resolutions').doc(session.resolutionId).get();
+      const resolution = resolutionSnap.exists ? resolutionSnap.data() || {} : {};
+      const candidates = await drive.findSourceFiles({ resolutionId: session.resolutionId, uploadId: session.uploadId }).catch(() => []);
+      for (const candidate of candidates) {
+        const referenced = resolution.uploadedSource?.driveFileId === candidate.id || resolution.finalizedUploadedSourceSnapshot?.driveFileId === candidate.id;
+        if (!referenced) await drive.deleteFile(candidate.id).catch(() => {});
+      }
       await doc.ref.set({ status: 'expired', updatedAt: now() }, { merge: true });
       cleaned += 1;
     }

@@ -52,10 +52,10 @@ async function assertAppendixStructure(result) {
   const changedFrozenInput = await merge(one, [...voteRows(3), { name: 'Changed voter', position: 'Director', vote: 'approve', submittedAt: FROZEN_METADATA_DATE }]);
   assert.notEqual(changedFrozenInput.sha256, oneMerged.sha256);
 
-  const existingMetadata = { generation: '42', metadata: { resolutionId: 'resolution_1', finalizationId: 'finalization_test_1', sha256: oneMerged.sha256 } };
-  assert.deepEqual(validateExistingFinalObject({ bytes: oneMerged.bytes, metadata: existingMetadata, expectedSha256: oneMerged.sha256, resolutionId: 'resolution_1', finalizationId: 'finalization_test_1' }), { sha256: oneMerged.sha256, generation: '42', sizeBytes: oneMerged.bytes.length });
+  const existingMetadata = { id: 'drive_file_42', appProperties: { resolutionId: 'resolution_1', finalizationId: 'finalization_test_1', sha256: oneMerged.sha256, documentType: 'resolution-final' } };
+  assert.deepEqual(validateExistingFinalObject({ bytes: oneMerged.bytes, metadata: existingMetadata, expectedSha256: oneMerged.sha256, resolutionId: 'resolution_1', finalizationId: 'finalization_test_1' }), { sha256: oneMerged.sha256, driveFileId: 'drive_file_42', sizeBytes: oneMerged.bytes.length });
   assert.throws(() => validateExistingFinalObject({ bytes: changedFrozenInput.bytes, metadata: existingMetadata, expectedSha256: oneMerged.sha256, resolutionId: 'resolution_1', finalizationId: 'finalization_test_1' }), error => error.code === 'final-object-conflict');
-  assert.throws(() => validateExistingFinalObject({ bytes: oneMerged.bytes, metadata: { ...existingMetadata, metadata: { ...existingMetadata.metadata, finalizationId: 'other' } }, expectedSha256: oneMerged.sha256, resolutionId: 'resolution_1', finalizationId: 'finalization_test_1' }), error => error.code === 'final-object-conflict');
+  assert.throws(() => validateExistingFinalObject({ bytes: oneMerged.bytes, metadata: { ...existingMetadata, appProperties: { ...existingMetadata.appProperties, finalizationId: 'other' } }, expectedSha256: oneMerged.sha256, resolutionId: 'resolution_1', finalizationId: 'finalization_test_1' }), error => error.code === 'final-object-conflict');
 
   const four = await createSourcePdf({ pages: 4 });
   const fourMerged = await merge(four, voteRows(4));
