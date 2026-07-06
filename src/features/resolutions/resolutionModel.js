@@ -47,6 +47,8 @@ export function validateResolutionDraft(draft, eligibleVoterCount = 0) {
   const layout = validateResolutionPdfLayout(draft);
   payload.pdfLayoutMode = layout.payload.pdfLayoutMode;
   payload.pdfSections = layout.payload.pdfSections;
+  payload.documentSourceMode = layout.payload.documentSourceMode;
+  payload.uploadedVotesTableConfig = layout.payload.uploadedVotesTableConfig;
   const errors = [...layout.errors];
   if (!payload.meetingId) errors.push("Choose a BOD meeting.");
   if (!payload.resolutionNumber) errors.push("Enter a resolution number.");
@@ -125,6 +127,32 @@ export function normalizeResolution(raw) {
     pdfSections: normalizeResolutionSections(raw.pdfSections),
     finalizedPdfLayoutMode: raw.finalizedPdfLayoutMode ? normalizePdfLayoutMode(raw.finalizedPdfLayoutMode) : "",
     finalizedPdfSectionsSnapshot: normalizeResolutionSections(raw.finalizedPdfSectionsSnapshot),
+    documentSourceMode: normalizeDocumentSourceMode(raw.documentSourceMode, normalizePdfLayoutMode(raw.pdfLayoutMode)),
+    uploadedVotesTableConfig: normalizeUploadedVotesTableConfig(raw.uploadedVotesTableConfig),
+    uploadedSource: raw.uploadedSource && typeof raw.uploadedSource === "object" ? {
+      uploadId: text(raw.uploadedSource.uploadId, 160),
+      status: text(raw.uploadedSource.status, 40),
+      originalFileName: text(raw.uploadedSource.originalFileName, 180),
+      mimeType: text(raw.uploadedSource.mimeType, 80),
+      sizeBytes: count(raw.uploadedSource.sizeBytes),
+      pageCount: count(raw.uploadedSource.pageCount),
+      sha256Abbreviation: text(raw.uploadedSource.sha256Abbreviation, 16),
+      uploadedByName: text(raw.uploadedSource.uploadedByName, 160),
+      uploadedAt: iso(raw.uploadedSource.uploadedAt),
+    } : null,
+    merge: raw.merge && typeof raw.merge === "object" ? {
+      status: text(raw.merge.status, 40),
+      attemptCount: count(raw.merge.attemptCount),
+      lastErrorCode: text(raw.merge.lastErrorCode, 80),
+      finalPageCount: count(raw.merge.finalPageCount),
+      generatedAt: iso(raw.merge.generatedAt),
+    } : { status: "", attemptCount: 0, lastErrorCode: "", finalPageCount: 0, generatedAt: "" },
+    canUpload: raw.canUpload === true,
+    canReplace: raw.canReplace === true,
+    canRemove: raw.canRemove === true,
+    canPreviewSource: raw.canPreviewSource === true,
+    canRetryMerge: raw.canRetryMerge === true,
+    canDownloadFinal: raw.canDownloadFinal === true,
   };
 }
 
@@ -157,4 +185,4 @@ export function getResolutionPdfFilename(number) {
   const safe = text(number, 80).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return `${safe || "RCPH-Resolution"}.pdf`;
 }
-import { normalizePdfLayoutMode, normalizeResolutionSections, validateResolutionPdfLayout } from "./resolutionSectionsModel.js";
+import { normalizeDocumentSourceMode, normalizePdfLayoutMode, normalizeResolutionSections, normalizeUploadedVotesTableConfig, validateResolutionPdfLayout } from "./resolutionSectionsModel.js";

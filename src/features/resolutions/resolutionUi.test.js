@@ -8,9 +8,18 @@ const dashboardCard = readFileSync(new URL("../dashboard/MemberResolutions.jsx",
 const dashboardPage = readFileSync(new URL("../../pages/dashboard/DashboardPage.jsx", import.meta.url), "utf8");
 const pdf = readFileSync(new URL("./resolutionPdf.js", import.meta.url), "utf8");
 const bodPdf = readFileSync(new URL("../bod-tools/bodAvenueReportPdf.js", import.meta.url), "utf8");
+const pdfBuilder = readFileSync(new URL("../admin/resolutions/ResolutionPdfBuilder.jsx", import.meta.url), "utf8");
+const uploadPanel = readFileSync(new URL("../admin/resolutions/ResolutionPdfUploadPanel.jsx", import.meta.url), "utf8");
 
 test("Resolutions is placed directly after Announcements in Admin navigation", () => {
   assert.match(adminNav, /\["announcements", "Announcements"\], \["resolutions", "Resolutions"\]/);
+});
+
+test("uploaded-PDF mode exposes private upload, preview, retry, and final download workflow", () => {
+  for (const label of ["Upload Ready-Made PDF", "Standard Resolution Format", "Custom Section Layout"]) assert.match(pdfBuilder, new RegExp(label));
+  for (const label of ["Choose PDF", "Open / Preview", "Replace", "Remove", "Appended Votes Table", "All eligible voters"]) assert.match(uploadPanel, new RegExp(label));
+  assert.match(adminModule, /retryResolutionPdfMerge/);
+  assert.match(adminModule, /downloadFinalizedResolutionPdf/);
 });
 
 test("Admin resolution tool exposes lifecycle groups and permission-scoped actions", () => {

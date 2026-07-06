@@ -7,6 +7,7 @@ import {
   deleteResolutionSection,
   duplicateResolutionSection,
   moveResolutionSection,
+  normalizeDocumentSourceMode,
   normalizePdfLayoutMode,
   normalizeResolutionSection,
   normalizeResolutionSections,
@@ -18,6 +19,15 @@ test("old resolutions default to standard and invalid modes are rejected", () =>
   assert.equal(normalizePdfLayoutMode(undefined), "standard");
   assert.equal(validateResolutionPdfLayout({}).payload.pdfLayoutMode, "standard");
   assert.equal(validateResolutionPdfLayout({ pdfLayoutMode: "anything", pdfSections: [] }).ok, false);
+  assert.equal(normalizeDocumentSourceMode(undefined, "custom"), "custom");
+  assert.equal(validateResolutionPdfLayout({ documentSourceMode: "uploadedPdf" }).payload.documentSourceMode, "uploadedPdf");
+});
+
+test("uploaded Votes Table configuration is normalized and Firestore safe", () => {
+  const payload = validateResolutionPdfLayout({ documentSourceMode: "uploadedPdf", uploadedVotesTableConfig: { columns: { name: false, signature: true }, voterScope: "all", showTitle: false, showResultSummary: false } }).payload;
+  assert.equal(payload.uploadedVotesTableConfig.columns.signature, true);
+  assert.equal(payload.uploadedVotesTableConfig.voterScope, "all");
+  assert.equal(assertNoNestedArrays(payload.uploadedVotesTableConfig, "uploadedVotesTableConfig"), true);
 });
 
 test("builder add, edit, duplicate, move, and delete preserve unique stable IDs", () => {

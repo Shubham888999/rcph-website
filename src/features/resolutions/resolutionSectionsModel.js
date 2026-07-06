@@ -1,4 +1,5 @@
 export const PDF_LAYOUT_MODES = Object.freeze(["standard", "custom"]);
+export const DOCUMENT_SOURCE_MODES = Object.freeze(["standard", "custom", "uploadedPdf"]);
 export const RESOLUTION_SECTION_TYPES = Object.freeze(["heading", "paragraph", "table", "votesTable", "spacer"]);
 export const RESOLUTION_PDF_LIMITS = Object.freeze({ sections: 100, textCharacters: 50000, tableRows: 200, tableColumns: 20 });
 export const RESOLUTION_FONTS = Object.freeze(["Helvetica", "Times Roman", "Courier"]);
@@ -39,6 +40,22 @@ export function createSectionId() {
 
 export function normalizePdfLayoutMode(value) {
   return value == null || value === "" ? "standard" : choice(cleanText(value, 20).toLowerCase(), PDF_LAYOUT_MODES, "standard");
+}
+
+export function normalizeDocumentSourceMode(value, pdfLayoutMode = "standard") {
+  return choice(value, DOCUMENT_SOURCE_MODES, pdfLayoutMode === "custom" ? "custom" : "standard");
+}
+
+export function normalizeUploadedVotesTableConfig(raw = {}) {
+  const columns = Object.fromEntries(VOTES_TABLE_COLUMNS.map((key) => [key, typeof raw.columns?.[key] === "boolean" ? raw.columns[key] : key !== "signature"]));
+  if (!VOTES_TABLE_COLUMNS.some((key) => columns[key])) columns.name = true;
+  return {
+    columns,
+    voterScope: choice(raw.voterScope, ["submitted", "all"], "submitted"),
+    showTitle: raw.showTitle !== false,
+    repeatHeader: raw.repeatHeader !== false,
+    showResultSummary: raw.showResultSummary !== false,
+  };
 }
 
 function normalizeTextStyle(raw = {}, heading = false) {
@@ -178,7 +195,9 @@ function rawTextCharacterCount(sections) {
 export function validateResolutionPdfLayout(raw = {}) {
   const errors = [];
   const requestedMode = raw.pdfLayoutMode == null || raw.pdfLayoutMode === "" ? "standard" : cleanText(raw.pdfLayoutMode, 20).toLowerCase();
+  const requestedSourceMode = raw.documentSourceMode == null || raw.documentSourceMode === "" ? null : cleanText(raw.documentSourceMode, 30);
   if (!PDF_LAYOUT_MODES.includes(requestedMode)) errors.push("Choose a valid PDF layout mode.");
+  if (requestedSourceMode && !DOCUMENT_SOURCE_MODES.includes(requestedSourceMode)) errors.push("Choose a valid Resolution document source.");
   const source = Array.isArray(raw.pdfSections) ? raw.pdfSections : [];
   if (source.length > RESOLUTION_PDF_LIMITS.sections) errors.push(`A custom layout may contain at most ${RESOLUTION_PDF_LIMITS.sections} sections.`);
   if (rawTextCharacterCount(source) > RESOLUTION_PDF_LIMITS.textCharacters) errors.push(`Custom layout text may contain at most ${RESOLUTION_PDF_LIMITS.textCharacters.toLocaleString()} characters.`);
@@ -203,7 +222,9 @@ export function validateResolutionPdfLayout(raw = {}) {
   const pdfSections = normalizeResolutionSections(source);
   try { assertNoNestedArrays(pdfSections, "pdfSections"); }
   catch (error) { errors.push(error.message); }
-  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode, pdfSections } };
+  const documentSourceMode = normalizeDocumentSourceMode(requestedSourceMode, pdfLayoutMode);
+  const uploadedVotesTableConfig = normalizeUploadedVotesTableConfig(raw.uploadedVotesTableConfig);
+  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode, pdfSections, documentSourceMode, uploadedVotesTableConfig } };
 }
 
 export function assertNoNestedArrays(value, path = "value") {

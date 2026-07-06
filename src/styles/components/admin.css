@@ -2572,6 +2572,30 @@ min-width: 250px;
   color: var(--color-text-muted);
 }
 
+.resolution-upload {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--admin-border, #d7dde6);
+  border-radius: 0.75rem;
+  background: var(--admin-surface-soft, #f8fafc);
+}
+
+.resolution-upload__file {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.resolution-upload__file > span,
+.resolution-upload__status {
+  color: var(--admin-muted, #5f6b7a);
+  font-size: 0.88rem;
+}
+
+.resolution-upload__status.is-failed {
+  color: var(--admin-danger, #a61b1b);
+}
+
 .resolution-admin-group {
   display: grid;
   gap: 1rem;

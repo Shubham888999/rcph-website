@@ -12,6 +12,7 @@ import {
   updateResolutionSection,
   VOTES_TABLE_COLUMNS,
 } from "../../resolutions/resolutionSectionsModel";
+import ResolutionPdfUploadPanel from "./ResolutionPdfUploadPanel";
 
 const TYPE_LABELS = { heading: "Heading", paragraph: "Paragraph", table: "Table", votesTable: "Votes Table", spacer: "Spacer / Page Break" };
 const COLUMN_LABELS = { name: "Name", position: "Position", vote: "Vote", timestamp: "Timestamp", signature: "Signature" };
@@ -95,19 +96,21 @@ function SectionEditor({ section, index, total, onUpdate, onDelete, onDuplicate,
   </details>;
 }
 
-export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview }) {
-  const mode = value.pdfLayoutMode || "standard";
+export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview, onNotice, onPersisted }) {
+  const mode = value.documentSourceMode || (value.pdfLayoutMode === "custom" ? "custom" : "standard");
   const sections = value.pdfSections || [];
   const setSections = (pdfSections) => onChange({ ...value, pdfSections });
+  const setMode = (documentSourceMode) => onChange({ ...value, documentSourceMode, pdfLayoutMode: documentSourceMode === "custom" ? "custom" : "standard" });
+  const modeLocked = !["draft", undefined, ""].includes(value.status) || (mode === "uploadedPdf" && value.uploadedSource?.status === "ready");
   return <fieldset className="resolution-builder" disabled={disabled}>
-    <legend>Resolution PDF format</legend>
-    <div className="resolution-builder__modes"><label><input type="radio" name={`pdf-mode-${value.id || "new"}`} checked={mode === "standard"} onChange={() => onChange({ ...value, pdfLayoutMode: "standard" })} /> Standard Resolution Format</label><label><input type="radio" name={`pdf-mode-${value.id || "new"}`} checked={mode === "custom"} onChange={() => onChange({ ...value, pdfLayoutMode: "custom" })} /> Custom Section Layout</label></div>
+    <legend>Resolution PDF Source</legend>
+    <div className="resolution-builder__modes"><label><input type="radio" disabled={modeLocked} name={`pdf-mode-${value.id || "new"}`} checked={mode === "standard"} onChange={() => setMode("standard")} /> Standard Resolution Format</label><label><input type="radio" disabled={modeLocked} name={`pdf-mode-${value.id || "new"}`} checked={mode === "custom"} onChange={() => setMode("custom")} /> Custom Section Layout</label><label><input type="radio" disabled={modeLocked} name={`pdf-mode-${value.id || "new"}`} checked={mode === "uploadedPdf"} onChange={() => setMode("uploadedPdf")} /> Upload Ready-Made PDF</label></div>
     {mode === "custom" ? <div className="resolution-builder__custom">
       <div className="admin-actions resolution-builder__add">{RESOLUTION_SECTION_TYPES.map((type) => <button type="button" key={type} disabled={sections.length >= 100} onClick={() => setSections(addResolutionSection(sections, type))}>Add {TYPE_LABELS[type]}</button>)}<button type="button" onClick={() => setSections(createDefaultResolutionSections())}>Use starter template</button><button type="button" onClick={() => setSections([])}>Start empty</button></div>
       <p className="admin-help">{sections.length}/100 sections. Votes Table rows are resolved from authoritative voting data when the PDF is generated.</p>
       <div className="resolution-builder__sections">{sections.map((section, index) => <SectionEditor key={section.id} section={section} index={index} total={sections.length} onUpdate={(changes) => setSections(updateResolutionSection(sections, section.id, changes))} onDelete={() => setSections(deleteResolutionSection(sections, section.id))} onDuplicate={() => setSections(duplicateResolutionSection(sections, section.id))} onMove={(direction) => setSections(moveResolutionSection(sections, section.id, direction))} />)}</div>
       {!sections.length ? <p className="admin-empty">This custom layout is empty. Add a section or use the starter template.</p> : null}
       <section className="resolution-builder__preview" aria-label="Ordered PDF section preview"><h4>Preview summary</h4><ol>{sections.map((section) => <li key={section.id}><strong>{TYPE_LABELS[section.type]}</strong><span>{describeResolutionSection(section)}</span></li>)}</ol>{onPreview ? <button type="button" onClick={onPreview}>Download Preview PDF</button> : null}</section>
-    </div> : <p className="admin-help">Uses the existing standard Resolution PDF layout.</p>}
+    </div> : mode === "uploadedPdf" ? <ResolutionPdfUploadPanel value={value} onChange={onChange} disabled={disabled} onNotice={onNotice} onPersisted={onPersisted} /> : <p className="admin-help">Uses the existing standard Resolution PDF layout.</p>}
   </fieldset>;
 }
