@@ -24,6 +24,7 @@ const resolutionModel = require('./lib/resolutions');
 const { createResolutionDriveService } = require('./lib/resolution-drive');
 const { createResolutionUploadService } = require('./lib/resolution-upload');
 const bodAvenueReport = require('./lib/bod-avenue-report');
+const { stripRotaractorPrefix } = require('./lib/member-name');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -753,7 +754,7 @@ function buildEligibleAnnouncementRecipient(uid, { authRecord, userSnap, roleSna
 
   return {
     uid,
-    name: normalizeText(userData.name || authRecord.displayName || authRecord.email || uid, 160),
+    name: stripRotaractorPrefix(normalizeText(userData.name || authRecord.displayName || authRecord.email || uid, 160)),
     email: normalizeEmail(userData.email || authRecord.email || ''),
     role,
   };
@@ -1579,7 +1580,7 @@ async function getResolutionManagerContext(uid) {
   return {
     uid,
     role,
-    name: normalizeText(account.userData.name || account.authRecord.displayName || account.authRecord.email, 160),
+    name: stripRotaractorPrefix(normalizeText(account.userData.name || account.authRecord.displayName || account.authRecord.email, 160)),
     position: role === 'president' || presidentPosition ? 'President' : 'Secretary',
   };
 }
@@ -1657,7 +1658,7 @@ async function loadActiveResolutionVoters() {
       || String(roleData.status || 'approved').toLowerCase() !== 'approved'
       || !['bod', 'admin', 'president'].includes(role)) return;
     const positions = Array.from(byUid.get(uid).positions.values()).sort((a, b) => a.sortOrder - b.sortOrder);
-    const name = normalizeText(user.name || bodMember.name, 160);
+    const name = stripRotaractorPrefix(normalizeText(user.name || bodMember.name, 160));
     if (!name || !positions.length) return;
     voters.push({
       uid,
@@ -1749,7 +1750,7 @@ function buildFinalizedVoteRows(resolution, votes, config) {
     return (Array.isArray(resolution.eligibleVoters) ? resolution.eligibleVoters : []).map(voter => {
       const vote = voteByUid.get(normalizeText(voter?.uid, 128));
       return {
-        name: normalizeText(vote?.voterName || voter?.name || 'Not available', 160),
+        name: stripRotaractorPrefix(normalizeText(vote?.voterName || voter?.name || 'Not available', 160)),
         position: normalizeText(vote?.voterPosition || voter?.position || 'Not available', 240),
         vote: resolutionModel.normalizeVoteChoice(vote?.choice) || 'didNotVote',
         submittedAt: vote?.submittedAt || null,
@@ -1757,7 +1758,7 @@ function buildFinalizedVoteRows(resolution, votes, config) {
     });
   }
   return (Array.isArray(votes) ? votes : []).map(vote => ({
-    name: normalizeText(vote?.voterName || 'Not available', 160),
+    name: stripRotaractorPrefix(normalizeText(vote?.voterName || 'Not available', 160)),
     position: normalizeText(vote?.voterPosition || 'Not available', 240),
     vote: resolutionModel.normalizeVoteChoice(vote?.choice) || 'didNotVote',
     submittedAt: vote?.submittedAt || null,
@@ -1820,10 +1821,10 @@ async function buildProfileFromAuth(uid, request, data) {
   }
 
   const email = normalizeEmail(record?.email || request.auth?.token?.email || data.email);
-  const name = normalizeText(
+  const name = stripRotaractorPrefix(normalizeText(
     data.name || record?.displayName || request.auth?.token?.name || email.split('@')[0],
     120
-  );
+  ));
 
   return {
     uid,
@@ -1857,7 +1858,7 @@ function setDocPreservingExistingAttendance(tx, ref, snap, eventIds, now) {
 function setMemberProfileDoc(tx, ref, snap, profile, approvedRole, clubPosition, now) {
   const existing = snap.exists ? (snap.data() || {}) : {};
   tx.set(ref, {
-    name: profile.name || existing.name || '',
+    name: stripRotaractorPrefix(profile.name || existing.name || ''),
     email: profile.email || existing.email || '',
     role: approvedRole,
     position: clubPosition,
@@ -2418,7 +2419,7 @@ async function getCallableUserProfile(uid, request) {
 
   return {
     email: normalizeEmail(userData.email || record?.email || request.auth?.token?.email || ''),
-    name: normalizeText(userData.name || record?.displayName || request.auth?.token?.name || request.auth?.token?.email || uid, 140),
+    name: stripRotaractorPrefix(normalizeText(userData.name || record?.displayName || request.auth?.token?.name || request.auth?.token?.email || uid, 140)),
   };
 }
 
@@ -3064,7 +3065,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
           tx.set(userRef, approvedProfile, { merge: true });
         } else {
           tx.set(userRef, {
-            name: profile.name || current.name || '',
+            name: stripRotaractorPrefix(profile.name || current.name || ''),
             email: profile.email || current.email || '',
             provider: profile.provider || current.provider || '',
             updatedAt: now,
@@ -3213,7 +3214,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
   if (result.shouldNotify) {
     const notificationData = {
       uid,
-      name: profile.name,
+      name: stripRotaractorPrefix(profile.name),
       email: profile.email,
       phone: commonSignupData.phone,
       requestedRole,
@@ -3648,7 +3649,7 @@ exports.getProspectManagementData = onCall(CALLABLE_OPTIONS, async (request) => 
       const percent = Math.max(0, Math.min(100, Number(progress.percent) || Math.round((attendanceProgressCount / requiredConsecutiveAttendance) * 100)));
       return {
         uid,
-        name: normalizeText(user.name || user.email || uid, 160),
+        name: stripRotaractorPrefix(normalizeText(user.name || user.email || uid, 160)),
         email: normalizeEmail(user.email || ''),
         phone: normalizeText(user.phone, 40),
         hobbies: normalizeText(user.hobbies, 600),
@@ -3816,7 +3817,7 @@ exports.promoteProspectToGbm = onCall(CALLABLE_OPTIONS, async (request) => {
 
     const profile = {
       uid,
-      name: normalizeText(user.name || user.email || uid, 120),
+      name: stripRotaractorPrefix(normalizeText(user.name || user.email || uid, 120)),
       email: normalizeEmail(user.email || ''),
     };
     tx.set(userRef, {
@@ -4389,7 +4390,7 @@ exports.submitResolutionVote = onCall(CALLABLE_OPTIONS, async (request) => {
     const previousChoice = resolutionModel.normalizeVoteChoice(previous.choice);
     tx.set(voteRef, {
       voterUid: uid,
-      voterName: normalizeText(voter.name, 160),
+      voterName: stripRotaractorPrefix(normalizeText(voter.name, 160)),
       voterPosition: normalizeText(voter.position, 240),
       choice,
       submittedAt: previous.submittedAt || now,
@@ -4397,7 +4398,7 @@ exports.submitResolutionVote = onCall(CALLABLE_OPTIONS, async (request) => {
     }, { merge: false });
     setResolutionAudit(tx, resolutionRef, previousChoice ? 'vote_changed' : 'vote_submitted', {
       uid,
-      name: normalizeText(voter.name, 160),
+      name: stripRotaractorPrefix(normalizeText(voter.name, 160)),
       position: normalizeText(voter.position, 240),
     }, now, {
       previousValue: previousChoice || null,

@@ -1,5 +1,7 @@
 'use strict';
 
+const { formatRotaractorName, stripRotaractorPrefix } = require('./member-name');
+
 const REPORTABLE_AVENUE_CODES = Object.freeze(['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI', 'GBM']);
 const REPORTABLE_AVENUE_SET = new Set(REPORTABLE_AVENUE_CODES);
 const BOD_TOOL_ROLES = new Set(['bod', 'admin', 'president']);
@@ -45,12 +47,12 @@ function buildSafeAvenueDirectorRows(options) {
     if (!isApprovedActiveUser(user) || !isApprovedBodRole(role)) continue;
     const resolved = positionHelpers.resolvePositionKeysFromRecords({ users: user, roles: role });
     if (resolved.unknownValues?.length || !resolved.positionKeys.includes(positionKey)) continue;
-    const name = text(user.name, 160);
+    const name = stripRotaractorPrefix(text(user.name, 160));
     const positionTitle = text(assignment.displayTitle || definition.displayTitle, 160);
     const dedupeKey = `${name.toLowerCase()}|${positionTitle.toLowerCase()}`;
     if (!name || !positionTitle || seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    rows.push({ name, positionTitle });
+    rows.push({ name: formatRotaractorName(name, true), positionTitle });
   }
 
   return rows.sort((left, right) => left.name.localeCompare(right.name));

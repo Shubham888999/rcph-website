@@ -1,6 +1,7 @@
 'use strict';
 
 const defaultPositionHelpers = require('./positions');
+const { stripRotaractorPrefix } = require('./member-name');
 
 const OPERATION_SOURCES = Object.freeze([
   'accountApproval',
@@ -258,7 +259,7 @@ function buildMemberPositionPayload(params) {
   const metadata = params.metadata || defaultPositionHelpers.derivePositionMetadata([]);
   const existing = params.existing || {};
   return {
-    name: params.profile.name || existing.name || '',
+    name: stripRotaractorPrefix(params.profile.name || existing.name || ''),
     email: params.profile.email || existing.email || '',
     role: params.role,
     position: metadata.clubPosition,
@@ -277,7 +278,7 @@ function buildBodMemberPositionPayload(params) {
   const metadata = params.metadata || defaultPositionHelpers.derivePositionMetadata([]);
   const existing = params.existing || {};
   return {
-    name: params.profile.name || existing.name || '',
+    name: stripRotaractorPrefix(params.profile.name || existing.name || ''),
     email: params.profile.email || existing.email || '',
     role: params.role,
     position: metadata.clubPosition,
@@ -407,7 +408,7 @@ function enrichConflictDetails(conflicts, holderProfilesByUid) {
       const profile = holderProfilesByUid[uid] || {};
       return {
         uid,
-        name: profile.name || '',
+        name: stripRotaractorPrefix(profile.name || ''),
         email: profile.email || '',
       };
     }),

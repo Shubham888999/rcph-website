@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const { formatRotaractorName } = require('./member-name');
 
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_SOURCE_PAGES = 25;
@@ -164,7 +165,7 @@ async function buildVoteAppendix(document, details, letterheadBytes) {
   }
 
   function rowValues(row) {
-    return { name: row.name, position: row.position || 'Not available', vote: displayVote(row.vote), timestamp: formatTimestamp(row.submittedAt), signature: '' };
+    return { name: formatRotaractorName(row.name, true), position: row.position || 'Not available', vote: displayVote(row.vote), timestamp: formatTimestamp(row.submittedAt), signature: '' };
   }
 
   addPage();
