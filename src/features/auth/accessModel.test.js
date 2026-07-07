@@ -157,6 +157,7 @@ test("absent authority booleans remain false", () => {
   assert.equal(access.isPresidentRole, false);
   assert.equal(access.hasWebsiteDirectorPosition, false);
   assert.equal(access.hasPresidentAuthority, false);
+  assert.equal(access.hasSergeantAtArmsPosition, false);
 });
 
 test("role status other than approved is inactive and denied", () => {
@@ -175,4 +176,42 @@ test("callable failure fallback grants no access", () => {
   const access = createDeniedAccess();
   assert.equal(hasCapability(access, "memberDashboard"), false);
   assert.equal(hasCapability(access, "adminTools"), false);
+});
+test("BOD with trusted Sergeant-at-Arms authority gets ordinary Admin access", () => {
+  const access = approved("bod", {
+    hasSergeantAtArmsPosition: true,
+  });
+
+  assert.equal(access.hasSergeantAtArmsPosition, true);
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessPresidentControls, false);
+  assert.equal(access.canAccessResolutionTools, false);
+});
+test("plain saa position key without trusted authority does not grant Admin access", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "forged-saa",
+    user: { status: "approved" },
+    role: { role: "bod", status: "approved" },
+    positionKeys: ["saa"],
+    authority: {},
+  });
+
+  assert.equal(access.hasSergeantAtArmsPosition, false);
+  assert.equal(access.canAccessAdminTools, false);
+});
+test("pending Sergeant authority grants no Admin access", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "pending-saa",
+    user: { status: "pending" },
+    role: { role: "bod", status: "pending" },
+    positionKeys: ["saa"],
+    authority: {
+      hasSergeantAtArmsPosition: true,
+    },
+  });
+
+  assert.equal(access.isPending, true);
+  assert.equal(access.canAccessAdminTools, false);
 });

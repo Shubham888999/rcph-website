@@ -92,6 +92,8 @@ export function getAccessHubViewModel(access) {
     primary: destinations.find(({ primary }) => primary) || null,
     secondary: destinations.filter(({ primary }) => !primary),
     hasDelegatedWebsiteAuthority: Boolean(access?.hasWebsiteDirectorPosition && access?.hasPresidentAuthority),
+    hasDelegatedSergeantAuthority:
+  access?.hasSergeantAtArmsPosition === true,
   };
 }
 

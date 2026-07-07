@@ -21,3 +21,14 @@ test("Locks mutations and denial copy use the normalized capability", () => {
   assert.match(moduleSource, /President access is required to manage administrative locks\./);
   assert.match(moduleSource, /setAdminLock\(target\.key, target\.locked\)/);
 });
+test("Sergeant Admin access still cannot expose Locks or Resolutions", () => {
+  assert.match(
+    shell,
+    /path !== "resolutions" \|\| access\.canAccessResolutionTools/
+  );
+
+  assert.match(
+    shell,
+    /path !== "locks" \|\| access\.canAccessPresidentControls/
+  );
+});

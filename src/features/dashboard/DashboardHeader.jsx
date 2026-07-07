@@ -23,9 +23,19 @@ export default function DashboardHeader({ profile, mode, access, onSignOut }) {
         <motion.p className="dashboard-eyebrow" variants={reduceMotion ? undefined : mastheadItem}>
           Rotaract Club of Pune Heritage
         </motion.p>
-        <motion.h1 variants={reduceMotion ? undefined : mastheadItem}>
-          {mode === "prospect" ? `Welcome, ${name}` : `${name}’s Club Pulse`}
-        </motion.h1>
+<motion.h1 variants={reduceMotion ? undefined : mastheadItem}>
+  {mode === "prospect" ? (
+    <>
+      <span className="dashboard-masthead__welcome-line">Welcome,</span>
+      <span className="dashboard-masthead__member-name">{name}</span>
+    </>
+  ) : (
+    <>
+      <span className="dashboard-masthead__member-name">{name}’s</span>
+      <span className="dashboard-masthead__title-line">Club Pulse</span>
+    </>
+  )}
+</motion.h1>
         <motion.p className="dashboard-masthead__role" variants={reduceMotion ? undefined : mastheadItem}>{identity}</motion.p>
         <motion.p className="dashboard-masthead__context" variants={reduceMotion ? undefined : mastheadItem}>
           {mode === "prospect"

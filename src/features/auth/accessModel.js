@@ -18,8 +18,9 @@ export function createDeniedAccess() {
     positionKeys: [],
     positionSource: null,
     isPresidentRole: false,
-    hasWebsiteDirectorPosition: false,
-    hasPresidentAuthority: false,
+hasWebsiteDirectorPosition: false,
+hasSergeantAtArmsPosition: false,
+hasPresidentAuthority: false,
     isApproved: false,
     isPending: false,
     isRejected: false,
@@ -61,8 +62,14 @@ export function normalizeTrustedAccess(payload) {
     : {};
   // Copy server authority flags strictly; position names and keys never create authority locally.
   const isPresidentRole = authority.isPresidentRole === true;
-  const hasWebsiteDirectorPosition = authority.hasWebsiteDirectorPosition === true;
-  const hasPresidentAuthority = authority.hasPresidentAuthority === true;
+const hasWebsiteDirectorPosition =
+  authority.hasWebsiteDirectorPosition === true;
+
+const hasSergeantAtArmsPosition =
+  authority.hasSergeantAtArmsPosition === true;
+
+const hasPresidentAuthority =
+  authority.hasPresidentAuthority === true;
   const resolutionManager = payload.resolutionManager === true;
   const isMemberRole = ACTIVE_ROLES.has(storedRole);
 
@@ -76,9 +83,10 @@ export function normalizeTrustedAccess(payload) {
           : isProfileMissing ? "profile-missing" : "inactive",
     positionKeys: cleanPositionKeys(payload.positionKeys),
     positionSource: typeof payload.positionSource === "string" ? payload.positionSource : null,
-    isPresidentRole,
-    hasWebsiteDirectorPosition,
-    hasPresidentAuthority,
+isPresidentRole,
+hasWebsiteDirectorPosition,
+hasSergeantAtArmsPosition,
+hasPresidentAuthority,
     resolutionManager,
     isApproved,
     isPending,
@@ -88,8 +96,12 @@ export function normalizeTrustedAccess(payload) {
     canAccessMemberDashboard: isApproved && isMemberRole,
     canAccessProspectDashboard: isApproved && storedRole === "prospect",
     canAccessBodTools: isApproved && ["bod", "admin", "president"].includes(storedRole),
-    canAccessAdminTools: isApproved
-      && (["admin", "president"].includes(storedRole) || hasPresidentAuthority),
+canAccessAdminTools: isApproved
+  && (
+    ["admin", "president"].includes(storedRole)
+    || hasPresidentAuthority
+    || hasSergeantAtArmsPosition
+  ),
     canAccessResolutionTools: isApproved && resolutionManager,
     canAccessVisitSubmissions: isApproved
       && (["admin", "president"].includes(storedRole)

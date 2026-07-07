@@ -38,7 +38,13 @@ export default function AccessPage() {
         <header className="access-hub__masthead">
           <div className="access-hub__identity">
             <motion.p className="access-hub__eyebrow" variants={reduceMotion ? undefined : revealItem}>Rotaract Club of Pune Heritage</motion.p>
-            <motion.h1 id="access-hub-title" variants={reduceMotion ? undefined : revealItem}>Welcome, {displayName}</motion.h1>
+<motion.h1
+  id="access-hub-title"
+  variants={reduceMotion ? undefined : revealItem}
+>
+  <span className="access-hub__welcome-line">Welcome,</span>
+  <span className="access-hub__member-name">{displayName}</span>
+</motion.h1>
             {email ? <motion.p className="access-hub__email" variants={reduceMotion ? undefined : revealItem}>{email}</motion.p> : null}
             <motion.p className="access-hub__intro" variants={reduceMotion ? undefined : revealItem}>Choose where you want to continue.</motion.p>
           </div>
@@ -59,7 +65,15 @@ export default function AccessPage() {
             Administrative access is available through server-verified Website Director authority. Your approved role remains {hub.role}.
           </motion.p>
         ) : null}
-
+{hub.hasDelegatedSergeantAuthority ? (
+  <motion.p
+    className="access-hub__authority"
+    variants={reduceMotion ? undefined : revealItem}
+  >
+    Administrative access is available through your server-verified
+    Sergeant-at-Arms assignment. Your approved role remains {hub.role}.
+  </motion.p>
+) : null}
         {hub.primary ? (
           <motion.nav className="access-hub__primary" aria-label="Recommended destination" variants={reduceMotion ? undefined : revealItem}>
             <Link to={hub.primary.href}>
