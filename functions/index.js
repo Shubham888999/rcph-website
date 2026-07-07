@@ -1454,11 +1454,12 @@ async function getAuthorityContext(uid, preloaded = {}) {
     status: active ? 'approved' : '',
     positionKeys: [],
     positionSource: null,
-    authority: {
-      isPresidentRole: active?.role === 'president',
-      hasWebsiteDirectorPosition: false,
-      hasPresidentAuthority: false,
-    },
+authority: {
+  isPresidentRole: active?.role === 'president',
+  hasWebsiteDirectorPosition: false,
+  hasSergeantAtArmsPosition: false,
+  hasPresidentAuthority: false,
+},
   };
 
   if (!active) return base;
@@ -1468,9 +1469,20 @@ async function getAuthorityContext(uid, preloaded = {}) {
     && cwdDefinition?.active === true;
 
   const presidentDefinition = positionHelpers.getPositionDefinition('president');
-  const canHoldPresidentAuthority = ['bod', 'admin', 'president'].includes(active.role)
-    && presidentDefinition?.active === true;
-  if (!canHoldWebsiteDirectorAuthority && !canHoldPresidentAuthority) return base;
+const canHoldPresidentAuthority = ['bod', 'admin', 'president'].includes(active.role)
+  && presidentDefinition?.active === true;
+
+const sergeantDefinition = positionHelpers.getPositionDefinition('saa');
+const canHoldSergeantAtArmsAuthority = ['bod', 'admin', 'president'].includes(active.role)
+  && sergeantDefinition?.active === true;
+
+if (
+  !canHoldWebsiteDirectorAuthority
+  && !canHoldPresidentAuthority
+  && !canHoldSergeantAtArmsAuthority
+) {
+  return base;
+}
 
   const userSnap = preloaded.userSnap || await db.collection('users').doc(uid).get();
   const userData = userSnap.exists ? (userSnap.data() || {}) : null;
@@ -1509,32 +1521,68 @@ async function getAuthorityContext(uid, preloaded = {}) {
       || await db.collection('bodPositionAssignments').doc(`president_${uid}`).get();
     hasPresidentPosition = isActivePositionAssignment(uid, 'president', assignmentSnap);
   }
+let hasSergeantAtArmsPosition = false;
 
+if (
+  canHoldSergeantAtArmsAuthority
+  && isApprovedActiveUserRecord(userData)
+  && positionKeysAreWellFormed
+  && metadata.positionKeys.includes('saa')
+) {
+  const assignmentSnap = preloaded.saaAssignmentSnap
+    || await db.collection('bodPositionAssignments').doc(`saa_${uid}`).get();
+
+  hasSergeantAtArmsPosition = isActivePositionAssignment(
+    uid,
+    'saa',
+    assignmentSnap
+  );
+}
   return {
     ...base,
     positionKeys: metadata.positionKeys.slice(),
     positionSource: resolved.source,
     authority: {
-      isPresidentRole: active.role === 'president',
-      hasWebsiteDirectorPosition,
-      hasPresidentAuthority: hasPresidentPosition || hasWebsiteDirectorPosition,
-    },
+  isPresidentRole: active.role === 'president',
+  hasWebsiteDirectorPosition,
+  hasSergeantAtArmsPosition,
+  hasPresidentAuthority: hasPresidentPosition || hasWebsiteDirectorPosition,
+},
   };
 }
-
+function hasOrdinaryAdminAuthority(authority) {
+  return Boolean(
+    authority?.role
+    && (
+      authority.role === 'admin'
+      || authority.authority?.hasPresidentAuthority === true
+      || authority.authority?.hasSergeantAtArmsPosition === true
+    )
+  );
+}
 async function assertAdminOrPresident(uid) {
   const authority = await getAuthorityContext(uid);
-  if (!authority.role || (authority.role !== 'admin' && !authority.authority.hasPresidentAuthority)) {
-    throw new HttpsError('permission-denied', 'Admin or president access required.');
+
+  if (!hasOrdinaryAdminAuthority(authority)) {
+    throw new HttpsError(
+      'permission-denied',
+      'Administrative access required.'
+    );
   }
+
   return authority.role;
 }
 
 async function assertAdminOrPresidentAuthority(uid) {
   const authority = await getAuthorityContext(uid);
-  if (!authority.role || (authority.role !== 'admin' && !authority.authority.hasPresidentAuthority)) {
-    throw new HttpsError('permission-denied', 'Admin or president access required.');
+
+  if (!hasOrdinaryAdminAuthority(authority)) {
+    throw new HttpsError(
+      'permission-denied',
+      'Administrative access required.'
+    );
   }
+
   return authority;
 }
 
@@ -3258,7 +3306,13 @@ exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const syncOptions = {
     actorUid: approverUid,
     actorRole: approverRole,
-    actorHasPresidentAuthority: approverAuthority.authority.hasPresidentAuthority,
+    actorHasPresidentAuthority:
+  approverAuthority.authority.hasPresidentAuthority,
+
+actorHasAdminPanelAuthority:
+  approverAuthority.role === 'admin'
+  || approverAuthority.authority.hasPresidentAuthority === true
+  || approverAuthority.authority.hasSergeantAtArmsPosition === true,
     targetUid,
     role: approvedRole,
     confirmJointPositionKeys: data.confirmJointPositionKeys || [],
@@ -3303,7 +3357,13 @@ exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) 
   const result = await syncUserAccessAndPositionsWithAttendance({
     actorUid,
     actorRole,
-    actorHasPresidentAuthority: actorAuthority.authority.hasPresidentAuthority,
+    actorHasPresidentAuthority:
+  approverAuthority.authority.hasPresidentAuthority,
+
+actorHasAdminPanelAuthority:
+  approverAuthority.role === 'admin'
+  || approverAuthority.authority.hasPresidentAuthority === true
+  || approverAuthority.authority.hasSergeantAtArmsPosition === true,
     targetUid,
     role,
     positionKeys: data.positionKeys,
@@ -3388,7 +3448,13 @@ exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const result = await syncUserAccessAndPositionsWithAttendance({
     actorUid,
     actorRole,
-    actorHasPresidentAuthority: actorAuthority.authority.hasPresidentAuthority,
+    actorHasPresidentAuthority:
+  approverAuthority.authority.hasPresidentAuthority,
+
+actorHasAdminPanelAuthority:
+  approverAuthority.role === 'admin'
+  || approverAuthority.authority.hasPresidentAuthority === true
+  || approverAuthority.authority.hasSergeantAtArmsPosition === true,,
     targetUid,
     role,
     positionKeys: data.positionKeys,
@@ -3565,23 +3631,33 @@ exports.uploadVisitSubmissionFile = onRequest({
 
 exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  const [userSnap, roleSnap, cwdAssignmentSnap, presidentAssignmentSnap] = await Promise.all([
-    db.collection('users').doc(uid).get(),
-    db.collection('roles').doc(uid).get(),
-    db.collection('bodPositionAssignments').doc(`${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`).get(),
-    db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
-  ]);
+const [
+  userSnap,
+  roleSnap,
+  cwdAssignmentSnap,
+  presidentAssignmentSnap,
+  saaAssignmentSnap,
+] = await Promise.all([
+  db.collection('users').doc(uid).get(),
+  db.collection('roles').doc(uid).get(),
+  db.collection('bodPositionAssignments')
+    .doc(`${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`)
+    .get(),
+  db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
+  db.collection('bodPositionAssignments').doc(`saa_${uid}`).get(),
+]);
   const roleData = roleSnap.exists ? (roleSnap.data() || {}) : null;
   const role = roleData && String(roleData.status || 'approved').toLowerCase() === 'approved'
     ? normalizeRole(roleData.role)
     : '';
   const activeRole = role && ACTIVE_ROLES.has(role) ? { role, data: roleData } : null;
-  const authorityContext = await getAuthorityContext(uid, {
-    activeRole,
-    userSnap,
-    cwdAssignmentSnap,
-    presidentAssignmentSnap,
-  });
+const authorityContext = await getAuthorityContext(uid, {
+  activeRole,
+  userSnap,
+  cwdAssignmentSnap,
+  presidentAssignmentSnap,
+  saaAssignmentSnap,
+});
   const resolutionManager = await hasResolutionManagerAuthority(uid, { activeRole, userSnap });
 
   return {

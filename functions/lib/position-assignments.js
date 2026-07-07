@@ -443,16 +443,24 @@ function createPositionAssignmentService(deps) {
     const targetUid = toSafeText(options?.targetUid, 128);
     const actorUid = toSafeText(options?.actorUid, 128);
     const actorRole = normalizeRoleValue(options?.actorRole);
-    const actorHasPresidentAuthority = options?.actorHasPresidentAuthority === true || actorRole === 'president';
-    const role = normalizeRoleValue(options?.role);
+const actorHasPresidentAuthority =
+  options?.actorHasPresidentAuthority === true
+  || actorRole === 'president';
+
+const actorHasAdminPanelAuthority =
+  options?.actorHasAdminPanelAuthority === true
+  || actorRole === 'admin'
+  || actorRole === 'president'
+  || actorHasPresidentAuthority;
+      const role = normalizeRoleValue(options?.role);
     const operationSource = toSafeText(options?.operationSource, 80);
 
     if (!targetUid || targetUid.includes('/') || !actorUid || actorUid.includes('/')) {
       throwSyncError('invalid-argument', 'Valid actor and target users are required.');
     }
-    if (actorRole !== 'admin' && actorRole !== 'president' && !actorHasPresidentAuthority) {
-      throwSyncError('permission-denied', 'Admin or president access required.');
-    }
+if (!actorHasAdminPanelAuthority) {
+  throwSyncError('permission-denied', 'Administrative access required.');
+}
     if (!MANAGEABLE_ROLES.has(role)) {
       throwSyncError('invalid-argument', 'Valid target role required.');
     }
