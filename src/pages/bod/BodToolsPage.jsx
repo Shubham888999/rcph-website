@@ -23,6 +23,7 @@ import BodToolsSkeleton from "../../features/bod-tools/BodToolsSkeleton";
 import useBodEvents from "../../features/bod-tools/useBodEvents";
 import { clearDashboardDataCache } from "../../features/dashboard/dashboardService";
 import useAuth from "../../hooks/useAuth";
+import { formatRotaractorName } from "../../utils/memberName";
 import "../../styles/components/bod-tools.css";
 
 const DEFAULT_FILTERS = { status: "active", type: "", avenue: "", month: "", mine: false, search: "" };
@@ -47,7 +48,7 @@ export default function BodToolsPage() {
   const visibleEvents = useMemo(() => filterBodEvents(events, filters, uid), [events, filters, uid]);
   const avenues = useMemo(() => [...new Set(events.flatMap((event) => event.avenues))].sort(), [events]);
   const months = useMemo(() => [...new Set(events.map((event) => event.startDate.slice(0, 7)))].sort().reverse(), [events]);
-  const displayName = access?.user?.name || user?.displayName || "RCPH member";
+  const displayName = formatRotaractorName(access?.user?.name || user?.displayName || "RCPH member", access?.user || access?.storedRole);
 
   async function runMutation(operation, request, successMessage, close) {
     if (mutationLockRef.current || !canMutate) return;

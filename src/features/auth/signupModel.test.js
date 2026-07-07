@@ -14,6 +14,7 @@ import {
   selectSignupPath,
   updateSignupField,
   validateSignup,
+  normalizeSignupText,
 } from "./signupModel.js";
 import { getSignupDiagnostic, getSignupError } from "./signupErrors.js";
 
@@ -73,8 +74,9 @@ test("returning to chooser clears passwords and invite code", () => {
   assert.equal(next.confirmPassword, "");
   assert.equal(next.inviteCode, "");
 });
-test("name normalization trims only surrounding whitespace", () => {
+test("name normalization trims whitespace and strips manual Rtr prefixes", () => {
   assert.equal(normalizeSignupName("  Asha M.  "), "Asha M.");
+  assert.equal(normalizeSignupName("Rtr. Rtr. Asha M."), "Asha M.");
 });
 test("email normalization trims and lowercases", () => {
   assert.equal(normalizeSignupEmail(" USER@Example.COM "), "user@example.com");
@@ -104,6 +106,12 @@ test("phone normalization preserves practical formatting and plus", () => {
 test("required common fields are rejected", () => {
   const result = validateSignup(selectSignupPath(createSignupForm(), "existing-member"));
   assert.ok(result.errors.name && result.errors.phone && result.errors.email && result.errors.gender);
+});
+test("signup text normalization preserves Rtr-like ordinary text", () => {
+  assert.equal(
+    normalizeSignupText("Rtr. is commonly used in Rotaract"),
+    "Rtr. is commonly used in Rotaract",
+  );
 });
 test("mandatory legal acceptance blocks signup", () => {
   const result = validateSignup({ ...validMember(), legalAccepted: false });

@@ -14,6 +14,7 @@ import {
   updateRosterMember,
 } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
+import { formatRotaractorName, stripRotaractorPrefix } from "../../../utils/memberName";
 
 export function CommandCenter({ data, access, uid, onNotice }) {
   const [ranking, setRanking] = useState({ enabled: false, value: "", subtitle: "" });
@@ -105,8 +106,8 @@ export function AccountsModule({ users, access, uid, onNotice }) {
   return <>
     <AdminModuleHeader title="Accounts & Roles" description="Approve requests and maintain role/position assignments through this page." />
     <div className="admin-filterbar"><label>Search<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label>Status<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="all">All</option></select></label></div>
-    {rows.length ? <div className="admin-table-wrap"><table><caption>Account requests and approved access</caption><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Positions</th><th>Action</th></tr></thead><tbody>{rows.map((user) => <tr key={user.id}><td>{user.name}</td><td>{user.email || "Unavailable"}</td><td>{user.status === "pending" ? user.requestedRole : user.role}</td><td>{user.status}</td><td>{user.positionKeys.join(", ") || user.clubPosition || "None"}</td><td><button type="button" onClick={() => open(user)}>Manage</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No account records match this view." />}
-    {editor ? <AdminDialog title={`Manage ${editor.user.name}`} busy={busy} onClose={() => setEditor(null)}><div className="admin-form">
+    {rows.length ? <div className="admin-table-wrap"><table><caption>Account requests and approved access</caption><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Positions</th><th>Action</th></tr></thead><tbody>{rows.map((user) => <tr key={user.id}><td>{formatRotaractorName(user.name, user)}</td><td>{user.email || "Unavailable"}</td><td>{user.status === "pending" ? user.requestedRole : user.role}</td><td>{user.status}</td><td>{user.positionKeys.join(", ") || user.clubPosition || "None"}</td><td><button type="button" onClick={() => open(user)}>Manage</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No account records match this view." />}
+    {editor ? <AdminDialog title={`Manage ${formatRotaractorName(editor.user.name, editor.user)}`} busy={busy} onClose={() => setEditor(null)}><div className="admin-form">
       {protectedPresident ? <p>This President account can only be changed by trusted President controls.</p> : <>
         <label>Access role<select value={editor.role} onChange={(event) => changeRole(event.target.value)}>{roles.map((role) => <option key={role}>{role}</option>)}</select></label>
         {editor.role === "gbm" ? <p className="admin-position-picker__role-note">GBM accounts do not receive BOD position assignments. Saving sends an empty position list.</p> : <PositionMultiSelect
@@ -136,8 +137,8 @@ export function MembersModule({ members, uid, onNotice }) {
   const [editing, setEditing] = useState(null);
   const [target, setTarget] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "members", onNotice });
-  function add(event) { event.preventDefault(); run("add-member", () => addRosterMember("members", { name: name.trim() }), "Member added.").then((result) => { if (result) setName(""); }); }
-  function saveEdit(event) { event.preventDefault(); run("rename-member", () => updateRosterMember("members", editing.id, { name: editing.name.trim() }), "Member updated.").then((result) => { if (result !== null) setEditing(null); }); }
+  function add(event) { event.preventDefault(); run("add-member", () => addRosterMember("members", { name: stripRotaractorPrefix(name) }), "Member added.").then((result) => { if (result) setName(""); }); }
+  function saveEdit(event) { event.preventDefault(); run("rename-member", () => updateRosterMember("members", editing.id, { name: stripRotaractorPrefix(editing.name) }), "Member updated.").then((result) => { if (result !== null) setEditing(null); }); }
 return (
   <>
     <AdminModuleHeader
@@ -219,7 +220,7 @@ return (
               </div>
 
               <div className="member-roster-row__identity">
-                <h3>{member.name}</h3>
+                <h3>{formatRotaractorName(member.name, true)}</h3>
 
                 <p>
                   {member.email || "No email in roster"}
@@ -264,10 +265,10 @@ return (
         })}
       </div>
     </section>
-    {editing ? <AdminDialog title={`Rename ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><form className="admin-form" onSubmit={saveEdit}><label>Full name<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} required autoFocus /></label><div className="admin-actions"><button type="button" onClick={() => setEditing(null)}>Cancel</button><button disabled={busy}>Save</button></div></form></AdminDialog> : null}
+    {editing ? <AdminDialog title={`Rename ${formatRotaractorName(editing.name, true)}`} busy={busy} onClose={() => setEditing(null)}><form className="admin-form" onSubmit={saveEdit}><label>Full name<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} required autoFocus /></label><div className="admin-actions"><button type="button" onClick={() => setEditing(null)}>Cancel</button><button disabled={busy}>Save</button></div></form></AdminDialog> : null}
     {target ? (
       <AdminDialog
-        title={`Remove ${target.name}?`}
+        title={`Remove ${formatRotaractorName(target.name, true)}?`}
         busy={busy}
         onClose={() => setTarget(null)}
       >

@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { formatRotaractorName } from "../../utils/memberName";
 
 const cardVariants = {
   hidden: { opacity: 1, y: 22 },
@@ -16,6 +17,7 @@ function getAccentCategory(role = "") {
 
 export default function BodCard({ member, reduceMotion, council = false }) {
   const accentCategory = getAccentCategory(member.role);
+  const displayName = formatRotaractorName(member.name, true);
 
   return (
     <motion.article
@@ -25,7 +27,7 @@ export default function BodCard({ member, reduceMotion, council = false }) {
       <div className="bod-card-react__portrait">
         <img
           src={member.image}
-          alt={`${member.name}, ${member.role} at Rotaract Club of Pune Heritage`}
+          alt={`${displayName}, ${member.role} at Rotaract Club of Pune Heritage`}
           loading="lazy"
           decoding="async"
         />
@@ -33,7 +35,7 @@ export default function BodCard({ member, reduceMotion, council = false }) {
       </div>
       <div className="bod-card-react__content">
         <p className="bod-card-react__role">{member.role}</p>
-        <h3>{member.name}</h3>
+        <h3>{displayName}</h3>
         <span className="bod-card-react__accent" aria-hidden="true" />
         {member.context ? <p className="bod-card-react__context">{member.context}</p> : null}
         <div className="bod-card-react__details">

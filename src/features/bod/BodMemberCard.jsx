@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
 import BoardSparkles from "./BoardSparkles";
 import { getBodAccentCategory, getBodMemberAvenue, getBodMemberId } from "./bodGridModel";
+import { formatRotaractorName } from "../../utils/memberName";
 
 export default function BodMemberCard({ member, active, onToggle, reduceMotion, buttonRef, index }) {
   const memberId = getBodMemberId(member);
   const avenue = getBodMemberAvenue(member);
   const accent = getBodAccentCategory(member.role);
   const detailId = `bod-member-details-${memberId}`;
+  const displayName = formatRotaractorName(member.name, true);
 
   return (
     <motion.article
@@ -22,13 +24,13 @@ export default function BodMemberCard({ member, active, onToggle, reduceMotion, 
         type="button"
         aria-expanded={active}
         aria-controls={detailId}
-        aria-label={`${active ? "Close" : "Open"} profile for ${member.name}, ${member.role}`}
+        aria-label={`${active ? "Close" : "Open"} profile for ${displayName}, ${member.role}`}
         onClick={() => onToggle(member)}
       >
         <span className="bod-member-card__portrait">
           <img
             src={member.image}
-            alt={`${member.name}, ${member.role} at Rotaract Club of Pune Heritage`}
+            alt={`${displayName}, ${member.role} at Rotaract Club of Pune Heritage`}
             loading="lazy"
             decoding="async"
           />
@@ -37,7 +39,7 @@ export default function BodMemberCard({ member, active, onToggle, reduceMotion, 
 
         <span className="bod-member-card__closed-copy">
           <span className="bod-member-card__role">{member.role}</span>
-          <span className="bod-member-card__name">{member.name}</span>
+          <span className="bod-member-card__name">{displayName}</span>
           {avenue ? <span className="bod-member-card__avenue">{avenue}</span> : null}
         </span>
 

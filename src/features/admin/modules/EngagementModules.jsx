@@ -5,6 +5,7 @@ import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
 import { buildAnnouncementPayload } from "../shared/adminModel";
 import { adminCalls, clearAdminCaches, loadAdminCallable } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
+import { formatRotaractorName } from "../../../utils/memberName";
 
 export function ProspectsModule({ uid, onNotice }) {
   const [state, setState] = useState({ status: "loading", prospects: [], summary: {} });
@@ -39,7 +40,7 @@ export function AnnouncementsModule({ uid, onNotice }) {
   const { busy, run } = useAdminMutation({ uid, module: "announcements", onNotice });
   const load = useCallback((refresh = false) => {
     Promise.all([loadAdminCallable(uid, "getAnnouncementRecipientOptions", refresh), adminCalls.announcementHistory({ limit: 20, cursor: null })]).then(([directory, log]) => {
-      setRecipients(Array.isArray(directory.recipients) ? directory.recipients : []);
+      setRecipients(Array.isArray(directory.recipients) ? directory.recipients.map((recipient) => ({ ...recipient, rawName: recipient.name, name: formatRotaractorName(recipient.name || recipient.email, recipient) })) : []);
       setHistory(Array.isArray(log.announcements) ? log.announcements : []);
       setCursor(log.nextCursor || null);
       setStatus("success");

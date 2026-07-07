@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { getCouncilInstagramProfile, getCouncilMemberId } from "./councilGridModel";
+import { formatRotaractorName } from "../../utils/memberName";
 
 const contentVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } } };
 const lineVariants = {
@@ -12,13 +13,14 @@ export default function CouncilMemberDetails({ member, reduceMotion }) {
   const detailId = `council-member-details-${memberId}`;
   const titleId = `${detailId}-title`;
   const instagram = getCouncilInstagramProfile(member);
+  const displayName = formatRotaractorName(member.name, true);
 
   return (
     <motion.section id={detailId} className="bod-member-details council-member-details" role="region" aria-labelledby={titleId} aria-live="polite" initial={reduceMotion ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0, y: -8 }} transition={{ duration: reduceMotion ? 0 : 0.28, ease: [0.4, 0, 0.2, 1] }}>
       <motion.div className="bod-member-details__canvas council-member-details__canvas" variants={reduceMotion ? undefined : contentVariants} initial={reduceMotion ? false : "hidden"} animate={reduceMotion ? undefined : "visible"}>
         <div className="bod-member-details__identity">
           <motion.p className="bod-member-details__eyebrow" variants={reduceMotion ? undefined : lineVariants}>Council profile</motion.p>
-          <motion.h3 id={titleId} variants={reduceMotion ? undefined : lineVariants}>{member.name}</motion.h3>
+          <motion.h3 id={titleId} variants={reduceMotion ? undefined : lineVariants}>{displayName}</motion.h3>
           <motion.p className="bod-member-details__role" variants={reduceMotion ? undefined : lineVariants}>{member.role}</motion.p>
           {member.councilGroup ? <motion.p className="bod-member-details__avenue" variants={reduceMotion ? undefined : lineVariants}>{member.councilGroup}</motion.p> : null}
           {member.context ? <motion.p className="council-member-details__context" variants={reduceMotion ? undefined : lineVariants}>{member.context}</motion.p> : null}

@@ -6,6 +6,7 @@ import useAuth from "../../hooks/useAuth";
 import "../../styles/components/auth-access.css";
 import "../../styles/components/access-hub.css";
 import ProspectWhatsAppGroup from "../../features/prospect/ProspectWhatsAppGroup";
+import { formatRotaractorName } from "../../utils/memberName";
 import "../../styles/components/member-dashboard.css";
 const revealItem = {
   hidden: { opacity: 1, y: 14 },
@@ -16,7 +17,7 @@ export default function AccessPage() {
   const { access, user, signOut } = useAuth();
   const reduceMotion = useReducedMotion();
   const profile = access?.user || {};
-  const displayName = profile.name || user?.displayName || user?.email || "RCPH Member";
+  const displayName = formatRotaractorName(profile.name || user?.displayName || user?.email || "RCPH Member", profile);
   const email = profile.email || user?.email || "";
   const hub = getAccessHubViewModel(access);
   const isProspect = access?.canAccessProspectDashboard === true;

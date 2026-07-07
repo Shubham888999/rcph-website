@@ -1,6 +1,7 @@
 import AdminModuleHeader from "../AdminModuleHeader";
 import AttendanceMark from "../../../components/status/AttendanceMark";
 import { formatInr, normalizeAttendance } from "../shared/adminModel";
+import { formatRotaractorName } from "../../../utils/memberName";
 
 const PANELS = [
   ["President", "https://drive.google.com/drive/folders/1gLXYLCWpwzdGvqXkkIB3pS-XTxnuEcGh"],
@@ -33,10 +34,10 @@ export default function DzrVisitModule({ data }) {
     <section className="admin-panel"><h3>BOD panels</h3><div className="admin-card-grid">{PANELS.map(([name, url], index) => <article className="admin-record-card" key={name}><h4>{index + 1}. {name}</h4><a href={url} target="_blank" rel="noopener noreferrer">Open Drive folder</a></article>)}</div></section>
     <ReadOnlyAttendance title="Member attendance" members={data.members} events={events} attendance={data.attendance} />
     <ReadOnlyAttendance title="BOD attendance" members={data.bodMembers} events={data.bodMeetings.filter((item) => !item.archived)} attendance={data.bodAttendance} />
-    <section className="admin-panel"><h3>Fines</h3><div className="admin-table-wrap"><table><caption>View-only fine records</caption><thead><tr><th>Member</th><th>Amount</th><th>Reason</th><th>Event</th><th>Date</th></tr></thead><tbody>{data.fines.map((fine) => <tr key={fine.id}><td>{fine.memberName}</td><td>{formatInr(fine.amount)}</td><td>{fine.reason}</td><td>{fine.eventName}</td><td>{fine.date}</td></tr>)}</tbody></table></div></section>
+    <section className="admin-panel"><h3>Fines</h3><div className="admin-table-wrap"><table><caption>View-only fine records</caption><thead><tr><th>Member</th><th>Amount</th><th>Reason</th><th>Event</th><th>Date</th></tr></thead><tbody>{data.fines.map((fine) => <tr key={fine.id}><td>{formatRotaractorName(fine.memberName, true)}</td><td>{formatInr(fine.amount)}</td><td>{fine.reason}</td><td>{fine.eventName}</td><td>{fine.date}</td></tr>)}</tbody></table></div></section>
     <section className="admin-panel"><h3>Treasury</h3><div className="admin-table-wrap"><table><caption>View-only treasury ledger</caption><thead><tr><th>Date</th><th>Title</th><th>Type</th><th>Avenue</th><th>Amount</th><th>Paid by</th><th>Paid to</th></tr></thead><tbody>{data.treasury.map((item) => <tr key={item.id}><td>{item.date}</td><td>{item.title}</td><td>{item.type}</td><td>{item.avenue || "—"}</td><td>{formatInr(item.amount)}</td><td>{item.paidBy || "—"}</td><td>{item.paidTo || "—"}</td></tr>)}</tbody></table></div></section>
   </>;
 }
 
 function Metric({ label, value }) { return <article className="admin-metric"><span>{label}</span><strong>{value}</strong></article>; }
-function ReadOnlyAttendance({ title, members, events, attendance }) { return <section className="admin-panel"><h3>{title}</h3><div className="admin-table-wrap"><table><caption>{title}, view only</caption><thead><tr><th>Member</th>{events.map((event) => <th key={event.id}>{event.name}</th>)}</tr></thead><tbody>{members.map((member) => <tr key={member.id}><th>{member.name}</th>{events.map((event) => { const value = normalizeAttendance(attendance[member.id]?.[event.id]); return <td key={event.id}><AttendanceMark value={value} size="small" /></td>; })}</tr>)}</tbody></table></div></section>; }
+function ReadOnlyAttendance({ title, members, events, attendance }) { return <section className="admin-panel"><h3>{title}</h3><div className="admin-table-wrap"><table><caption>{title}, view only</caption><thead><tr><th>Member</th>{events.map((event) => <th key={event.id}>{event.name}</th>)}</tr></thead><tbody>{members.map((member) => <tr key={member.id}><th>{formatRotaractorName(member.name, member.role ? member : true)}</th>{events.map((event) => { const value = normalizeAttendance(attendance[member.id]?.[event.id]); return <td key={event.id}><AttendanceMark value={value} size="small" /></td>; })}</tr>)}</tbody></table></div></section>; }

@@ -7,6 +7,7 @@ import { AVENUES, buildEventPayload, normalizeAttendance } from "../shared/admin
 import { adminCalls, addRosterMember, deleteRosterMember, setAttendanceBulk, setAttendanceCell, setAttendanceRow, updateRosterMember } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
 import AttendanceExportPanel from "../attendance-export/AttendanceExportPanel";
+import { formatRotaractorName, stripRotaractorPrefix } from "../../../utils/memberName";
 
 function nextAttendance(value) { return value === true ? false : value === false ? "NA" : true; }
 function getAttendanceStats(memberId, events, attendance) {
@@ -229,6 +230,7 @@ function AttendanceGrid({
 
               const isProspect =
                 member.role?.toLowerCase() === "prospect";
+              const memberDisplayName = formatRotaractorName(member.name, member.role ? member : true);
 
               return (
                 <tr key={member.id}>
@@ -258,7 +260,7 @@ function AttendanceGrid({
 
     <div className="attendance-member-row__main">
       <div className="attendance-member-row__identity">
-        <strong>{member.name}</strong>
+        <strong>{memberDisplayName}</strong>
 
         {isProspect ? (
           <span className="attendance-member-role">
@@ -269,7 +271,7 @@ function AttendanceGrid({
 
       <select
         className="attendance-member-cell__bulk"
-        aria-label={`Bulk attendance for ${member.name}`}
+        aria-label={`Bulk attendance for ${memberDisplayName}`}
         disabled={locked || busy}
         defaultValue=""
         onChange={(change) => {
@@ -314,7 +316,7 @@ function AttendanceGrid({
                           }`}
                           type="button"
                           disabled={locked || busy}
-                          aria-label={`${member.name}, ${event.name}: ${label}`}
+                          aria-label={`${memberDisplayName}, ${event.name}: ${label}`}
                           onClick={() =>
                             run(
                               "set-attendance",
@@ -358,7 +360,7 @@ function AttendanceGrid({
 function MailDraftTool({ members, title }) {
   const [draft, setDraft] = useState({ to: "", from: "", subject: "", body: "" });
   function open(event) { event.preventDefault(); const query = new URLSearchParams({ subject: draft.subject, body: `${draft.body}\n\nFrom: ${draft.from}` }); window.location.href = `mailto:${encodeURIComponent(draft.to)}?${query.toString()}`; }
-  return <details className="admin-panel"><summary>{title} warning/termination mail drafts</summary><form className="admin-form admin-form--inline" onSubmit={open}><label>Recipient<select value={draft.to} onChange={(event) => setDraft({ ...draft, to: event.target.value })} required><option value="">Choose member</option>{members.filter((member) => member.email).map((member) => <option key={member.id} value={member.email}>{member.name}</option>)}</select></label><label>From<input type="email" value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })} required /></label><label>Subject<input value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} required /></label><label>Message<textarea value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} required /></label><button>Open mail draft</button></form><p>This opens the default mail application; React does not send the message.</p></details>;
+  return <details className="admin-panel"><summary>{title} warning/termination mail drafts</summary><form className="admin-form admin-form--inline" onSubmit={open}><label>Recipient<select value={draft.to} onChange={(event) => setDraft({ ...draft, to: event.target.value })} required><option value="">Choose member</option>{members.filter((member) => member.email).map((member) => <option key={member.id} value={member.email}>{formatRotaractorName(member.name, member.role ? member : true)}</option>)}</select></label><label>From<input type="email" value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })} required /></label><label>Subject<input value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} required /></label><label>Message<textarea value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} required /></label><button>Open mail draft</button></form><p>This opens the default mail application; React does not send the message.</p></details>;
 }
 
 const emptyEvent = { name: "", date: "", endDate: "", desc: "", avenue: [] };
@@ -536,7 +538,7 @@ export function BodOperationsModule({ data, lock, uid, onNotice }) {
   const { busy, run } = useAdminMutation({ uid, module: "bod-operations", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const meetings = data.bodMeetings.filter((item) => !item.archived);
-  function saveMember(event) { event.preventDefault(); run("edit-bod-member", () => updateRosterMember("bodMembers", editMember.id, { name: editMember.name.trim(), position: editMember.position.trim() }), "BOD member updated.").then((result) => { if (result !== null) setEditMember(null); }); }
+  function saveMember(event) { event.preventDefault(); run("edit-bod-member", () => updateRosterMember("bodMembers", editMember.id, { name: stripRotaractorPrefix(editMember.name), position: editMember.position.trim() }), "BOD member updated.").then((result) => { if (result !== null) setEditMember(null); }); }
   function saveMeeting(event) { event.preventDefault(); run("edit-bod-meeting", () => adminCalls.updateBodMeeting({ meetingId: editMeeting.id, name: editMeeting.name.trim(), date: editMeeting.date }), "BOD meeting updated.").then((result) => { if (result) setEditMeeting(null); }); }
   return <>
     <AdminModuleHeader title="Club Directors, Meetings & Attendance" />
@@ -598,7 +600,7 @@ export function BodOperationsModule({ data, lock, uid, onNotice }) {
 
         run(
           "add-bod-member",
-          () => addRosterMember("bodMembers", member),
+          () => addRosterMember("bodMembers", { ...member, name: stripRotaractorPrefix(member.name) }),
           "BOD member added."
         ).then((result) => {
           if (result) {
@@ -770,7 +772,7 @@ export function BodOperationsModule({ data, lock, uid, onNotice }) {
           </div>
 
           <div className="bod-director-row__identity">
-            <h4>{item.name}</h4>
+            <h4>{formatRotaractorName(item.name, true)}</h4>
 
             <p>{item.position || "Position unavailable"}</p>
           </div>
@@ -889,10 +891,10 @@ export function BodOperationsModule({ data, lock, uid, onNotice }) {
     <AttendanceExportPanel panelKey="bod" members={data.bodMembers} events={meetings} attendance={data.bodAttendance} onNotice={onNotice} />
     <AttendanceGrid members={data.bodMembers} events={meetings} attendance={data.bodAttendance} collectionName="bodAttendance" locked={locked} uid={uid} onNotice={onNotice} />
     <MailDraftTool members={data.bodMembers} title="BOD" />
-    {editMember ? <AdminDialog title={`Edit ${editMember.name}`} busy={busy} onClose={() => setEditMember(null)}><form className="admin-form" onSubmit={saveMember}><label>Name<input value={editMember.name} onChange={(event) => setEditMember({ ...editMember, name: event.target.value })} required /></label><label>Position<input value={editMember.position} onChange={(event) => setEditMember({ ...editMember, position: event.target.value })} /></label><button disabled={busy}>Save BOD member</button></form></AdminDialog> : null}
+    {editMember ? <AdminDialog title={`Edit ${formatRotaractorName(editMember.name, true)}`} busy={busy} onClose={() => setEditMember(null)}><form className="admin-form" onSubmit={saveMember}><label>Name<input value={editMember.name} onChange={(event) => setEditMember({ ...editMember, name: event.target.value })} required /></label><label>Position<input value={editMember.position} onChange={(event) => setEditMember({ ...editMember, position: event.target.value })} /></label><button disabled={busy}>Save BOD member</button></form></AdminDialog> : null}
     {editMeeting ? <AdminDialog title={`Edit ${editMeeting.name}`} busy={busy} onClose={() => setEditMeeting(null)}><form className="admin-form" onSubmit={saveMeeting}><label>Name<input value={editMeeting.name} onChange={(event) => setEditMeeting({ ...editMeeting, name: event.target.value })} required /></label><label>Date<input type="date" value={editMeeting.date} onChange={(event) => setEditMeeting({ ...editMeeting, date: event.target.value })} required /></label><button disabled={busy}>Save meeting</button></form></AdminDialog> : null}
     {archiveMeeting ? <AdminDialog title={`Archive ${archiveMeeting.name}?`} busy={busy} onClose={() => setArchiveMeeting(null)}><p>This soft-archives the club meeting while preserving historical attendance.</p><div className="admin-actions"><button onClick={() => setArchiveMeeting(null)}>Cancel</button><button className="danger" onClick={() => run("archive-bod-meeting", () => adminCalls.archiveBodMeeting(archiveMeeting.id), "BOD meeting archived.").then((result) => { if (result) setArchiveMeeting(null); })}>Archive</button></div></AdminDialog> : null}
-    {remove ? <AdminDialog title={`Remove ${remove.name}?`} busy={busy} onClose={() => setRemove(null)}><p>This permanently removes the BOD roster and attendance documents, matching production.</p><div className="admin-actions"><button onClick={() => setRemove(null)}>Cancel</button><button className="danger" onClick={() => run("remove-bod-member", () => deleteRosterMember("bodMembers", "bodAttendance", remove.id), "BOD member removed.").then((result) => { if (result !== null) setRemove(null); })}>Remove</button></div></AdminDialog> : null}
+    {remove ? <AdminDialog title={`Remove ${formatRotaractorName(remove.name, true)}?`} busy={busy} onClose={() => setRemove(null)}><p>This permanently removes the BOD roster and attendance documents, matching production.</p><div className="admin-actions"><button onClick={() => setRemove(null)}>Cancel</button><button className="danger" onClick={() => run("remove-bod-member", () => deleteRosterMember("bodMembers", "bodAttendance", remove.id), "BOD member removed.").then((result) => { if (result !== null) setRemove(null); })}>Remove</button></div></AdminDialog> : null}
   </>;
 }
 

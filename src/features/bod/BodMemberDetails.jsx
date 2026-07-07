@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { getBodMemberAvenue, getBodMemberId, getInstagramProfile } from "./bodGridModel";
+import { formatRotaractorName } from "../../utils/memberName";
 
 const contentVariants = {
   hidden: {},
@@ -17,6 +18,7 @@ export default function BodMemberDetails({ member, reduceMotion }) {
   const titleId = `${detailId}-title`;
   const avenue = getBodMemberAvenue(member);
   const instagram = getInstagramProfile(member);
+  const displayName = formatRotaractorName(member.name, true);
 
   return (
     <motion.section
@@ -37,7 +39,7 @@ export default function BodMemberDetails({ member, reduceMotion }) {
       >
         <div className="bod-member-details__identity">
           <motion.p className="bod-member-details__eyebrow" variants={reduceMotion ? undefined : lineVariants}>Board profile</motion.p>
-          <motion.h3 id={titleId} variants={reduceMotion ? undefined : lineVariants}>{member.name}</motion.h3>
+          <motion.h3 id={titleId} variants={reduceMotion ? undefined : lineVariants}>{displayName}</motion.h3>
           <motion.p className="bod-member-details__role" variants={reduceMotion ? undefined : lineVariants}>{member.role}</motion.p>
           {avenue ? <motion.p className="bod-member-details__avenue" variants={reduceMotion ? undefined : lineVariants}>{avenue}</motion.p> : null}
         </div>

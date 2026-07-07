@@ -2,10 +2,11 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { getPositionLabels } from "./accessHubModel";
 import { getRoleLabel } from "./dashboardPresentationModel";
+import { formatRotaractorName } from "../../utils/memberName";
 
 export default function DashboardHeader({ profile, mode, access, onSignOut }) {
   const reduceMotion = useReducedMotion();
-  const name = profile.name || profile.memberName || (mode === "prospect" ? "Prospect" : "RCPH Member");
+  const name = formatRotaractorName(profile.name || profile.memberName || (mode === "prospect" ? "Prospect" : "RCPH Member"), mode === "prospect" ? { role: "prospect" } : profile);
   const canonicalPositions = getPositionLabels(profile.positionKeys);
   const legacyPosition = profile.memberPosition || profile.clubPosition;
   const positions = canonicalPositions.length ? canonicalPositions : legacyPosition ? [legacyPosition] : [];

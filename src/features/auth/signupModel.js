@@ -6,6 +6,7 @@ import {
   LEGAL_EFFECTIVE_DATE,
   LEGAL_VERSIONS,
 } from "../legal/legalConstants.js";
+import { stripRotaractorPrefix } from "../../utils/memberName.js";
 
 export const SIGNUP_PATHS = {
   CHOICE: "choice",
@@ -47,6 +48,10 @@ export function createSignupForm() {
 }
 
 export function normalizeSignupName(value) {
+  return stripRotaractorPrefix(value);
+}
+
+export function normalizeSignupText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -118,19 +123,19 @@ export function validateSignup(form, options = {}) {
   if (!minimalProfileCompletion && !SIGNUP_GENDERS.includes(form.gender)) {
     errors.gender = "Select a gender option.";
   }
-  if (!minimalProfileCompletion && form.gender === "self-describe" && !normalizeSignupName(form.genderSelfDescribe)) {
+  if (!minimalProfileCompletion && form.gender === "self-describe" && !normalizeSignupText(form.genderSelfDescribe)) {
     errors.genderSelfDescribe = "Please describe your gender.";
   }
 
   if (form.path === SIGNUP_PATHS.PROSPECT) {
-    if (!normalizeSignupName(form.hobbies)) errors.hobbies = "Tell us about your hobbies or interests.";
+    if (!normalizeSignupText(form.hobbies)) errors.hobbies = "Tell us about your hobbies or interests.";
     if (!["yes", "no"].includes(form.previousRotaract)) {
       errors.previousRotaract = "Select whether you have been part of Rotaract before.";
     }
-    if (form.previousRotaract === "yes" && !normalizeSignupName(form.previousRotaractDetails)) {
+    if (form.previousRotaract === "yes" && !normalizeSignupText(form.previousRotaractDetails)) {
       errors.previousRotaractDetails = "Describe your previous Rotaract experience.";
     }
-    if (!normalizeSignupName(form.joinReason)) errors.joinReason = "Tell us why you want to join RCPH.";
+    if (!normalizeSignupText(form.joinReason)) errors.joinReason = "Tell us why you want to join RCPH.";
     if (!["yes", "no"].includes(form.referred)) {
       errors.referred = "Select whether someone referred you.";
     }
@@ -139,7 +144,7 @@ export function validateSignup(form, options = {}) {
     }
   } else if (form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
     if (!SIGNUP_ROLES.includes(form.requestedRole)) errors.requestedRole = "Choose GBM, BOD, or Admin.";
-    if (form.requestedRole === "admin" && !normalizeSignupName(form.inviteCode)) {
+    if (form.requestedRole === "admin" && !normalizeSignupText(form.inviteCode)) {
       errors.inviteCode = "Enter the Admin invite code.";
     }
   } else {
@@ -188,7 +193,7 @@ export function buildSignupPayload(form, options = {}) {
       provider,
       ...consent,
       ...(form.requestedRole === "admin"
-        ? { inviteCode: normalizeSignupName(form.inviteCode) }
+        ? { inviteCode: normalizeSignupText(form.inviteCode) }
         : {}),
     };
   }
@@ -199,9 +204,9 @@ export function buildSignupPayload(form, options = {}) {
     requestedRole: form.path === SIGNUP_PATHS.PROSPECT ? "prospect" : form.requestedRole,
     provider,
     gender: SIGNUP_GENDERS.includes(form.gender) ? form.gender : "",
-    genderSelfDescribe: form.gender === "self-describe"
-      ? normalizeSignupName(form.genderSelfDescribe)
-      : "",
+genderSelfDescribe: form.gender === "self-describe"
+  ? normalizeSignupText(form.genderSelfDescribe)
+  : "",
     ...consent,
   };
 
@@ -210,12 +215,12 @@ export function buildSignupPayload(form, options = {}) {
       ...base,
       signupType: "prospect",
       requestedRole: "prospect",
-      hobbies: normalizeSignupName(form.hobbies),
+      hobbies: normalizeSignupText(form.hobbies),
       previousRotaract: form.previousRotaract === "yes",
-      previousRotaractDetails: form.previousRotaract === "yes"
-        ? normalizeSignupName(form.previousRotaractDetails)
-        : "N/A",
-      joinReason: normalizeSignupName(form.joinReason),
+previousRotaractDetails: form.previousRotaract === "yes"
+  ? normalizeSignupText(form.previousRotaractDetails)
+  : "N/A",
+      joinReason: normalizeSignupText(form.joinReason),
       referred: form.referred === "yes",
       referredBy: form.referred === "yes" ? normalizeSignupName(form.referredBy) : "N/A",
     };
@@ -224,7 +229,7 @@ export function buildSignupPayload(form, options = {}) {
   return {
     ...base,
     ...(form.requestedRole === "admin"
-      ? { inviteCode: normalizeSignupName(form.inviteCode) }
+      ? { inviteCode: normalizeSignupText(form.inviteCode) }
       : {}),
   };
 }

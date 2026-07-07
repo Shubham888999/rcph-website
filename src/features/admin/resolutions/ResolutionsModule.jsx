@@ -19,6 +19,7 @@ import {
   updateResolutionDraft,
   updateResolutionPdfLayout,
 } from "../../resolutions/resolutionService";
+import { formatRotaractorName } from "../../../utils/memberName";
 
 const EMPTY_DRAFT = { meetingId: "", resolutionNumber: "", title: "", body: "", notes: "", proposedByUid: "", secondedByUid: "", votingRule: "simple_majority", customApprovalCount: "", documentSourceMode: "standard", pdfLayoutMode: "standard", pdfSections: [], uploadedVotesTableConfig: { columns: { name: true, position: true, vote: true, timestamp: true, signature: false }, voterScope: "submitted", showTitle: true, repeatHeader: true, showResultSummary: true } };
 const RULE_LABELS = { simple_majority: "Simple majority", majority_of_eligible: "Majority of eligible voters", two_thirds: "Two-thirds of eligible voters", unanimous: "Unanimous non-abstaining votes", custom_approval_count: "Custom approval count" };
@@ -40,8 +41,8 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
       <label>Resolution number<input value={value.resolutionNumber} onChange={set("resolutionNumber")} placeholder="RCPH/2026-27/RES/004" maxLength="80" required /></label>
       <label>Title<input value={value.title} onChange={set("title")} maxLength="220" required /></label>
       <label>Voting rule<select value={value.votingRule} onChange={set("votingRule")}>{Object.entries(RULE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-      <label>Proposed by<select value={value.proposedByUid} onChange={set("proposedByUid")} required><option value="">Choose member</option>{roster.map((member) => <option key={member.uid} value={member.uid}>{member.name} · {member.position}</option>)}</select></label>
-      <label>Seconded by<select value={value.secondedByUid} onChange={set("secondedByUid")} required><option value="">Choose member</option>{roster.map((member) => <option key={member.uid} value={member.uid}>{member.name} · {member.position}</option>)}</select></label>
+      <label>Proposed by<select value={value.proposedByUid} onChange={set("proposedByUid")} required><option value="">Choose member</option>{roster.map((member) => <option key={member.uid} value={member.uid}>{formatRotaractorName(member.name, true)} · {member.position}</option>)}</select></label>
+      <label>Seconded by<select value={value.secondedByUid} onChange={set("secondedByUid")} required><option value="">Choose member</option>{roster.map((member) => <option key={member.uid} value={member.uid}>{formatRotaractorName(member.name, true)} · {member.position}</option>)}</select></label>
       {value.votingRule === "custom_approval_count" ? <label>Approvals required<input type="number" min="1" max={roster.length || undefined} step="1" value={value.customApprovalCount} onChange={set("customApprovalCount")} required /></label> : null}
     </div>
     <label>Full resolution text<textarea rows="8" maxLength="20000" value={value.body} onChange={set("body")} required /></label>
@@ -81,8 +82,8 @@ function ResolutionDetails({ details, busy, onRefresh, onDownload, onRetry }) {
     <p><b>PDF format:</b> {resolution.documentSourceMode === "uploadedPdf" ? "Uploaded PDF with voting record" : (resolution.finalizedPdfLayoutMode || resolution.pdfLayoutMode) === "custom" ? "Custom Section Layout" : "Standard Resolution Format"}</p>
     {resolution.documentSourceMode === "uploadedPdf" ? <p><b>Final PDF:</b> {statusLabel(resolution.merge.status || "pending")}{resolution.merge.finalPageCount ? ` · ${resolution.merge.finalPageCount} pages` : ""}</p> : null}
     <div className="admin-actions"><button type="button" disabled={busy} onClick={onRefresh}>Refresh vote counts</button>{FINAL_RESOLUTION_STATUSES.includes(resolution.status) && (resolution.documentSourceMode !== "uploadedPdf" || resolution.canDownloadFinal) ? <button type="button" disabled={busy} onClick={onDownload}>Download completed resolution PDF</button> : null}{resolution.canRetryMerge ? <button type="button" disabled={busy} onClick={onRetry}>Retry final PDF</button> : null}</div>
-    <div className="admin-table-wrap"><table><caption>Eligible voter snapshot and final votes</caption><thead><tr><th>Name</th><th>Position</th><th>Vote</th><th>Submitted</th></tr></thead><tbody>{resolution.eligibleVoters.map((voter) => { const vote = voteByUid.get(voter.uid); return <tr key={voter.uid}><td>{voter.name}</td><td>{voter.position}</td><td>{vote ? statusLabel(vote.choice) : "Pending"}</td><td>{vote ? formatDateTime(vote.submittedAt) : "—"}</td></tr>; })}</tbody></table></div>
-    <section className="resolution-audit"><h3>Audit history</h3><ol>{audit.map((entry) => <li key={entry.id}><strong>{statusLabel(entry.action)}</strong><span>{entry.actorName} · {entry.actorPosition}</span><time dateTime={entry.timestamp}>{formatDateTime(entry.timestamp)}</time></li>)}</ol></section>
+    <div className="admin-table-wrap"><table><caption>Eligible voter snapshot and final votes</caption><thead><tr><th>Name</th><th>Position</th><th>Vote</th><th>Submitted</th></tr></thead><tbody>{resolution.eligibleVoters.map((voter) => { const vote = voteByUid.get(voter.uid); return <tr key={voter.uid}><td>{formatRotaractorName(voter.name, true)}</td><td>{voter.position}</td><td>{vote ? statusLabel(vote.choice) : "Pending"}</td><td>{vote ? formatDateTime(vote.submittedAt) : "—"}</td></tr>; })}</tbody></table></div>
+    <section className="resolution-audit"><h3>Audit history</h3><ol>{audit.map((entry) => <li key={entry.id}><strong>{statusLabel(entry.action)}</strong><span>{formatRotaractorName(entry.actorName, true)} · {entry.actorPosition}</span><time dateTime={entry.timestamp}>{formatDateTime(entry.timestamp)}</time></li>)}</ol></section>
   </div>;
 }
 

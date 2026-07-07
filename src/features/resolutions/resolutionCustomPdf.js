@@ -1,4 +1,5 @@
 import { normalizeResolutionSections, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
+import { formatRotaractorName } from "../../utils/memberName.js";
 
 const BOUNDS = Object.freeze({ left: 54, right: 541, bottom: 260, top: 665 });
 const WIDTH = BOUNDS.right - BOUNDS.left;
@@ -113,7 +114,7 @@ function normalizedVoteColumns(columns) {
 
 function safeVoter(voter, vote, canonical) {
   return {
-    name: printable(vote?.voterName) || printable(voter?.name) || printable(canonical?.name, "Not available"),
+    name: formatRotaractorName(printable(vote?.voterName) || printable(voter?.name) || printable(canonical?.name, "Not available"), true),
     position: printable(vote?.voterPosition) || printable(voter?.position) || printable(canonical?.position, "Not available"),
   };
 }

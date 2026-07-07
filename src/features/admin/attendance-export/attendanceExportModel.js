@@ -1,4 +1,5 @@
 import { normalizeAttendance, validDate } from "../shared/adminModel.js";
+import { formatRotaractorName } from "../../../utils/memberName.js";
 
 export const ATTENDANCE_EXPORT_PANELS = Object.freeze({
   club: Object.freeze({
@@ -56,7 +57,7 @@ export function createAttendanceExportReport(panelKey, { members, events, attend
     .filter((member) => member?.id)
     .map((member) => ({
       id: cleanText(member.id, 128),
-      name: cleanText(member.name, 160) || "Unnamed member",
+      name: formatRotaractorName(cleanText(member.name, 160), member.role ? member : true) || "Unnamed member",
       roleOrPosition: cleanText(member.position || member.role, 180),
     }));
   const safeAttendance = attendance && typeof attendance === "object" ? attendance : {};

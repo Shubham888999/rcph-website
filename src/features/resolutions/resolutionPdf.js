@@ -1,6 +1,7 @@
 import { FINAL_RESOLUTION_STATUSES, getResolutionPdfFilename } from "./resolutionModel.js";
 import { buildCustomResolutionPdfPages, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
 import { getResolutionLetterheadJpeg } from "./resolutionLetterhead.js";
+import { formatRotaractorName } from "../../utils/memberName.js";
 
 export const RESOLUTION_PDF_PAGE = Object.freeze({ width: 595, height: 842 });
 export const RESOLUTION_CONTENT_BOUNDS = Object.freeze({ left: 54, right: 541, bottom: 260, top: 665 });
@@ -74,7 +75,7 @@ export function buildResolutionVoteRows(details) {
   return (details?.resolution?.eligibleVoters || []).map((voter) => {
     const vote = votes.get(voter.uid);
     return {
-      name: voter.name,
+      name: formatRotaractorName(voter.name, true),
       position: voter.position,
       vote: vote ? label(vote.choice) : "Not submitted",
       submittedAt: vote ? formatDateTime(vote.submittedAt) : "-",
@@ -96,8 +97,8 @@ function buildDocumentBlocks(details) {
   detail("Resolution title", resolution.title);
   detail("BOD meeting", resolution.meetingTitle);
   detail("Meeting date", resolution.meetingDate);
-  detail("Proposed by", `${resolution.proposedByName} - ${resolution.proposedByPosition}`);
-  detail("Seconded by", `${resolution.secondedByName} - ${resolution.secondedByPosition}`);
+  detail("Proposed by", `${formatRotaractorName(resolution.proposedByName, true)} - ${resolution.proposedByPosition}`);
+  detail("Seconded by", `${formatRotaractorName(resolution.secondedByName, true)} - ${resolution.secondedByPosition}`);
   detail("Voting opened", formatDateTime(resolution.openedAt));
   detail("Voting closed", formatDateTime(resolution.closedAt));
   detail("Final result", label(resolution.result || resolution.status));

@@ -8,6 +8,7 @@ import useAdminMutation from "../shared/useAdminMutation";
 import TreasuryAttachments from "../treasury/TreasuryAttachments";
 import TreasuryFileField from "../treasury/TreasuryFileField";
 import { createTreasuryUploadState, getSafeTreasuryUploadError, validateTreasuryUploadFile } from "../treasury/treasuryUploadModel";
+import { formatRotaractorName } from "../../../utils/memberName";
 
 export function FinesModule({ fines, members, lock, uid, onNotice }) {
   const empty = { memberId: "", reason: "", eventName: "", date: "", amount: "" };
@@ -23,7 +24,24 @@ export function FinesModule({ fines, members, lock, uid, onNotice }) {
     if (!payload.memberId || !payload.reason || !payload.eventName || !payload.date || payload.amount === null) return;
     run("add-fine", () => addFine(payload), "Fine added.").then((result) => { if (result) setDraft(empty); });
   }
-  return <><AdminModuleHeader title="Sergeant-at-Arms: Fines" /><div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{locked ? "Fines are locked or lock status is unavailable." : `${fines.length} records · ${formatInr(total)}`}</div><section className="admin-panel"><form className="admin-form admin-form--inline" onSubmit={submit}><label>Member<select value={draft.memberId} onChange={(e) => setDraft({ ...draft, memberId: e.target.value })} required><option value="">Choose member</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><label>Reason<select value={draft.reason} onChange={(e) => setDraft({ ...draft, reason: e.target.value })} required><option value="">Choose reason</option><option value="missing_badge">Missing badge</option><option value="late">Late to event/meeting</option></select></label><label>Event/meeting<input value={draft.eventName} onChange={(e) => setDraft({ ...draft, eventName: e.target.value })} required /></label><label>Date<input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} required /></label><label>Amount INR<input type="number" min="0" step="1" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} required /></label><button disabled={locked || busy}>Add fine</button></form></section>{fines.length ? <div className="admin-table-wrap"><table><caption>Fine records</caption><thead><tr><th>Member</th><th>Amount</th><th>Reason</th><th>Event</th><th>Date</th><th>Action</th></tr></thead><tbody>{fines.map((fine) => <tr key={fine.id}><td>{fine.memberName || fine.memberId}</td><td>{formatInr(fine.amount)}</td><td>{fine.reason}</td><td>{fine.eventName}</td><td>{fine.date}</td><td><button className="danger" disabled={locked} onClick={() => setTarget(fine)}>Delete</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No fine records." />}{target ? <AdminDialog title="Permanently delete fine?" busy={busy} onClose={() => setTarget(null)}><p>This matches production behavior and cannot be undone.</p><div className="admin-actions"><button onClick={() => setTarget(null)}>Cancel</button><button className="danger" onClick={() => run("delete-fine", () => deleteFine(target.id), "Fine permanently deleted.").then((result) => { if (result !== null) setTarget(null); })}>Delete permanently</button></div></AdminDialog> : null}</>;
+  return (
+    <>
+      <AdminModuleHeader title="Sergeant-at-Arms: Fines" />
+      <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{locked ? "Fines are locked or lock status is unavailable." : `${fines.length} records · ${formatInr(total)}`}</div>
+      <section className="admin-panel">
+        <form className="admin-form admin-form--inline" onSubmit={submit}>
+          <label>Member<select value={draft.memberId} onChange={(e) => setDraft({ ...draft, memberId: e.target.value })} required><option value="">Choose member</option>{members.map((m) => <option key={m.id} value={m.id}>{formatRotaractorName(m.name, true)}</option>)}</select></label>
+          <label>Reason<select value={draft.reason} onChange={(e) => setDraft({ ...draft, reason: e.target.value })} required><option value="">Choose reason</option><option value="missing_badge">Missing badge</option><option value="late">Late to event/meeting</option></select></label>
+          <label>Event/meeting<input value={draft.eventName} onChange={(e) => setDraft({ ...draft, eventName: e.target.value })} required /></label>
+          <label>Date<input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} required /></label>
+          <label>Amount INR<input type="number" min="0" step="1" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} required /></label>
+          <button disabled={locked || busy}>Add fine</button>
+        </form>
+      </section>
+      {fines.length ? <div className="admin-table-wrap"><table><caption>Fine records</caption><thead><tr><th>Member</th><th>Amount</th><th>Reason</th><th>Event</th><th>Date</th><th>Action</th></tr></thead><tbody>{fines.map((fine) => <tr key={fine.id}><td>{formatRotaractorName(fine.memberName || fine.memberId, true)}</td><td>{formatInr(fine.amount)}</td><td>{fine.reason}</td><td>{fine.eventName}</td><td>{fine.date}</td><td><button className="danger" disabled={locked} onClick={() => setTarget(fine)}>Delete</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No fine records." />}
+      {target ? <AdminDialog title="Permanently delete fine?" busy={busy} onClose={() => setTarget(null)}><p>This matches production behavior and cannot be undone.</p><div className="admin-actions"><button onClick={() => setTarget(null)}>Cancel</button><button className="danger" onClick={() => run("delete-fine", () => deleteFine(target.id), "Fine permanently deleted.").then((result) => { if (result !== null) setTarget(null); })}>Delete permanently</button></div></AdminDialog> : null}
+    </>
+  );
 }
 
 const EMPTY_TREASURY = {
@@ -184,7 +202,7 @@ function TreasuryForm({ value, setValue, members, onSubmit, busy, upload, setUpl
         <label>Date<input type="date" value={value.date} onChange={set("date")} required /></label>
         <label>Avenue<select value={value.avenue} onChange={set("avenue")} required><option value="">Choose</option>{[...AVENUES, "Other"].map((item) => <option key={item}>{item}</option>)}</select></label>
         <label>Purpose<input value={value.purpose} onChange={set("purpose")} /></label>
-        <label>Paid by<select value={value.paidBy} onChange={set("paidBy")}><option value="">Other/none</option><option value="Rotaract Club of Pune Heritage">Club</option>{members.map((member) => <option key={member.id} value={member.name}>{member.name}</option>)}</select></label>
+        <label>Paid by<select value={value.paidBy} onChange={set("paidBy")}><option value="">Other/none</option><option value="Rotaract Club of Pune Heritage">Club</option>{members.map((member) => <option key={member.id} value={member.name}>{formatRotaractorName(member.name, true)}</option>)}</select></label>
         <label>Paid to<input value={value.paidTo} onChange={set("paidTo")} /></label>
         <label>Payment mode<select value={value.paymentMode} onChange={set("paymentMode")}><option value="">Choose</option>{["Cash", "UPI", "Bank Transfer", "Cheque", "Card", "Other"].map((item) => <option key={item}>{item}</option>)}</select></label>
         <label>Reference<input value={value.referenceNumber} onChange={set("referenceNumber")} /></label>

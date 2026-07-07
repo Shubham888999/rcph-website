@@ -15,6 +15,7 @@ import VisitSubmissionsModule from "../../features/admin/visit/VisitSubmissionsM
 import { clearBodEventCache } from "../../features/bod-tools/bodEventService";
 import { clearDashboardDataCache } from "../../features/dashboard/dashboardService";
 import useAuth from "../../hooks/useAuth";
+import { formatRotaractorName } from "../../utils/memberName";
 import "../../styles/components/admin.css";
 
 export default function AdminPage() {
@@ -41,5 +42,5 @@ export default function AdminPage() {
   else if (segment === "visit-submissions") content = <VisitSubmissionsModule onNotice={setNotice} />;
   else if (segment === "dzr-visit") content = <DzrVisitModule data={data} />;
   else content = <AdminError message="This Admin module does not exist." />;
-  return <main className="admin-page"><AdminShell access={access} displayName={access?.user?.name || user?.displayName || "RCPH Admin"} onSignOut={handleSignOut}><AdminNotice notice={notice} onDismiss={() => setNotice(null)} />{content}</AdminShell></main>;
+  return <main className="admin-page"><AdminShell access={access} displayName={formatRotaractorName(access?.user?.name || user?.displayName || "RCPH Admin", access?.user || access?.storedRole)} onSignOut={handleSignOut}><AdminNotice notice={notice} onDismiss={() => setNotice(null)} />{content}</AdminShell></main>;
 }
