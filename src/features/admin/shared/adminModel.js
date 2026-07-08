@@ -3,8 +3,13 @@ import { stripRotaractorPrefix } from "../../../utils/memberName.js";
 export const ADMIN_ROLES = ["gbm", "bod", "admin", "president"];
 export const ATTENDANCE_VALUES = [true, false, "NA"];
 export const AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
-export const LOCK_KEYS = ["attendance", "bodAttendance", "fines", "treasury"];
-
+export const LOCK_KEYS = [
+  "attendance",
+  "bodAttendance",
+  "bodEvents",
+  "fines",
+  "treasury",
+];
 export function text(value, max = 5000) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }
 export function validDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;

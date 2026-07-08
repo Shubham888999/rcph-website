@@ -5,7 +5,7 @@ export default function BodLockNotice({ lock, canBypass }) {
   return (
     <div className="bod-lock-notice bod-lock-notice--danger" role="status">
       <strong>Event submissions are locked.</strong>{" "}
-      {canBypass ? "Server-verified lock bypass is available; the callable remains authoritative." : "Create, edit, archive, and sync controls are disabled."}
+      {canBypass ? "Do not bypass this lock without proper authorization." : "Create, edit, archive, and sync controls are disabled."}
       {lock.reason ? <span> {lock.reason}</span> : null}
     </div>
   );

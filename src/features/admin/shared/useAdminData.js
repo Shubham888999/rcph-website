@@ -4,8 +4,13 @@ import { normalizeAdminUser, normalizeEvent, normalizeFine, normalizeMember, nor
 import { subscribeAdminCollection, subscribeAdminLock } from "./adminService";
 
 const COLLECTIONS = ["users", "members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "districtEvents", "districtAttendance", "fines", "treasury"];
-const LOCKS = ["attendance", "bodAttendance", "fines", "treasury"];
-
+const LOCKS = [
+  "attendance",
+  "bodAttendance",
+  "bodEvents",
+  "fines",
+  "treasury",
+];
 function normalize(module, rows) {
   if (["attendance", "bodAttendance", "districtAttendance"].includes(module)) return Object.fromEntries(rows.map((row) => [row.id, { ...row.data }]));
   const fn = module === "users" ? normalizeAdminUser : ["members", "bodMembers"].includes(module) ? normalizeMember : module === "events" ? (id, raw) => normalizeEvent(id, raw, "club") : module === "bodMeetings" ? (id, raw) => normalizeEvent(id, raw, "bodMeeting") : module === "districtEvents" ? (id, raw) => normalizeEvent(id, raw, "districtEvent") : module === "fines" ? normalizeFine : normalizeTreasury;
