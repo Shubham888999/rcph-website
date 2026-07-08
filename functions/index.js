@@ -3454,7 +3454,7 @@ exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
 actorHasAdminPanelAuthority:
   approverAuthority.role === 'admin'
   || approverAuthority.authority.hasPresidentAuthority === true
-  || approverAuthority.authority.hasSergeantAtArmsPosition === true,,
+  || approverAuthority.authority.hasSergeantAtArmsPosition === true,
     targetUid,
     role,
     positionKeys: data.positionKeys,
