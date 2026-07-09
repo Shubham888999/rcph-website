@@ -13,8 +13,8 @@ export const BOD_AVENUE_REPORT_LAYOUT = Object.freeze({
   // Safe boundaries are based on the official A4 letterhead: top branding/title above,
   // skyline and contact footer below. Report body content must stay inside this box.
   safeArea: Object.freeze({ left: 36, right: 559, top: 636, bottom: 205 }),
-  topMeta: Object.freeze({ y: 704, fontSize: 7.5, gray: 0.2 }),
-  generatedMeta: Object.freeze({ x: 36, y: 90, fontSize: 8.2, gray: 0.3 }),
+  topMeta: Object.freeze({ y: 715, fontSize: 10, gray: 0.2 }),
+  generatedMeta: Object.freeze({ x: 20, y: 85, fontSize: 8.2, gray: 0.3 }),
   summary: Object.freeze({
     top: 636,
     labelSize: 7.4,

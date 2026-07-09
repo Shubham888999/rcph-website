@@ -121,20 +121,108 @@ export default function BodToolsPage() {
   return (
     <main className="bod-tools-page">
       <BodToolsShell>
-        <BodToolsHeader access={access} displayName={displayName} onSignOut={handleSignOut} />
+<BodToolsHeader
+  access={access}
+  displayName={displayName}
+  onSignOut={handleSignOut}
+  canCreateEvent={canMutate}
+  onCreateEvent={() => {
+    setMutationError("");
+    setForm({ event: null });
+  }}
+/>
         <BodLockNotice lock={lock} canBypass={access.canAccessPresidentControls} />
         <BodEventMutationNotice notice={notice} onDismiss={() => setNotice(null)} />
-        <section className="bod-tools-actions" aria-labelledby="bod-actions-title">
-          <div><p className="bod-tools-kicker">Club operations</p><h2 id="bod-actions-title">Manage & Create Club Events</h2></div>
-          <button type="button" className="bod-button--primary" disabled={!canMutate} onClick={() => { setMutationError(""); setForm({ event: null }); }}>Create club event</button>
-        </section>
+<section
+  className="bod-tools-metrics"
+  aria-label="BOD event overview"
+>
+  <article className="bod-tools-metric">
+    <span>Active events</span>
+    <strong>
+      {events.filter((event) => event.isActive).length}
+    </strong>
+    <small>Current event records</small>
+  </article>
+
+  <article className="bod-tools-metric">
+    <span>Visible results</span>
+    <strong>{visibleEvents.length}</strong>
+    <small>Based on active filters</small>
+  </article>
+
+  <article className="bod-tools-metric">
+    <span>Avenues represented</span>
+    <strong>{avenues.length}</strong>
+    <small>Across loaded events</small>
+  </article>
+
+  <article
+    className={`bod-tools-metric bod-tools-metric--${
+      lockState === "unlocked" ? "open" : "locked"
+    }`}
+  >
+    <span>Submissions</span>
+    <strong>
+      {lock.status === "loading"
+        ? "Checking"
+        : lock.status === "error"
+          ? "Unavailable"
+          : lock.locked
+            ? "Locked"
+            : "Open"}
+    </strong>
+    <small>
+      {canMutate
+        ? "Event actions available"
+        : "Changes currently disabled"}
+    </small>
+  </article>
+</section>
         {status === "loading" ? <BodToolsSkeleton /> : null}
         {status === "error" ? <BodToolsErrorState onRetry={reload} onSignOut={handleSignOut} /> : null}
-        {status === "success" ? <><BodAvenueReportPanel events={events} onNotice={setNotice} /><BodEventFilters filters={filters} onChange={setFilters} onReset={() => setFilters(DEFAULT_FILTERS)} avenues={avenues} months={months} resultCount={visibleEvents.length} /><BodEventList events={visibleEvents} access={access} lockState={lockState} onDetails={setDetails} onEdit={(event) => { setMutationError(""); setForm({ event }); }} onArchive={(event) => { setMutationError(""); setConfirmation({ event, mode: "archive" }); }} onSync={(event) => { setMutationError(""); setConfirmation({ event, mode: "sync" }); }} onReset={() => setFilters(DEFAULT_FILTERS)} /></> : null}
-      </BodToolsShell>
+{status === "success" ? (
+  <>
+    <BodEventFilters
+      filters={filters}
+      onChange={setFilters}
+      onReset={() => setFilters(DEFAULT_FILTERS)}
+      avenues={avenues}
+      months={months}
+      resultCount={visibleEvents.length}
+    />
+
+    <BodEventList
+      events={visibleEvents}
+      access={access}
+      lockState={lockState}
+      onDetails={setDetails}
+      onEdit={(event) => {
+        setMutationError("");
+        setForm({ event });
+      }}
+      onArchive={(event) => {
+        setMutationError("");
+        setConfirmation({ event, mode: "archive" });
+      }}
+      onSync={(event) => {
+        setMutationError("");
+        setConfirmation({ event, mode: "sync" });
+      }}
+      onReset={() => setFilters(DEFAULT_FILTERS)}
+    />
+
+    <BodAvenueReportPanel
+      events={events}
+      onNotice={setNotice}
+    />
+  </>
+) : null}      </BodToolsShell>
       <BodEventDetailsDialog event={details} onClose={() => setDetails(null)} />
       {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
       <BodEventArchiveDialog event={confirmation?.event || null} mode={confirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmMutation} />
+    
+    
     </main>
   );
 }

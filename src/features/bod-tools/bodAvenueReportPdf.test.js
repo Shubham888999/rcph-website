@@ -246,9 +246,9 @@ test("exceptionally tall rows use a bounded continuation fallback instead of loo
 test("report body content stays inside the declared top and bottom safe boundaries", () => {
   const pages = buildBodAvenueReportPdfPages(report(Array.from({ length: 6 }, (_, index) => makeEvent(`Safe-${index + 1}`, "Safe content detail ".repeat(35)))));
   const { safeArea, topMeta, generatedMeta } = BOD_AVENUE_REPORT_LAYOUT;
-  assert.equal(topMeta.y, 704);
+  assert.equal(topMeta.y, 715);
   assert.equal(topMeta.gray, 0.2);
-  assert.equal(generatedMeta.y, 90);
+  assert.equal(generatedMeta.y, 85);
   assert.equal(generatedMeta.fontSize, 8.2);
   assert.equal(generatedMeta.gray, 0.3);
   assert.equal(BOD_AVENUE_REPORT_LAYOUT.table.fontSize, 8);
