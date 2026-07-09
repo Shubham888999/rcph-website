@@ -31,6 +31,7 @@ const event = (id, overrides = {}) => ({
   collaborators: [],
   collaboratorsKnown: true,
   description: "Description",
+  avenueDescriptions: {},
   ...overrides,
 });
 
@@ -141,6 +142,40 @@ test("combined reports group by avenue then month and count unique events once",
   assert.deepEqual(report.groups.map((group) => `${group.avenueCode}:${group.month}`), ["CMD:2026-07", "CMD:2026-08", "PDD:2026-07", "PDD:2026-08"]);
   assert.deepEqual(report.groups.filter((group) => group.events.some((row) => row.name === "Event multi")).map((group) => group.avenueCode), ["CMD", "PDD"]);
   assert.equal(report.groups[0].directorText, "Director C (Community Service Director)");
+});
+
+test("multi-avenue canonical events use avenue-specific descriptions while counting once", () => {
+  const report = buildBodAvenueReportModel({
+    selectedMonths: ["2026-07"],
+    selectedAvenueCodes: ["PDD", "CMD"],
+    events: [
+      event("multi", {
+        avenues: ["CMD", "PDD"],
+        description: "Public summary",
+        avenueDescriptions: {
+          CMD: "Community-specific report narrative",
+          PDD: "Professional-specific report narrative",
+        },
+      }),
+    ],
+    selectedEventIds: ["multi"],
+  });
+  assert.equal(report.eventCount, 1);
+  assert.equal(report.groupCount, 2);
+  assert.equal(report.events[0].description, "Public summary");
+  assert.equal(report.groups.find((group) => group.avenueCode === "CMD").events[0].description, "Community-specific report narrative");
+  assert.equal(report.groups.find((group) => group.avenueCode === "PDD").events[0].description, "Professional-specific report narrative");
+});
+
+test("single-avenue reports also prefer the selected avenue description", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    events: [event("one", { description: "Public summary", avenueDescriptions: { CMD: "Community report text" } })],
+    selectedEventIds: ["one"],
+  });
+  assert.equal(report.isCombined, false);
+  assert.equal(report.events[0].description, "Community report text");
 });
 
 test("no active director is explicit in avenue group metadata", () => {

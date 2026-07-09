@@ -2,14 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   BOD_EVENT_SOURCE,
+  buildAvenueDescriptionDraft,
   buildBodEventPayload,
+  getEventDescriptionForAvenue,
   getBodEventAttachments,
   getBodEventPermissions,
   getDriveFileId,
   getDriveThumbnailUrl,
   isValidDateOnly,
+  normalizeAvenueDescriptions,
   normalizeBodEvent,
   safeExternalUrl,
+  validateAvenueDescriptionCoverage,
 } from "./bodEventModel.js";
 
 const base = { name: " Project One ", date: "2026-07-05", type: "clubEvent", avenue: ["CMD"] };
@@ -40,6 +44,37 @@ test("arrays are cleaned, malformed values ignored, and avenues deduplicated", (
   const event = normalizeBodEvent("a", { ...base, avenue: [" cmd ", null, "CMD", 3], imageLinks: ["https://example.com/a.jpg", "javascript:bad"] });
   assert.deepEqual(event.avenues, ["CMD"]);
   assert.deepEqual(event.imageLinks, ["https://example.com/a.jpg"]);
+});
+
+test("canonical BOD events normalize avenue descriptions without exposing invalid keys", () => {
+  const event = normalizeBodEvent("a", {
+    ...base,
+    avenues: ["pdd", "CMD", "bad"],
+    description: "General public text",
+    avenueDescriptions: { CMD: " Community report ", PDD: " Professional report ", ISD: "extra", bad: "ignored" },
+  });
+  assert.deepEqual(event.avenues, ["CMD", "PDD"]);
+  assert.deepEqual(event.avenueDescriptions, { CMD: "Community report", PDD: "Professional report" });
+  assert.equal(getEventDescriptionForAvenue(event, "CMD"), "Community report");
+  assert.equal(getEventDescriptionForAvenue(event, "PDD"), "Professional report");
+  assert.equal(getEventDescriptionForAvenue(event, "ISD"), "General public text");
+});
+
+test("old shared-description events build editable avenue drafts and report fallbacks", () => {
+  const event = normalizeBodEvent("legacy", { ...base, description: "Shared legacy description", avenue: ["CMD", "PDD"] });
+  assert.deepEqual(event.avenueDescriptions, {});
+  assert.deepEqual(buildAvenueDescriptionDraft(event), { CMD: "Shared legacy description", PDD: "Shared legacy description" });
+  assert.equal(getEventDescriptionForAvenue(event, "CMD"), "Shared legacy description");
+});
+
+test("avenue description validation rejects malformed, extra, invalid, and prototype keys", () => {
+  assert.equal(validateAvenueDescriptionCoverage(["CMD"], ["bad"]).ok, false);
+  assert.deepEqual(normalizeAvenueDescriptions({ CMD: "Ok", PDD: "Extra" }, ["CMD"]), { CMD: "Ok" });
+  assert.deepEqual(validateAvenueDescriptionCoverage(["CMD"], { CMD: "Ok" }).errors, []);
+  assert.match(validateAvenueDescriptionCoverage(["CMD"], { CMD: "Ok", PDD: "Extra" }).errors.join(" "), /unselected/i);
+  assert.match(validateAvenueDescriptionCoverage(["CMD"], { CMD: "Ok", bad: "No" }).errors.join(" "), /invalid/i);
+  assert.match(validateAvenueDescriptionCoverage(["CMD"], JSON.parse('{"CMD":"Ok","__proto__":"No"}')).errors.join(" "), /invalid/i);
+  assert.match(validateAvenueDescriptionCoverage(["CMD", "PDD"], { CMD: "Ok" }).errors.join(" "), /every selected/i);
 });
 
 test("strict dates accept leap day and reject invalid dates and reversed ranges", () => {
@@ -101,6 +136,11 @@ test("payload builder whitelists fields and forces production classification", (
   assert.equal(payload.type, "clubEvent");
   assert.equal(payload.source, BOD_EVENT_SOURCE);
   assert.equal(payload.visibility, "public");
+  assert.equal(payload.description, "Desc");
+  assert.equal(payload.desc, "Desc");
+  assert.deepEqual(payload.avenue, ["CMD"]);
+  assert.deepEqual(payload.avenues, ["CMD"]);
+  assert.deepEqual(payload.avenueDescriptions, { CMD: "Desc" });
   assert.deepEqual(payload.collaborators, [{ name: "Partner" }]);
   assert.equal(Object.hasOwn(payload, "uiOnly"), false);
 });
@@ -109,4 +149,27 @@ test("payload validation rejects bad ranges and keeps no raw record fields", () 
   const result = buildBodEventPayload({ name: "Test", conductedBy: "Member", startDate: "2026-07-05", endDate: "2026-07-04", avenues: ["CMD"] });
   assert.equal(result.payload, null);
   assert.ok(result.errors.endDate);
+});
+
+test("payload builder requires a complete selected-avenue description map", () => {
+  assert.deepEqual(buildBodEventPayload({
+    name: "Test", conductedBy: "Member", startDate: "2026-07-05", avenues: ["CMD", "PDD"],
+    description: "Public text",
+    avenueDescriptions: { CMD: "Community report", PDD: "Professional report" },
+  }).payload.avenueDescriptions, { CMD: "Community report", PDD: "Professional report" });
+
+  for (const avenueDescriptions of [
+    { CMD: "Community report" },
+    { CMD: "Community report", PDD: "Professional report", ISD: "Extra" },
+    { CMD: "Community report", BAD: "Nope" },
+    [],
+  ]) {
+    const result = buildBodEventPayload({
+      name: "Test", conductedBy: "Member", startDate: "2026-07-05", avenues: ["CMD", "PDD"],
+      description: "Public text",
+      avenueDescriptions,
+    });
+    assert.equal(result.payload, null);
+    assert.ok(result.errors.avenueDescriptions);
+  }
 });

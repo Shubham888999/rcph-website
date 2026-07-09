@@ -1,4 +1,5 @@
 import { AVENUES } from "../calendar/avenues.js";
+import { getEventDescriptionForAvenue } from "./bodEventModel.js";
 
 export const BOD_AVENUE_REPORT_LIMIT = 100;
 export const REPORTABLE_BOD_AVENUES = AVENUES;
@@ -205,7 +206,7 @@ function safeCollaborators(event) {
   return event?.collaboratorsKnown === false ? "Not available" : "None";
 }
 
-function presentationEvent(event) {
+function presentationEvent(event, avenueCode = "") {
   return {
     date: event.startDate,
     month: event.startDate.slice(0, 7),
@@ -215,7 +216,7 @@ function presentationEvent(event) {
     role: ROLE_LABELS[event.rcphRole] || "Not available",
     hostClub: cleanText(event.hostClub, 180) || "Not available",
     collaborators: safeCollaborators(event),
-    description: cleanText(event.description, 2500) || "Not available",
+    description: cleanText(getEventDescriptionForAvenue(event, avenueCode), 2500) || "Not available",
     avenues: normalizeBodReportAvenueCodes(event.avenues),
   };
 }
@@ -292,7 +293,7 @@ export function buildBodAvenueReportModel(options = {}) {
     for (const month of selectedMonths) {
       const groupEvents = chosen
         .filter((event) => event.startDate.startsWith(`${month}-`) && event.avenues.includes(avenueCode))
-        .map(presentationEvent);
+        .map((event) => presentationEvent(event, avenueCode));
       if (!groupEvents.length) continue;
       groups.push({
         avenueCode,
@@ -330,7 +331,7 @@ export function buildBodAvenueReportModel(options = {}) {
     generatedAt: timestamp.toISOString(),
     appearance,
     isCombined: !singleMonth || !singleAvenue,
-    events: chosen.map(presentationEvent),
+    events: chosen.map((event) => presentationEvent(event, singleAvenue ? primaryAvenueCode : "")),
     groups,
   };
 }

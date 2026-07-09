@@ -3,10 +3,16 @@ import BodEventFileUploader from "./BodEventFileUploader";
 import { updateBodEvent } from "./bodEventService";
 import { uploadBodEventFile } from "./bodUploadService";
 import { getSafeBodUploadError } from "./bodUploadModel";
-import { BOD_AVENUES, buildBodEventPayload } from "./bodEventModel";
+import {
+  BOD_AVENUES,
+  BOD_EVENT_DESCRIPTION_LIMIT,
+  buildAvenueDescriptionDraft,
+  buildBodEventPayload,
+} from "./bodEventModel";
 import useAccessibleDialog from "./useAccessibleDialog";
 
 function initialDraft(event, displayName) {
+  const avenues = event?.avenues || [];
   return {
     name: event?.name || "",
     conductedBy: event?.conductedBy === "Unavailable" ? displayName : event?.conductedBy || displayName,
@@ -14,7 +20,8 @@ function initialDraft(event, displayName) {
     endDate: event?.endDate || "",
     time: event?.time || "",
     description: event?.description || "",
-    avenues: event?.avenues || [],
+    avenues,
+    avenueDescriptions: buildAvenueDescriptionDraft(event || {}, avenues),
     rcphRole: event?.rcphRole || "host",
     hostClub: event?.hostClub || "Rotaract Club of Pune Heritage",
     collaborators: event?.collaborators?.length ? event.collaborators : [{ name: "" }],
@@ -40,7 +47,28 @@ export default function BodEventForm({ event, displayName, busy, mutationError, 
   }
 
   function toggleAvenue(avenue) {
-    update("avenues", draft.avenues.includes(avenue) ? draft.avenues.filter((item) => item !== avenue) : [...draft.avenues, avenue]);
+    setDraft((current) => {
+      const selected = current.avenues.includes(avenue);
+      const currentText = current.avenueDescriptions?.[avenue] || "";
+      if (selected && currentText.trim() && !window.confirm(`Remove the ${avenue} report description?`)) return current;
+      const avenueDescriptions = { ...(current.avenueDescriptions || {}) };
+      if (selected) delete avenueDescriptions[avenue];
+      else avenueDescriptions[avenue] = avenueDescriptions[avenue] || current.description;
+      return {
+        ...current,
+        avenues: selected ? current.avenues.filter((item) => item !== avenue) : [...current.avenues, avenue],
+        avenueDescriptions,
+      };
+    });
+    setErrors((current) => ({ ...current, avenues: "", avenueDescriptions: "" }));
+  }
+
+  function updateAvenueDescription(avenue, value) {
+    setDraft((current) => ({
+      ...current,
+      avenueDescriptions: { ...(current.avenueDescriptions || {}), [avenue]: value },
+    }));
+    setErrors((current) => ({ ...current, avenueDescriptions: "" }));
   }
 
   function updateCollaborator(index, name) {
@@ -182,8 +210,17 @@ if (completed.length) {
             <label>Time<input type="time" name="time" value={draft.time} onChange={(e) => update("time", e.target.value)} aria-invalid={Boolean(errors.time)} aria-describedby={described("time")} />{errors.time ? <span id="bod-time-error" className="bod-field-error">{errors.time}</span> : null}</label>
             <label>RCPH role<select value={draft.rcphRole} onChange={(e) => update("rcphRole", e.target.value)}><option value="host">Host</option><option value="cohost">Co-host</option><option value="collaborator">Collaborator</option><option value="participant">Participant</option></select></label>
           </div>
-          <label>Description<textarea value={draft.description} onChange={(e) => update("description", e.target.value)} maxLength="2500" rows="4" /></label>
+          <label>Public / General Event Description<textarea value={draft.description} onChange={(e) => update("description", e.target.value)} maxLength={BOD_EVENT_DESCRIPTION_LIMIT} rows="4" /></label>
           <fieldset name="avenues" aria-describedby={described("avenues")}><legend>Avenues *</legend><div className="bod-avenue-grid">{BOD_AVENUES.map((avenue) => <label key={avenue}><input type="checkbox" checked={draft.avenues.includes(avenue)} onChange={() => toggleAvenue(avenue)} /> {avenue}</label>)}</div>{errors.avenues ? <span id="bod-avenues-error" className="bod-field-error">{errors.avenues}</span> : null}</fieldset>
+          {draft.avenues.length ? (
+            <fieldset className="bod-avenue-descriptions" aria-describedby={described("avenueDescriptions")}>
+              <legend>Avenue report descriptions *</legend>
+              {draft.avenues.map((avenue) => (
+                <label key={avenue}>Description for {avenue}<textarea name="avenueDescriptions" value={draft.avenueDescriptions?.[avenue] || ""} onChange={(e) => updateAvenueDescription(avenue, e.target.value)} maxLength={BOD_EVENT_DESCRIPTION_LIMIT} rows="3" /></label>
+              ))}
+              {errors.avenueDescriptions ? <span id="bod-avenueDescriptions-error" className="bod-field-error">{errors.avenueDescriptions}</span> : null}
+            </fieldset>
+          ) : null}
           <label>Host club<input value={draft.hostClub} onChange={(e) => update("hostClub", e.target.value)} maxLength="180" /></label>
           <fieldset><legend>Collaborators</legend>{draft.collaborators.map((collaborator, index) => <div className="bod-collaborator-row" key={index}><label><span className="sr-only">Collaborator {index + 1}</span><input value={collaborator.name} onChange={(e) => updateCollaborator(index, e.target.value)} placeholder="Club or organization name" /></label><button type="button" onClick={() => removeCollaborator(index)} disabled={draft.collaborators.length === 1}>Remove</button></div>)}<button type="button" className="bod-button--quiet" onClick={() => update("collaborators", [...draft.collaborators, { name: "" }])}>Add collaborator</button></fieldset>
           <label>Collaboration notes<textarea value={draft.collaborationNotes} onChange={(e) => update("collaborationNotes", e.target.value)} maxLength="1000" rows="3" /></label>

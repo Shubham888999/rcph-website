@@ -23,7 +23,7 @@ const MOCK_LETTERHEAD = Object.freeze({
 const decodePdf = (bytes) => new TextDecoder("latin1").decode(bytes);
 const occurrences = (value, pattern) => value.match(pattern)?.length || 0;
 
-const makeEvent = (id, description = "Short description", startDate = "2026-07-05", avenues = ["CMD"]) => ({
+const makeEvent = (id, description = "Short description", startDate = "2026-07-05", avenues = ["CMD"], overrides = {}) => ({
   id,
   name: `Project ${id}`,
   startDate,
@@ -36,6 +36,8 @@ const makeEvent = (id, description = "Short description", startDate = "2026-07-0
   collaborators: [{ name: "Partner Club" }],
   collaboratorsKnown: true,
   description,
+  avenueDescriptions: {},
+  ...overrides,
 });
 
 function report(events, options = {}) {
@@ -112,7 +114,12 @@ test("long director names wrap the summary into a second row without hiding repo
 
 test("grouped reports render avenue-month headings, director metadata, and repeated table headers", () => {
   const model = report([
-    makeEvent("Multi", "Shared description", "2026-07-02", ["CMD", "PDD"]),
+    makeEvent("Multi", "Shared description", "2026-07-02", ["CMD", "PDD"], {
+      avenueDescriptions: {
+        CMD: "Community service group description",
+        PDD: "Professional development group description",
+      },
+    }),
     makeEvent("August", "August description", "2026-08-03", ["CMD"]),
   ], {
     selectedMonths: ["2026-07", "2026-08"],
@@ -134,6 +141,8 @@ test("grouped reports render avenue-month headings, director metadata, and repea
     "Director: Mira Shah",
   ]) assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.equal(occurrences(pdf, /Project Multi/g), 2);
+  assert.match(pdf, /Community service group description/);
+  assert.match(pdf, /Professional development group description/);
   assert.ok(occurrences(pdf, /Host \/ Collaborators \/ Description/g) >= model.groupCount);
 });
 

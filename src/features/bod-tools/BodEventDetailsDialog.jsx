@@ -1,5 +1,5 @@
 import useAccessibleDialog from "./useAccessibleDialog";
-import { getBodEventAttachments } from "./bodEventModel";
+import { getBodEventAttachments, getEventDescriptionForAvenue } from "./bodEventModel";
 
 const TYPE_LABELS = { clubEvent: "Club Event", bodMeeting: "BOD Meeting", districtEvent: "District Event", unknown: "Unknown type" };
 const ROLE_LABELS = { host: "Host", cohost: "Co-host", collaborator: "Collaborator", participant: "Participant" };
@@ -27,7 +27,15 @@ export default function BodEventDetailsDialog({ event, onClose }) {
           <div><dt>Created by</dt><dd>{event.createdByName}</dd></div>
           <div><dt>Created</dt><dd>{created}</dd></div>
         </dl>
-        <section><h3>Description</h3><p>{event.description || "No description supplied."}</p></section>
+        <section><h3>Public / General Event Description</h3><p>{event.description || "No description supplied."}</p></section>
+        {event.avenues.length ? (
+          <section>
+            <h3>Avenue report descriptions</h3>
+            <dl className="bod-detail-list">
+              {event.avenues.map((avenue) => <div key={avenue}><dt>{avenue}</dt><dd>{getEventDescriptionForAvenue(event, avenue)}</dd></div>)}
+            </dl>
+          </section>
+        ) : null}
         {event.collaborationNotes ? <section><h3>Collaboration notes</h3><p>{event.collaborationNotes}</p></section> : null}
         {driveUrl ? <a href={driveUrl} target="_blank" rel="noopener noreferrer">Open Drive folder <span className="sr-only">(opens in a new tab)</span></a> : null}
         {attachments.length ? (
