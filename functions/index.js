@@ -24,6 +24,7 @@ const resolutionModel = require('./lib/resolutions');
 const { createResolutionDriveService } = require('./lib/resolution-drive');
 const { createResolutionUploadService } = require('./lib/resolution-upload');
 const bodAvenueReport = require('./lib/bod-avenue-report');
+const bodEventSchema = require('./lib/bod-event-schema');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 
 admin.initializeApp();
@@ -2314,7 +2315,29 @@ function timestampCreatedAt(existing, now) {
   return existing.createdAt || now;
 }
 
-function normalizeBodEventPayload(raw) {
+function normalizeLegacyClubEventDescriptionFields(raw) {
+  const desc = normalizeText(raw.desc || raw.description, 2500);
+  const avenue = normalizeStringArray(raw.avenue, 12, 40);
+  let avenueDescriptions = {};
+  if (raw.avenueDescriptions !== undefined && raw.avenueDescriptions !== null) {
+    try {
+      const bodAvenues = bodEventSchema.normalizeBodAvenues(avenue);
+      avenueDescriptions = bodEventSchema.normalizeAvenueDescriptions({
+        avenues: bodAvenues,
+        avenueDescriptions: raw.avenueDescriptions,
+        fallbackDescription: desc,
+      });
+    } catch (error) {
+      if (error instanceof bodEventSchema.BodEventSchemaError) {
+        throw new HttpsError('invalid-argument', error.message);
+      }
+      throw error;
+    }
+  }
+  return { desc, description: desc, avenue, avenues: avenue, avenueDescriptions };
+}
+
+function normalizeBodEventPayload(raw, options = {}) {
   const hasCollaborationFields = ['rcphRole', 'hostClub', 'collaborators', 'collaborationNotes']
     .some(field => Object.prototype.hasOwnProperty.call(raw || {}, field));
   const name = normalizeText(raw.name, 180);
@@ -2322,8 +2345,18 @@ function normalizeBodEventPayload(raw) {
   const date = normalizeText(raw.date || raw.eventStart, 20);
   const endDate = normalizeText(raw.endDate || raw.eventEnd || date, 20);
   const time = normalizeText(raw.time || raw.eventTime, 20);
-  const desc = normalizeText(raw.desc || raw.description, 2500);
-  const avenue = normalizeStringArray(raw.avenue, 12, 40);
+  let bodDescriptionFields;
+  try {
+    bodDescriptionFields = options.allowNonBodAvenues
+      ? normalizeLegacyClubEventDescriptionFields(raw || {})
+      : bodEventSchema.normalizeBodEventDescriptionFields(raw || {});
+  } catch (error) {
+    if (error instanceof bodEventSchema.BodEventSchemaError) {
+      throw new HttpsError('invalid-argument', error.message);
+    }
+    throw error;
+  }
+  const { desc, description, avenue, avenues, avenueDescriptions } = bodDescriptionFields;
   const imageLinks = normalizeStringArray(raw.imageLinks || raw.driveLinks || raw.uploadedFileUrls, 30, 700);
   const driveLinks = normalizeStringArray(raw.driveLinks || imageLinks, 30, 700);
   const driveFolder = normalizeText(raw.driveFolder || raw.driveFolderId, 700);
@@ -2349,7 +2382,10 @@ function normalizeBodEventPayload(raw) {
     endDate,
     time,
     desc,
+    description,
     avenue,
+    avenues,
+    avenueDescriptions,
     imageLinks,
     driveLinks,
     driveFolder,
@@ -2374,7 +2410,7 @@ function normalizeClubEventPayload(raw, userProfile, source = 'adminAttendanceMa
     source,
     type: 'clubEvent',
     visibility: 'public',
-  });
+  }, { allowNonBodAvenues: true });
   return {
     ...payload,
     source,
@@ -2578,8 +2614,10 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     endDate: payload.endDate,
     time: payload.time,
     desc: payload.desc,
-    description: payload.desc,
+    description: payload.description || payload.desc,
     avenue: payload.avenue,
+    avenues: payload.avenues || payload.avenue,
+    avenueDescriptions: payload.avenueDescriptions || {},
     imageLinks: payload.imageLinks,
     driveFolder: payload.driveFolder,
     driveFolderId: driveFolderId || existingBod.driveFolderId || '',
@@ -2611,7 +2649,9 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     date: payload.date,
     endDate: payload.endDate,
     desc: payload.desc,
+    description: payload.description || payload.desc,
     avenue: payload.avenue,
+    avenues: payload.avenues || payload.avenue,
     source,
     bodEventId: eventId,
     type,
@@ -5318,6 +5358,10 @@ exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
     endDate: bodData.endDate || bodData.eventEnd,
     time: bodData.time || bodData.eventTime,
     desc: bodData.desc || bodData.description,
+    description: bodData.description || bodData.desc,
+    avenue: bodData.avenue || bodData.avenues,
+    avenues: bodData.avenues || bodData.avenue,
+    avenueDescriptions: bodData.avenueDescriptions,
     imageLinks: bodData.imageLinks || (bodData.previewLink ? [bodData.previewLink] : []),
     driveFolder: bodData.driveFolder || bodData.driveFolderId,
     driveLinks: bodData.driveLinks || bodData.imageLinks,

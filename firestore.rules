@@ -78,6 +78,45 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/locks/$(panelKey)).data.locked == true;
     }
 
+    function validBodAvenueCodes() {
+      return ['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI', 'GBM'];
+    }
+
+    function validBodAvenueDescriptionValue(descriptions, code) {
+      return !(code in descriptions)
+        || (descriptions[code] is string
+          && descriptions[code].size() > 0
+          && descriptions[code].size() <= 2500);
+    }
+
+    function validBodAvenueDescriptions(data) {
+      return data.avenueDescriptions is map
+        && data.avenueDescriptions.keys().hasOnly(data.avenues)
+        && data.avenueDescriptions.keys().hasAll(data.avenues)
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'ISD')
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'CMD')
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'CSD')
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'PDD')
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'RRRO')
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'PRO')
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'DEI')
+        && validBodAvenueDescriptionValue(data.avenueDescriptions, 'GBM');
+    }
+
+    function validBodEventWrite(data) {
+      return data.type == 'clubEvent'
+        && data.description is string
+        && data.description.size() <= 2500
+        && data.desc == data.description
+        && data.avenues is list
+        && data.avenue is list
+        && data.avenues == data.avenue
+        && data.avenues.size() > 0
+        && data.avenues.size() <= 8
+        && data.avenues.hasOnly(validBodAvenueCodes())
+        && validBodAvenueDescriptions(data);
+    }
+
     match /roles/{uid} {
       allow read: if signedIn();
       allow write: if false;
@@ -169,7 +208,10 @@ service cloud.firestore {
 
     match /bodEvents/{eventId} {
       allow read: if signedIn();
-      allow create, update, delete: if isApprovedBod() && !panelLocked('bodEvents');
+      allow create, update: if isApprovedBod()
+        && !panelLocked('bodEvents')
+        && validBodEventWrite(request.resource.data);
+      allow delete: if isApprovedBod() && !panelLocked('bodEvents');
     }
 
     match /fines/{fineId} {

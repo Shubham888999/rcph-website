@@ -23,7 +23,7 @@ assert.equal(normalizeReportAvenueCode(' cmd '), 'CMD');
 assert.equal(normalizeReportAvenueCode('unknown'), '');
 assert.deepEqual(REPORTABLE_AVENUE_CODES, ['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI', 'GBM']);
 assert.deepEqual(buildSafeAvenueDirectorRows({ avenueCode: 'CMD', assignments: [active], positionHelpers, ...maps() }), [
-  { name: 'Director One', positionTitle: 'Community Service Director' },
+  { name: 'Rtr. Director One', positionTitle: 'Community Service Director' },
 ]);
 assert.deepEqual(buildSafeAvenueDirectorRows({ avenueCode: 'ISD', assignments: [active], positionHelpers, ...maps() }), []);
 assert.deepEqual(buildSafeAvenueDirectorRows({ avenueCode: 'CMD', assignments: [{ ...active, active: false }], positionHelpers, ...maps() }), []);

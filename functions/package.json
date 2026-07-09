@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "test:resolutions": "node scripts/verify-resolutions.js"
+    "test:resolutions": "node scripts/verify-resolutions.js",
+    "test:bod-event-schema": "node scripts/verify-bod-event-schema.js"
   },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",
