@@ -1,10 +1,9 @@
-import { getBodAvenueReportFilename } from "./bodAvenueReportModel.js";
+import { getBodAvenueReportFilename, normalizeBodReportAppearance } from "./bodAvenueReportModel.js";
 import {
   A4_PDF_SIZE,
+  normalizePdfText,
   pdfFillRectCommand,
   pdfLineCommand,
-  pdfTextCommand,
-  wrapPdfText,
 } from "../pdf/simplePdf.js";
 
 export const BOD_AVENUE_REPORT_LETTERHEAD_URL = "/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png";
@@ -14,18 +13,8 @@ export const BOD_AVENUE_REPORT_LAYOUT = Object.freeze({
   // Safe boundaries are based on the official A4 letterhead: top branding/title above,
   // skyline and contact footer below. Report body content must stay inside this box.
   safeArea: Object.freeze({ left: 36, right: 559, top: 636, bottom: 205 }),
-topMeta: Object.freeze({
-  y: 704,
-  fontSize: 7.5,
-  gray: 0.2,
-}),
-
-generatedMeta: Object.freeze({
-  x: 36,
-  y: 90,
-  fontSize: 8.2,
-  gray: 0.3,
-}),
+  topMeta: Object.freeze({ y: 704, fontSize: 7.5, gray: 0.2 }),
+  generatedMeta: Object.freeze({ x: 36, y: 90, fontSize: 8.2, gray: 0.3 }),
   summary: Object.freeze({
     top: 636,
     labelSize: 7.4,
@@ -35,23 +24,31 @@ generatedMeta: Object.freeze({
     dividerGap: 8,
     dividerGray: 0.62,
     columns: Object.freeze([
-      Object.freeze({ key: "month", label: "Month", width: 85 }),
+      Object.freeze({ key: "period", label: "Month", width: 85 }),
       Object.freeze({ key: "director", label: "Director Name", width: 224 }),
-      Object.freeze({ key: "avenue", label: "Avenue", width: 148 }),
+      Object.freeze({ key: "avenues", label: "Avenue", width: 148 }),
       Object.freeze({ key: "events", label: "Total Events", width: 66 }),
     ]),
   }),
-table: Object.freeze({
-  headerHeight: 23,
-  fontSize: 8,
-  headerFontSize: 7.7,
-  lineHeight: 10.1,
-  padding: 4,
-  headerGray: 0.9,
-  alternateRowGray: 0.975,
-  borderGray: 0.7,
-  headerBorderGray: 0.55,
-}),
+  group: Object.freeze({
+    groupGapAfterTable: 9,
+    headingSize: 9.2,
+    headingLineHeight: 12,
+    directorSize: 7.6,
+    directorLineHeight: 9.5,
+    headingToTableGap: 5,
+  }),
+  table: Object.freeze({
+    headerHeight: 23,
+    fontSize: 8,
+    headerFontSize: 7.7,
+    lineHeight: 10.1,
+    padding: 4,
+    headerGray: 0.9,
+    alternateRowGray: 0.975,
+    borderGray: 0.7,
+    headerBorderGray: 0.55,
+  }),
 });
 
 export const BOD_AVENUE_REPORT_CONTENT_WIDTH =
@@ -63,6 +60,19 @@ export const BOD_AVENUE_REPORT_TABLE_COLUMNS = Object.freeze([
   Object.freeze({ key: "role", label: "Role", width: 66 }),
   Object.freeze({ key: "details", label: "Host / Collaborators / Description", width: BOD_AVENUE_REPORT_CONTENT_WIDTH - 256 }),
 ]);
+
+const BODY_SIZE_STYLES = Object.freeze({
+  compact: Object.freeze({ fontSize: 7.5, headerFontSize: 7.3 }),
+  default: Object.freeze({ fontSize: 8, headerFontSize: 7.7 }),
+  comfortable: Object.freeze({ fontSize: 8.8, headerFontSize: 8.1 }),
+  large: Object.freeze({ fontSize: 10, headerFontSize: 8.6 }),
+});
+
+const DENSITY_STYLES = Object.freeze({
+  compact: Object.freeze({ padding: 3, lineHeightFactor: 1.16, headerHeight: 21 }),
+  standard: Object.freeze({ padding: 4, lineHeight: 10.1, headerHeight: 23 }),
+  comfortable: Object.freeze({ padding: 5, lineHeightFactor: 1.32, headerHeight: 26 }),
+});
 
 const USER_MESSAGE = "The BOD Avenue Report letterhead could not be loaded. Please try again.";
 const PNG_SIGNATURE = Object.freeze([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -86,6 +96,13 @@ function concatBytes(parts) {
 
 function ascii(value) {
   return encoder.encode(value);
+}
+
+function escapePdfText(value) {
+  const bulletToken = "RCPH_PDF_BULLET_TOKEN";
+  return normalizePdfText(String(value ?? "").replace(/\u2022|â€¢/g, bulletToken))
+    .replace(/[\\()]/g, (character) => `\\${character}`)
+    .replaceAll(bulletToken, "\\225");
 }
 
 function assertValidPngSignature(bytes) {
@@ -153,12 +170,71 @@ export function getBodAvenueReportLetterheadPng() {
   return cachedLetterheadPromise;
 }
 
-function approximateTextWidth(text, size, bold = false) {
-  return String(text || "").length * size * 0.52 * (bold ? 1.04 : 1);
+function fontFamilyName(value) {
+  return value === "times" ? "times" : "helvetica";
 }
 
-function rightAlignedTextCommand({ right, y, text, size, bold = false, gray = 0 }) {
-  return pdfTextCommand({ x: right - approximateTextWidth(text, size, bold), y, text, size, bold, gray });
+function fontResource(fontFamily, bold = false) {
+  if (fontFamily === "times") return bold ? "F4" : "F3";
+  return bold ? "F2" : "F1";
+}
+
+function textFactor(fontFamily) {
+  return fontFamily === "times" ? 0.48 : 0.52;
+}
+
+function approximateTextWidth(text, size, bold = false, fontFamily = "helvetica") {
+  return normalizePdfText(text).length * size * textFactor(fontFamily) * (bold ? 1.04 : 1);
+}
+
+function textCommand({ x, y, text, size = 9, bold = false, gray = 0, fontFamily = "helvetica" }) {
+  const shade = Math.max(0, Math.min(1, Number(gray) || 0));
+  return `BT ${shade} g /${fontResource(fontFamily, bold)} ${size} Tf ${x.toFixed(1)} ${y.toFixed(1)} Td (${escapePdfText(text)}) Tj ET`;
+}
+
+function rightAlignedTextCommand({ right, y, text, size, bold = false, gray = 0, fontFamily = "helvetica" }) {
+  return textCommand({ x: right - approximateTextWidth(text, size, bold, fontFamily), y, text, size, bold, gray, fontFamily });
+}
+
+function wrapText(value, maxWidth, size, fontFamily = "helvetica", bold = false) {
+  const averageCharacterWidth = size * textFactor(fontFamily) * (bold ? 1.04 : 1);
+  const maxCharacters = Math.max(1, Math.floor(maxWidth / averageCharacterWidth));
+  const lines = [];
+  for (const paragraph of normalizePdfText(value).split("\n")) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) { lines.push(""); continue; }
+    let current = "";
+    for (const word of words) {
+      if (word.length > maxCharacters) {
+        if (current) { lines.push(current); current = ""; }
+        for (let index = 0; index < word.length; index += maxCharacters) lines.push(word.slice(index, index + maxCharacters));
+      } else if (!current) current = word;
+      else if (`${current} ${word}`.length <= maxCharacters) current += ` ${word}`;
+      else { lines.push(current); current = word; }
+    }
+    if (current) lines.push(current);
+  }
+  return lines;
+}
+
+function resolveReportStyle(report) {
+  const appearance = normalizeBodReportAppearance(report?.appearance);
+  const body = BODY_SIZE_STYLES[appearance.bodySize];
+  const density = DENSITY_STYLES[appearance.density];
+  const fontFamily = fontFamilyName(appearance.fontFamily);
+  const lineHeight = density.lineHeight || body.fontSize * density.lineHeightFactor;
+  return {
+    appearance,
+    fontFamily,
+    table: {
+      ...BOD_AVENUE_REPORT_LAYOUT.table,
+      fontSize: body.fontSize,
+      headerFontSize: body.headerFontSize,
+      padding: density.padding,
+      lineHeight,
+      headerHeight: density.headerHeight,
+    },
+  };
 }
 
 function formatReportDate(value) {
@@ -186,66 +262,70 @@ function formatGeneratedMetadata(value) {
 function addTextLines(commands, lines, x, y, options = {}) {
   const size = options.size || 9;
   const lineHeight = options.lineHeight || size * 1.3;
-  lines.forEach((line, index) => commands.push(pdfTextCommand({
+  lines.forEach((line, index) => commands.push(textCommand({
     x,
     y: y - index * lineHeight,
     text: line,
     size,
     bold: options.bold,
     gray: options.gray,
+    fontFamily: options.fontFamily,
   })));
   return y - Math.max(1, lines.length) * lineHeight;
 }
 
 function summaryFields(report) {
+  const multiMonth = (report.selectedMonths || []).length > 1;
+  const multiAvenue = (report.selectedAvenueCodes || []).length > 1;
   return {
-    month: report.monthLabel,
-    director: report.directorText,
-    avenue: report.avenueLabel,
-    events: String(report.eventCount),
+    period: { label: multiMonth ? "Period" : "Month", value: report.periodLabel || report.monthLabel },
+    director: { label: "Director Name", value: report.directorText },
+    avenues: { label: multiAvenue ? "Avenues" : "Avenue", value: report.avenuesLabel || report.avenueLabel },
+    events: { label: "Total Events", value: String(report.eventCount) },
   };
 }
 
-function summaryNeedsTwoRows(values) {
+function summaryNeedsTwoRows(fields, style) {
   const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
   return layout.columns.some((column) => {
     const valueWidth = column.width - 6;
-    return approximateTextWidth(values[column.key], layout.valueSize) > valueWidth;
+    return approximateTextWidth(fields[column.key].value, layout.valueSize, false, style.fontFamily) > valueWidth;
   });
 }
 
-function drawSummaryField(commands, field, value, x, y, width) {
+function drawSummaryField(commands, field, x, y, width, style) {
   const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
-  commands.push(pdfTextCommand({ x, y, text: field.label, size: layout.labelSize, bold: true, gray: 0.12 }));
-  const lines = wrapPdfText(value, width, layout.valueSize);
+  commands.push(textCommand({ x, y, text: field.label, size: layout.labelSize, bold: true, gray: 0.12, fontFamily: style.fontFamily }));
+  const lines = wrapText(field.value, width, layout.valueSize, style.fontFamily);
   addTextLines(commands, lines, x, y - layout.lineHeight, {
     size: layout.valueSize,
     lineHeight: layout.lineHeight,
     gray: 0.08,
+    fontFamily: style.fontFamily,
   });
   return lines.length;
 }
 
-function drawSummary(commands, report) {
+function drawSummary(commands, report, style) {
   const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
-  const values = summaryFields(report);
+  const fields = summaryFields(report);
   let y = layout.top;
-  if (!summaryNeedsTwoRows(values)) {
+  if (!summaryNeedsTwoRows(fields, style)) {
     let x = safe.left;
     let maxLines = 1;
-    layout.columns.forEach((field) => {
-      maxLines = Math.max(maxLines, drawSummaryField(commands, field, values[field.key], x, y, field.width - 6));
-      x += field.width;
+    layout.columns.forEach((column) => {
+      maxLines = Math.max(maxLines, drawSummaryField(commands, fields[column.key], x, y, column.width - 6, style));
+      x += column.width;
     });
     y -= layout.lineHeight * (maxLines + 1);
   } else {
-    const firstRow = layout.columns.filter((field) => field.key !== "director");
+    const firstRow = layout.columns.filter((column) => column.key !== "director");
     const rowWidth = BOD_AVENUE_REPORT_CONTENT_WIDTH / firstRow.length;
-    firstRow.forEach((field, index) => drawSummaryField(commands, field, values[field.key], safe.left + rowWidth * index, y, rowWidth - 8));
+    firstRow.forEach((column, index) => drawSummaryField(commands, fields[column.key], safe.left + rowWidth * index, y, rowWidth - 8, style));
     y -= layout.lineHeight * 2 + layout.rowGap;
-    drawSummaryField(commands, layout.columns.find((field) => field.key === "director"), values.director, safe.left, y, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6);
-    const directorLines = wrapPdfText(values.director, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6, layout.valueSize).length;
+    drawSummaryField(commands, fields.director, safe.left, y, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6, style);
+    const directorLines = wrapText(fields.director.value, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6, layout.valueSize, style.fontFamily).length;
     y -= layout.lineHeight * (directorLines + 1);
   }
   const dividerY = y - layout.dividerGap;
@@ -253,13 +333,13 @@ function drawSummary(commands, report) {
   return dividerY - layout.dividerGap;
 }
 
-function drawTableHeader(commands, top) {
+function drawTableHeader(commands, top, style) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
-  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  const table = style.table;
   commands.push(pdfFillRectCommand({ x: safe.left, y: top - table.headerHeight, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: table.headerHeight, gray: table.headerGray }));
   let x = safe.left;
   for (const column of BOD_AVENUE_REPORT_TABLE_COLUMNS) {
-    commands.push(pdfTextCommand({ x: x + table.padding, y: top - 15, text: column.label, size: table.headerFontSize, bold: true }));
+    commands.push(textCommand({ x: x + table.padding, y: top - 15, text: column.label, size: table.headerFontSize, bold: true, fontFamily: style.fontFamily }));
     commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - table.headerHeight, gray: table.headerBorderGray }));
     x += column.width;
   }
@@ -269,34 +349,35 @@ function drawTableHeader(commands, top) {
   return top - table.headerHeight;
 }
 
-function eventCellLines(event) {
-  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+function eventCellLines(event, style) {
+  const table = style.table;
   const details = `Host: ${event.hostClub}\nCollaborators: ${event.collaborators}\nDescription: ${event.description}`;
   return {
-    date: wrapPdfText(event.dateLabel, BOD_AVENUE_REPORT_TABLE_COLUMNS[0].width - table.padding * 2, table.fontSize),
-    event: wrapPdfText(event.name, BOD_AVENUE_REPORT_TABLE_COLUMNS[1].width - table.padding * 2, table.fontSize),
-    role: wrapPdfText(event.role, BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize),
-    details: wrapPdfText(details, BOD_AVENUE_REPORT_TABLE_COLUMNS[3].width - table.padding * 2, table.fontSize),
+    date: wrapText(event.dateLabel, BOD_AVENUE_REPORT_TABLE_COLUMNS[0].width - table.padding * 2, table.fontSize, style.fontFamily),
+    event: wrapText(event.name, BOD_AVENUE_REPORT_TABLE_COLUMNS[1].width - table.padding * 2, table.fontSize, style.fontFamily),
+    role: wrapText(event.role, BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize, style.fontFamily),
+    details: wrapText(details, BOD_AVENUE_REPORT_TABLE_COLUMNS[3].width - table.padding * 2, table.fontSize, style.fontFamily),
   };
 }
 
-function rowHeightForLines(lines) {
-  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+function rowHeightForLines(lines, style) {
+  const table = style.table;
   return Math.max(1, ...Object.values(lines).map((cellLines) => cellLines.length)) * table.lineHeight + table.padding * 2;
 }
 
-function drawRow(commands, lines, top, shade) {
+function drawRow(commands, lines, top, shade, style) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
-  const table = BOD_AVENUE_REPORT_LAYOUT.table;
-  const rowHeight = rowHeightForLines(lines);
+  const table = style.table;
+  const rowHeight = rowHeightForLines(lines, style);
   if (shade) commands.push(pdfFillRectCommand({ x: safe.left, y: top - rowHeight, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: rowHeight, gray: table.alternateRowGray }));
   let x = safe.left;
   BOD_AVENUE_REPORT_TABLE_COLUMNS.forEach((column) => {
-    lines[column.key].forEach((line, index) => commands.push(pdfTextCommand({
+    lines[column.key].forEach((line, index) => commands.push(textCommand({
       x: x + table.padding,
       y: top - table.padding - table.fontSize - index * table.lineHeight,
       text: line,
       size: table.fontSize,
+      fontFamily: style.fontFamily,
     })));
     commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - rowHeight, gray: table.borderGray }));
     x += column.width;
@@ -306,9 +387,9 @@ function drawRow(commands, lines, top, shade) {
   return top - rowHeight;
 }
 
-function splitOversizedRow(lines) {
+function splitOversizedRow(lines, style) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
-  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  const table = style.table;
   const availableLines = Math.max(1, Math.floor((safe.top - table.headerHeight - safe.bottom - table.padding * 2) / table.lineHeight));
   const remaining = Object.fromEntries(Object.entries(lines).map(([key, value]) => [key, [...value]]));
   const chunks = [];
@@ -325,35 +406,91 @@ function splitOversizedRow(lines) {
   return chunks;
 }
 
-function createPage(pages) {
+function createTablePage(pages, style) {
   const commands = [];
   pages.push(commands);
-  return { commands, y: drawTableHeader(commands, BOD_AVENUE_REPORT_LAYOUT.safeArea.top) };
+  return { commands, y: drawTableHeader(commands, BOD_AVENUE_REPORT_LAYOUT.safeArea.top, style) };
 }
 
-function drawEventRows(pages, report, startY) {
+function createBlankPage(pages) {
+  const commands = [];
+  pages.push(commands);
+  return { commands, y: BOD_AVENUE_REPORT_LAYOUT.safeArea.top };
+}
+
+function drawEventRows(pages, events, startY, style) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
-  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  const table = style.table;
   let commands = pages.at(-1);
   let y = startY;
   const freshPageRowCapacity = safe.top - table.headerHeight - safe.bottom;
-  report.events.forEach((event, eventIndex) => {
-    const lines = eventCellLines(event);
-    const rowHeight = rowHeightForLines(lines);
+  events.forEach((event, eventIndex) => {
+    const lines = eventCellLines(event, style);
+    const rowHeight = rowHeightForLines(lines, style);
     if (rowHeight > freshPageRowCapacity) {
       // Exceptional fallback: a single event row can exceed one safe page after wrapping.
       // Only then do we split it into continuation chunks to avoid an infinite loop.
-      for (const chunk of splitOversizedRow(lines)) {
-        const chunkHeight = rowHeightForLines(chunk);
-        if (y - chunkHeight < safe.bottom) ({ commands, y } = createPage(pages));
-        y = drawRow(commands, chunk, y, eventIndex % 2 === 1);
+      for (const chunk of splitOversizedRow(lines, style)) {
+        const chunkHeight = rowHeightForLines(chunk, style);
+        if (y - chunkHeight < safe.bottom) ({ commands, y } = createTablePage(pages, style));
+        y = drawRow(commands, chunk, y, eventIndex % 2 === 1, style);
       }
       return;
     }
     // Atomic row pagination: measure the complete event row before drawing it.
-    if (y - rowHeight < safe.bottom) ({ commands, y } = createPage(pages));
-    y = drawRow(commands, lines, y, eventIndex % 2 === 1);
+    if (y - rowHeight < safe.bottom) ({ commands, y } = createTablePage(pages, style));
+    y = drawRow(commands, lines, y, eventIndex % 2 === 1, style);
   });
+  return y;
+}
+
+function groupIntroModel(group, style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const directorLines = wrapText(`Director: ${group.directorText}`, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.directorSize, style.fontFamily);
+  return {
+    heading: `${group.avenueLabel} - ${group.monthLabel}`,
+    directorLines,
+    height: layout.headingLineHeight + directorLines.length * layout.directorLineHeight + layout.headingToTableGap,
+  };
+}
+
+function drawGroupIntro(commands, y, group, style) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const intro = groupIntroModel(group, style);
+  commands.push(textCommand({ x: safe.left, y, text: intro.heading, size: layout.headingSize, bold: true, gray: 0.08, fontFamily: style.fontFamily }));
+  y -= layout.headingLineHeight;
+  addTextLines(commands, intro.directorLines, safe.left, y, {
+    size: layout.directorSize,
+    lineHeight: layout.directorLineHeight,
+    gray: 0.24,
+    fontFamily: style.fontFamily,
+  });
+  return y - intro.directorLines.length * layout.directorLineHeight - layout.headingToTableGap;
+}
+
+function drawGroupedContent(pages, report, startY, style) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  let commands = pages.at(-1);
+  let y = startY;
+  let completedGroup = false;
+  for (const group of report.groups || []) {
+    const firstRow = group.events[0] ? eventCellLines(group.events[0], style) : null;
+    const firstRowHeight = firstRow ? rowHeightForLines(firstRow, style) : style.table.lineHeight + style.table.padding * 2;
+    const intro = groupIntroModel(group, style);
+    const samePageGap = completedGroup ? BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable : 0;
+    const required = samePageGap + intro.height + style.table.headerHeight + firstRowHeight;
+    if (y - required < safe.bottom) {
+      ({ commands, y } = createBlankPage(pages));
+    } else {
+      y -= samePageGap;
+    }
+    y = drawGroupIntro(commands, y, group, style);
+    y = drawTableHeader(commands, y, style);
+    y = drawEventRows(pages, group.events, y, style);
+    commands = pages.at(-1);
+    completedGroup = true;
+  }
 }
 
 function addPageChrome(pages, report) {
@@ -361,24 +498,29 @@ function addPageChrome(pages, report) {
   const top = BOD_AVENUE_REPORT_LAYOUT.topMeta;
   const meta = BOD_AVENUE_REPORT_LAYOUT.generatedMeta;
   const generatedDate = formatReportDate(report.generatedAt);
-const metadataLine = `Generated by RCPH Website • ${formatGeneratedMetadata(report.generatedAt)}`;  // Two-pass page numbering: body pagination completes first, then every page gets X of Y.
+  const metadataLine = `Generated by RCPH Website \u2022 ${formatGeneratedMetadata(report.generatedAt)}`;
+  // Two-pass page numbering: body pagination completes first, then every page gets X of Y.
   pages.forEach((page, index) => {
     const pageNumber = `Page ${index + 1} of ${pages.length}`;
     page.unshift(
-      pdfTextCommand({ x: safe.left, y: top.y, text: generatedDate, size: top.fontSize, gray: top.gray }),
+      textCommand({ x: safe.left, y: top.y, text: generatedDate, size: top.fontSize, gray: top.gray }),
       rightAlignedTextCommand({ right: safe.right, y: top.y, text: pageNumber, size: top.fontSize, gray: top.gray }),
     );
-    page.push(pdfTextCommand({ x: meta.x, y: meta.y, text: metadataLine, size: meta.fontSize, gray: meta.gray }));
+    page.push(textCommand({ x: meta.x, y: meta.y, text: metadataLine, size: meta.fontSize, gray: meta.gray }));
   });
 }
 
 export function buildBodAvenueReportPdfPages(report) {
   if (!report?.events?.length || report.eventCount !== report.events.length) throw new TypeError("A finalized non-empty report model is required.");
+  const style = resolveReportStyle(report);
   const pages = [[]];
   const firstPage = pages[0];
-  const tableTop = drawSummary(firstPage, report);
-  const startY = drawTableHeader(firstPage, tableTop);
-  drawEventRows(pages, report, startY);
+  const tableTop = drawSummary(firstPage, report, style);
+  if (report.isCombined) drawGroupedContent(pages, report, tableTop, style);
+  else {
+    const startY = drawTableHeader(firstPage, tableTop, style);
+    drawEventRows(pages, report.events, startY, style);
+  }
   addPageChrome(pages, report);
   return pages;
 }
@@ -434,13 +576,15 @@ export function buildBodAvenueReportPdfDocument(report, letterhead) {
   validateLetterhead(letterhead);
   const pages = buildBodAvenueReportPdfPages(report);
   const objects = [];
-  const imageId = 5;
-  const pageIds = pages.map((_, index) => 6 + index * 2);
+  const imageId = 7;
+  const pageIds = pages.map((_, index) => 8 + index * 2);
   const placement = imagePlacement(letterhead);
   objects[1] = ascii("<< /Type /Catalog /Pages 2 0 R >>");
   objects[2] = ascii(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>`);
   objects[3] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
   objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  objects[5] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>");
+  objects[6] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>");
   objects[imageId] = imageObject(letterhead);
   pages.forEach((page, index) => {
     const pageId = pageIds[index];
@@ -450,7 +594,7 @@ export function buildBodAvenueReportPdfDocument(report, letterhead) {
       ...page,
     ];
     const content = ascii(commands.join("\n"));
-    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /BG ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> /XObject << /BG ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
     objects[contentId] = streamObject(content);
   });
   return assemblePdf(objects);

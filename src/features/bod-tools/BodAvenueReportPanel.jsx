@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  BOD_AVENUE_REPORT_APPEARANCE_OPTIONS,
+  BOD_AVENUE_REPORT_DEFAULT_APPEARANCE,
   BOD_AVENUE_REPORT_LIMIT,
   REPORTABLE_BOD_AVENUES,
   buildBodAvenueReportModel,
   createBodAvenueSelection,
   filterBodAvenueReportEvents,
+  formatBodReportMonth,
+  getBodAvenueReportMonthOptions,
   normalizeBodAvenueDirectors,
+  normalizeBodReportAvenueCodes,
+  normalizeBodReportMonths,
   toggleBodAvenueEvent,
 } from "./bodAvenueReportModel";
 import { fetchBodAvenueReportDirectors } from "./bodEventService";
 
-const EMPTY_DIRECTORS = Object.freeze([]);
+const EMPTY_DIRECTOR_MAP = Object.freeze({});
 
 function currentMonth() {
   const now = new Date();
@@ -28,49 +34,89 @@ function createPreview(options) {
   try { return buildBodAvenueReportModel(options); } catch { return null; }
 }
 
+function toggleValue(values, value, checked, normalize) {
+  const next = new Set(values);
+  if (checked) next.add(value);
+  else next.delete(value);
+  return normalize([...next]);
+}
+
+function appearanceLabel(options, value) {
+  return options.find((item) => item.value === value)?.label || value;
+}
+
 export default function BodAvenueReportPanel({ events, onNotice }) {
-  const [month, setMonth] = useState(currentMonth);
-  const [avenueCode, setAvenueCode] = useState("");
+  const [selectedMonths, setSelectedMonths] = useState(() => [currentMonth()]);
+  const [selectedAvenueCodes, setSelectedAvenueCodes] = useState([]);
   const [selection, setSelection] = useState(() => ({ scope: "", ids: new Set() }));
-  const [directorData, setDirectorData] = useState(() => ({ avenueCode: "", state: "idle", directors: [] }));
+  const [directorData, setDirectorData] = useState(() => ({ scope: "", state: "idle", directorsByAvenue: {} }));
+  const [appearance, setAppearance] = useState(BOD_AVENUE_REPORT_DEFAULT_APPEARANCE);
   const [showPreview, setShowPreview] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState("");
+  const monthOptions = useMemo(() => getBodAvenueReportMonthOptions(events, selectedMonths[0] || currentMonth()), [events, selectedMonths]);
   const matchingEvents = useMemo(
-    () => filterBodAvenueReportEvents(events, { month, avenueCode }),
-    [events, month, avenueCode],
+    () => filterBodAvenueReportEvents(events, { selectedMonths, selectedAvenueCodes }),
+    [events, selectedAvenueCodes, selectedMonths],
   );
-  const selectionScope = `${month}|${avenueCode}|${matchingEvents.map((event) => event.id).join("|")}`;
+  const selectionScope = `${selectedMonths.join("|")}::${selectedAvenueCodes.join("|")}::${matchingEvents.map((event) => event.id).join("|")}`;
+  // Existing UX reset behavior: when filters change, the valid matching set is selected again.
   const selectedIds = selection.scope === selectionScope ? selection.ids : createBodAvenueSelection(matchingEvents);
-  const directors = directorData.avenueCode === avenueCode ? directorData.directors : EMPTY_DIRECTORS;
-  const directorState = directorData.avenueCode === avenueCode ? directorData.state : (avenueCode ? "loading" : "idle");
   const selectedEvents = useMemo(
     () => matchingEvents.filter((event) => selectedIds.has(event.id)),
     [matchingEvents, selectedIds],
   );
+  const directorScope = selectedAvenueCodes.join("|");
+  const directorsByAvenue = directorData.scope === directorScope ? directorData.directorsByAvenue : EMPTY_DIRECTOR_MAP;
+  const directorState = directorData.scope === directorScope ? directorData.state : (selectedAvenueCodes.length ? "loading" : "idle");
 
   useEffect(() => {
     let cancelled = false;
-    if (!avenueCode) return undefined;
-    fetchBodAvenueReportDirectors(avenueCode).then((payload) => {
-      if (cancelled) return;
-      setDirectorData({ avenueCode, state: "success", directors: normalizeBodAvenueDirectors(payload, avenueCode) });
-    }).catch(() => {
-      if (cancelled) return;
-      setDirectorData({ avenueCode, state: "error", directors: [] });
-    });
+    const scope = selectedAvenueCodes.join("|");
+    if (!scope) return undefined;
+    Promise.allSettled(selectedAvenueCodes.map((avenueCode) => fetchBodAvenueReportDirectors(avenueCode).then((payload) => [avenueCode, payload])))
+      .then((results) => {
+        if (cancelled) return;
+        const directors = {};
+        let failed = false;
+        results.forEach((result) => {
+          if (result.status !== "fulfilled") { failed = true; return; }
+          const [avenueCode, payload] = result.value;
+          directors[avenueCode] = normalizeBodAvenueDirectors(payload, avenueCode);
+        });
+        setDirectorData({ scope, state: failed ? "error" : "success", directorsByAvenue: directors });
+      });
     return () => { cancelled = true; };
-  }, [avenueCode]);
+  }, [selectedAvenueCodes]);
 
   const preview = useMemo(() => createPreview({
-    month,
-    avenueCode,
+    selectedMonths,
+    selectedAvenueCodes,
     events,
     selectedEventIds: selectedIds,
-    directors,
-  }), [avenueCode, directors, events, month, selectedIds]);
+    directorsByAvenue,
+    appearance,
+  }), [appearance, directorsByAvenue, events, selectedAvenueCodes, selectedIds, selectedMonths]);
   const tooMany = selectedEvents.length > BOD_AVENUE_REPORT_LIMIT;
   const canDownload = Boolean(preview && directorState !== "loading" && !tooMany && !downloading);
+
+  function updateMonths(next) {
+    setSelectedMonths(next);
+    setShowPreview(false);
+    setMessage("");
+  }
+
+  function updateAvenues(next) {
+    setSelectedAvenueCodes(next);
+    setShowPreview(false);
+    setMessage("");
+  }
+
+  function updateAppearance(key, value) {
+    setAppearance((current) => ({ ...current, [key]: value }));
+    setShowPreview(false);
+    setMessage("");
+  }
 
   async function download() {
     if (!canDownload) return;
@@ -78,16 +124,17 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     setMessage("");
     try {
       const finalized = buildBodAvenueReportModel({
-        month,
-        avenueCode,
+        selectedMonths,
+        selectedAvenueCodes,
         events,
         selectedEventIds: selectedIds,
-        directors,
+        directorsByAvenue,
+        appearance,
         generatedAt: new Date(),
       });
       const { downloadBodAvenueReportPdf } = await import("./bodAvenueReportPdf.js");
       await downloadBodAvenueReportPdf(finalized);
-      setMessage(`${finalized.eventCount} event${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.`);
+      setMessage(`${finalized.eventCount} unique event${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.`);
       onNotice?.({ type: "success", message: "Monthly avenue report downloaded. No event records were changed." });
     } catch (error) {
       setMessage(error?.message || "The report could not be generated. Please review the selected events and try again.");
@@ -97,42 +144,83 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     }
   }
 
+  const allVisibleMonths = monthOptions.map((option) => option.value);
+  const appearanceText = [
+    appearanceLabel(BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.fontFamilies, appearance.fontFamily),
+    appearanceLabel(BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.bodySizes, appearance.bodySize),
+    appearanceLabel(BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.densities, appearance.density),
+  ].join(" / ");
+
   return (
     <section className="bod-avenue-report" aria-labelledby="bod-avenue-report-title">
       <div className="bod-avenue-report__heading">
         <div>
           <p className="bod-tools-kicker">Read-only reporting</p>
           <h2 id="bod-avenue-report-title">Monthly Avenue Report</h2>
-          <p>Generate a monthly summary of events conducted under a selected avenue.</p>
+          <p>Generate a monthly summary of events conducted under selected avenues.</p>
         </div>
-        <span>Maximum {BOD_AVENUE_REPORT_LIMIT} events</span>
+        <span>Maximum {BOD_AVENUE_REPORT_LIMIT} unique events</span>
       </div>
 
       <div className="bod-avenue-report__filters">
-        <label htmlFor="bod-report-month">Month<input id="bod-report-month" type="month" value={month} onChange={(event) => { setMonth(event.target.value); setShowPreview(false); setMessage(""); }} /></label>
-        <label htmlFor="bod-report-avenue">Avenue<select id="bod-report-avenue" value={avenueCode} onChange={(event) => { const next = event.target.value; setAvenueCode(next); setDirectorData({ avenueCode: next, state: next ? "loading" : "idle", directors: [] }); setShowPreview(false); setMessage(""); }}><option value="">Select an avenue</option>{REPORTABLE_BOD_AVENUES.map((avenue) => <option key={avenue.code} value={avenue.code}>{avenue.label}</option>)}</select></label>
+        <fieldset>
+          <legend>Months</legend>
+          <div className="bod-avenue-report__mini-actions">
+            <button type="button" onClick={() => updateMonths(normalizeBodReportMonths(allVisibleMonths))} disabled={!allVisibleMonths.length || selectedMonths.length === allVisibleMonths.length}>Select all visible months</button>
+            <button type="button" onClick={() => updateMonths([])} disabled={!selectedMonths.length}>Clear selection</button>
+          </div>
+          <div className="bod-avenue-report__check-grid">
+            {monthOptions.map((option) => <label key={option.value} htmlFor={`bod-report-month-${option.value}`}><input id={`bod-report-month-${option.value}`} type="checkbox" checked={selectedMonths.includes(option.value)} onChange={(event) => updateMonths(toggleValue(selectedMonths, option.value, event.target.checked, normalizeBodReportMonths))} /> {option.label}</label>)}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Avenues</legend>
+          <div className="bod-avenue-report__mini-actions">
+            <button type="button" onClick={() => updateAvenues(REPORTABLE_BOD_AVENUES.map((avenue) => avenue.code))} disabled={selectedAvenueCodes.length === REPORTABLE_BOD_AVENUES.length}>Select all</button>
+            <button type="button" onClick={() => updateAvenues([])} disabled={!selectedAvenueCodes.length}>Clear selection</button>
+          </div>
+          <div className="bod-avenue-report__check-grid">
+            {REPORTABLE_BOD_AVENUES.map((avenue) => <label key={avenue.code} htmlFor={`bod-report-avenue-${avenue.code}`}><input id={`bod-report-avenue-${avenue.code}`} type="checkbox" checked={selectedAvenueCodes.includes(avenue.code)} onChange={(event) => updateAvenues(toggleValue(selectedAvenueCodes, avenue.code, event.target.checked, normalizeBodReportAvenueCodes))} /> {avenue.label}</label>)}
+          </div>
+        </fieldset>
       </div>
 
-      {avenueCode ? <p className="bod-avenue-report__director">
-        <strong>Director(s):</strong>{" "}
-        {directorState === "loading" ? "Loading current assignments..." : directors.length
-          ? directors.map((director) => `${director.name} (${director.positionTitle})`).join(", ")
-          : "Not available"}
-        {directorState === "error" ? <small> Current assignments could not be loaded; this does not block a report marked Not available.</small> : null}
+      <div className="bod-avenue-report__appearance">
+        <label htmlFor="bod-report-font">Font family<select id="bod-report-font" value={appearance.fontFamily} onChange={(event) => updateAppearance("fontFamily", event.target.value)}>{BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.fontFamilies.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <label htmlFor="bod-report-body-size">Body font size<select id="bod-report-body-size" value={appearance.bodySize} onChange={(event) => updateAppearance("bodySize", event.target.value)}>{BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.bodySizes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <label htmlFor="bod-report-density">Table density<select id="bod-report-density" value={appearance.density} onChange={(event) => updateAppearance("density", event.target.value)}>{BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.densities.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+      </div>
+
+      {selectedAvenueCodes.length ? <p className="bod-avenue-report__director">
+        <strong>Director lookup:</strong>{" "}
+        {directorState === "loading" ? "Loading current assignments..." : selectedAvenueCodes.length === 1
+          ? (directorsByAvenue[selectedAvenueCodes[0]]?.length
+            ? directorsByAvenue[selectedAvenueCodes[0]].map((director) => `${director.name} (${director.positionTitle})`).join(", ")
+            : "Not available")
+          : `${selectedAvenueCodes.length} avenue director groups`}
+        {directorState === "error" ? <small> Some current assignments could not be loaded; unavailable groups will be marked Not available.</small> : null}
       </p> : null}
 
       <div className="bod-avenue-report__selection-actions">
         <button type="button" onClick={() => setSelection({ scope: selectionScope, ids: createBodAvenueSelection(matchingEvents) })} disabled={!matchingEvents.length || selectedEvents.length === matchingEvents.length}>Select all events</button>
         <button type="button" onClick={() => setSelection({ scope: selectionScope, ids: new Set() })} disabled={!selectedIds.size}>Clear selection</button>
-        <span aria-live="polite"><strong>{selectedEvents.length}</strong> event{selectedEvents.length === 1 ? "" : "s"} selected</span>
+        <span aria-live="polite"><strong>{selectedEvents.length}</strong> selected / <strong>{matchingEvents.length}</strong> unique matching events</span>
+        <span>{selectedMonths.length} month{selectedMonths.length === 1 ? "" : "s"}</span>
+        <span>{selectedAvenueCodes.length} avenue{selectedAvenueCodes.length === 1 ? "" : "s"}</span>
+        {preview ? <span>{preview.groupCount} group{preview.groupCount === 1 ? "" : "s"}</span> : null}
+        <span>{appearanceText}</span>
       </div>
 
       <fieldset className="bod-avenue-report__events">
         <legend>Eligible events</legend>
-        {!month || !avenueCode ? <p>Select a month and avenue to find reportable events.</p> : matchingEvents.length ? <ul>{matchingEvents.map((event) => <li key={event.id}><label htmlFor={`bod-report-event-${event.id}`}><input id={`bod-report-event-${event.id}`} type="checkbox" checked={selectedIds.has(event.id)} onChange={(change) => setSelection({ scope: selectionScope, ids: toggleBodAvenueEvent(selectedIds, event.id, change.target.checked) })} /><span><strong>{event.name}</strong><small>{eventDateLabel(event.startDate)} · {event.avenues.join(" · ")} · {event.rcphRole} · Active</small></span></label></li>)}</ul> : <p>No reportable events were found for this avenue and month.</p>}
+        {!selectedMonths.length || !selectedAvenueCodes.length ? <p>Select at least one month and one avenue to find reportable events.</p> : matchingEvents.length ? <ul>{matchingEvents.map((event) => {
+          const selectedEventAvenues = event.avenues.filter((code) => selectedAvenueCodes.includes(code));
+          return <li key={event.id}><label htmlFor={`bod-report-event-${event.id}`}><input id={`bod-report-event-${event.id}`} type="checkbox" checked={selectedIds.has(event.id)} onChange={(change) => setSelection({ scope: selectionScope, ids: toggleBodAvenueEvent(selectedIds, event.id, change.target.checked) })} /><span><strong>{event.name}</strong><small>{eventDateLabel(event.startDate)} / {formatBodReportMonth(event.startDate.slice(0, 7))} / {selectedEventAvenues.join(", ")}{selectedEventAvenues.length > 1 ? " / multi-avenue match" : ""} / {event.rcphRole} / Active</small></span></label></li>;
+        })}</ul> : <p>No reportable events were found for this selection.</p>}
       </fieldset>
 
-      {tooMany ? <p role="alert" className="bod-avenue-report__error">Select no more than {BOD_AVENUE_REPORT_LIMIT} events.</p> : null}
+      {tooMany ? <p role="alert" className="bod-avenue-report__error">Select no more than {BOD_AVENUE_REPORT_LIMIT} unique events.</p> : null}
       <div className="bod-avenue-report__actions">
         <button type="button" onClick={() => setShowPreview(true)} disabled={!preview || tooMany}>Preview report</button>
         <button type="button" className="bod-button--primary" onClick={download} disabled={!canDownload}>{downloading ? "Generating PDF..." : "Download PDF"}</button>
@@ -140,8 +228,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
 
       {showPreview && preview ? <section className="bod-avenue-report__preview" aria-labelledby="bod-report-preview-title">
         <h3 id="bod-report-preview-title">Report preview</h3>
-        <dl><div><dt>Month</dt><dd>{preview.monthLabel}</dd></div><div><dt>Avenue</dt><dd>{preview.avenueLabel}</dd></div><div><dt>Director(s)</dt><dd>{preview.directorText}</dd></div><div><dt>Events</dt><dd>{preview.eventCount}</dd></div></dl>
-        <ol>{preview.events.map((event, index) => <li key={`${event.date}-${event.name}-${index}`}><strong>{event.name}</strong><span>{event.dateLabel} · {event.role}</span></li>)}</ol>
+        <dl><div><dt>{preview.selectedMonths.length > 1 ? "Period" : "Month"}</dt><dd>{preview.periodLabel}</dd></div><div><dt>Avenues</dt><dd>{preview.avenuesLabel}</dd></div><div><dt>Director(s)</dt><dd>{preview.directorText}</dd></div><div><dt>Unique events</dt><dd>{preview.eventCount}</dd></div><div><dt>Groups</dt><dd>{preview.groupCount}</dd></div></dl>
+        <ol>{preview.events.map((event, index) => <li key={`${event.date}-${event.name}-${index}`}><strong>{event.name}</strong><span>{event.dateLabel} / {event.avenues.join(", ")}</span></li>)}</ol>
       </section> : null}
       {message ? <p className={message.startsWith("The report") ? "bod-avenue-report__error" : "bod-avenue-report__success"} role={message.startsWith("The report") ? "alert" : "status"} aria-live="polite">{message}</p> : null}
     </section>

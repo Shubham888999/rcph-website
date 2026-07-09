@@ -13,12 +13,14 @@ test("authorized BOD Tools page mounts the monthly avenue report without changin
 });
 
 test("report UI exposes labeled filters, selection, preview, lazy PDF download, and live feedback", () => {
-  for (const text of ["Monthly Avenue Report", "Select all events", "Clear selection", "Preview report", "Download PDF", "No reportable events were found"]) assert.match(panel, new RegExp(text));
-  assert.match(panel, /htmlFor="bod-report-month"/);
-  assert.match(panel, /htmlFor="bod-report-avenue"/);
+  for (const text of ["Monthly Avenue Report", "Months", "Avenues", "Select all visible months", "Select all events", "Clear selection", "Preview report", "Download PDF", "No reportable events were found"]) assert.match(panel, new RegExp(text));
+  for (const text of ["Font family", "Body font size", "Table density", "unique matching events"]) assert.match(panel, new RegExp(text));
+  assert.match(panel, /bod-report-month-\$\{option\.value\}/);
+  assert.match(panel, /bod-report-avenue-\$\{avenue\.code\}/);
   assert.match(panel, /type="checkbox"/);
   assert.match(panel, /aria-live="polite"/);
   assert.match(panel, /await import\("\.\/bodAvenueReportPdf\.js"\)/);
+  assert.match(panel, /Existing UX reset behavior/);
   assert.doesNotMatch(page, /bodAvenueReportPdf/);
 });
 
@@ -28,6 +30,6 @@ test("director lookup uses one trusted callable and does not accept a target UID
 });
 
 test("report controls and preview stack at mobile widths without horizontal grids", () => {
-  assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.bod-avenue-report__filters[\s\S]*grid-template-columns: 1fr/);
+  assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.bod-avenue-report__filters[\s\S]*\.bod-avenue-report__appearance[\s\S]*grid-template-columns: 1fr/);
   assert.match(styles, /\.bod-avenue-report__events \{[^}]*overflow: auto/);
 });
