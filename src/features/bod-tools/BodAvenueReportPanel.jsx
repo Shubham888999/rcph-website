@@ -89,8 +89,9 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
       await downloadBodAvenueReportPdf(finalized);
       setMessage(`${finalized.eventCount} event${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.`);
       onNotice?.({ type: "success", message: "Monthly avenue report downloaded. No event records were changed." });
-    } catch {
-      setMessage("The report could not be generated. Please review the selected events and try again.");
+    } catch (error) {
+      setMessage(error?.message || "The report could not be generated. Please review the selected events and try again.");
+      onNotice?.({ type: "error", message: error?.message || "The report could not be generated." });
     } finally {
       setDownloading(false);
     }

@@ -49,5 +49,7 @@ test("Resolution PDF uses A4 safe-area pagination and a shared letterhead XObjec
 
 test("Resolution letterhead integration remains isolated from the BOD Avenue renderer", () => {
   assert.doesNotMatch(bodPdf, /resolutionLetterhead|resolution_letterhead|RESOLUTION_CONTENT_BOUNDS/);
-  assert.match(bodPdf, /buildSimpleA4Pdf\(buildBodAvenueReportPdfPages\(report\)\)/);
+  assert.match(bodPdf, /BOD_AVENUE_REPORT_LETTERHEAD_URL/);
+  assert.match(bodPdf, /parseBodAvenueReportLetterheadPng/);
+  assert.match(bodPdf, /\/XObject << \/BG/);
 });

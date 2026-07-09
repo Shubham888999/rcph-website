@@ -1,143 +1,465 @@
 import { getBodAvenueReportFilename } from "./bodAvenueReportModel.js";
 import {
   A4_PDF_SIZE,
-  buildSimpleA4Pdf,
   pdfFillRectCommand,
   pdfLineCommand,
   pdfTextCommand,
   wrapPdfText,
 } from "../pdf/simplePdf.js";
 
-const MARGIN = 36;
-const CONTENT_WIDTH = A4_PDF_SIZE.width - MARGIN * 2;
-const TABLE_BOTTOM = 48;
-const TABLE_COLUMNS = Object.freeze([
-  { key: "date", label: "Date", width: 58 },
-  { key: "event", label: "Event", width: 132 },
-  { key: "role", label: "Role", width: 66 },
-  { key: "details", label: "Host / Collaborators / Description", width: CONTENT_WIDTH - 256 },
+export const BOD_AVENUE_REPORT_LETTERHEAD_URL = "/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png";
+
+export const BOD_AVENUE_REPORT_LAYOUT = Object.freeze({
+  page: A4_PDF_SIZE,
+  // Safe boundaries are based on the official A4 letterhead: top branding/title above,
+  // skyline and contact footer below. Report body content must stay inside this box.
+  safeArea: Object.freeze({ left: 36, right: 559, top: 636, bottom: 205 }),
+topMeta: Object.freeze({
+  y: 704,
+  fontSize: 7.5,
+  gray: 0.2,
+}),
+
+generatedMeta: Object.freeze({
+  x: 36,
+  y: 90,
+  fontSize: 8.2,
+  gray: 0.3,
+}),
+  summary: Object.freeze({
+    top: 636,
+    labelSize: 7.4,
+    valueSize: 8.1,
+    lineHeight: 10.8,
+    rowGap: 5,
+    dividerGap: 8,
+    dividerGray: 0.62,
+    columns: Object.freeze([
+      Object.freeze({ key: "month", label: "Month", width: 85 }),
+      Object.freeze({ key: "director", label: "Director Name", width: 224 }),
+      Object.freeze({ key: "avenue", label: "Avenue", width: 148 }),
+      Object.freeze({ key: "events", label: "Total Events", width: 66 }),
+    ]),
+  }),
+table: Object.freeze({
+  headerHeight: 23,
+  fontSize: 8,
+  headerFontSize: 7.7,
+  lineHeight: 10.1,
+  padding: 4,
+  headerGray: 0.9,
+  alternateRowGray: 0.975,
+  borderGray: 0.7,
+  headerBorderGray: 0.55,
+}),
+});
+
+export const BOD_AVENUE_REPORT_CONTENT_WIDTH =
+  BOD_AVENUE_REPORT_LAYOUT.safeArea.right - BOD_AVENUE_REPORT_LAYOUT.safeArea.left;
+
+export const BOD_AVENUE_REPORT_TABLE_COLUMNS = Object.freeze([
+  Object.freeze({ key: "date", label: "Date", width: 58 }),
+  Object.freeze({ key: "event", label: "Event", width: 132 }),
+  Object.freeze({ key: "role", label: "Role", width: 66 }),
+  Object.freeze({ key: "details", label: "Host / Collaborators / Description", width: BOD_AVENUE_REPORT_CONTENT_WIDTH - 256 }),
 ]);
 
-function formatGeneratedAt(value) {
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
+const USER_MESSAGE = "The BOD Avenue Report letterhead could not be loaded. Please try again.";
+const PNG_SIGNATURE = Object.freeze([137, 80, 78, 71, 13, 10, 26, 10]);
+const encoder = new TextEncoder();
+let cachedLetterheadPromise = null;
+
+function asBytes(value) {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  return new Uint8Array();
+}
+
+function concatBytes(parts) {
+  const length = parts.reduce((total, part) => total + part.length, 0);
+  const output = new Uint8Array(length);
+  let offset = 0;
+  parts.forEach((part) => { output.set(part, offset); offset += part.length; });
+  return output;
+}
+
+function ascii(value) {
+  return encoder.encode(value);
+}
+
+function assertValidPngSignature(bytes) {
+  if (bytes.length < 33 || PNG_SIGNATURE.some((byte, index) => bytes[index] !== byte)) {
+    throw new Error("The BOD Avenue Report letterhead is not a valid PNG image.");
+  }
+}
+
+export function parseBodAvenueReportLetterheadPng(value) {
+  const bytes = asBytes(value);
+  assertValidPngSignature(bytes);
+  const width = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+  const height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+  const bitDepth = bytes[24];
+  const colorType = bytes[25];
+  const compression = bytes[26];
+  const filter = bytes[27];
+  const interlace = bytes[28];
+  if (!Number.isInteger(width) || width < 1 || !Number.isInteger(height) || height < 1) throw new Error("The BOD Avenue Report letterhead dimensions are invalid.");
+  if (bitDepth !== 8 || colorType !== 2 || compression !== 0 || filter !== 0 || interlace !== 0) {
+    throw new Error("The BOD Avenue Report letterhead PNG must be an 8-bit RGB, non-interlaced image.");
+  }
+  const idat = [];
+  for (let offset = 8; offset < bytes.length;) {
+    if (offset + 12 > bytes.length) throw new Error("The BOD Avenue Report letterhead PNG is incomplete.");
+    const length = (bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3];
+    const type = String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (length < 0 || dataEnd + 4 > bytes.length) throw new Error("The BOD Avenue Report letterhead PNG has an invalid chunk.");
+    if (type === "IDAT") idat.push(bytes.subarray(dataStart, dataEnd));
+    if (type === "IEND") break;
+    offset = dataEnd + 4;
+  }
+  const imageBytes = concatBytes(idat);
+  if (!imageBytes.length) throw new Error("The BOD Avenue Report letterhead PNG has no image data.");
+  return { bytes: imageBytes, width, height, bitsPerComponent: 8, colorSpace: "DeviceRGB", colors: 3 };
+}
+
+export async function loadBodAvenueReportLetterheadPng(options = {}) {
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const parser = options.parsePng || parseBodAvenueReportLetterheadPng;
+  const logger = options.logger || console;
+  try {
+    if (typeof fetchImpl !== "function") throw new Error("Asset loading is unavailable.");
+    const response = await fetchImpl(BOD_AVENUE_REPORT_LETTERHEAD_URL, { cache: "force-cache" });
+    if (!response?.ok) throw new Error(`Asset request failed with status ${response?.status || "unknown"}.`);
+    return parser(await response.arrayBuffer());
+  } catch (error) {
+    logger?.error?.("BOD Avenue Report letterhead preparation failed.", {
+      assetUrl: BOD_AVENUE_REPORT_LETTERHEAD_URL,
+      errorName: typeof error?.name === "string" ? error.name : "Error",
+    });
+    throw new Error(USER_MESSAGE, { cause: error });
+  }
+}
+
+export function getBodAvenueReportLetterheadPng() {
+  if (!cachedLetterheadPromise) {
+    cachedLetterheadPromise = loadBodAvenueReportLetterheadPng().catch((error) => {
+      cachedLetterheadPromise = null;
+      throw error;
+    });
+  }
+  return cachedLetterheadPromise;
+}
+
+function approximateTextWidth(text, size, bold = false) {
+  return String(text || "").length * size * 0.52 * (bold ? 1.04 : 1);
+}
+
+function rightAlignedTextCommand({ right, y, text, size, bold = false, gray = 0 }) {
+  return pdfTextCommand({ x: right - approximateTextWidth(text, size, bold), y, text, size, bold, gray });
+}
+
+function formatReportDate(value) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     timeZone: "Asia/Kolkata",
   }).format(new Date(value));
 }
 
-function addWrappedText(commands, text, x, y, width, options = {}) {
+function formatReportTime(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  }).format(new Date(value));
+}
+
+function formatGeneratedMetadata(value) {
+  return `${formatReportDate(value)} at ${formatReportTime(value)} IST`;
+}
+
+function addTextLines(commands, lines, x, y, options = {}) {
   const size = options.size || 9;
   const lineHeight = options.lineHeight || size * 1.3;
-  const lines = wrapPdfText(text, width, size);
-  lines.forEach((line, index) => commands.push(pdfTextCommand({ x, y: y - index * lineHeight, text: line, size, bold: options.bold, gray: options.gray })));
-  return y - lines.length * lineHeight;
+  lines.forEach((line, index) => commands.push(pdfTextCommand({
+    x,
+    y: y - index * lineHeight,
+    text: line,
+    size,
+    bold: options.bold,
+    gray: options.gray,
+  })));
+  return y - Math.max(1, lines.length) * lineHeight;
 }
 
-function drawTableHeader(commands, top) {
-  const height = 23;
-  commands.push(pdfFillRectCommand({ x: MARGIN, y: top - height, width: CONTENT_WIDTH, height, gray: 0.9 }));
-  let x = MARGIN;
-  for (const column of TABLE_COLUMNS) {
-    commands.push(pdfTextCommand({ x: x + 4, y: top - 15, text: column.label, size: 7.5, bold: true }));
-    commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - height, gray: 0.55 }));
-    x += column.width;
-  }
-  commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - height, gray: 0.55 }));
-  commands.push(pdfLineCommand({ x1: MARGIN, y1: top, x2: MARGIN + CONTENT_WIDTH, y2: top, gray: 0.55 }));
-  commands.push(pdfLineCommand({ x1: MARGIN, y1: top - height, x2: MARGIN + CONTENT_WIDTH, y2: top - height, gray: 0.55 }));
-  return top - height;
-}
-
-function addContinuationPage(pages, report) {
-  const commands = [];
-  commands.push(pdfTextCommand({ x: MARGIN, y: 806, text: "MONTHLY BOD AVENUE REPORT", size: 11, bold: true }));
-  commands.push(pdfTextCommand({ x: MARGIN, y: 790, text: `${report.monthLabel} - ${report.avenueLabel}`, size: 8, gray: 0.25 }));
-  pages.push(commands);
-  return drawTableHeader(commands, 770);
-}
-
-function eventCellLines(event) {
-  const details = `Host: ${event.hostClub}\nCollaborators: ${event.collaborators}\nDescription: ${event.description}`;
+function summaryFields(report) {
   return {
-    date: wrapPdfText(event.dateLabel, TABLE_COLUMNS[0].width - 8, 7.5),
-    event: wrapPdfText(event.name, TABLE_COLUMNS[1].width - 8, 7.5),
-    role: wrapPdfText(event.role, TABLE_COLUMNS[2].width - 8, 7.5),
-    details: wrapPdfText(details, TABLE_COLUMNS[3].width - 8, 7.5),
+    month: report.monthLabel,
+    director: report.directorText,
+    avenue: report.avenueLabel,
+    events: String(report.eventCount),
   };
 }
 
+function summaryNeedsTwoRows(values) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
+  return layout.columns.some((column) => {
+    const valueWidth = column.width - 6;
+    return approximateTextWidth(values[column.key], layout.valueSize) > valueWidth;
+  });
+}
+
+function drawSummaryField(commands, field, value, x, y, width) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
+  commands.push(pdfTextCommand({ x, y, text: field.label, size: layout.labelSize, bold: true, gray: 0.12 }));
+  const lines = wrapPdfText(value, width, layout.valueSize);
+  addTextLines(commands, lines, x, y - layout.lineHeight, {
+    size: layout.valueSize,
+    lineHeight: layout.lineHeight,
+    gray: 0.08,
+  });
+  return lines.length;
+}
+
+function drawSummary(commands, report) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const values = summaryFields(report);
+  let y = layout.top;
+  if (!summaryNeedsTwoRows(values)) {
+    let x = safe.left;
+    let maxLines = 1;
+    layout.columns.forEach((field) => {
+      maxLines = Math.max(maxLines, drawSummaryField(commands, field, values[field.key], x, y, field.width - 6));
+      x += field.width;
+    });
+    y -= layout.lineHeight * (maxLines + 1);
+  } else {
+    const firstRow = layout.columns.filter((field) => field.key !== "director");
+    const rowWidth = BOD_AVENUE_REPORT_CONTENT_WIDTH / firstRow.length;
+    firstRow.forEach((field, index) => drawSummaryField(commands, field, values[field.key], safe.left + rowWidth * index, y, rowWidth - 8));
+    y -= layout.lineHeight * 2 + layout.rowGap;
+    drawSummaryField(commands, layout.columns.find((field) => field.key === "director"), values.director, safe.left, y, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6);
+    const directorLines = wrapPdfText(values.director, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6, layout.valueSize).length;
+    y -= layout.lineHeight * (directorLines + 1);
+  }
+  const dividerY = y - layout.dividerGap;
+  commands.push(pdfLineCommand({ x1: safe.left, y1: dividerY, x2: safe.right, y2: dividerY, width: 0.6, gray: layout.dividerGray }));
+  return dividerY - layout.dividerGap;
+}
+
+function drawTableHeader(commands, top) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  commands.push(pdfFillRectCommand({ x: safe.left, y: top - table.headerHeight, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: table.headerHeight, gray: table.headerGray }));
+  let x = safe.left;
+  for (const column of BOD_AVENUE_REPORT_TABLE_COLUMNS) {
+    commands.push(pdfTextCommand({ x: x + table.padding, y: top - 15, text: column.label, size: table.headerFontSize, bold: true }));
+    commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - table.headerHeight, gray: table.headerBorderGray }));
+    x += column.width;
+  }
+  commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - table.headerHeight, gray: table.headerBorderGray }));
+  commands.push(pdfLineCommand({ x1: safe.left, y1: top, x2: safe.right, y2: top, gray: table.headerBorderGray }));
+  commands.push(pdfLineCommand({ x1: safe.left, y1: top - table.headerHeight, x2: safe.right, y2: top - table.headerHeight, gray: table.headerBorderGray }));
+  return top - table.headerHeight;
+}
+
+function eventCellLines(event) {
+  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  const details = `Host: ${event.hostClub}\nCollaborators: ${event.collaborators}\nDescription: ${event.description}`;
+  return {
+    date: wrapPdfText(event.dateLabel, BOD_AVENUE_REPORT_TABLE_COLUMNS[0].width - table.padding * 2, table.fontSize),
+    event: wrapPdfText(event.name, BOD_AVENUE_REPORT_TABLE_COLUMNS[1].width - table.padding * 2, table.fontSize),
+    role: wrapPdfText(event.role, BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize),
+    details: wrapPdfText(details, BOD_AVENUE_REPORT_TABLE_COLUMNS[3].width - table.padding * 2, table.fontSize),
+  };
+}
+
+function rowHeightForLines(lines) {
+  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  return Math.max(1, ...Object.values(lines).map((cellLines) => cellLines.length)) * table.lineHeight + table.padding * 2;
+}
+
+function drawRow(commands, lines, top, shade) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  const rowHeight = rowHeightForLines(lines);
+  if (shade) commands.push(pdfFillRectCommand({ x: safe.left, y: top - rowHeight, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: rowHeight, gray: table.alternateRowGray }));
+  let x = safe.left;
+  BOD_AVENUE_REPORT_TABLE_COLUMNS.forEach((column) => {
+    lines[column.key].forEach((line, index) => commands.push(pdfTextCommand({
+      x: x + table.padding,
+      y: top - table.padding - table.fontSize - index * table.lineHeight,
+      text: line,
+      size: table.fontSize,
+    })));
+    commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - rowHeight, gray: table.borderGray }));
+    x += column.width;
+  });
+  commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - rowHeight, gray: table.borderGray }));
+  commands.push(pdfLineCommand({ x1: safe.left, y1: top - rowHeight, x2: safe.right, y2: top - rowHeight, gray: table.borderGray }));
+  return top - rowHeight;
+}
+
+function splitOversizedRow(lines) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const table = BOD_AVENUE_REPORT_LAYOUT.table;
+  const availableLines = Math.max(1, Math.floor((safe.top - table.headerHeight - safe.bottom - table.padding * 2) / table.lineHeight));
+  const remaining = Object.fromEntries(Object.entries(lines).map(([key, value]) => [key, [...value]]));
+  const chunks = [];
+  let first = true;
+  while (Object.values(remaining).some((cellLines) => cellLines.length)) {
+    const chunk = {};
+    for (const key of Object.keys(remaining)) chunk[key] = remaining[key].splice(0, availableLines);
+    if (!first && !chunk.event.length) chunk.event = ["(continued)"];
+    if (!first && !chunk.date.length) chunk.date = [""];
+    if (!first && !chunk.role.length) chunk.role = [""];
+    chunks.push(chunk);
+    first = false;
+  }
+  return chunks;
+}
+
+function createPage(pages) {
+  const commands = [];
+  pages.push(commands);
+  return { commands, y: drawTableHeader(commands, BOD_AVENUE_REPORT_LAYOUT.safeArea.top) };
+}
+
 function drawEventRows(pages, report, startY) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const table = BOD_AVENUE_REPORT_LAYOUT.table;
   let commands = pages.at(-1);
   let y = startY;
-  const lineHeight = 9.5;
-  const padding = 4;
+  const freshPageRowCapacity = safe.top - table.headerHeight - safe.bottom;
   report.events.forEach((event, eventIndex) => {
-    const remaining = eventCellLines(event);
-    let firstChunk = true;
-    while (Object.values(remaining).some((lines) => lines.length)) {
-      const availableLines = Math.floor((y - TABLE_BOTTOM - padding * 2) / lineHeight);
-      if (availableLines < 2) {
-        y = addContinuationPage(pages, report);
-        commands = pages.at(-1);
-        continue;
+    const lines = eventCellLines(event);
+    const rowHeight = rowHeightForLines(lines);
+    if (rowHeight > freshPageRowCapacity) {
+      // Exceptional fallback: a single event row can exceed one safe page after wrapping.
+      // Only then do we split it into continuation chunks to avoid an infinite loop.
+      for (const chunk of splitOversizedRow(lines)) {
+        const chunkHeight = rowHeightForLines(chunk);
+        if (y - chunkHeight < safe.bottom) ({ commands, y } = createPage(pages));
+        y = drawRow(commands, chunk, y, eventIndex % 2 === 1);
       }
-      const chunkSize = Math.min(availableLines, Math.max(...Object.values(remaining).map((lines) => lines.length)));
-      const chunks = {};
-      for (const key of Object.keys(remaining)) chunks[key] = remaining[key].splice(0, chunkSize);
-      if (!firstChunk && !chunks.event.length) chunks.event = ["(continued)"];
-      const rowLineCount = Math.max(1, ...Object.values(chunks).map((lines) => lines.length));
-      const rowHeight = rowLineCount * lineHeight + padding * 2;
-      if (eventIndex % 2 === 1) commands.push(pdfFillRectCommand({ x: MARGIN, y: y - rowHeight, width: CONTENT_WIDTH, height: rowHeight, gray: 0.975 }));
-      let x = MARGIN;
-      TABLE_COLUMNS.forEach((column) => {
-        chunks[column.key].forEach((line, index) => commands.push(pdfTextCommand({
-          x: x + padding,
-          y: y - padding - 7.5 - index * lineHeight,
-          text: line,
-          size: 7.5,
-        })));
-        commands.push(pdfLineCommand({ x1: x, y1: y, x2: x, y2: y - rowHeight, gray: 0.7 }));
-        x += column.width;
-      });
-      commands.push(pdfLineCommand({ x1: x, y1: y, x2: x, y2: y - rowHeight, gray: 0.7 }));
-      commands.push(pdfLineCommand({ x1: MARGIN, y1: y - rowHeight, x2: MARGIN + CONTENT_WIDTH, y2: y - rowHeight, gray: 0.7 }));
-      y -= rowHeight;
-      firstChunk = false;
+      return;
     }
+    // Atomic row pagination: measure the complete event row before drawing it.
+    if (y - rowHeight < safe.bottom) ({ commands, y } = createPage(pages));
+    y = drawRow(commands, lines, y, eventIndex % 2 === 1);
+  });
+}
+
+function addPageChrome(pages, report) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const top = BOD_AVENUE_REPORT_LAYOUT.topMeta;
+  const meta = BOD_AVENUE_REPORT_LAYOUT.generatedMeta;
+  const generatedDate = formatReportDate(report.generatedAt);
+const metadataLine = `Generated by RCPH Website • ${formatGeneratedMetadata(report.generatedAt)}`;  // Two-pass page numbering: body pagination completes first, then every page gets X of Y.
+  pages.forEach((page, index) => {
+    const pageNumber = `Page ${index + 1} of ${pages.length}`;
+    page.unshift(
+      pdfTextCommand({ x: safe.left, y: top.y, text: generatedDate, size: top.fontSize, gray: top.gray }),
+      rightAlignedTextCommand({ right: safe.right, y: top.y, text: pageNumber, size: top.fontSize, gray: top.gray }),
+    );
+    page.push(pdfTextCommand({ x: meta.x, y: meta.y, text: metadataLine, size: meta.fontSize, gray: meta.gray }));
   });
 }
 
 export function buildBodAvenueReportPdfPages(report) {
   if (!report?.events?.length || report.eventCount !== report.events.length) throw new TypeError("A finalized non-empty report model is required.");
   const pages = [[]];
-  const commands = pages[0];
-  commands.push(pdfTextCommand({ x: MARGIN, y: 806, text: "ROTARACT CLUB OF PUNE HERITAGE", size: 15, bold: true }));
-  commands.push(pdfTextCommand({ x: MARGIN, y: 784, text: "MONTHLY BOD AVENUE REPORT", size: 13, bold: true }));
-  commands.push(pdfLineCommand({ x1: MARGIN, y1: 770, x2: MARGIN + CONTENT_WIDTH, y2: 770, width: 1.2, gray: 0.2 }));
-  let y = 748;
-  y = addWrappedText(commands, `Month: ${report.monthLabel}`, MARGIN, y, CONTENT_WIDTH, { size: 9, bold: true }) - 3;
-  y = addWrappedText(commands, `Avenue: ${report.avenueLabel} (${report.avenueCode})`, MARGIN, y, CONTENT_WIDTH, { size: 9, bold: true }) - 3;
-  y = addWrappedText(commands, `Director(s): ${report.directorText}`, MARGIN, y, CONTENT_WIDTH, { size: 9 }) - 3;
-  y = addWrappedText(commands, `Director source: ${report.directorAssignmentBasis}`, MARGIN, y, CONTENT_WIDTH, { size: 7.5, gray: 0.25 }) - 3;
-  y = addWrappedText(commands, `Total events: ${report.eventCount}`, MARGIN, y, CONTENT_WIDTH, { size: 9 }) - 3;
-  y = addWrappedText(commands, `Generated on: ${formatGeneratedAt(report.generatedAt)}`, MARGIN, y, CONTENT_WIDTH, { size: 9 }) - 10;
-  y = drawTableHeader(commands, y);
-  drawEventRows(pages, report, y);
-  pages.forEach((page, index) => {
-    page.push(pdfLineCommand({ x1: MARGIN, y1: 38, x2: MARGIN + CONTENT_WIDTH, y2: 38, gray: 0.8 }));
-    page.push(pdfTextCommand({ x: MARGIN, y: 23, text: "System-generated placeholder report", size: 7, gray: 0.35 }));
-    page.push(pdfTextCommand({ x: 515, y: 23, text: `Page ${index + 1} of ${pages.length}`, size: 7, gray: 0.35 }));
-  });
+  const firstPage = pages[0];
+  const tableTop = drawSummary(firstPage, report);
+  const startY = drawTableHeader(firstPage, tableTop);
+  drawEventRows(pages, report, startY);
+  addPageChrome(pages, report);
   return pages;
 }
 
-export function buildBodAvenueReportPdfDocument(report) {
-  return buildSimpleA4Pdf(buildBodAvenueReportPdfPages(report));
+function validateLetterhead(letterhead) {
+  if (!(letterhead?.bytes instanceof Uint8Array) || !letterhead.bytes.length || !Number.isInteger(letterhead.width) || !Number.isInteger(letterhead.height)) {
+    throw new TypeError("A valid BOD Avenue Report letterhead PNG is required.");
+  }
+  if (letterhead.colorSpace !== "DeviceRGB" || letterhead.bitsPerComponent !== 8 || letterhead.colors !== 3) {
+    throw new TypeError("A valid 8-bit RGB BOD Avenue Report letterhead PNG is required.");
+  }
 }
 
-export async function downloadBodAvenueReportPdf(report) {
-  const pdf = buildBodAvenueReportPdfDocument(report);
+function imagePlacement(letterhead) {
+  const page = BOD_AVENUE_REPORT_LAYOUT.page;
+  const scale = Math.min(page.width / letterhead.width, page.height / letterhead.height);
+  const width = letterhead.width * scale;
+  const height = letterhead.height * scale;
+  return { x: (page.width - width) / 2, y: (page.height - height) / 2, width, height };
+}
+
+function imageObject(letterhead) {
+  return concatBytes([
+    ascii(`<< /Type /XObject /Subtype /Image /Width ${letterhead.width} /Height ${letterhead.height} /ColorSpace /${letterhead.colorSpace} /BitsPerComponent ${letterhead.bitsPerComponent} /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors ${letterhead.colors} /BitsPerComponent ${letterhead.bitsPerComponent} /Columns ${letterhead.width} >> /Length ${letterhead.bytes.length} >>\nstream\n`),
+    letterhead.bytes,
+    ascii("\nendstream"),
+  ]);
+}
+
+function streamObject(bytes) {
+  return concatBytes([ascii(`<< /Length ${bytes.length} >>\nstream\n`), bytes, ascii("\nendstream")]);
+}
+
+function assemblePdf(objects) {
+  const chunks = [ascii("%PDF-1.4\n%RCPH-BINARY\n")];
+  const offsets = [0];
+  let length = chunks[0].length;
+  for (let id = 1; id < objects.length; id += 1) {
+    offsets[id] = length;
+    const objectBytes = concatBytes([ascii(`${id} 0 obj\n`), objects[id], ascii("\nendobj\n")]);
+    chunks.push(objectBytes);
+    length += objectBytes.length;
+  }
+  const xrefOffset = length;
+  let xref = `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id += 1) xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  xref += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  chunks.push(ascii(xref));
+  return concatBytes(chunks);
+}
+
+export function buildBodAvenueReportPdfDocument(report, letterhead) {
+  validateLetterhead(letterhead);
+  const pages = buildBodAvenueReportPdfPages(report);
+  const objects = [];
+  const imageId = 5;
+  const pageIds = pages.map((_, index) => 6 + index * 2);
+  const placement = imagePlacement(letterhead);
+  objects[1] = ascii("<< /Type /Catalog /Pages 2 0 R >>");
+  objects[2] = ascii(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>`);
+  objects[3] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  objects[imageId] = imageObject(letterhead);
+  pages.forEach((page, index) => {
+    const pageId = pageIds[index];
+    const contentId = pageId + 1;
+    const commands = [
+      `q\n${placement.width.toFixed(2)} 0 0 ${placement.height.toFixed(2)} ${placement.x.toFixed(2)} ${placement.y.toFixed(2)} cm\n/BG Do\nQ`,
+      ...page,
+    ];
+    const content = ascii(commands.join("\n"));
+    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /BG ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    objects[contentId] = streamObject(content);
+  });
+  return assemblePdf(objects);
+}
+
+export async function downloadBodAvenueReportPdf(report, options = {}) {
+  const loadLetterhead = options.loadLetterhead || getBodAvenueReportLetterheadPng;
+  const letterhead = await loadLetterhead();
+  const pdf = buildBodAvenueReportPdfDocument(report, letterhead);
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
