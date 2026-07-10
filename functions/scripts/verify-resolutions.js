@@ -83,8 +83,12 @@ const customDraft = validateDraftInput({
 assert.equal(customDraft.ok, true);
 assert.equal(assertNoNestedArrays(customDraft.payload.pdfSections, 'pdfSections'), true);
 
-assert.equal(canManageResolutions({ role: 'admin', userActive: true, userApproved: true, secretaryAssignmentActive: false }), false);
+assert.equal(canManageResolutions({ role: 'admin', userActive: true, userApproved: true, secretaryAssignmentActive: false }), true);
+assert.equal(canManageResolutions({ role: 'admin', userActive: false, userApproved: true, secretaryAssignmentActive: false }), false);
+assert.equal(canManageResolutions({ role: 'admin', userActive: true, userApproved: false, secretaryAssignmentActive: false }), false);
 assert.equal(canManageResolutions({ role: 'bod', userActive: true, userApproved: true, secretaryAssignmentActive: true }), true);
+assert.equal(canManageResolutions({ role: 'bod', userActive: true, userApproved: true, secretaryAssignmentActive: false }), false);
 assert.equal(canManageResolutions({ role: 'president', userActive: true, userApproved: true, secretaryAssignmentActive: false }), true);
+assert.equal(canManageResolutions({ role: 'gbm', userActive: true, userApproved: true, secretaryAssignmentActive: false }), false);
 
 console.log('Resolution verification passed.');

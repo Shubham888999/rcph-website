@@ -26,6 +26,13 @@ const { createResolutionUploadService } = require('./lib/resolution-upload');
 const bodAvenueReport = require('./lib/bod-avenue-report');
 const bodEventSchema = require('./lib/bod-event-schema');
 const { stripRotaractorPrefix } = require('./lib/member-name');
+const {
+  MemberProfileValidationError,
+  normalizeMemberProfileUpdateInput,
+  normalizeRid,
+  normalizeStoredRid,
+  serializeMemberProfile,
+} = require('./lib/member-profile');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -1281,6 +1288,7 @@ function getSignupNotificationRows(userData) {
     ['Full name', signupEmailValue(userData.name)],
     ['Email', signupEmailValue(userData.email)],
     ['Phone', signupEmailValue(userData.phone)],
+    ['RID', signupEmailValue(userData.rid)],
     ['Requested role', signupEmailValue(role)],
     ['Signup type', signupEmailValue(userData.signupType)],
     ['Status', signupEmailValue(userData.status)],
@@ -1385,6 +1393,13 @@ function throwCallableServiceError(err, fallbackMessage) {
   }
   console.warn(fallbackMessage, { message: err?.message || String(err) });
   throw new HttpsError('internal', fallbackMessage);
+}
+
+function throwMemberProfileError(err, fallbackMessage) {
+  if (err instanceof MemberProfileValidationError) {
+    throw new HttpsError(err.code || 'invalid-argument', err.message);
+  }
+  throwCallableServiceError(err, fallbackMessage);
 }
 
 function safeProviderFromAuth(request, fallback) {
@@ -1561,6 +1576,30 @@ function hasOrdinaryAdminAuthority(authority) {
     )
   );
 }
+
+function hasLockToolsAuthority(authority, userData) {
+  return Boolean(
+    isApprovedActiveUserRecord(userData)
+    && authority?.role
+    && (
+      authority.role === 'admin'
+      || authority.role === 'president'
+      || authority.authority?.hasPresidentAuthority === true
+    )
+  );
+}
+
+function hasResolutionToolsAuthority({ role, userData, resolutionManager }) {
+  return Boolean(
+    isApprovedActiveUserRecord(userData)
+    && (
+      role === 'admin'
+      || role === 'president'
+      || resolutionManager === true
+    )
+  );
+}
+
 async function assertAdminOrPresident(uid) {
   const authority = await getAuthorityContext(uid);
 
@@ -1625,12 +1664,12 @@ async function getResolutionManagerContext(uid) {
     userApproved: String(account.userData.status || '').toLowerCase() === 'approved',
     secretaryAssignmentActive: secretary || presidentPosition,
   });
-  if (!allowed) throw new HttpsError('permission-denied', 'President or Secretary authority required.');
+  if (!allowed) throw new HttpsError('permission-denied', 'Resolution tools access required.');
   return {
     uid,
     role,
     name: stripRotaractorPrefix(normalizeText(account.userData.name || account.authRecord.displayName || account.authRecord.email, 160)),
-    position: role === 'president' || presidentPosition ? 'President' : 'Secretary',
+    position: role === 'admin' ? 'Admin' : role === 'president' || presidentPosition ? 'President' : 'Secretary',
   };
 }
 
@@ -1640,7 +1679,7 @@ async function hasResolutionManagerAuthority(uid, preloaded = {}) {
     const userSnap = preloaded.userSnap || await db.collection('users').doc(uid).get();
     const userData = userSnap.exists ? (userSnap.data() || {}) : {};
     if (!active || !isApprovedActiveUserRecord(userData)) return false;
-    if (active.role === 'president') return true;
+    if (active.role === 'admin' || active.role === 'president') return true;
     const [secretarySnap, presidentSnap] = await Promise.all([
       db.collection('bodPositionAssignments').doc(`secretary_${uid}`).get(),
       db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
@@ -1904,9 +1943,51 @@ function setDocPreservingExistingAttendance(tx, ref, snap, eventIds, now) {
   tx.set(ref, payload, { merge: true });
 }
 
-function setMemberProfileDoc(tx, ref, snap, profile, approvedRole, clubPosition, now) {
+function ridSignupResult(status, memberId = '') {
+  return {
+    ridStatus: status,
+    ridConflict: status === 'conflict',
+    ...(memberId ? { memberId } : {}),
+  };
+}
+
+function applySignupRidToPayload(payload, existing, rid, memberId) {
+  if (!rid) return ridSignupResult('not-provided', memberId);
+  const existingRid = normalizeStoredRid(existing.rid);
+  if (!existingRid) {
+    payload.rid = rid;
+    return ridSignupResult('saved', memberId);
+  }
+  if (existingRid === rid) return ridSignupResult('already-matched', memberId);
+  return ridSignupResult('conflict', memberId);
+}
+
+async function findMemberMatchForSignup(tx, uid, email) {
+  const uidRef = db.collection('members').doc(uid);
+  const uidSnap = await tx.get(uidRef);
+  if (uidSnap.exists) {
+    return { ref: uidRef, snap: uidSnap, match: 'uid' };
+  }
+
+  if (email) {
+    const emailSnap = await tx.get(
+      db.collection('members').where('email', '==', email).limit(2)
+    );
+    if (emailSnap.docs.length === 1) {
+      const snap = emailSnap.docs[0];
+      return { ref: snap.ref, snap, match: 'email' };
+    }
+    if (emailSnap.docs.length > 1) {
+      return { ref: uidRef, snap: uidSnap, match: 'ambiguous-email' };
+    }
+  }
+
+  return { ref: uidRef, snap: uidSnap, match: 'new' };
+}
+
+function setMemberProfileDoc(tx, ref, snap, profile, approvedRole, clubPosition, now, options = {}) {
   const existing = snap.exists ? (snap.data() || {}) : {};
-  tx.set(ref, {
+  const payload = {
     name: stripRotaractorPrefix(profile.name || existing.name || ''),
     email: profile.email || existing.email || '',
     role: approvedRole,
@@ -1916,7 +1997,25 @@ function setMemberProfileDoc(tx, ref, snap, profile, approvedRole, clubPosition,
     active: true,
     createdAt: existing.createdAt || now,
     updatedAt: now,
-  }, { merge: true });
+  };
+  const ridResult = applySignupRidToPayload(payload, existing, options.rid || '', ref.id);
+  tx.set(ref, payload, { merge: true });
+  return ridResult;
+}
+
+function setSignupRidOnExistingMember(tx, ref, snap, rid, now, uid) {
+  if (!rid) return ridSignupResult('not-provided', ref?.id || '');
+  if (!snap?.exists) return ridSignupResult('unmatched');
+  const existing = snap.data() || {};
+  const payload = {
+    updatedAt: now,
+    updatedBy: uid,
+  };
+  const result = applySignupRidToPayload(payload, existing, rid, ref.id);
+  if (result.ridStatus === 'saved') {
+    tx.set(ref, payload, { merge: true });
+  }
+  return result;
 }
 
 const GENERAL_MEMBER_ATTENDANCE_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
@@ -3103,6 +3202,16 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
     }
   }
 
+  let signupRid = '';
+  try {
+    signupRid = normalizeRid(data.rid);
+  } catch (err) {
+    throwMemberProfileError(err, 'Invalid member RID.');
+  }
+  if (requestedRole === 'prospect' && signupRid) {
+    throw new HttpsError('invalid-argument', 'RID is only accepted for existing-member signup.');
+  }
+
   const profile = await buildProfileFromAuth(uid, request, data);
   const commonSignupData = {
     phone: normalizeText(data.phone, 40),
@@ -3132,6 +3241,11 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
     const existingRole = roleData ? normalizeRole(roleData.role) : '';
 
     if (roleData && ACTIVE_ROLES.has(existingRole) && isApprovedRoleDoc(roleData, existingRole)) {
+      let ridResult = ridSignupResult(signupRid ? 'unmatched' : 'not-provided');
+      if (signupRid && existingRole !== 'prospect') {
+        const memberMatch = await findMemberMatchForSignup(tx, uid, profile.email);
+        ridResult = setSignupRidOnExistingMember(tx, memberMatch.ref, memberMatch.snap, signupRid, now, uid);
+      }
       const approvedProfile = {
         ...profile,
         ...(existingRole === 'prospect' && prospectSignup ? prospectSignup : {}),
@@ -3160,16 +3274,22 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
           }, { merge: true });
         }
       }
-      return { status: 'approved', role: existingRole, existing: true, shouldNotify: false };
+      return { status: 'approved', role: existingRole, existing: true, shouldNotify: false, ...ridResult };
     }
 
     const userData = userSnap.exists ? (userSnap.data() || {}) : null;
     if (userData && String(userData.status || '').toLowerCase() === 'approved') {
+      let ridResult = ridSignupResult(signupRid ? 'unmatched' : 'not-provided');
+      if (signupRid && normalizeRole(userData.role) !== 'prospect') {
+        const memberMatch = await findMemberMatchForSignup(tx, uid, profile.email);
+        ridResult = setSignupRidOnExistingMember(tx, memberMatch.ref, memberMatch.snap, signupRid, now, uid);
+      }
       return {
         status: 'approved',
         role: normalizeRole(userData.role),
         existing: true,
         shouldNotify: false,
+        ...ridResult,
       };
     }
 
@@ -3253,14 +3373,25 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
 
     if (requestedRole === 'gbm') {
       const clubPosition = 'Member';
-      const memberRef = db.collection('members').doc(uid);
-      const attendanceRef = db.collection('attendance').doc(uid);
-      const districtAttendanceRef = db.collection('districtAttendance').doc(uid);
-      const [memberSnap, attendanceSnap, districtAttendanceSnap] = await Promise.all([
-        tx.get(memberRef),
+      const memberMatch = await findMemberMatchForSignup(tx, uid, profile.email);
+      const memberRef = memberMatch.ref;
+      const memberSnap = memberMatch.snap;
+      const attendanceRef = db.collection('attendance').doc(memberRef.id);
+      const districtAttendanceRef = db.collection('districtAttendance').doc(memberRef.id);
+      const [attendanceSnap, districtAttendanceSnap] = await Promise.all([
         tx.get(attendanceRef),
         tx.get(districtAttendanceRef),
       ]);
+      const ridResult = setMemberProfileDoc(
+        tx,
+        memberRef,
+        memberSnap,
+        profile,
+        'gbm',
+        clubPosition,
+        now,
+        { rid: signupRid }
+      );
 
       tx.set(userRef, {
         ...base,
@@ -3278,14 +3409,28 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
         updatedAt: now,
         approvedBy: 'system',
       }, { merge: true });
-      setMemberProfileDoc(tx, memberRef, memberSnap, profile, 'gbm', clubPosition, now);
       setDocPreservingExistingAttendance(tx, attendanceRef, attendanceSnap, eventIds, now);
       setDocPreservingExistingAttendance(tx, districtAttendanceRef, districtAttendanceSnap, districtEventIds, now);
-      return { status: 'approved', role: 'gbm', existing: false, shouldNotify: !userSnap.exists };
+      return { status: 'approved', role: 'gbm', existing: false, shouldNotify: !userSnap.exists, ...ridResult };
     }
+
+    let pendingRidResult = ridSignupResult(signupRid ? 'unmatched' : 'not-provided');
+    if (signupRid) {
+      const memberMatch = await findMemberMatchForSignup(tx, uid, profile.email);
+      pendingRidResult = setSignupRidOnExistingMember(tx, memberMatch.ref, memberMatch.snap, signupRid, now, uid);
+    }
+    const pendingRidMetadata = signupRid
+      ? {
+          requestedRid: signupRid,
+          requestedRidStatus: pendingRidResult.ridStatus,
+          requestedRidConflict: pendingRidResult.ridConflict === true,
+          requestedRidMemberId: pendingRidResult.memberId || '',
+        }
+      : {};
 
     tx.set(userRef, {
       ...base,
+      ...pendingRidMetadata,
       role: 'pending',
       status: 'pending',
       createdAt: userData?.createdAt || now,
@@ -3296,6 +3441,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       requestedRole,
       existing: false,
       shouldNotify: !userSnap.exists,
+      ...pendingRidResult,
     };
   });
 
@@ -3305,6 +3451,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       name: stripRotaractorPrefix(profile.name),
       email: profile.email,
       phone: commonSignupData.phone,
+      rid: signupRid,
       requestedRole,
       role: result.role,
       signupType: requestedRole === 'prospect' ? 'prospect' : 'internal',
@@ -3328,6 +3475,41 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
 
   const { shouldNotify, ...signupResult } = result;
   return { ok: true, ...signupResult };
+});
+
+exports.updateMemberProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertAdminOrPresidentAuthority(actorUid);
+
+  let input;
+  try {
+    input = normalizeMemberProfileUpdateInput(request.data || {});
+  } catch (err) {
+    throwMemberProfileError(err, 'Invalid member profile update.');
+  }
+
+  const memberRef = db.collection('members').doc(input.memberId);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  let member = null;
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(memberRef);
+    if (!snap.exists) {
+      throw new HttpsError('not-found', 'Member profile not found.');
+    }
+
+    const current = snap.data() || {};
+    const update = {
+      ...input.payload,
+      updatedAt: now,
+      updatedBy: actorUid,
+    };
+
+    tx.set(memberRef, update, { merge: true });
+    member = serializeMemberProfile(input.memberId, { ...current, ...input.payload });
+  });
+
+  return { ok: true, member };
 });
 
 exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -3699,6 +3881,13 @@ const authorityContext = await getAuthorityContext(uid, {
   saaAssignmentSnap,
 });
   const resolutionManager = await hasResolutionManagerAuthority(uid, { activeRole, userSnap });
+  const userData = userSnap.exists ? (userSnap.data() || {}) : null;
+  const canAccessLockTools = hasLockToolsAuthority(authorityContext, userData);
+  const canAccessResolutionTools = hasResolutionToolsAuthority({
+    role: authorityContext.role,
+    userData,
+    resolutionManager,
+  });
 
   return {
     ok: true,
@@ -3709,6 +3898,8 @@ const authorityContext = await getAuthorityContext(uid, {
     positionSource: authorityContext.positionSource,
     authority: authorityContext.authority,
     resolutionManager,
+    canAccessLockTools,
+    canAccessResolutionTools,
   };
 });
 

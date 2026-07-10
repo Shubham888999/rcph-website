@@ -29,6 +29,13 @@ service cloud.firestore {
         && get(rolePath()).data.get('status', 'approved') == 'approved';
     }
 
+    function hasApprovedActiveRole(role) {
+      return hasRole(role)
+        && exists(userPath())
+        && get(userPath()).data.get('status', '') == 'approved'
+        && get(userPath()).data.get('active', true) != false;
+    }
+
     function hasAnyRole(roles) {
       return signedIn()
         && exists(rolePath())
@@ -73,6 +80,12 @@ service cloud.firestore {
       return hasRole('bod') || isAdmin();
     }
 
+    function hasLockTools() {
+      return hasApprovedActiveRole('admin')
+        || hasApprovedActiveRole('president')
+        || hasPresidentAuthority();
+    }
+
     function panelLocked(panelKey) {
       return exists(/databases/$(database)/documents/locks/$(panelKey))
         && get(/databases/$(database)/documents/locks/$(panelKey)).data.locked == true;
@@ -101,6 +114,20 @@ service cloud.firestore {
         && validBodAvenueDescriptionValue(data.avenueDescriptions, 'PRO')
         && validBodAvenueDescriptionValue(data.avenueDescriptions, 'DEI')
         && validBodAvenueDescriptionValue(data.avenueDescriptions, 'GBM');
+    }
+
+    function validMemberRid(data) {
+      return !data.keys().hasAny(['rid'])
+        || (data.rid is string
+          && data.rid.size() <= 40
+          && data.rid.matches('^[^\\x00-\\x1F\\x7F]*$'));
+    }
+
+    function validMemberProfileWrite(data) {
+      return validMemberRid(data)
+        && (!data.keys().hasAny(['name']) || (data.name is string && data.name.size() <= 160))
+        && (!data.keys().hasAny(['email']) || (data.email is string && data.email.size() <= 320))
+        && (!data.keys().hasAny(['active']) || data.active is bool);
     }
 
     function validBodEventWrite(data) {
@@ -173,7 +200,10 @@ service cloud.firestore {
 
     match /members/{memberId} {
       allow read: if isAdmin();
-      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+      allow create, update: if isAdmin()
+        && !panelLocked('attendance')
+        && validMemberProfileWrite(request.resource.data);
+      allow delete: if isAdmin() && !panelLocked('attendance');
     }
 
     match /attendance/{attendanceId} {
@@ -226,7 +256,7 @@ service cloud.firestore {
 
     match /locks/{panelId} {
       allow read: if signedIn();
-      allow create, update, delete: if hasPresidentAuthority();
+      allow create, update, delete: if hasLockTools();
     }
 
     match /passwordResets/{resetId} {

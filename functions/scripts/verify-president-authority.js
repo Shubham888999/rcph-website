@@ -166,6 +166,25 @@ function assignmentSeed(targetUid, role, positionKeys) {
   };
 }
 
+function seedWithAccount(seed, uid, role, positionKeys) {
+  const account = assignmentSeed(uid, role, positionKeys);
+  return {
+    ...seed,
+    users: { ...(seed.users || {}), ...account.users },
+    roles: { ...(seed.roles || {}), ...account.roles },
+    members: { ...(seed.members || {}), ...account.members },
+    bodMembers: { ...(seed.bodMembers || {}), ...account.bodMembers },
+    bodPositionOccupancy: {
+      ...(seed.bodPositionOccupancy || {}),
+      ...account.bodPositionOccupancy,
+    },
+    bodPositionAssignments: {
+      ...(seed.bodPositionAssignments || {}),
+      ...account.bodPositionAssignments,
+    },
+  };
+}
+
 async function runSyncCase(seed, options) {
   const { db, service } = createAssignmentService(seed);
   try {
@@ -327,11 +346,13 @@ test('Firestore rules centralize President authority and block client assignment
   const rules = fs.readFileSync(path.join(__dirname, '..', '..', 'firestore.rules'), 'utf8');
   assert(rules.includes('function hasPresidentAuthority()'), 'rules define hasPresidentAuthority');
   assert(rules.includes('function hasActivePresidentAssignment()'), 'rules define canonical active President assignment authority');
-  assert(rules.includes('bodPositionAssignments/president_$(request.auth.uid)'), 'rules use canonical President assignment');
+  assert(rules.includes('function presidentAssignmentPath()'), 'rules centralize canonical President assignment path');
+  assert(rules.includes('"president_" + request.auth.uid'), 'rules use canonical President assignment');
   assert(rules.includes('bodPositionOccupancy/cwd'), 'rules use server-maintained cwd occupancy');
   assert(/match \/bodPositionAssignments\/\{assignmentId\}[\s\S]*allow write: if false;/.test(rules), 'clients cannot write assignments');
   assert(/match \/bodPositionOccupancy\/\{positionKey\}[\s\S]*allow write: if false;/.test(rules), 'clients cannot write occupancy');
-  assert(/match \/locks\/\{panelId\}[\s\S]*allow create, update, delete: if hasPresidentAuthority\(\);/.test(rules), 'locks use President authority');
+  assert(rules.includes('function hasLockTools()'), 'rules define focused lock tools authority');
+  assert(/match \/locks\/\{panelId\}[\s\S]*allow create, update, delete: if hasLockTools\(\);/.test(rules), 'locks use focused lock tools authority');
 });
 test('approved user without role document is denied Visit access', () => {
   assertDenied(() => access('uid', {
@@ -383,9 +404,74 @@ async function runPositionAssignmentAuthorityTests() {
 
   await assertSyncDenied(
     'BOD without President authority cannot assign cwd',
-    assignmentSeed('target', 'bod', ['secretary']),
+    seedWithAccount(
+      assignmentSeed('target', 'bod', ['secretary']),
+      'actor',
+      'bod',
+      []
+    ),
     { actorUid: 'actor', actorRole: 'bod', targetUid: 'target', role: 'bod', positionKeys: ['secretary', 'cwd'] },
-    'Admin or president access required'
+    'Administrative access required.'
+  );
+
+  await assertSyncDenied(
+    'SAA-only BOD cannot assign cwd',
+    seedWithAccount(
+      assignmentSeed('target', 'bod', ['secretary']),
+      'actor',
+      'bod',
+      ['saa']
+    ),
+    {
+      actorUid: 'actor',
+      actorRole: 'bod',
+      actorHasAdminPanelAuthority: true,
+      actorHasPresidentAuthority: false,
+      targetUid: 'target',
+      role: 'bod',
+      positionKeys: ['secretary', 'cwd'],
+    },
+    'President authority is required'
+  );
+
+  await assertSyncDenied(
+    'SAA-only BOD cannot remove cwd',
+    seedWithAccount(
+      assignmentSeed('target', 'bod', ['cwd']),
+      'actor',
+      'bod',
+      ['saa']
+    ),
+    {
+      actorUid: 'actor',
+      actorRole: 'bod',
+      actorHasAdminPanelAuthority: true,
+      actorHasPresidentAuthority: false,
+      targetUid: 'target',
+      role: 'bod',
+      positionKeys: ['secretary'],
+    },
+    'President authority is required'
+  );
+
+  await assertSyncDenied(
+    'Locks and Resolutions flags do not grant cwd assignment authority',
+    seedWithAccount(
+      assignmentSeed('target', 'bod', ['secretary']),
+      'actor',
+      'bod',
+      []
+    ),
+    {
+      actorUid: 'actor',
+      actorRole: 'bod',
+      canAccessLockTools: true,
+      canAccessResolutionTools: true,
+      targetUid: 'target',
+      role: 'bod',
+      positionKeys: ['secretary', 'cwd'],
+    },
+    'Administrative access required.'
   );
 
   await assertSyncDenied(
@@ -507,7 +593,12 @@ await assertSyncDenied(
 
 await assertSyncDenied(
   'BOD cannot assign President role',
-  assignmentSeed('target', 'bod', ['secretary']),
+  seedWithAccount(
+    assignmentSeed('target', 'bod', ['secretary']),
+    'actor',
+    'bod',
+    []
+  ),
   {
     actorUid: 'actor',
     actorRole: 'bod',
@@ -516,7 +607,7 @@ await assertSyncDenied(
     role: 'president',
     positionKeys: ['president'],
   },
-  'Admin or president access required'
+  'Administrative access required.'
 );
 
 await assertSyncDenied(

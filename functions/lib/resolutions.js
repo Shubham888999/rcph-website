@@ -132,7 +132,8 @@ function calculateResolutionResult({ votingRule, customApprovalCount, eligibleVo
 
 function canManageResolutions({ role, userActive, userApproved, secretaryAssignmentActive }) {
   if (userActive === false || userApproved === false) return false;
-  return text(role, 30).toLowerCase() === 'president' || secretaryAssignmentActive === true;
+  return ['admin', 'president'].includes(text(role, 30).toLowerCase())
+    || secretaryAssignmentActive === true;
 }
 
 module.exports = {
