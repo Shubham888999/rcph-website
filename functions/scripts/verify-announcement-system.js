@@ -30,7 +30,6 @@ const dashboardHtml = read('my-dashboard.html');
 const dashboardJs = read('js/my-dashboard.js');
 
 [
-  'publishAnnouncement',
   'getAnnouncementRecipientOptions',
   'getAnnouncementHistory',
   'markAnnouncementRead',
@@ -42,6 +41,12 @@ const dashboardJs = read('js/my-dashboard.js');
     `${name} callable should be exported exactly once with CALLABLE_OPTIONS`
   );
 });
+
+assert.strictEqual(
+  countMatches(functionsIndex, /exports\.publishAnnouncement\s*=\s*onCall\(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS/g),
+  1,
+  'publishAnnouncement callable should be exported exactly once with attachment-aware callable options'
+);
 
 assert(functionsIndex.includes("const ANNOUNCEMENTS_COLLECTION = 'announcements'"), 'canonical announcements collection should exist');
 assert(functionsIndex.includes("const ANNOUNCEMENT_DELIVERIES_COLLECTION = 'announcementDeliveries'"), 'canonical announcementDeliveries collection should exist');
@@ -62,9 +67,9 @@ assert(functionsIndex.includes('explicitUidSet.has(recipient.uid)'), 'explicit u
 assert(functionsIndex.includes("roleSeen.has('all') ? ['all']"), 'all target should normalize to only ["all"]');
 
 const dashboardStats = sliceBetween(functionsIndex, 'exports.getMyDashboardStats', 'exports.syncExistingRolesToUsers');
-assert(dashboardStats.includes('const announcements = await getDashboardAnnouncementsForUser(uid);'), 'dashboard stats should load announcements once');
+assert.strictEqual(countMatches(dashboardStats, /getDashboardAnnouncementsForUser\(uid\)/g), 1, 'dashboard stats should load announcements once');
 assert(countMatches(dashboardStats, /\bannouncements,\s*/g) >= 2, 'dashboard stats should return announcements for prospect and member paths');
-assert(dashboardStats.includes('const clubRanking = await getPublicDashboardClubRanking();'), 'dashboard stats should preserve clubRanking');
+assert.strictEqual(countMatches(dashboardStats, /getPublicDashboardClubRanking\(\)/g), 1, 'dashboard stats should preserve clubRanking');
 assert(!dashboardStats.includes('emailSummary') && !dashboardStats.includes('targetRoles') && !dashboardStats.includes('targetUserIds'), 'dashboard stats should not expose announcement targeting or email metadata');
 
 [

@@ -382,6 +382,7 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
           approveCount: frozen.approveCount,
           rejectCount: frozen.rejectCount,
           abstainCount: frozen.abstainCount,
+          appendVoteTable: frozen.appendVoteTable !== false,
           config: frozen.finalizedVotesTableConfigSnapshot,
           rows: frozen.finalizedVoteRowsSnapshot,
           metadataTimestamp: frozen.merge?.createdAt || frozen.closedAt,
@@ -409,6 +410,7 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
         tx.update(resolutionRef, {
           merge: { ...current.merge, status: 'ready', lastErrorCode: '', leaseId: null, leaseExpiresAt: null, updatedAt: completedAt, generatedAt },
           finalizedMergedPdf: { driveFileId: metadata.id, driveFolderKey: 'resolutionFinal', finalizationId, sha256: merged.sha256, sizeBytes: merged.bytes.length, pageCount: merged.pageCount, sourcePageCount: merged.sourcePageCount, appendixPageCount: merged.appendixPageCount, generatedAt },
+          finalPdfHash: merged.sha256,
           updatedAt: completedAt,
         });
       });

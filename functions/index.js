@@ -23,6 +23,10 @@ const {
 const resolutionModel = require('./lib/resolutions');
 const { createResolutionDriveService } = require('./lib/resolution-drive');
 const { createResolutionUploadService } = require('./lib/resolution-upload');
+const {
+  ANNOUNCEMENT_ATTACHMENT_EMAIL_MAX_BYTES,
+  createAnnouncementAttachmentService,
+} = require('./lib/announcement-attachments');
 const bodAvenueReport = require('./lib/bod-avenue-report');
 const bodEventSchema = require('./lib/bod-event-schema');
 const { stripRotaractorPrefix } = require('./lib/member-name');
@@ -68,6 +72,8 @@ const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE;
 const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS || '';
 const DEFAULT_SIGNUP_NOTIFY_TO = 'rcph3131@gmail.com';
+const RESOLUTION_OFFICIAL_EMAIL = normalizeEmail(process.env.RESOLUTION_OFFICIAL_EMAIL || DEFAULT_SIGNUP_NOTIFY_TO);
+const RESOLUTION_DASHBOARD_URL = normalizeText(process.env.RCPH_DASHBOARD_URL || process.env.RESOLUTION_DASHBOARD_URL || 'https://www.rcph3131.org/dashboard', 500);
 const CALLABLE_OPTIONS = {
   region: 'us-central1',
   cors: [
@@ -84,6 +90,8 @@ const CALLABLE_OPTIONS = {
 };
 const RESOLUTION_DRIVE_SECRETS = [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN];
 const RESOLUTION_PDF_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: '1GiB', secrets: RESOLUTION_DRIVE_SECRETS };
+const ANNOUNCEMENT_ATTACHMENT_SECRETS = RESOLUTION_DRIVE_SECRETS;
+const ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: ANNOUNCEMENT_ATTACHMENT_SECRETS };
 const resolutionDrive = createResolutionDriveService({
   env: process.env,
   secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
@@ -95,6 +103,18 @@ const resolutionUploads = createResolutionUploadService({
   getManagerContext: getResolutionManagerContext,
   logger: console,
   uploadEndpoint: 'https://us-central1-rcph-admin.cloudfunctions.net/uploadResolutionSourcePdf',
+});
+const announcementAttachments = createAnnouncementAttachmentService({
+  db,
+  admin,
+  env: process.env,
+  secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
+  getManagerContext: async uid => {
+    await assertApprovedActiveCallableAccount(uid);
+    return assertAdminOrPresidentAuthority(uid);
+  },
+  logger: console,
+  uploadEndpoint: 'https://us-central1-rcph-admin.cloudfunctions.net/uploadAnnouncementAttachment',
 });
 
 const transporter = nodemailer.createTransport({
@@ -479,6 +499,7 @@ function normalizeAnnouncementPayload(raw = {}) {
     targetUserIds,
     expiresAt: normalizeAnnouncementExpiry(source.expiresAt),
     emailRequested: normalizeAnnouncementSendEmail(source.sendEmail),
+    attachmentSessionId: source.attachmentSessionId ? validateAnnouncementDocId(source.attachmentSessionId, 'attachmentSessionId') : '',
   };
 }
 
@@ -573,6 +594,7 @@ function normalizePublishedAnnouncementForDashboard(id, announcement, delivery, 
     read: delivery.dashboardStatus === 'read'
       || delivery.dashboardStatus === 'dismissed'
       || !!delivery.readAt,
+    attachment: announcementAttachments.reportSafeAttachment(announcement.attachment),
   };
 }
 
@@ -687,6 +709,7 @@ function normalizeAnnouncementHistoryItem(id, data, dashboardSummary = {}) {
     },
     emailRequested: data?.emailRequested === true,
     emailSummary: normalizeAnnouncementHistoryEmailSummary(data?.emailSummary || {}),
+    attachment: announcementAttachments.reportSafeAttachment(data?.attachment),
     publishedAt: timestampToIso(data?.publishedAt),
     expiresAt: timestampToIso(data?.expiresAt),
     createdAt: timestampToIso(data?.createdAt),
@@ -930,6 +953,38 @@ async function getDashboardAnnouncementsForUser(uid) {
   }
 }
 
+async function getAnnouncementForAttachmentAccess(uid, announcementId) {
+  const safeAnnouncementId = validateAnnouncementDocId(announcementId, 'announcementId');
+  await assertApprovedActiveCallableAccount(uid);
+
+  let canManage = false;
+  try {
+    await assertAdminOrPresidentAuthority(uid);
+    canManage = true;
+  } catch {
+    canManage = false;
+  }
+
+  const announcementSnap = await db.collection(ANNOUNCEMENTS_COLLECTION).doc(safeAnnouncementId).get();
+  if (!announcementSnap.exists) throw new HttpsError('not-found', 'Announcement not found.');
+  const announcement = announcementSnap.data() || {};
+  if (canManage) return { id: safeAnnouncementId, ...announcement };
+
+  const deliverySnap = await db
+    .collection(ANNOUNCEMENT_DELIVERIES_COLLECTION)
+    .doc(announcementDeliveryId(safeAnnouncementId, uid))
+    .get();
+  if (!deliverySnap.exists) throw new HttpsError('permission-denied', 'Announcement is not available to this account.');
+  const delivery = deliverySnap.data() || {};
+  if (delivery.uid !== uid || delivery.dashboardStatus === 'dismissed') {
+    throw new HttpsError('permission-denied', 'Announcement is not available to this account.');
+  }
+  if (announcement.status !== 'published' || isAnnouncementExpired(announcement.expiresAt || delivery.expiresAt)) {
+    throw new HttpsError('not-found', 'Announcement not found.');
+  }
+  return { id: safeAnnouncementId, ...announcement };
+}
+
 function normalizeBoolean(value) {
   if (typeof value === 'boolean') return value;
   return ['true', 'yes', '1'].includes(String(value || '').trim().toLowerCase());
@@ -1153,7 +1208,7 @@ async function tryMarkAnnouncementEmailFailures(announcementId, recipients, code
   }
 }
 
-async function sendAnnouncementEmails({ announcementId, announcement, recipients }) {
+async function sendAnnouncementEmails({ announcementId, announcement, recipients, emailAttachment = null }) {
   const summary = { attempted: recipients.length, sent: 0, failed: 0 };
   if (!recipients.length) return summary;
 
@@ -1197,6 +1252,7 @@ async function sendAnnouncementEmails({ announcementId, announcement, recipients
         subject,
         text,
         html,
+        attachments: emailAttachment ? [emailAttachment] : undefined,
       });
       smtpSent = true;
     } catch (err) {
@@ -1577,6 +1633,14 @@ function hasOrdinaryAdminAuthority(authority) {
   );
 }
 
+function rolePositionSyncAuthority(authority) {
+  return {
+    actorRole: normalizeRole(authority?.role),
+    actorHasPresidentAuthority: authority?.authority?.hasPresidentAuthority === true,
+    actorHasAdminPanelAuthority: hasOrdinaryAdminAuthority(authority),
+  };
+}
+
 function hasLockToolsAuthority(authority, userData) {
   return Boolean(
     isApprovedActiveUserRecord(userData)
@@ -1751,14 +1815,19 @@ async function loadActiveResolutionVoters() {
     voters.push({
       uid,
       name,
+      email: normalizeEmail(user.email || ''),
+      role,
       position: positions.map(item => item.displayTitle).join(', '),
       positionKeys: positions.map(item => item.key),
+      eligibilityReason: 'active_bod_position',
+      active: true,
     });
   });
   return voters.sort((a, b) => a.position.localeCompare(b.position) || a.name.localeCompare(b.name));
 }
 
 function validateResolutionCustomCount(payload, eligibleCount) {
+  if (resolutionModel.normalizeApprovalMethod(payload.approvalMethod) === 'record_only') return;
   if (payload.votingRule === 'custom_approval_count'
     && (!Number.isInteger(payload.customApprovalCount)
       || payload.customApprovalCount < 1
@@ -1767,12 +1836,219 @@ function validateResolutionCustomCount(payload, eligibleCount) {
   }
 }
 
+function resolveSelectedResolutionVoters(payload, voters) {
+  if (resolutionModel.normalizeApprovalMethod(payload.approvalMethod) === 'record_only') return [];
+  if (!Array.isArray(payload.eligibleVoterIds)) {
+    throw new HttpsError('failed-precondition', 'Select at least one eligible voter before opening voting.');
+  }
+  const seen = new Set();
+  const selectedIds = [];
+  payload.eligibleVoterIds.forEach(item => {
+    if (typeof item !== 'string' || !item.trim() || item.trim().length > 128 || item.includes('/')) {
+      throw new HttpsError('failed-precondition', 'Saved eligible voter selection is invalid.');
+    }
+    const uid = normalizeText(item, 128);
+    if (uid && !seen.has(uid)) {
+      seen.add(uid);
+      selectedIds.push(uid);
+    }
+  });
+  if (!selectedIds.length) {
+    throw new HttpsError('failed-precondition', 'Select at least one eligible voter before opening voting.');
+  }
+  const voterByUid = new Map(voters.map(voter => [voter.uid, voter]));
+  const missingIds = selectedIds.filter(uid => !voterByUid.has(uid));
+  if (missingIds.length) {
+    throw new HttpsError('failed-precondition', 'Selected eligible voters must be active UID-linked BOD members.');
+  }
+  return selectedIds.map(uid => voterByUid.get(uid));
+}
+
+function resolutionMethodLabel(method) {
+  const normalized = resolutionModel.normalizeApprovalMethod(method);
+  if (normalized === 'hybrid_email') return 'Hybrid Email Confirmation';
+  if (normalized === 'record_only') return 'Record Only / No Voting';
+  return 'Website Voting';
+}
+
+function shortResolutionHash(hash) {
+  return normalizeText(hash, 128).slice(0, 12).toUpperCase();
+}
+
+function stableResolutionJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableResolutionJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableResolutionJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+function buildResolutionDocumentHash(resolution) {
+  if (resolutionUploads.sourceMode(resolution) === 'uploadedPdf' && resolution.uploadedSource?.sha256) {
+    return normalizeText(resolution.uploadedSource.sha256, 128);
+  }
+  const snapshot = {
+    resolutionNumber: normalizeText(resolution.resolutionNumber, 80),
+    title: normalizeText(resolution.title, 220),
+    body: typeof resolution.body === 'string' ? resolution.body.slice(0, 20000) : '',
+    notes: typeof resolution.notes === 'string' ? resolution.notes.slice(0, 10000) : '',
+    meetingId: normalizeText(resolution.meetingId, 160),
+    meetingTitle: normalizeText(resolution.meetingTitle, 220),
+    meetingDate: normalizeText(resolution.meetingDate, 20),
+    proposedByUid: normalizeText(resolution.proposedByUid, 128),
+    secondedByUid: normalizeText(resolution.secondedByUid, 128),
+    documentSourceMode: resolutionUploads.sourceMode(resolution),
+    pdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
+    pdfSections: resolutionModel.normalizePdfSections(resolution.pdfSections),
+  };
+  return crypto.createHash('sha256').update(stableResolutionJson(snapshot), 'utf8').digest('hex');
+}
+
+function resolutionDeadlineText(resolution) {
+  return normalizeText(resolution.votingDeadline || resolution.deadline, 80) || 'Until voting is closed by the Resolution manager.';
+}
+
+function buildDefaultOfficialEmailSubject(resolution) {
+  return `Resolution ${normalizeText(resolution.resolutionNumber, 80)} - ${normalizeText(resolution.title, 220)}`;
+}
+
+function buildDefaultOfficialEmailBody(resolution, documentShortHash, actor) {
+  const presidentName = stripRotaractorPrefix(normalizeText(actor?.name || resolution.openedByName || 'President', 160));
+  return [
+    'Dear Board Members,',
+    '',
+    `This email is being issued to formally document the resolution discussed during our online Board Meeting held on ${normalizeText(resolution.meetingDate, 20) || '[MEETING DATE]'} at [MEETING TIME].`,
+    '',
+    'As per procedure, the following resolution is read and presented for approval.',
+    '',
+    'To officially pass this resolution, each Board Member is required to review the attached resolution and submit their vote through the RCPH Member Dashboard.',
+    '',
+    'After submitting the vote, each member must send the prepared confirmation reply from their registered email address.',
+    '',
+    'The record and validity of the voting process shall be substantiated through the official email correspondence trail and the website audit record.',
+    '',
+    `Resolution ${normalizeText(resolution.resolutionNumber, 80)}: ${normalizeText(resolution.title, 220)}`,
+    '',
+    'Document Fingerprint:',
+    documentShortHash || '[SHORT HASH]',
+    '',
+    'Voting Deadline:',
+    resolutionDeadlineText(resolution),
+    '',
+    'Warm regards,',
+    `Rtr. ${presidentName}`,
+    'President | RIY',
+    'Rotaract Club of Pune Heritage',
+  ].join('\n');
+}
+
+function buildDashboardResolutionNotice({ resolution, voter, documentShortHash }) {
+  return [
+    `Dear Rtr. ${stripRotaractorPrefix(normalizeText(voter.name, 160))},`,
+    '',
+    `Resolution ${normalizeText(resolution.resolutionNumber, 80)}: ${normalizeText(resolution.title, 220)} is now open for voting.`,
+    '',
+    'Please review the attached resolution from the official email and submit your vote through your Member Dashboard.',
+    '',
+    'Dashboard:',
+    RESOLUTION_DASHBOARD_URL,
+    '',
+    'Voting Deadline:',
+    resolutionDeadlineText(resolution),
+    '',
+    'Document Fingerprint:',
+    documentShortHash,
+    '',
+    'After submitting your vote, use the "Open prepared email reply" option and send the confirmation from your registered email address.',
+  ].join('\n');
+}
+
+async function sendResolutionDashboardNotifications({ resolutionId, resolution, voters, documentShortHash }) {
+  const summary = { attempted: voters.length, sent: 0, failed: 0, skipped: 0 };
+  if (!voters.length) return summary;
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    summary.skipped = voters.length;
+    return summary;
+  }
+  for (const voter of voters) {
+    const email = normalizeEmail(voter.email);
+    if (!email || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)) {
+      summary.failed += 1;
+      continue;
+    }
+    try {
+      await transporter.sendMail({
+        from: `"RCPH Platform" <${EMAIL_USER}>`,
+        to: email,
+        subject: `Action Required: Vote on Resolution ${normalizeText(resolution.resolutionNumber, 80)}`,
+        text: buildDashboardResolutionNotice({ resolution, voter, documentShortHash }),
+      });
+      summary.sent += 1;
+    } catch (error) {
+      summary.failed += 1;
+      console.warn('Resolution dashboard notification failed.', { resolutionId, uid: voter.uid, code: error?.code || 'smtp_failed' });
+    }
+  }
+  return summary;
+}
+
+async function sendOfficialResolutionEmail({ resolutionId, resolution, voters }) {
+  const recipients = voters.map(voter => normalizeEmail(voter.email)).filter(email => /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email));
+  const summary = { attempted: recipients.length, sent: 0, failed: 0, skipped: 0, attachment: 'none' };
+  if (!recipients.length) return summary;
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    summary.skipped = recipients.length;
+    return summary;
+  }
+  const mail = {
+    from: `"RCPH Platform" <${EMAIL_USER}>`,
+    to: recipients.join(', '),
+    replyTo: normalizeEmail(resolution.clubReplyToEmail || RESOLUTION_OFFICIAL_EMAIL) || undefined,
+    subject: normalizeText(resolution.officialEmailSubject, 220) || buildDefaultOfficialEmailSubject(resolution),
+    text: typeof resolution.officialEmailBody === 'string' ? resolution.officialEmailBody.slice(0, 8000) : buildDefaultOfficialEmailBody(resolution, resolution.originalDocumentShortHash, null),
+  };
+  if (resolutionUploads.sourceMode(resolution) === 'uploadedPdf' && resolution.uploadedSource?.driveFileId && resolution.uploadedSource?.sha256) {
+    try {
+      const downloaded = await resolutionDrive.downloadSourceFile({
+        driveFileId: resolution.uploadedSource.driveFileId,
+        resolutionId,
+        uploadId: resolution.uploadedSource.uploadId,
+        sha256: resolution.uploadedSource.sha256,
+      });
+      mail.attachments = [{
+        filename: normalizeText(resolution.uploadedSource.originalFileName, 180) || 'resolution.pdf',
+        content: downloaded.bytes,
+        contentType: 'application/pdf',
+      }];
+      summary.attachment = 'uploaded_pdf';
+    } catch (error) {
+      console.warn('Resolution official email attachment unavailable.', { resolutionId, code: error?.code || 'attachment_failed' });
+      summary.attachment = 'unavailable';
+    }
+  }
+  try {
+    const info = await transporter.sendMail(mail);
+    summary.sent = recipients.length;
+    summary.messageId = normalizeText(info?.messageId, 240);
+  } catch (error) {
+    summary.failed = recipients.length;
+    console.warn('Resolution official email failed.', { resolutionId, code: error?.code || 'smtp_failed' });
+  }
+  return summary;
+}
+
 function publicResolutionFields(id, data) {
   const documentSourceMode = resolutionUploads.sourceMode(data);
   const uploadedSource = resolutionUploads.reportSafeSource(data.uploadedSource);
   const merge = resolutionUploads.reportSafeMerge(data.merge, data.finalizedMergedPdf);
   const isDraft = data.status === 'draft';
   const isFinal = ['passed', 'rejected', 'closed_without_decision'].includes(data.status);
+  const eligibleVoterIds = Array.isArray(data.eligibleVoterIds)
+    ? data.eligibleVoterIds.map(item => normalizeText(item, 128)).filter(Boolean)
+    : Array.isArray(data.eligibleVoterUids) ? data.eligibleVoterUids.map(item => normalizeText(item, 128)).filter(Boolean) : [];
+  const eligibleVoterUids = Array.isArray(data.eligibleVoterUids)
+    ? data.eligibleVoterUids.map(item => normalizeText(item, 128)).filter(Boolean)
+    : [];
   return {
     id,
     resolutionNumber: normalizeText(data.resolutionNumber, 80),
@@ -1789,9 +2065,29 @@ function publicResolutionFields(id, data) {
     secondedByName: normalizeText(data.secondedByName, 160),
     secondedByPosition: normalizeText(data.secondedByPosition, 240),
     status: resolutionModel.normalizeResolutionStatus(data.status),
+    approvalMethod: resolutionModel.normalizeApprovalMethod(data.approvalMethod),
     votingRule: resolutionModel.normalizeVotingRule(data.votingRule),
     customApprovalCount: Number.isInteger(data.customApprovalCount) ? data.customApprovalCount : null,
-    eligibleVoterCount: Array.isArray(data.eligibleVoterUids) ? data.eligibleVoterUids.length : 0,
+    appendVoteTable: data.appendVoteTable !== false,
+    emailEvidenceRequired: data.emailEvidenceRequired === true,
+    originalDocumentHash: normalizeText(data.originalDocumentHash, 128),
+    originalDocumentShortHash: normalizeText(data.originalDocumentShortHash, 24),
+    originalDocumentVersion: Number.isInteger(data.originalDocumentVersion) && data.originalDocumentVersion > 0 ? data.originalDocumentVersion : 1,
+    votingOpenedAt: timestampToIso(data.votingOpenedAt || data.openedAt),
+    votingClosedAt: timestampToIso(data.votingClosedAt || data.closedAt),
+    votingOpenedBy: normalizeText(data.votingOpenedBy || data.openedByUid, 128),
+    votingClosedBy: normalizeText(data.votingClosedBy || data.closedByUid, 128),
+    eligibleVoterIds,
+    officialEmailSubject: normalizeText(data.officialEmailSubject, 220),
+    officialEmailBody: typeof data.officialEmailBody === 'string' ? data.officialEmailBody.slice(0, 8000) : '',
+    officialEmailSentAt: timestampToIso(data.officialEmailSentAt),
+    officialEmailSentBy: normalizeText(data.officialEmailSentBy, 160),
+    officialEmailRecipients: Array.isArray(data.officialEmailRecipients) ? data.officialEmailRecipients.map(item => normalizeText(item, 220)).filter(Boolean) : [],
+    clubReplyToEmail: normalizeText(data.clubReplyToEmail || RESOLUTION_OFFICIAL_EMAIL, 220),
+    finalResult: resolutionModel.normalizeResolutionStatus(data.finalResult || data.result),
+    finalPdfHash: normalizeText(data.finalPdfHash, 128),
+    auditBundleHash: normalizeText(data.auditBundleHash, 128),
+    eligibleVoterCount: eligibleVoterUids.length || eligibleVoterIds.length,
     approveCount: Math.max(0, Number(data.approveCount) || 0),
     rejectCount: Math.max(0, Number(data.rejectCount) || 0),
     abstainCount: Math.max(0, Number(data.abstainCount) || 0),
@@ -1822,8 +2118,8 @@ function publicResolutionFields(id, data) {
   };
 }
 
-function countResolutionVotes(votes) {
-  const choices = (Array.isArray(votes) ? votes : []).map(vote => resolutionModel.normalizeVoteChoice(vote?.choice)).filter(Boolean);
+function countResolutionVotes(votes, approvalMethod = 'website') {
+  const choices = resolutionModel.voteCountsForMethod(votes, approvalMethod);
   return {
     approveCount: choices.filter(choice => choice === 'approve').length,
     rejectCount: choices.filter(choice => choice === 'reject').length,
@@ -1833,7 +2129,13 @@ function countResolutionVotes(votes) {
 }
 
 function buildFinalizedVoteRows(resolution, votes, config) {
-  const voteByUid = new Map((Array.isArray(votes) ? votes : []).map(vote => [normalizeText(vote?.voterUid, 128), vote]));
+  const method = resolutionModel.normalizeApprovalMethod(resolution.approvalMethod);
+  const validVotes = (Array.isArray(votes) ? votes : []).filter(vote => {
+    if (vote?.superseded === true) return false;
+    if (method === 'hybrid_email') return resolutionModel.normalizeEmailConfirmationStatus(vote?.emailConfirmationStatus) === 'email_verified';
+    return true;
+  });
+  const voteByUid = new Map(validVotes.map(vote => [normalizeText(vote?.voterUid, 128), vote]));
   if (config.voterScope === 'all') {
     return (Array.isArray(resolution.eligibleVoters) ? resolution.eligibleVoters : []).map(voter => {
       const vote = voteByUid.get(normalizeText(voter?.uid, 128));
@@ -1845,7 +2147,7 @@ function buildFinalizedVoteRows(resolution, votes, config) {
       };
     });
   }
-  return (Array.isArray(votes) ? votes : []).map(vote => ({
+  return validVotes.map(vote => ({
     name: stripRotaractorPrefix(normalizeText(vote?.voterName || 'Not available', 160)),
     position: normalizeText(vote?.voterPosition || 'Not available', 240),
     vote: resolutionModel.normalizeVoteChoice(vote?.choice) || 'didNotVote',
@@ -1884,6 +2186,16 @@ async function getOpenResolutionsForUser(uid) {
       currentVote: resolutionModel.normalizeVoteChoice(vote.choice),
       submittedAt: timestampToIso(vote.submittedAt),
       voteUpdatedAt: timestampToIso(vote.updatedAt),
+      emailConfirmationStatus: resolutionModel.normalizeEmailConfirmationStatus(vote.emailConfirmationStatus),
+      preparedReplyText: typeof vote.preparedReplyText === 'string' ? vote.preparedReplyText.slice(0, 8000) : '',
+      preparedReplyReference: normalizeText(vote.preparedReplyReference, 160),
+      emailConfirmedAt: timestampToIso(vote.emailConfirmedAt),
+      emailSentClaimedAt: timestampToIso(vote.emailSentClaimedAt),
+      emailRejectedAt: timestampToIso(vote.emailRejectedAt),
+      emailVerificationNote: normalizeText(vote.emailVerificationNote, 1000),
+      requiredSenderEmail: normalizeEmail(vote.voterEmail || ''),
+      documentHash: normalizeText(vote.documentHash, 128),
+      documentShortHash: normalizeText(vote.documentShortHash, 24),
     };
   }));
   return rows.filter(Boolean).sort((a, b) => String(b.openedAt).localeCompare(String(a.openedAt)) || b.id.localeCompare(a.id));
@@ -3515,7 +3827,7 @@ exports.updateMemberProfile = onCall(CALLABLE_OPTIONS, async (request) => {
 exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const approverUid = requireAuth(request);
   const approverAuthority = await assertAdminOrPresidentAuthority(approverUid);
-  const approverRole = approverAuthority.role;
+  const approverSyncAuthority = rolePositionSyncAuthority(approverAuthority);
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -3527,14 +3839,7 @@ exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
   const syncOptions = {
     actorUid: approverUid,
-    actorRole: approverRole,
-    actorHasPresidentAuthority:
-  approverAuthority.authority.hasPresidentAuthority,
-
-actorHasAdminPanelAuthority:
-  approverAuthority.role === 'admin'
-  || approverAuthority.authority.hasPresidentAuthority === true
-  || approverAuthority.authority.hasSergeantAtArmsPosition === true,
+    ...approverSyncAuthority,
     targetUid,
     role: approvedRole,
     confirmJointPositionKeys: data.confirmJointPositionKeys || [],
@@ -3565,7 +3870,7 @@ actorHasAdminPanelAuthority:
 exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
   const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
-  const actorRole = actorAuthority.role;
+  const actorSyncAuthority = rolePositionSyncAuthority(actorAuthority);
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -3578,14 +3883,7 @@ exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) 
   const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
   const result = await syncUserAccessAndPositionsWithAttendance({
     actorUid,
-    actorRole,
-    actorHasPresidentAuthority:
-  approverAuthority.authority.hasPresidentAuthority,
-
-actorHasAdminPanelAuthority:
-  approverAuthority.role === 'admin'
-  || approverAuthority.authority.hasPresidentAuthority === true
-  || approverAuthority.authority.hasSergeantAtArmsPosition === true,
+    ...actorSyncAuthority,
     targetUid,
     role,
     positionKeys: data.positionKeys,
@@ -3657,7 +3955,7 @@ exports.rejectUserRoleRequest = onCall(CALLABLE_OPTIONS, async (request) => {
 exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
   const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
-  const actorRole = actorAuthority.role;
+  const actorSyncAuthority = rolePositionSyncAuthority(actorAuthority);
 
   const data = request.data || {};
   const targetUid = normalizeText(data.targetUid, 128);
@@ -3669,14 +3967,7 @@ exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
   const result = await syncUserAccessAndPositionsWithAttendance({
     actorUid,
-    actorRole,
-    actorHasPresidentAuthority:
-  approverAuthority.authority.hasPresidentAuthority,
-
-actorHasAdminPanelAuthority:
-  approverAuthority.role === 'admin'
-  || approverAuthority.authority.hasPresidentAuthority === true
-  || approverAuthority.authority.hasSergeantAtArmsPosition === true,
+    ...actorSyncAuthority,
     targetUid,
     role,
     positionKeys: data.positionKeys,
@@ -4268,7 +4559,25 @@ exports.getAnnouncementHistory = onCall(CALLABLE_OPTIONS, async (request) => {
   };
 });
 
-exports.publishAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
+exports.createAnnouncementAttachmentUploadSession = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  try {
+    return await announcementAttachments.createUploadSession(actorUid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not prepare announcement attachment upload.');
+  }
+});
+
+exports.removeAnnouncementAttachmentUpload = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  try {
+    return await announcementAttachments.removeUpload(actorUid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not remove announcement attachment.');
+  }
+});
+
+exports.publishAnnouncement = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
   await assertAdminOrPresidentAuthority(actorUid);
   await assertApprovedActiveCallableAccount(actorUid);
@@ -4277,27 +4586,43 @@ exports.publishAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
   const announcementRef = db.collection(ANNOUNCEMENTS_COLLECTION).doc();
   const announcementId = announcementRef.id;
   const timestamp = admin.firestore.FieldValue.serverTimestamp();
-
-  await announcementRef.set({
-    title: announcement.title,
-    body: announcement.body,
-    priority: announcement.priority,
-    actionText: announcement.actionText,
-    actionUrl: announcement.actionUrl,
-    targetRoles: announcement.targetRoles,
-    targetUserIds: announcement.targetUserIds,
-    status: 'publishing',
-    recipientCount: 0,
-    publishedAt: timestamp,
-    expiresAt: announcement.expiresAt,
-    createdBy: actorUid,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    emailRequested: announcement.emailRequested,
-    emailSummary: { ...ANNOUNCEMENT_EMAIL_SUMMARY_DEFAULT },
-  });
+  let reservedAttachmentSessionId = '';
+  let attachment = null;
+  let emailAttachment = null;
 
   try {
+    if (announcement.attachmentSessionId) {
+      attachment = await announcementAttachments.reserveForPublish(actorUid, announcement.attachmentSessionId, announcementId);
+      reservedAttachmentSessionId = announcement.attachmentSessionId;
+      if (announcement.emailRequested) {
+        if (attachment.sizeBytes > ANNOUNCEMENT_ATTACHMENT_EMAIL_MAX_BYTES) {
+          throw new HttpsError('failed-precondition', 'Attachment is too large for announcement email delivery.');
+        }
+        const downloaded = await announcementAttachments.downloadAttachmentBytes(attachment);
+        emailAttachment = announcementAttachments.emailAttachmentFromBytes(attachment, downloaded.bytes);
+      }
+    }
+
+    await announcementRef.set({
+      title: announcement.title,
+      body: announcement.body,
+      priority: announcement.priority,
+      actionText: announcement.actionText,
+      actionUrl: announcement.actionUrl,
+      targetRoles: announcement.targetRoles,
+      targetUserIds: announcement.targetUserIds,
+      status: 'publishing',
+      recipientCount: 0,
+      publishedAt: timestamp,
+      expiresAt: announcement.expiresAt,
+      createdBy: actorUid,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      emailRequested: announcement.emailRequested,
+      emailSummary: { ...ANNOUNCEMENT_EMAIL_SUMMARY_DEFAULT },
+      attachment,
+    });
+
     const recipients = await resolveAnnouncementRecipients({
       targetRoles: announcement.targetRoles,
       targetUserIds: announcement.targetUserIds,
@@ -4325,6 +4650,10 @@ exports.publishAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
+    if (reservedAttachmentSessionId) {
+      await announcementAttachments.markPublished(actorUid, reservedAttachmentSessionId, announcementId);
+    }
+
     let emailSummary = { ...ANNOUNCEMENT_EMAIL_SUMMARY_DEFAULT };
     if (announcement.emailRequested) {
       try {
@@ -4332,6 +4661,7 @@ exports.publishAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
           announcementId,
           announcement,
           recipients,
+          emailAttachment,
         });
       } catch (emailErr) {
         console.warn('Announcement email processing failed after dashboard publish', {
@@ -4369,10 +4699,12 @@ exports.publishAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
         targetUserIds: announcement.targetUserIds,
         status: 'published',
         emailRequested: announcement.emailRequested,
+        attachment: announcementAttachments.reportSafeAttachment(attachment),
       },
       emailSummary,
     };
   } catch (err) {
+    if (reservedAttachmentSessionId) await announcementAttachments.releaseReservation(actorUid, reservedAttachmentSessionId, announcementId);
     if (!(err instanceof HttpsError && err.code === 'failed-precondition')) {
       await announcementRef.set({
         status: 'failed',
@@ -4478,12 +4810,14 @@ async function prepareResolutionDraftInput(raw) {
   if (!meetingSnap.exists || meetingSnap.data()?.archived === true) {
     throw new HttpsError('not-found', 'Linked BOD meeting not found.');
   }
-  if (!voters.length) throw new HttpsError('failed-precondition', 'No UID-linked active BOD voters are available.');
-  validateResolutionCustomCount(payload, voters.length);
+  if (payload.approvalMethod !== 'record_only' && !voters.length) throw new HttpsError('failed-precondition', 'No UID-linked active BOD voters are available.');
+  const selectedVoters = resolveSelectedResolutionVoters(payload, voters);
+  validateResolutionCustomCount(payload, selectedVoters.length);
   const voterByUid = new Map(voters.map(voter => [voter.uid, voter]));
-  const proposer = voterByUid.get(payload.proposedByUid);
-  const seconder = voterByUid.get(payload.secondedByUid);
-  if (!proposer || !seconder) throw new HttpsError('failed-precondition', 'Proposer and seconder must be active UID-linked BOD members.');
+  const proposer = payload.proposedByUid ? voterByUid.get(payload.proposedByUid) : { name: '', position: '' };
+  const seconder = payload.secondedByUid ? voterByUid.get(payload.secondedByUid) : { name: '', position: '' };
+  if (payload.proposedByUid && !proposer) throw new HttpsError('failed-precondition', 'Proposer must be an active UID-linked BOD member.');
+  if (payload.secondedByUid && !seconder) throw new HttpsError('failed-precondition', 'Seconder must be an active UID-linked BOD member.');
   const meeting = meetingSnap.data() || {};
   if (!normalizeText(meeting.name, 220) || !/^\d{4}-\d{2}-\d{2}$/.test(String(meeting.date || ''))) {
     throw new HttpsError('failed-precondition', 'Linked BOD meeting is incomplete.');
@@ -4493,6 +4827,7 @@ async function prepareResolutionDraftInput(raw) {
     meeting: { id: meetingSnap.id, title: normalizeText(meeting.name, 220), date: String(meeting.date) },
     proposer,
     seconder,
+    selectedVoters,
   };
 }
 
@@ -4525,14 +4860,29 @@ exports.createResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
       status: 'draft',
       eligibleVoters: [],
       eligibleVoterUids: [],
+      eligibleVoterIds: prepared.payload.eligibleVoterIds,
+      eligibleVoterSnapshot: [],
+      originalDocumentHash: '',
+      originalDocumentShortHash: '',
+      originalDocumentVersion: 1,
       openedAt: null,
       openedByUid: null,
       openedByName: null,
       openedByPosition: null,
+      votingOpenedAt: null,
+      votingOpenedBy: null,
       closedAt: null,
       closedByUid: null,
       closedByName: null,
       closedByPosition: null,
+      votingClosedAt: null,
+      votingClosedBy: null,
+      officialEmailSentAt: null,
+      officialEmailSentBy: null,
+      emailEvidenceRequired: prepared.payload.approvalMethod === 'hybrid_email',
+      finalResult: null,
+      finalPdfHash: '',
+      auditBundleHash: '',
       result: null,
       approveCount: 0,
       rejectCount: 0,
@@ -4585,6 +4935,7 @@ exports.updateResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
       proposedByPosition: prepared.proposer.position,
       secondedByName: prepared.seconder.name,
       secondedByPosition: prepared.seconder.position,
+      emailEvidenceRequired: prepared.payload.approvalMethod === 'hybrid_email',
       updatedAt: now,
     });
     setResolutionAudit(tx, resolutionRef, 'draft_edited', actor, now, {
@@ -4608,7 +4959,7 @@ exports.updateResolutionPdfLayout = onCall(CALLABLE_OPTIONS, async (request) => 
     const snap = await tx.get(resolutionRef);
     if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
     const existing = snap.data() || {};
-    if (!['draft', 'open'].includes(existing.status)) throw new HttpsError('failed-precondition', 'Only draft or open resolution layouts may be edited.');
+    if (existing.status !== 'draft') throw new HttpsError('failed-precondition', 'The Resolution PDF source cannot change after voting opens.');
     if (existing.status === 'draft'
       && resolutionUploads.sourceMode(existing) === 'uploadedPdf'
       && validation.payload.documentSourceMode !== 'uploadedPdf'
@@ -4637,6 +4988,7 @@ exports.openResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (re
   ]);
   if (!meetingCheck.exists) throw new HttpsError('not-found', 'Resolution not found.');
   const before = meetingCheck.data() || {};
+  const approvalMethod = resolutionModel.normalizeApprovalMethod(before.approvalMethod);
   if (resolutionUploads.sourceMode(before) === 'uploadedPdf') {
     if (before.uploadedSource?.status !== 'ready') throw new HttpsError('failed-precondition', 'A ready uploaded PDF is required before voting can open.');
     if (!before.uploadedVotesTableConfig || typeof before.uploadedVotesTableConfig !== 'object') throw new HttpsError('failed-precondition', 'A valid uploaded PDF Votes Table configuration is required.');
@@ -4647,32 +4999,134 @@ exports.openResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (re
   }
   const linkedMeeting = await db.collection('bodMeetings').doc(String(before.meetingId || '')).get();
   if (!linkedMeeting.exists || linkedMeeting.data()?.archived === true) throw new HttpsError('failed-precondition', 'Linked BOD meeting is unavailable.');
-  if (!voters.length) throw new HttpsError('failed-precondition', 'No UID-linked active BOD voters are available.');
-  validateResolutionCustomCount(before, voters.length);
+  if (approvalMethod !== 'record_only' && !voters.length) throw new HttpsError('failed-precondition', 'No UID-linked active BOD voters are available.');
+  const selectedVoters = resolveSelectedResolutionVoters(before, voters);
+  validateResolutionCustomCount(before, selectedVoters.length);
   const resolutionRef = meetingCheck.ref;
   const now = resolutionTimestamp();
+  const documentHash = buildResolutionDocumentHash(before);
+  const documentShortHash = shortResolutionHash(documentHash);
+  const eligibleSnapshot = resolutionModel.buildEligibleVoterSnapshot(selectedVoters, selectedVoters.map(voter => voter.uid));
+  const officialEmailSubject = normalizeText(before.officialEmailSubject, 220) || buildDefaultOfficialEmailSubject(before);
+  const officialEmailBody = normalizeText(before.officialEmailBody, 8000) || buildDefaultOfficialEmailBody(before, documentShortHash, actor);
+  const commonFrozenFields = {
+    eligibleVoters: eligibleSnapshot.map(voter => ({ uid: voter.uid, name: voter.name, email: voter.email, role: voter.role, position: voter.position, eligibilityReason: voter.eligibilityReason, active: voter.active })),
+    eligibleVoterUids: eligibleSnapshot.map(voter => voter.uid),
+    eligibleVoterIds: eligibleSnapshot.map(voter => voter.uid),
+    eligibleVoterSnapshot: eligibleSnapshot,
+    originalDocumentHash: documentHash,
+    originalDocumentShortHash: documentShortHash,
+    originalDocumentVersion: Number.isInteger(before.originalDocumentVersion) && before.originalDocumentVersion > 0 ? before.originalDocumentVersion : 1,
+    officialEmailSubject,
+    officialEmailBody,
+    officialEmailRecipients: eligibleSnapshot.map(voter => voter.email).filter(Boolean),
+    clubReplyToEmail: normalizeEmail(before.clubReplyToEmail || RESOLUTION_OFFICIAL_EMAIL),
+    emailEvidenceRequired: approvalMethod === 'hybrid_email',
+  };
   await db.runTransaction(async tx => {
     const snap = await tx.get(resolutionRef);
     if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
     const data = snap.data() || {};
     if (data.status !== 'draft') throw new HttpsError('failed-precondition', 'Only a draft resolution may be opened.');
+    if (approvalMethod === 'record_only') {
+      tx.update(resolutionRef, {
+        ...commonFrozenFields,
+        status: 'closed_without_decision',
+        result: 'closed_without_decision',
+        finalResult: 'closed_without_decision',
+        approveCount: 0,
+        rejectCount: 0,
+        abstainCount: 0,
+        votesReceivedCount: 0,
+        openedAt: now,
+        openedByUid: actor.uid,
+        openedByName: actor.name,
+        openedByPosition: actor.position,
+        votingOpenedAt: now,
+        votingOpenedBy: actor.uid,
+        closedAt: now,
+        closedByUid: actor.uid,
+        closedByName: actor.name,
+        closedByPosition: actor.position,
+        votingClosedAt: now,
+        votingClosedBy: actor.uid,
+        finalizedPdfLayoutMode: data.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
+        finalizedPdfSectionsSnapshot: data.pdfLayoutMode === 'custom' ? resolutionModel.normalizePdfSections(data.pdfSections) : [],
+        updatedAt: now,
+      });
+      setResolutionAudit(tx, resolutionRef, 'document_finalized', actor, now, { metadata: { documentHash, documentShortHash } });
+      setResolutionAudit(tx, resolutionRef, 'approval_method_selected', actor, now, { newValue: { approvalMethod } });
+      setResolutionAudit(tx, resolutionRef, 'record_only_archived', actor, now, { previousValue: { status: 'draft' }, newValue: { status: 'closed_without_decision' } });
+      return;
+    }
     tx.update(resolutionRef, {
+      ...commonFrozenFields,
       status: 'open',
-      eligibleVoters: voters.map(voter => ({ uid: voter.uid, name: voter.name, position: voter.position })),
-      eligibleVoterUids: voters.map(voter => voter.uid),
       openedAt: now,
       openedByUid: actor.uid,
       openedByName: actor.name,
       openedByPosition: actor.position,
+      votingOpenedAt: now,
+      votingOpenedBy: actor.uid,
       updatedAt: now,
     });
+    setResolutionAudit(tx, resolutionRef, 'document_finalized', actor, now, { metadata: { documentHash, documentShortHash } });
+    setResolutionAudit(tx, resolutionRef, 'approval_method_selected', actor, now, { newValue: { approvalMethod } });
+    setResolutionAudit(tx, resolutionRef, 'voter_list_frozen', actor, now, { metadata: { eligibleVoterCount: eligibleSnapshot.length } });
+    if (approvalMethod === 'hybrid_email') {
+      setResolutionAudit(tx, resolutionRef, 'official_email_prepared', actor, now, { metadata: { recipientCount: eligibleSnapshot.length, documentShortHash } });
+    }
     setResolutionAudit(tx, resolutionRef, 'voting_opened', actor, now, {
       previousValue: { status: 'draft' },
       newValue: { status: 'open' },
-      metadata: { eligibleVoterCount: voters.length },
+      metadata: { eligibleVoterCount: eligibleSnapshot.length, approvalMethod },
     });
   });
-  return { ok: true, resolutionId, eligibleVoterCount: voters.length };
+  if (approvalMethod === 'record_only') return { ok: true, resolutionId, status: 'closed_without_decision', documentHash, documentShortHash };
+  if (approvalMethod === 'hybrid_email') {
+    const frozenForMail = {
+      ...before,
+      ...commonFrozenFields,
+      openedAt: now,
+      openedByName: actor.name,
+      openedByPosition: actor.position,
+    };
+    const [officialSummary, noticeSummary] = await Promise.all([
+      sendOfficialResolutionEmail({ resolutionId, resolution: frozenForMail, voters: eligibleSnapshot }),
+      sendResolutionDashboardNotifications({ resolutionId, resolution: frozenForMail, voters: eligibleSnapshot, documentShortHash }),
+    ]);
+    const sentAt = officialSummary.sent > 0 ? resolutionTimestamp() : null;
+    await resolutionRef.set({
+      officialEmailSentAt: sentAt,
+      officialEmailSentBy: officialSummary.sent > 0 ? actor.uid : '',
+      officialEmailMessageId: officialSummary.messageId || '',
+      officialEmailSummary: officialSummary,
+      dashboardNotificationSummary: noticeSummary,
+      dashboardNotificationsSentAt: noticeSummary.sent > 0 ? resolutionTimestamp() : null,
+      updatedAt: resolutionTimestamp(),
+    }, { merge: true });
+    await resolutionRef.collection('audit').add({
+      action: officialSummary.sent > 0 ? 'official_email_sent' : 'official_email_prepared',
+      actorUid: actor.uid,
+      actorName: actor.name,
+      actorPosition: actor.position,
+      timestamp: resolutionTimestamp(),
+      previousValue: null,
+      newValue: { sent: officialSummary.sent, failed: officialSummary.failed, skipped: officialSummary.skipped },
+      metadata: officialSummary,
+    });
+    await resolutionRef.collection('audit').add({
+      action: 'dashboard_notifications_sent',
+      actorUid: actor.uid,
+      actorName: actor.name,
+      actorPosition: actor.position,
+      timestamp: resolutionTimestamp(),
+      previousValue: null,
+      newValue: { sent: noticeSummary.sent, failed: noticeSummary.failed, skipped: noticeSummary.skipped },
+      metadata: noticeSummary,
+    });
+  }
+  return { ok: true, resolutionId, eligibleVoterCount: eligibleSnapshot.length };
 });
 
 exports.submitResolutionVote = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -4693,15 +5147,65 @@ exports.submitResolutionVote = onCall(CALLABLE_OPTIONS, async (request) => {
     if (!voter || !Array.isArray(resolution.eligibleVoterUids) || !resolution.eligibleVoterUids.includes(uid)) {
       throw new HttpsError('permission-denied', 'You are not an eligible voter for this resolution.');
     }
+    const approvalMethod = resolutionModel.normalizeApprovalMethod(resolution.approvalMethod);
+    if (approvalMethod === 'record_only') throw new HttpsError('failed-precondition', 'This resolution is record-only and does not accept votes.');
     const previous = voteSnap.exists ? (voteSnap.data() || {}) : {};
     const previousChoice = resolutionModel.normalizeVoteChoice(previous.choice);
+    const previousEmailStatus = resolutionModel.normalizeEmailConfirmationStatus(previous.emailConfirmationStatus);
+    if (previousChoice && approvalMethod === 'hybrid_email' && resolutionModel.isHybridVoteChoiceLocked(previousEmailStatus)) {
+      throw new HttpsError('failed-precondition', 'This hybrid vote is locked after email confirmation is claimed.');
+    }
+    const reference = `RCPH-${resolutionId.slice(0, 8)}-${uid.slice(0, 6)}-${crypto.randomBytes(4).toString('hex')}`.toUpperCase();
+    const documentHash = normalizeText(resolution.originalDocumentHash || buildResolutionDocumentHash(resolution), 128);
+    const documentShortHash = normalizeText(resolution.originalDocumentShortHash || shortResolutionHash(documentHash), 24);
+    const emailConfirmationStatus = approvalMethod === 'hybrid_email' ? 'email_pending' : 'submitted';
+    const preparedReplyText = approvalMethod === 'hybrid_email' ? resolutionModel.buildPreparedReplyText({
+      voterName: voter.name,
+      resolutionNumber: resolution.resolutionNumber,
+      title: resolution.title,
+      choice,
+      documentShortHash,
+      reference,
+    }) : '';
+    if (previousChoice && approvalMethod === 'hybrid_email') {
+      tx.set(resolutionRef.collection('voteHistory').doc(), {
+        ...previous,
+        superseded: true,
+        supersededBy: reference,
+        supersededAt: now,
+      });
+      setResolutionAudit(tx, resolutionRef, 'vote_superseded', {
+        uid,
+        name: stripRotaractorPrefix(normalizeText(voter.name, 160)),
+        position: normalizeText(voter.position, 240),
+      }, now, { previousValue: { choice: previousChoice, reference: previous.preparedReplyReference || '' }, newValue: { choice, reference } });
+    }
     tx.set(voteRef, {
+      resolutionId,
       voterUid: uid,
+      voterEmail: normalizeEmail(voter.email || ''),
       voterName: stripRotaractorPrefix(normalizeText(voter.name, 160)),
       voterPosition: normalizeText(voter.position, 240),
       choice,
-      submittedAt: previous.submittedAt || now,
+      selectedVote: choice,
+      submittedAt: approvalMethod === 'hybrid_email' ? now : (previous.submittedAt || now),
+      submittedBy: uid,
       updatedAt: now,
+      emailConfirmationStatus,
+      preparedReplyText,
+      preparedReplyReference: approvalMethod === 'hybrid_email' ? reference : '',
+      emailConfirmedAt: null,
+      emailSentClaimedAt: null,
+      emailRejectedAt: null,
+      emailVerificationNote: '',
+      emailMessageId: '',
+      emailThreadId: '',
+      emailSender: '',
+      superseded: false,
+      supersededBy: '',
+      documentHash,
+      documentShortHash,
+      auditVersion: Number.isInteger(previous.auditVersion) ? previous.auditVersion + 1 : 1,
     }, { merge: false });
     setResolutionAudit(tx, resolutionRef, previousChoice ? 'vote_changed' : 'vote_submitted', {
       uid,
@@ -4709,11 +5213,173 @@ exports.submitResolutionVote = onCall(CALLABLE_OPTIONS, async (request) => {
       position: normalizeText(voter.position, 240),
     }, now, {
       previousValue: previousChoice || null,
-      newValue: choice,
+      newValue: { choice, emailConfirmationStatus, reference: approvalMethod === 'hybrid_email' ? reference : '' },
     });
-    responseVote = { choice, submittedAt: timestampToIso(previous.submittedAt || now), updatedAt: timestampToIso(now) };
+    if (approvalMethod === 'hybrid_email') {
+      setResolutionAudit(tx, resolutionRef, 'prepared_reply_generated', {
+        uid,
+        name: stripRotaractorPrefix(normalizeText(voter.name, 160)),
+        position: normalizeText(voter.position, 240),
+      }, now, { metadata: { reference, documentShortHash } });
+    }
+    responseVote = {
+      choice,
+      selectedVote: choice,
+      submittedAt: timestampToIso(approvalMethod === 'hybrid_email' ? now : (previous.submittedAt || now)),
+      updatedAt: timestampToIso(now),
+      emailConfirmationStatus,
+      preparedReplyText,
+      preparedReplyReference: approvalMethod === 'hybrid_email' ? reference : '',
+      requiredSenderEmail: approvalMethod === 'hybrid_email' ? normalizeEmail(voter.email || '') : '',
+      documentHash,
+      documentShortHash,
+    };
   });
   return { ok: true, resolutionId, vote: responseVote };
+});
+
+exports.markResolutionEmailSent = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const suppliedChoice = resolutionModel.normalizeVoteChoice(request.data?.choice);
+  const suppliedReference = normalizeText(request.data?.voteReference, 160);
+  const suppliedHash = normalizeText(request.data?.documentHash, 128);
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const voteRef = resolutionRef.collection('votes').doc(uid);
+  const now = resolutionTimestamp();
+  let responseVote = null;
+  await db.runTransaction(async tx => {
+    const [resolutionSnap, voteSnap] = await Promise.all([tx.get(resolutionRef), tx.get(voteRef)]);
+    if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    if (!voteSnap.exists) throw new HttpsError('failed-precondition', 'Submit your vote before marking the email as sent.');
+    const resolution = resolutionSnap.data() || {};
+    const vote = voteSnap.data() || {};
+    if (resolution.status !== 'open') throw new HttpsError('failed-precondition', 'Voting is closed.');
+    if (resolutionModel.normalizeApprovalMethod(resolution.approvalMethod) !== 'hybrid_email') throw new HttpsError('failed-precondition', 'Email confirmation is only used for hybrid resolutions.');
+    if (vote.voterUid !== uid) throw new HttpsError('permission-denied', 'You can only update your own confirmation status.');
+    const choice = resolutionModel.normalizeVoteChoice(vote.choice);
+    const emailStatus = resolutionModel.normalizeEmailConfirmationStatus(vote.emailConfirmationStatus);
+    const claimableStatus = emailStatus || 'email_pending';
+    const reference = normalizeText(vote.preparedReplyReference, 160);
+    const documentHash = normalizeText(vote.documentHash, 128);
+    const documentShortHash = normalizeText(vote.documentShortHash, 24);
+    if (!choice) throw new HttpsError('failed-precondition', 'Submit your vote before marking the email as sent.');
+    if (!suppliedChoice || suppliedChoice !== choice) throw new HttpsError('failed-precondition', 'Selected vote changed. Refresh and resend the current prepared email.');
+    if (!suppliedReference || suppliedReference !== reference) throw new HttpsError('failed-precondition', 'Vote reference changed. Refresh and resend the current prepared email.');
+    if (!suppliedHash || (suppliedHash !== documentHash && suppliedHash !== documentShortHash)) throw new HttpsError('failed-precondition', 'Document fingerprint changed. Refresh and resend the current prepared email.');
+    if (emailStatus === 'email_sent_claimed') {
+      responseVote = {
+        choice,
+        selectedVote: choice,
+        submittedAt: timestampToIso(vote.submittedAt),
+        updatedAt: timestampToIso(vote.updatedAt),
+        emailConfirmationStatus: 'email_sent_claimed',
+        emailSentClaimedAt: timestampToIso(vote.emailSentClaimedAt),
+        preparedReplyText: typeof vote.preparedReplyText === 'string' ? vote.preparedReplyText.slice(0, 8000) : '',
+        preparedReplyReference: reference,
+        requiredSenderEmail: normalizeEmail(vote.voterEmail || ''),
+        documentHash,
+        documentShortHash,
+      };
+      return;
+    }
+    if (emailStatus === 'email_verified') throw new HttpsError('failed-precondition', 'This vote is already verified.');
+    if (!['email_pending', 'email_rejected'].includes(claimableStatus)) throw new HttpsError('failed-precondition', 'This vote cannot be marked as sent.');
+    tx.update(voteRef, {
+      emailConfirmationStatus: 'email_sent_claimed',
+      emailSentClaimedAt: now,
+      updatedAt: now,
+    });
+    setResolutionAudit(tx, resolutionRef, 'email_sent_claimed', {
+      uid,
+      name: normalizeText(vote.voterName, 160),
+      position: normalizeText(vote.voterPosition, 240),
+    }, now, { metadata: { reference } });
+    responseVote = {
+      choice,
+      selectedVote: choice,
+      submittedAt: timestampToIso(vote.submittedAt),
+      updatedAt: timestampToIso(now),
+      emailConfirmationStatus: 'email_sent_claimed',
+      emailSentClaimedAt: timestampToIso(now),
+      preparedReplyText: typeof vote.preparedReplyText === 'string' ? vote.preparedReplyText.slice(0, 8000) : '',
+      preparedReplyReference: reference,
+      requiredSenderEmail: normalizeEmail(vote.voterEmail || ''),
+      documentHash,
+      documentShortHash,
+    };
+  });
+  return { ok: true, resolutionId, vote: responseVote };
+});
+
+exports.verifyResolutionEmailConfirmation = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const voterUid = validateAnnouncementDocId(request.data?.voterUid, 'voterUid');
+  const action = normalizeText(request.data?.action || request.data?.status, 80);
+  const nextStatus = action === 'email_rejected' || action === 'reject' ? 'email_rejected' : 'email_verified';
+  const senderEmail = normalizeEmail(request.data?.senderEmail);
+  const note = normalizeText(request.data?.note, 1000);
+  const messageId = normalizeText(request.data?.messageId, 240);
+  const threadId = normalizeText(request.data?.threadId, 240);
+  const suppliedReference = normalizeText(request.data?.voteReference, 160);
+  const suppliedHash = normalizeText(request.data?.documentHash, 128);
+  const receivedAtInput = normalizeText(request.data?.receivedAt, 80);
+  const receivedAtDate = receivedAtInput && Number.isFinite(Date.parse(receivedAtInput)) ? new Date(receivedAtInput) : null;
+  const receivedAt = receivedAtDate ? admin.firestore.Timestamp.fromDate(receivedAtDate) : resolutionTimestamp();
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const voteRef = resolutionRef.collection('votes').doc(voterUid);
+  const now = resolutionTimestamp();
+  await db.runTransaction(async tx => {
+    const [resolutionSnap, voteSnap] = await Promise.all([tx.get(resolutionRef), tx.get(voteRef)]);
+    if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    if (!voteSnap.exists) throw new HttpsError('not-found', 'Vote not found.');
+    const resolution = resolutionSnap.data() || {};
+    const vote = voteSnap.data() || {};
+    if (resolutionModel.normalizeApprovalMethod(resolution.approvalMethod) !== 'hybrid_email') throw new HttpsError('failed-precondition', 'Email verification is only used for hybrid resolutions.');
+    const recordedEmail = normalizeEmail(vote.voterEmail);
+    const reference = normalizeText(vote.preparedReplyReference, 160);
+    const documentHash = normalizeText(vote.documentHash, 128);
+    const documentShortHash = normalizeText(vote.documentShortHash, 24);
+    const currentStatus = resolutionModel.normalizeEmailConfirmationStatus(vote.emailConfirmationStatus);
+    if (vote.superseded === true || ['superseded', 'invalidated_document_changed'].includes(currentStatus)) {
+      throw new HttpsError('failed-precondition', 'This vote is no longer active.');
+    }
+    if (currentStatus !== 'email_sent_claimed') {
+      throw new HttpsError('failed-precondition', 'Only a claimed confirmation email can be verified or rejected.');
+    }
+    if (nextStatus === 'email_verified') {
+      if (!senderEmail || senderEmail !== recordedEmail) throw new HttpsError('failed-precondition', 'Sender email does not match the registered voter email.');
+      if (!suppliedReference || suppliedReference !== reference) throw new HttpsError('failed-precondition', 'Vote reference does not match.');
+      if (!suppliedHash || (suppliedHash !== documentHash && suppliedHash !== documentShortHash)) throw new HttpsError('failed-precondition', 'Document fingerprint does not match.');
+    }
+    tx.update(voteRef, {
+      emailConfirmationStatus: nextStatus,
+      emailConfirmedAt: nextStatus === 'email_verified' ? receivedAt : null,
+      emailRejectedAt: nextStatus === 'email_rejected' ? now : null,
+      emailVerificationNote: note,
+      emailSender: senderEmail,
+      emailMessageId: messageId,
+      emailThreadId: threadId,
+      updatedAt: now,
+    });
+    setResolutionAudit(tx, resolutionRef, nextStatus === 'email_verified' ? 'email_verified' : 'email_rejected', actor, now, {
+      newValue: {
+        voterUid,
+        status: nextStatus,
+        reference,
+        senderEmail,
+        messageId,
+      },
+      metadata: {
+        note,
+        documentHash: suppliedHash,
+        receivedAt: timestampToIso(receivedAt),
+      },
+    });
+  });
+  return { ok: true, resolutionId, voterUid, emailConfirmationStatus: nextStatus };
 });
 
 exports.getMyOpenResolutions = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -4744,6 +5410,7 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
       customApprovalCount: resolution.customApprovalCount,
       eligibleVoterCount: Array.isArray(resolution.eligibleVoterUids) ? resolution.eligibleVoterUids.length : 0,
       votes,
+      approvalMethod: resolution.approvalMethod,
     });
     const finalizedPdfSectionsSnapshot = resolution.pdfLayoutMode === 'custom' ? resolutionModel.normalizePdfSections(resolution.pdfSections) : [];
     assertFirestoreSafeResolutionSections(finalizedPdfSectionsSnapshot, 'finalizedPdfSectionsSnapshot');
@@ -4762,8 +5429,17 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
       closedByUid: actor.uid,
       closedByName: actor.name,
       closedByPosition: actor.position,
+      votingClosedAt: now,
+      votingClosedBy: actor.uid,
+      finalResult: finalResult.result,
       finalizedPdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
       finalizedPdfSectionsSnapshot,
+      auditBundleHash: crypto.createHash('sha256').update(stableResolutionJson({
+        resolutionId,
+        result: finalResult.result,
+        counts: finalResult,
+        closedAt: now.toMillis ? now.toMillis() : Date.now(),
+      }), 'utf8').digest('hex'),
       ...uploadedFinalization,
       updatedAt: now,
     });
@@ -4777,6 +5453,7 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
         votesReceivedCount: finalResult.votesReceivedCount,
       },
     });
+    setResolutionAudit(tx, resolutionRef, 'final_result_calculated', actor, now, { newValue: { result: finalResult.result } });
     setResolutionAudit(tx, resolutionRef, 'result_finalized', actor, now, { newValue: { result: finalResult.result } });
   });
   let merge = null;
@@ -4828,13 +5505,13 @@ exports.getAdminResolutions = onCall(CALLABLE_OPTIONS, async (request) => {
     const fields = publicResolutionFields(snap.id, data);
     if (data.status !== 'open') return fields;
     const votesSnap = await snap.ref.collection('votes').get();
-    return { ...fields, ...countResolutionVotes(votesSnap.docs.map(vote => vote.data() || {})) };
+    return { ...fields, ...countResolutionVotes(votesSnap.docs.map(vote => vote.data() || {}), data.approvalMethod) };
   }));
   return {
     ok: true,
     resolutions,
     meetings: meetingsSnap.docs.map(snap => ({ id: snap.id, name: normalizeText(snap.data()?.name, 220), date: normalizeText(snap.data()?.date, 20), archived: snap.data()?.archived === true })).filter(item => item.name && item.date),
-    roster: voters.map(voter => ({ uid: voter.uid, name: voter.name, position: voter.position })),
+    roster: voters.map(voter => ({ uid: voter.uid, name: voter.name, email: voter.email || '', role: voter.role || 'bod', position: voter.position, active: voter.active !== false })),
   };
 });
 
@@ -4852,23 +5529,57 @@ exports.getResolutionDetails = onCall(CALLABLE_OPTIONS, async (request) => {
   if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
   const data = resolutionSnap.data() || {};
   const voteData = votesSnap.docs.map(snap => ({ id: snap.id, data: snap.data() || {} }));
-  const liveCounts = data.status === 'open' ? countResolutionVotes(voteData.map(item => item.data)) : {};
+  const liveCounts = data.status === 'open' ? countResolutionVotes(voteData.map(item => item.data), data.approvalMethod) : {};
   return {
     ok: true,
     resolution: {
       ...publicResolutionFields(resolutionId, data),
       ...liveCounts,
-      eligibleVoters: Array.isArray(data.eligibleVoters) ? data.eligibleVoters.map(voter => ({ uid: normalizeText(voter?.uid, 128), name: normalizeText(voter?.name, 160), position: normalizeText(voter?.position, 240) })).filter(voter => voter.uid) : [],
+      eligibleVoters: Array.isArray(data.eligibleVoters) ? data.eligibleVoters.map(voter => ({
+        uid: normalizeText(voter?.uid, 128),
+        name: normalizeText(voter?.name, 160),
+        email: normalizeEmail(voter?.email),
+        role: normalizeText(voter?.role, 40),
+        position: normalizeText(voter?.position, 240),
+        eligibilityReason: normalizeText(voter?.eligibilityReason, 240),
+        active: voter?.active !== false,
+      })).filter(voter => voter.uid) : [],
     },
     votes: voteData.map(item => {
       const vote = item.data;
-      return { voterUid: item.id, voterName: normalizeText(vote.voterName, 160), voterPosition: normalizeText(vote.voterPosition, 240), choice: resolutionModel.normalizeVoteChoice(vote.choice), submittedAt: timestampToIso(vote.submittedAt), updatedAt: timestampToIso(vote.updatedAt) };
+      return {
+        voterUid: item.id,
+        resolutionId: normalizeText(vote.resolutionId, 160),
+        voterEmail: normalizeEmail(vote.voterEmail),
+        voterName: normalizeText(vote.voterName, 160),
+        voterPosition: normalizeText(vote.voterPosition, 240),
+        choice: resolutionModel.normalizeVoteChoice(vote.choice),
+        selectedVote: resolutionModel.normalizeVoteChoice(vote.selectedVote || vote.choice),
+        submittedAt: timestampToIso(vote.submittedAt),
+        submittedBy: normalizeText(vote.submittedBy, 128),
+        updatedAt: timestampToIso(vote.updatedAt),
+        emailConfirmationStatus: resolutionModel.normalizeEmailConfirmationStatus(vote.emailConfirmationStatus),
+        preparedReplyText: typeof vote.preparedReplyText === 'string' ? vote.preparedReplyText.slice(0, 8000) : '',
+        preparedReplyReference: normalizeText(vote.preparedReplyReference, 160),
+        emailConfirmedAt: timestampToIso(vote.emailConfirmedAt),
+        emailSentClaimedAt: timestampToIso(vote.emailSentClaimedAt),
+        emailRejectedAt: timestampToIso(vote.emailRejectedAt),
+        emailVerificationNote: normalizeText(vote.emailVerificationNote, 1000),
+        emailMessageId: normalizeText(vote.emailMessageId, 240),
+        emailThreadId: normalizeText(vote.emailThreadId, 240),
+        emailSender: normalizeEmail(vote.emailSender),
+        superseded: vote.superseded === true,
+        supersededBy: normalizeText(vote.supersededBy, 160),
+        documentHash: normalizeText(vote.documentHash, 128),
+        documentShortHash: normalizeText(vote.documentShortHash, 24),
+        auditVersion: Number.isInteger(vote.auditVersion) ? vote.auditVersion : 1,
+      };
     }),
     audit: auditSnap.docs.map(snap => {
       const audit = snap.data() || {};
       return { id: snap.id, action: normalizeText(audit.action, 80), actorName: normalizeText(audit.actorName, 160), actorPosition: normalizeText(audit.actorPosition, 240), timestamp: timestampToIso(audit.timestamp), previousValue: audit.previousValue ?? null, newValue: audit.newValue ?? null, metadata: audit.metadata && typeof audit.metadata === 'object' ? audit.metadata : {} };
     }),
-    canonicalVoters: canonicalVoters.map(voter => ({ uid: voter.uid, name: voter.name, position: voter.position })),
+    canonicalVoters: canonicalVoters.map(voter => ({ uid: voter.uid, name: voter.name, email: voter.email || '', role: voter.role || 'bod', position: voter.position, active: voter.active !== false })),
   };
 });
 
@@ -4902,6 +5613,9 @@ exports.uploadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSe
 exports.downloadResolutionSourcePdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20, secrets: RESOLUTION_DRIVE_SECRETS }, (req, res) => resolutionUploads.streamSourcePdf(req, res));
 exports.downloadFinalizedResolutionPdf = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20, secrets: RESOLUTION_DRIVE_SECRETS }, (req, res) => resolutionUploads.streamFinalPdf(req, res));
 exports.cleanupResolutionPdfUploads = onSchedule({ region: 'us-central1', schedule: 'every day 03:30', timeZone: 'Asia/Kolkata', timeoutSeconds: 300, memory: '256MiB', secrets: RESOLUTION_DRIVE_SECRETS }, () => resolutionUploads.cleanupExpiredSessions());
+exports.uploadAnnouncementAttachment = onRequest({ region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', maxInstances: 5, concurrency: 10, secrets: ANNOUNCEMENT_ATTACHMENT_SECRETS }, (req, res) => announcementAttachments.uploadHttp(req, res));
+exports.downloadAnnouncementAttachment = onRequest({ region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', maxInstances: 10, concurrency: 20, secrets: ANNOUNCEMENT_ATTACHMENT_SECRETS }, (req, res) => announcementAttachments.streamDownload(req, res, getAnnouncementForAttachmentAccess));
+exports.cleanupAnnouncementAttachmentUploads = onSchedule({ region: 'us-central1', schedule: 'every day 03:45', timeZone: 'Asia/Kolkata', timeoutSeconds: 300, memory: '256MiB', secrets: ANNOUNCEMENT_ATTACHMENT_SECRETS }, () => announcementAttachments.cleanupExpiredSessions());
 
 exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);

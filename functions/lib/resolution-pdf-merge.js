@@ -209,7 +209,7 @@ async function mergeResolutionPdf({ sourceBytes, letterheadBytes, details }) {
   output.setSubject(`Finalized RCPH Resolution voting record: ${title}`);
   const copiedPages = await output.copyPages(inspected.document, inspected.document.getPageIndices());
   copiedPages.forEach(page => output.addPage(page));
-  const appendixPageCount = await buildVoteAppendix(output, details, letterheadBytes);
+  const appendixPageCount = details.appendVoteTable === false ? 0 : await buildVoteAppendix(output, details, letterheadBytes);
   const bytes = Buffer.from(await output.save({ useObjectStreams: false, addDefaultPage: false, updateFieldAppearances: false }));
   return {
     bytes,
