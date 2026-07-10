@@ -96,7 +96,7 @@ function SectionEditor({ section, index, total, onUpdate, onDelete, onDuplicate,
   </details>;
 }
 
-export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview, onNotice, onPersisted }) {
+export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview, onNotice, onPersisted, onEnsurePersisted }) {
   const mode = value.documentSourceMode || (value.pdfLayoutMode === "custom" ? "custom" : "standard");
   const sections = value.pdfSections || [];
   const setSections = (pdfSections) => onChange({ ...value, pdfSections });
@@ -111,6 +111,6 @@ export default function ResolutionPdfBuilder({ value, onChange, disabled = false
       <div className="resolution-builder__sections">{sections.map((section, index) => <SectionEditor key={section.id} section={section} index={index} total={sections.length} onUpdate={(changes) => setSections(updateResolutionSection(sections, section.id, changes))} onDelete={() => setSections(deleteResolutionSection(sections, section.id))} onDuplicate={() => setSections(duplicateResolutionSection(sections, section.id))} onMove={(direction) => setSections(moveResolutionSection(sections, section.id, direction))} />)}</div>
       {!sections.length ? <p className="admin-empty">This custom layout is empty. Add a section or use the starter template.</p> : null}
       <section className="resolution-builder__preview" aria-label="Ordered PDF section preview"><h4>Preview summary</h4><ol>{sections.map((section) => <li key={section.id}><strong>{TYPE_LABELS[section.type]}</strong><span>{describeResolutionSection(section)}</span></li>)}</ol>{onPreview ? <button type="button" onClick={onPreview}>Download Preview PDF</button> : null}</section>
-    </div> : mode === "uploadedPdf" ? <ResolutionPdfUploadPanel value={value} onChange={onChange} disabled={disabled} onNotice={onNotice} onPersisted={onPersisted} /> : <p className="admin-help">Uses the existing standard Resolution PDF layout.</p>}
+    </div> : mode === "uploadedPdf" ? <ResolutionPdfUploadPanel value={value} onChange={onChange} disabled={disabled} onNotice={onNotice} onPersisted={onPersisted} onEnsurePersisted={onEnsurePersisted} /> : <p className="admin-help">Uses the existing standard Resolution PDF layout.</p>}
   </fieldset>;
 }

@@ -62,6 +62,26 @@ export async function submitResolutionVote(uid, resolutionId, choice) {
   return result.vote;
 }
 
+export async function markResolutionEmailSent(uid, resolution) {
+  requireUser(uid);
+  const payload = typeof resolution === "string"
+    ? { resolutionId: resolution }
+    : {
+      resolutionId: resolution?.id,
+      choice: resolution?.currentVote,
+      voteReference: resolution?.preparedReplyReference,
+      documentHash: resolution?.documentHash || resolution?.documentShortHash,
+    };
+  const result = await call("markResolutionEmailSent", payload);
+  if (result.ok !== true || !result.vote) throw new Error("Resolution email status update failed.");
+  clearDashboardDataCache(uid);
+  return result.vote;
+}
+
+export async function verifyResolutionEmailConfirmation(payload) {
+  return call("verifyResolutionEmailConfirmation", payload);
+}
+
 export async function loadMyOpenResolutions(uid) {
   requireUser(uid);
   const result = await call("getMyOpenResolutions");

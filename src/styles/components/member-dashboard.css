@@ -627,6 +627,74 @@
   white-space: pre-wrap;
 }
 
+.announcement-card__attachment {
+  margin: 0.85rem 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.announcement-card__attachment img {
+  width: min(100%, 34rem);
+  max-height: 18rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.announcement-card__attachment p {
+  margin: 0;
+  padding: 0.75rem;
+  border-left: 2px solid rgba(216, 91, 150, 0.45);
+  background: rgba(216, 91, 150, 0.06);
+}
+
+.announcement-card__attachment button {
+  justify-self: start;
+  min-height: 2.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-gold-soft);
+  background: rgba(255, 255, 255, 0.025);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.announcement-card__attachment button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.announcement-card__attachment--pdf {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid rgba(229, 194, 104, 0.18);
+  border-left: 3px solid var(--color-gold);
+  background: rgba(229, 194, 104, 0.055);
+}
+
+.announcement-card__attachment--pdf > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.announcement-card__attachment--pdf span,
+.announcement-card__attachment--pdf small {
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.announcement-card__attachment--pdf > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
 .announcement-card small {
   color: var(--color-muted);
 }
@@ -723,9 +791,16 @@
 }
 
 .dashboard-resolution-card__meeting,
+.dashboard-resolution-card__method,
 .dashboard-resolution-card__current span,
 .dashboard-resolution-card__current small {
   color: var(--color-muted);
+}
+
+.dashboard-resolution-card__method {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 750;
 }
 
 .dashboard-resolution-card__body {
@@ -790,6 +865,10 @@
   background: var(--color-gold);
 }
 
+.dashboard-resolution-card fieldset:disabled .dashboard-resolution-votes button:not(.is-selected) {
+  opacity: 0.58;
+}
+
 .dashboard-resolution-card__current {
   justify-content: flex-start;
 }
@@ -798,8 +877,134 @@
   flex-basis: 100%;
 }
 
+.dashboard-resolution-email {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.dashboard-resolution-email__status {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border-left: 3px solid var(--color-gold);
+  background: rgba(229, 194, 104, 0.06);
+}
+
+.dashboard-resolution-email__status.is-email_verified {
+  border-left-color: var(--color-teal);
+  background: rgba(96, 195, 196, 0.08);
+}
+
+.dashboard-resolution-email__status.is-email_rejected {
+  border-left-color: var(--color-danger);
+  background: rgba(153, 40, 87, 0.16);
+}
+
+.dashboard-resolution-email__status span,
+.dashboard-resolution-email__hint {
+  color: var(--color-muted);
+  font-size: 0.88rem;
+}
+
+.dashboard-resolution-email__reply {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dashboard-resolution-email__sender {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(229, 194, 104, 0.22);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.dashboard-resolution-email__sender span,
+.dashboard-resolution-email__sender small {
+  color: var(--color-muted);
+  font-size: 0.84rem;
+}
+
+.dashboard-resolution-email__sender strong,
+.dashboard-resolution-email__sender-value {
+  color: var(--color-gold-soft);
+  overflow-wrap: anywhere;
+}
+
+.dashboard-resolution-email__sender.is-missing {
+  border-color: rgba(153, 40, 87, 0.42);
+  background: rgba(153, 40, 87, 0.12);
+}
+
+.dashboard-resolution-email__reply textarea {
+  width: 100%;
+  min-height: 12rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(229, 194, 104, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.035);
+  font: inherit;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.dashboard-resolution-email__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.dashboard-resolution-email__actions a,
+.dashboard-resolution-email__actions button,
+.dashboard-resolution-email__confirm a,
+.dashboard-resolution-email__confirm button {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-gold-soft);
+  background: rgba(255, 255, 255, 0.025);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.dashboard-resolution-email__confirm {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(229, 194, 104, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(229, 194, 104, 0.07);
+}
+
+.dashboard-resolution-email__confirm p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.dashboard-resolution-email__confirm div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .dashboard-resolution-votes button:focus-visible,
-.dashboard-resolutions .dashboard-section-heading button:focus-visible {
+.dashboard-resolutions .dashboard-section-heading button:focus-visible,
+.dashboard-resolution-email__actions a:focus-visible,
+.dashboard-resolution-email__actions button:focus-visible,
+.dashboard-resolution-email__confirm a:focus-visible,
+.dashboard-resolution-email__confirm button:focus-visible {
   outline: 3px solid var(--color-teal);
   outline-offset: 3px;
 }
@@ -814,9 +1019,22 @@
     flex-direction: column;
   }
 
-  .dashboard-resolution-card dl,
-  .dashboard-resolution-votes {
+  .announcement-card__attachment--pdf {
     grid-template-columns: 1fr;
+  }
+
+  .announcement-card__attachment--pdf > div:last-child {
+    justify-content: flex-start;
+  }
+
+  .dashboard-resolution-card dl,
+  .dashboard-resolution-votes,
+  .dashboard-resolution-email__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-resolution-email__actions {
+    display: grid;
   }
 }
 

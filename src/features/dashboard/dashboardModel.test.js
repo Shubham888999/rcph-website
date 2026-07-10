@@ -86,6 +86,39 @@ test("announcement normalization excludes targeting and delivery internals", () 
   assert.equal("targetUserIds" in item, false);
   assert.equal("delivery" in item, false);
 });
+test("announcement attachment normalization exposes only safe dashboard metadata", () => {
+  const [item] = normalizeDashboardAnnouncements([{
+    id: "a",
+    title: "Hello",
+    body: "Body",
+    attachment: {
+      status: "ready",
+      filename: "agenda.pdf",
+      mimeType: "application/pdf",
+      kind: "pdf",
+      sizeBytes: 2048,
+      driveFileId: "secret-drive-id",
+      uploadSessionId: "secret-session",
+    },
+  }], 0);
+  assert.deepEqual(item.attachment, {
+    status: "ready",
+    filename: "agenda.pdf",
+    mimeType: "application/pdf",
+    kind: "pdf",
+    sizeBytes: 2048,
+  });
+  assert.equal("driveFileId" in item.attachment, false);
+  assert.equal("uploadSessionId" in item.attachment, false);
+});
+test("missing or invalid announcement attachments do not break cards", () => {
+  const items = normalizeDashboardAnnouncements([
+    { id: "plain", title: "Plain", body: "Body" },
+    { id: "bad", title: "Bad", body: "Body", attachment: { status: "ready", filename: "bad.exe", mimeType: "application/x-msdownload", kind: "pdf", sizeBytes: 10 } },
+  ], 0);
+  assert.equal(items.find((item) => item.id === "plain").attachment, null);
+  assert.equal(items.find((item) => item.id === "bad").attachment, null);
+});
 test("dashboard exposes only open eligible resolution payloads", () => {
   const model = normalizeDashboardResponse(memberResponse({ openResolutions: [{ id: "r1", status: "open", resolutionNumber: "R/1", title: "Vote now", currentVote: "approve" }, { id: "r2", status: "passed", resolutionNumber: "R/2", title: "Closed" }] }));
   assert.deepEqual(model.openResolutions.map((item) => item.id), ["r1"]);

@@ -3,6 +3,8 @@ import { normalizeDashboardResolutions } from "../resolutions/resolutionModel.js
 
 const ROLES = new Set(["prospect", "gbm", "bod", "admin", "president"]);
 const PRIORITIES = new Set(["normal", "important", "urgent"]);
+const ATTACHMENT_KINDS = new Set(["image", "pdf"]);
+const ATTACHMENT_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
 
 function text(value, max = 300) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -92,6 +94,16 @@ function normalizeIsoDate(value) {
   return Number.isFinite(millis) ? new Date(millis).toISOString() : "";
 }
 
+function normalizeAnnouncementAttachment(raw) {
+  if (!raw || typeof raw !== "object" || raw.status !== "ready") return null;
+  const filename = text(raw.filename, 180);
+  const mimeType = text(raw.mimeType, 120).toLowerCase();
+  const kind = text(raw.kind, 20).toLowerCase();
+  const sizeBytes = Number(raw.sizeBytes);
+  if (!filename || !ATTACHMENT_KINDS.has(kind) || !ATTACHMENT_MIME_TYPES.has(mimeType) || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) return null;
+  return { status: "ready", filename, mimeType, kind, sizeBytes };
+}
+
 export function normalizeDashboardAnnouncements(raw, now = Date.now()) {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
@@ -126,6 +138,7 @@ export function normalizeDashboardAnnouncements(raw, now = Date.now()) {
       publishedAt,
       expiresAt,
       read: item.read === true,
+      attachment: normalizeAnnouncementAttachment(item.attachment),
     };
   }).filter(Boolean)
     .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0) || b.id.localeCompare(a.id))

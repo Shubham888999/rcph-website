@@ -25,6 +25,7 @@ async function mutateAnnouncement(uid, callableName, announcementId) {
 }
 
 const cache = createDashboardRequestCache(requestDashboard);
+const ANNOUNCEMENT_ATTACHMENT_DOWNLOAD_ENDPOINT = "https://us-central1-rcph-admin.cloudfunctions.net/downloadAnnouncementAttachment";
 
 export function getDashboardData(uid) {
   return cache.get({ uid });
@@ -49,6 +50,17 @@ export function markDashboardAnnouncementUnread(uid, announcementId) {
 
 export function dismissDashboardAnnouncement(uid, announcementId) {
   return mutateAnnouncement(uid, "dismissAnnouncement", announcementId);
+}
+
+export async function fetchAnnouncementAttachment(uid, announcementId, { download = false } = {}) {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) throw new Error("An authenticated user is required.");
+  const token = await auth.currentUser.getIdToken();
+  const url = new URL(ANNOUNCEMENT_ATTACHMENT_DOWNLOAD_ENDPOINT);
+  url.searchParams.set("announcementId", announcementId);
+  if (download) url.searchParams.set("download", "1");
+  const response = await fetch(url.href, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("Attachment unavailable");
+  return response.blob();
 }
 
 export function getAnnouncementMutationErrorMessage() {

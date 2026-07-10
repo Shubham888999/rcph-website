@@ -48,4 +48,20 @@ export function canUsePresidentControls(access) { return canUseAdmin(access) && 
 export function buildAccessPayload({ targetUid, role, positionKeys = [], confirmJointPositionKeys = [], mode = "maintenance" }) { return { targetUid: text(targetUid, 128), role: ADMIN_ROLES.includes(role) ? role : "", positionKeys: [...new Set(positionKeys.map((x) => text(x, 80)).filter(Boolean))], confirmJointPositionKeys: [...new Set(confirmJointPositionKeys.map((x) => text(x, 80)).filter(Boolean))], operationSource: mode === "approval" ? "accountApproval" : "roleMaintenance" }; }
 export function buildEventPayload(draft, id = "") { const payload = { name: text(draft.name, 180), date: text(draft.date, 20), endDate: text(draft.endDate, 20) || text(draft.date, 20), desc: text(draft.desc, 2500), avenue: cleanAvenues(draft.avenue) }; if (id) payload.eventId = text(id, 128); return payload; }
 export function buildFinePayload(draft) { return { memberId: text(draft.memberId, 128), memberName: stripRotaractorPrefix(text(draft.memberName, 160)), reason: text(draft.reason, 120), eventName: text(draft.eventName, 180), date: text(draft.date, 20), amount: money(draft.amount) }; }
-export function buildAnnouncementPayload(draft) { return { title: text(draft.title, 160), body: text(draft.body, 5000), priority: ["normal", "important", "urgent"].includes(draft.priority) ? draft.priority : "normal", actionText: text(draft.actionText, 80), actionUrl: draft.actionUrl ? safeUrl(draft.actionUrl) : "", targetRoles: [...new Set((draft.targetRoles || []).filter((x) => ["all", "prospect", "gbm", "bod", "admin", "president"].includes(x)))], targetUserIds: [...new Set((draft.targetUserIds || []).map((x) => text(x, 128)).filter(Boolean))], expiresAt: draft.expiresAt || null, sendEmail: draft.sendEmail === true }; }
+export const ANNOUNCEMENT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const ANNOUNCEMENT_ATTACHMENT_TYPES = Object.freeze(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+export function formatAttachmentSize(sizeBytes) {
+  const value = Number(sizeBytes);
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+  if (value >= 1024) return `${Math.round(value / 1024)} KB`;
+  return `${Math.round(value)} B`;
+}
+export function validateAnnouncementAttachmentFile(file) {
+  if (!file) return "Choose an image or PDF attachment.";
+  if (!ANNOUNCEMENT_ATTACHMENT_TYPES.includes(file.type)) return "Choose a PDF, JPEG, PNG, or WebP file.";
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) return "The selected attachment is empty.";
+  if (file.size > ANNOUNCEMENT_ATTACHMENT_MAX_BYTES) return `Attachment must be ${formatAttachmentSize(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES)} or smaller.`;
+  return "";
+}
+export function buildAnnouncementPayload(draft) { const attachmentSessionId = text(draft.attachmentSessionId, 160); return { title: text(draft.title, 160), body: text(draft.body, 5000), priority: ["normal", "important", "urgent"].includes(draft.priority) ? draft.priority : "normal", actionText: text(draft.actionText, 80), actionUrl: draft.actionUrl ? safeUrl(draft.actionUrl) : "", targetRoles: [...new Set((draft.targetRoles || []).filter((x) => ["all", "prospect", "gbm", "bod", "admin", "president"].includes(x)))], targetUserIds: [...new Set((draft.targetUserIds || []).map((x) => text(x, 128)).filter(Boolean))], expiresAt: draft.expiresAt || null, sendEmail: draft.sendEmail === true, ...(attachmentSessionId ? { attachmentSessionId } : {}) }; }

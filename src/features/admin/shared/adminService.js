@@ -4,7 +4,7 @@ import { auth, functions } from "../../../app/firebase";
 import { db } from "../../../app/firestore";
 import { createAdminCache } from "./adminCache";
 import { registerAdminCacheClear } from "./adminCacheRegistry";
-import { attendancePatch } from "./adminModel";
+import { attendancePatch, validateAnnouncementAttachmentFile } from "./adminModel";
 import {
   buildTreasuryAppsScriptPayload,
   buildTreasuryUploadTicketPayload,
@@ -46,6 +46,7 @@ export const adminCalls = {
   dashboard: () => callable("getMyDashboardStats", {}), updateRanking: (payload) => callable("updateClubRanking", payload),
   prospects: () => callable("getProspectManagementData", {}), recalcProspect: (uid) => callable("recalculateProspectProgress", { uid }), updateDues: (uid, duesPaid) => callable("updateProspectDues", { uid, duesPaid }), promoteProspect: (uid) => callable("promoteProspectToGbm", { uid }),
   announcementRecipients: () => callable("getAnnouncementRecipientOptions", {}), announcementHistory: (payload) => callable("getAnnouncementHistory", payload), publishAnnouncement: (payload) => callable("publishAnnouncement", payload),
+  createAnnouncementAttachmentSession: (payload) => callable("createAnnouncementAttachmentUploadSession", payload), removeAnnouncementAttachmentUpload: (sessionId) => callable("removeAnnouncementAttachmentUpload", { sessionId }),
   createClubEvent: (payload) => callable("createAdminClubEvent", payload), updateClubEvent: (payload) => callable("updateAdminClubEvent", payload), archiveClubEvent: (eventId) => callable("archiveAdminClubEvent", { eventId }),
   createBodMeeting: (payload) => callable("createBodMeetingSynced", payload), updateBodMeeting: (payload) => callable("updateBodMeetingSynced", payload), archiveBodMeeting: (meetingId) => callable("archiveBodMeetingSynced", { meetingId }),
   createDistrictEvent: (payload) => callable("createDistrictEventSynced", payload), updateDistrictEvent: (payload) => callable("updateDistrictEventSynced", payload), archiveDistrictEvent: (districtEventId) => callable("archiveDistrictEventSynced", { districtEventId }),
@@ -85,6 +86,27 @@ export async function uploadVisitFile(file, session, approved, onStage) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error("The trusted Club Visits uploader rejected the file.");
   return normalizeVisitUploadResponse(data);
+}
+
+export async function uploadAnnouncementAttachment(file, onStage) {
+  const validationError = validateAnnouncementAttachmentFile(file);
+  if (validationError) throw new Error(validationError);
+  onStage?.("requesting");
+  const session = await adminCalls.createAnnouncementAttachmentSession({ fileName: file.name, mimeType: file.type, sizeBytes: file.size });
+  if (!session?.sessionId || !session?.proof || !session?.uploadEndpoint) throw new Error("Attachment upload authorization was incomplete.");
+  const form = new FormData();
+  form.append("sessionId", session.sessionId);
+  form.append("proof", session.proof);
+  form.append("fileName", file.name);
+  form.append("mimeType", file.type);
+  form.append("sizeBytes", String(file.size));
+  form.append("file", file, file.name);
+  onStage?.("uploading");
+  const response = await fetch(session.uploadEndpoint, { method: "POST", body: form });
+  onStage?.("processing");
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok !== true || !data.attachment) throw new Error(data?.message || "The attachment upload was rejected.");
+  return { sessionId: data.sessionId || session.sessionId, attachment: data.attachment, maxSizeBytes: session.maxSizeBytes };
 }
 
 function readFileAsBase64(file) {

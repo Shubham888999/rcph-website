@@ -14,7 +14,8 @@ import {
   markDashboardAnnouncementUnread,
 } from "../../features/dashboard/dashboardService";
 import useDashboardData from "../../features/dashboard/useDashboardData";
-import { getResolutionErrorMessage, loadMyOpenResolutions, submitResolutionVote } from "../../features/resolutions/resolutionService";
+import { getResolutionErrorMessage, loadMyOpenResolutions, markResolutionEmailSent, submitResolutionVote } from "../../features/resolutions/resolutionService";
+import { isHybridVoteChoiceLocked } from "../../features/resolutions/resolutionModel";
 import ProspectProgress from "../../features/prospect/ProspectProgress";
 import useAuth from "../../hooks/useAuth";
 import "../../styles/components/member-dashboard.css";
@@ -80,15 +81,43 @@ export default function DashboardPage() {
 
   async function voteOnResolution(resolution, choice) {
     if (!user?.uid || resolutionBusyId) return;
+    if (resolution.approvalMethod === "hybrid_email" && isHybridVoteChoiceLocked(resolution.emailConfirmationStatus)) {
+      setDashboardNotice({ type: "error", message: "This hybrid vote is locked while email confirmation is reviewed." });
+      return;
+    }
     const previous = data.openResolutions;
     const optimisticTime = new Date().toISOString();
     setResolutionBusyId(resolution.id);
     setDashboardNotice(null);
-    updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, currentVote: choice, submittedAt: item.submittedAt || optimisticTime, voteUpdatedAt: optimisticTime } : item));
+    updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, currentVote: choice, submittedAt: item.submittedAt || optimisticTime, voteUpdatedAt: optimisticTime, emailConfirmationStatus: item.approvalMethod === "hybrid_email" ? "email_pending" : item.emailConfirmationStatus } : item));
     try {
       const vote = await submitResolutionVote(user.uid, resolution.id, choice);
-      updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, currentVote: vote.choice, submittedAt: vote.submittedAt, voteUpdatedAt: vote.updatedAt } : item));
-      setDashboardNotice({ type: "success", message: `Your ${choice} vote was recorded.` });
+      updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, currentVote: vote.choice, submittedAt: vote.submittedAt, voteUpdatedAt: vote.updatedAt, emailConfirmationStatus: vote.emailConfirmationStatus || item.emailConfirmationStatus, preparedReplyText: vote.preparedReplyText || item.preparedReplyText, preparedReplyReference: vote.preparedReplyReference || item.preparedReplyReference, requiredSenderEmail: vote.requiredSenderEmail || item.requiredSenderEmail, documentHash: vote.documentHash || item.documentHash, documentShortHash: vote.documentShortHash || item.documentShortHash } : item));
+      setDashboardNotice({ type: "success", message: resolution.approvalMethod === "hybrid_email" ? "Your vote was submitted. Send the prepared email reply to complete confirmation." : `Your ${choice} vote was recorded.` });
+    } catch (error) {
+      updateOpenResolutions(previous);
+      setDashboardNotice({ type: "error", message: getResolutionErrorMessage(error) });
+      refreshOpenResolutions();
+    } finally {
+      setResolutionBusyId("");
+    }
+  }
+
+  async function claimResolutionEmailSent(resolution) {
+    if (!user?.uid || resolutionBusyId) return;
+    if (resolution.approvalMethod === "hybrid_email" && !resolution.requiredSenderEmail) {
+      setDashboardNotice({ type: "error", message: "Required sender email is missing. Contact an Admin before marking this email as sent." });
+      return;
+    }
+    const previous = data.openResolutions;
+    const optimisticTime = new Date().toISOString();
+    setResolutionBusyId(resolution.id);
+    setDashboardNotice(null);
+    updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, emailConfirmationStatus: "email_sent_claimed", emailSentClaimedAt: optimisticTime } : item));
+    try {
+      const vote = await markResolutionEmailSent(user.uid, resolution);
+      updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, ...vote, currentVote: vote.choice || item.currentVote, voteUpdatedAt: vote.updatedAt || item.voteUpdatedAt } : item));
+      setDashboardNotice({ type: "success", message: "Email marked as sent. It will count only after admin verification." });
     } catch (error) {
       updateOpenResolutions(previous);
       setDashboardNotice({ type: "error", message: getResolutionErrorMessage(error) });
@@ -116,8 +145,8 @@ export default function DashboardPage() {
           onSignOut={handleSignOut}
         />
         {dashboardNotice ? <div className={`dashboard-announcement-notice dashboard-announcement-notice--${dashboardNotice.type}`} role={dashboardNotice.type === "error" ? "alert" : "status"} aria-live="polite"><span>{dashboardNotice.message}</span><button type="button" onClick={() => setDashboardNotice(null)} aria-label="Dismiss dashboard notice">×</button></div> : null}
-        <MemberAnnouncements announcements={data.announcements} busyId={announcementBusyId} onToggleRead={updateReadState} onDismiss={dismissAnnouncement} />
-        <MemberResolutions resolutions={data.openResolutions} busyId={resolutionBusyId} onVote={voteOnResolution} onRefresh={refreshOpenResolutions} />
+        <MemberAnnouncements uid={user?.uid || ""} announcements={data.announcements} busyId={announcementBusyId} onToggleRead={updateReadState} onDismiss={dismissAnnouncement} />
+        <MemberResolutions resolutions={data.openResolutions} busyId={resolutionBusyId} onVote={voteOnResolution} onClaimEmailSent={claimResolutionEmailSent} onRefresh={refreshOpenResolutions} />
         {prospect ? <ProspectProgress data={data} /> : <MemberOverview data={data} />}
       </div>
     </main>

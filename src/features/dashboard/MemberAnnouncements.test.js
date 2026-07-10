@@ -25,3 +25,27 @@ test("dashboard mutations are optimistic and restore the previous list on failur
   assert.match(pageSource, /updateAnnouncements\(\(current\) => current\.filter/);
   assert.ok((pageSource.match(/updateAnnouncements\(previous\)/g) || []).length >= 2);
 });
+
+test("announcement attachments use the secure dashboard download helper", () => {
+  assert.match(source, /import \{ fetchAnnouncementAttachment \} from "\.\/dashboardService"/);
+  assert.match(source, /function AnnouncementAttachment/);
+  assert.match(source, /fetchAnnouncementAttachment\(uid, announcement\.id\)/);
+  assert.match(source, /fetchAnnouncementAttachment\(uid, announcement\.id, \{ download \}\)/);
+  assert.match(pageSource, /<MemberAnnouncements uid=\{user\?\.uid \|\| ""\}/);
+});
+
+test("image announcement attachments render a lazy preview and unavailable fallback", () => {
+  assert.match(source, /attachment\.kind === "image"/);
+  assert.match(source, /URL\.createObjectURL\(blob\)/);
+  assert.match(source, /<img src=\{state\.url\} alt=\{`\$\{announcement\.title\} attachment`\} loading="lazy" \/>/);
+  assert.match(source, /Attachment unavailable/);
+  assert.match(source, /View image/);
+});
+
+test("PDF announcement attachments expose view and download actions without Drive ids", () => {
+  assert.match(source, /Attached PDF/);
+  assert.match(source, /View PDF/);
+  assert.match(source, /Download/);
+  assert.match(source, /disabled=\{!uid\}/);
+  assert.doesNotMatch(source, /driveFileId/);
+});

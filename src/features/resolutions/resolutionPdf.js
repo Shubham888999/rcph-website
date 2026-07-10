@@ -20,6 +20,13 @@ function label(value) {
   return String(value || "").replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function compactPerson(name, position) {
+  const displayName = String(name || "").trim();
+  const displayPosition = String(position || "").trim();
+  if (!displayName) return "";
+  return `${formatRotaractorName(displayName, true)}${displayPosition ? ` - ${displayPosition}` : ""}`;
+}
+
 function plainPdfText(value) {
   return String(value || "")
     .replace(/[\u2010-\u2015]/g, "-")
@@ -71,14 +78,23 @@ function block(lines, keepLines = 1) {
 }
 
 export function buildResolutionVoteRows(details) {
-  const votes = new Map((details?.votes || []).map((vote) => [vote.voterUid, vote]));
+  const method = details?.resolution?.approvalMethod || "website";
+  const validVotes = (details?.votes || []).filter((vote) => {
+    if (vote.superseded) return false;
+    if (method === "hybrid_email") return vote.emailConfirmationStatus === "email_verified";
+    return true;
+  });
+  const votes = new Map(validVotes.map((vote) => [vote.voterUid, vote]));
   return (details?.resolution?.eligibleVoters || []).map((voter) => {
     const vote = votes.get(voter.uid);
     return {
       name: formatRotaractorName(voter.name, true),
       position: voter.position,
       vote: vote ? label(vote.choice) : "Not submitted",
+      verification: vote ? method === "hybrid_email" ? "Email verified" : "Website verified" : "Pending",
       submittedAt: vote ? formatDateTime(vote.submittedAt) : "-",
+      emailConfirmedAt: vote?.emailConfirmedAt ? formatDateTime(vote.emailConfirmedAt) : "-",
+      reference: vote?.preparedReplyReference || "-",
     };
   });
 }
@@ -87,7 +103,11 @@ function buildDocumentBlocks(details) {
   const resolution = details.resolution;
   const blocks = [];
   const detailsLines = [];
-  const detail = (name, value) => detailsLines.push(...wrappedLines(`${name}: ${value || "-"}`, { size: 8.5, gap: 1 }));
+  const detail = (name, value, optional = false) => {
+    const printable = String(value || "").trim();
+    if (optional && !printable) return;
+    detailsLines.push(...wrappedLines(`${name}: ${printable || "-"}`, { size: 8.5, gap: 1 }));
+  };
 
   blocks.push(block([
     ...wrappedLines("ROTARACT CLUB OF PUNE HERITAGE", { size: 13, bold: true, gap: 2 }),
@@ -97,16 +117,20 @@ function buildDocumentBlocks(details) {
   detail("Resolution title", resolution.title);
   detail("BOD meeting", resolution.meetingTitle);
   detail("Meeting date", resolution.meetingDate);
-  detail("Proposed by", `${formatRotaractorName(resolution.proposedByName, true)} - ${resolution.proposedByPosition}`);
-  detail("Seconded by", `${formatRotaractorName(resolution.secondedByName, true)} - ${resolution.secondedByPosition}`);
+  detail("Proposed by", compactPerson(resolution.proposedByName, resolution.proposedByPosition), true);
+  detail("Seconded by", compactPerson(resolution.secondedByName, resolution.secondedByPosition), true);
   detail("Voting opened", formatDateTime(resolution.openedAt));
   detail("Voting closed", formatDateTime(resolution.closedAt));
+  detail("Voting method", label(resolution.approvalMethod || "website"));
+  detail("Document fingerprint", resolution.originalDocumentShortHash || "-");
   detail("Final result", label(resolution.result || resolution.status));
   blocks.push(block(detailsLines, 2));
-  blocks.push(block([
-    ...wrappedLines("Resolution", { size: 10.5, bold: true, gap: 2 }),
-    ...wrappedLines(resolution.body, { size: 9, gap: 5 }),
-  ], 2));
+  if (String(resolution.body || "").trim()) {
+    blocks.push(block([
+      ...wrappedLines("Resolution", { size: 10.5, bold: true, gap: 2 }),
+      ...wrappedLines(resolution.body, { size: 9, gap: 5 }),
+    ], 2));
+  }
   if (resolution.notes) {
     blocks.push(block([
       ...wrappedLines("Background / notes", { size: 10.5, bold: true, gap: 2 }),
@@ -114,33 +138,43 @@ function buildDocumentBlocks(details) {
     ], 2));
   }
   blocks.push(block([
-    ...wrappedLines("Vote summary", { size: 10.5, bold: true, gap: 2 }),
+    ...wrappedLines("Certification", { size: 10.5, bold: true, gap: 2 }),
+    ...wrappedLines(`Resolution ${resolution.resolutionNumber}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Voting Method: ${label(resolution.approvalMethod || "website")}`, { size: 8.5, gap: 1 }),
     ...wrappedLines(`Eligible voters: ${resolution.eligibleVoterCount}`, { size: 8.5, gap: 1 }),
-    ...wrappedLines(`Votes received: ${resolution.votesReceivedCount}`, { size: 8.5, gap: 1 }),
-    ...wrappedLines(`Approvals: ${resolution.approveCount}`, { size: 8.5, gap: 1 }),
-    ...wrappedLines(`Rejections: ${resolution.rejectCount}`, { size: 8.5, gap: 1 }),
-    ...wrappedLines(`Abstentions: ${resolution.abstainCount}`, { size: 8.5, gap: 4 }),
+    ...wrappedLines(`Verified votes: ${resolution.votesReceivedCount}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Approve: ${resolution.approveCount}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Reject: ${resolution.rejectCount}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Abstain: ${resolution.abstainCount}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Result: ${label(resolution.result || resolution.status)}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Voting Opened: ${formatDateTime(resolution.openedAt)}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Voting Closed: ${formatDateTime(resolution.closedAt)}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Document Fingerprint: ${resolution.originalDocumentShortHash || "-"}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Audit Reference: ${resolution.auditBundleHash || resolution.id || "-"}`, { size: 8.5, gap: 4 }),
+    ...(resolution.approvalMethod === "hybrid_email" ? wrappedLines("Only votes with verified email confirmation were included in the official tally.", { size: 8.5, gap: 4 }) : []),
   ], 2));
-  blocks.push(block([
-    ...wrappedLines("Final vote table", { size: 10.5, bold: true, gap: 2 }),
-    ...wrappedLines("Name                     | Position                       | Vote         | Submitted at", { size: 7.5, bold: true, mono: true }),
-    ...wrappedLines("-------------------------+--------------------------------+--------------+--------------------------", { size: 7.5, mono: true }),
-  ], 3));
-  buildResolutionVoteRows(details).forEach((row) => {
-    const cells = [wrapText(row.name, 24 * 4.5, 7.5, true), wrapText(row.position, 30 * 4.5, 7.5, true), wrapText(row.vote, 12 * 4.5, 7.5, true), wrapText(row.submittedAt, 24 * 4.5, 7.5, true)];
-    const height = Math.max(...cells.map((cell) => cell.length));
-    const lines = [];
-    for (let index = 0; index < height; index += 1) {
-      lines.push({
-        text: `${(cells[0][index] || "").padEnd(24)} | ${(cells[1][index] || "").padEnd(30)} | ${(cells[2][index] || "").padEnd(12)} | ${(cells[3][index] || "").padEnd(24)}`,
-        size: 7.5,
-        mono: true,
-        bold: false,
-        gap: index === height - 1 ? 2 : 0,
-      });
-    }
-    blocks.push(block(lines, lines.length));
-  });
+  if (resolution.appendVoteTable !== false) {
+    blocks.push(block([
+      ...wrappedLines("Final vote table", { size: 10.5, bold: true, gap: 2 }),
+      ...wrappedLines("Name                 | Position                 | Vote     | Verification     | Submitted", { size: 7.2, bold: true, mono: true }),
+      ...wrappedLines("---------------------+--------------------------+----------+------------------+----------------", { size: 7.2, mono: true }),
+    ], 3));
+    buildResolutionVoteRows(details).forEach((row) => {
+      const cells = [wrapText(row.name, 20 * 4.3, 7.2, true), wrapText(row.position, 25 * 4.3, 7.2, true), wrapText(row.vote, 8 * 4.3, 7.2, true), wrapText(row.verification, 17 * 4.3, 7.2, true), wrapText(row.submittedAt, 15 * 4.3, 7.2, true)];
+      const height = Math.max(...cells.map((cell) => cell.length));
+      const lines = [];
+      for (let index = 0; index < height; index += 1) {
+        lines.push({
+          text: `${(cells[0][index] || "").padEnd(20)} | ${(cells[1][index] || "").padEnd(25)} | ${(cells[2][index] || "").padEnd(8)} | ${(cells[3][index] || "").padEnd(17)} | ${(cells[4][index] || "").padEnd(15)}`,
+          size: 7.2,
+          mono: true,
+          bold: false,
+          gap: index === height - 1 ? 2 : 0,
+        });
+      }
+      blocks.push(block(lines, lines.length));
+    });
+  }
   blocks.push(block([
     ...wrappedLines("System-generated resolution record", { size: 7.5, gap: 1 }),
     ...wrappedLines(`Generated at: ${formatDateTime(new Date().toISOString())}`, { size: 7.5 }),

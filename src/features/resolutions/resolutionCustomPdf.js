@@ -120,7 +120,12 @@ function safeVoter(voter, vote, canonical) {
 }
 
 export function buildCustomVotesRows(details, section) {
-  const votes = Array.isArray(details?.votes) ? details.votes : [];
+  const method = details?.resolution?.approvalMethod || "website";
+  const votes = (Array.isArray(details?.votes) ? details.votes : []).filter((vote) => {
+    if (vote?.superseded) return false;
+    if (method === "hybrid_email") return vote?.emailConfirmationStatus === "email_verified";
+    return true;
+  });
   const eligible = Array.isArray(details?.resolution?.eligibleVoters) ? details.resolution.eligibleVoters : [];
   const canonical = new Map((details?.canonicalVoters || []).map((voter) => [voter.uid, voter]));
   const voteByUid = new Map(votes.map((vote) => [vote.voterUid, vote]));
