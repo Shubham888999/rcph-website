@@ -3,10 +3,12 @@ import { ADMIN_NAV } from "./shared/adminNavigation";
 
 export default function AdminShell({ access, displayName, onSignOut, children }) {
   const location = useLocation(); const navigate = useNavigate(); const segment = location.pathname.replace(/^\/admin\/?/, "");
+  const canAccessLockTools = access.canAccessLockTools === true || access.canAccessPresidentControls === true;
   const navigation = access.canAccessAdminTools
-    ? ADMIN_NAV.filter(([path]) => (path !== "resolutions" || access.canAccessResolutionTools) && (path !== "locks" || access.canAccessPresidentControls))
+    ? ADMIN_NAV.filter(([path]) => (path !== "resolutions" || access.canAccessResolutionTools) && (path !== "locks" || canAccessLockTools))
     : ADMIN_NAV.filter(([path]) => (
       (path === "resolutions" && access.canAccessResolutionTools)
+      || (path === "locks" && canAccessLockTools)
       || (path === "visit-submissions" && access.canAccessVisitSubmissions)
     ));
   return <div className="admin-shell"><aside className="admin-sidebar"><div><p className="admin-kicker">Rotaract Club of Pune Heritage</p><h1>RCPH Admin</h1><p>{displayName}</p>

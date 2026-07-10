@@ -20,15 +20,19 @@ import "../../styles/components/admin.css";
 
 export default function AdminPage() {
   const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, ""); const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools) });
-  const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members"], attendance: ["members", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "districtEvents", "districtAttendance"], fines: ["members", "fines"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
+  const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "districtEvents", "districtAttendance"], fines: ["members", "fines"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
+  const canAccessLockTools = access?.canAccessLockTools === true || access?.canAccessPresidentControls === true;
+  const canAccessResolutionTools = access?.canAccessResolutionTools === true;
+  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools);
   const state = moduleState(...(requirements[segment] || []));
   async function handleSignOut() { clearAdminCaches(uid); clearBodEventCache(uid); clearDashboardDataCache(uid); await signOut(); }
   let content;
-  if (state.status === "loading") content = <AdminLoading />;
+  if (routeDenied) content = <AdminError message="You do not have access to this protected Admin module." />;
+  else if (state.status === "loading") content = <AdminLoading />;
   else if (state.status === "error") content = <AdminError message={state.error} />;
   else if (segment === "") content = <CommandCenter data={data} access={access} uid={uid} onNotice={setNotice} />;
   else if (segment === "requests") content = <AccountsModule users={data.users} access={access} uid={uid} onNotice={setNotice} />;
-  else if (segment === "members") content = <MembersModule members={data.members} uid={uid} onNotice={setNotice} />;
+  else if (segment === "members") content = <MembersModule members={data.members} users={data.users} events={data.events} attendance={data.attendance} fines={data.fines} uid={uid} onNotice={setNotice} />;
   else if (segment === "attendance") content = <ClubAttendanceModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;
   else if (segment === "bod") content = <BodOperationsModule data={data} lock={locks.bodAttendance} uid={uid} onNotice={setNotice} />;
   else if (segment === "district") content = <DistrictModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;

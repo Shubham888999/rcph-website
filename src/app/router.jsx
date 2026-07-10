@@ -52,7 +52,7 @@ export const router = createBrowserRouter([{
             children: [{ path: "/admin/resolutions", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
           },
           {
-            element: <RoleRoute capability="presidentControls" />,
+            element: <RoleRoute capability="lockTools" />,
             children: [{ path: "/admin/locks", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
           },
           {

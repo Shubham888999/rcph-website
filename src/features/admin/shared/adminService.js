@@ -42,6 +42,7 @@ registerAdminCacheClear((uid) => clearAdminCaches(uid));
 
 export const adminCalls = {
   updateAccess: (payload) => callable("updateUserAccessAndPositions", payload), rejectAccess: (payload) => callable("rejectUserRoleRequest", payload),
+  updateMemberProfile: (payload) => callable("updateMemberProfile", payload),
   dashboard: () => callable("getMyDashboardStats", {}), updateRanking: (payload) => callable("updateClubRanking", payload),
   prospects: () => callable("getProspectManagementData", {}), recalcProspect: (uid) => callable("recalculateProspectProgress", { uid }), updateDues: (uid, duesPaid) => callable("updateProspectDues", { uid, duesPaid }), promoteProspect: (uid) => callable("promoteProspectToGbm", { uid }),
   announcementRecipients: () => callable("getAnnouncementRecipientOptions", {}), announcementHistory: (payload) => callable("getAnnouncementHistory", payload), publishAnnouncement: (payload) => callable("publishAnnouncement", payload),

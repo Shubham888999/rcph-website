@@ -19,6 +19,19 @@ function approved(role, authority = {}, resolutionManager = false) {
   });
 }
 
+function approvedWithCapabilities(role, capabilities = {}, authority = {}, resolutionManager = false) {
+  return normalizeTrustedAccess({
+    ok: true,
+    uid: "user-1",
+    user: { name: "Test Member", status: "approved" },
+    role: { role, status: "approved" },
+    positionKeys: [],
+    authority,
+    resolutionManager,
+    ...capabilities,
+  });
+}
+
 test("approved Prospect gets member and prospect access only", () => {
   const access = approved("prospect");
   assert.equal(hasCapability(access, "memberDashboard"), true);
@@ -57,11 +70,26 @@ test("BOD without a canonical position cannot enter Club Visits", () => {
 
 test("approved Admin gets Admin access", () => {
   assert.equal(approved("admin").canAccessAdminTools, true);
+  assert.equal(approved("admin").canAccessLockTools, false);
+  assert.equal(approved("admin").canAccessResolutionTools, false);
+});
+
+test("approved Admin receives Locks and Resolutions only from trusted capability flags", () => {
+  const access = approvedWithCapabilities("admin", {
+    canAccessLockTools: true,
+    canAccessResolutionTools: true,
+  });
+
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessLockTools, true);
+  assert.equal(access.canAccessResolutionTools, true);
+  assert.equal(hasCapability(access, "lockTools"), true);
 });
 
 test("approved President with canonical authority gets Admin and President access", () => {
   const access = approved("president", { isPresidentRole: true, hasPresidentAuthority: true }, true);
   assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessLockTools, true);
   assert.equal(access.canAccessPresidentControls, true);
   assert.equal(access.canAccessResolutionTools, true);
 });
@@ -75,6 +103,7 @@ test("President role label without canonical authority gets no President control
 test("BOD role with canonical active President authority gets President controls", () => {
   const access = approved("bod", { hasPresidentAuthority: true });
   assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canAccessLockTools, true);
   assert.equal(access.canAccessPresidentControls, true);
 });
 
@@ -185,6 +214,7 @@ test("BOD with trusted Sergeant-at-Arms authority gets ordinary Admin access", (
   assert.equal(access.hasSergeantAtArmsPosition, true);
   assert.equal(access.canAccessAdminTools, true);
   assert.equal(access.canAccessPresidentControls, false);
+  assert.equal(access.canAccessLockTools, false);
   assert.equal(access.canAccessResolutionTools, false);
 });
 test("plain saa position key without trusted authority does not grant Admin access", () => {

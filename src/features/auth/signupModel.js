@@ -30,6 +30,7 @@ export function createSignupForm() {
     name: "",
     phone: "",
     email: "",
+    rid: "",
     gender: "",
     genderSelfDescribe: "",
     password: "",
@@ -59,6 +60,26 @@ export function normalizeSignupPhone(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export function normalizeSignupRid(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function hasSignupRidControlChars(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
+export function validateSignupRid(value) {
+  const rid = normalizeSignupRid(value);
+  if (!rid) return "";
+  if (rid.length > 40) return "RID must be 40 characters or fewer.";
+  if (hasSignupRidControlChars(rid)) return "RID cannot include control characters.";
+  return "";
+}
+
 export function normalizeSignupEmail(value) {
   return normalizeAuthEmail(value);
 }
@@ -78,12 +99,13 @@ export function selectSignupPath(form, path) {
     inviteCode: "",
   };
   if (base.path === SIGNUP_PATHS.PROSPECT) {
-    return { ...base, requestedRole: "prospect" };
+    return { ...base, requestedRole: "prospect", rid: "" };
   }
   if (base.path === SIGNUP_PATHS.EXISTING_MEMBER) {
     return {
       ...base,
       requestedRole: SIGNUP_ROLES.includes(form.requestedRole) ? form.requestedRole : "gbm",
+      rid: normalizeSignupRid(form.rid),
       hobbies: "",
       previousRotaract: "",
       previousRotaractDetails: "",
@@ -112,6 +134,7 @@ export function validateSignup(form, options = {}) {
     && form.path === SIGNUP_PATHS.EXISTING_MEMBER;
   const name = normalizeSignupName(form.name);
   const phone = normalizeSignupPhone(form.phone);
+  const rid = normalizeSignupRid(form.rid);
   const email = normalizeSignupEmail(options.identityEmail || form.email);
   const password = normalizeSignupPassword(form.password);
   const confirmation = normalizeSignupPassword(form.confirmPassword);
@@ -144,6 +167,8 @@ export function validateSignup(form, options = {}) {
     }
   } else if (form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
     if (!SIGNUP_ROLES.includes(form.requestedRole)) errors.requestedRole = "Choose GBM, BOD, or Admin.";
+    const ridError = validateSignupRid(rid);
+    if (ridError) errors.rid = ridError;
     if (form.requestedRole === "admin" && !normalizeSignupText(form.inviteCode)) {
       errors.inviteCode = "Enter the Admin invite code.";
     }
@@ -187,10 +212,12 @@ export function buildSignupPayload(form, options = {}) {
     legalEffectiveDate: LEGAL_EFFECTIVE_DATE,
   };
   if (options.profileCompletion === true && form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
+    const rid = normalizeSignupRid(form.rid);
     return {
       name: normalizeSignupName(form.name),
       requestedRole: form.requestedRole,
       provider,
+      ...(rid ? { rid } : {}),
       ...consent,
       ...(form.requestedRole === "admin"
         ? { inviteCode: normalizeSignupText(form.inviteCode) }
@@ -228,6 +255,7 @@ previousRotaractDetails: form.previousRotaract === "yes"
 
   return {
     ...base,
+    ...(normalizeSignupRid(form.rid) ? { rid: normalizeSignupRid(form.rid) } : {}),
     ...(form.requestedRole === "admin"
       ? { inviteCode: normalizeSignupText(form.inviteCode) }
       : {}),

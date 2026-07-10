@@ -30,6 +30,7 @@ hasPresidentAuthority: false,
     canAccessProspectDashboard: false,
     canAccessBodTools: false,
     canAccessAdminTools: false,
+    canAccessLockTools: false,
     canAccessResolutionTools: false,
     canAccessVisitSubmissions: false,
     canAccessPresidentControls: false,
@@ -71,6 +72,11 @@ const hasSergeantAtArmsPosition =
 const hasPresidentAuthority =
   authority.hasPresidentAuthority === true;
   const resolutionManager = payload.resolutionManager === true;
+  const trustedLockTools = payload.canAccessLockTools === true
+    || authority.canAccessLockTools === true;
+  const trustedResolutionTools = payload.canAccessResolutionTools === true
+    || authority.canAccessResolutionTools === true
+    || resolutionManager;
   const isMemberRole = ACTIVE_ROLES.has(storedRole);
 
   return {
@@ -102,7 +108,9 @@ canAccessAdminTools: isApproved
     || hasPresidentAuthority
     || hasSergeantAtArmsPosition
   ),
-    canAccessResolutionTools: isApproved && resolutionManager,
+    canAccessLockTools: isApproved
+      && (trustedLockTools || hasPresidentAuthority),
+    canAccessResolutionTools: isApproved && trustedResolutionTools,
     canAccessVisitSubmissions: isApproved
       && (["admin", "president"].includes(storedRole)
         || (storedRole === "bod" && cleanPositionKeys(payload.positionKeys).length > 0)),
@@ -127,6 +135,7 @@ export function hasCapability(access, capability) {
     bodTools: "canAccessBodTools",
     adminTools: "canAccessAdminTools",
     resolutionTools: "canAccessResolutionTools",
+    lockTools: "canAccessLockTools",
     visitSubmissions: "canAccessVisitSubmissions",
     presidentControls: "canAccessPresidentControls",
   };

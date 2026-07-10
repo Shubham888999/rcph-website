@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { ADMIN_NAV } from "../shared/adminNavigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AdminModuleHeader from "../AdminModuleHeader";
 import AdminDialog from "../shared/AdminDialog";
 import { AdminEmpty } from "../shared/AdminStates";
@@ -11,55 +13,556 @@ import {
   addRosterMember,
   deleteRosterMember,
   loadAdminCallable,
-  updateRosterMember,
 } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
 import { formatRotaractorName, stripRotaractorPrefix } from "../../../utils/memberName";
+import { getMemberOperationsModel } from "./memberOperationsModel";
 
 export function CommandCenter({ data, access, uid, onNotice }) {
-  const [ranking, setRanking] = useState({ enabled: false, value: "", subtitle: "" });
-  const { busy, run } = useAdminMutation({ uid, module: "command-center", onNotice });
+  const [ranking, setRanking] = useState({
+    enabled: false,
+    value: "",
+    subtitle: "",
+  });
+
+  const { busy, run } = useAdminMutation({
+    uid,
+    module: "command-center",
+    onNotice,
+  });
+
   useEffect(() => {
     let active = true;
-    loadAdminCallable(uid, "getMyDashboardStats").then((result) => {
-      const value = result?.clubRanking;
-      if (active && value && typeof value === "object") {
-        setRanking({ enabled: value.enabled === true, value: String(value.value || ""), subtitle: String(value.subtitle || "") });
-      }
-    }).catch(() => {});
-    return () => { active = false; };
+
+    loadAdminCallable(uid, "getMyDashboardStats")
+      .then((result) => {
+        const value = result?.clubRanking;
+
+        if (active && value && typeof value === "object") {
+          setRanking({
+            enabled: value.enabled === true,
+            value: String(value.value || ""),
+            subtitle: String(value.subtitle || ""),
+          });
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
   }, [uid]);
-  const values = Object.values(data.attendance).flatMap((row) => data.events.map((event) => row[event.id])).filter((value) => value === true || value === false);
-  const average = values.length ? Math.round((values.filter(Boolean).length / values.length) * 100) : null;
-  const income = data.treasury.filter((item) => item.type === "income").reduce((sum, item) => sum + item.amount, 0);
-  const expense = data.treasury.filter((item) => item.type === "expense").reduce((sum, item) => sum + item.amount, 0);
+
+  const activeMembers = data.members.filter((member) => member.active);
+  const activeEvents = data.events.filter((event) => !event.archived);
+  const pendingUsers = data.users.filter(
+    (user) => user.status === "pending",
+  );
+
+  const attendanceValues = Object.values(data.attendance)
+    .flatMap((row) =>
+      data.events.map((event) => row[event.id]),
+    )
+    .filter((value) => value === true || value === false);
+
+  const attendanceAverage = attendanceValues.length
+    ? Math.round(
+        (
+          attendanceValues.filter(Boolean).length /
+          attendanceValues.length
+        ) * 100,
+      )
+    : null;
+
+  const income = data.treasury
+    .filter((item) => item.type === "income")
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const expense = data.treasury
+    .filter((item) => item.type === "expense")
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const treasuryNet = income - expense;
+  const canAccessLockTools =
+    access.canAccessLockTools === true ||
+    access.canAccessPresidentControls === true;
+  const canAccessResolutionTools = access.canAccessResolutionTools === true;
+
+  const recentEvents = [...activeEvents]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 4);
+
+  const recentFines = [...data.fines]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
+
+  const recentTreasury = [...data.treasury]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
+
+  const quickActions = [
+    {
+      path: "requests",
+      label: "Review accounts",
+      description:
+        pendingUsers.length > 0
+          ? `${pendingUsers.length} account request${pendingUsers.length === 1 ? "" : "s"} need attention.`
+          : "Manage approved accounts and role assignments.",
+      value: pendingUsers.length,
+      accent: "gold",
+    },
+    {
+      path: "attendance",
+      label: "Club attendance",
+      description:
+        attendanceAverage === null
+          ? "Attendance records are ready to be managed."
+          : `Current recorded attendance is ${attendanceAverage}%.`,
+      value:
+        attendanceAverage === null
+          ? "—"
+          : `${attendanceAverage}%`,
+      accent: "teal",
+    },
+    {
+      path: "bod",
+      label: "BOD operations",
+      description:
+        "Manage directors, BOD meetings, and synchronized attendance.",
+      value: data.bodMembers.length,
+      accent: "gold",
+    },
+    {
+      path: "treasury",
+      label: "Treasury",
+      description:
+        treasuryNet >= 0
+          ? "The current treasury balance is positive."
+          : "Current expenses exceed recorded income.",
+      value: formatInr(treasuryNet),
+      accent: treasuryNet >= 0 ? "teal" : "danger",
+    },
+    {
+      path: "reports",
+      label: "Reports",
+      description:
+        "Review official event and operational reporting data.",
+      value: activeEvents.length,
+      accent: "gold",
+    },
+    {
+      path: "locks",
+      label: "System locks",
+      description:
+        canAccessLockTools
+          ? "Review and control protected submission modules."
+          : "View current operational availability.",
+      value: canAccessLockTools
+        ? "Control"
+        : "View",
+      accent: "teal",
+      hidden: !canAccessLockTools,
+    },
+    {
+      path: "resolutions",
+      label: "Resolutions",
+      description: "Create, manage, and finalize meeting-linked BOD resolutions.",
+      value: "Govern",
+      accent: "gold",
+      hidden: !canAccessResolutionTools,
+    },
+  ].filter((item) => !item.hidden);
+
+  const allowedPaths = new Set(
+    ADMIN_NAV.map(([path]) => path),
+  );
+
   function saveRanking(event) {
     event.preventDefault();
-    run("update-ranking", () => adminCalls.updateRanking(ranking), "Club ranking saved.");
+
+    run(
+      "update-ranking",
+      () => adminCalls.updateRanking(ranking),
+      "Club ranking saved.",
+    );
   }
-  return <>
-    <AdminModuleHeader title="Admin Command Center" />
-    <section className="admin-metric-grid">
-      <Metric label="Active members" value={data.members.filter((member) => member.active).length} />
-      <Metric label="Club events" value={data.events.filter((event) => !event.archived).length} />
-      <Metric label="Pending requests" value={data.users.filter((user) => user.status === "pending").length} />
-      <Metric label="Overall attendance" value={average === null ? "Unavailable" : `${average}%`} />
-      <Metric label="Fine records" value={data.fines.length} />
-      <Metric label="Treasury net" value={formatInr(income - expense)} />
-    </section>
-    <section className="admin-panel"><h3>Club Ranking</h3><p>Shared with approved dashboards through the existing server callable.</p>
-      <form className="admin-form admin-form--inline" onSubmit={saveRanking}>
-        <label><input type="checkbox" checked={ranking.enabled} onChange={(event) => setRanking({ ...ranking, enabled: event.target.checked })} /> Show ranking</label>
-        <label>Ranking value<input maxLength="80" value={ranking.value} onChange={(event) => setRanking({ ...ranking, value: event.target.value })} required={ranking.enabled} /></label>
-        <label>Subtitle<input maxLength="120" value={ranking.subtitle} onChange={(event) => setRanking({ ...ranking, subtitle: event.target.value })} /></label>
-        <button disabled={busy}>Save ranking</button>
-      </form>
-    </section>
-    <section className="admin-panel"><h3>Authority</h3><p>{access.canAccessPresidentControls ? "All module controls are available." : "President-only controls remain unavailable."}</p></section>
-  </>;
+
+  return (
+    <div className="command-center">
+      <header className="command-center-hero">
+        <div className="command-center-hero__copy">
+          <p className="admin-kicker">Admin command center</p>
+
+          <h2>
+            Club operations,
+            <span> clearly in view.</span>
+          </h2>
+
+          <p>
+            Monitor member activity, event operations, attendance,
+            finance, and administrative priorities from one workspace.
+          </p>
+        </div>
+
+        <div className="command-center-hero__status">
+          <span>Current authority</span>
+
+          <strong>
+            {access.canAccessPresidentControls
+              ? "President controls available"
+              : access.canAccessAdminTools
+                ? "Administrative control"
+                : "Delegated module access"}
+          </strong>
+
+          <p>
+            {access.canAccessPresidentControls
+              ? "President-only controls are available."
+              : "Focused capabilities are shown separately below."}
+          </p>
+        </div>
+      </header>
+
+      <section
+        className="command-center-metrics"
+        aria-label="Club operations overview"
+      >
+        <Metric
+          label="Active members"
+          value={activeMembers.length}
+          detail={`${data.members.length} total roster records`}
+          accent="teal"
+        />
+
+        <Metric
+          label="Club events"
+          value={activeEvents.length}
+          detail={`${data.events.length} total event records`}
+          accent="gold"
+        />
+
+        <Metric
+          label="Pending requests"
+          value={pendingUsers.length}
+          detail={
+            pendingUsers.length
+              ? "Administrative review required"
+              : "No pending approvals"
+          }
+          accent={pendingUsers.length ? "danger" : "teal"}
+        />
+
+        <Metric
+          label="Overall attendance"
+          value={
+            attendanceAverage === null
+              ? "—"
+              : `${attendanceAverage}%`
+          }
+          detail={`${attendanceValues.length} recorded responses`}
+          accent="teal"
+        />
+
+        <Metric
+          label="Fine records"
+          value={data.fines.length}
+          detail={
+            data.fines.length
+              ? "Recorded fine entries"
+              : "No fine records"
+          }
+          accent="gold"
+        />
+
+        <Metric
+          label="Treasury net"
+          value={formatInr(treasuryNet)}
+          detail={`${formatInr(income)} income · ${formatInr(expense)} expenses`}
+          accent={treasuryNet >= 0 ? "teal" : "danger"}
+        />
+      </section>
+
+      <section
+        className="command-center-section"
+        aria-labelledby="command-actions-title"
+      >
+        <header className="command-center-section__header">
+          <div>
+            <p className="admin-kicker">Priority navigation</p>
+            <h3 id="command-actions-title">Operations shortcuts</h3>
+          </div>
+
+          <span>{quickActions.length} available modules</span>
+        </header>
+
+        <div className="command-center-actions">
+          {quickActions.map((action) => {
+            if (!allowedPaths.has(action.path)) return null;
+
+            return (
+              <Link
+                className={`command-center-action command-center-action--${action.accent}`}
+                key={action.path}
+                to={`/admin/${action.path}`}
+              >
+                <div>
+                  <span>{action.label}</span>
+                  <strong>{action.value}</strong>
+                </div>
+
+                <p>{action.description}</p>
+
+                <small>Open module →</small>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="command-center-columns">
+        <section className="command-center-section">
+          <header className="command-center-section__header">
+            <div>
+              <p className="admin-kicker">Club activity</p>
+              <h3>Recent events</h3>
+            </div>
+
+            <Link to="/admin/reports">View reports</Link>
+          </header>
+
+          {recentEvents.length ? (
+            <div className="command-center-activity">
+              {recentEvents.map((event) => (
+                <article key={event.id}>
+                  <div>
+                    <strong>{event.name}</strong>
+                    <span>{event.date}</span>
+                  </div>
+
+                  <p>
+                    {event.avenue.join(", ") ||
+                      "No avenue assigned"}
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="command-center-empty">
+              No active club events are available.
+            </p>
+          )}
+        </section>
+
+        <section className="command-center-section">
+          <header className="command-center-section__header">
+            <div>
+              <p className="admin-kicker">Financial activity</p>
+              <h3>Recent records</h3>
+            </div>
+
+            <Link to="/admin/treasury">Open treasury</Link>
+          </header>
+
+          <div className="command-center-finance">
+            <div>
+              <span>Latest treasury entries</span>
+
+              {recentTreasury.length ? (
+                recentTreasury.map((item) => (
+                  <article key={item.id}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <small>{item.date}</small>
+                    </div>
+
+                    <b
+                      className={
+                        item.type === "income"
+                          ? "is-income"
+                          : "is-expense"
+                      }
+                    >
+                      {item.type === "income" ? "+" : "−"}
+                      {formatInr(item.amount)}
+                    </b>
+                  </article>
+                ))
+              ) : (
+                <p>No treasury entries.</p>
+              )}
+            </div>
+
+            <div>
+              <span>Latest fine records</span>
+
+              {recentFines.length ? (
+                recentFines.map((fine) => (
+                  <article key={fine.id}>
+                    <div>
+                      <strong>
+                        {fine.memberName || "Member"}
+                      </strong>
+                      <small>{fine.reason || fine.date}</small>
+                    </div>
+
+                    <b>{formatInr(fine.amount)}</b>
+                  </article>
+                ))
+              ) : (
+                <p>No fine records.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section className="command-center-ranking">
+        <div className="command-center-ranking__intro">
+          <p className="admin-kicker">Dashboard display</p>
+          <h3>Club ranking</h3>
+
+          <p>
+            Control the ranking information shown across approved
+            member dashboards.
+          </p>
+
+          <div className="command-center-ranking__preview">
+            <span>
+              {ranking.enabled
+                ? "Ranking visible"
+                : "Ranking hidden"}
+            </span>
+
+            <strong>
+              {ranking.value || "No ranking value"}
+            </strong>
+
+            <small>
+              {ranking.subtitle ||
+                "Add a supporting ranking subtitle."}
+            </small>
+          </div>
+        </div>
+
+        <form
+          className="command-center-ranking__form"
+          onSubmit={saveRanking}
+        >
+          <label className="command-center-ranking__toggle">
+            <input
+              type="checkbox"
+              checked={ranking.enabled}
+              onChange={(event) =>
+                setRanking({
+                  ...ranking,
+                  enabled: event.target.checked,
+                })
+              }
+            />
+
+            <span>Show ranking on dashboards</span>
+          </label>
+
+          <label>
+            Ranking value
+            <input
+              maxLength="80"
+              value={ranking.value}
+              onChange={(event) =>
+                setRanking({
+                  ...ranking,
+                  value: event.target.value,
+                })
+              }
+              required={ranking.enabled}
+            />
+          </label>
+
+          <label>
+            Subtitle
+            <input
+              maxLength="120"
+              value={ranking.subtitle}
+              onChange={(event) =>
+                setRanking({
+                  ...ranking,
+                  subtitle: event.target.value,
+                })
+              }
+            />
+          </label>
+
+          <button disabled={busy}>
+            {busy ? "Saving…" : "Save ranking"}
+          </button>
+        </form>
+      </section>
+
+      <section className="command-center-authority">
+        <div>
+          <p className="admin-kicker">Access summary</p>
+          <h3>Administrative authority</h3>
+
+          <p>
+            {access.canAccessPresidentControls
+              ? "President controls are available alongside the focused capabilities listed here."
+              : "Standard administrative modules and focused protected capabilities are listed separately."}
+          </p>
+        </div>
+
+        <dl>
+          <div>
+            <dt>Admin tools</dt>
+            <dd>
+              {access.canAccessAdminTools
+                ? "Available"
+                : "Restricted"}
+            </dd>
+          </div>
+
+          <div>
+            <dt>Locks</dt>
+            <dd>
+              {canAccessLockTools
+                ? "Available"
+                : "Restricted"}
+            </dd>
+          </div>
+
+          <div>
+            <dt>Resolutions</dt>
+            <dd>
+              {canAccessResolutionTools
+                ? "Available"
+                : "Restricted"}
+            </dd>
+          </div>
+
+          <div>
+            <dt>President controls</dt>
+            <dd>
+              {access.canAccessPresidentControls
+                ? "Available"
+                : "Restricted"}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  );
 }
 
-function Metric({ label, value }) { return <article className="admin-metric"><span>{label}</span><strong>{value}</strong></article>; }
+function Metric({ label, value, detail, accent = "gold" }) {
+  return (
+    <article
+      className={`command-center-metric command-center-metric--${accent}`}
+    >
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </article>
+  );
+}
 
 export function AccountsModule({ users, access, uid, onNotice }) {
   const [filter, setFilter] = useState("pending");
@@ -132,180 +635,509 @@ export function AccountsModule({ users, access, uid, onNotice }) {
   </>;
 }
 
-export function MembersModule({ members, uid, onNotice }) {
+export function MembersModule({
+  members,
+  users = [],
+  attendance = {},
+  events = [],
+  fines = [],
+  uid,
+  onNotice,
+}) {
   const [name, setName] = useState("");
-  const [editing, setEditing] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [profileEditor, setProfileEditor] = useState(null);
   const [target, setTarget] = useState(null);
+  const [selectedId, setSelectedId] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [positionFilter, setPositionFilter] = useState("all");
+  const [sort, setSort] = useState("nameAsc");
+  const [issueFilter, setIssueFilter] = useState("");
+  const [viewMode, setViewMode] = useState("detailed");
+  const searchRef = useRef(null);
   const { busy, run } = useAdminMutation({ uid, module: "members", onNotice });
-  function add(event) { event.preventDefault(); run("add-member", () => addRosterMember("members", { name: stripRotaractorPrefix(name) }), "Member added.").then((result) => { if (result) setName(""); }); }
-  function saveEdit(event) { event.preventDefault(); run("rename-member", () => updateRosterMember("members", editing.id, { name: stripRotaractorPrefix(editing.name) }), "Member updated.").then((result) => { if (result !== null) setEditing(null); }); }
-return (
-  <>
-    <AdminModuleHeader
-      title="Club Members"
-    />
 
-    <section className="member-roster-summary" aria-label="Member roster summary">
-      <article>
-        <span>Total members</span>
-        <strong>{members.length}</strong>
-      </article>
+  const model = useMemo(() => getMemberOperationsModel(
+    { members, users, attendance, events, fines },
+    { search, status: statusFilter, position: positionFilter, sort, issue: issueFilter },
+  ), [members, users, attendance, events, fines, search, statusFilter, positionFilter, sort, issueFilter]);
 
-      <article>
-        <span>Active members</span>
-        <strong>
-          {members.filter((member) => member.active).length}
-        </strong>
-      </article>
+  const selectedMember = model.rows.find((member) => member.id === selectedId)
+    || null;
 
-      <article>
-        <span>Inactive members</span>
-        <strong>
-          {members.filter((member) => !member.active).length}
-        </strong>
-      </article>
-    </section>
+  useEffect(() => {
+    function onKeyDown(event) {
+      const active = document.activeElement;
+      const typing = active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName);
+      const dialogOpen = Boolean(document.querySelector(".admin-dialog"));
 
-    <section className="member-roster-add">
-      <form
-        className="member-roster-add__form"
-        onSubmit={add}
-      >
+      if (event.key === "/" && !typing && !dialogOpen) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+
+      if (event.key === "Escape" && active === searchRef.current && search) {
+        event.preventDefault();
+        setSearch("");
+        setIssueFilter("");
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [search]);
+
+  function add(event) {
+    event.preventDefault();
+    run(
+      "add-member",
+      () => addRosterMember("members", { name: stripRotaractorPrefix(name) }),
+      "Member added.",
+    ).then((result) => {
+      if (result) {
+        setName("");
+        setAddOpen(false);
+      }
+    });
+  }
+
+  function openProfileEditor(member) {
+    setProfileEditor({
+      id: member.id,
+      name: member.name || "",
+      email: member.email || "",
+      rid: member.rid || "",
+      active: member.active !== false,
+    });
+  }
+
+  function saveProfile(event) {
+    event.preventDefault();
+    run(
+      "update-member-profile",
+      () => adminCalls.updateMemberProfile({
+        memberId: profileEditor.id,
+        name: profileEditor.name,
+        email: profileEditor.email,
+        rid: profileEditor.rid,
+        active: profileEditor.active === true,
+      }),
+      "Member profile updated.",
+    ).then((result) => {
+      if (result !== null) setProfileEditor(null);
+    });
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setPositionFilter("all");
+    setSort("nameAsc");
+    setIssueFilter("");
+  }
+
+  function applyAttention(item) {
+    setIssueFilter(item.key);
+    if (item.key === "inactive") setStatusFilter("inactive");
+    else setStatusFilter("all");
+  }
+
+  return (
+    <div className="member-ops">
+      <header className="member-ops-hero">
+        <div className="member-ops-hero__copy">
+          <p className="admin-kicker">Member Operations</p>
+          <h2>Club Members</h2>
+          <p>
+            Manage active club directory, participation and member records.
+          </p>
+        </div>
+
+        <dl className="member-ops-hero__metrics" aria-label="Member roster intelligence">
+          <div>
+            <dt>Total members</dt>
+            <dd>{model.metrics.total}</dd>
+          </div>
+          <div>
+            <dt>Active members</dt>
+            <dd>{model.metrics.active}</dd>
+          </div>
+          <div>
+            <dt>Inactive members</dt>
+            <dd>{model.metrics.inactive}</dd>
+          </div>
+        </dl>
+      </header>
+
+      {model.attentionItems.length ? (
+        <section className="member-ops-attention" aria-labelledby="member-attention-title">
+          <header>
+            <p className="admin-kicker">Attention needed</p>
+            <h3 id="member-attention-title">Member records to review</h3>
+          </header>
+
+          <div className="member-ops-attention__items">
+            {model.attentionItems.map((item) => (
+              <button
+                className={issueFilter === item.key ? "is-active" : ""}
+                key={item.key}
+                type="button"
+                onClick={() => applyAttention(item)}
+              >
+                <strong>{item.count}</strong>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="member-ops-command" aria-label="Member command bar">
         <label>
-          <span>Full name</span>
-
+          <span>Search members</span>
           <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Enter member name"
-            required
+            ref={searchRef}
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name, email, RID, role"
           />
         </label>
 
-        <button disabled={busy}>Add member</button>
-      </form>
-    </section>
+        <label>
+          <span>Status</span>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </label>
 
-    <section className="member-roster-list" aria-label="Club members">
-      <header className="member-roster-list__header">
-        <div>
-          <p className="admin-kicker">Club directory</p>
-          <h3>Current Members</h3>
+        <label>
+          <span>Role or position</span>
+          <select value={positionFilter} onChange={(event) => setPositionFilter(event.target.value)}>
+            <option value="all">All</option>
+            {model.positionOptions.map((position) => (
+              <option key={position} value={position}>{position}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span>Sort</span>
+          <select value={sort} onChange={(event) => setSort(event.target.value)}>
+            <option value="nameAsc">Name A-Z</option>
+            <option value="nameDesc">Name Z-A</option>
+            <option value="activeFirst">Active first</option>
+            <option value="incompleteFirst">Incomplete records first</option>
+          </select>
+        </label>
+
+        <div className="member-ops-command__actions">
+          <div className="member-ops-view-toggle" role="group" aria-label="Roster density">
+            <button
+              className={viewMode === "detailed" ? "is-active" : ""}
+              type="button"
+              onClick={() => setViewMode("detailed")}
+            >
+              Detailed
+            </button>
+            <button
+              className={viewMode === "compact" ? "is-active" : ""}
+              type="button"
+              onClick={() => setViewMode("compact")}
+            >
+              Compact
+            </button>
+          </div>
+
+          <button type="button" onClick={clearFilters}>Clear</button>
+          <button type="button" onClick={() => setAddOpen(true)}>Add member</button>
+        </div>
+      </section>
+
+      {issueFilter ? (
+        <div className="member-ops-filter-note" role="status">
+          <span>Attention filter active</span>
+          <button type="button" onClick={() => setIssueFilter("")}>Clear attention filter</button>
+        </div>
+      ) : null}
+
+      <section className="member-ops-workspace" aria-label="Member workspace">
+        <div className={`member-ops-roster member-ops-roster--${viewMode}`}>
+          <header>
+            <div>
+              <p className="admin-kicker">Club directory</p>
+              <h3>Member workspace</h3>
+            </div>
+            <span>{model.filteredRows.length} of {model.metrics.total}</span>
+          </header>
+
+          {model.filteredRows.length ? (
+            <div className="member-ops-rows" role="listbox" aria-label="Filtered member records" aria-activedescendant={selectedMember ? `member-${selectedMember.id}` : undefined}>
+              {model.filteredRows.map((member) => (
+                <article
+                  aria-selected={selectedMember?.id === member.id}
+                  className={selectedMember?.id === member.id ? "member-ops-row is-selected" : "member-ops-row"}
+                  key={member.id}
+                  role="option"
+                  tabIndex={0}
+                  onClick={() => setSelectedId(member.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedId(member.id);
+                    }
+                  }}
+                >
+                  <div className="member-ops-row__initials" aria-hidden="true">{member.initials}</div>
+
+                  <div className="member-ops-row__main">
+                    <h4>{formatRotaractorName(member.name, true)}</h4>
+                    <p>{member.email || "No email in records"}</p>
+                  </div>
+
+                  <div className="member-ops-row__facts">
+                    <span className={member.active !== false ? "member-status member-status--active" : "member-status member-status--inactive"}>
+                      {member.active !== false ? "Active" : "Inactive"}
+                    </span>
+                    <span>{member.positionLabel || "No role or position"}</span>
+                    <span>{member.normalizedRid ? `RID ${member.normalizedRid}` : "RID not recorded"}</span>
+                    <span>{member.accountLinked ? "Approved account linked" : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</span>
+                    {member.attendanceSummary.recorded ? <span>{member.attendanceSummary.rate}% attendance</span> : <span>No attendance responses</span>}
+                    {member.fineSummary.count ? <span>{member.fineSummary.count} fine record{member.fineSummary.count === 1 ? "" : "s"}</span> : <span>No fine records</span>}
+                  </div>
+
+                  <div className="member-ops-row__quality">
+                    <span>Record completeness: {member.completeness.score}%</span>
+                    <i style={{ "--member-completeness": `${member.completeness.score}%` }} />
+                  </div>
+
+                  <div className="member-ops-row__actions">
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); }}>View</button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); openProfileEditor(member); }}>Edit</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <AdminEmpty message="No member records match this workspace view." />
+          )}
         </div>
 
-        <span>
-          {members.length} {members.length === 1 ? "member" : "members"}
+        <MemberInspector
+          busy={busy}
+          member={selectedMember}
+          onEdit={openProfileEditor}
+          onRemove={setTarget}
+        />
+      </section>
+
+      <section className="member-ops-insights" aria-labelledby="member-insights-title">
+        <header>
+          <p className="admin-kicker">Member insights</p>
+          <h3 id="member-insights-title">Loaded data signals</h3>
+        </header>
+
+        <dl>
+          <div><dt>Active members</dt><dd>{model.metrics.activePercent}%</dd></div>
+          <div><dt>Account linkage</dt><dd>{model.metrics.linkedPercent}%</dd></div>
+          <div><dt>Missing email</dt><dd>{model.metrics.missingEmail}</dd></div>
+          <div><dt>Missing RID</dt><dd>{model.metrics.missingRid}</dd></div>
+          <div><dt>Missing position</dt><dd>{model.metrics.missingPosition}</dd></div>
+          <div><dt>Account email mismatch</dt><dd>{model.metrics.accountEmailMismatch}</dd></div>
+          <div><dt>With fine records</dt><dd>{model.metrics.withFineRecords}</dd></div>
+          <div><dt>No attendance responses</dt><dd>{model.metrics.noAttendanceResponses}</dd></div>
+        </dl>
+      </section>
+
+      {addOpen ? (
+        <AdminDialog title="Add member" busy={busy} onClose={() => setAddOpen(false)}>
+          <form className="admin-form" onSubmit={add}>
+            <label>
+              Full name
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Enter member name"
+                required
+                autoFocus
+              />
+            </label>
+            <div className="admin-actions">
+              <button type="button" onClick={() => setAddOpen(false)} disabled={busy}>Cancel</button>
+              <button disabled={busy}>{busy ? "Adding..." : "Create member"}</button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+
+      {profileEditor ? (
+        <AdminDialog
+          title={`Edit ${formatRotaractorName(profileEditor.name, true)}`}
+          busy={busy}
+          onClose={() => setProfileEditor(null)}
+        >
+          <form className="admin-form" onSubmit={saveProfile}>
+            <label>
+              Full name
+              <input
+                value={profileEditor.name}
+                onChange={(event) => setProfileEditor({ ...profileEditor, name: event.target.value })}
+                required
+                autoFocus
+              />
+            </label>
+
+            <label>
+              Email address
+              <input
+                type="email"
+                inputMode="email"
+                value={profileEditor.email}
+                onChange={(event) => setProfileEditor({ ...profileEditor, email: event.target.value })}
+                maxLength="320"
+              />
+            </label>
+
+            <label>
+              RID
+              <input
+                value={profileEditor.rid}
+                onChange={(event) => setProfileEditor({ ...profileEditor, rid: event.target.value })}
+                maxLength="40"
+              />
+            </label>
+
+            <label className="admin-checkbox">
+              <input
+                type="checkbox"
+                checked={profileEditor.active}
+                onChange={(event) => setProfileEditor({ ...profileEditor, active: event.target.checked })}
+              />
+              Active member
+            </label>
+
+            <div className="admin-actions">
+              <button type="button" onClick={() => setProfileEditor(null)} disabled={busy}>Cancel</button>
+              <button disabled={busy}>{busy ? "Saving..." : "Save profile"}</button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+      {target ? (
+        <AdminDialog
+          title={`Remove ${formatRotaractorName(target.name, true)}?`}
+          busy={busy}
+          onClose={() => setTarget(null)}
+        >
+          <p>
+            This permanently removes the production member roster document and
+            its attendance document, matching current production behavior.
+          </p>
+
+          <div className="admin-actions">
+            <button onClick={() => setTarget(null)}>
+              Cancel
+            </button>
+
+            <button
+              className="danger"
+              onClick={() =>
+                run(
+                  "delete-member",
+                  () =>
+                    deleteRosterMember(
+                      "members",
+                      "attendance",
+                      target.id,
+                    ),
+                  "Member and attendance row removed.",
+                ).then((result) => {
+                  if (result !== null) setTarget(null);
+                })
+              }
+            >
+              Permanently remove
+            </button>
+          </div>
+        </AdminDialog>
+      ) : null}
+    </div>
+  );
+}
+
+function MemberInspector({ member, busy, onEdit, onRemove }) {
+  if (!member) {
+    return (
+      <aside className="member-ops-inspector" aria-label="Member inspector">
+        <AdminEmpty message="Select a member to inspect their roster record." />
+      </aside>
+    );
+  }
+
+  const missingText = member.completeness.missing.length
+    ? member.completeness.missing.join(", ")
+    : "No missing fields in the current completeness checks.";
+
+  return (
+    <aside className="member-ops-inspector" aria-label={`Inspector for ${member.name}`}>
+      <header>
+        <p className="admin-kicker">Member inspector</p>
+        <h3>{formatRotaractorName(member.name, true)}</h3>
+        <span className={member.active !== false ? "member-status member-status--active" : "member-status member-status--inactive"}>
+          {member.active !== false ? "Active" : "Inactive"}
         </span>
       </header>
 
-      <div className="member-roster-list__rows">
-        {members.map((member) => {
-          const initials = member.name
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part[0]?.toUpperCase())
-            .join("");
+      <section>
+        <h4>Overview</h4>
+        <dl>
+          <div><dt>Email</dt><dd>{member.email || "No email in roster"}</dd></div>
+          <div><dt>RID</dt><dd>{member.normalizedRid || "RID not recorded"}</dd></div>
+          <div><dt>Role</dt><dd>{member.role || "Not recorded"}</dd></div>
+          <div><dt>Position</dt><dd>{member.position || "Not recorded"}</dd></div>
+          <div><dt>Account linkage</dt><dd>{member.accountLinked ? `Confirmed by email: ${member.linkedAccount.email}` : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</dd></div>
+          {member.accountEmailMismatch ? (
+            <div><dt>Account email mismatch</dt><dd>{member.possibleNameMatches.map((user) => user.email).join(", ")}</dd></div>
+          ) : null}
+        </dl>
+      </section>
 
-          return (
-            <article
-              className="member-roster-row"
-              key={member.id}
-            >
-              <div
-                className="member-roster-row__initials"
-                aria-hidden="true"
-              >
-                {initials || "M"}
-              </div>
+      <section>
+        <h4>Participation</h4>
+        <dl>
+          <div><dt>Attendance rate</dt><dd>{member.attendanceSummary.rate === null ? "Unavailable" : `${member.attendanceSummary.rate}%`}</dd></div>
+          <div><dt>Attendance records</dt><dd>{member.attendanceSummary.recorded}</dd></div>
+          <div><dt>Present responses</dt><dd>{member.attendanceSummary.present}</dd></div>
+        </dl>
+      </section>
 
-              <div className="member-roster-row__identity">
-                <h3>{formatRotaractorName(member.name, true)}</h3>
+      <section>
+        <h4>Finance</h4>
+        <dl>
+          <div><dt>Fine records</dt><dd>{member.fineSummary.count}</dd></div>
+          <div><dt>Total fine amount</dt><dd>{formatInr(member.fineSummary.total)}</dd></div>
+        </dl>
+      </section>
 
-                <p>
-                  {member.email || "No email in roster"}
-                </p>
-              </div>
+      <section>
+        <h4>Record quality</h4>
+        <p>Record completeness: {member.completeness.score}%</p>
+        <div className="member-ops-progress" aria-hidden="true"><i style={{ "--member-completeness": `${member.completeness.score}%` }} /></div>
+        <p>{missingText}</p>
+      </section>
 
-              <div className="member-roster-row__status">
-                <span
-                  className={
-                    member.active
-                      ? "member-status member-status--active"
-                      : "member-status member-status--inactive"
-                  }
-                >
-                  {member.active ? "Active" : "Inactive"}
-                </span>
-              </div>
-
-              <div className="member-roster-row__actions">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setEditing({
-                      id: member.id,
-                      name: member.name,
-                    })
-                  }
-                >
-                  Rename
-                </button>
-
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={() => setTarget(member)}
-                >
-                  Remove
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </section>
-    {editing ? <AdminDialog title={`Rename ${formatRotaractorName(editing.name, true)}`} busy={busy} onClose={() => setEditing(null)}><form className="admin-form" onSubmit={saveEdit}><label>Full name<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} required autoFocus /></label><div className="admin-actions"><button type="button" onClick={() => setEditing(null)}>Cancel</button><button disabled={busy}>Save</button></div></form></AdminDialog> : null}
-    {target ? (
-      <AdminDialog
-        title={`Remove ${formatRotaractorName(target.name, true)}?`}
-        busy={busy}
-        onClose={() => setTarget(null)}
-      >
-        <p>
-          This permanently removes the production member roster document and
-          its attendance document, matching current production behavior.
-        </p>
-
+      <section>
+        <h4>Actions</h4>
         <div className="admin-actions">
-          <button onClick={() => setTarget(null)}>
-            Cancel
-          </button>
-
-          <button
-            className="danger"
-            onClick={() =>
-              run(
-                "delete-member",
-                () =>
-                  deleteRosterMember(
-                    "members",
-                    "attendance",
-                    target.id
-                  ),
-                "Member and attendance row removed."
-              ).then((result) => {
-                if (result !== null) setTarget(null);
-              })
-            }
-          >
-            Permanently remove
-          </button>
+          <button type="button" onClick={() => onEdit(member)} disabled={busy}>Edit member</button>
+          <button type="button" className="danger" onClick={() => onRemove(member)} disabled={busy}>Remove member</button>
         </div>
-      </AdminDialog>
-    ) : null}
-  </>
-);
+      </section>
+    </aside>
+  );
 }
 
 export function ReportsModule({ events }) {

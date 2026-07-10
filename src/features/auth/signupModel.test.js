@@ -11,9 +11,11 @@ import {
   normalizeSignupName,
   normalizeSignupPassword,
   normalizeSignupPhone,
+  normalizeSignupRid,
   selectSignupPath,
   updateSignupField,
   validateSignup,
+  validateSignupRid,
   normalizeSignupText,
 } from "./signupModel.js";
 import { getSignupDiagnostic, getSignupError } from "./signupErrors.js";
@@ -103,6 +105,16 @@ test("signup validation uses the latest edited email value", () => {
 test("phone normalization preserves practical formatting and plus", () => {
   assert.equal(normalizeSignupPhone(" +91 98765-43210 "), "+91 98765-43210");
 });
+test("RID normalization trims without changing case", () => {
+  assert.equal(normalizeSignupRid("  rId-3131-A  "), "rId-3131-A");
+});
+test("optional existing-member RID validates length and control characters", () => {
+  assert.equal(validateSignup(validMember()).errors.rid, undefined);
+  assert.equal(validateSignup({ ...validMember(), rid: "RID-3131" }).errors.rid, undefined);
+  assert.match(validateSignup({ ...validMember(), rid: "x".repeat(41) }).errors.rid, /40 characters/);
+  assert.match(validateSignup({ ...validMember(), rid: "RID\u0001" }).errors.rid, /control characters/);
+  assert.equal(validateSignupRid("RID-3131"), "");
+});
 test("required common fields are rejected", () => {
   const result = validateSignup(selectSignupPath(createSignupForm(), "existing-member"));
   assert.ok(result.errors.name && result.errors.phone && result.errors.email && result.errors.gender);
@@ -190,6 +202,12 @@ test("existing-member payload uses requested role exactly", () => {
   assert.equal(payload.requestedRole, "bod");
   assert.equal(payload.consentSource, "member-signup");
 });
+test("existing-member payload includes optional RID only when supplied", () => {
+  const empty = buildSignupPayload(validMember("bod"));
+  const withRid = buildSignupPayload({ ...validMember("bod"), rid: "  rId-3131-A  " });
+  assert.equal("rid" in empty, false);
+  assert.equal(withRid.rid, "rId-3131-A");
+});
 test("versioned consent payload normalizes optional choice strictly", () => {
   const payload = buildSignupPayload({ ...validMember(), communicationsOptIn: "true" });
   assert.equal(payload.termsAccepted, true);
@@ -205,6 +223,10 @@ test("existing-member payload excludes Prospect fields", () => {
   const payload = buildSignupPayload({ ...validMember(), hobbies: "hidden", joinReason: "hidden" });
   assert.equal("hobbies" in payload, false);
   assert.equal("joinReason" in payload, false);
+});
+test("Prospect payload never includes RID", () => {
+  const payload = buildSignupPayload({ ...validProspect(), rid: "RID-3131" });
+  assert.equal("rid" in payload, false);
 });
 test("payload builders whitelist fields", () => {
   const payload = buildSignupPayload({ ...validMember(), arbitraryAuthority: true, role: "president" });
@@ -254,6 +276,15 @@ test("existing-member profile completion uses the legacy minimal callable payloa
     consentSource: "member-signup",
     legalEffectiveDate: "2026-07-02",
   });
+});
+test("existing-member profile completion includes RID only when supplied", () => {
+  const payload = buildSignupPayload({ ...validMember("bod"), rid: " RID-NEW " }, {
+    provider: "password",
+    profileCompletion: true,
+    identityEmail: "auth@example.com",
+  });
+  assert.equal(payload.rid, "RID-NEW");
+  assert.equal(payload.email, undefined);
 });
 test("Prospect approved outcome requests trusted refresh", () => {
   assert.equal(classifySignupOutcome({ status: "approved", role: "prospect" }).refreshTrustedAccess, true);

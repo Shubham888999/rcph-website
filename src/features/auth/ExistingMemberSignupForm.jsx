@@ -49,6 +49,11 @@ export default function ExistingMemberSignupForm(props) {
               {errors.inviteCode ? <p id="signup-invite-error" className="signup-field-error" role="alert">{errors.inviteCode}</p> : null}
             </div>
           ) : null}
+          <div className="signup-field">
+            <label htmlFor="signup-rid">RID</label>
+            <input id="signup-rid" type="text" value={form.rid} disabled={Boolean(busy)} maxLength="40" aria-invalid={Boolean(errors.rid)} aria-describedby={errors.rid ? "signup-rid-error" : "signup-rid-help"} onChange={(event) => onChange("rid", event.target.value)} />
+            {errors.rid ? <p id="signup-rid-error" className="signup-field-error" role="alert">{errors.rid}</p> : <p id="signup-rid-help" className="signup-help">Only enter if you know your RID.</p>}
+          </div>
         </fieldset>
         <SignupConsents form={form} errors={errors} disabled={busy} onChange={onChange} />
         <button className="signup-primary-button" type="submit" disabled={Boolean(busy)}>{busy ? "Submitting request..." : profileCompletion ? "Complete account setup" : "Create member account"}</button>
