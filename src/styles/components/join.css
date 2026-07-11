@@ -310,3 +310,106 @@
 @media (max-width:900px) { .join-hero__motif { width:100%; min-height:auto; } .join-criteria__copy { padding-left:0; border-left:0; } }
 @media (max-width:620px) { .join-hero { padding-block:3.5rem 4.5rem; } .join-section + .join-section::before { left:0; width:100%; } .join-journey-list li { padding-right:0; } }
 @media (prefers-reduced-motion:reduce) { .join-page *,.join-page *::before,.join-page *::after { transition-duration:.01ms!important; animation-duration:.01ms!important; animation-iteration-count:1!important; } }
+/* Final mobile corrections */
+@media (max-width: 620px) {
+  .join-hero {
+    width: min(100% - 2rem, 1180px);
+    padding-block: 3rem 4rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 2.5rem;
+  }
+
+  .join-hero__content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .join-hero h1 {
+    max-width: 11ch;
+    font-size: clamp(2.65rem, 12vw, 3.8rem);
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+    text-wrap: balance;
+  }
+
+  .join-hero__content > p:not(.join-kicker) {
+    max-width: 34rem;
+    margin: 1.5rem 0;
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  .join-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .join-actions .button {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .join-hero__motif {
+    width: 100%;
+    min-height: auto;
+    margin: 0;
+    padding: 1.5rem 1.25rem;
+    gap: 0;
+  }
+
+  .join-hero__motif span {
+    padding-block: 0.8rem;
+    font-size: clamp(1.15rem, 7vw, 1.65rem);
+    line-height: 1.1;
+  }
+
+  .join-section {
+    width: min(100% - 2rem, 1180px);
+    padding-block: 4rem;
+  }
+
+  .join-section__heading {
+    max-width: 100%;
+    margin-bottom: 1.75rem;
+  }
+
+  .join-section h2 {
+    max-width: 14ch;
+    font-size: clamp(2rem, 10vw, 3rem);
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .join-criteria {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+
+  .join-criteria__copy {
+    width: 100%;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .join-benefit-card {
+    padding: 1.35rem;
+  }
+
+  .join-benefit-card h3 {
+    font-size: 1.2rem;
+  }
+
+  .join-journey-list li {
+    padding: 1.5rem 0 1.5rem 1.25rem;
+  }
+
+  .join-cta {
+    width: min(100% - 2rem, 1280px);
+    padding: 4rem 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+}

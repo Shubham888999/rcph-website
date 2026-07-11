@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -22,6 +22,29 @@
     <meta name="twitter:image" content="https://rcph3131.org/images/logo3.webp" />
     <meta name="twitter:image:alt" content="Rotaract Club of Pune Heritage official logo" />
     <title>Rotaract Club of Pune Heritage | RCPH</title>
+    <script>
+      (function () {
+        var key = "rcph-theme";
+        var fallback = "dark";
+        var resolved = fallback;
+        var normalize = function (value) {
+          return value === "light" || value === "dark" ? value : "";
+        };
+
+        try {
+          var stored = normalize(window.localStorage && window.localStorage.getItem(key));
+          var system = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches
+            ? "light"
+            : fallback;
+          resolved = stored || system || fallback;
+        } catch (_) {
+          resolved = fallback;
+        }
+
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.style.colorScheme = resolved;
+      })();
+    </script>
     <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://rcph3131.org/#organization","name":"Rotaract Club of Pune Heritage","alternateName":"RCPH","url":"https://rcph3131.org/","logo":"https://rcph3131.org/images/logo3.webp","areaServed":{"@type":"Place","name":"Pune, Maharashtra, India"},"sameAs":["https://instagram.com/rc_pune_heritage/"],"parentOrganization":{"@type":"Organization","name":"Rotaract District 3131"}},{"@type":"WebSite","@id":"https://rcph3131.org/#website","url":"https://rcph3131.org/","name":"Rotaract Club of Pune Heritage","alternateName":"RCPH","publisher":{"@id":"https://rcph3131.org/#organization"}}]}</script>
   </head>
   <body>

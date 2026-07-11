@@ -282,3 +282,113 @@
 @media (hover:hover) and (pointer:fine) { .projects-card { transition:transform .25s ease,border-color .25s ease; } .projects-card:hover { transform:translateY(-5px); border-color:rgba(229,194,104,.4); } }
 @media (max-width:900px) { .projects-hero__motif { width:min(100%,440px); min-height:250px; } }
 @media (max-width:620px) { .projects-hero { padding-block:3.5rem 4.5rem; } .projects-section + .projects-section::before { left:0; width:100%; } .projects-hero__motif { min-height:210px; } }
+/* Final mobile corrections */
+@media (max-width: 620px) {
+  .projects-hero {
+    width: min(100% - 2rem, 1180px);
+    padding-block: 3rem 4rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 2.5rem;
+  }
+
+  .projects-hero__content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .projects-hero h1 {
+    max-width: 12ch;
+    font-size: clamp(2.65rem, 12vw, 3.8rem);
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+    text-wrap: balance;
+  }
+
+  .projects-hero__content > p:not(.projects-kicker) {
+    max-width: 36rem;
+    margin: 1.5rem 0;
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  .projects-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .projects-actions .button {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .projects-hero__motif {
+    width: 100%;
+    min-height: auto;
+    margin: 0;
+    padding: 1.5rem 1.25rem;
+    gap: 0.4rem;
+  }
+
+  .projects-hero__motif::before {
+    inset: 0.75rem -0.5rem -0.5rem 0.75rem;
+  }
+
+  .projects-hero__motif::after {
+    left: 0;
+    top: 0;
+    width: 42%;
+  }
+
+  .projects-hero__motif span {
+    padding-block: 0.45rem;
+    font-size: clamp(1.05rem, 6vw, 1.4rem);
+    line-height: 1.15;
+  }
+
+  .projects-section {
+    width: min(100% - 2rem, 1180px);
+    padding-block: 4rem;
+  }
+
+  .projects-section__heading {
+    margin-bottom: 1.75rem;
+  }
+
+  .projects-section h2 {
+    max-width: 15ch;
+    font-size: clamp(2rem, 10vw, 3rem);
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .projects-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .projects-card {
+    width: 100%;
+  }
+
+  .projects-card__content {
+    padding: 1.25rem;
+  }
+
+  .projects-card h3 {
+    font-size: 1.25rem;
+  }
+
+  .projects-card__content > p:last-child {
+    font-size: 0.96rem;
+    line-height: 1.65;
+  }
+
+  .projects-cta {
+    width: min(100% - 2rem, 1280px);
+    padding: 4rem 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+}
