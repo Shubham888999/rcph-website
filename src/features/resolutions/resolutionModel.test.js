@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPreparedEmailLinks, buildPreparedReplyText, calculateResolutionResult, canClaimHybridEmailSent, canVerifyHybridEmail, getResolutionPdfFilename, isHybridVoteChoiceLocked, normalizeApprovalMethod, normalizeDashboardResolutions, normalizeResolutionStatus, normalizeVoteChoice, validateResolutionDraft } from "./resolutionModel.js";
+import { approvalMethodLabel, buildPreparedEmailLinks, buildPreparedReplyText, calculateResolutionResult, canClaimHybridEmailSent, canVerifyHybridEmail, getResolutionPdfFilename, isAuthenticatedFinalHybrid, isHybridVoteChoiceLocked, normalizeApprovalMethod, normalizeDashboardResolutions, normalizeResolutionStatus, normalizeVoteChoice, normalizeVoteProcessingMode, validateResolutionDraft } from "./resolutionModel.js";
 import { buildResolutionPdfDocument, buildResolutionVoteRows, generateResolutionPdf } from "./resolutionPdf.js";
 
 test("resolution status and vote choices normalize strictly", () => {
@@ -10,6 +10,12 @@ test("resolution status and vote choices normalize strictly", () => {
   assert.equal(normalizeVoteChoice("yes"), "");
   assert.equal(normalizeApprovalMethod(""), "website");
   assert.equal(normalizeApprovalMethod("hybrid_email"), "hybrid_email");
+  assert.equal(normalizeVoteProcessingMode("authenticated_final"), "authenticated_final");
+  assert.equal(normalizeVoteProcessingMode("future"), "");
+  assert.equal(isAuthenticatedFinalHybrid("hybrid_email", "authenticated_final"), true);
+  assert.equal(isAuthenticatedFinalHybrid("hybrid_email", ""), false);
+  assert.equal(approvalMethodLabel("hybrid_email"), "Website Vote with Prepared Email");
+  assert.equal(approvalMethodLabel("hybrid_email", "legacy_email_verification"), "Hybrid Email Confirmation");
 });
 
 test("result calculations enforce every voting rule", () => {
@@ -23,6 +29,8 @@ test("result calculations enforce every voting rule", () => {
   assert.equal(calculateResolutionResult({ votingRule: "custom_approval_count", customApprovalCount: 2, eligibleVoterCount: 5, votes: ["approve", "approve"] }).status, "passed");
   assert.equal(calculateResolutionResult({ votingRule: "simple_majority", eligibleVoterCount: 5, votes: ["abstain"] }).status, "closed_without_decision");
   assert.equal(calculateResolutionResult({ votingRule: "simple_majority", eligibleVoterCount: 3, approvalMethod: "hybrid_email", votes: [{ choice: "approve", emailConfirmationStatus: "email_pending" }, { choice: "reject", emailConfirmationStatus: "email_verified" }] }).votesReceivedCount, 1);
+  assert.equal(calculateResolutionResult({ votingRule: "simple_majority", eligibleVoterCount: 3, approvalMethod: "hybrid_email", voteProcessingMode: "authenticated_final", votes: [{ choice: "approve", emailConfirmationStatus: "submitted" }, { choice: "reject", emailConfirmationStatus: "email_pending" }] }).votesReceivedCount, 2);
+  assert.equal(calculateResolutionResult({ votingRule: "simple_majority", eligibleVoterCount: 3, votes: [{ choice: "approve", emailConfirmationStatus: "invalidated_document_changed" }, { choice: "reject", emailConfirmationStatus: "submitted" }] }).votesReceivedCount, 1);
   assert.equal(calculateResolutionResult({ votingRule: "simple_majority", eligibleVoterCount: 3, approvalMethod: "record_only", votes: ["approve"] }).status, "closed_without_decision");
 });
 
@@ -152,6 +160,15 @@ test("final PDF vote rows include frozen names, positions, choices, and timestam
   assert.equal(rows[0].position, "Secretary");
   assert.equal(rows[0].vote, "Approve");
   assert.match(rows[0].submittedAt, /2026/);
+});
+
+test("new-mode hybrid PDF rows include submitted authenticated votes without email verification", () => {
+  const rows = buildResolutionVoteRows({
+    resolution: { approvalMethod: "hybrid_email", voteProcessingMode: "authenticated_final", eligibleVoters: [{ uid: "u1", name: "Member", position: "Secretary" }] },
+    votes: [{ voterUid: "u1", choice: "approve", emailConfirmationStatus: "submitted", submittedAt: "2026-07-02T10:00:00Z" }],
+  });
+  assert.equal(rows[0].vote, "Approve");
+  assert.equal(rows[0].verification, "Recorded and counted");
 });
 
 test("draft and open resolutions cannot generate a final PDF", async () => {

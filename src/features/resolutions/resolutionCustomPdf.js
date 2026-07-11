@@ -1,5 +1,6 @@
 import { normalizeResolutionSections, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
+import { isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 
 const BOUNDS = Object.freeze({ left: 54, right: 541, bottom: 260, top: 665 });
 const WIDTH = BOUNDS.right - BOUNDS.left;
@@ -121,9 +122,11 @@ function safeVoter(voter, vote, canonical) {
 
 export function buildCustomVotesRows(details, section) {
   const method = details?.resolution?.approvalMethod || "website";
+  const authenticatedFinal = isAuthenticatedFinalHybrid(details?.resolution);
   const votes = (Array.isArray(details?.votes) ? details.votes : []).filter((vote) => {
     if (vote?.superseded) return false;
-    if (method === "hybrid_email") return vote?.emailConfirmationStatus === "email_verified";
+    if (["superseded", "invalidated_document_changed"].includes(vote?.emailConfirmationStatus)) return false;
+    if (method === "hybrid_email" && !authenticatedFinal) return vote?.emailConfirmationStatus === "email_verified";
     return true;
   });
   const eligible = Array.isArray(details?.resolution?.eligibleVoters) ? details.resolution.eligibleVoters : [];

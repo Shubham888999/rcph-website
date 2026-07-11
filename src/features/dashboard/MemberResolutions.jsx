@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { formatRotaractorName } from "../../utils/memberName";
-import { approvalMethodLabel, buildPreparedEmailLinks, buildPreparedReplySubject, canClaimHybridEmailSent, isHybridVoteChoiceLocked } from "../resolutions/resolutionModel";
+import { approvalMethodLabel, buildPreparedEmailLinks, buildPreparedReplySubject, canClaimHybridEmailSent, isAuthenticatedFinalHybrid, isHybridVoteChoiceLocked, isLegacyHybridEmail } from "../resolutions/resolutionModel";
 
 function formatDateTime(value) {
   if (!value) return "";
@@ -24,7 +24,7 @@ function HybridEmailPanel({ resolution, busy, onClaimEmailSent }) {
   const [confirming, setConfirming] = useState(false);
   const [gmailConfirming, setGmailConfirming] = useState(false);
   const [gmailOpened, setGmailOpened] = useState(false);
-  if (resolution.approvalMethod !== "hybrid_email") return null;
+  if (!isLegacyHybridEmail(resolution)) return null;
   const hasReply = Boolean(resolution.preparedReplyText);
   const canClaim = canClaimHybridEmailSent(resolution.emailConfirmationStatus);
   const requiredSenderEmail = resolution.requiredSenderEmail || "";
@@ -96,22 +96,90 @@ function HybridEmailPanel({ resolution, busy, onClaimEmailSent }) {
   </section>;
 }
 
+function AuthenticatedFinalEmailPanel({ resolution }) {
+  const [copied, setCopied] = useState(false);
+  const [gmailConfirming, setGmailConfirming] = useState(false);
+  if (!isAuthenticatedFinalHybrid(resolution) || !resolution.currentVote) return null;
+  const hasReply = Boolean(resolution.preparedReplyText);
+  const links = buildPreparedEmailLinks({
+    to: resolution.clubReplyToEmail,
+    subject: buildPreparedReplySubject(resolution),
+    body: resolution.preparedReplyText,
+  });
+
+  async function copyText() {
+    try {
+      await navigator.clipboard.writeText(resolution.preparedReplyText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return <section className="dashboard-resolution-email dashboard-resolution-email--optional" aria-label="Prepared confirmation email">
+    <div className="dashboard-resolution-email__status is-email_verified">
+      <strong>Prepared confirmation email</strong>
+      <span>This email is optional and may be sent as an additional official record.</span>
+    </div>
+    {hasReply ? <div className="dashboard-resolution-email__reply">
+      <textarea readOnly rows="9" value={resolution.preparedReplyText} aria-label="Prepared confirmation text" />
+      <div className="dashboard-resolution-email__actions">
+        <a href={links.mailto}>Open default email app</a>
+        <button type="button" onClick={() => setGmailConfirming(true)}>Open Gmail</button>
+        <button type="button" onClick={copyText}>{copied ? "Copied" : "Copy confirmation text"}</button>
+      </div>
+      {gmailConfirming ? <div className="dashboard-resolution-email__confirm" role="alert">
+        <strong>Open Gmail</strong>
+        <p>This optional email is for additional documentation. Your dashboard vote is already final and counted.</p>
+        <div><button type="button" onClick={() => setGmailConfirming(false)}>Go back</button><a href={links.gmail} target="_blank" rel="noreferrer" onClick={() => setGmailConfirming(false)}>Open Gmail</a></div>
+      </div> : null}
+    </div> : <p className="dashboard-resolution-email__hint">The prepared email will appear after your vote is recorded.</p>}
+  </section>;
+}
+
 export default function MemberResolutions({ resolutions, busyId, onVote, onClaimEmailSent, onRefresh }) {
+  const [confirmation, setConfirmation] = useState(null);
   if (!resolutions.length) return null;
   return <section className="member-dashboard-section dashboard-resolutions" aria-labelledby="dashboard-resolutions-title">
     <div className="dashboard-section-heading"><div><p className="auth-access-kicker">Live BOD voting</p><h2 id="dashboard-resolutions-title">Resolutions awaiting your vote</h2></div><button type="button" onClick={onRefresh}>Refresh</button></div>
     <div className="dashboard-resolution-list">{resolutions.map((resolution) => {
       const busy = busyId === resolution.id;
-      const hybridLocked = resolution.approvalMethod === "hybrid_email" && isHybridVoteChoiceLocked(resolution.emailConfirmationStatus);
+      const authenticatedFinal = isAuthenticatedFinalHybrid(resolution);
+      const legacyHybrid = isLegacyHybridEmail(resolution);
+      const hybridLocked = legacyHybrid && isHybridVoteChoiceLocked(resolution.emailConfirmationStatus);
+      const voteLocked = authenticatedFinal && Boolean(resolution.currentVote);
+      const pendingChoice = confirmation?.resolutionId === resolution.id ? confirmation.choice : "";
+      const methodLabel = approvalMethodLabel(resolution.approvalMethod, resolution.voteProcessingMode || (legacyHybrid ? "legacy_email_verification" : ""));
+      const submitVote = (choice) => {
+        if (authenticatedFinal) {
+          setConfirmation({ resolutionId: resolution.id, choice });
+          return;
+        }
+        onVote(resolution, choice);
+      };
+      const confirmVote = () => {
+        if (!pendingChoice) return;
+        setConfirmation(null);
+        onVote(resolution, pendingChoice);
+      };
       return <article className="dashboard-resolution-card" key={resolution.id} aria-busy={busy}>
-        <header><span>{resolution.resolutionNumber}</span><strong>{resolution.approvalMethod === "hybrid_email" ? "Hybrid Email Confirmation" : "Voting open"}</strong></header>
+        <header><span>{resolution.resolutionNumber}</span><strong>{resolution.approvalMethod === "hybrid_email" ? methodLabel : "Voting open"}</strong></header>
         <h3>{resolution.title}</h3>
         <p className="dashboard-resolution-card__meeting">{resolution.meetingTitle} - {resolution.meetingDate}</p>
-        <p className="dashboard-resolution-card__method">{approvalMethodLabel(resolution.approvalMethod)}{resolution.originalDocumentShortHash ? ` - Fingerprint ${resolution.originalDocumentShortHash}` : ""}</p>
+        <p className="dashboard-resolution-card__method">{methodLabel}{resolution.originalDocumentShortHash ? ` - Fingerprint ${resolution.originalDocumentShortHash}` : ""}</p>
+        {authenticatedFinal ? <p className="dashboard-resolution-card__finality">Your vote will be recorded through your authenticated RCPH account. Once confirmed, it cannot be changed.</p> : null}
         {resolution.body ? <div className="dashboard-resolution-card__body">{resolution.body}</div> : null}
         {resolution.proposedByName || resolution.secondedByName ? <dl>{resolution.proposedByName ? <div><dt>Proposed by</dt><dd>{formatRotaractorName(resolution.proposedByName, true)}{resolution.proposedByPosition ? ` - ${resolution.proposedByPosition}` : ""}</dd></div> : null}{resolution.secondedByName ? <div><dt>Seconded by</dt><dd>{formatRotaractorName(resolution.secondedByName, true)}{resolution.secondedByPosition ? ` - ${resolution.secondedByPosition}` : ""}</dd></div> : null}</dl> : null}
-        <fieldset disabled={busy || hybridLocked}><legend>{hybridLocked ? "Selected vote locked" : "Cast or change your vote"}</legend><div className="dashboard-resolution-votes">{["approve", "reject", "abstain"].map((choice) => <button type="button" key={choice} className={resolution.currentVote === choice ? "is-selected" : ""} aria-pressed={resolution.currentVote === choice} onClick={() => onVote(resolution, choice)}>{choiceLabel(choice)}</button>)}</div></fieldset>
-        <div className="dashboard-resolution-card__current" aria-live="polite"><strong>Your vote: {choiceLabel(resolution.currentVote)}</strong>{resolution.submittedAt ? <span>Submitted at: {formatDateTime(resolution.submittedAt)}</span> : null}<small>{hybridLocked ? "Your selected hybrid vote is locked. It is counted only after Admin verification." : resolution.approvalMethod === "hybrid_email" ? "You may change this choice until you mark the confirmation email as sent." : "You may change your vote while voting remains open."}</small></div>
+        <fieldset disabled={busy || hybridLocked || voteLocked}><legend>{voteLocked ? "Vote recorded" : authenticatedFinal ? "Select your final vote" : hybridLocked ? "Selected vote locked" : "Cast or change your vote"}</legend><div className="dashboard-resolution-votes">{["approve", "reject", "abstain"].map((choice) => <button type="button" key={choice} className={resolution.currentVote === choice ? "is-selected" : ""} aria-pressed={resolution.currentVote === choice} onClick={() => submitVote(choice)}>{choiceLabel(choice)}</button>)}</div></fieldset>
+        {pendingChoice ? <div className="dashboard-resolution-confirm" role="alert">
+          <strong>Confirm your vote</strong>
+          <p>Selected vote: {choiceLabel(pendingChoice)}</p>
+          <p>This vote will be recorded immediately and cannot be changed after confirmation.</p>
+          <div><button type="button" onClick={() => setConfirmation(null)}>Go back</button><button type="button" disabled={busy} onClick={confirmVote}>Confirm vote</button></div>
+        </div> : null}
+        <div className="dashboard-resolution-card__current" aria-live="polite"><strong>{authenticatedFinal && resolution.currentVote ? "Vote recorded" : `Your vote: ${choiceLabel(resolution.currentVote)}`}</strong>{resolution.currentVote && authenticatedFinal ? <span>Your vote: {choiceLabel(resolution.currentVote)}</span> : null}{resolution.submittedAt ? <span>{authenticatedFinal ? "Recorded on" : "Submitted at"}: {formatDateTime(resolution.submittedAt)}</span> : null}<small>{authenticatedFinal ? resolution.currentVote ? "This vote is final and has been included in the resolution result." : "Confirming submits your final authenticated dashboard vote." : hybridLocked ? "Your selected hybrid vote is locked. It is counted only after Admin verification." : resolution.approvalMethod === "hybrid_email" ? "You may change this choice until you mark the confirmation email as sent." : "You may change your vote while voting remains open."}</small></div>
+        <AuthenticatedFinalEmailPanel resolution={resolution} />
         <HybridEmailPanel resolution={resolution} busy={busy} onClaimEmailSent={onClaimEmailSent} />
       </article>;
     })}</div>

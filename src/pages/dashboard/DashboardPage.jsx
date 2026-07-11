@@ -15,7 +15,7 @@ import {
 } from "../../features/dashboard/dashboardService";
 import useDashboardData from "../../features/dashboard/useDashboardData";
 import { getResolutionErrorMessage, loadMyOpenResolutions, markResolutionEmailSent, submitResolutionVote } from "../../features/resolutions/resolutionService";
-import { isHybridVoteChoiceLocked } from "../../features/resolutions/resolutionModel";
+import { isAuthenticatedFinalHybrid, isHybridVoteChoiceLocked } from "../../features/resolutions/resolutionModel";
 import ProspectProgress from "../../features/prospect/ProspectProgress";
 import useAuth from "../../hooks/useAuth";
 import "../../styles/components/member-dashboard.css";
@@ -81,7 +81,12 @@ export default function DashboardPage() {
 
   async function voteOnResolution(resolution, choice) {
     if (!user?.uid || resolutionBusyId) return;
-    if (resolution.approvalMethod === "hybrid_email" && isHybridVoteChoiceLocked(resolution.emailConfirmationStatus)) {
+    const authenticatedFinal = isAuthenticatedFinalHybrid(resolution);
+    if (authenticatedFinal && resolution.currentVote) {
+      setDashboardNotice({ type: "error", message: "This vote is final and cannot be changed." });
+      return;
+    }
+    if (!authenticatedFinal && resolution.approvalMethod === "hybrid_email" && isHybridVoteChoiceLocked(resolution.emailConfirmationStatus)) {
       setDashboardNotice({ type: "error", message: "This hybrid vote is locked while email confirmation is reviewed." });
       return;
     }
@@ -89,11 +94,13 @@ export default function DashboardPage() {
     const optimisticTime = new Date().toISOString();
     setResolutionBusyId(resolution.id);
     setDashboardNotice(null);
-    updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, currentVote: choice, submittedAt: item.submittedAt || optimisticTime, voteUpdatedAt: optimisticTime, emailConfirmationStatus: item.approvalMethod === "hybrid_email" ? "email_pending" : item.emailConfirmationStatus } : item));
+    if (!authenticatedFinal) {
+      updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, currentVote: choice, submittedAt: item.submittedAt || optimisticTime, voteUpdatedAt: optimisticTime, emailConfirmationStatus: item.approvalMethod === "hybrid_email" ? "email_pending" : item.emailConfirmationStatus } : item));
+    }
     try {
       const vote = await submitResolutionVote(user.uid, resolution.id, choice);
       updateOpenResolutions((current) => current.map((item) => item.id === resolution.id ? { ...item, currentVote: vote.choice, submittedAt: vote.submittedAt, voteUpdatedAt: vote.updatedAt, emailConfirmationStatus: vote.emailConfirmationStatus || item.emailConfirmationStatus, preparedReplyText: vote.preparedReplyText || item.preparedReplyText, preparedReplyReference: vote.preparedReplyReference || item.preparedReplyReference, requiredSenderEmail: vote.requiredSenderEmail || item.requiredSenderEmail, documentHash: vote.documentHash || item.documentHash, documentShortHash: vote.documentShortHash || item.documentShortHash } : item));
-      setDashboardNotice({ type: "success", message: resolution.approvalMethod === "hybrid_email" ? "Your vote was submitted. Send the prepared email reply to complete confirmation." : `Your ${choice} vote was recorded.` });
+      setDashboardNotice({ type: "success", message: authenticatedFinal ? "Your vote was recorded and counted." : resolution.approvalMethod === "hybrid_email" ? "Your vote was submitted. Send the prepared email reply to complete confirmation." : `Your ${choice} vote was recorded.` });
     } catch (error) {
       updateOpenResolutions(previous);
       setDashboardNotice({ type: "error", message: getResolutionErrorMessage(error) });
@@ -105,6 +112,10 @@ export default function DashboardPage() {
 
   async function claimResolutionEmailSent(resolution) {
     if (!user?.uid || resolutionBusyId) return;
+    if (isAuthenticatedFinalHybrid(resolution)) {
+      setDashboardNotice({ type: "error", message: "This prepared email is optional and does not need to be marked sent." });
+      return;
+    }
     if (resolution.approvalMethod === "hybrid_email" && !resolution.requiredSenderEmail) {
       setDashboardNotice({ type: "error", message: "Required sender email is missing. Contact an Admin before marking this email as sent." });
       return;

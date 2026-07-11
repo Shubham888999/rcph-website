@@ -10,6 +10,7 @@ import {
   FINAL_RESOLUTION_STATUSES,
   approvalMethodLabel,
   canVerifyHybridEmail,
+  isAuthenticatedFinalHybrid,
   validateResolutionDraft,
 } from "../../resolutions/resolutionModel";
 import { validateResolutionPdfLayout } from "../../resolutions/resolutionSectionsModel";
@@ -62,6 +63,14 @@ function statusLabel(value) {
   return String(value || "").replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function resolutionApprovalMethodLabel(resolution) {
+  if (resolution?.approvalMethod === "hybrid_email") {
+    const mode = resolution.voteProcessingMode || (resolution.status && resolution.status !== "draft" ? "legacy_email_verification" : "authenticated_final");
+    return approvalMethodLabel("hybrid_email", mode);
+  }
+  return approvalMethodLabel(resolution?.approvalMethod);
+}
+
 function buildHybridEmailPlaceholder(value, meeting) {
   return [
     "Dear Board Members,",
@@ -70,11 +79,11 @@ function buildHybridEmailPlaceholder(value, meeting) {
     "",
     "As per procedure, the following resolution is read and presented for approval.",
     "",
-    "To officially pass this resolution, each Board Member is required to review the attached resolution and submit their vote through the RCPH Member Dashboard.",
+    "To officially pass this resolution, each Board Member is required to review the attached resolution and submit their final vote through the RCPH Member Dashboard.",
     "",
-    "After submitting the vote, each member must send the prepared confirmation reply from their registered email address.",
+    "After a vote is submitted, the dashboard prepares an optional confirmation email for additional documentation.",
     "",
-    "The record and validity of the voting process shall be substantiated through the official email correspondence trail and the website audit record.",
+    "A confirmed vote submitted through the authenticated RCPH Member Dashboard is official, final, and counted immediately.",
     "",
     `Resolution ${value.resolutionNumber || "[NUMBER]"}: ${value.title || "[TITLE]"}`,
     "",
@@ -264,7 +273,7 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
       <label>Seconded by <span className="admin-optional">Optional</span><select value={value.secondedByUid} onChange={set("secondedByUid")}><option value="">Not recorded</option>{roster.map((member) => <option key={member.uid} value={member.uid}>{formatRotaractorName(member.name, true)} - {member.position}</option>)}</select></label>
       {!isRecordOnly && value.votingRule === "custom_approval_count" ? <label>Approvals required<input type="number" min="1" max={selectedVoterIds.length || undefined} step="1" value={value.customApprovalCount} onChange={set("customApprovalCount")} required /></label> : null}
     </div>
-    {!isRecordOnly ? <label className="resolution-append-toggle"><input type="checkbox" checked={value.appendVoteTable !== false} onChange={(event) => onChange({ ...value, appendVoteTable: event.target.checked })} /> Append verified vote table to final PDF</label> : null}
+    {!isRecordOnly ? <label className="resolution-append-toggle"><input type="checkbox" checked={value.appendVoteTable !== false} onChange={(event) => onChange({ ...value, appendVoteTable: event.target.checked })} /> Append submitted vote table to final PDF</label> : null}
     <label>Full resolution text <span className="admin-optional">Optional</span><textarea rows="8" maxLength="20000" value={value.body} onChange={set("body")} /></label>
     <label>Background or notes <span className="admin-optional">Optional</span><textarea rows="4" maxLength="10000" value={value.notes} onChange={set("notes")} /></label>
     {isHybrid ? <fieldset className="resolution-email-config">
@@ -282,11 +291,13 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
 function ResolutionCard({ item, busy, onEdit, onEditLayout, onOpen, onClose, onCancel, onView }) {
   const completed = FINAL_RESOLUTION_STATUSES.includes(item.status);
   const recordOnly = item.approvalMethod === "record_only";
+  const authenticatedFinal = isAuthenticatedFinalHybrid(item);
+  const methodLabel = resolutionApprovalMethodLabel(item);
   return <article className={`resolution-admin-card is-${item.status}`}>
     <header><div><span>{item.resolutionNumber}</span><h4>{item.title}</h4></div><strong>{statusLabel(item.status)}</strong></header>
     <p>{item.meetingTitle || "Linked BOD meeting"} - {item.meetingDate || "Date unavailable"}</p>
-    <small>{approvalMethodLabel(item.approvalMethod)}{item.originalDocumentShortHash ? ` - ${item.originalDocumentShortHash}` : ""}</small>
-    <dl><div><dt>{item.approvalMethod === "hybrid_email" ? "Verified" : "Received"}</dt><dd>{item.votesReceivedCount}/{item.eligibleVoterCount}</dd></div><div><dt>Approve</dt><dd>{item.approveCount}</dd></div><div><dt>Reject</dt><dd>{item.rejectCount}</dd></div><div><dt>Abstain</dt><dd>{item.abstainCount}</dd></div></dl>
+    <small>{methodLabel}{item.originalDocumentShortHash ? ` - ${item.originalDocumentShortHash}` : ""}</small>
+    <dl><div><dt>{authenticatedFinal ? "Recorded" : item.approvalMethod === "hybrid_email" ? "Verified" : "Received"}</dt><dd>{item.votesReceivedCount}/{item.eligibleVoterCount}</dd></div><div><dt>Approve</dt><dd>{item.approveCount}</dd></div><div><dt>Reject</dt><dd>{item.rejectCount}</dd></div><div><dt>Abstain</dt><dd>{item.abstainCount}</dd></div></dl>
     <small>Created {formatDateTime(item.createdAt)}</small>
     <div className="resolution-admin-card__actions">
       {item.status === "draft" ? <><button disabled={busy} onClick={() => onEdit(item)}>Edit</button><button disabled={busy || (item.documentSourceMode === "uploadedPdf" && item.uploadedSource?.status !== "ready")} onClick={() => onOpen(item)}>{recordOnly ? "Archive record" : "Open voting"}</button></> : null}
@@ -306,6 +317,18 @@ function ResolutionGroup({ title, items, ...actions }) {
 function VerificationRow({ resolution, voter, vote, busy, onVerify }) {
   const [form, setForm] = useState({ senderEmail: vote?.voterEmail || voter.email || "", receivedAt: "", messageId: "", threadId: "", note: "", voteReference: vote?.preparedReplyReference || "", documentHash: vote?.documentHash || resolution.originalDocumentHash || "" });
   if (resolution.approvalMethod !== "hybrid_email" || !vote) return null;
+  if (isAuthenticatedFinalHybrid(resolution)) {
+    return <div className="resolution-recorded-vote">
+      <dl>
+        <div><dt>Vote</dt><dd>{statusLabel(vote.choice)}</dd></div>
+        <div><dt>Submitted</dt><dd>{formatDateTime(vote.submittedAt)}</dd></div>
+        <div><dt>Vote reference</dt><dd>{vote.preparedReplyReference || "-"}</dd></div>
+        <div><dt>Document fingerprint</dt><dd>{vote.documentShortHash || resolution.originalDocumentShortHash || "-"}</dd></div>
+        <div><dt>Status</dt><dd>Recorded and counted</dd></div>
+      </dl>
+      {vote.preparedReplyText ? <textarea readOnly rows="5" value={vote.preparedReplyText} aria-label={`Prepared email for ${voter.name}`} /> : null}
+    </div>;
+  }
   const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
   const verificationReady = canVerifyHybridEmail(vote.emailConfirmationStatus);
   const actionDisabled = busy || !verificationReady;
@@ -329,21 +352,24 @@ function ResolutionDetails({ details, busy, onRefresh, onDownload, onRetry, onVe
   const { resolution, votes, audit } = details;
   const voteByUid = new Map(votes.map((vote) => [vote.voterUid, vote]));
   const hybrid = resolution.approvalMethod === "hybrid_email";
+  const authenticatedFinal = isAuthenticatedFinalHybrid(resolution);
+  const metricLabel = authenticatedFinal ? "Recorded" : hybrid ? "Verified" : "Received";
+  const verificationHeading = authenticatedFinal ? "Recorded votes" : "Email verification";
   return <div className="resolution-details">
-    <div className="resolution-details__summary"><span>{resolution.resolutionNumber}</span><strong>{statusLabel(resolution.status)}</strong><p>{resolution.meetingTitle} - {resolution.meetingDate}</p><p><b>Method:</b> {approvalMethodLabel(resolution.approvalMethod)}</p>{resolution.originalDocumentShortHash ? <p><b>Document fingerprint:</b> {resolution.originalDocumentShortHash}</p> : null}{resolution.proposedByName ? <p><b>Proposed by:</b> {formatRotaractorName(resolution.proposedByName, true)}{resolution.proposedByPosition ? ` - ${resolution.proposedByPosition}` : ""}</p> : null}{resolution.secondedByName ? <p><b>Seconded by:</b> {formatRotaractorName(resolution.secondedByName, true)}{resolution.secondedByPosition ? ` - ${resolution.secondedByPosition}` : ""}</p> : null}{resolution.body ? <p>{resolution.body}</p> : null}{resolution.notes ? <p><b>Notes:</b> {resolution.notes}</p> : null}</div>
-    <div className="resolution-live-metrics"><div><span>Eligible</span><strong>{resolution.eligibleVoterCount}</strong></div><div><span>{hybrid ? "Verified" : "Received"}</span><strong>{resolution.votesReceivedCount}</strong></div><div><span>Approve</span><strong>{resolution.approveCount}</strong></div><div><span>Reject</span><strong>{resolution.rejectCount}</strong></div><div><span>Abstain</span><strong>{resolution.abstainCount}</strong></div></div>
+    <div className="resolution-details__summary"><span>{resolution.resolutionNumber}</span><strong>{statusLabel(resolution.status)}</strong><p>{resolution.meetingTitle} - {resolution.meetingDate}</p><p><b>Method:</b> {resolutionApprovalMethodLabel(resolution)}</p>{resolution.originalDocumentShortHash ? <p><b>Document fingerprint:</b> {resolution.originalDocumentShortHash}</p> : null}{resolution.proposedByName ? <p><b>Proposed by:</b> {formatRotaractorName(resolution.proposedByName, true)}{resolution.proposedByPosition ? ` - ${resolution.proposedByPosition}` : ""}</p> : null}{resolution.secondedByName ? <p><b>Seconded by:</b> {formatRotaractorName(resolution.secondedByName, true)}{resolution.secondedByPosition ? ` - ${resolution.secondedByPosition}` : ""}</p> : null}{resolution.body ? <p>{resolution.body}</p> : null}{resolution.notes ? <p><b>Notes:</b> {resolution.notes}</p> : null}</div>
+    <div className="resolution-live-metrics"><div><span>Eligible</span><strong>{resolution.eligibleVoterCount}</strong></div><div><span>{metricLabel}</span><strong>{resolution.votesReceivedCount}</strong></div><div><span>Approve</span><strong>{resolution.approveCount}</strong></div><div><span>Reject</span><strong>{resolution.rejectCount}</strong></div><div><span>Abstain</span><strong>{resolution.abstainCount}</strong></div></div>
     <p><b>PDF format:</b> {resolution.documentSourceMode === "uploadedPdf" ? "Uploaded PDF with voting record" : (resolution.finalizedPdfLayoutMode || resolution.pdfLayoutMode) === "custom" ? "Custom Section Layout" : "Standard Resolution Format"}</p>
     <p><b>Append vote table:</b> {resolution.appendVoteTable === false ? "No" : "Yes"}</p>
-    {hybrid ? <section className="resolution-email-snapshot"><h3>Hybrid email snapshot</h3><p><b>Official subject:</b> {resolution.officialEmailSubject || "Not prepared"}</p><p><b>Official sent:</b> {resolution.officialEmailSentAt ? formatDateTime(resolution.officialEmailSentAt) : "Prepared / pending send"}</p><textarea readOnly rows="8" value={resolution.officialEmailBody} /></section> : null}
+    {hybrid ? <section className="resolution-email-snapshot"><h3>{authenticatedFinal ? "Prepared email snapshot" : "Hybrid email snapshot"}</h3><p><b>Official subject:</b> {resolution.officialEmailSubject || "Not prepared"}</p><p><b>Official sent:</b> {resolution.officialEmailSentAt ? formatDateTime(resolution.officialEmailSentAt) : "Prepared / pending send"}</p><textarea readOnly rows="8" value={resolution.officialEmailBody} /></section> : null}
     {resolution.documentSourceMode === "uploadedPdf" ? <p><b>Final PDF:</b> {statusLabel(resolution.merge.status || "pending")}{resolution.merge.finalPageCount ? ` - ${resolution.merge.finalPageCount} pages` : ""}</p> : null}
     <div className="admin-actions"><button type="button" disabled={busy} onClick={onRefresh}>Refresh vote counts</button>{FINAL_RESOLUTION_STATUSES.includes(resolution.status) && (resolution.documentSourceMode !== "uploadedPdf" || resolution.canDownloadFinal) ? <button type="button" disabled={busy} onClick={onDownload}>Download completed resolution PDF</button> : null}{resolution.canRetryMerge ? <button type="button" disabled={busy} onClick={onRetry}>Retry final PDF</button> : null}</div>
-    <div className="admin-table-wrap"><table><caption>Eligible voter snapshot and final votes</caption><thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Vote</th><th>Submitted</th><th>Verification</th><th>Reference</th></tr></thead><tbody>{resolution.eligibleVoters.map((voter) => {
+    <div className="admin-table-wrap"><table><caption>Eligible voter snapshot and final votes</caption><thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Vote</th><th>Submitted</th><th>{authenticatedFinal ? "Status" : "Verification"}</th><th>Reference</th></tr></thead><tbody>{resolution.eligibleVoters.map((voter) => {
       const vote = voteByUid.get(voter.uid);
-      return <tr key={voter.uid}><td>{formatRotaractorName(voter.name, true)}</td><td>{voter.email || "-"}</td><td>{voter.position}</td><td>{vote ? statusLabel(vote.choice) : "Pending"}</td><td>{vote ? formatDateTime(vote.submittedAt) : "-"}</td><td>{hybrid ? statusLabel(vote?.emailConfirmationStatus || "not_voted") : vote ? "Website verified" : "Pending"}</td><td>{vote?.preparedReplyReference || "-"}</td></tr>;
+      return <tr key={voter.uid}><td>{formatRotaractorName(voter.name, true)}</td><td>{voter.email || "-"}</td><td>{voter.position}</td><td>{vote ? statusLabel(vote.choice) : "Pending"}</td><td>{vote ? formatDateTime(vote.submittedAt) : "-"}</td><td>{authenticatedFinal ? vote ? "Recorded and counted" : "Pending" : hybrid ? statusLabel(vote?.emailConfirmationStatus || "not_voted") : vote ? "Website verified" : "Pending"}</td><td>{vote?.preparedReplyReference || "-"}</td></tr>;
     })}</tbody></table></div>
-    {hybrid ? <section className="resolution-verification-list"><h3>Email verification</h3>{resolution.eligibleVoters.map((voter) => {
+    {hybrid ? <section className="resolution-verification-list"><h3>{verificationHeading}</h3>{resolution.eligibleVoters.map((voter) => {
       const vote = voteByUid.get(voter.uid);
-      return <article key={voter.uid}><header><strong>{formatRotaractorName(voter.name, true)}</strong><span>{vote ? statusLabel(vote.emailConfirmationStatus || "email_pending") : "Not voted"}</span></header><VerificationRow resolution={resolution} voter={voter} vote={vote} busy={busy} onVerify={onVerify} /></article>;
+      return <article key={voter.uid}><header><strong>{formatRotaractorName(voter.name, true)}</strong><span>{authenticatedFinal ? vote ? "Recorded and counted" : "Pending" : vote ? statusLabel(vote.emailConfirmationStatus || "email_pending") : "Not voted"}</span></header><VerificationRow resolution={resolution} voter={voter} vote={vote} busy={busy} onVerify={onVerify} />{authenticatedFinal && !vote ? <p className="resolution-verification-controls__pending">Pending voter has not submitted a dashboard vote.</p> : null}</article>;
     })}</section> : null}
     <section className="resolution-audit"><h3>Audit history</h3><ol>{audit.map((entry) => <li key={entry.id}><strong>{statusLabel(entry.action)}</strong><span>{formatRotaractorName(entry.actorName, true)} - {entry.actorPosition}</span><time dateTime={entry.timestamp}>{formatDateTime(entry.timestamp)}</time></li>)}</ol></section>
   </div>;

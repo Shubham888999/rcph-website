@@ -51,7 +51,7 @@ test("uploaded-PDF dark admin panel uses readable theme tokens", () => {
 
 test("Admin resolution tool exposes lifecycle groups and permission-scoped actions", () => {
   for (const label of ["Open voting", "Drafts", "Completed", "Cancelled", "Download completed resolution PDF", "Audit history"]) assert.match(adminModule, new RegExp(label));
-  for (const label of ["Approval Method", "Website Voting", "Hybrid Email Confirmation", "Record Only / No Voting", "Append verified vote table to final PDF", "Email configuration", "Mark email verified", "Reject email confirmation"]) assert.match(adminModule + model, new RegExp(label));
+  for (const label of ["Approval Method", "Website Voting", "Website Vote with Prepared Email", "Hybrid Email Confirmation", "Record Only / No Voting", "Append submitted vote table to final PDF", "Email configuration", "Mark email verified", "Reject email confirmation"]) assert.match(adminModule + model, new RegExp(label));
   assert.match(adminModule, /item\.status === "draft"/);
   assert.match(adminModule, /item\.status === "open"/);
   for (const label of ["Edit PDF layout", "Custom Section Layout", "Download Preview PDF"]) assert.match(adminModule + readFileSync(new URL("../admin/resolutions/ResolutionPdfBuilder.jsx", import.meta.url), "utf8"), new RegExp(label));
@@ -103,9 +103,24 @@ test("dashboard voting is textual, optimistic, and rollback-capable", () => {
   for (const choice of ["approve", "reject", "abstain"]) assert.match(dashboardCard, new RegExp(`"${choice}"`));
   assert.match(dashboardCard, /Your vote:/);
   assert.match(dashboardCard, /You may change your vote while voting remains open/);
-  for (const label of ["Open default email app", "Open Gmail", "Copy confirmation text", "I have sent the email"]) assert.match(dashboardCard, new RegExp(label));
+  for (const label of ["Open default email app", "Open Gmail", "Copy confirmation text", "I have sent the email", "Confirm your vote", "Confirm vote"]) assert.match(dashboardCard, new RegExp(label));
   assert.match(dashboardPage, /updateOpenResolutions\(previous\)/);
   assert.match(dashboardPage, /setInterval\(refreshOpenResolutions, 20000\)/);
+});
+
+test("new-mode hybrid dashboard and admin avoid required email verification language", () => {
+  for (const label of [
+    "This vote will be recorded immediately and cannot be changed after confirmation.",
+    "This vote is final and has been included in the resolution result.",
+    "This email is optional and may be sent as an additional official record.",
+    "Prepared confirmation email",
+    "Recorded and counted",
+    "Pending voter has not submitted a dashboard vote.",
+  ]) assert.match(dashboardCard + adminModule, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(dashboardCard, /isAuthenticatedFinalHybrid\(resolution\)/);
+  assert.match(dashboardPage, /isAuthenticatedFinalHybrid\(resolution\)/);
+  assert.match(adminModule, /isAuthenticatedFinalHybrid\(resolution\)/);
+  assert.match(adminModule, /resolutionApprovalMethodLabel/);
 });
 
 test("hybrid email workflow displays required sender and gates Gmail opening", () => {
@@ -135,7 +150,7 @@ test("hybrid member voting locks after email-sent claim while staying uncounted 
   for (const label of ["Email sent - awaiting Admin verification", "Your selected vote is locked while the email confirmation is being reviewed. It is not counted until an Admin verifies the email.", "Email verified - your vote is now counted", "Email confirmation rejected", "I have resent the email", "Confirm email sent", "Selected vote:", "Confirm only if the message was sent from this registered email address. Your vote will be locked while Admin verification is pending."]) assert.match(dashboardCard, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(dashboardCard, /isHybridVoteChoiceLocked/);
   assert.match(dashboardCard, /canClaimHybridEmailSent/);
-  assert.match(dashboardCard, /disabled=\{busy \|\| hybridLocked\}/);
+  assert.match(dashboardCard, /disabled=\{busy \|\| hybridLocked \|\| voteLocked\}/);
   assert.match(dashboardPage, /isHybridVoteChoiceLocked\(resolution\.emailConfirmationStatus\)/);
   assert.match(dashboardPage, /markResolutionEmailSent\(user\.uid, resolution\)/);
   assert.match(model, /isHybridVoteChoiceLocked/);

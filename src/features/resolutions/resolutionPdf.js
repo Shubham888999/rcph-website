@@ -1,4 +1,4 @@
-import { FINAL_RESOLUTION_STATUSES, getResolutionPdfFilename } from "./resolutionModel.js";
+import { FINAL_RESOLUTION_STATUSES, approvalMethodLabel, getResolutionPdfFilename, isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 import { buildCustomResolutionPdfPages, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
 import { getResolutionLetterheadJpeg } from "./resolutionLetterhead.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
@@ -25,6 +25,11 @@ function compactPerson(name, position) {
   const displayPosition = String(position || "").trim();
   if (!displayName) return "";
   return `${formatRotaractorName(displayName, true)}${displayPosition ? ` - ${displayPosition}` : ""}`;
+}
+
+function resolutionMethodDisplay(resolution) {
+  const mode = resolution?.approvalMethod === "hybrid_email" ? resolution.voteProcessingMode || "legacy_email_verification" : "";
+  return approvalMethodLabel(resolution?.approvalMethod || "website", mode);
 }
 
 function plainPdfText(value) {
@@ -79,9 +84,11 @@ function block(lines, keepLines = 1) {
 
 export function buildResolutionVoteRows(details) {
   const method = details?.resolution?.approvalMethod || "website";
+  const authenticatedFinal = isAuthenticatedFinalHybrid(details?.resolution);
   const validVotes = (details?.votes || []).filter((vote) => {
     if (vote.superseded) return false;
-    if (method === "hybrid_email") return vote.emailConfirmationStatus === "email_verified";
+    if (["superseded", "invalidated_document_changed"].includes(vote.emailConfirmationStatus)) return false;
+    if (method === "hybrid_email" && !authenticatedFinal) return vote.emailConfirmationStatus === "email_verified";
     return true;
   });
   const votes = new Map(validVotes.map((vote) => [vote.voterUid, vote]));
@@ -91,7 +98,7 @@ export function buildResolutionVoteRows(details) {
       name: formatRotaractorName(voter.name, true),
       position: voter.position,
       vote: vote ? label(vote.choice) : "Not submitted",
-      verification: vote ? method === "hybrid_email" ? "Email verified" : "Website verified" : "Pending",
+      verification: vote ? authenticatedFinal ? "Recorded and counted" : method === "hybrid_email" ? "Email verified" : "Website verified" : "Pending",
       submittedAt: vote ? formatDateTime(vote.submittedAt) : "-",
       emailConfirmedAt: vote?.emailConfirmedAt ? formatDateTime(vote.emailConfirmedAt) : "-",
       reference: vote?.preparedReplyReference || "-",
@@ -101,6 +108,10 @@ export function buildResolutionVoteRows(details) {
 
 function buildDocumentBlocks(details) {
   const resolution = details.resolution;
+  const authenticatedFinal = isAuthenticatedFinalHybrid(resolution);
+  const legacyHybrid = resolution.approvalMethod === "hybrid_email" && !authenticatedFinal;
+  const methodDisplay = resolutionMethodDisplay(resolution);
+  const submittedVoteLabel = authenticatedFinal ? "Submitted votes" : legacyHybrid ? "Verified votes" : "Verified votes";
   const blocks = [];
   const detailsLines = [];
   const detail = (name, value, optional = false) => {
@@ -121,7 +132,7 @@ function buildDocumentBlocks(details) {
   detail("Seconded by", compactPerson(resolution.secondedByName, resolution.secondedByPosition), true);
   detail("Voting opened", formatDateTime(resolution.openedAt));
   detail("Voting closed", formatDateTime(resolution.closedAt));
-  detail("Voting method", label(resolution.approvalMethod || "website"));
+  detail("Voting method", methodDisplay);
   detail("Document fingerprint", resolution.originalDocumentShortHash || "-");
   detail("Final result", label(resolution.result || resolution.status));
   blocks.push(block(detailsLines, 2));
@@ -140,9 +151,9 @@ function buildDocumentBlocks(details) {
   blocks.push(block([
     ...wrappedLines("Certification", { size: 10.5, bold: true, gap: 2 }),
     ...wrappedLines(`Resolution ${resolution.resolutionNumber}`, { size: 8.5, gap: 1 }),
-    ...wrappedLines(`Voting Method: ${label(resolution.approvalMethod || "website")}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`Voting Method: ${methodDisplay}`, { size: 8.5, gap: 1 }),
     ...wrappedLines(`Eligible voters: ${resolution.eligibleVoterCount}`, { size: 8.5, gap: 1 }),
-    ...wrappedLines(`Verified votes: ${resolution.votesReceivedCount}`, { size: 8.5, gap: 1 }),
+    ...wrappedLines(`${submittedVoteLabel}: ${resolution.votesReceivedCount}`, { size: 8.5, gap: 1 }),
     ...wrappedLines(`Approve: ${resolution.approveCount}`, { size: 8.5, gap: 1 }),
     ...wrappedLines(`Reject: ${resolution.rejectCount}`, { size: 8.5, gap: 1 }),
     ...wrappedLines(`Abstain: ${resolution.abstainCount}`, { size: 8.5, gap: 1 }),
@@ -151,7 +162,8 @@ function buildDocumentBlocks(details) {
     ...wrappedLines(`Voting Closed: ${formatDateTime(resolution.closedAt)}`, { size: 8.5, gap: 1 }),
     ...wrappedLines(`Document Fingerprint: ${resolution.originalDocumentShortHash || "-"}`, { size: 8.5, gap: 1 }),
     ...wrappedLines(`Audit Reference: ${resolution.auditBundleHash || resolution.id || "-"}`, { size: 8.5, gap: 4 }),
-    ...(resolution.approvalMethod === "hybrid_email" ? wrappedLines("Only votes with verified email confirmation were included in the official tally.", { size: 8.5, gap: 4 }) : []),
+    ...(legacyHybrid ? wrappedLines("Only votes with verified email confirmation were included in the official tally.", { size: 8.5, gap: 4 }) : []),
+    ...(authenticatedFinal ? wrappedLines("Authenticated dashboard votes were recorded and counted immediately. Prepared confirmation emails are optional supporting records.", { size: 8.5, gap: 4 }) : []),
   ], 2));
   if (resolution.appendVoteTable !== false) {
     blocks.push(block([

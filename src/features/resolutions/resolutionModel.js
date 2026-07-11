@@ -3,17 +3,18 @@ export const FINAL_RESOLUTION_STATUSES = Object.freeze(["passed", "rejected", "c
 export const VOTE_CHOICES = Object.freeze(["approve", "reject", "abstain"]);
 export const VOTING_RULES = Object.freeze(["simple_majority", "majority_of_eligible", "two_thirds", "unanimous", "custom_approval_count"]);
 export const APPROVAL_METHODS = Object.freeze(["website", "hybrid_email", "record_only"]);
+export const VOTE_PROCESSING_MODES = Object.freeze(["", "legacy_email_verification", "authenticated_final"]);
 export const VOTE_EMAIL_STATUSES = Object.freeze(["", "submitted", "email_pending", "email_sent_claimed", "email_verified", "email_rejected", "superseded", "invalidated_document_changed"]);
 
 export const APPROVAL_METHOD_LABELS = Object.freeze({
   website: "Website Voting",
-  hybrid_email: "Hybrid Email Confirmation",
+  hybrid_email: "Website Vote with Prepared Email",
   record_only: "Record Only / No Voting",
 });
 
 export const APPROVAL_METHOD_DESCRIPTIONS = Object.freeze({
   website: "Members vote directly through the Member Dashboard.",
-  hybrid_email: "Members vote through the dashboard and personally send a prepared email reply from their registered email address.",
+  hybrid_email: "Members submit a final vote through the RCPH Member Dashboard. After confirmation, the vote is recorded and counted immediately. The website then prepares an optional email for additional documentation.",
   record_only: "Create and archive the resolution without opening a voting process.",
 });
 
@@ -87,13 +88,31 @@ export function normalizeApprovalMethod(value) {
   return APPROVAL_METHODS.includes(method) ? method : "website";
 }
 
+export function normalizeVoteProcessingMode(value) {
+  const mode = text(value, 60).toLowerCase();
+  return VOTE_PROCESSING_MODES.includes(mode) ? mode : "";
+}
+
 export function normalizeEmailConfirmationStatus(value) {
   const status = text(value, 60).toLowerCase();
   return VOTE_EMAIL_STATUSES.includes(status) ? status : "";
 }
 
-export function approvalMethodLabel(value) {
-  return APPROVAL_METHOD_LABELS[normalizeApprovalMethod(value)] || APPROVAL_METHOD_LABELS.website;
+export function isAuthenticatedFinalHybrid(resolutionOrMethod, processingMode = "") {
+  const method = typeof resolutionOrMethod === "object" ? resolutionOrMethod?.approvalMethod : resolutionOrMethod;
+  const mode = typeof resolutionOrMethod === "object" ? resolutionOrMethod?.voteProcessingMode : processingMode;
+  return normalizeApprovalMethod(method) === "hybrid_email" && normalizeVoteProcessingMode(mode) === "authenticated_final";
+}
+
+export function isLegacyHybridEmail(resolutionOrMethod, processingMode = "") {
+  const method = typeof resolutionOrMethod === "object" ? resolutionOrMethod?.approvalMethod : resolutionOrMethod;
+  return normalizeApprovalMethod(method) === "hybrid_email" && !isAuthenticatedFinalHybrid(resolutionOrMethod, processingMode);
+}
+
+export function approvalMethodLabel(value, processingMode = "") {
+  const method = normalizeApprovalMethod(value);
+  if (method === "hybrid_email" && normalizeVoteProcessingMode(processingMode) === "legacy_email_verification") return "Hybrid Email Confirmation";
+  return APPROVAL_METHOD_LABELS[method] || APPROVAL_METHOD_LABELS.website;
 }
 
 export function isVotingApprovalMethod(value) {
@@ -153,24 +172,27 @@ export function validateResolutionDraft(draft, eligibleVoterCount = 0) {
   return { ok: errors.length === 0, errors, payload };
 }
 
-export function voteChoicesForApprovalMethod(votes, approvalMethod = "website") {
+export function voteChoicesForApprovalMethod(votes, approvalMethod = "website", processingMode = "") {
   const method = normalizeApprovalMethod(approvalMethod);
+  const authenticatedFinal = isAuthenticatedFinalHybrid(method, processingMode);
   return (Array.isArray(votes) ? votes : [])
     .filter((vote) => {
       if (vote?.superseded === true) return false;
-      if (method === "hybrid_email") return normalizeEmailConfirmationStatus(vote?.emailConfirmationStatus) === "email_verified";
+      const status = normalizeEmailConfirmationStatus(vote?.emailConfirmationStatus);
+      if (status === "invalidated_document_changed" || status === "superseded") return false;
+      if (method === "hybrid_email" && !authenticatedFinal) return status === "email_verified";
       return true;
     })
     .map((vote) => normalizeVoteChoice(typeof vote === "string" ? vote : vote?.choice || vote?.selectedVote))
     .filter(Boolean);
 }
 
-export function calculateResolutionResult({ votingRule, customApprovalCount, eligibleVoterCount, votes, approvalMethod = "website" }) {
+export function calculateResolutionResult({ votingRule, customApprovalCount, eligibleVoterCount, votes, approvalMethod = "website", voteProcessingMode = "" }) {
   const method = normalizeApprovalMethod(approvalMethod);
   if (method === "record_only") return { status: "closed_without_decision", approveCount: 0, rejectCount: 0, abstainCount: 0, votesReceivedCount: 0 };
   const rule = normalizeVotingRule(votingRule);
   if (!rule) throw new TypeError("Valid voting rule required.");
-  const choices = voteChoicesForApprovalMethod(votes, method);
+  const choices = voteChoicesForApprovalMethod(votes, method, voteProcessingMode);
   const approveCount = choices.filter((choice) => choice === "approve").length;
   const rejectCount = choices.filter((choice) => choice === "reject").length;
   const abstainCount = choices.filter((choice) => choice === "abstain").length;
@@ -212,6 +234,7 @@ export function normalizeResolution(raw) {
     secondedByPosition: text(raw.secondedByPosition, 240),
     status,
     approvalMethod: normalizeApprovalMethod(raw.approvalMethod),
+    voteProcessingMode: normalizeVoteProcessingMode(raw.voteProcessingMode),
     votingRule: normalizeVotingRule(raw.votingRule),
     customApprovalCount: Number.isInteger(raw.customApprovalCount) ? raw.customApprovalCount : null,
     appendVoteTable: raw.appendVoteTable !== false,
@@ -346,8 +369,9 @@ export function normalizeResolutionVote(raw) {
   };
 }
 
-export function buildPreparedReplyText({ voterName, resolutionNumber, title, choice, documentShortHash, reference }) {
+export function buildPreparedReplyText({ voterName, resolutionNumber, title, choice, documentShortHash, reference, submittedAt }) {
   const vote = normalizeVoteChoice(choice);
+  const submitted = iso(submittedAt);
   const intro = `I, Rtr. ${text(voterName, 160)}, serving as a Board Member of the Rotaract Club of Pune Heritage, hereby confirm that I have read and carefully reviewed the ${text(title, 220)} in its entirety.`;
   const statement = vote === "approve"
     ? "I express my full approval and support for the passing of this resolution, including all the points and provisions stated therein."
@@ -365,6 +389,7 @@ export function buildPreparedReplyText({ voterName, resolutionNumber, title, cho
     "",
     `Document Fingerprint: ${text(documentShortHash, 24)}`,
     "",
+    ...(submitted ? [`Submitted At: ${submitted}`, ""] : []),
     `Vote Reference: ${text(reference, 160)}`,
   ].join("\n");
 }
