@@ -9,8 +9,10 @@ const {
   canManageResolutions,
   buildEligibleVoterSnapshot,
   buildPreparedReplyText,
+  isAuthenticatedFinalHybrid,
   isHybridVoteChoiceLocked,
   normalizeApprovalMethod,
+  normalizeVoteProcessingMode,
   normalizeResolutionStatus,
   normalizeVoteChoice,
   normalizePdfSections,
@@ -20,6 +22,10 @@ const {
 
 const root = path.join(__dirname, '..', '..');
 const functionsIndex = fs.readFileSync(path.join(root, 'functions', 'index.js'), 'utf8');
+const openVotingBody = functionsIndex.slice(
+  functionsIndex.indexOf('exports.openResolutionVoting = onCall'),
+  functionsIndex.indexOf('exports.submitResolutionVote = onCall')
+);
 const openResolutionsBody = functionsIndex.slice(
   functionsIndex.indexOf('async function getOpenResolutionsForUser'),
   functionsIndex.indexOf('function inviteCodeMatches')
@@ -57,6 +63,10 @@ assert.equal(normalizeVoteChoice('Approve'), 'approve');
 assert.equal(normalizeVoteChoice('other'), '');
 assert.equal(normalizeApprovalMethod(''), 'website');
 assert.equal(normalizeApprovalMethod('hybrid_email'), 'hybrid_email');
+assert.equal(normalizeVoteProcessingMode('authenticated_final'), 'authenticated_final');
+assert.equal(normalizeVoteProcessingMode('unknown'), '');
+assert.equal(isAuthenticatedFinalHybrid('hybrid_email', 'authenticated_final'), true);
+assert.equal(isAuthenticatedFinalHybrid('hybrid_email', ''), false);
 
 assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 4, votes: ['approve', 'reject'] }).status, 'rejected');
 assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 4, votes: ['approve', 'approve', 'reject', 'abstain'] }).status, 'passed');
@@ -68,6 +78,8 @@ assert.equal(calculateResolutionResult({ votingRule: 'unanimous', eligibleVoterC
 assert.equal(calculateResolutionResult({ votingRule: 'custom_approval_count', customApprovalCount: 2, eligibleVoterCount: 4, votes: ['approve', 'approve'] }).status, 'passed');
 assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 4, votes: ['abstain'] }).status, 'closed_without_decision');
 assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 3, approvalMethod: 'hybrid_email', votes: [{ choice: 'approve', emailConfirmationStatus: 'email_pending' }, { choice: 'reject', emailConfirmationStatus: 'email_verified' }] }).votesReceivedCount, 1);
+assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 3, approvalMethod: 'hybrid_email', voteProcessingMode: 'authenticated_final', votes: [{ choice: 'approve', emailConfirmationStatus: 'submitted' }, { choice: 'reject', emailConfirmationStatus: 'email_pending' }] }).votesReceivedCount, 2);
+assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 3, votes: [{ choice: 'approve', emailConfirmationStatus: 'invalidated_document_changed' }, { choice: 'reject', emailConfirmationStatus: 'submitted' }] }).votesReceivedCount, 1);
 assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 3, approvalMethod: 'record_only', votes: ['approve'] }).status, 'closed_without_decision');
 assert.equal(isHybridVoteChoiceLocked('email_pending'), false);
 assert.equal(isHybridVoteChoiceLocked('email_sent_claimed'), true);
@@ -75,14 +87,23 @@ assert.equal(isHybridVoteChoiceLocked('email_verified'), true);
 assert.equal(isHybridVoteChoiceLocked('email_rejected'), true);
 assert.equal(isHybridVoteChoiceLocked('invalidated_document_changed'), true);
 assert.match(openResolutionsBody, /requiredSenderEmail: normalizeEmail\(vote\.voterEmail \|\| ''\)/, 'member payload exposes only the current vote trusted sender email');
+assert.match(openVotingBody, /voteProcessingMode = approvalMethod === 'hybrid_email' \? 'authenticated_final' : ''/, 'new draft hybrid resolutions freeze authenticated-final processing when voting opens');
+assert.match(openVotingBody, /emailEvidenceRequired: false/, 'new opened resolutions do not require email evidence');
 assert.match(submitVoteBody, /voterEmail: normalizeEmail\(voter\.email \|\| ''\)/, 'vote submission freezes the voter email used for verification');
 assert.match(submitVoteBody, /requiredSenderEmail: approvalMethod === 'hybrid_email' \? normalizeEmail\(voter\.email \|\| ''\) : ''/, 'submit response returns the same frozen sender email to the current voter');
+assert.match(submitVoteBody, /if \(previousChoice && authenticatedFinalHybrid\)/, 'authenticated-final hybrid votes are locked after the first submission');
+assert.match(submitVoteBody, /previousChoice === choice[\s\S]*responseVote/, 'repeated authenticated-final submissions with the same choice are idempotent');
+assert.match(submitVoteBody, /This vote is final and cannot be changed/, 'changed authenticated-final submissions are rejected');
+assert.match(submitVoteBody, /authenticatedFinalHybrid \? 'submitted' : 'email_pending'/, 'authenticated-final hybrid votes are stored as submitted');
+assert.match(submitVoteBody, /prepared_email_generated/, 'authenticated-final prepared emails are audited');
 assert.match(submitVoteBody, /isHybridVoteChoiceLocked\(previousEmailStatus\)/, 'submitResolutionVote blocks choice changes after hybrid email lock states');
 assert.match(markEmailSentBody, /suppliedChoice[\s\S]*suppliedReference[\s\S]*suppliedHash/, 'markResolutionEmailSent binds the claim to choice, reference, and document hash');
+assert.match(markEmailSentBody, /isAuthenticatedFinalHybrid/, 'legacy email-sent claims reject authenticated-final resolutions');
 assert.match(markEmailSentBody, /requiredSenderEmail: normalizeEmail\(vote\.voterEmail \|\| ''\)/, 'email-sent response preserves the trusted sender email');
 assert.match(markEmailSentBody, /emailStatus === 'email_sent_claimed'[\s\S]*return;/, 'repeated email-sent claims are idempotent');
 assert.match(markEmailSentBody, /\['email_pending', 'email_rejected'\]\.includes\(claimableStatus\)/, 'rejected hybrid votes may resend the same confirmation');
 assert.match(verifyEmailBody, /const recordedEmail = normalizeEmail\(vote\.voterEmail\)/, 'email verification still uses the stored vote sender email');
+assert.match(verifyEmailBody, /isAuthenticatedFinalHybrid/, 'legacy email verification rejects authenticated-final resolutions');
 assert.match(verifyEmailBody, /vote\.superseded === true/, 'superseded votes cannot be verified');
 assert.match(verifyEmailBody, /currentStatus !== 'email_sent_claimed'/, 'only claimed hybrid emails can be verified or rejected');
 

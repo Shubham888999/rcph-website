@@ -13,6 +13,7 @@ const RESOLUTION_STATUSES = Object.freeze([
 const FINAL_RESOLUTION_STATUSES = Object.freeze(['passed', 'rejected', 'closed_without_decision']);
 const VOTE_CHOICES = Object.freeze(['approve', 'reject', 'abstain']);
 const APPROVAL_METHODS = Object.freeze(['website', 'hybrid_email', 'record_only']);
+const VOTE_PROCESSING_MODES = Object.freeze(['', 'legacy_email_verification', 'authenticated_final']);
 const EMAIL_CONFIRMATION_STATUSES = Object.freeze([
   '',
   'submitted',
@@ -112,9 +113,19 @@ function normalizeApprovalMethod(value) {
   return APPROVAL_METHODS.includes(method) ? method : 'website';
 }
 
+function normalizeVoteProcessingMode(value) {
+  const mode = text(value, 60).toLowerCase();
+  return VOTE_PROCESSING_MODES.includes(mode) ? mode : '';
+}
+
 function normalizeEmailConfirmationStatus(value) {
   const status = text(value, 60).toLowerCase();
   return EMAIL_CONFIRMATION_STATUSES.includes(status) ? status : '';
+}
+
+function isAuthenticatedFinalHybrid(approvalMethod, processingMode) {
+  return normalizeApprovalMethod(approvalMethod) === 'hybrid_email'
+    && normalizeVoteProcessingMode(processingMode) === 'authenticated_final';
 }
 
 function isHybridVoteChoiceLocked(emailConfirmationStatus) {
@@ -169,19 +180,22 @@ function validateDraftInput(raw) {
   return { ok: errors.length === 0, errors, payload };
 }
 
-function voteCountsForMethod(votes, approvalMethod = 'website') {
+function voteCountsForMethod(votes, approvalMethod = 'website', processingMode = '') {
   const method = normalizeApprovalMethod(approvalMethod);
+  const authenticatedFinal = isAuthenticatedFinalHybrid(method, processingMode);
   return (Array.isArray(votes) ? votes : [])
     .filter(vote => {
       if (vote?.superseded === true) return false;
-      if (method === 'hybrid_email') return normalizeEmailConfirmationStatus(vote?.emailConfirmationStatus) === 'email_verified';
+      const status = normalizeEmailConfirmationStatus(vote?.emailConfirmationStatus);
+      if (status === 'invalidated_document_changed' || status === 'superseded') return false;
+      if (method === 'hybrid_email' && !authenticatedFinal) return status === 'email_verified';
       return true;
     })
     .map(vote => normalizeVoteChoice(typeof vote === 'string' ? vote : vote?.choice || vote?.selectedVote))
     .filter(Boolean);
 }
 
-function calculateResolutionResult({ votingRule, customApprovalCount, eligibleVoterCount, votes, approvalMethod = 'website' }) {
+function calculateResolutionResult({ votingRule, customApprovalCount, eligibleVoterCount, votes, approvalMethod = 'website', voteProcessingMode = '' }) {
   const method = normalizeApprovalMethod(approvalMethod);
   if (method === 'record_only') {
     return {
@@ -199,7 +213,7 @@ function calculateResolutionResult({ votingRule, customApprovalCount, eligibleVo
   const rule = normalizeVotingRule(votingRule);
   const eligible = Number.isInteger(eligibleVoterCount) && eligibleVoterCount >= 0 ? eligibleVoterCount : 0;
   if (!rule) throw new TypeError('Valid voting rule required.');
-  const normalizedVotes = voteCountsForMethod(votes, method);
+  const normalizedVotes = voteCountsForMethod(votes, method, voteProcessingMode);
   const approveCount = normalizedVotes.filter(choice => choice === 'approve').length;
   const rejectCount = normalizedVotes.filter(choice => choice === 'reject').length;
   const abstainCount = normalizedVotes.filter(choice => choice === 'abstain').length;
@@ -265,8 +279,9 @@ function canManageResolutions({ role, userActive, userApproved, secretaryAssignm
     || secretaryAssignmentActive === true;
 }
 
-function buildPreparedReplyText({ voterName, resolutionNumber, title, choice, documentShortHash, reference }) {
+function buildPreparedReplyText({ voterName, resolutionNumber, title, choice, documentShortHash, reference, submittedAt }) {
   const selected = normalizeVoteChoice(choice);
+  const submitted = text(submittedAt, 80);
   const intro = `I, Rtr. ${text(voterName, 160)}, serving as a Board Member of the Rotaract Club of Pune Heritage, hereby confirm that I have read and carefully reviewed the ${text(title, 220)} in its entirety.`;
   const statement = selected === 'approve'
     ? 'I express my full approval and support for the passing of this resolution, including all the points and provisions stated therein.'
@@ -284,6 +299,7 @@ function buildPreparedReplyText({ voterName, resolutionNumber, title, choice, do
     '',
     `Document Fingerprint: ${text(documentShortHash, 24)}`,
     '',
+    ...(submitted ? [`Submitted At: ${submitted}`, ''] : []),
     `Vote Reference: ${text(reference, 160)}`,
   ].join('\n');
 }
@@ -294,6 +310,7 @@ module.exports = {
   FINAL_RESOLUTION_STATUSES,
   RESOLUTION_STATUSES,
   VOTE_CHOICES,
+  VOTE_PROCESSING_MODES,
   VOTING_RULES,
   calculateResolutionResult,
   canManageResolutions,
@@ -301,8 +318,10 @@ module.exports = {
   buildEligibleVoterSnapshot,
   buildPreparedReplyText,
   isHybridVoteChoiceLocked,
+  isAuthenticatedFinalHybrid,
   normalizeResolutionStatus,
   normalizeApprovalMethod,
+  normalizeVoteProcessingMode,
   normalizeEmailConfirmationStatus,
   normalizeVoteChoice,
   normalizeVotingRule,
