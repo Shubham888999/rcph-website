@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const { formatRotaractorName } = require('./member-name');
+const { normalizeGeneratedPageOrder, normalizeResolutionPageConfig } = require('./resolution-sections');
 
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_SOURCE_PAGES = 25;
@@ -90,6 +91,36 @@ function wrapText(value, font, size, width) {
   }
   if (line) lines.push(line);
   return lines;
+}
+
+function wrapMultilineText(value, font, size, width) {
+  return String(value ?? '').replace(/\r\n/g, '\n').split('\n').flatMap(line => wrapText(line, font, size, width));
+}
+
+async function embedResolutionFonts(document) {
+  return {
+    Helvetica: await document.embedFont(StandardFonts.Helvetica),
+    HelveticaBold: await document.embedFont(StandardFonts.HelveticaBold),
+    HelveticaOblique: await document.embedFont(StandardFonts.HelveticaOblique),
+    HelveticaBoldOblique: await document.embedFont(StandardFonts.HelveticaBoldOblique),
+    TimesRoman: await document.embedFont(StandardFonts.TimesRoman),
+    TimesRomanBold: await document.embedFont(StandardFonts.TimesRomanBold),
+    TimesRomanItalic: await document.embedFont(StandardFonts.TimesRomanItalic),
+    TimesRomanBoldItalic: await document.embedFont(StandardFonts.TimesRomanBoldItalic),
+    Courier: await document.embedFont(StandardFonts.Courier),
+    CourierBold: await document.embedFont(StandardFonts.CourierBold),
+    CourierOblique: await document.embedFont(StandardFonts.CourierOblique),
+    CourierBoldOblique: await document.embedFont(StandardFonts.CourierBoldOblique),
+  };
+}
+
+function pickResolutionFont(fonts, style = {}) {
+  const family = style.fontFamily || 'Helvetica';
+  const bold = style.bold === true || style.headerBold === true || style.boldHeader === true;
+  const italic = style.italic === true;
+  if (family === 'Times Roman') return bold && italic ? fonts.TimesRomanBoldItalic : bold ? fonts.TimesRomanBold : italic ? fonts.TimesRomanItalic : fonts.TimesRoman;
+  if (family === 'Courier') return bold && italic ? fonts.CourierBoldOblique : bold ? fonts.CourierBold : italic ? fonts.CourierOblique : fonts.Courier;
+  return bold && italic ? fonts.HelveticaBoldOblique : bold ? fonts.HelveticaBold : italic ? fonts.HelveticaOblique : fonts.Helvetica;
 }
 
 function formatTimestamp(value) {
@@ -191,7 +222,129 @@ async function buildVoteAppendix(document, details, letterheadBytes) {
     page.drawText('No voting records were submitted.', { x: BOUNDS.left + 4, y: y - 16, size: 8, font });
     y -= 24;
   }
-  pages.forEach((appendixPage, index) => appendixPage.drawText(`Appendix page ${index + 1} of ${pages.length}`, { x: 448, y: 686, size: 8, font }));
+  return pages.length;
+}
+
+async function buildResolutionPageAppendix(document, details, letterheadBytes) {
+  const config = normalizeResolutionPageConfig(details.resolutionPageConfig, details);
+  if (!config.enabled) return 0;
+  const fonts = await embedResolutionFonts(document);
+  const background = await document.embedPng(letterheadBytes);
+  const pages = [];
+  let page;
+  let y;
+
+  function addPage() {
+    page = document.addPage([PAGE.width, PAGE.height]);
+    page.drawImage(background, { x: 0, y: 0, width: PAGE.width, height: PAGE.height });
+    pages.push(page);
+    y = BOUNDS.top;
+  }
+
+  function ensure(height) {
+    if (!page) addPage();
+    if (y - height < BOUNDS.bottom && y < BOUNDS.top) addPage();
+  }
+
+  function alignedX(line, font, size, style, width = BOUNDS.right - BOUNDS.left, left = BOUNDS.left) {
+    const measured = Math.min(width, font.widthOfTextAtSize(safePdfText(line), size));
+    if (style.alignment === 'center') return left + ((width - measured) / 2);
+    if (style.alignment === 'right') return left + width - measured;
+    return left;
+  }
+
+  function drawTextBlock(value, style) {
+    const font = pickResolutionFont(fonts, style);
+    const size = Number(style.fontSize) || 10;
+    const lineSpacing = Number(style.lineSpacing) || 1.25;
+    const lineHeight = size * lineSpacing;
+    const lines = wrapMultilineText(value, font, size, BOUNDS.right - BOUNDS.left);
+    if (style.spaceBefore) {
+      ensure(style.spaceBefore);
+      y -= style.spaceBefore;
+    }
+    for (const line of lines) {
+      ensure(lineHeight);
+      const x = alignedX(line, font, size, style);
+      page.drawText(safePdfText(line), { x, y, size, font, color: rgb(0, 0, 0) });
+      if (style.underline) {
+        const width = font.widthOfTextAtSize(safePdfText(line), size);
+        page.drawLine({ start: { x, y: y - 2 }, end: { x: x + width, y: y - 2 }, thickness: 0.5, color: rgb(0, 0, 0) });
+      }
+      y -= lineHeight;
+    }
+    if (style.spaceAfter) {
+      ensure(style.spaceAfter);
+      y -= style.spaceAfter;
+    }
+  }
+
+  function drawTable(block) {
+    if (block.title) drawTextBlock(block.title, { fontFamily: block.style.headerFontFamily || block.style.fontFamily, fontSize: Math.max(10, block.style.headerFontSize || block.style.fontSize), bold: true, alignment: 'left', lineSpacing: 1.2, spaceBefore: block.style.spaceBefore, spaceAfter: 5 });
+    else if (block.style.spaceBefore) y -= block.style.spaceBefore;
+    const widths = block.columns.map(column => ((BOUNDS.right - BOUNDS.left) * (Number(column.widthPercent) || 1)) / 100);
+    const total = widths.reduce((sum, width) => sum + width, 0) || 1;
+    const normalizedWidths = widths.map(width => ((BOUNDS.right - BOUNDS.left) * width) / total);
+    const bodyFont = pickResolutionFont(fonts, block.style);
+    const headerFont = pickResolutionFont(fonts, { fontFamily: block.style.headerFontFamily || block.style.fontFamily, bold: block.style.boldHeader !== false });
+
+    function rowModel(row, rowIndex) {
+      const header = rowIndex === 0 && block.options.hasHeaderRow !== false;
+      const font = header ? headerFont : bodyFont;
+      const size = header ? Number(block.style.headerFontSize || block.style.fontSize) : Number(block.style.fontSize || 9);
+      const spacing = block.options.compactRows ? 1.05 : 1.2;
+      const cells = block.columns.map((column, columnIndex) => {
+        const textValue = row?.cells?.[column.id] || column.label || '';
+        return { alignment: column.alignment || block.style.alignment || 'left', width: normalizedWidths[columnIndex], lines: wrapMultilineText(textValue, font, size, normalizedWidths[columnIndex] - (block.style.cellPadding * 2)) };
+      });
+      const lineCount = Math.max(1, ...cells.map(cell => cell.lines.length));
+      return { cells, font, size, spacing, height: Math.max(18, lineCount * size * spacing + block.style.cellPadding * 2), header };
+    }
+
+    function drawRow(model) {
+      ensure(model.height);
+      const top = y;
+      const bottom = top - model.height;
+      let x = BOUNDS.left;
+      if (block.options.showBorders !== false) page.drawRectangle({ x, y: bottom, width: BOUNDS.right - BOUNDS.left, height: model.height, borderColor: rgb(0.3, 0.3, 0.3), borderWidth: 0.5 });
+      model.cells.forEach((cell, index) => {
+        if (index > 0 && block.options.showBorders !== false) page.drawLine({ start: { x, y: top }, end: { x, y: bottom }, thickness: 0.5, color: rgb(0.3, 0.3, 0.3) });
+        cell.lines.forEach((line, lineIndex) => {
+          const textWidth = model.font.widthOfTextAtSize(safePdfText(line), model.size);
+          const textX = cell.alignment === 'right' ? x + cell.width - block.style.cellPadding - textWidth : cell.alignment === 'center' ? x + (cell.width - textWidth) / 2 : x + block.style.cellPadding;
+          page.drawText(safePdfText(line), { x: textX, y: top - block.style.cellPadding - model.size - (lineIndex * model.size * model.spacing), size: model.size, font: model.font, color: rgb(0, 0, 0) });
+        });
+        x += cell.width;
+      });
+      y = bottom;
+    }
+
+    const models = block.rows.map(rowModel);
+    const header = block.options.hasHeaderRow !== false ? models[0] : null;
+    models.forEach((model, index) => {
+      if (page && y - model.height < BOUNDS.bottom) {
+        addPage();
+        if (header && block.options.repeatHeader && index !== 0) drawRow(header);
+      }
+      drawRow(model);
+    });
+    if (block.style.spaceAfter) y -= block.style.spaceAfter;
+  }
+
+  addPage();
+  drawTextBlock(config.heading.text, config.heading);
+  drawTextBlock([
+    `Subject: ${config.details.subject || ''}`,
+    `Date: ${config.details.date || ''}`,
+    `Place: ${config.details.place || ''}`,
+    `No. of Board Members: ${config.details.boardMembersPresent || ''}`,
+    `Total No. of Board Members: ${config.details.totalBoardMembers || ''}`,
+  ].join('\n'), config.detailsStyle);
+  drawTextBlock(config.mainStatement.text, config.mainStatement);
+  config.blocks.forEach(block => {
+    if (block.type === 'paragraph') drawTextBlock(block.text, block.style);
+    else if (block.type === 'table') drawTable(block);
+  });
   return pages.length;
 }
 
@@ -209,18 +362,35 @@ async function mergeResolutionPdf({ sourceBytes, letterheadBytes, details }) {
   output.setSubject(`Finalized RCPH Resolution voting record: ${title}`);
   const copiedPages = await output.copyPages(inspected.document, inspected.document.getPageIndices());
   copiedPages.forEach(page => output.addPage(page));
-  const appendixPageCount = details.appendVoteTable === false ? 0 : await buildVoteAppendix(output, details, letterheadBytes);
+  let appendixPageCount = 0;
+  let resolutionPageCount = 0;
+  let voteTablePageCount = 0;
+  const pageOrder = normalizeGeneratedPageOrder(details.generatedPageOrder);
+  for (const type of pageOrder) {
+    if (type === 'resolution_page') {
+      const count = await buildResolutionPageAppendix(output, details, letterheadBytes);
+      resolutionPageCount += count;
+      appendixPageCount += count;
+    }
+    if (type === 'vote_table' && details.appendVoteTable !== false) {
+      const count = await buildVoteAppendix(output, details, letterheadBytes);
+      voteTablePageCount += count;
+      appendixPageCount += count;
+    }
+  }
   const bytes = Buffer.from(await output.save({ useObjectStreams: false, addDefaultPage: false, updateFieldAppearances: false }));
   return {
     bytes,
     sha256: sha256(bytes),
     sourcePageCount: inspected.pageCount,
     appendixPageCount,
+    resolutionPageCount,
+    voteTablePageCount,
     pageCount: inspected.pageCount + appendixPageCount,
   };
 }
 
-function loadLetterheadBytes(assetPath = path.join(__dirname, '..', 'assets', 'resolution_letterhead.png')) {
+function loadLetterheadBytes(assetPath = path.join(__dirname, '..', 'assets', 'RCPH_BOD_Avenue_Report_Letterhead_A4.png')) {
   return fs.readFileSync(assetPath);
 }
 
@@ -230,6 +400,7 @@ module.exports = {
   MAX_SOURCE_BYTES,
   MAX_SOURCE_PAGES,
   PAGE,
+  buildResolutionPageAppendix,
   buildVoteAppendix,
   frozenMetadataDate,
   inspectSourcePdf,

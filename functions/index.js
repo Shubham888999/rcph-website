@@ -1904,6 +1904,8 @@ function buildResolutionDocumentHash(resolution) {
     documentSourceMode: resolutionUploads.sourceMode(resolution),
     pdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
     pdfSections: resolutionModel.normalizePdfSections(resolution.pdfSections),
+    resolutionPageConfig: resolutionModel.normalizeResolutionPageConfig(resolution.resolutionPageConfig, resolution),
+    generatedPageOrder: resolutionModel.normalizeGeneratedPageOrder(resolution.generatedPageOrder),
   };
   return crypto.createHash('sha256').update(stableResolutionJson(snapshot), 'utf8').digest('hex');
 }
@@ -2115,6 +2117,10 @@ function publicResolutionFields(id, data) {
     finalizedPdfSectionsSnapshot: resolutionModel.normalizePdfSections(data.finalizedPdfSectionsSnapshot),
     documentSourceMode,
     uploadedVotesTableConfig: resolutionModel.normalizeUploadedVotesTableConfig(data.uploadedVotesTableConfig),
+    resolutionPageConfig: resolutionModel.normalizeResolutionPageConfig(data.resolutionPageConfig, data),
+    generatedPageOrder: resolutionModel.normalizeGeneratedPageOrder(data.generatedPageOrder),
+    finalizedResolutionPageConfigSnapshot: data.finalizedResolutionPageConfigSnapshot ? resolutionModel.normalizeResolutionPageConfig(data.finalizedResolutionPageConfigSnapshot, data) : null,
+    finalizedGeneratedPageOrderSnapshot: data.finalizedGeneratedPageOrderSnapshot ? resolutionModel.normalizeGeneratedPageOrder(data.finalizedGeneratedPageOrderSnapshot) : null,
     uploadedSource,
     merge,
     canUpload: isDraft && documentSourceMode === 'uploadedPdf',
@@ -5455,10 +5461,15 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
     });
     const finalizedPdfSectionsSnapshot = resolution.pdfLayoutMode === 'custom' ? resolutionModel.normalizePdfSections(resolution.pdfSections) : [];
     assertFirestoreSafeResolutionSections(finalizedPdfSectionsSnapshot, 'finalizedPdfSectionsSnapshot');
+    const finalizedResolutionPageConfigSnapshot = resolutionModel.normalizeResolutionPageConfig(resolution.resolutionPageConfig, resolution);
+    const finalizedGeneratedPageOrderSnapshot = resolutionModel.normalizeGeneratedPageOrder(resolution.generatedPageOrder);
+    resolutionModel.assertNoNestedArrays(finalizedResolutionPageConfigSnapshot, 'finalizedResolutionPageConfigSnapshot');
     uploadedMode = resolutionUploads.sourceMode(resolution) === 'uploadedPdf';
     const uploadedFinalization = uploadedMode ? {
       finalizedUploadedSourceSnapshot: { ...resolution.uploadedSource },
       finalizedVotesTableConfigSnapshot: resolutionModel.normalizeUploadedVotesTableConfig(resolution.uploadedVotesTableConfig),
+      finalizedResolutionPageConfigSnapshot,
+      finalizedGeneratedPageOrderSnapshot,
       finalizedVoteRowsSnapshot: buildFinalizedVoteRows(resolution, votes, resolutionModel.normalizeUploadedVotesTableConfig(resolution.uploadedVotesTableConfig)),
       merge: { status: 'pending', finalizationId, attemptCount: 0, lastErrorCode: '', createdAt: now, updatedAt: now },
     } : {};
@@ -5475,6 +5486,8 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
       finalResult: finalResult.result,
       finalizedPdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
       finalizedPdfSectionsSnapshot,
+      finalizedResolutionPageConfigSnapshot,
+      finalizedGeneratedPageOrderSnapshot,
       auditBundleHash: crypto.createHash('sha256').update(stableResolutionJson({
         resolutionId,
         result: finalResult.result,

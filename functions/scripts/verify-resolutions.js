@@ -16,6 +16,8 @@ const {
   normalizeResolutionStatus,
   normalizeVoteChoice,
   normalizePdfSections,
+  normalizeResolutionPageConfig,
+  normalizeGeneratedPageOrder,
   validatePdfLayout,
   validateDraftInput,
 } = require('../lib/resolutions');
@@ -147,10 +149,37 @@ assert.deepEqual(frozenSnapshot.map(voter => voter.uid), ['u2', 'u1']);
 assert.deepEqual(frozenSnapshot.map(voter => voter.email), ['second@example.com', 'first@example.com']);
 assert.deepEqual(frozenSnapshot.map(voter => voter.position), ['President', 'Secretary']);
 
-assert.deepEqual(validatePdfLayout({}).payload, {
-  pdfLayoutMode: 'standard', pdfSections: [], documentSourceMode: 'standard',
-  uploadedVotesTableConfig: { columns: { name: true, position: true, vote: true, timestamp: true, signature: false }, voterScope: 'submitted', showTitle: true, repeatHeader: true, showResultSummary: true },
+const defaultPdfLayout = validatePdfLayout({});
+assert.equal(defaultPdfLayout.ok, true);
+assert.equal(defaultPdfLayout.payload.pdfLayoutMode, 'standard');
+assert.deepEqual(defaultPdfLayout.payload.pdfSections, []);
+assert.equal(defaultPdfLayout.payload.documentSourceMode, 'standard');
+assert.deepEqual(defaultPdfLayout.payload.uploadedVotesTableConfig, { columns: { name: true, position: true, vote: true, timestamp: true, signature: false }, voterScope: 'submitted', showTitle: true, repeatHeader: true, showResultSummary: true });
+assert.equal(defaultPdfLayout.payload.resolutionPageConfig.enabled, false);
+assert.deepEqual(defaultPdfLayout.payload.generatedPageOrder, ['resolution_page', 'vote_table']);
+assert.deepEqual(normalizeGeneratedPageOrder(['vote_table']), ['vote_table', 'resolution_page']);
+assert.equal(normalizeResolutionPageConfig({ enabled: false }).enabled, false);
+const resolutionPageLayout = validatePdfLayout({
+  resolutionPageConfig: {
+    enabled: true,
+    version: 1,
+    heading: { text: 'RESOLUTION', fontFamily: 'Helvetica', fontSize: 16, bold: true, italic: false, underline: true, alignment: 'center', lineSpacing: 1, spaceBefore: 0, spaceAfter: 12 },
+    details: { subject: 'Service Project', date: '2026-07-11', place: 'Houston', boardMembersPresent: '7', totalBoardMembers: '9' },
+    detailsStyle: { fontFamily: 'Helvetica', fontSize: 10, bold: true, italic: false, underline: false, alignment: 'left', lineSpacing: 1.1, spaceBefore: 0, spaceAfter: 10 },
+    mainStatement: { text: 'The board resolves to approve the project.', fontFamily: 'Times Roman', fontSize: 12, bold: true, italic: false, underline: false, alignment: 'left', lineSpacing: 1.25, spaceBefore: 0, spaceAfter: 10 },
+    blocks: [
+      { id: 'paragraph_1', type: 'paragraph', text: 'Additional context.', style: { fontFamily: 'Helvetica', fontSize: 11, bold: false, italic: false, underline: false, alignment: 'left', lineSpacing: 1.2, spaceBefore: 0, spaceAfter: 8 } },
+    ],
+  },
+  generatedPageOrder: ['vote_table', 'resolution_page'],
 });
+assert.equal(resolutionPageLayout.ok, true);
+assert.equal(resolutionPageLayout.payload.resolutionPageConfig.enabled, true);
+assert.equal(resolutionPageLayout.payload.resolutionPageConfig.heading.text, 'RESOLUTION');
+assert.deepEqual(resolutionPageLayout.payload.generatedPageOrder, ['vote_table', 'resolution_page']);
+assert.equal(assertNoNestedArrays(resolutionPageLayout.payload.resolutionPageConfig, 'resolutionPageConfig'), true);
+assert.equal(validatePdfLayout({ resolutionPageConfig: { enabled: true, heading: { text: 'x', fontFamily: 'Papyrus', fontSize: 16, alignment: 'center' }, details: {}, detailsStyle: {}, mainStatement: {} } }).ok, false);
+assert.equal(validatePdfLayout({ generatedPageOrder: ['vote_table', 'vote_table'] }).ok, false);
 const uploadedLayout = validatePdfLayout({ documentSourceMode: 'uploadedPdf', uploadedVotesTableConfig: { columns: { name: true, signature: true }, voterScope: 'all', showTitle: false, showResultSummary: false } });
 assert.equal(uploadedLayout.ok, true);
 assert.equal(uploadedLayout.payload.documentSourceMode, 'uploadedPdf');

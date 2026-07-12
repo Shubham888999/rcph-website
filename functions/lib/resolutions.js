@@ -328,6 +328,8 @@ module.exports = {
   normalizePdfSections: resolutionSections.normalizeSections,
   normalizeDocumentSourceMode: resolutionSections.normalizeSourceMode,
   normalizeUploadedVotesTableConfig: resolutionSections.normalizeUploadedVotesTableConfig,
+  normalizeResolutionPageConfig: resolutionSections.normalizeResolutionPageConfig,
+  normalizeGeneratedPageOrder: resolutionSections.normalizeGeneratedPageOrder,
   validatePdfLayout: resolutionSections.validateLayout,
   validateDraftInput,
   voteCountsForMethod,

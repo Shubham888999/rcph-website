@@ -384,6 +384,8 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
           abstainCount: frozen.abstainCount,
           appendVoteTable: frozen.appendVoteTable !== false,
           config: frozen.finalizedVotesTableConfigSnapshot,
+          resolutionPageConfig: frozen.finalizedResolutionPageConfigSnapshot,
+          generatedPageOrder: frozen.finalizedGeneratedPageOrderSnapshot,
           rows: frozen.finalizedVoteRowsSnapshot,
           metadataTimestamp: frozen.merge?.createdAt || frozen.closedAt,
           finalizationId,
