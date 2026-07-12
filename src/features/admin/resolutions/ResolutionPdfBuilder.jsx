@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   addResolutionSection,
   addResolutionPageBlock,
@@ -22,6 +23,11 @@ import {
   updateResolutionSection,
   VOTES_TABLE_COLUMNS,
 } from "../../resolutions/resolutionSectionsModel";
+import {
+  GENERATED_PAGES_PREVIEW_MODES,
+  getGeneratedPagesPreviewAvailability,
+  normalizeGeneratedPagesPreviewMode,
+} from "../../resolutions/resolutionPreview";
 import ResolutionPdfUploadPanel from "./ResolutionPdfUploadPanel";
 
 const TYPE_LABELS = { heading: "Heading", paragraph: "Paragraph", table: "Table", votesTable: "Votes Table", spacer: "Spacer / Page Break" };
@@ -166,7 +172,8 @@ function SectionEditor({ section, index, total, onUpdate, onDelete, onDuplicate,
   </details>;
 }
 
-export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview, onNotice, onPersisted, onEnsurePersisted }) {
+export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview, onGeneratedPagesPreview, onNotice, onPersisted, onEnsurePersisted }) {
+  const [generatedPreview, setGeneratedPreview] = useState({ mode: GENERATED_PAGES_PREVIEW_MODES.ALL, action: "", error: "" });
   const mode = value.documentSourceMode || (value.pdfLayoutMode === "custom" ? "custom" : "standard");
   const sections = value.pdfSections || [];
   const resolutionPageConfig = normalizeResolutionPageConfig(value.resolutionPageConfig, value);
@@ -178,6 +185,29 @@ export default function ResolutionPdfBuilder({ value, onChange, disabled = false
   const toggleResolutionPage = (enabled) => setResolutionPageConfig(enabled ? { ...(value.resolutionPageConfig ? resolutionPageConfig : createDefaultResolutionPageConfig(value)), enabled: true } : { ...resolutionPageConfig, enabled: false });
   const generatedOrderValue = generatedPageOrder[0] === "vote_table" ? "vote_table_first" : "resolution_page_first";
   const modeLocked = !["draft", undefined, ""].includes(value.status) || (mode === "uploadedPdf" && value.uploadedSource?.status === "ready");
+  const previewMode = normalizeGeneratedPagesPreviewMode(generatedPreview.mode);
+  const generatedPreviewAvailability = getGeneratedPagesPreviewAvailability({ resolution: { ...value, resolutionPageConfig, generatedPageOrder } });
+  const selectedPreviewAvailable = generatedPreviewAvailability.modes[previewMode] === true;
+  const generatedPreviewBusy = Boolean(generatedPreview.action);
+  const generatedPreviewDisabled = disabled || !onGeneratedPagesPreview || !generatedPreviewAvailability.enabled || !selectedPreviewAvailable || generatedPreviewBusy;
+  const generatedPreviewMessage = !generatedPreviewAvailability.enabled
+    ? generatedPreviewAvailability.message
+    : !selectedPreviewAvailable
+      ? previewMode === GENERATED_PAGES_PREVIEW_MODES.RESOLUTION_PAGE
+        ? "Enable the Resolution Page before previewing it."
+        : "Enable the Voting Table before previewing it."
+      : "";
+  const setGeneratedPreviewMode = (event) => setGeneratedPreview({ mode: event.target.value, action: "", error: "" });
+  const runGeneratedPagesPreview = async (action) => {
+    if (generatedPreviewDisabled) return;
+    setGeneratedPreview((current) => ({ ...current, action, error: "" }));
+    try {
+      await onGeneratedPagesPreview({ previewMode, action });
+      setGeneratedPreview((current) => ({ ...current, action: "", error: "" }));
+    } catch (error) {
+      setGeneratedPreview((current) => ({ ...current, action: "", error: error?.message || "PDF generation failed." }));
+    }
+  };
   return <fieldset className="resolution-builder" disabled={disabled}>
     <legend>Resolution PDF Source</legend>
     <div className="resolution-builder__modes"><label><input type="radio" disabled={modeLocked} name={`pdf-mode-${value.id || "new"}`} checked={mode === "standard"} onChange={() => setMode("standard")} /> Standard Resolution Format</label><label><input type="radio" disabled={modeLocked} name={`pdf-mode-${value.id || "new"}`} checked={mode === "custom"} onChange={() => setMode("custom")} /> Custom Section Layout</label><label><input type="radio" disabled={modeLocked} name={`pdf-mode-${value.id || "new"}`} checked={mode === "uploadedPdf"} onChange={() => setMode("uploadedPdf")} /> Upload Ready-Made PDF</label></div>
@@ -191,12 +221,33 @@ export default function ResolutionPdfBuilder({ value, onChange, disabled = false
     <section className="resolution-builder__generated">
       <label className="resolution-append-toggle"><input type="checkbox" checked={resolutionPageConfig.enabled} onChange={(event) => toggleResolutionPage(event.target.checked)} /> Add Resolution Page</label>
       <p className="admin-help">Generate an editable official resolution page on the RCPH letterhead and include it in the final PDF.</p>
-      {resolutionPageConfig.enabled ? <ResolutionPageEditor resolution={value} config={resolutionPageConfig} onChange={setResolutionPageConfig} /> : null}
       {resolutionPageConfig.enabled && value.appendVoteTable !== false ? <fieldset className="resolution-builder__generated-order">
         <legend>Generated page order</legend>
         <label><input type="radio" name={`generated-page-order-${value.id || "new"}`} checked={generatedOrderValue === "resolution_page_first"} onChange={() => setGeneratedPageOrder(["resolution_page", "vote_table"])} /> Resolution Page -&gt; Voting Table</label>
         <label><input type="radio" name={`generated-page-order-${value.id || "new"}`} checked={generatedOrderValue === "vote_table_first"} onChange={() => setGeneratedPageOrder(["vote_table", "resolution_page"])} /> Voting Table -&gt; Resolution Page</label>
       </fieldset> : null}
+      <section className="resolution-builder__generated-preview" aria-label="Generated page preview">
+        <div>
+          <h4>Generated Page Preview</h4>
+          <p className="admin-help">Generate a temporary PDF containing only the Resolution Page and Voting Table using the current editor values. Nothing will be saved or finalized.</p>
+        </div>
+        <div className="admin-form-grid resolution-builder__preview-controls">
+          <label>Preview
+            <select value={previewMode} onChange={setGeneratedPreviewMode}>
+              <option value={GENERATED_PAGES_PREVIEW_MODES.ALL} disabled={!generatedPreviewAvailability.modes.all}>All enabled generated pages</option>
+              <option value={GENERATED_PAGES_PREVIEW_MODES.RESOLUTION_PAGE} disabled={!generatedPreviewAvailability.modes.resolution_page}>Resolution Page only</option>
+              <option value={GENERATED_PAGES_PREVIEW_MODES.VOTE_TABLE} disabled={!generatedPreviewAvailability.modes.vote_table}>Voting Table only</option>
+            </select>
+          </label>
+          <div className="admin-actions resolution-builder__preview-actions">
+            <button type="button" disabled={generatedPreviewDisabled} onClick={() => runGeneratedPagesPreview("open")}>{generatedPreview.action === "open" ? "Generating preview..." : "Open Preview"}</button>
+            <button type="button" disabled={generatedPreviewDisabled} onClick={() => runGeneratedPagesPreview("download")}>{generatedPreview.action === "download" ? "Generating preview..." : "Download Preview"}</button>
+          </div>
+        </div>
+        {generatedPreviewMessage ? <p className="resolution-builder__preview-status" role="status">{generatedPreviewMessage}</p> : null}
+        {generatedPreview.error ? <p className="resolution-builder__preview-error" role="alert">{generatedPreview.error}</p> : null}
+      </section>
+      {resolutionPageConfig.enabled ? <ResolutionPageEditor resolution={value} config={resolutionPageConfig} onChange={setResolutionPageConfig} /> : null}
     </section>
   </fieldset>;
 }

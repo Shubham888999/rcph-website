@@ -15,6 +15,7 @@ import {
 } from "../../resolutions/resolutionModel";
 import { validateResolutionPdfLayout } from "../../resolutions/resolutionSectionsModel";
 import { generateResolutionPdf, generateResolutionPreviewPdf } from "../../resolutions/resolutionPdf";
+import { presentGeneratedPagesPreviewPdf } from "../../resolutions/resolutionPreview";
 import ResolutionPdfBuilder from "./ResolutionPdfBuilder";
 import { downloadFinalizedResolutionPdf, retryResolutionPdfMerge } from "../../resolutions/resolutionUploadService";
 import {
@@ -203,7 +204,7 @@ function EligibleVotersSelector({ value, roster, onChange, disabled }) {
   </section>;
 }
 
-function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, onSubmit, onPreview, onNotice, onPersisted, onEnsurePersisted }) {
+function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, onSubmit, onPreview, onGeneratedPagesPreview, onNotice, onPersisted, onEnsurePersisted }) {
   const set = (key) => (event) => onChange({ ...value, [key]: event.target.value });
   const approvalMethod = value.approvalMethod || "website";
   const isRecordOnly = approvalMethod === "record_only";
@@ -285,7 +286,7 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
       <label>Club reply-to email<input type="email" value={value.clubReplyToEmail} placeholder="rcph3131@gmail.com" maxLength="220" onChange={set("clubReplyToEmail")} /></label>
       <div className="resolution-email-config__preview"><strong>Dashboard notice recipients</strong><span>{selectedVoters.length} selected BOD voter{selectedVoters.length === 1 ? "" : "s"}</span><p>{selectedVoters.map((member) => member.email || member.name).join(", ")}</p></div>
     </fieldset> : null}
-    <ResolutionPdfBuilder value={value} onChange={onChange} disabled={busy} onPreview={onPreview} onNotice={onNotice} onPersisted={onPersisted} onEnsurePersisted={onEnsurePersisted} />
+    <ResolutionPdfBuilder value={value} onChange={onChange} disabled={busy} onPreview={onPreview} onGeneratedPagesPreview={onGeneratedPagesPreview} onNotice={onNotice} onPersisted={onPersisted} onEnsurePersisted={onEnsurePersisted} />
     <button disabled={busy || (value.id && value.documentSourceMode === "uploadedPdf" && value.uploadedSource?.status !== "ready")}>{submitLabel}</button>
   </form>;
 }
@@ -482,6 +483,19 @@ export default function ResolutionsModule({ uid, onNotice }) {
     catch (error) { onNotice({ type: "error", message: error.message }); }
   }
 
+  async function previewGeneratedPages(value, options = {}, source = null) {
+    try {
+      const result = await presentGeneratedPagesPreviewPdf({ ...previewDetails(value, source), previewMode: options.previewMode }, { action: options.action });
+      if (result.popupBlocked) onNotice({ type: "info", message: "Browser popup blocking was detected, so the generated pages preview was downloaded instead." });
+      else onNotice({ type: "success", message: options.action === "download" ? "Generated pages preview downloaded." : "Generated pages preview opened." });
+      return result;
+    } catch (error) {
+      const message = error?.message || "Generated pages preview could not be created.";
+      onNotice({ type: "error", message });
+      throw new Error(message, { cause: error });
+    }
+  }
+
   async function editLayout(item) {
     const result = await run("load-resolution-layout", () => loadResolutionDetails(uid, item.id), "Resolution PDF layout loaded.", { onError(error) { onNotice({ type: "error", message: getResolutionErrorMessage(error) }); return true; } });
     if (result) setLayoutEditing(result);
@@ -507,13 +521,13 @@ export default function ResolutionsModule({ uid, onNotice }) {
   return <>
     <AdminModuleHeader title="Resolutions" description="Meeting-linked BOD resolution drafts, live voting, final records, and audit history." action={<button onClick={load} disabled={busy}>Refresh</button>} />
     {!state.meetings.length || !state.roster.length ? <div className="admin-notice admin-notice--error" role="alert">A valid BOD meeting is required. Website and hybrid voting also require at least one UID-linked active BOD position assignment.</div> : null}
-    <section className="admin-panel"><h3>Create draft resolution</h3><ResolutionForm value={draft} onChange={setDraft} meetings={state.meetings} roster={state.roster} busy={busy || !state.meetings.length} submitLabel={draft.id ? "Save draft changes" : "Save draft"} onSubmit={create} onPreview={() => downloadPreview(draft)} onNotice={onNotice} onPersisted={(uploadedSource) => setDraft((current) => ({ ...current, uploadedSource }))} onEnsurePersisted={ensureDraftPersisted} /></section>
+    <section className="admin-panel"><h3>Create draft resolution</h3><ResolutionForm value={draft} onChange={setDraft} meetings={state.meetings} roster={state.roster} busy={busy || !state.meetings.length} submitLabel={draft.id ? "Save draft changes" : "Save draft"} onSubmit={create} onPreview={() => downloadPreview(draft)} onGeneratedPagesPreview={(options) => previewGeneratedPages(draft, options)} onNotice={onNotice} onPersisted={(uploadedSource) => setDraft((current) => ({ ...current, uploadedSource }))} onEnsurePersisted={ensureDraftPersisted} /></section>
     <ResolutionGroup title="Open voting" items={state.resolutions.filter((item) => item.status === "open")} {...common} />
     <ResolutionGroup title="Drafts" items={state.resolutions.filter((item) => item.status === "draft")} {...common} />
     <ResolutionGroup title="Completed" items={state.resolutions.filter((item) => FINAL_RESOLUTION_STATUSES.includes(item.status))} {...common} />
     <ResolutionGroup title="Cancelled" items={state.resolutions.filter((item) => item.status === "cancelled")} {...common} />
-    {editing ? <AdminDialog title={`Edit ${editing.resolutionNumber}`} busy={busy} className="admin-dialog--wide" onClose={() => setEditing(null)}><ResolutionForm value={editing} onChange={setEditing} meetings={state.meetings} roster={state.roster} busy={busy} submitLabel="Save draft changes" onSubmit={update} onPreview={() => downloadPreview(editing)} onNotice={onNotice} onPersisted={(uploadedSource) => setEditing((current) => current ? { ...current, uploadedSource } : current)} /></AdminDialog> : null}
-    {layoutEditing ? <AdminDialog title={`PDF layout - ${layoutEditing.resolution.resolutionNumber}`} busy={busy} className="admin-dialog--wide" onClose={() => setLayoutEditing(null)}><form className="admin-form" onSubmit={saveLayout}><ResolutionPdfBuilder value={layoutEditing.resolution} onChange={(resolution) => setLayoutEditing({ ...layoutEditing, resolution })} disabled={busy} onPreview={() => downloadPreview(layoutEditing.resolution, layoutEditing)} onNotice={onNotice} /><button disabled={busy}>Save PDF layout</button></form></AdminDialog> : null}
+    {editing ? <AdminDialog title={`Edit ${editing.resolutionNumber}`} busy={busy} className="admin-dialog--wide" onClose={() => setEditing(null)}><ResolutionForm value={editing} onChange={setEditing} meetings={state.meetings} roster={state.roster} busy={busy} submitLabel="Save draft changes" onSubmit={update} onPreview={() => downloadPreview(editing)} onGeneratedPagesPreview={(options) => previewGeneratedPages(editing, options)} onNotice={onNotice} onPersisted={(uploadedSource) => setEditing((current) => current ? { ...current, uploadedSource } : current)} /></AdminDialog> : null}
+    {layoutEditing ? <AdminDialog title={`PDF layout - ${layoutEditing.resolution.resolutionNumber}`} busy={busy} className="admin-dialog--wide" onClose={() => setLayoutEditing(null)}><form className="admin-form" onSubmit={saveLayout}><ResolutionPdfBuilder value={layoutEditing.resolution} onChange={(resolution) => setLayoutEditing({ ...layoutEditing, resolution })} disabled={busy} onPreview={() => downloadPreview(layoutEditing.resolution, layoutEditing)} onGeneratedPagesPreview={(options) => previewGeneratedPages(layoutEditing.resolution, options, layoutEditing)} onNotice={onNotice} /><button disabled={busy}>Save PDF layout</button></form></AdminDialog> : null}
     {confirm ? <AdminDialog title={`${statusLabel(confirm.type)} ${confirm.item.resolutionNumber}?`} busy={busy} onClose={() => setConfirm(null)}><p>{confirm.type === "open" ? confirm.item.approvalMethod === "record_only" ? "This will archive the resolution without opening a voting process." : `${confirm.item.eligibleVoterCount} selected eligible voter${confirm.item.eligibleVoterCount === 1 ? "" : "s"} will be frozen as the voting snapshot.` : confirm.type === "close" ? "Votes will be frozen and the final result calculated server-side. This cannot be reopened." : "The resolution will stop accepting votes and cannot be reopened."}</p><div className="admin-actions"><button onClick={() => setConfirm(null)}>Back</button><button className={confirm.type === "cancel" ? "danger" : ""} onClick={performConfirmed}>{confirm.item.approvalMethod === "record_only" && confirm.type === "open" ? "Archive record" : `${statusLabel(confirm.type)} resolution`}</button></div></AdminDialog> : null}
     {details ? <AdminDialog title={details.resolution.resolutionNumber} busy={busy} className="admin-dialog--wide" onClose={() => setDetails(null)}><ResolutionDetails details={details} busy={busy} onRefresh={() => showDetails(details.resolution)} onVerify={verifyEmail} onRetry={async () => { const result = await run("retry-resolution-pdf", () => retryResolutionPdfMerge(details.resolution.id), "Final PDF generated.", { onError(error) { onNotice({ type: "error", message: getResolutionErrorMessage(error) }); return true; } }); if (result) await showDetails(details.resolution); }} onDownload={async () => { try { if (details.resolution.documentSourceMode === "uploadedPdf") await downloadFinalizedResolutionPdf(details.resolution.id, details.resolution.resolutionNumber); else await generateResolutionPdf(details); } catch (error) { onNotice({ type: "error", message: error.message }); } }} /></AdminDialog> : null}
   </>;

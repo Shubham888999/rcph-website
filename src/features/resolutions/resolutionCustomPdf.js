@@ -4,6 +4,11 @@ import { isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 
 const BOUNDS = Object.freeze({ left: 54, right: 541, bottom: 260, top: 665 });
 const WIDTH = BOUNDS.right - BOUNDS.left;
+const RESOLUTION_PAGE_SIDE_INSET = 28;
+const RESOLUTION_PAGE_LEFT =
+  BOUNDS.left + RESOLUTION_PAGE_SIDE_INSET;
+const RESOLUTION_PAGE_WIDTH =
+  WIDTH - RESOLUTION_PAGE_SIDE_INSET * 2;
 const START_Y = BOUNDS.top - 10;
 const PAGE_HEIGHT = START_Y - BOUNDS.bottom;
 
@@ -85,22 +90,60 @@ function createPaginator() {
   return { pages, current, newPage, ensure, space, addText, addLine, get y() { return y; }, set y(value) { y = value; } };
 }
 
-function renderTextSection(pager, section) {
+function renderTextSection(pager, section, options = {}) {
   const style = section.style;
-  const lines = wrap(section.text, WIDTH, style);
+  const left = options.left ?? BOUNDS.left;
+  const width = options.width ?? WIDTH;
+  const lines = wrap(section.text, width, style);
+
   const lineHeight = style.fontSize * style.lineSpacing;
-  const keepHeight = section.type === "heading" ? style.spaceBefore + lineHeight + style.spaceAfter + (10 * 1.25 * 2) : style.spaceBefore + lineHeight;
+  const keepHeight =
+    section.type === "heading"
+      ? style.spaceBefore +
+        lineHeight +
+        style.spaceAfter +
+        10 * 1.25 * 2
+      : style.spaceBefore + lineHeight;
+
   pager.ensure(keepHeight);
   pager.space(style.spaceBefore);
+
   if (section.type === "paragraph" && section.listStyle !== "none") {
-    const items = String(section.text || "").split("\n").map((item) => item.trim()).filter(Boolean);
+    const items = String(section.text || "")
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
     items.forEach((item, index) => {
-      const prefix = section.listStyle === "bullet" ? "• " : `${index + 1}. `;
-      const indent = approximateTextWidth(prefix, style.fontSize, style.fontFamily, style.bold);
-      const itemLines = wrap(item, WIDTH - indent, style);
-      itemLines.forEach((line, lineIndex) => pager.addText(`${lineIndex ? "" : prefix}${line}`, { ...style, alignment: "left" }, { left: BOUNDS.left + (lineIndex ? indent : 0), width: WIDTH - (lineIndex ? indent : 0) }));
+      const prefix =
+        section.listStyle === "bullet" ? "• " : `${index + 1}. `;
+
+      const indent = approximateTextWidth(
+        prefix,
+        style.fontSize,
+        style.fontFamily,
+        style.bold,
+      );
+
+      const itemLines = wrap(item, width - indent, style);
+
+      itemLines.forEach((line, lineIndex) => {
+        pager.addText(
+          `${lineIndex ? "" : prefix}${line}`,
+          { ...style, alignment: "left" },
+          {
+            left: left + (lineIndex ? indent : 0),
+            width: width - (lineIndex ? indent : 0),
+          },
+        );
+      });
     });
-  } else lines.forEach((line) => pager.addText(line, style));
+  } else {
+    lines.forEach((line) => {
+      pager.addText(line, style, { left, width });
+    });
+  }
+
   pager.space(style.spaceAfter);
 }
 
@@ -112,7 +155,184 @@ function normalizedVoteColumns(columns) {
   const total = enabled.reduce((sum, key) => sum + base[key], 0) || 1;
   return enabled.map((key) => ({ key, width: base[key] / total * 100, alignment: key === "vote" ? "center" : "left" }));
 }
+function contentSizedVoteColumns(
+  rows,
+  columns,
+  style,
+  availableWidth = RESOLUTION_PAGE_WIDTH,
+) {
+  const minimumWidths = {
+    name: 100,
+    position: 105,
+    vote: 68,
+    timestamp: 76,
+    signature: 82,
+  };
 
+  const maximumWidths = {
+    name: 175,
+    position: 190,
+    vote: 82,
+    timestamp: 135,
+    signature: 110,
+  };
+
+  const padding = style.cellPadding * 2;
+  const headerFontSize =
+    style.headerFontSize || style.fontSize;
+
+  let absoluteWidths = columns.map((column, columnIndex) => {
+    const headerText = String(
+      rows[0]?.[columnIndex] || "",
+    );
+
+    const headerWidth =
+      approximateTextWidth(
+        headerText,
+        headerFontSize,
+        style.fontFamily,
+        true,
+      ) + padding;
+
+    const longestBodyWidth = rows
+      .slice(1)
+      .reduce((largest, row) => {
+        const value = String(
+          row[columnIndex] || "",
+        );
+
+        const measuredWidth =
+          approximateTextWidth(
+            value,
+            style.fontSize,
+            style.fontFamily,
+            false,
+          ) + padding;
+
+        return Math.max(
+          largest,
+          measuredWidth,
+        );
+      }, 0);
+
+    const minimum =
+      minimumWidths[column.key] || 70;
+
+    const maximum =
+      maximumWidths[column.key] || 180;
+
+    return Math.min(
+      maximum,
+      Math.max(
+        minimum,
+        headerWidth,
+        longestBodyWidth,
+      ),
+    );
+  });
+
+  let tableWidth = absoluteWidths.reduce(
+    (total, width) => total + width,
+    0,
+  );
+
+  if (tableWidth > availableWidth) {
+    const minimumTotal = columns.reduce(
+      (total, column) =>
+        total +
+        (minimumWidths[column.key] || 70),
+      0,
+    );
+
+    if (minimumTotal >= availableWidth) {
+      const scale =
+        availableWidth / tableWidth;
+
+      absoluteWidths = absoluteWidths.map(
+        (width) => width * scale,
+      );
+    } else {
+      const shrinkableTotal =
+        absoluteWidths.reduce(
+          (total, width, index) => {
+            const minimum =
+              minimumWidths[
+                columns[index].key
+              ] || 70;
+
+            return (
+              total +
+              Math.max(
+                0,
+                width - minimum,
+              )
+            );
+          },
+          0,
+        );
+
+      const requiredReduction =
+        tableWidth - availableWidth;
+
+      const shrinkRatio =
+        shrinkableTotal > 0
+          ? Math.min(
+              1,
+              requiredReduction /
+                shrinkableTotal,
+            )
+          : 0;
+
+      absoluteWidths =
+        absoluteWidths.map(
+          (width, index) => {
+            const minimum =
+              minimumWidths[
+                columns[index].key
+              ] || 70;
+
+            return (
+              width -
+              Math.max(
+                0,
+                width - minimum,
+              ) *
+                shrinkRatio
+            );
+          },
+        );
+    }
+
+    tableWidth = absoluteWidths.reduce(
+      (total, width) => total + width,
+      0,
+    );
+  }
+
+  tableWidth = Math.min(
+    tableWidth,
+    availableWidth,
+  );
+
+  return {
+    tableWidth,
+
+    columns: columns.map(
+      (column, index) => ({
+        ...column,
+
+        // tableRowModel expects percentages,
+        // not absolute point widths.
+        widthPercent:
+          absoluteWidths[index] /
+          tableWidth *
+          100,
+
+        width: undefined,
+      }),
+    ),
+  };
+}
 function safeVoter(voter, vote, canonical) {
   return {
     name: formatRotaractorName(printable(vote?.voterName) || printable(voter?.name) || printable(canonical?.name, "Not available"), true),
@@ -142,55 +362,210 @@ export function buildCustomVotesRows(details, section) {
   });
 }
 
-function tableRowModel(values, columns, style, header = false, signature = false) {
-  const fontSize = header && style.headerFontSize ? style.headerFontSize : style.fontSize;
+function tableRowModel(
+  values,
+  columns,
+  style,
+  header = false,
+  signature = false,
+  tableWidth = WIDTH,
+) {
+  const fontSize =
+    header && style.headerFontSize
+      ? style.headerFontSize
+      : style.fontSize;
+
   const lineSpacing = style.compactRows ? 1.05 : 1.2;
-  const rowStyle = { fontFamily: header && style.headerFontFamily ? style.headerFontFamily : style.fontFamily, fontSize, bold: header ? (style.headerBold ?? style.boldHeader) : false, italic: false, underline: false, alignment: "left", lineSpacing };
+
+  const rowStyle = {
+    fontFamily:
+      header && style.headerFontFamily
+        ? style.headerFontFamily
+        : style.fontFamily,
+    fontSize,
+    bold: header
+      ? (style.headerBold ?? style.boldHeader)
+      : false,
+    italic: false,
+    underline: false,
+    alignment: "left",
+    lineSpacing,
+  };
+
   const cells = columns.map((column, index) => {
-    const width = WIDTH * (column.widthPercent ?? column.width) / 100;
-    return { width, alignment: column.alignment || "left", lines: wrap(values[index] || "", width - style.cellPadding * 2, rowStyle) };
+    const width =
+      tableWidth *
+      (column.widthPercent ?? column.width) /
+      100;
+
+    return {
+      width,
+      alignment: column.alignment || "left",
+      lines: wrap(
+        values[index] || "",
+        width - style.cellPadding * 2,
+        rowStyle,
+      ),
+    };
   });
-  const lineCount = Math.max(1, ...cells.map((cell) => cell.lines.length));
-  const height = Math.max(signature ? 28 : 0, lineCount * fontSize * lineSpacing + style.cellPadding * 2);
-  return { cells, height, style: rowStyle };
+
+  const lineCount = Math.max(
+    1,
+    ...cells.map((cell) => cell.lines.length),
+  );
+
+  const height = Math.max(
+    signature ? 28 : 0,
+    lineCount * fontSize * lineSpacing +
+      style.cellPadding * 2,
+  );
+
+  return {
+    cells,
+    height,
+    style: rowStyle,
+  };
 }
 
-function drawTableRow(pager, model, showBorders) {
+function drawTableRow(
+  pager,
+  model,
+  showBorders,
+  tableLeft = BOUNDS.left,
+) {
   pager.ensure(model.height);
+
   const top = pager.y;
   const bottom = top - model.height;
-  let x = BOUNDS.left;
+  let x = tableLeft;
+
   model.cells.forEach((cell) => {
     if (showBorders) {
       pager.addLine(x, top, x + cell.width, top);
       pager.addLine(x, bottom, x + cell.width, bottom);
       pager.addLine(x, top, x, bottom);
-      pager.addLine(x + cell.width, top, x + cell.width, bottom);
+      pager.addLine(
+        x + cell.width,
+        top,
+        x + cell.width,
+        bottom,
+      );
     }
+
     cell.lines.forEach((line, index) => {
-      const lineStyle = { ...model.style, alignment: cell.alignment };
-      const y = top - model.style.fontSize - model.style.fontSize * model.style.lineSpacing * index - 2;
-      const textX = alignedX(line, lineStyle, cell.width - 8, x + 4);
-      pager.current().push({ kind: "text", text: line, x: textX, y, size: model.style.fontSize, fontFamily: model.style.fontFamily, bold: model.style.bold, italic: false, underline: false, width: approximateTextWidth(line, model.style.fontSize, model.style.fontFamily, model.style.bold) });
+      const lineStyle = {
+        ...model.style,
+        alignment: cell.alignment,
+      };
+
+      const y =
+        top -
+        model.style.fontSize -
+        model.style.fontSize *
+          model.style.lineSpacing *
+          index -
+        2;
+
+      const textX = alignedX(
+        line,
+        lineStyle,
+        cell.width - 8,
+        x + 4,
+      );
+
+      pager.current().push({
+        kind: "text",
+        text: line,
+        x: textX,
+        y,
+        size: model.style.fontSize,
+        fontFamily: model.style.fontFamily,
+        bold: model.style.bold,
+        italic: false,
+        underline: false,
+        width: approximateTextWidth(
+          line,
+          model.style.fontSize,
+          model.style.fontFamily,
+          model.style.bold,
+        ),
+      });
     });
+
     x += cell.width;
   });
+
   pager.y = bottom;
 }
 
-function renderTable(pager, section, rows, columns, options = {}) {
+function renderTable(
+  pager,
+  section,
+  rows,
+  columns,
+  options = {},
+) {
   const style = section.style;
+
+  const tableLeft =
+    options.left ?? BOUNDS.left;
+
+  const tableWidth =
+    options.width ?? WIDTH;
+
   pager.space(style.spaceBefore);
-  const models = rows.map((row, index) => tableRowModel(row, columns, style, options.headerIndex === index, options.signature));
-  const header = options.headerIndex === 0 ? models[0] : null;
+
+  const models = rows.map((row, index) =>
+    tableRowModel(
+      row,
+      columns,
+      style,
+      options.headerIndex === index,
+      options.signature,
+      tableWidth,
+    ),
+  );
+
+  const header =
+    options.headerIndex === 0
+      ? models[0]
+      : null;
+
   models.forEach((model, index) => {
-    if (model.height > PAGE_HEIGHT) throw new Error(`Table row ${index + 1} is too tall for a Resolution PDF page.`);
-    if (pager.current().length && pager.y - model.height < BOUNDS.bottom) {
-      pager.newPage();
-      if (header && options.repeatHeader && index !== 0) drawTableRow(pager, header, options.showBorders);
+    if (model.height > PAGE_HEIGHT) {
+      throw new Error(
+        `Table row ${index + 1} is too tall for a Resolution PDF page.`,
+      );
     }
-    drawTableRow(pager, model, options.showBorders);
+
+    if (
+      pager.current().length &&
+      pager.y - model.height < BOUNDS.bottom
+    ) {
+      pager.newPage();
+
+      if (
+        header &&
+        options.repeatHeader &&
+        index !== 0
+      ) {
+        drawTableRow(
+          pager,
+          header,
+          options.showBorders,
+          tableLeft,
+        );
+      }
+    }
+
+    drawTableRow(
+      pager,
+      model,
+      options.showBorders,
+      tableLeft,
+    );
   });
+
   pager.space(style.spaceAfter);
 }
 
@@ -205,15 +580,213 @@ function renderCustomTable(pager, section) {
 }
 
 function renderVotesTable(pager, section, details) {
-  if (section.options.showTitle) renderTextSection(pager, { id: `${section.id}_title`, type: "heading", text: section.title, style: { fontFamily: section.style.fontFamily, fontSize: Math.max(10, section.style.headerFontSize), bold: true, italic: false, underline: false, alignment: "left", lineSpacing: 1.2, spaceBefore: section.style.spaceBefore, spaceAfter: 5 } });
-  const columns = normalizedVoteColumns(section.columns);
-  const labels = { name: "Name", position: "Position", vote: "Vote", timestamp: "Timestamp", signature: "Signature" };
-  const rows = [columns.map((column) => labels[column.key]), ...buildCustomVotesRows(details, section).map((row) => columns.map((column) => row[column.key]))];
-  renderTable(pager, { ...section, style: { ...section.style, spaceBefore: 0 } }, rows, columns, { headerIndex: 0, repeatHeader: section.options.repeatHeader, showBorders: true, signature: section.columns.signature });
-  if (section.options.showResultSummary) {
-    const resolution = details.resolution;
-    renderTextSection(pager, { id: `${section.id}_result`, type: "paragraph", text: `Approve count: ${resolution.approveCount}\nReject count: ${resolution.rejectCount}\nAbstain count: ${resolution.abstainCount}\nEligible voter count: ${resolution.eligibleVoterCount}\nFinal result: ${display(resolution.result || resolution.status)}`, listStyle: "none", style: { fontFamily: section.style.fontFamily, fontSize: section.style.fontSize, bold: false, italic: false, underline: false, alignment: "left", lineSpacing: 1.2, spaceBefore: 0, spaceAfter: 6 } });
+  if (section.options.showTitle) {
+    renderTextSection(pager, {
+      id: `${section.id}_title`,
+      type: "heading",
+      text: section.title,
+      style: {
+        fontFamily: section.style.fontFamily,
+        fontSize: Math.max(10, section.style.headerFontSize),
+        bold: true,
+        italic: false,
+        underline: false,
+        alignment: "left",
+        lineSpacing: 1.2,
+        spaceBefore: section.style.spaceBefore,
+        spaceAfter: 5,
+      },
+    });
   }
+
+const baseColumns =
+  normalizedVoteColumns(
+    section.columns,
+  );
+
+const labels = {
+  name: "Name",
+  position: "Position",
+  vote: "Vote",
+  timestamp: "Timestamp",
+  signature: "Signature",
+};
+
+const voteRows =
+  buildCustomVotesRows(
+    details,
+    section,
+  );
+
+const rows = [
+  baseColumns.map(
+    (column) => labels[column.key],
+  ),
+
+  ...voteRows.map((row) =>
+    baseColumns.map(
+      (column) => row[column.key],
+    ),
+  ),
+];
+
+const sizing = section.generatedPage
+  ? contentSizedVoteColumns(
+      rows,
+      baseColumns,
+      section.style,
+      RESOLUTION_PAGE_WIDTH,
+    )
+  : {
+      columns: baseColumns,
+      tableWidth: WIDTH,
+    };
+
+const columns = sizing.columns;
+
+renderTable(
+  pager,
+  {
+    ...section,
+    style: {
+      ...section.style,
+      spaceBefore: 0,
+    },
+  },
+  rows,
+  columns,
+  {
+    headerIndex: 0,
+    repeatHeader:
+      section.options.repeatHeader,
+    showBorders: true,
+    signature:
+      section.columns.signature,
+
+    ...(section.generatedPage
+      ? {
+          left:
+            RESOLUTION_PAGE_LEFT,
+          width:
+            sizing.tableWidth,
+        }
+      : {}),
+  },
+);
+
+  if (!section.options.showResultSummary) return;
+
+  const resolution = details.resolution || {};
+
+  if (section.generatedPage) {
+    pager.space(16);
+
+    renderTextSection(
+      pager,
+      {
+        id: `${section.id}_summary_heading`,
+        type: "heading",
+        text: "VOTING SUMMARY",
+        style: {
+          fontFamily: "Helvetica",
+          fontSize: 12,
+          bold: true,
+          italic: false,
+          underline: true,
+          alignment: "left",
+          lineSpacing: 1.2,
+          spaceBefore: 0,
+          spaceAfter: 12,
+        },
+      },
+      {
+        left: RESOLUTION_PAGE_LEFT,
+        width: RESOLUTION_PAGE_WIDTH,
+      },
+    );
+
+    renderTextSection(
+      pager,
+      {
+        id: `${section.id}_summary_counts`,
+        type: "paragraph",
+        text:
+          `Approve: ${resolution.approveCount || 0}     ` +
+          `Reject: ${resolution.rejectCount || 0}     ` +
+          `Abstain: ${resolution.abstainCount || 0}\n` +
+          `Votes Received: ${resolution.votesReceivedCount || 0}     ` +
+          `Eligible Voters: ${resolution.eligibleVoterCount || 0}`,
+        listStyle: "none",
+        style: {
+          fontFamily: "Helvetica",
+          fontSize: 10,
+          bold: false,
+          italic: false,
+          underline: false,
+          alignment: "left",
+          lineSpacing: 1.5,
+          spaceBefore: 0,
+          spaceAfter: 14,
+        },
+      },
+      {
+        left: RESOLUTION_PAGE_LEFT,
+        width: RESOLUTION_PAGE_WIDTH,
+      },
+    );
+
+    renderTextSection(
+      pager,
+      {
+        id: `${section.id}_final_result`,
+        type: "paragraph",
+        text: `Final Result: ${display(
+          resolution.result || resolution.status,
+        )}`,
+        listStyle: "none",
+        style: {
+          fontFamily: "Helvetica",
+          fontSize: 12,
+          bold: true,
+          italic: false,
+          underline: false,
+          alignment: "left",
+          lineSpacing: 1.25,
+          spaceBefore: 0,
+          spaceAfter: 10,
+        },
+      },
+      {
+        left: RESOLUTION_PAGE_LEFT,
+        width: RESOLUTION_PAGE_WIDTH,
+      },
+    );
+
+    return;
+  }
+
+  renderTextSection(pager, {
+    id: `${section.id}_result`,
+    type: "paragraph",
+    text:
+      `Approve count: ${resolution.approveCount}\n` +
+      `Reject count: ${resolution.rejectCount}\n` +
+      `Abstain count: ${resolution.abstainCount}\n` +
+      `Eligible voter count: ${resolution.eligibleVoterCount}\n` +
+      `Final result: ${display(resolution.result || resolution.status)}`,
+    listStyle: "none",
+    style: {
+      fontFamily: section.style.fontFamily,
+      fontSize: section.style.fontSize,
+      bold: false,
+      italic: false,
+      underline: false,
+      alignment: "left",
+      lineSpacing: 1.2,
+      spaceBefore: 0,
+      spaceAfter: 6,
+    },
+  });
 }
 
 export function buildCustomResolutionPdfPages(details, sections) {
@@ -253,37 +826,251 @@ function finishGeneratedPages(pager, kind) {
   return markGeneratedPages(pager.pages, kind);
 }
 
+function renderResolutionDetails(pager, normalized) {
+  const style = {
+    ...normalized.detailsStyle,
+    alignment: "left",
+  };
+
+  const columnGap = 34;
+  const halfWidth =
+    (RESOLUTION_PAGE_WIDTH - columnGap) / 2;
+
+  pager.space(style.spaceBefore);
+
+  const subjectLines = wrap(
+    `Subject: ${normalized.details.subject || ""}`,
+    RESOLUTION_PAGE_WIDTH,
+    style,
+  );
+
+  subjectLines.forEach((line) => {
+    pager.addText(line, style, {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_PAGE_WIDTH,
+    });
+  });
+
+  // Visible blank space after Subject.
+  pager.space(10);
+
+  const sharedY = pager.y;
+
+  pager.addText(
+    `Date - ${normalized.details.date || ""}`,
+    style,
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: halfWidth,
+    },
+  );
+
+  pager.y = sharedY;
+
+  pager.addText(
+    `Place - ${normalized.details.place || ""}`,
+    {
+      ...style,
+      alignment: "right",
+    },
+    {
+      left:
+        RESOLUTION_PAGE_LEFT +
+        halfWidth +
+        columnGap,
+      width: halfWidth,
+    },
+  );
+
+  // Visible blank space after Date/Place.
+  pager.space(10);
+
+  pager.addText(
+    `No. of Board Members - ${
+      normalized.details.boardMembersPresent || ""
+    }`,
+    style,
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_PAGE_WIDTH,
+    },
+  );
+
+  // Visible blank space between the two member rows.
+  pager.space(10);
+
+  pager.addText(
+    `Total No. of Board Members - ${
+      normalized.details.totalBoardMembers || ""
+    }`,
+    style,
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_PAGE_WIDTH,
+    },
+  );
+
+  // Large old-template gap before the formal paragraph.
+  pager.space(32);
+}
+
 export function buildResolutionPagePdfPages(details, config) {
   const pager = createPaginator();
-  const normalized = normalizeResolutionPageConfig(config, details?.resolution || {});
-  renderTextSection(pager, { id: "resolution_page_heading", type: "heading", text: normalized.heading.text, style: normalized.heading });
-  const detailLines = [
-    ["Subject", normalized.details.subject],
-    ["Date", normalized.details.date],
-    ["Place", normalized.details.place],
-    ["No. of Board Members", normalized.details.boardMembersPresent],
-    ["Total No. of Board Members", normalized.details.totalBoardMembers],
-  ].map(([label, value]) => `${label}: ${value || ""}`);
-  renderTextSection(pager, { id: "resolution_page_details", type: "paragraph", text: detailLines.join("\n"), listStyle: "none", style: normalized.detailsStyle });
-  renderTextSection(pager, { id: "resolution_page_statement", type: "paragraph", text: normalized.mainStatement.text, listStyle: "none", style: normalized.mainStatement });
-  normalized.blocks.forEach((block) => {
-    if (block.type === "paragraph") renderTextSection(pager, { ...block, listStyle: "none" });
-    else if (block.type === "table") renderCustomTable(pager, block);
-  });
+
+  const normalized = normalizeResolutionPageConfig(
+    config,
+    details?.resolution || {},
+  );
+
+  renderResolutionDetails(pager, normalized);
+
+renderTextSection(
+  pager,
+  {
+    id: "resolution_page_statement",
+    type: "paragraph",
+    text: normalized.mainStatement.text,
+    listStyle: "none",
+    style: {
+      ...normalized.mainStatement,
+      lineSpacing: 1.45,
+    },
+  },
+  {
+    left: RESOLUTION_PAGE_LEFT,
+    width: RESOLUTION_PAGE_WIDTH,
+  },
+);
+
+normalized.blocks.forEach((block) => {
+  if (block.type === "paragraph") {
+    renderTextSection(
+      pager,
+      {
+        ...block,
+        listStyle: "none",
+      },
+      {
+        left: RESOLUTION_PAGE_LEFT,
+        width: RESOLUTION_PAGE_WIDTH,
+      },
+    );
+  } else if (block.type === "table") {
+    renderCustomTable(pager, block);
+  }
+});
+
   return finishGeneratedPages(pager, "resolution_page");
 }
 
 export function buildGeneratedVotesTablePdfPages(details, config) {
   const normalized = normalizeUploadedVotesTableConfig(config);
   const pager = createPaginator();
-  renderVotesTable(pager, {
-    id: "generated_vote_table",
-    type: "votesTable",
-    title: "Voting Record",
-    columns: normalized.columns,
-    options: normalized,
-    style: { fontFamily: "Helvetica", fontSize: 9, headerFontSize: 9, headerBold: true, cellPadding: 4, spaceBefore: 0, spaceAfter: 8 },
-  }, details);
+  const resolution = details?.resolution || {};
+
+  renderTextSection(
+    pager,
+    {
+      id: "generated_vote_table_heading",
+      type: "heading",
+      text: "VOTING RECORD",
+      style: {
+        fontFamily: "Helvetica",
+        fontSize: 16,
+        bold: true,
+        italic: false,
+        underline: true,
+        alignment: "center",
+        lineSpacing: 1.15,
+        spaceBefore: 0,
+        spaceAfter: 24,
+      },
+    },
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_PAGE_WIDTH,
+    },
+  );
+
+  renderTextSection(
+    pager,
+    {
+      id: "generated_vote_table_subject",
+      type: "paragraph",
+      text: `Resolution: ${resolution.title || "Resolution"}`,
+      listStyle: "none",
+      style: {
+        fontFamily: "Helvetica",
+        fontSize: 11,
+        bold: true,
+        italic: false,
+        underline: false,
+        alignment: "left",
+        lineSpacing: 1.3,
+        spaceBefore: 0,
+        spaceAfter: 8,
+      },
+    },
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_PAGE_WIDTH,
+    },
+  );
+
+  renderTextSection(
+    pager,
+    {
+      id: "generated_vote_table_meta",
+      type: "paragraph",
+      text:
+        `Date: ${resolution.meetingDate || "—"}\n` +
+        `Eligible Board Members: ${
+          resolution.eligibleVoterCount || 0
+        }`,
+      listStyle: "none",
+      style: {
+        fontFamily: "Helvetica",
+        fontSize: 10,
+        bold: false,
+        italic: false,
+        underline: false,
+        alignment: "left",
+        lineSpacing: 1.4,
+        spaceBefore: 0,
+        spaceAfter: 20,
+      },
+    },
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_PAGE_WIDTH,
+    },
+  );
+
+  renderVotesTable(
+    pager,
+    {
+      id: "generated_vote_table",
+      type: "votesTable",
+      title: "",
+      columns: normalized.columns,
+      options: {
+        ...normalized,
+        showTitle: false,
+      },
+      style: {
+        fontFamily: "Helvetica",
+        fontSize: 10,
+        headerFontSize: 10,
+        headerBold: true,
+        cellPadding: 7,
+        spaceBefore: 0,
+        spaceAfter: 18,
+      },
+      generatedPage: true,
+    },
+    details,
+  );
+
   return finishGeneratedPages(pager, "vote_table");
 }
 

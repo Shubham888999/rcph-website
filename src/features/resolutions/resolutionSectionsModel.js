@@ -9,8 +9,23 @@ export const VOTES_TABLE_COLUMNS = Object.freeze(["name", "position", "vote", "t
 export const GENERATED_PAGE_TYPES = Object.freeze(["resolution_page", "vote_table"]);
 export const DEFAULT_GENERATED_PAGE_ORDER = Object.freeze(["resolution_page", "vote_table"]);
 
-const DEFAULT_RESOLUTION_STATEMENT = "This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled Board Meeting, have considered and passed the resolution stated below in accordance with the applicable voting requirements and the records maintained by the Club.";
+const LEGACY_RESOLUTION_STATEMENT =
+  "This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled Board Meeting, have considered and passed the resolution stated below in accordance with the applicable voting requirements and the records maintained by the Club.";
 
+function resolutionSubjectMatter(resolution = {}) {
+  const title = cleanText(resolution.title || resolution.subject, 300);
+
+  return title
+    .replace(/^passing\s+the\s+resolution\s+of\s+/i, "")
+    .replace(/^resolution\s+of\s+/i, "")
+    .trim() || "[RESOLUTION SUBJECT]";
+}
+
+function createDefaultResolutionStatement(resolution = {}) {
+  const subject = resolutionSubjectMatter(resolution);
+
+  return `This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled board meeting with a majority of _____, have passed the Resolution of ${subject} of Rotaract Club of Pune Heritage for Rotary International Year 2026-27 by signing the attached document.`;
+}
 function cleanText(value, max = 50000) {
   if (typeof value !== "string") return "";
   const safe = Array.from(value, (character) => ({ character, code: character.charCodeAt(0) }))
@@ -237,20 +252,135 @@ export function normalizeGeneratedPageOrder(raw) {
 }
 
 export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
-  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const source =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? raw
+      : {};
+
+  const legacyTemplate = !source.version || source.version < 2;
+
+  const headingSource = {
+    ...source.heading,
+  };
+
+  const detailsStyleSource = {
+    ...source.detailsStyle,
+  };
+
+  const statementSource = {
+    ...source.mainStatement,
+  };
+
+  /*
+   * Migrate only the untouched version-1 template values.
+   * Explicit Admin customizations remain preserved.
+   */
+  if (
+    legacyTemplate &&
+    (!source.heading?.spaceAfter || source.heading.spaceAfter === 18)
+  ) {
+    headingSource.spaceAfter = 30;
+  }
+
+  if (
+    legacyTemplate &&
+    (!source.detailsStyle?.lineSpacing ||
+      source.detailsStyle.lineSpacing === 1.4)
+  ) {
+    detailsStyleSource.lineSpacing = 1.25;
+  }
+
+  if (
+    legacyTemplate &&
+    (!source.detailsStyle?.spaceAfter ||
+      source.detailsStyle.spaceAfter === 18)
+  ) {
+    detailsStyleSource.spaceAfter = 32;
+  }
+
+  const existingStatementText = cleanText(
+    source.mainStatement?.text,
+    RESOLUTION_PAGE_LIMITS.paragraphCharacters,
+  );
+
+  const useNewDefaultStatement =
+    !existingStatementText ||
+    existingStatementText === LEGACY_RESOLUTION_STATEMENT;
+
+  if (
+    legacyTemplate &&
+    (!source.mainStatement?.lineSpacing ||
+      source.mainStatement.lineSpacing === 1.35)
+  ) {
+    statementSource.lineSpacing = 1.45;
+  }
+
+  if (
+    legacyTemplate &&
+    (!source.mainStatement?.spaceBefore ||
+      source.mainStatement.spaceBefore === 4)
+  ) {
+    statementSource.spaceBefore = 0;
+  }
+
+  if (
+    legacyTemplate &&
+    (!source.mainStatement?.spaceAfter ||
+      source.mainStatement.spaceAfter === 16)
+  ) {
+    statementSource.spaceAfter = 24;
+  }
+
   return {
     enabled: source.enabled === true,
-    version: 1,
+    version: 2,
+
     heading: {
-      ...normalizeResolutionPageTextStyle(source.heading, { fontFamily: "Helvetica", fontSize: 16, bold: true, underline: true, alignment: "center", lineSpacing: 1.2, spaceBefore: 0, spaceAfter: 12 }),
-      text: cleanText(source.heading?.text ?? source.headingText, 120) || "RESOLUTION",
+      ...normalizeResolutionPageTextStyle(headingSource, {
+        fontFamily: "Helvetica",
+        fontSize: 16,
+        bold: true,
+        underline: true,
+        alignment: "center",
+        lineSpacing: 1.15,
+        spaceBefore: 0,
+        spaceAfter: 30,
+      }),
+      text:
+        cleanText(source.heading?.text ?? source.headingText, 120) ||
+        "RESOLUTION",
     },
+
     details: normalizeResolutionPageDetails(source.details, defaults),
-    detailsStyle: normalizeResolutionPageTextStyle(source.detailsStyle, { fontFamily: "Helvetica", fontSize: 10, bold: true, alignment: "left", lineSpacing: 1.25, spaceBefore: 0, spaceAfter: 10 }),
+
+    detailsStyle: normalizeResolutionPageTextStyle(
+      detailsStyleSource,
+      {
+        fontFamily: "Helvetica",
+        fontSize: 10,
+        bold: true,
+        alignment: "left",
+        lineSpacing: 1.25,
+        spaceBefore: 0,
+        spaceAfter: 32,
+      },
+    ),
+
     mainStatement: {
-      ...normalizeResolutionPageTextStyle(source.mainStatement, { fontFamily: "Helvetica", fontSize: 12, bold: true, alignment: "left", lineSpacing: 1.25, spaceBefore: 4, spaceAfter: 10 }),
-      text: cleanText(source.mainStatement?.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters) || DEFAULT_RESOLUTION_STATEMENT,
+      ...normalizeResolutionPageTextStyle(statementSource, {
+        fontFamily: "Helvetica",
+        fontSize: 12,
+        bold: true,
+        alignment: "left",
+        lineSpacing: 1.45,
+        spaceBefore: 0,
+        spaceAfter: 24,
+      }),
+      text: useNewDefaultStatement
+        ? createDefaultResolutionStatement(defaults)
+        : existingStatementText,
     },
+
     blocks: normalizeResolutionPageBlocks(source.blocks),
   };
 }

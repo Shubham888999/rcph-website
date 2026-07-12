@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildResolutionPagePdfPages } from "./resolutionCustomPdf.js";
 import {
   addResolutionSection,
   addResolutionPageBlock,
@@ -37,7 +38,23 @@ test("uploaded Votes Table configuration is normalized and Firestore safe", () =
   assert.equal(payload.uploadedVotesTableConfig.voterScope, "all");
   assert.equal(assertNoNestedArrays(payload.uploadedVotesTableConfig, "uploadedVotesTableConfig"), true);
 });
+test("generated Resolution Page retains the main statement", () => {
+  const config = createDefaultResolutionPageConfig({
+    title: "Budget approval",
+    meetingDate: "2026-07-02",
+  });
 
+  const pages = buildResolutionPagePdfPages(
+    { resolution: {} },
+    config,
+  );
+
+  assert.ok(
+    pages.flat().some((item) =>
+      item.text?.includes("This is to resolve that we"),
+    ),
+  );
+});
 test("Resolution Page config defaults disabled and initializes the official template", () => {
   const legacy = validateResolutionPdfLayout({}).payload;
   assert.equal(legacy.resolutionPageConfig.enabled, false);

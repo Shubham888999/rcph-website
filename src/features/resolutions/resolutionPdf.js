@@ -337,7 +337,7 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
     const backgroundName = page.letterhead === "official" ? "OfficialBG" : "BG";
     const commands = [
       `q\n${RESOLUTION_PDF_PAGE.width} 0 0 ${RESOLUTION_PDF_PAGE.height} 0 0 cm\n/${backgroundName} Do\nQ`,
-      ...(options.preview === true ? [`BT /F2 8 Tf ${RESOLUTION_CONTENT_BOUNDS.left} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (DRAFT PREVIEW) Tj ET`] : []),
+      ...(options.preview === true && options.previewLabel !== false ? [`BT /F2 8 Tf ${RESOLUTION_CONTENT_BOUNDS.left} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (DRAFT PREVIEW) Tj ET`] : []),
       ...(page.pageNumber === false ? [] : [`BT /F1 8 Tf ${RESOLUTION_PAGE_NUMBER_POSITION.x} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (Page ${index + 1} of ${pages.length}) Tj ET`]),
       ...page.map(textCommand),
     ];
