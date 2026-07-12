@@ -212,9 +212,39 @@ assert.match(rules, /match \/resolutionNumberIndex\/\{indexId\}[\s\S]*allow read
 async function runRolePositionRegressions() {
   let outcome = await runSync(accountSeed('target', 'pending', []));
   assert.equal(outcome.ok, true, 'approving pending Treasurer when vacant succeeds');
+  assert.equal(outcome.result.role, 'admin', 'Treasurer approval derives admin access');
   assert.deepEqual(outcome.result.addedPositionKeys, ['treasurer']);
   assert.equal(outcome.state.users.target.status, 'approved');
+  assert.equal(outcome.state.users.target.role, 'admin');
   assert.deepEqual(outcome.state.bodPositionOccupancy.treasurer.holderUids, ['target']);
+
+  outcome = await runSync(accountSeed('target', 'pending', []), {
+    role: 'gbm',
+    positionKeys: ['club-advisor'],
+  });
+  assert.equal(outcome.ok, true, 'Club Advisor can be assigned from account approval');
+  assert.equal(outcome.result.role, 'admin');
+  assert.deepEqual(outcome.result.positionKeys, ['club-advisor']);
+  assert.equal(outcome.state.users.target.role, 'admin');
+  assert.equal(outcome.state.bodMembers.target.active, true, 'Club Advisor creates BOD roster access');
+  assert.deepEqual(outcome.state.bodMembers.target.positionKeys, ['club-advisor']);
+
+  outcome = await runSync(accountSeed('target', 'pending', []), {
+    role: 'gbm',
+    positionKeys: ['co-cwd'],
+  });
+  assert.equal(outcome.ok, true, 'Co-Website Director can be assigned from account approval');
+  assert.equal(outcome.result.role, 'bod');
+  assert.deepEqual(outcome.result.positionKeys, ['co-cwd']);
+  assert.equal(outcome.state.users.target.role, 'bod');
+  assert.equal(outcome.state.bodMembers.target.active, true, 'Co-BOD creates BOD roster access');
+
+  outcome = await runSync(accountSeed('target', 'pending', []), {
+    role: 'bod',
+    positionKeys: ['co-secretary'],
+  });
+  assert.equal(outcome.ok, true, 'Co-Secretary derives admin access');
+  assert.equal(outcome.result.role, 'admin');
 
   const occupiedTreasurer = mergeSeed(
     accountSeed('target', 'pending', []),
@@ -237,6 +267,7 @@ async function runRolePositionRegressions() {
     positionKeys: ['secretary', 'rrro'],
   });
   assert.equal(outcome.ok, true, 'approved Admin can manage ordinary positions');
+  assert.equal(outcome.result.role, 'admin', 'Secretary plus lower position remains admin');
   assert.deepEqual(outcome.result.addedPositionKeys, ['rrro']);
 
   outcome = await runSync(accountSeed('target', 'bod', ['secretary'], { user: { status: 'approved' } }), {

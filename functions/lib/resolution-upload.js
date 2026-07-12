@@ -336,7 +336,7 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
         ? await drive.downloadFinalFile({ driveFileId: reference.driveFileId, resolutionId, finalizationId: reference.finalizationId || resolution.merge?.finalizationId, sha256: reference.sha256 })
         : await drive.downloadSourceFile({ driveFileId: reference.driveFileId, resolutionId, uploadId: reference.uploadId, sha256: reference.sha256 });
       if (sha256(downloaded.bytes) !== reference.sha256) throw serviceError('checksum-mismatch', 'The PDF checksum does not match.', 409);
-      const fileName = finalized ? `RCPH-${safeFileName(resolution.resolutionNumber, 'Resolution')}-Final.pdf` : safeFileName(reference.originalFileName);
+      const fileName = finalized ? `RCPH-${safeFileName(resolution.resolutionNumber || resolution.title || resolutionId, 'Resolution')}-Final.pdf` : safeFileName(reference.originalFileName);
       res.status(200).set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `${finalized ? 'attachment' : 'inline'}; filename="${fileName}"`, 'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' });
       return res.send(downloaded.bytes);
     } catch (error) {
@@ -376,8 +376,21 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
         sourceBytes,
         letterheadBytes: loadLetterheadBytes(),
         details: {
+          resolution: {
+            title: frozen.title,
+            subject: frozen.subject,
+            meetingDate: frozen.meetingDate,
+            date: frozen.date,
+            meetingLocation: frozen.meetingLocation,
+            place: frozen.place,
+          },
           resolutionNumber: frozen.resolutionNumber,
           title: frozen.title,
+          subject: frozen.subject,
+          meetingDate: frozen.meetingDate,
+          date: frozen.date,
+          meetingLocation: frozen.meetingLocation,
+          place: frozen.place,
           resultLabel: String(frozen.result || frozen.status || '').replaceAll('_', ' ').toUpperCase(),
           approveCount: frozen.approveCount,
           rejectCount: frozen.rejectCount,
@@ -395,7 +408,7 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
       let matches = await drive.findFinalFiles({ resolutionId: resolutionRef.id, finalizationId });
       if (matches.length > 1) throw serviceError('final-object-conflict', 'Multiple finalized Drive PDFs exist for this resolution.', 409);
       if (!matches.length) {
-        await drive.createFinalFile({ resolutionId: resolutionRef.id, resolutionNumber: frozen.resolutionNumber, finalizationId, sha256: merged.sha256, bytes: merged.bytes });
+        await drive.createFinalFile({ resolutionId: resolutionRef.id, resolutionNumber: frozen.resolutionNumber, title: frozen.title, finalizationId, sha256: merged.sha256, bytes: merged.bytes });
         matches = await drive.findFinalFiles({ resolutionId: resolutionRef.id, finalizationId });
         if (matches.length !== 1) throw serviceError('final-object-conflict', 'The finalized Drive PDF could not be uniquely identified.', 409);
       }

@@ -21,9 +21,24 @@ const {
   validatePdfLayout,
   validateDraftInput,
 } = require('../lib/resolutions');
+const {
+  ADMIN_POSITION_KEYS,
+  BOD_POSITION_KEYS,
+  CO_ADMIN_POSITION_KEYS,
+  CO_BOD_POSITION_KEYS,
+  buildPresidentAuthority,
+  derivePositionMetadata,
+  isResolutionVoterPosition,
+} = require('../lib/positions');
 
 const root = path.join(__dirname, '..', '..');
 const functionsIndex = fs.readFileSync(path.join(root, 'functions', 'index.js'), 'utf8');
+const resolutionUploadSource = fs.readFileSync(path.join(root, 'functions', 'lib', 'resolution-upload.js'), 'utf8');
+const resolutionPdfMergeSource = fs.readFileSync(path.join(root, 'functions', 'lib', 'resolution-pdf-merge.js'), 'utf8');
+const voterLoaderBody = functionsIndex.slice(
+  functionsIndex.indexOf('async function loadActiveResolutionVoters'),
+  functionsIndex.indexOf('function validateResolutionCustomCount')
+);
 const openVotingBody = functionsIndex.slice(
   functionsIndex.indexOf('exports.openResolutionVoting = onCall'),
   functionsIndex.indexOf('exports.submitResolutionVote = onCall')
@@ -69,6 +84,12 @@ assert.equal(normalizeVoteProcessingMode('authenticated_final'), 'authenticated_
 assert.equal(normalizeVoteProcessingMode('unknown'), '');
 assert.equal(isAuthenticatedFinalHybrid('hybrid_email', 'authenticated_final'), true);
 assert.equal(isAuthenticatedFinalHybrid('hybrid_email', ''), false);
+assert.equal(derivePositionMetadata(['club-advisor']).isResolutionVoter, true, 'Club Advisor is a Resolution voter');
+assert.equal(derivePositionMetadata(['co-club-advisor']).isResolutionVoter, true, 'Co-Club Advisor is a Resolution voter');
+assert.equal(derivePositionMetadata([]).isResolutionVoter, false, 'Admin role alone is not a Resolution voter');
+assert.equal(buildPresidentAuthority('admin', ['co-president']).hasPresidentAuthority, false, 'Co-President is not President-authorized');
+ADMIN_POSITION_KEYS.concat(CO_ADMIN_POSITION_KEYS, BOD_POSITION_KEYS, CO_BOD_POSITION_KEYS)
+  .forEach(key => assert.equal(isResolutionVoterPosition(key), true, `${key} is Resolution-voter eligible`));
 
 assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 4, votes: ['approve', 'reject'] }).status, 'rejected');
 assert.equal(calculateResolutionResult({ votingRule: 'simple_majority', eligibleVoterCount: 4, votes: ['approve', 'approve', 'reject', 'abstain'] }).status, 'passed');
@@ -89,10 +110,26 @@ assert.equal(isHybridVoteChoiceLocked('email_verified'), true);
 assert.equal(isHybridVoteChoiceLocked('email_rejected'), true);
 assert.equal(isHybridVoteChoiceLocked('invalidated_document_changed'), true);
 assert.match(openResolutionsBody, /requiredSenderEmail: normalizeEmail\(vote\.voterEmail \|\| ''\)/, 'member payload exposes only the current vote trusted sender email');
+assert.match(voterLoaderBody, /positionHelpers\.isResolutionVoterPosition\(positionKey\)/, 'Resolution voter loader uses canonical Resolution-voter metadata');
+assert.match(voterLoaderBody, /\['bod', 'admin', 'president'\]\.includes\(role\)/, 'Resolution voter loader allows Admin-level BOD-roster voters');
 assert.match(openVotingBody, /voteProcessingMode = approvalMethod === 'hybrid_email' \? 'authenticated_final' : ''/, 'new draft hybrid resolutions freeze authenticated-final processing when voting opens');
 assert.match(openVotingBody, /emailEvidenceRequired: false/, 'new opened resolutions do not require email evidence');
+assert.match(openVotingBody, /buildEligibleVoterSnapshot\(selectedVoters, selectedVoters\.map\(voter => voter\.uid\)\)/, 'openResolutionVoting freezes the selected eligible voter set');
+assert.match(functionsIndex, /const numberRef = prepared\.payload\.resolutionNumber[\s\S]*: null;/, 'blank resolution numbers skip create-time number index lookup');
+assert.match(functionsIndex, /if \(numberRef\) tx\.set\(numberRef/, 'blank resolution numbers skip create-time number index writes');
+assert.match(functionsIndex, /const oldNumberRef = existing\.resolutionNumber[\s\S]*: null;/, 'blank resolution numbers are safe when updating number indexes');
+assert.match(functionsIndex, /function resolutionTitleReference/, 'resolution email titles use a shared safe title helper');
+assert.match(functionsIndex, /subject: `Action Required: Vote on \$\{resolutionTitleReference\(resolution\)\}`/, 'dashboard notification subject remains readable without a number');
+assert.match(resolutionPdfMergeSource, /const RESOLUTION_PAGE_LEFT = BOUNDS\.left \+ RESOLUTION_PAGE_SIDE_INSET;/, 'backend merge renderer uses the generated Resolution Page side inset');
+assert.match(resolutionPdfMergeSource, /const RESOLUTION_PAGE_START_Y = START_Y \+ 28;/, 'backend merge renderer starts generated Resolution Pages at the preview Y position');
+assert.match(resolutionPdfMergeSource, /function renderResolutionDetails\(\)/, 'backend merge renderer has canonical Resolution details layout');
+assert.match(resolutionPdfMergeSource, /renderTwoColumnRow\(`Date - \$\{config\.details\.date \|\| ''\}`, `Place - \$\{config\.details\.place \|\| ''\}`\)/, 'backend merge renderer keeps Date and Place on one row');
+assert.match(resolutionPdfMergeSource, /renderTwoColumnRow\(`No\. of Board Members - \$\{config\.details\.boardMembersPresent \|\| ''\}`, `Total No\. of Board Members - \$\{config\.details\.totalBoardMembers \|\| ''\}`\)/, 'backend merge renderer keeps member counts on one row');
+assert.match(resolutionPdfMergeSource, /drawTextBlock\(config\.mainStatement\.text, \{ \.\.\.config\.mainStatement, lineSpacing: 1\.45 \}, \{ left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH \}\)/, 'backend merge renderer uses the preview statement width');
+assert.match(resolutionUploadSource, /rows: frozen\.finalizedVoteRowsSnapshot/, 'retry PDF merge uses frozen finalized vote rows');
 assert.match(submitVoteBody, /voterEmail: normalizeEmail\(voter\.email \|\| ''\)/, 'vote submission freezes the voter email used for verification');
 assert.match(submitVoteBody, /requiredSenderEmail: approvalMethod === 'hybrid_email' \? normalizeEmail\(voter\.email \|\| ''\) : ''/, 'submit response returns the same frozen sender email to the current voter');
+assert.match(submitVoteBody, /resolution\.eligibleVoters[\s\S]*resolution\.eligibleVoterUids[\s\S]*You are not an eligible voter/, 'submitResolutionVote validates against the frozen eligible-voter snapshot');
 assert.match(submitVoteBody, /if \(previousChoice && authenticatedFinalHybrid\)/, 'authenticated-final hybrid votes are locked after the first submission');
 assert.match(submitVoteBody, /previousChoice === choice[\s\S]*responseVote/, 'repeated authenticated-final submissions with the same choice are idempotent');
 assert.match(submitVoteBody, /This vote is final and cannot be changed/, 'changed authenticated-final submissions are rejected');
@@ -113,12 +150,19 @@ const invalid = validateDraftInput({ title: '', body: '', votingRule: 'invalid' 
 assert.equal(invalid.ok, false);
 assert.ok(invalid.errors.length >= 3);
 assert.equal(validateDraftInput(baseDraft()).ok, true);
+const blankNumberDraft = validateDraftInput(baseDraft({ resolutionNumber: '' }));
+assert.equal(blankNumberDraft.ok, true);
+assert.equal(blankNumberDraft.payload.resolutionNumber, '');
+assert.equal(blankNumberDraft.errors.some(error => /resolution number/i.test(error)), false);
 assert.equal(validateDraftInput(baseDraft({ votingRule: 'custom_approval_count', customApprovalCount: 0 })).ok, false);
 const recordOnly = validateDraftInput(baseDraft({ approvalMethod: 'record_only', votingRule: '' }));
 assert.equal(recordOnly.ok, true);
 assert.equal(recordOnly.payload.appendVoteTable, false);
 assert.deepEqual(recordOnly.payload.eligibleVoterIds, []);
 assert.match(buildPreparedReplyText({ voterName: 'Member', resolutionNumber: 'R/1', title: 'Budget', choice: 'approve', documentShortHash: 'ABC123', reference: 'REF-1' }), /Vote: APPROVE/);
+const blankNumberReply = buildPreparedReplyText({ voterName: 'Member', resolutionNumber: '', title: 'Budget', choice: 'approve', documentShortHash: 'ABC123', reference: 'REF-2' });
+assert.match(blankNumberReply, /Resolution: Budget/);
+assert.doesNotMatch(blankNumberReply, /Resolution\s+:|undefined|null/);
 for (const approvalMethod of ['website', 'hybrid_email', 'record_only']) {
   const optionalDraft = validateDraftInput(baseDraft({ body: '', proposedByUid: '', secondedByUid: '', approvalMethod, votingRule: 'simple_majority' }));
   assert.equal(optionalDraft.ok, true);
@@ -144,10 +188,13 @@ const frozenSnapshot = buildEligibleVoterSnapshot([
   { uid: 'u1', name: 'First', email: 'first@example.com', role: 'bod', position: 'Secretary', positionKeys: ['secretary'], active: true },
   { uid: 'u2', name: 'Second', email: 'second@example.com', role: 'president', position: 'President', positionKeys: ['president'], active: true },
   { uid: 'u3', name: 'Inactive', email: 'inactive@example.com', role: 'bod', position: 'Director', active: false },
-], ['u2', 'u3', 'u1']);
-assert.deepEqual(frozenSnapshot.map(voter => voter.uid), ['u2', 'u1']);
-assert.deepEqual(frozenSnapshot.map(voter => voter.email), ['second@example.com', 'first@example.com']);
-assert.deepEqual(frozenSnapshot.map(voter => voter.position), ['President', 'Secretary']);
+  { uid: 'u4', name: 'Advisor', email: 'advisor@example.com', role: 'admin', position: 'Club Advisor', positionKeys: ['club-advisor'], active: true },
+  { uid: 'u5', name: 'Multi', email: 'multi@example.com', role: 'admin', position: 'Co-Secretary, Co-Website Director', positionKeys: ['co-secretary', 'co-cwd'], active: true },
+], ['u2', 'u3', 'u1', 'u4', 'u5', 'u5']);
+assert.deepEqual(frozenSnapshot.map(voter => voter.uid), ['u2', 'u1', 'u4', 'u5']);
+assert.deepEqual(frozenSnapshot.map(voter => voter.email), ['second@example.com', 'first@example.com', 'advisor@example.com', 'multi@example.com']);
+assert.deepEqual(frozenSnapshot.map(voter => voter.position), ['President', 'Secretary', 'Club Advisor', 'Co-Secretary, Co-Website Director']);
+assert.deepEqual(frozenSnapshot.at(-1).positionKeys, ['co-secretary', 'co-cwd']);
 
 const defaultPdfLayout = validatePdfLayout({});
 assert.equal(defaultPdfLayout.ok, true);
@@ -159,6 +206,22 @@ assert.equal(defaultPdfLayout.payload.resolutionPageConfig.enabled, false);
 assert.deepEqual(defaultPdfLayout.payload.generatedPageOrder, ['resolution_page', 'vote_table']);
 assert.deepEqual(normalizeGeneratedPageOrder(['vote_table']), ['vote_table', 'resolution_page']);
 assert.equal(normalizeResolutionPageConfig({ enabled: false }).enabled, false);
+const placeholderStatement = normalizeResolutionPageConfig({ enabled: true }).mainStatement.text;
+const titleRepairedStatement = normalizeResolutionPageConfig(
+  { enabled: true, version: 2, mainStatement: { text: placeholderStatement } },
+  { title: 'Passing Club Bylaws', meetingDate: '12/07/2026', meetingLocation: "HPP'S House" }
+);
+assert.equal(titleRepairedStatement.version, 2);
+assert.match(titleRepairedStatement.mainStatement.text, /Resolution of Passing Club Bylaws/);
+assert.doesNotMatch(titleRepairedStatement.mainStatement.text, /\[RESOLUTION SUBJECT\]/);
+assert.equal(titleRepairedStatement.details.date, '12/07/2026');
+assert.equal(titleRepairedStatement.details.place, "HPP'S House");
+const customStatement = normalizeResolutionPageConfig(
+  { enabled: true, version: 2, mainStatement: { text: 'Custom [RESOLUTION SUBJECT] wording.' } },
+  { title: 'Passing Club Bylaws' }
+);
+assert.equal(customStatement.mainStatement.text, 'Custom [RESOLUTION SUBJECT] wording.');
+assert.match(normalizeResolutionPageConfig({ enabled: true, version: 2, mainStatement: { text: placeholderStatement } }).mainStatement.text, /\[RESOLUTION SUBJECT\]/);
 const resolutionPageLayout = validatePdfLayout({
   resolutionPageConfig: {
     enabled: true,

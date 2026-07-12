@@ -41,6 +41,7 @@ let result = plan({
   },
 });
 assertEqual(result.ok, true, 'position addition plan should pass');
+assertEqual(result.role, 'admin', 'Secretary plus RRRO derives admin access');
 assertDeepEqual(result.addedPositionKeys, ['rrro'], 'added position should be rrro');
 assertDeepEqual(result.removedPositionKeys, [], 'no positions should be removed');
 assertDeepEqual(result.newPositionKeys, ['secretary', 'rrro'], 'duplicates should normalize and sort');
@@ -48,7 +49,15 @@ assertDeepEqual(result.newPositionKeys, ['secretary', 'rrro'], 'duplicates shoul
 assertEqual(plan({ role: 'bod', requestedPositionKeys: [] }).ok, false, 'bod with zero positions fails');
 assertEqual(plan({ role: 'admin', requestedPositionKeys: [] }).ok, true, 'admin with zero positions passes');
 assertEqual(plan({ role: 'president', requestedPositionKeys: [] }).ok, true, 'president with zero positions passes');
-assertEqual(plan({ role: 'gbm', requestedPositionKeys: ['secretary'] }).ok, false, 'gbm with positions fails');
+result = plan({ role: 'gbm', requestedPositionKeys: ['co-cmd'] });
+assertEqual(result.ok, true, 'gbm with co-bod position is accepted');
+assertEqual(result.role, 'bod', 'gbm with co-bod position derives bod');
+result = plan({ role: 'gbm', requestedPositionKeys: ['secretary'] });
+assertEqual(result.ok, true, 'gbm with admin position is accepted');
+assertEqual(result.role, 'admin', 'gbm with admin position derives admin');
+result = plan({ role: 'admin', requestedPositionKeys: ['co-cwd'] });
+assertEqual(result.ok, true, 'admin request with only co-bod position is accepted');
+assertEqual(result.role, 'bod', 'client cannot force admin from only co-bod positions');
 
 result = plan({
   requestedPositionKeys: ['secretary'],

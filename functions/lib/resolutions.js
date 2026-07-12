@@ -36,6 +36,13 @@ function text(value, max) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '';
 }
 
+function resolutionTitleReference(resolutionNumber, title, separator = ' - ') {
+  const number = text(resolutionNumber, 80);
+  const name = text(title, 220);
+  if (!name) return number ? `Resolution ${number}` : 'Resolution';
+  return number ? `Resolution ${number}${separator}${name}` : `Resolution${separator}${name}`;
+}
+
 function multilineText(value, max) {
   return typeof value === 'string'
     ? value.trim().replace(/\r\n/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, max)
@@ -169,7 +176,6 @@ function validateDraftInput(raw) {
   };
   if (source.approvalMethod && !APPROVAL_METHODS.includes(text(source.approvalMethod, 60).toLowerCase())) errors.push('A valid approval method is required.');
   if (!payload.meetingId) errors.push('A valid BOD meeting is required.');
-  if (!payload.resolutionNumber) errors.push('Resolution number is required.');
   if (!payload.title) errors.push('Resolution title is required.');
   if (!isRecordOnly && !payload.votingRule) errors.push('A valid voting rule is required.');
   if (!isRecordOnly && payload.eligibleVoterIds.length < 1) errors.push('At least one eligible voter is required.');
@@ -257,8 +263,16 @@ function calculateResolutionResult({ votingRule, customApprovalCount, eligibleVo
 
 function buildEligibleVoterSnapshot(voters, selectedIds) {
   const voterByUid = new Map((Array.isArray(voters) ? voters : []).map(voter => [text(voter?.uid, 128), voter]));
-  return (Array.isArray(selectedIds) ? selectedIds : [])
-    .map(uid => voterByUid.get(text(uid, 128)))
+  const seen = new Set();
+  const uniqueSelectedIds = [];
+  for (const selectedId of (Array.isArray(selectedIds) ? selectedIds : [])) {
+    const uid = text(selectedId, 128);
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    uniqueSelectedIds.push(uid);
+  }
+  return uniqueSelectedIds
+    .map(uid => voterByUid.get(uid))
     .filter(Boolean)
     .map(voter => ({
       uid: text(voter.uid, 128),
@@ -293,7 +307,7 @@ function buildPreparedReplyText({ voterName, resolutionNumber, title, choice, do
     '',
     statement,
     '',
-    `Resolution ${text(resolutionNumber, 80)}: ${text(title, 220)}`,
+    resolutionTitleReference(resolutionNumber, title, ': '),
     '',
     `Vote: ${selected.toUpperCase()}`,
     '',

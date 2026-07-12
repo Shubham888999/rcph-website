@@ -10,7 +10,30 @@ const LIMITS = Object.freeze({ sections: 100, characters: 50000, rows: 200, colu
 const RESOLUTION_PAGE_LIMITS = Object.freeze({ blocks: 20, paragraphCharacters: 10000, rows: 100, columns: 10, cellCharacters: 2000 });
 const GENERATED_PAGE_TYPES = Object.freeze(['resolution_page', 'vote_table']);
 const DEFAULT_GENERATED_PAGE_ORDER = Object.freeze(['resolution_page', 'vote_table']);
-const DEFAULT_RESOLUTION_STATEMENT = 'This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled Board Meeting, have considered and passed the resolution stated below in accordance with the applicable voting requirements and the records maintained by the Club.';
+const LEGACY_RESOLUTION_STATEMENT = 'This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled Board Meeting, have considered and passed the resolution stated below in accordance with the applicable voting requirements and the records maintained by the Club.';
+const RESOLUTION_SUBJECT_PLACEHOLDER = '[RESOLUTION SUBJECT]';
+
+function resolutionSubjectMatter(resolution = {}) {
+  const title = text(resolution.title || resolution.subject, 300);
+  return title
+    .replace(/^passing\s+the\s+resolution\s+of\s+/i, '')
+    .replace(/^resolution\s+of\s+/i, '')
+    .trim() || RESOLUTION_SUBJECT_PLACEHOLDER;
+}
+
+function createDefaultResolutionStatement(resolution = {}) {
+  const subject = resolutionSubjectMatter(resolution);
+  return `This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled board meeting with a majority of _____, have passed the Resolution of ${subject} of Rotaract Club of Pune Heritage for Rotary International Year 2026-27 by signing the attached document.`;
+}
+
+function isUntouchedDefaultStatementWithPlaceholder(value) {
+  return value === createDefaultResolutionStatement({})
+    || (
+      value.includes(RESOLUTION_SUBJECT_PLACEHOLDER)
+      && value.replace(RESOLUTION_SUBJECT_PLACEHOLDER, '').trim()
+        === createDefaultResolutionStatement({ title: '' }).replace(RESOLUTION_SUBJECT_PLACEHOLDER, '').trim()
+    );
+}
 
 function text(value, max = 50000) {
   return typeof value === 'string' ? value.trim().replace(/\r\n/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, max) : '';
@@ -205,11 +228,31 @@ function normalizeResolutionPageBlocks(raw) {
 
 function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const legacyTemplate = !source.version || source.version < 2;
+  const headingSource = { ...source.heading };
+  const detailsStyleSource = { ...source.detailsStyle };
+  const statementSource = { ...source.mainStatement };
+
+  if (legacyTemplate && (!source.heading?.spaceAfter || source.heading.spaceAfter === 18)) headingSource.spaceAfter = 30;
+  if (legacyTemplate && (!source.detailsStyle?.lineSpacing || source.detailsStyle.lineSpacing === 1.4)) detailsStyleSource.lineSpacing = 1.25;
+  if (legacyTemplate && (!source.detailsStyle?.spaceAfter || source.detailsStyle.spaceAfter === 18)) detailsStyleSource.spaceAfter = 32;
+  if (legacyTemplate && (!source.mainStatement?.lineSpacing || source.mainStatement.lineSpacing === 1.35)) statementSource.lineSpacing = 1.45;
+  if (legacyTemplate && (!source.mainStatement?.spaceBefore || source.mainStatement.spaceBefore === 4)) statementSource.spaceBefore = 0;
+  if (legacyTemplate && (!source.mainStatement?.spaceAfter || source.mainStatement.spaceAfter === 16)) statementSource.spaceAfter = 24;
+
+  const existingStatementText = text(source.mainStatement?.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters);
+  const defaultStatement = createDefaultResolutionStatement(defaults);
+  const hasDefaultSubject = resolutionSubjectMatter(defaults) !== RESOLUTION_SUBJECT_PLACEHOLDER;
+  const useNewDefaultStatement =
+    !existingStatementText ||
+    existingStatementText === LEGACY_RESOLUTION_STATEMENT ||
+    (hasDefaultSubject && isUntouchedDefaultStatementWithPlaceholder(existingStatementText));
+
   return {
     enabled: source.enabled === true,
-    version: 1,
+    version: 2,
     heading: {
-      ...pageStyle(source.heading, { fontFamily: 'Helvetica', fontSize: 16, bold: true, underline: true, alignment: 'center', lineSpacing: 1.2, spaceBefore: 0, spaceAfter: 12 }),
+      ...pageStyle(headingSource, { fontFamily: 'Helvetica', fontSize: 16, bold: true, underline: true, alignment: 'center', lineSpacing: 1.15, spaceBefore: 0, spaceAfter: 30 }),
       text: text(source.heading?.text ?? source.headingText, 120) || 'RESOLUTION',
     },
     details: {
@@ -219,10 +262,10 @@ function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
       boardMembersPresent: text(source.details?.boardMembersPresent, 80),
       totalBoardMembers: text(source.details?.totalBoardMembers, 80),
     },
-    detailsStyle: pageStyle(source.detailsStyle, { fontFamily: 'Helvetica', fontSize: 10, bold: true, alignment: 'left', lineSpacing: 1.25, spaceBefore: 0, spaceAfter: 10 }),
+    detailsStyle: pageStyle(detailsStyleSource, { fontFamily: 'Helvetica', fontSize: 10, bold: true, alignment: 'left', lineSpacing: 1.25, spaceBefore: 0, spaceAfter: 32 }),
     mainStatement: {
-      ...pageStyle(source.mainStatement, { fontFamily: 'Helvetica', fontSize: 12, bold: true, alignment: 'left', lineSpacing: 1.25, spaceBefore: 4, spaceAfter: 10 }),
-      text: text(source.mainStatement?.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters) || DEFAULT_RESOLUTION_STATEMENT,
+      ...pageStyle(statementSource, { fontFamily: 'Helvetica', fontSize: 12, bold: true, alignment: 'left', lineSpacing: 1.45, spaceBefore: 0, spaceAfter: 24 }),
+      text: useNewDefaultStatement ? defaultStatement : existingStatementText,
     },
     blocks: normalizeResolutionPageBlocks(source.blocks),
   };

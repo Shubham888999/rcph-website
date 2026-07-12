@@ -11,6 +11,13 @@ const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_SOURCE_PAGES = 25;
 const PAGE = Object.freeze({ width: 595, height: 842 });
 const BOUNDS = Object.freeze({ left: 54, right: 541, bottom: 260, top: 665 });
+const WIDTH = BOUNDS.right - BOUNDS.left;
+const RESOLUTION_PAGE_SIDE_INSET = 28;
+const RESOLUTION_PAGE_LEFT = BOUNDS.left + RESOLUTION_PAGE_SIDE_INSET;
+const RESOLUTION_PAGE_WIDTH = WIDTH - RESOLUTION_PAGE_SIDE_INSET * 2;
+const RESOLUTION_STATEMENT_WIDTH = WIDTH;
+const START_Y = BOUNDS.top - 10;
+const RESOLUTION_PAGE_START_Y = START_Y + 28;
 const COLUMN_KEYS = Object.freeze(['name', 'position', 'vote', 'timestamp', 'signature']);
 const COLUMN_LABELS = Object.freeze({ name: 'Name', position: 'Position', vote: 'Vote', timestamp: 'Timestamp', signature: 'Signature' });
 
@@ -226,7 +233,8 @@ async function buildVoteAppendix(document, details, letterheadBytes) {
 }
 
 async function buildResolutionPageAppendix(document, details, letterheadBytes) {
-  const config = normalizeResolutionPageConfig(details.resolutionPageConfig, details);
+  const resolutionDefaults = details?.resolution && typeof details.resolution === 'object' ? details.resolution : details;
+  const config = normalizeResolutionPageConfig(details.resolutionPageConfig, resolutionDefaults);
   if (!config.enabled) return 0;
   const fonts = await embedResolutionFonts(document);
   const background = await document.embedPng(letterheadBytes);
@@ -238,7 +246,7 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
     page = document.addPage([PAGE.width, PAGE.height]);
     page.drawImage(background, { x: 0, y: 0, width: PAGE.width, height: PAGE.height });
     pages.push(page);
-    y = BOUNDS.top;
+    y = RESOLUTION_PAGE_START_Y;
   }
 
   function ensure(height) {
@@ -253,19 +261,21 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
     return left;
   }
 
-  function drawTextBlock(value, style) {
+  function drawTextBlock(value, style, options = {}) {
     const font = pickResolutionFont(fonts, style);
     const size = Number(style.fontSize) || 10;
     const lineSpacing = Number(style.lineSpacing) || 1.25;
     const lineHeight = size * lineSpacing;
-    const lines = wrapMultilineText(value, font, size, BOUNDS.right - BOUNDS.left);
+    const left = options.left ?? BOUNDS.left;
+    const width = options.width ?? WIDTH;
+    const lines = wrapMultilineText(value, font, size, width);
     if (style.spaceBefore) {
       ensure(style.spaceBefore);
       y -= style.spaceBefore;
     }
     for (const line of lines) {
       ensure(lineHeight);
-      const x = alignedX(line, font, size, style);
+      const x = alignedX(line, font, size, style, width, left);
       page.drawText(safePdfText(line), { x, y, size, font, color: rgb(0, 0, 0) });
       if (style.underline) {
         const width = font.widthOfTextAtSize(safePdfText(line), size);
@@ -277,6 +287,56 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
       ensure(style.spaceAfter);
       y -= style.spaceAfter;
     }
+  }
+
+  function renderResolutionDetails() {
+    const style = { ...config.detailsStyle, alignment: 'left' };
+    const font = pickResolutionFont(fonts, style);
+    const size = Number(style.fontSize) || 10;
+    const lineSpacing = Number(style.lineSpacing) || 1.25;
+    const lineHeight = size * lineSpacing;
+    const columnGap = 34;
+    const halfWidth = (RESOLUTION_PAGE_WIDTH - columnGap) / 2;
+    const rightColumnLeft = RESOLUTION_PAGE_LEFT + halfWidth + columnGap;
+
+    function drawLines(lines, rowY, left) {
+      lines.forEach((line, index) => {
+        page.drawText(safePdfText(line), { x: left, y: rowY - (index * lineHeight), size, font, color: rgb(0, 0, 0) });
+      });
+      return lines.length;
+    }
+
+    function renderTwoColumnRow(leftText, rightText) {
+      const leftLines = wrapMultilineText(leftText, font, size, halfWidth);
+      const rightLines = wrapMultilineText(rightText, font, size, halfWidth);
+      const rowLines = Math.max(leftLines.length, rightLines.length);
+      ensure(rowLines * lineHeight);
+      const rowY = y;
+      drawLines(leftLines, rowY, RESOLUTION_PAGE_LEFT);
+      drawLines(rightLines, rowY, rightColumnLeft);
+      y = rowY - rowLines * lineHeight;
+    }
+
+    if (style.spaceBefore) {
+      ensure(style.spaceBefore);
+      y -= style.spaceBefore;
+    }
+
+    const subjectLines = wrapMultilineText(`Subject: ${config.details.subject || ''}`, font, size, RESOLUTION_PAGE_WIDTH);
+    subjectLines.forEach(line => {
+      ensure(lineHeight);
+      page.drawText(safePdfText(line), { x: RESOLUTION_PAGE_LEFT, y, size, font, color: rgb(0, 0, 0) });
+      y -= lineHeight;
+    });
+
+    ensure(10);
+    y -= 10;
+    renderTwoColumnRow(`Date - ${config.details.date || ''}`, `Place - ${config.details.place || ''}`);
+    ensure(10);
+    y -= 10;
+    renderTwoColumnRow(`No. of Board Members - ${config.details.boardMembersPresent || ''}`, `Total No. of Board Members - ${config.details.totalBoardMembers || ''}`);
+    ensure(32);
+    y -= 32;
   }
 
   function drawTable(block) {
@@ -332,17 +392,11 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
   }
 
   addPage();
-  drawTextBlock(config.heading.text, config.heading);
-  drawTextBlock([
-    `Subject: ${config.details.subject || ''}`,
-    `Date: ${config.details.date || ''}`,
-    `Place: ${config.details.place || ''}`,
-    `No. of Board Members: ${config.details.boardMembersPresent || ''}`,
-    `Total No. of Board Members: ${config.details.totalBoardMembers || ''}`,
-  ].join('\n'), config.detailsStyle);
-  drawTextBlock(config.mainStatement.text, config.mainStatement);
+  drawTextBlock(config.heading.text, config.heading, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_PAGE_WIDTH });
+  renderResolutionDetails();
+  drawTextBlock(config.mainStatement.text, { ...config.mainStatement, lineSpacing: 1.45 }, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH });
   config.blocks.forEach(block => {
-    if (block.type === 'paragraph') drawTextBlock(block.text, block.style);
+    if (block.type === 'paragraph') drawTextBlock(block.text, block.style, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH });
     else if (block.type === 'table') drawTable(block);
   });
   return pages.length;

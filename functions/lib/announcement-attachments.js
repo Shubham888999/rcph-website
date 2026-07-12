@@ -497,6 +497,23 @@ function createAnnouncementAttachmentService(options = {}) {
     return { ok: true, removed: Boolean(driveFileId) };
   }
 
+  async function deleteAttachmentFile(attachment = {}, input = {}) {
+    const driveFileId = text(attachment.driveFileId, 300);
+    if (!driveFileId || attachment.status !== 'ready') return { ok: true, removed: false };
+    const driveFile = await getDriveFile(driveFileId);
+    assertTrustedDriveFile(driveFile, attachment);
+    await deleteDriveFile(driveFile.id);
+    const sessionId = text(attachment.uploadSessionId || input.sessionId, 300);
+    if (sessionId) {
+      await db.collection(ANNOUNCEMENT_ATTACHMENT_SESSION_COLLECTION).doc(sessionId).set({
+        status: 'deleted',
+        deletedAt: now(),
+        updatedAt: now(),
+      }, { merge: true }).catch(error => logger.warn('Announcement attachment session cleanup failed.', { code: error.code || 'session-cleanup-failed' }));
+    }
+    return { ok: true, removed: true };
+  }
+
   async function downloadAttachmentBytes(attachment) {
     if (!attachment?.driveFileId || attachment.status !== 'ready') throw serviceError('not-found', 'Announcement attachment is unavailable.', 404);
     const file = assertTrustedDriveFile(await getDriveFile(attachment.driveFileId), attachment);
@@ -568,6 +585,7 @@ function createAnnouncementAttachmentService(options = {}) {
   return {
     cleanupExpiredSessions,
     createUploadSession,
+    deleteAttachmentFile,
     downloadAttachmentBytes,
     emailAttachmentFromBytes,
     markPublished,

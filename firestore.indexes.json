@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "profileChangeAudit",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "targetUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "visitSubmissions",
       "queryScope": "COLLECTION",
       "fields": [

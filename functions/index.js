@@ -32,11 +32,14 @@ const bodEventSchema = require('./lib/bod-event-schema');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 const {
   MemberProfileValidationError,
-  normalizeMemberProfileUpdateInput,
   normalizeRid,
   normalizeStoredRid,
-  serializeMemberProfile,
 } = require('./lib/member-profile');
+const {
+  ProfileUpdateValidationError,
+  createProfileUpdateService,
+  normalizeDateOfBirth,
+} = require('./lib/profile-updates');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -45,6 +48,11 @@ const rolePositionAssignments = createPositionAssignmentService({
   admin,
   HttpsError,
   positionHelpers,
+});
+const profileUpdates = createProfileUpdateService({
+  db,
+  admin,
+  HttpsError,
 });
 const visitSubmissions = createVisitSubmissionService({
   db,
@@ -232,6 +240,18 @@ const ANNOUNCEMENT_EXPIRY_MAX_MS = 365 * 24 * 60 * 60 * 1000;
 const ANNOUNCEMENT_EMAIL_MAX_RECIPIENTS = 500;
 const RESOLUTIONS_COLLECTION = 'resolutions';
 const RESOLUTION_NUMBER_INDEX_COLLECTION = 'resolutionNumberIndex';
+const ADMIN_MAINTENANCE_AUDIT_COLLECTION = 'adminMaintenanceAudit';
+const FINE_EVENT_SOURCES = new Set([
+  'events',
+  'bodMeetings',
+  'districtEvents',
+]);
+
+const FINE_REASONS = new Set([
+  'missing_badge',
+  'late',
+]);
+const RESOLUTION_DELETION_AUDIT_COLLECTION = 'resolutionDeletionAudit';
 
 function normalizeRole(value) {
   return String(value || '').trim().toLowerCase();
@@ -243,6 +263,204 @@ function normalizeText(value, max = 300) {
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function normalizeFineDate(value, field = 'date') {
+  const date = normalizeText(value, 20);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new HttpsError(
+      'invalid-argument',
+      `${field} must be a valid YYYY-MM-DD date.`
+    );
+  }
+
+  const [year, month, day] =
+    date.split('-').map(Number);
+
+  const parsed =
+    new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      `${field} must be a valid date.`
+    );
+  }
+
+  return date;
+}
+
+function normalizeFineAmount(value) {
+  const amount = Number(value);
+
+  if (
+    !Number.isFinite(amount)
+    || amount <= 0
+    || amount > 1000000
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Fine amount must be greater than zero.'
+    );
+  }
+
+  return Math.round(amount * 100) / 100;
+}
+
+function validateFineDocumentId(value) {
+  const fineId = normalizeText(value, 128);
+
+  if (
+    !fineId
+    || fineId.includes('/')
+    || /[\u0000-\u001f\u007f]/.test(fineId)
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Valid fine ID required.'
+    );
+  }
+
+  return fineId;
+}
+
+function normalizeFineReason(value) {
+  const reason = normalizeText(value, 120);
+
+  if (!FINE_REASONS.has(reason)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Unsupported fine reason.'
+    );
+  }
+
+  return reason;
+}
+
+function getFineEventRef(eventSource, eventId) {
+  if (!FINE_EVENT_SOURCES.has(eventSource)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Unsupported event source.'
+    );
+  }
+
+  const safeEventId =
+    validateEventDocId(eventId);
+
+  if (!safeEventId) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Event or meeting is required.'
+    );
+  }
+
+  return db
+    .collection(eventSource)
+    .doc(safeEventId);
+}
+
+function resolveFineEventSnapshot({
+  eventSource,
+  eventId,
+  eventData,
+}) {
+  if (!eventData || eventData.archived === true) {
+    throw new HttpsError(
+      'failed-precondition',
+      'The selected event is unavailable.'
+    );
+  }
+
+  const eventName =
+    normalizeText(eventData.name, 180);
+
+  const eventDate =
+    normalizeFineDate(
+      eventData.date || eventData.eventStart,
+      'eventDate'
+    );
+
+  if (!eventName) {
+    throw new HttpsError(
+      'failed-precondition',
+      'The selected event has no valid name.'
+    );
+  }
+
+  let eventType = '';
+
+  if (eventSource === 'bodMeetings') {
+    eventType = 'bodMeeting';
+  } else if (eventSource === 'districtEvents') {
+    eventType = 'districtEvent';
+  } else {
+    if (
+      eventData.districtEventId
+      || eventData.type === 'districtEvent'
+      || eventData.kind === 'districtEvent'
+    ) {
+      throw new HttpsError(
+        'invalid-argument',
+        'Select this record from District Events.'
+      );
+    }
+
+    const avenues =
+      Array.isArray(eventData.avenue)
+        ? eventData.avenue
+        : [];
+
+    const isGbm = avenues.some(
+      (avenue) =>
+        String(avenue).trim().toUpperCase()
+        === 'GBM'
+    );
+
+    eventType =
+      isGbm ? 'gbm' : 'clubEvent';
+  }
+
+  return {
+    eventId,
+    eventSource,
+    eventType,
+    eventName,
+    eventDate,
+  };
+}
+
+function treasuryAvenueForFine(
+  eventType,
+  eventData
+) {
+  if (eventType === 'gbm') return 'GBM';
+  if (eventType === 'districtEvent') {
+    return 'Other';
+  }
+
+  if (
+    eventType === 'clubEvent'
+    && Array.isArray(eventData?.avenue)
+  ) {
+    const first =
+      eventData.avenue
+        .map((item) =>
+          String(item || '')
+            .trim()
+            .toUpperCase()
+        )
+        .find(Boolean);
+
+    if (first) return first;
+  }
+
+  return 'Club';
 }
 
 function hasPlainTextControlChars(value) {
@@ -631,7 +849,7 @@ function normalizeAnnouncementHistoryRequest(raw = {}) {
 
 function normalizeAnnouncementHistoryStatus(value) {
   const status = String(value || '').trim().toLowerCase();
-  if (['published', 'failed', 'publishing'].includes(status)) return status;
+  if (['published', 'failed', 'publishing', 'archived'].includes(status)) return status;
   return 'unknown';
 }
 
@@ -1451,8 +1669,30 @@ function throwCallableServiceError(err, fallbackMessage) {
   throw new HttpsError('internal', fallbackMessage);
 }
 
+async function commitFirestoreOperations(operations, batchSize = 450) {
+  let batch = db.batch();
+  let count = 0;
+  for (const apply of operations) {
+    apply(batch);
+    count += 1;
+    if (count >= batchSize) {
+      await batch.commit();
+      batch = db.batch();
+      count = 0;
+    }
+  }
+  if (count > 0) await batch.commit();
+}
+
 function throwMemberProfileError(err, fallbackMessage) {
   if (err instanceof MemberProfileValidationError) {
+    throw new HttpsError(err.code || 'invalid-argument', err.message);
+  }
+  throwCallableServiceError(err, fallbackMessage);
+}
+
+function throwProfileUpdateError(err, fallbackMessage) {
+  if (err instanceof ProfileUpdateValidationError) {
     throw new HttpsError(err.code || 'invalid-argument', err.message);
   }
   throwCallableServiceError(err, fallbackMessage);
@@ -1787,8 +2027,9 @@ async function loadActiveResolutionVoters() {
     const data = snap.data() || {};
     const uid = normalizeText(data.uid, 128);
     const positionKey = normalizeText(data.positionKey, 80).toLowerCase();
+    if (!uid || data.active !== true || !positionHelpers.isResolutionVoterPosition(positionKey)) return;
     const definition = positionHelpers.getPositionDefinition(positionKey);
-    if (!uid || !definition?.active || data.active !== true) return;
+    if (!definition) return;
     const current = byUid.get(uid) || { uid, positions: new Map() };
     current.positions.set(definition.key, definition);
     byUid.set(uid, current);
@@ -1914,8 +2155,15 @@ function resolutionDeadlineText(resolution) {
   return normalizeText(resolution.votingDeadline || resolution.deadline, 80) || 'Until voting is closed by the Resolution manager.';
 }
 
+function resolutionTitleReference(resolution, separator = ' - ') {
+  const number = normalizeText(resolution?.resolutionNumber, 80);
+  const title = normalizeText(resolution?.title, 220);
+  if (!title) return number ? `Resolution ${number}` : 'Resolution';
+  return number ? `Resolution ${number}${separator}${title}` : `Resolution${separator}${title}`;
+}
+
 function buildDefaultOfficialEmailSubject(resolution) {
-  return `Resolution ${normalizeText(resolution.resolutionNumber, 80)} - ${normalizeText(resolution.title, 220)}`;
+  return resolutionTitleReference(resolution);
 }
 
 function buildDefaultOfficialEmailBody(resolution, documentShortHash, actor) {
@@ -1933,7 +2181,7 @@ function buildDefaultOfficialEmailBody(resolution, documentShortHash, actor) {
     '',
     'A confirmed vote submitted through the authenticated RCPH Member Dashboard is official, final, and counted immediately.',
     '',
-    `Resolution ${normalizeText(resolution.resolutionNumber, 80)}: ${normalizeText(resolution.title, 220)}`,
+    resolutionTitleReference(resolution, ': '),
     '',
     'Document Fingerprint:',
     documentShortHash || '[SHORT HASH]',
@@ -1953,7 +2201,7 @@ function buildDashboardResolutionNotice({ resolution, voter, documentShortHash }
   return [
     `Dear Rtr. ${stripRotaractorPrefix(normalizeText(voter.name, 160))},`,
     '',
-    `Resolution ${normalizeText(resolution.resolutionNumber, 80)}: ${normalizeText(resolution.title, 220)} is now open for voting.`,
+    `${resolutionTitleReference(resolution, ': ')} is now open for voting.`,
     '',
     'Please review the attached resolution from the official email and submit your vote through your Member Dashboard.',
     '',
@@ -1989,7 +2237,7 @@ async function sendResolutionDashboardNotifications({ resolutionId, resolution, 
       await transporter.sendMail({
         from: `"RCPH Platform" <${EMAIL_USER}>`,
         to: email,
-        subject: `Action Required: Vote on Resolution ${normalizeText(resolution.resolutionNumber, 80)}`,
+        subject: `Action Required: Vote on ${resolutionTitleReference(resolution)}`,
         text: buildDashboardResolutionNotice({ resolution, voter, documentShortHash }),
       });
       summary.sent += 1;
@@ -2790,7 +3038,6 @@ function normalizeBodEventPayload(raw, options = {}) {
   const driveFolder = normalizeText(raw.driveFolder || raw.driveFolderId, 700);
 
   if (!name) throw new HttpsError('invalid-argument', 'Event name is required.');
-  if (!conductedBy) throw new HttpsError('invalid-argument', 'Conducted by is required.');
   if (!date) throw new HttpsError('invalid-argument', 'Start date is required.');
   if (!endDate) throw new HttpsError('invalid-argument', 'End date is required.');
   if (!avenue.length) throw new HttpsError('invalid-argument', 'Select at least one avenue.');
@@ -2936,19 +3183,18 @@ async function getCallableUserProfile(uid, request) {
 }
 
 async function initializeAttendanceForEvent(eventId, now) {
-  const membersSnap = await db.collection('members').get();
-  const activeMembers = membersSnap.docs.filter(doc => (doc.data() || {}).active !== false);
+  const participantIds = await loadGeneralAttendanceParticipantIds();
 
   const attendanceSnaps = await Promise.all(
-    activeMembers.map(memberDoc => db.collection('attendance').doc(memberDoc.id).get())
+    participantIds.map(participantId => db.collection('attendance').doc(participantId).get())
   );
 
   let batch = db.batch();
   let batchOps = 0;
   let attendanceRowsUpdated = 0;
 
-  for (let i = 0; i < activeMembers.length; i += 1) {
-    const memberDoc = activeMembers[i];
+  for (let i = 0; i < participantIds.length; i += 1) {
+    const participantId = participantIds[i];
     const attendanceSnap = attendanceSnaps[i];
     const existing = attendanceSnap.exists ? (attendanceSnap.data() || {}) : {};
 
@@ -2960,7 +3206,7 @@ async function initializeAttendanceForEvent(eventId, now) {
     };
     if (!attendanceSnap.exists || !existing.createdAt) payload.createdAt = now;
 
-    batch.set(db.collection('attendance').doc(memberDoc.id), payload, { merge: true });
+    batch.set(db.collection('attendance').doc(participantId), payload, { merge: true });
     batchOps += 1;
     attendanceRowsUpdated += 1;
 
@@ -2975,26 +3221,64 @@ async function initializeAttendanceForEvent(eventId, now) {
   return attendanceRowsUpdated;
 }
 
-async function initializeAttendanceFieldForCollection(memberCollection, attendanceCollection, fieldId, now) {
-  const membersSnap = await db.collection(memberCollection).get();
-  const activeMembers = membersSnap.docs.filter(doc => (doc.data() || {}).active !== false);
+function isApprovedGeneralAttendanceUser(user = {}) {
+  const role = normalizeRole(user.role);
+  const memberType = normalizeRole(user.memberType);
+  const status = normalizeRole(user.status);
+  return user.active !== false
+    && status === 'approved'
+    && (role === 'prospect' || role === 'gbm' || memberType === 'prospect' || memberType === 'member');
+}
+
+async function loadGeneralAttendanceParticipantIds() {
+  const [membersSnap, usersSnap] = await Promise.all([
+    db.collection('members').get(),
+    db.collection('users').get(),
+  ]);
+  const ids = [];
+  const seen = new Set();
+  const add = (id) => {
+    const safeId = normalizeText(id, 128);
+    if (!safeId || safeId.includes('/') || seen.has(safeId)) return;
+    seen.add(safeId);
+    ids.push(safeId);
+  };
+  membersSnap.docs
+    .filter(doc => (doc.data() || {}).active !== false)
+    .forEach(doc => {
+      const data = doc.data() || {};
+      const userId = normalizeText(data.userId || data.uid || '', 128);
+      add(userId || doc.id);
+    });
+  usersSnap.docs
+    .filter(doc => isApprovedGeneralAttendanceUser(doc.data() || {}))
+    .forEach(doc => add(doc.id));
+  return ids;
+}
+
+async function initializeAttendanceFieldForCollection(memberCollection, attendanceCollection, fieldId, now, options = {}) {
+  const participantIds = options.includeGeneralAttendanceUsers === true
+    ? await loadGeneralAttendanceParticipantIds()
+    : (await db.collection(memberCollection).get()).docs
+        .filter(doc => (doc.data() || {}).active !== false)
+        .map(doc => doc.id);
   const attendanceSnaps = await Promise.all(
-    activeMembers.map(memberDoc => db.collection(attendanceCollection).doc(memberDoc.id).get())
+    participantIds.map(participantId => db.collection(attendanceCollection).doc(participantId).get())
   );
 
   let batch = db.batch();
   let batchOps = 0;
   let rowsUpdated = 0;
 
-  for (let i = 0; i < activeMembers.length; i += 1) {
-    const memberDoc = activeMembers[i];
+  for (let i = 0; i < participantIds.length; i += 1) {
+    const participantId = participantIds[i];
     const attendanceSnap = attendanceSnaps[i];
     const existing = attendanceSnap.exists ? (attendanceSnap.data() || {}) : {};
     if (Object.prototype.hasOwnProperty.call(existing, fieldId)) continue;
 
     const payload = { [fieldId]: 'NA', updatedAt: now };
     if (!attendanceSnap.exists || !existing.createdAt) payload.createdAt = now;
-    batch.set(db.collection(attendanceCollection).doc(memberDoc.id), payload, { merge: true });
+    batch.set(db.collection(attendanceCollection).doc(participantId), payload, { merge: true });
     batchOps += 1;
     rowsUpdated += 1;
 
@@ -3542,8 +3826,15 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
   }
 
   const profile = await buildProfileFromAuth(uid, request, data);
+  let signupDateOfBirth = '';
+  try {
+    signupDateOfBirth = normalizeDateOfBirth(data.dateOfBirth);
+  } catch (err) {
+    throwProfileUpdateError(err, 'Invalid date of birth.');
+  }
   const commonSignupData = {
     phone: normalizeText(data.phone, 40),
+    dateOfBirth: signupDateOfBirth,
     gender: normalizeText(data.gender, 40).toLowerCase(),
     genderSelfDescribe: normalizeText(data.genderSelfDescribe ?? data.genderSelfDescription, 160),
   };
@@ -3810,36 +4101,46 @@ exports.updateMemberProfile = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
   await assertAdminOrPresidentAuthority(actorUid);
 
-  let input;
   try {
-    input = normalizeMemberProfileUpdateInput(request.data || {});
+    return await profileUpdates.updateAdminProfile({
+      actorUid,
+      data: request.data || {},
+    });
   } catch (err) {
-    throwMemberProfileError(err, 'Invalid member profile update.');
+    throwProfileUpdateError(err, 'Profile update failed.');
   }
-
-  const memberRef = db.collection('members').doc(input.memberId);
-  const now = admin.firestore.FieldValue.serverTimestamp();
-  let member = null;
-
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(memberRef);
-    if (!snap.exists) {
-      throw new HttpsError('not-found', 'Member profile not found.');
-    }
-
-    const current = snap.data() || {};
-    const update = {
-      ...input.payload,
-      updatedAt: now,
-      updatedBy: actorUid,
-    };
-
-    tx.set(memberRef, update, { merge: true });
-    member = serializeMemberProfile(input.memberId, { ...current, ...input.payload });
-  });
-
-  return { ok: true, member };
 });
+
+exports.updateMyProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+
+  try {
+    return await profileUpdates.updateSelfProfile({
+      actorUid,
+      data: request.data || {},
+    });
+  } catch (err) {
+    throwProfileUpdateError(err, 'Profile update failed.');
+  }
+});
+
+exports.getProfileChangeHistory = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  await assertAdminOrPresidentAuthority(actorUid);
+  const data = request.data || {};
+
+  try {
+    return await profileUpdates.getProfileChangeHistory({
+      actorUid,
+      targetUid: data.targetUid,
+      limit: Number.isInteger(data.limit) ? data.limit : undefined,
+      cursor: data.cursor || null,
+    });
+  } catch (err) {
+    throwProfileUpdateError(err, 'Profile history could not be loaded.');
+  }
+});
+
 
 exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   const approverUid = requireAuth(request);
@@ -4267,8 +4568,13 @@ exports.getProspectManagementData = onCall(CALLABLE_OPTIONS, async (request) => 
         name: stripRotaractorPrefix(normalizeText(user.name || user.email || uid, 160)),
         email: normalizeEmail(user.email || ''),
         phone: normalizeText(user.phone, 40),
+        dateOfBirth: profileUpdates.safeProfileFromUserData(user, 'prospect').dateOfBirth,
+        gender: normalizeText(user.gender, 40).toLowerCase(),
+        genderSelfDescribe: normalizeText(user.genderSelfDescribe, 160),
         hobbies: normalizeText(user.hobbies, 600),
+        previousRotaract: user.previousRotaract === true,
         joinReason: normalizeText(user.joinReason, 1200),
+        referred: user.referred === true,
         referredBy: normalizeText(user.referredBy || 'N/A', 160),
         previousRotaractDetails: normalizeText(user.previousRotaractDetails || 'N/A', 1200),
         role: normalizeRole(user.role),
@@ -4366,6 +4672,119 @@ exports.recalculateProspectProgress = onCall(CALLABLE_OPTIONS, async (request) =
   }
   const progress = await recalcProspectProgress(uid, { user });
   return { ok: true, uid, progress };
+});
+
+exports.deleteProspectAccount = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
+  await assertApprovedActiveCallableAccount(actorUid);
+  const uid = normalizeText(request.data?.uid, 128);
+  if (!uid || uid.includes('/')) throw new HttpsError('invalid-argument', 'Prospect uid is required.');
+  if (uid === actorUid) throw new HttpsError('failed-precondition', 'You cannot delete your own account.');
+
+  const refs = {
+    user: db.collection('users').doc(uid),
+    role: db.collection('roles').doc(uid),
+    progress: db.collection('prospectProgress').doc(uid),
+    member: db.collection('members').doc(uid),
+    attendance: db.collection('attendance').doc(uid),
+    districtAttendance: db.collection('districtAttendance').doc(uid),
+    bodMember: db.collection('bodMembers').doc(uid),
+    bodAttendance: db.collection('bodAttendance').doc(uid),
+  };
+  const [
+    userSnap,
+    roleSnap,
+    progressSnap,
+    memberSnap,
+    attendanceSnap,
+    districtAttendanceSnap,
+    bodMemberSnap,
+    bodAttendanceSnap,
+    memberByUserIdSnap,
+    memberByUidSnap,
+    bodMemberByUserIdSnap,
+    bodMemberByUidSnap,
+    deliverySnap,
+  ] = await Promise.all([
+    refs.user.get(),
+    refs.role.get(),
+    refs.progress.get(),
+    refs.member.get(),
+    refs.attendance.get(),
+    refs.districtAttendance.get(),
+    refs.bodMember.get(),
+    refs.bodAttendance.get(),
+    db.collection('members').where('userId', '==', uid).get(),
+    db.collection('members').where('uid', '==', uid).get(),
+    db.collection('bodMembers').where('userId', '==', uid).get(),
+    db.collection('bodMembers').where('uid', '==', uid).get(),
+    db.collection(ANNOUNCEMENT_DELIVERIES_COLLECTION).where('uid', '==', uid).get(),
+  ]);
+  const user = userSnap.exists ? (userSnap.data() || {}) : null;
+  const progress = progressSnap.exists ? (progressSnap.data() || {}) : {};
+  const role = roleSnap.exists ? (roleSnap.data() || {}) : {};
+  if (!user || user.active === false || normalizeRole(user.status) !== 'approved' || !isActiveProspectRecord(user) || isPromotedProspectRecord(user, progress)) {
+    throw new HttpsError('failed-precondition', 'Only a current approved Prospect account can be deleted.');
+  }
+  if (roleSnap.exists && normalizeRole(role.role) && normalizeRole(role.role) !== 'prospect') {
+    throw new HttpsError('failed-precondition', 'The account is no longer a Prospect.');
+  }
+
+  let authDeleted = false;
+  let authMissing = false;
+  try {
+    await admin.auth().deleteUser(uid);
+    authDeleted = true;
+  } catch (err) {
+    if (err?.code === 'auth/user-not-found') authMissing = true;
+    else throw new HttpsError('unavailable', 'Firebase Auth user could not be deleted.');
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const deletedPaths = [];
+  const deletedPathSet = new Set();
+  const operations = [];
+  function deleteRefIfExists(ref, exists) {
+    if (!exists || deletedPathSet.has(ref.path)) return;
+    deletedPathSet.add(ref.path);
+    deletedPaths.push(ref.path);
+    operations.push(batch => batch.delete(ref));
+  }
+  function deleteIfExists(ref, snap) {
+    deleteRefIfExists(ref, snap.exists);
+  }
+  deleteIfExists(refs.user, userSnap);
+  deleteIfExists(refs.role, roleSnap);
+  deleteIfExists(refs.progress, progressSnap);
+  deleteIfExists(refs.member, memberSnap);
+  deleteIfExists(refs.attendance, attendanceSnap);
+  deleteIfExists(refs.districtAttendance, districtAttendanceSnap);
+  deleteIfExists(refs.bodMember, bodMemberSnap);
+  deleteIfExists(refs.bodAttendance, bodAttendanceSnap);
+  [memberByUserIdSnap, memberByUidSnap, bodMemberByUserIdSnap, bodMemberByUidSnap].forEach(querySnap => {
+    querySnap.docs.forEach(doc => deleteRefIfExists(doc.ref, true));
+  });
+  deliverySnap.docs.forEach(doc => {
+    deleteRefIfExists(doc.ref, true);
+  });
+  const auditRef = db.collection(ADMIN_MAINTENANCE_AUDIT_COLLECTION).doc();
+  operations.push(batch => batch.set(auditRef, {
+    action: 'prospect_deleted',
+    actorUid,
+    actorRole: actorAuthority.role || '',
+    targetUid: uid,
+    targetEmail: normalizeEmail(user.email || ''),
+    targetName: stripRotaractorPrefix(normalizeText(user.name || '', 160)),
+    authDeleted,
+    authMissing,
+    deletedPaths,
+    deletedDeliveryCount: deliverySnap.size,
+    createdAt: now,
+  }));
+  await commitFirestoreOperations(operations);
+
+  return { ok: true, uid, authDeleted, authMissing, deletedPaths };
 });
 
 exports.promoteProspectToGbm = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -4475,6 +4894,498 @@ exports.promoteProspectToGbm = onCall(CALLABLE_OPTIONS, async (request) => {
 
   return { ok: true, uid, role: 'gbm', status: 'promoted' };
 });
+
+exports.createFine = onCall(
+  CALLABLE_OPTIONS,
+  async (request) => {
+    const actorUid = requireAuth(request);
+
+    const authority =
+      await assertAdminOrPresidentAuthority(
+        actorUid
+      );
+
+    await assertApprovedActiveCallableAccount(
+      actorUid
+    );
+
+    await assertPanelUnlockedForRole(
+      'fines',
+      authority,
+      'Fines'
+    );
+
+    await assertPanelUnlockedForRole(
+      'treasury',
+      authority,
+      'Treasury'
+    );
+
+    const data = request.data || {};
+
+    const fineId =
+      validateFineDocumentId(data.fineId);
+
+    const memberId =
+      normalizeText(data.memberId, 128);
+
+    if (
+      !memberId
+      || memberId.includes('/')
+    ) {
+      throw new HttpsError(
+        'invalid-argument',
+        'Valid member required.'
+      );
+    }
+
+    const reason =
+      normalizeFineReason(data.reason);
+
+    const amount =
+      normalizeFineAmount(data.amount);
+
+    const fineDate =
+      normalizeFineDate(
+        data.date,
+        'date'
+      );
+
+    const eventSource =
+      normalizeText(data.eventSource, 40);
+
+    const eventId =
+      validateEventDocId(data.eventId);
+
+    const memberRef =
+      db.collection('members').doc(memberId);
+
+    const eventRef =
+      getFineEventRef(
+        eventSource,
+        eventId
+      );
+
+    const fineRef =
+      db.collection('fines').doc(fineId);
+
+    const treasuryEntryId =
+      `fine_${fineId}`;
+
+    const treasuryRef =
+      db
+        .collection('treasury')
+        .doc(treasuryEntryId);
+
+    const auditRef =
+      db
+        .collection(
+          ADMIN_MAINTENANCE_AUDIT_COLLECTION
+        )
+        .doc();
+
+    const actorProfile =
+      await getCallableUserProfile(
+        actorUid,
+        request
+      );
+
+    let created = false;
+
+    await db.runTransaction(async (tx) => {
+      const [
+        memberSnap,
+        eventSnap,
+        fineSnap,
+        treasurySnap,
+      ] = await Promise.all([
+        tx.get(memberRef),
+        tx.get(eventRef),
+        tx.get(fineRef),
+        tx.get(treasuryRef),
+      ]);
+
+      if (!memberSnap.exists) {
+        throw new HttpsError(
+          'not-found',
+          'Member not found.'
+        );
+      }
+
+      const memberData =
+        memberSnap.data() || {};
+
+      if (memberData.active === false) {
+        throw new HttpsError(
+          'failed-precondition',
+          'Inactive members cannot receive fines.'
+        );
+      }
+
+      if (!eventSnap.exists) {
+        throw new HttpsError(
+          'not-found',
+          'Event or meeting not found.'
+        );
+      }
+
+      const eventData =
+        eventSnap.data() || {};
+
+      const event =
+        resolveFineEventSnapshot({
+          eventSource,
+          eventId,
+          eventData,
+        });
+
+      /*
+       * Safe idempotency:
+       * if both linked records already exist and
+       * match each other, return success without
+       * creating duplicates.
+       */
+      if (
+        fineSnap.exists
+        || treasurySnap.exists
+      ) {
+        const existingFine =
+          fineSnap.exists
+            ? fineSnap.data() || {}
+            : {};
+
+        const existingTreasury =
+          treasurySnap.exists
+            ? treasurySnap.data() || {}
+            : {};
+
+        const validExistingPair =
+          fineSnap.exists
+          && treasurySnap.exists
+          && existingFine.treasuryEntryId
+            === treasuryEntryId
+          && existingTreasury.source
+            === 'fine'
+          && existingTreasury.fineId
+            === fineId;
+
+        if (validExistingPair) {
+          created = false;
+          return;
+        }
+
+        throw new HttpsError(
+          'already-exists',
+          'A conflicting Fine or Treasury record already exists.'
+        );
+      }
+
+      const now =
+        admin.firestore.FieldValue
+          .serverTimestamp();
+
+      const memberName =
+        stripRotaractorPrefix(
+          normalizeText(
+            memberData.name
+              || data.memberName,
+            160
+          )
+        );
+
+      if (!memberName) {
+        throw new HttpsError(
+          'failed-precondition',
+          'Member name is unavailable.'
+        );
+      }
+
+      const treasuryAvenue =
+        treasuryAvenueForFine(
+          event.eventType,
+          eventData
+        );
+
+      const finePayload = {
+        memberId,
+        memberName,
+        reason,
+        amount,
+        date: fineDate,
+
+        eventId: event.eventId,
+        eventSource: event.eventSource,
+        eventType: event.eventType,
+        eventName: event.eventName,
+        eventDate: event.eventDate,
+
+        treasuryEntryId,
+
+        createdAt: now,
+        createdBy: actorUid,
+        createdByName:
+          actorProfile.name || '',
+        updatedAt: now,
+        updatedBy: actorUid,
+      };
+
+      const treasuryPayload = {
+        title: `Fine - ${reason}`,
+        name: `Fine - ${reason}`,
+
+        type: 'income',
+        amount,
+        date: fineDate,
+
+        avenue: treasuryAvenue,
+
+        purpose:
+          `Fine - ${reason} - ${memberName}`,
+
+        linkedEventName:
+          event.eventName,
+
+        paidBy: memberName,
+        paidByType: 'member',
+        paidByMemberId: memberId,
+
+        paidTo: '',
+        paidToType: '',
+        paidToMemberId: '',
+
+        paymentMode: '',
+        referenceNumber:
+          `FINE-${fineId}`,
+
+        reimbursementStatus:
+          'Not Applicable',
+
+        reimbursedTo: '',
+        reimbursementDate: '',
+
+        source: 'fine',
+        fineId,
+
+        memberId,
+        memberName,
+
+        eventId: event.eventId,
+        eventSource: event.eventSource,
+        eventType: event.eventType,
+        eventName: event.eventName,
+        eventDate: event.eventDate,
+
+        createdAt: now,
+        createdByUid: actorUid,
+        createdByName:
+          actorProfile.name || '',
+
+        updatedAt: now,
+        updatedByUid: actorUid,
+        updatedByName:
+          actorProfile.name || '',
+      };
+
+      tx.create(fineRef, finePayload);
+
+      tx.create(
+        treasuryRef,
+        treasuryPayload
+      );
+
+      tx.set(auditRef, {
+        action: 'fine_created',
+        actorUid,
+        actorRole:
+          authority.role || '',
+        fineId,
+        treasuryEntryId,
+        memberId,
+        memberName,
+        amount,
+        reason,
+        eventId: event.eventId,
+        eventSource:
+          event.eventSource,
+        eventName: event.eventName,
+        createdAt: now,
+      });
+
+      created = true;
+    });
+
+    return {
+      ok: true,
+      created,
+      fineId,
+      treasuryEntryId,
+    };
+  }
+);
+
+exports.deleteFine = onCall(
+  CALLABLE_OPTIONS,
+  async (request) => {
+    const actorUid = requireAuth(request);
+
+    const authority =
+      await assertAdminOrPresidentAuthority(
+        actorUid
+      );
+
+    await assertApprovedActiveCallableAccount(
+      actorUid
+    );
+
+    await assertPanelUnlockedForRole(
+      'fines',
+      authority,
+      'Fines'
+    );
+
+    await assertPanelUnlockedForRole(
+      'treasury',
+      authority,
+      'Treasury'
+    );
+
+    const fineId =
+      validateFineDocumentId(
+        request.data?.fineId
+      );
+
+    const fineRef =
+      db.collection('fines').doc(fineId);
+
+    const auditRef =
+      db
+        .collection(
+          ADMIN_MAINTENANCE_AUDIT_COLLECTION
+        )
+        .doc();
+
+    let treasuryDeleted = false;
+
+    await db.runTransaction(async (tx) => {
+      const fineSnap =
+        await tx.get(fineRef);
+
+      if (!fineSnap.exists) {
+        throw new HttpsError(
+          'not-found',
+          'Fine not found.'
+        );
+      }
+
+      const fineData =
+        fineSnap.data() || {};
+
+      /*
+       * New Fines store treasuryEntryId.
+       * Historical Fines may not.
+       */
+      const treasuryEntryId =
+        normalizeText(
+          fineData.treasuryEntryId,
+          128
+        );
+
+      let treasuryRef = null;
+      let treasurySnap = null;
+
+      if (treasuryEntryId) {
+        treasuryRef =
+          db
+            .collection('treasury')
+            .doc(treasuryEntryId);
+
+        treasurySnap =
+          await tx.get(treasuryRef);
+      }
+
+      if (treasurySnap?.exists) {
+        const treasuryData =
+          treasurySnap.data() || {};
+
+        if (
+          treasuryData.source !== 'fine'
+          || treasuryData.fineId !== fineId
+        ) {
+          throw new HttpsError(
+            'failed-precondition',
+            'The linked Treasury record does not match this Fine.'
+          );
+        }
+
+        tx.delete(treasuryRef);
+        treasuryDeleted = true;
+      }
+
+      const now =
+        admin.firestore.FieldValue
+          .serverTimestamp();
+
+      tx.set(auditRef, {
+        action: 'fine_deleted',
+        actorUid,
+        actorRole:
+          authority.role || '',
+
+        fineId,
+        treasuryEntryId:
+          treasuryEntryId || null,
+
+        treasuryDeleted,
+
+        memberId:
+          normalizeText(
+            fineData.memberId,
+            128
+          ),
+
+        memberName:
+          normalizeText(
+            fineData.memberName,
+            160
+          ),
+
+        amount:
+          Number(fineData.amount) || 0,
+
+        reason:
+          normalizeText(
+            fineData.reason,
+            120
+          ),
+
+        eventId:
+          normalizeText(
+            fineData.eventId,
+            128
+          ),
+
+        eventName:
+          normalizeText(
+            fineData.eventName,
+            180
+          ),
+
+        historicalFineWithoutLink:
+          !treasuryEntryId,
+
+        createdAt: now,
+      });
+
+      tx.delete(fineRef);
+    });
+
+    return {
+      ok: true,
+      fineId,
+      treasuryDeleted,
+    };
+  }
+);
 
 exports.updateClubRanking = onCall(CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
@@ -4734,6 +5645,96 @@ exports.publishAnnouncement = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, a
   }
 });
 
+exports.archiveAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
+  await assertApprovedActiveCallableAccount(actorUid);
+  const announcementId = validateAnnouncementDocId(request.data?.announcementId, 'announcementId');
+  const announcementRef = db.collection(ANNOUNCEMENTS_COLLECTION).doc(announcementId);
+  const auditRef = db.collection(ADMIN_MAINTENANCE_AUDIT_COLLECTION).doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(announcementRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Announcement not found.');
+    const data = snap.data() || {};
+    if (data.status === 'archived') return;
+    if (data.status !== 'published') {
+      throw new HttpsError('failed-precondition', 'Only published announcements are archived. Unpublished announcements may be deleted.');
+    }
+    tx.set(announcementRef, {
+      status: 'archived',
+      archivedFromStatus: data.status,
+      archivedAt: now,
+      archivedBy: actorUid,
+      updatedAt: now,
+    }, { merge: true });
+    tx.set(auditRef, {
+      action: 'announcement_archived',
+      actorUid,
+      actorRole: actorAuthority.role || '',
+      announcementId,
+      title: normalizeText(data.title, 160),
+      previousStatus: data.status,
+      recipientCount: normalizeNonNegativeInteger(data.recipientCount, 0),
+      createdAt: now,
+    });
+  });
+
+  return { ok: true, announcementId, status: 'archived' };
+});
+
+exports.deleteAnnouncement = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
+  await assertApprovedActiveCallableAccount(actorUid);
+  const announcementId = validateAnnouncementDocId(request.data?.announcementId, 'announcementId');
+  const announcementRef = db.collection(ANNOUNCEMENTS_COLLECTION).doc(announcementId);
+  const [announcementSnap, deliveriesSnap] = await Promise.all([
+    announcementRef.get(),
+    db.collection(ANNOUNCEMENT_DELIVERIES_COLLECTION).where('announcementId', '==', announcementId).get(),
+  ]);
+  if (!announcementSnap.exists) throw new HttpsError('not-found', 'Announcement not found.');
+  const data = announcementSnap.data() || {};
+  const status = normalizeAnnouncementHistoryStatus(data.status);
+  if (status === 'published' || (status === 'archived' && data.archivedFromStatus === 'published')) {
+    throw new HttpsError('failed-precondition', 'Published announcements must be archived, not deleted.');
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const deletedPaths = [announcementRef.path, ...deliveriesSnap.docs.map(doc => doc.ref.path)];
+  const auditRef = db.collection(ADMIN_MAINTENANCE_AUDIT_COLLECTION).doc();
+  const operations = [
+    batch => batch.set(auditRef, {
+      action: 'announcement_deleted',
+      actorUid,
+      actorRole: actorAuthority.role || '',
+      announcementId,
+      title: normalizeText(data.title, 160),
+      previousStatus: data.status || '',
+      recipientCount: normalizeNonNegativeInteger(data.recipientCount, 0),
+      deliveryCount: deliveriesSnap.size,
+      deletedPaths,
+      createdAt: now,
+    }),
+    batch => batch.delete(announcementRef),
+    ...deliveriesSnap.docs.map(doc => batch => batch.delete(doc.ref)),
+  ];
+  await commitFirestoreOperations(operations);
+
+  let attachmentRemoved = false;
+  if (data.attachment?.status === 'ready') {
+    try {
+      const result = await announcementAttachments.deleteAttachmentFile(data.attachment);
+      attachmentRemoved = result.removed === true;
+    } catch (err) {
+      console.warn('Announcement attachment cleanup after delete failed.', { announcementId, code: err?.code || 'drive-delete-failed' });
+    }
+  }
+
+  return { ok: true, announcementId, deletedPaths, attachmentRemoved };
+});
+
 exports.markAnnouncementRead = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const announcementId = validateAnnouncementDocId(request.data?.announcementId, 'announcementId');
@@ -4861,11 +5862,15 @@ exports.createResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
   const actor = await getResolutionManagerContext(uid);
   const prepared = await prepareResolutionDraftInput(request.data || {});
   const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc();
-  const numberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(prepared.payload.resolutionNumber));
+  const numberRef = prepared.payload.resolutionNumber
+    ? db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(prepared.payload.resolutionNumber))
+    : null;
   const now = resolutionTimestamp();
   await db.runTransaction(async tx => {
-    const numberSnap = await tx.get(numberRef);
-    if (numberSnap.exists) throw new HttpsError('already-exists', 'Resolution number already exists.');
+    if (numberRef) {
+      const numberSnap = await tx.get(numberRef);
+      if (numberSnap.exists) throw new HttpsError('already-exists', 'Resolution number already exists.');
+    }
     tx.set(resolutionRef, {
       ...prepared.payload,
       meetingTitle: prepared.meeting.title,
@@ -4911,7 +5916,7 @@ exports.createResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
       createdByName: actor.name,
       updatedAt: now,
     });
-    tx.set(numberRef, { resolutionId: resolutionRef.id, resolutionNumber: prepared.payload.resolutionNumber, createdAt: now });
+    if (numberRef) tx.set(numberRef, { resolutionId: resolutionRef.id, resolutionNumber: prepared.payload.resolutionNumber, createdAt: now });
     setResolutionAudit(tx, resolutionRef, 'resolution_created', actor, now, { newValue: { status: 'draft' } });
   });
   return { ok: true, resolutionId: resolutionRef.id };
@@ -4934,16 +5939,22 @@ exports.updateResolutionDraft = onCall(CALLABLE_OPTIONS, async (request) => {
       && existing.uploadedSource?.status === 'ready') {
       throw new HttpsError('failed-precondition', 'Remove the uploaded source PDF before changing the document source.');
     }
-    const oldNumberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(existing.resolutionNumber));
-    const newNumberRef = db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(prepared.payload.resolutionNumber));
-    const numberChanged = oldNumberRef.id !== newNumberRef.id;
+    const oldNumberRef = existing.resolutionNumber
+      ? db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(existing.resolutionNumber))
+      : null;
+    const newNumberRef = prepared.payload.resolutionNumber
+      ? db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(prepared.payload.resolutionNumber))
+      : null;
+    const numberChanged = (oldNumberRef?.id || '') !== (newNumberRef?.id || '');
     if (numberChanged) {
-      const newNumberSnap = await tx.get(newNumberRef);
-      if (newNumberSnap.exists && newNumberSnap.data()?.resolutionId !== resolutionId) {
-        throw new HttpsError('already-exists', 'Resolution number already exists.');
+      if (newNumberRef) {
+        const newNumberSnap = await tx.get(newNumberRef);
+        if (newNumberSnap.exists && newNumberSnap.data()?.resolutionId !== resolutionId) {
+          throw new HttpsError('already-exists', 'Resolution number already exists.');
+        }
       }
-      tx.delete(oldNumberRef);
-      tx.set(newNumberRef, { resolutionId, resolutionNumber: prepared.payload.resolutionNumber, createdAt: existing.createdAt || now, updatedAt: now });
+      if (oldNumberRef) tx.delete(oldNumberRef);
+      if (newNumberRef) tx.set(newNumberRef, { resolutionId, resolutionNumber: prepared.payload.resolutionNumber, createdAt: existing.createdAt || now, updatedAt: now });
     }
     tx.update(resolutionRef, {
       ...prepared.payload,
@@ -5546,6 +6557,97 @@ exports.cancelResolution = onCall(CALLABLE_OPTIONS, async (request) => {
   return { ok: true, resolutionId };
 });
 
+exports.deleteResolution = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const [resolutionSnap, votesSnap, auditSnap] = await Promise.all([
+    resolutionRef.get(),
+    resolutionRef.collection('votes').limit(1).get(),
+    resolutionRef.collection('audit').orderBy('timestamp', 'asc').get(),
+  ]);
+  if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+  const data = resolutionSnap.data() || {};
+  if (!['draft', 'cancelled'].includes(data.status)) {
+    throw new HttpsError('failed-precondition', 'Only draft or cancelled resolutions may be deleted.');
+  }
+  if (!votesSnap.empty) {
+    throw new HttpsError('failed-precondition', 'Resolutions with vote records cannot be deleted.');
+  }
+  const mergeStatus = normalizeText(data.merge?.status, 40);
+  if (data.finalizedMergedPdf?.driveFileId || data.finalPdfHash || data.finalizedUploadedSourceSnapshot?.driveFileId || ['ready', 'processing', 'pending'].includes(mergeStatus)) {
+    throw new HttpsError('failed-precondition', 'Finalized resolution artifacts must be preserved.');
+  }
+
+  const now = resolutionTimestamp();
+  const numberRef = data.resolutionNumber
+    ? db.collection(RESOLUTION_NUMBER_INDEX_COLLECTION).doc(resolutionNumberIndexId(data.resolutionNumber))
+    : null;
+  const numberSnap = numberRef ? await numberRef.get() : null;
+  const auditEntries = auditSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  const sourceToDelete = data.uploadedSource?.status === 'ready' ? data.uploadedSource : null;
+  const deletionAuditRef = db.collection(RESOLUTION_DELETION_AUDIT_COLLECTION).doc(resolutionId);
+  const deletedPaths = [resolutionRef.path, ...auditSnap.docs.map(doc => doc.ref.path)];
+  const operations = [
+    batch => batch.set(deletionAuditRef, {
+      action: 'resolution_deleted',
+      resolutionId,
+      actorUid: actor.uid,
+      actorName: actor.name,
+      actorPosition: actor.position,
+      deletedAt: now,
+      previousStatus: data.status || '',
+      resolutionNumber: normalizeText(data.resolutionNumber, 80),
+      title: normalizeText(data.title, 220),
+      meetingId: normalizeText(data.meetingId, 160),
+      meetingTitle: normalizeText(data.meetingTitle, 220),
+      createdByUid: normalizeText(data.createdByUid, 128),
+      createdAt: data.createdAt || null,
+      auditEntries,
+      deletedPaths,
+      uploadedSource: sourceToDelete ? {
+        uploadId: normalizeText(sourceToDelete.uploadId, 160),
+        driveFileId: normalizeText(sourceToDelete.driveFileId, 300),
+        sha256: normalizeText(sourceToDelete.sha256, 128),
+      } : null,
+    }),
+    batch => batch.delete(resolutionRef),
+    ...auditSnap.docs.map(doc => batch => batch.delete(doc.ref)),
+  ];
+  if (numberRef && numberSnap?.exists && numberSnap.data()?.resolutionId === resolutionId) {
+    deletedPaths.push(numberRef.path);
+    operations.push(batch => batch.delete(numberRef));
+  }
+  await commitFirestoreOperations(operations);
+
+  let sourceRemoved = false;
+  if (sourceToDelete?.driveFileId) {
+    try {
+      await resolutionDrive.deleteSourceFile({
+        driveFileId: sourceToDelete.driveFileId,
+        resolutionId,
+        uploadId: sourceToDelete.uploadId,
+        sha256: sourceToDelete.sha256,
+      });
+      sourceRemoved = true;
+    } catch (err) {
+      console.warn('Deleted Resolution source PDF cleanup failed.', { resolutionId, code: err?.code || 'drive-delete-failed' });
+    }
+    if (sourceToDelete.uploadId) {
+      const sessions = await db.collection('resolutionPdfUploadSessions').where('uploadId', '==', sourceToDelete.uploadId).get();
+      const sessionOps = sessions.docs.map(doc => batch => batch.set(doc.ref, {
+        status: 'deleted',
+        deletedAt: resolutionTimestamp(),
+        updatedAt: resolutionTimestamp(),
+      }, { merge: true }));
+      if (sessionOps.length) await commitFirestoreOperations(sessionOps);
+    }
+  }
+
+  return { ok: true, resolutionId, sourceRemoved, deletedPaths };
+});
+
 exports.getAdminResolutions = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   await getResolutionManagerContext(uid);
@@ -5715,17 +6817,12 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
       announcements,
       openResolutions,
       profile: {
-        uid,
-        name: userData.name || request.auth?.token?.name || '',
-        email: userData.email || request.auth?.token?.email || '',
-        role: 'prospect',
+        ...profileUpdates.safeProfileFromUserData({
+          ...userData,
+          name: userData.name || request.auth?.token?.name || '',
+          email: userData.email || request.auth?.token?.email || '',
+        }, 'prospect', { uid }),
         clubPosition: 'Prospect',
-        phone: userData.phone || '',
-        gender: userData.gender || '',
-        hobbies: userData.hobbies || '',
-        joinReason: userData.joinReason || '',
-        referredBy: userData.referredBy || 'N/A',
-        previousRotaractDetails: userData.previousRotaractDetails || 'N/A',
       },
       prospectProgress: {
         criteriaVersion: progressData.criteriaVersion,
@@ -5871,10 +6968,11 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     announcements,
     openResolutions,
     profile: {
-      uid,
-      name: userData.name || memberData.name || request.auth?.token?.name || '',
-      email: userData.email || memberData.email || request.auth?.token?.email || '',
-      role: active.role,
+      ...profileUpdates.safeProfileFromUserData({
+        ...userData,
+        name: userData.name || memberData.name || request.auth?.token?.name || '',
+        email: userData.email || memberData.email || request.auth?.token?.email || '',
+      }, active.role, { uid }),
       clubPosition: userData.clubPosition || '',
       memberName: memberData.name || '',
       memberPosition: memberData.position || '',
@@ -6550,7 +7648,7 @@ exports.createDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => 
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   const result = await writeDistrictEventSynced({ districtEventId, payload, uid, userProfile, now });
-  const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('members', 'districtAttendance', districtEventId, now);
+  const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('members', 'districtAttendance', districtEventId, now, { includeGeneralAttendanceUsers: true });
   return { ok: true, districtEventId, attendanceRowsUpdated, ...result };
 });
 
@@ -6567,7 +7665,7 @@ exports.updateDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => 
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   const result = await writeDistrictEventSynced({ districtEventId, payload, uid, userProfile, now });
-  const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('members', 'districtAttendance', districtEventId, now);
+  const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('members', 'districtAttendance', districtEventId, now, { includeGeneralAttendanceUsers: true });
   return { ok: true, districtEventId, attendanceRowsUpdated, ...result };
 });
 

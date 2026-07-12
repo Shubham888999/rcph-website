@@ -25,7 +25,7 @@ function blockBetween(source, startMarker, endMarker) {
 const updateMemberProfileBlock = blockBetween(
   functionsIndex,
   'exports.updateMemberProfile = onCall',
-  'exports.approveUserRole = onCall'
+  'exports.updateMyProfile = onCall'
 );
 const signupBlock = blockBetween(
   functionsIndex,
@@ -77,10 +77,10 @@ assert.deepEqual(serializeMemberProfile('m1', {
 });
 
 assert.match(updateMemberProfileBlock, /assertAdminOrPresidentAuthority\(actorUid\)/, 'member profile callable uses trusted Admin tools authorization');
-assert.match(updateMemberProfileBlock, /normalizeMemberProfileUpdateInput/, 'member profile callable validates whitelisted fields');
-assert.match(updateMemberProfileBlock, /updatedAt: now/, 'member profile callable writes updatedAt');
-assert.match(updateMemberProfileBlock, /updatedBy: actorUid/, 'member profile callable writes updatedBy');
-assert.match(updateMemberProfileBlock, /serializeMemberProfile/, 'member profile callable returns normalized member record');
+assert.match(updateMemberProfileBlock, /profileUpdates\.updateAdminProfile/, 'member profile callable delegates to canonical profile service');
+assert.doesNotMatch(updateMemberProfileBlock, /normalizeMemberProfileUpdateInput/, 'member profile callable no longer performs legacy member roster edits directly');
+assert.doesNotMatch(updateMemberProfileBlock, /rid:/, 'member profile callable no longer updates RID');
+assert.doesNotMatch(updateMemberProfileBlock, /active:/, 'member profile callable no longer updates active status');
 assert.doesNotMatch(updateMemberProfileBlock, /admin\.auth\(\)\.updateUser/, 'member profile callable does not mutate Auth email');
 assert.doesNotMatch(updateMemberProfileBlock, /canAccessPresidentControls/, 'member profile callable does not broaden President controls');
 

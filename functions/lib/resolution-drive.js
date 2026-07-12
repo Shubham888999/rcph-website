@@ -147,11 +147,11 @@ function createResolutionDriveService(options = {}) {
     await deleteFile(file.id);
   }
 
-  async function createFinalFile({ resolutionId, resolutionNumber, finalizationId, sha256, bytes }) {
+  async function createFinalFile({ resolutionId, resolutionNumber, title, finalizationId, sha256, bytes }) {
     const config = getConfig();
     return createPdf({
       folderId: config.finalFolderId,
-      name: `RCPH-${safeNamePart(resolutionNumber)}-${safeNamePart(finalizationId)}.pdf`,
+      name: `RCPH-${safeNamePart(resolutionNumber || title || resolutionId)}-${safeNamePart(finalizationId)}.pdf`,
       bytes,
       appProperties: { resolutionId, finalizationId, sha256, documentType: 'resolution-final' },
     });

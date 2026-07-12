@@ -21,6 +21,9 @@ service cloud.firestore {
     function presidentAssignmentPath() {
       return /databases/$(database)/documents/bodPositionAssignments/$(("president_" + request.auth.uid));
     }
+    function saaAssignmentPath() {
+  return /databases/$(database)/documents/bodPositionAssignments/$(("saa_" + request.auth.uid));
+}
 
     function hasRole(role) {
       return signedIn()
@@ -55,6 +58,18 @@ service cloud.firestore {
         && get(presidentAssignmentPath()).data.active == true;
     }
 
+function hasActiveSaaAssignment() {
+  return hasAnyRole(['bod', 'admin', 'president'])
+    && exists(userPath())
+    && get(userPath()).data.get('status', '') == 'approved'
+    && get(userPath()).data.get('active', true) != false
+    && get(userPath()).data.get('positionKeys', []).hasAny(['saa'])
+    && exists(saaAssignmentPath())
+    && get(saaAssignmentPath()).data.positionKey == 'saa'
+    && get(saaAssignmentPath()).data.uid == request.auth.uid
+    && get(saaAssignmentPath()).data.active == true;
+}
+
     function hasWebsiteDirectorPosition() {
       return signedIn()
         && hasAnyRole(['bod', 'admin', 'president'])
@@ -72,10 +87,11 @@ service cloud.firestore {
       return hasActivePresidentAssignment() || hasWebsiteDirectorPosition();
     }
 
-    function isAdmin() {
-      return hasRole('admin') || hasPresidentAuthority();
-    }
-
+function isAdmin() {
+  return hasRole('admin')
+    || hasPresidentAuthority()
+    || hasActiveSaaAssignment();
+}
     function isApprovedBod() {
       return hasRole('bod') || isAdmin();
     }
@@ -85,6 +101,18 @@ service cloud.firestore {
         || hasApprovedActiveRole('president')
         || hasPresidentAuthority();
     }
+
+function isFineLinkedTreasury(data) {
+  return data.keys().hasAny([
+    'fineId',
+    'linkedFineId',
+    'treasuryEntryId'
+  ])
+  || (
+    data.keys().hasAny(['source'])
+    && data.source == 'fine'
+  );
+}
 
     function panelLocked(panelKey) {
       return exists(/databases/$(database)/documents/locks/$(panelKey))
@@ -169,6 +197,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /profileChangeAudit/{auditId} {
+      allow read, write: if false;
+    }
+
+    match /adminMaintenanceAudit/{auditId} {
+      allow read, write: if false;
+    }
+
     match /visitSubmissionConfig/{visitType} {
       allow read, write: if false;
     }
@@ -244,15 +280,43 @@ service cloud.firestore {
       allow delete: if isApprovedBod() && !panelLocked('bodEvents');
     }
 
-    match /fines/{fineId} {
-      allow read: if isAdmin();
-      allow create, update, delete: if isAdmin() && !panelLocked('fines');
-    }
+match /fines/{fineId} {
+  allow read: if isAdmin();
 
-    match /treasury/{transactionId} {
-      allow read: if isAdmin();
-      allow create, update, delete: if isAdmin() && !panelLocked('treasury');
-    }
+  // Fine creation/deletion must go through
+  // trusted Functions so Treasury stays linked.
+  allow create, update, delete: if false;
+}
+
+match /treasury/{transactionId} {
+  allow read: if isAdmin();
+
+  // Manual Treasury entries remain client-managed.
+  // Fine-linked Treasury entries are backend-only.
+  allow create:
+    if isAdmin()
+    && !panelLocked('treasury')
+    && !isFineLinkedTreasury(
+      request.resource.data
+    );
+
+  allow update:
+    if isAdmin()
+    && !panelLocked('treasury')
+    && !isFineLinkedTreasury(
+      resource.data
+    )
+    && !isFineLinkedTreasury(
+      request.resource.data
+    );
+
+  allow delete:
+    if isAdmin()
+    && !panelLocked('treasury')
+    && !isFineLinkedTreasury(
+      resource.data
+    );
+}
 
     match /locks/{panelId} {
       allow read: if signedIn();
@@ -291,6 +355,22 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /resolutionDeletionAudit/{auditId} {
+      allow read, write: if false;
+    }
+
+    match /announcements/{announcementId} {
+      allow read, write: if false;
+    }
+
+    match /announcementDeliveries/{deliveryId} {
+      allow read, write: if false;
+    }
+
+    match /announcementAttachmentUploadSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
     match /resolutionPdfUploadSessions/{sessionId} {
       allow read, write: if false;
     }
@@ -304,4 +384,3 @@ service cloud.firestore {
     }
   }
 }
-

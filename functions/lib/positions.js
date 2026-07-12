@@ -5,8 +5,10 @@ const RAW_POSITION_CATALOG = [
     key: 'president',
     displayTitle: 'President',
     avenueCode: 'PRES',
-    group: 'executive',
+    group: 'admin',
     sortOrder: 1,
+    effectiveRole: 'president',
+    bodRoster: true,
     aliases: ['President', 'Club President'],
     active: true,
   },
@@ -14,8 +16,10 @@ const RAW_POSITION_CATALOG = [
     key: 'immediate-past-president',
     displayTitle: 'Immediate Past President',
     avenueCode: 'IPP',
-    group: 'executive',
+    group: 'admin',
     sortOrder: 2,
+    effectiveRole: 'admin',
+    bodRoster: true,
     aliases: ['Immediate Past President', 'IPP'],
     active: true,
   },
@@ -23,8 +27,10 @@ const RAW_POSITION_CATALOG = [
     key: 'vice-president',
     displayTitle: 'Vice President',
     avenueCode: 'VP',
-    group: 'executive',
+    group: 'admin',
     sortOrder: 3,
+    effectiveRole: 'admin',
+    bodRoster: true,
     aliases: ['Vice President', 'Vice-President', 'VP'],
     active: true,
   },
@@ -32,8 +38,10 @@ const RAW_POSITION_CATALOG = [
     key: 'secretary',
     displayTitle: 'Secretary',
     avenueCode: 'SEC',
-    group: 'executive',
+    group: 'admin',
     sortOrder: 4,
+    effectiveRole: 'admin',
+    bodRoster: true,
     aliases: ['Secretary', 'Club Secretary'],
     active: true,
   },
@@ -41,8 +49,10 @@ const RAW_POSITION_CATALOG = [
     key: 'joint-secretary',
     displayTitle: 'Joint Secretary',
     avenueCode: 'JSEC',
-    group: 'executive',
+    group: 'admin',
     sortOrder: 5,
+    effectiveRole: 'admin',
+    bodRoster: true,
     aliases: ['Joint Secretary', 'Joint-Secretary'],
     active: true,
   },
@@ -50,17 +60,32 @@ const RAW_POSITION_CATALOG = [
     key: 'treasurer',
     displayTitle: 'Treasurer',
     avenueCode: 'TREAS',
-    group: 'executive',
+    group: 'admin',
     sortOrder: 6,
+    effectiveRole: 'admin',
+    bodRoster: true,
     aliases: ['Treasurer', 'Club Treasurer'],
+    active: true,
+  },
+  {
+    key: 'club-advisor',
+    displayTitle: 'Club Advisor',
+    avenueCode: 'ADV',
+    group: 'admin',
+    sortOrder: 7,
+    effectiveRole: 'admin',
+    bodRoster: true,
+    aliases: ['Club Advisor', 'Advisor'],
     active: true,
   },
   {
     key: 'csd',
     displayTitle: 'Club Service Director',
     avenueCode: 'CSD',
-    group: 'avenue-directors',
-    sortOrder: 7,
+    group: 'bod',
+    sortOrder: 20,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['CSD', 'Club Service', 'Club Service Director'],
     active: true,
   },
@@ -68,8 +93,10 @@ const RAW_POSITION_CATALOG = [
     key: 'cmd',
     displayTitle: 'Community Service Director',
     avenueCode: 'CMD',
-    group: 'avenue-directors',
-    sortOrder: 8,
+    group: 'bod',
+    sortOrder: 21,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['CMD', 'Community Service', 'Community Service Director'],
     active: true,
   },
@@ -77,8 +104,10 @@ const RAW_POSITION_CATALOG = [
     key: 'isd',
     displayTitle: 'International Service Director',
     avenueCode: 'ISD',
-    group: 'avenue-directors',
-    sortOrder: 9,
+    group: 'bod',
+    sortOrder: 22,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['ISD', 'International Service', 'International Service Director'],
     active: true,
   },
@@ -86,8 +115,10 @@ const RAW_POSITION_CATALOG = [
     key: 'pdd',
     displayTitle: 'Professional Development Director',
     avenueCode: 'PDD',
-    group: 'avenue-directors',
-    sortOrder: 10,
+    group: 'bod',
+    sortOrder: 23,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['PDD', 'Professional Development', 'Professional Development Director'],
     active: true,
   },
@@ -95,8 +126,10 @@ const RAW_POSITION_CATALOG = [
     key: 'rrro',
     displayTitle: 'Rotary Rotaract Relations Officer',
     avenueCode: 'RRRO',
-    group: 'officers-representatives',
-    sortOrder: 11,
+    group: 'bod',
+    sortOrder: 24,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['RRRO', 'Rotary Rotaract Relations Officer', 'Rotary-Rotaract Relations Officer'],
     active: true,
   },
@@ -104,8 +137,10 @@ const RAW_POSITION_CATALOG = [
     key: 'pro',
     displayTitle: 'Public Relations Officer',
     avenueCode: 'PRO',
-    group: 'officers-representatives',
-    sortOrder: 12,
+    group: 'bod',
+    sortOrder: 25,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['PRO', 'Public Relations', 'Public Relations Officer'],
     active: true,
   },
@@ -113,8 +148,10 @@ const RAW_POSITION_CATALOG = [
     key: 'dei',
     displayTitle: 'DEI Director',
     avenueCode: 'DEI',
-    group: 'officers-representatives',
-    sortOrder: 13,
+    group: 'bod',
+    sortOrder: 26,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: [
       'DEI',
       'DEI Director',
@@ -127,8 +164,10 @@ const RAW_POSITION_CATALOG = [
     key: 'editor',
     displayTitle: 'Editor',
     avenueCode: 'EDITOR',
-    group: 'officers-representatives',
-    sortOrder: 14,
+    group: 'bod',
+    sortOrder: 27,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['Editor', 'Club Editor'],
     active: true,
   },
@@ -136,8 +175,10 @@ const RAW_POSITION_CATALOG = [
     key: 'cwd',
     displayTitle: 'Website Director',
     avenueCode: 'CWD',
-    group: 'officers-representatives',
-    sortOrder: 15,
+    group: 'bod',
+    sortOrder: 28,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['CWD', 'Website Director', 'Club Website Director', 'Web Director'],
     active: true,
   },
@@ -145,8 +186,10 @@ const RAW_POSITION_CATALOG = [
     key: 'sports-representative',
     displayTitle: 'Sports Representative',
     avenueCode: 'SPORTS',
-    group: 'officers-representatives',
-    sortOrder: 16,
+    group: 'bod',
+    sortOrder: 29,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['Sports Representative', 'Club Sports Representative', 'Sports Director'],
     active: true,
   },
@@ -154,8 +197,10 @@ const RAW_POSITION_CATALOG = [
     key: 'wrwc',
     displayTitle: 'World Rotaract Week Chairperson',
     avenueCode: 'WRWC',
-    group: 'officers-representatives',
-    sortOrder: 17,
+    group: 'bod',
+    sortOrder: 30,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['WRWC', 'World Rotaract Week Chairperson', 'World Rotaract Week Chair'],
     active: true,
   },
@@ -163,8 +208,10 @@ const RAW_POSITION_CATALOG = [
     key: 'wr',
     displayTitle: "Women's Representative",
     avenueCode: 'WR',
-    group: 'officers-representatives',
-    sortOrder: 18,
+    group: 'bod',
+    sortOrder: 31,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['WR', "Women's Representative", 'Womens Representative', 'Women Representative'],
     active: true,
   },
@@ -172,28 +219,53 @@ const RAW_POSITION_CATALOG = [
     key: 'saa',
     displayTitle: 'Sergeant-at-Arms',
     avenueCode: 'SAA',
-    group: 'officers-representatives',
-    sortOrder: 19,
+    group: 'bod',
+    sortOrder: 32,
+    effectiveRole: 'bod',
+    bodRoster: true,
     aliases: ['SAA', 'Sergeant-at-Arms', 'Sergeant at Arms'],
     active: true,
   },
+  { key: 'co-president', displayTitle: 'Co-President', avenueCode: 'CPRES', group: 'co-admin', sortOrder: 50, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-President', 'Co President'], active: true },
+  { key: 'co-vice-president', displayTitle: 'Co-Vice President', avenueCode: 'CVP', group: 'co-admin', sortOrder: 51, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-Vice President', 'Co Vice President', 'Co-Vice-President'], active: true },
+  { key: 'co-secretary', displayTitle: 'Co-Secretary', avenueCode: 'CSEC', group: 'co-admin', sortOrder: 52, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-Secretary', 'Co Secretary', 'Co Club Secretary'], active: true },
+  { key: 'co-treasurer', displayTitle: 'Co-Treasurer', avenueCode: 'CTREAS', group: 'co-admin', sortOrder: 53, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-Treasurer', 'Co Treasurer', 'Co Club Treasurer'], active: true },
+  { key: 'co-club-advisor', displayTitle: 'Co-Club Advisor', avenueCode: 'CADV', group: 'co-admin', sortOrder: 54, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-Club Advisor', 'Co Club Advisor', 'Co Advisor'], active: true },
+  { key: 'co-csd', displayTitle: 'Co-Club Service Director', avenueCode: 'CCSD', group: 'co-bod', sortOrder: 70, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Club Service Director', 'Co Club Service', 'Co-CSD'], active: true },
+  { key: 'co-cmd', displayTitle: 'Co-Community Service Director', avenueCode: 'CCMD', group: 'co-bod', sortOrder: 71, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Community Service Director', 'Co Community Service', 'Co-CMD'], active: true },
+  { key: 'co-isd', displayTitle: 'Co-International Service Director', avenueCode: 'CISD', group: 'co-bod', sortOrder: 72, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-International Service Director', 'Co International Service', 'Co-ISD'], active: true },
+  { key: 'co-pdd', displayTitle: 'Co-Professional Development Director', avenueCode: 'CPDD', group: 'co-bod', sortOrder: 73, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Professional Development Director', 'Co Professional Development', 'Co-PDD'], active: true },
+  { key: 'co-rrro', displayTitle: 'Co-Rotary Rotaract Relations Officer', avenueCode: 'CRRRO', group: 'co-bod', sortOrder: 74, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Rotary Rotaract Relations Officer', 'Co Rotary-Rotaract Relations Officer', 'Co-RRRO'], active: true },
+  { key: 'co-pro', displayTitle: 'Co-Public Relations Officer', avenueCode: 'CPRO', group: 'co-bod', sortOrder: 75, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Public Relations Officer', 'Co Public Relations', 'Co-PRO'], active: true },
+  { key: 'co-dei', displayTitle: 'Co-DEI Director', avenueCode: 'CDEI', group: 'co-bod', sortOrder: 76, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-DEI Director', 'Co Diversity Equity Inclusion Officer', 'Co Diversity Equity and Inclusion Officer'], active: true },
+  { key: 'co-editor', displayTitle: 'Co-Editor', avenueCode: 'CEDITOR', group: 'co-bod', sortOrder: 77, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Editor', 'Co Club Editor'], active: true },
+  { key: 'co-cwd', displayTitle: 'Co-Website Director', avenueCode: 'CCWD', group: 'co-bod', sortOrder: 78, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Website Director', 'Co Club Website Director', 'Co Web Director'], active: true },
+  { key: 'co-sports-representative', displayTitle: 'Co-Sports Representative', avenueCode: 'CSPORTS', group: 'co-bod', sortOrder: 79, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Sports Representative', 'Co Club Sports Representative', 'Co Sports Director'], active: true },
+  { key: 'co-wrwc', displayTitle: 'Co-World Rotaract Week Chairperson', avenueCode: 'CWRWC', group: 'co-bod', sortOrder: 80, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-World Rotaract Week Chairperson', 'Co World Rotaract Week Chair'], active: true },
+  { key: 'co-wr', displayTitle: "Co-Women's Representative", avenueCode: 'CWR', group: 'co-bod', sortOrder: 81, effectiveRole: 'bod', bodRoster: true, aliases: ["Co-Women's Representative", 'Co Womens Representative', 'Co Women Representative'], active: true },
+  { key: 'co-saa', displayTitle: 'Co-Sergeant-at-Arms', avenueCode: 'CSAA', group: 'co-bod', sortOrder: 82, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Sergeant-at-Arms', 'Co Sergeant at Arms'], active: true },
 ];
 
 const POSITION_GROUPS = Object.freeze({
-  executive: Object.freeze({
-    key: 'executive',
-    displayTitle: 'Executive Positions',
+  admin: Object.freeze({
+    key: 'admin',
+    displayTitle: 'Admin Positions',
     sortOrder: 1,
   }),
-  'avenue-directors': Object.freeze({
-    key: 'avenue-directors',
-    displayTitle: 'Avenue Directors',
+  bod: Object.freeze({
+    key: 'bod',
+    displayTitle: 'BOD Positions',
     sortOrder: 2,
   }),
-  'officers-representatives': Object.freeze({
-    key: 'officers-representatives',
-    displayTitle: 'Officers and Representatives',
+  'co-admin': Object.freeze({
+    key: 'co-admin',
+    displayTitle: 'Co-Admin Positions',
     sortOrder: 3,
+  }),
+  'co-bod': Object.freeze({
+    key: 'co-bod',
+    displayTitle: 'Co-BOD Positions',
+    sortOrder: 4,
   }),
 });
 
@@ -205,6 +277,9 @@ function cloneDefinition(definition) {
     avenueCode: definition.avenueCode,
     group: definition.group,
     sortOrder: definition.sortOrder,
+    effectiveRole: definition.effectiveRole,
+    bodRoster: definition.bodRoster !== false,
+    resolutionVoter: definition.resolutionVoter !== false && definition.bodRoster !== false,
     aliases: definition.aliases.slice(),
     active: definition.active,
   };
@@ -230,6 +305,9 @@ function freezeDefinition(definition) {
     avenueCode: definition.avenueCode,
     group: definition.group,
     sortOrder: definition.sortOrder,
+    effectiveRole: definition.effectiveRole || 'bod',
+    bodRoster: definition.bodRoster !== false,
+    resolutionVoter: definition.resolutionVoter !== false && definition.bodRoster !== false,
     aliases: Object.freeze(definition.aliases.slice()),
     active: definition.active !== false,
   });
@@ -249,6 +327,11 @@ const POSITION_KEYS = Object.freeze(
     .map((definition) => definition.key)
 );
 const WEBSITE_DIRECTOR_POSITION_KEY = 'cwd';
+const ADMIN_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_CATALOG[key].group === 'admin'));
+const BOD_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_CATALOG[key].group === 'bod'));
+const CO_ADMIN_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_CATALOG[key].group === 'co-admin'));
+const CO_BOD_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_CATALOG[key].group === 'co-bod'));
+const ROLE_PRECEDENCE = Object.freeze({ prospect: 0, gbm: 1, bod: 2, admin: 3, president: 4 });
 
 const SORT_ORDER_BY_KEY = POSITION_KEYS.reduce((map, key, index) => {
   map[key] = POSITION_CATALOG[key].sortOrder || index + 1;
@@ -333,6 +416,32 @@ function isActivePositionKey(key) {
   return !!definition && definition.active === true;
 }
 
+function isResolutionVoterPosition(positionKey) {
+  const normalizedKey = normalizePositionKey(positionKey);
+  const definition = normalizedKey ? POSITION_CATALOG[normalizedKey] : null;
+  return !!definition && definition.active === true && definition.resolutionVoter === true;
+}
+
+function hasResolutionVoterPosition(positionKeys) {
+  return normalizePositionKeys(positionKeys).positionKeys.some(isResolutionVoterPosition);
+}
+
+function effectiveRoleForPosition(position) {
+  const normalizedKey = normalizePositionKey(position);
+  const definition = normalizedKey ? POSITION_CATALOG[normalizedKey] : null;
+  return definition?.effectiveRole || 'gbm';
+}
+
+function deriveEffectiveRole(positionKeys, fallbackRole = 'gbm') {
+  const normalized = normalizePositionKeys(positionKeys);
+  const fallback = ROLE_PRECEDENCE[normalizeRole(fallbackRole)] != null ? normalizeRole(fallbackRole) : 'gbm';
+  if (!normalized.positionKeys.length) return fallback;
+  return normalized.positionKeys.reduce((best, key) => {
+    const role = effectiveRoleForPosition(key);
+    return ROLE_PRECEDENCE[role] > ROLE_PRECEDENCE[best] ? role : best;
+  }, 'gbm');
+}
+
 function derivePositionMetadata(positionKeys) {
   const normalized = normalizePositionKeys(positionKeys);
   const inactiveKeys = [];
@@ -352,7 +461,10 @@ function derivePositionMetadata(positionKeys) {
     positionTitles: definitions.map((definition) => definition.displayTitle),
     avenueCodes: definitions.map((definition) => definition.avenueCode),
     clubPosition: definitions.map((definition) => definition.displayTitle).join(', '),
-    hasBodPosition: definitions.length > 0,
+    positionRoles: definitions.map((definition) => definition.effectiveRole || 'bod'),
+    effectiveRole: deriveEffectiveRole(definitions.map((definition) => definition.key)),
+    hasBodPosition: definitions.some((definition) => definition.bodRoster !== false),
+    isResolutionVoter: definitions.some((definition) => definition.resolutionVoter === true),
   };
 
   if (normalized.unknownValues.length) result.unknownValues = normalized.unknownValues.slice();
@@ -433,14 +545,6 @@ function validateRolePositionCombination(role, positionKeys) {
     });
   }
 
-  if ((normalizedRole === 'prospect' || normalizedRole === 'gbm') && metadata.positionKeys.length > 0) {
-    return validationFailure('positions-not-allowed', 'This role cannot have BOD position assignments.', {
-      normalizedRole,
-      positionKeys: metadata.positionKeys.slice(),
-      metadata,
-    });
-  }
-
   if (normalizedRole === 'bod' && metadata.positionKeys.length === 0) {
     return validationFailure('position-required', 'BOD role requires at least one active club position.', {
       normalizedRole,
@@ -451,7 +555,8 @@ function validateRolePositionCombination(role, positionKeys) {
 
   return {
     ok: true,
-    normalizedRole,
+    requestedRole: normalizedRole,
+    normalizedRole: deriveEffectiveRole(metadata.positionKeys, normalizedRole),
     positionKeys: metadata.positionKeys.slice(),
     metadata,
   };
@@ -542,11 +647,19 @@ module.exports = {
   POSITION_CATALOG,
   POSITION_KEYS,
   POSITION_GROUPS,
+  ADMIN_POSITION_KEYS,
+  BOD_POSITION_KEYS,
+  CO_ADMIN_POSITION_KEYS,
+  CO_BOD_POSITION_KEYS,
   WEBSITE_DIRECTOR_POSITION_KEY,
   normalizePositionKey,
   normalizePositionKeys,
   getPositionDefinition,
   isActivePositionKey,
+  isResolutionVoterPosition,
+  hasResolutionVoterPosition,
+  effectiveRoleForPosition,
+  deriveEffectiveRole,
   derivePositionMetadata,
   hasWebsiteDirectorPosition,
   isActivePositionAssignment,
