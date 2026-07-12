@@ -63,11 +63,34 @@ test("Resolution Page config defaults disabled and initializes the official temp
   assert.equal(config.enabled, true);
   assert.equal(config.heading.text, "RESOLUTION");
   assert.deepEqual({ size: config.heading.fontSize, bold: config.heading.bold, underline: config.heading.underline, alignment: config.heading.alignment }, { size: 16, bold: true, underline: true, alignment: "center" });
+  assert.equal(normalizeResolutionPageConfig({ enabled: true, heading: { text: "" } }).heading.text, "RESOLUTION");
   assert.equal(config.details.subject, "Budget approval");
   assert.equal(config.details.date, "2026-07-02");
   assert.deepEqual({ size: config.detailsStyle.fontSize, bold: config.detailsStyle.bold }, { size: 10, bold: true });
   assert.deepEqual({ size: config.mainStatement.fontSize, bold: config.mainStatement.bold }, { size: 12, bold: true });
   assert.equal(assertNoNestedArrays(config, "resolutionPageConfig"), true);
+});
+
+test("Resolution Page placeholder defaults are repaired without overwriting custom statements", () => {
+  const placeholderDefault = createDefaultResolutionPageConfig({}).mainStatement.text;
+  const normalized = normalizeResolutionPageConfig(
+    { enabled: true, version: 2, mainStatement: { text: placeholderDefault } },
+    { title: "Passing Club Bylaws" },
+  );
+  assert.match(normalized.mainStatement.text, /Resolution of Passing Club Bylaws/);
+  assert.doesNotMatch(normalized.mainStatement.text, /\[RESOLUTION SUBJECT\]/);
+
+  const customized = normalizeResolutionPageConfig(
+    { enabled: true, version: 2, mainStatement: { text: "Custom wording about [RESOLUTION SUBJECT] stays as written." } },
+    { title: "Passing Club Bylaws" },
+  );
+  assert.equal(customized.mainStatement.text, "Custom wording about [RESOLUTION SUBJECT] stays as written.");
+
+  const emptyTitle = normalizeResolutionPageConfig(
+    { enabled: true, version: 2, mainStatement: { text: placeholderDefault } },
+    {},
+  );
+  assert.match(emptyTitle.mainStatement.text, /\[RESOLUTION SUBJECT\]/);
 });
 
 test("Resolution Page block helpers add, update, duplicate, move, and delete", () => {

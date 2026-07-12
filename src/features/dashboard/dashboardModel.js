@@ -145,15 +145,20 @@ export function normalizeDashboardAnnouncements(raw, now = Date.now()) {
     .slice(0, 5);
 }
 
-function normalizeProfile(raw) {
+export function normalizeDashboardProfile(raw) {
   if (!raw || typeof raw !== "object") return null;
   const role = text(raw.role, 40).toLowerCase();
   if (!ROLES.has(role)) return null;
   const authority = raw.authority && typeof raw.authority === "object" ? raw.authority : {};
-  return {
+  const profile = {
     name: text(raw.name, 160),
     email: text(raw.email, 320),
     role,
+    phone: text(raw.phone, 40),
+    dateOfBirth: normalizeDateOnly(raw.dateOfBirth),
+    gender: text(raw.gender, 40).toLowerCase(),
+    genderSelfDescribe: text(raw.genderSelfDescribe, 160),
+    hobbies: text(raw.hobbies, 600),
     clubPosition: text(raw.clubPosition, 120),
     memberName: text(raw.memberName, 160),
     memberPosition: text(raw.memberPosition, 120),
@@ -162,6 +167,15 @@ function normalizeProfile(raw) {
       : [],
     hasPresidentAuthority: authority.hasPresidentAuthority === true,
     hasWebsiteDirectorPosition: authority.hasWebsiteDirectorPosition === true,
+  };
+  if (role !== "prospect") return profile;
+  return {
+    ...profile,
+    previousRotaract: raw.previousRotaract === true,
+    previousRotaractDetails: text(raw.previousRotaractDetails === "N/A" ? "" : raw.previousRotaractDetails, 1200),
+    joinReason: text(raw.joinReason, 1200),
+    referred: raw.referred === true,
+    referredBy: text(raw.referredBy === "N/A" ? "" : raw.referredBy, 160),
   };
 }
 
@@ -174,7 +188,7 @@ function normalizeRanking(raw) {
 export function normalizeDashboardResponse(raw, now = Date.now()) {
   if (!raw || typeof raw !== "object" || raw.ok !== true) throw new TypeError("Dashboard response is invalid.");
   const mode = raw.mode === "prospect" ? "prospect" : "member";
-  const profile = normalizeProfile(raw.profile);
+  const profile = normalizeDashboardProfile(raw.profile);
   if (!profile || (mode === "prospect" && profile.role !== "prospect")) {
     throw new TypeError("Dashboard profile is invalid.");
   }
@@ -215,6 +229,16 @@ export function normalizeDashboardResponse(raw, now = Date.now()) {
         : [],
     },
   };
+}
+
+export function mergeDashboardProfile(data, incomingProfile) {
+  if (!data || typeof data !== "object" || !data.profile) return data;
+  const normalized = normalizeDashboardProfile({
+    ...data.profile,
+    ...(incomingProfile || {}),
+    role: data.profile.role,
+  });
+  return normalized ? { ...data, profile: normalized } : data;
 }
 
 export function formatDashboardDate(value) {

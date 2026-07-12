@@ -92,7 +92,15 @@ export function buildResolutionVoteRows(details) {
     return true;
   });
   const votes = new Map(validVotes.map((vote) => [vote.voterUid, vote]));
-  return (details?.resolution?.eligibleVoters || []).map((voter) => {
+  const seen = new Set();
+  const eligibleVoters = [];
+  for (const voter of (details?.resolution?.eligibleVoters || [])) {
+    const uid = typeof voter?.uid === "string" ? voter.uid.trim() : "";
+    if (uid && seen.has(uid)) continue;
+    if (uid) seen.add(uid);
+    eligibleVoters.push(voter);
+  }
+  return eligibleVoters.map((voter) => {
     const vote = votes.get(voter.uid);
     return {
       name: formatRotaractorName(voter.name, true),
@@ -360,7 +368,7 @@ export async function generateResolutionPdf(details, options = {}) {
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = getResolutionPdfFilename(resolution.resolutionNumber);
+  link.download = getResolutionPdfFilename(resolution.resolutionNumber, resolution.title || resolution.id);
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -376,7 +384,7 @@ export async function generateResolutionPreviewPdf(details, options = {}) {
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = getResolutionPdfFilename(resolution.resolutionNumber).replace(/\.pdf$/i, "-DRAFT-PREVIEW.pdf");
+  link.download = getResolutionPdfFilename(resolution.resolutionNumber, resolution.title || resolution.id).replace(/\.pdf$/i, "-DRAFT-PREVIEW.pdf");
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

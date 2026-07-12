@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalMethodLabel, buildPreparedEmailLinks, buildPreparedReplyText, calculateResolutionResult, canClaimHybridEmailSent, canVerifyHybridEmail, getResolutionPdfFilename, isAuthenticatedFinalHybrid, isHybridVoteChoiceLocked, normalizeApprovalMethod, normalizeDashboardResolutions, normalizeResolutionStatus, normalizeVoteChoice, normalizeVoteProcessingMode, validateResolutionDraft } from "./resolutionModel.js";
+import { approvalMethodLabel, buildPreparedEmailLinks, buildPreparedReplySubject, buildPreparedReplyText, calculateResolutionResult, canClaimHybridEmailSent, canVerifyHybridEmail, getResolutionPdfFilename, isAuthenticatedFinalHybrid, isHybridVoteChoiceLocked, normalizeApprovalMethod, normalizeDashboardResolutions, normalizeResolutionStatus, normalizeVoteChoice, normalizeVoteProcessingMode, validateResolutionDraft } from "./resolutionModel.js";
 import { buildResolutionPdfDocument, buildResolutionVoteRows, generateResolutionPdf } from "./resolutionPdf.js";
 
 test("resolution status and vote choices normalize strictly", () => {
@@ -56,6 +56,10 @@ test("draft validation requires core metadata and valid custom count", () => {
   assert.equal(validateResolutionDraft({}).ok, false);
   const base = { meetingId: "m1", resolutionNumber: "R/1", title: "Title", body: "Body", proposedByUid: "u1", secondedByUid: "u2", eligibleVoterIds: ["u1", "u2", "u3"], votingRule: "simple_majority" };
   assert.equal(validateResolutionDraft(base, 3).ok, true);
+  const withoutNumber = validateResolutionDraft({ ...base, resolutionNumber: "" }, 3);
+  assert.equal(withoutNumber.ok, true);
+  assert.equal(withoutNumber.payload.resolutionNumber, "");
+  assert.ok(!withoutNumber.errors.some((error) => /resolution number/i.test(error)));
   assert.equal(validateResolutionDraft({ ...base, votingRule: "custom_approval_count", customApprovalCount: 4 }, 3).ok, false);
   const recordOnly = validateResolutionDraft({ ...base, approvalMethod: "record_only", votingRule: "" }, 3);
   assert.equal(recordOnly.ok, true);
@@ -117,6 +121,10 @@ test("prepared hybrid reply includes vote evidence and encodes email links", () 
   assert.match(links.gmail, /su=Re%3A%20Resolution%20R%2F1/);
   assert.match(links.gmail, /body=/);
   assert.doesNotMatch(links.gmail, /authuser=|\/u\/[01]\//);
+  const blankNumberBody = buildPreparedReplyText({ voterName: "Member", resolutionNumber: "", title: "Budget & Plan", choice: "approve", documentShortHash: "ABC123", reference: "REF 2" });
+  assert.match(blankNumberBody, /Resolution: Budget & Plan/);
+  assert.doesNotMatch(blankNumberBody, /Resolution\s+:|Resolution undefined|Resolution null/);
+  assert.equal(buildPreparedReplySubject({ resolutionNumber: "", title: "Budget & Plan" }), "Re: Resolution - Budget & Plan");
 });
 
 test("dashboard hybrid resolution preserves trusted required sender email", () => {
@@ -170,9 +178,10 @@ test("draft validation persists Resolution Page config and generated page order"
 });
 
 test("dashboard includes only open resolutions and filename is sanitized", () => {
-  const rows = normalizeDashboardResolutions([{ id: "o", status: "open", resolutionNumber: "R/1", title: "Open" }, { id: "c", status: "passed", resolutionNumber: "R/2", title: "Closed" }]);
-  assert.deepEqual(rows.map((row) => row.id), ["o"]);
+  const rows = normalizeDashboardResolutions([{ id: "o", status: "open", resolutionNumber: "R/1", title: "Open" }, { id: "blank", status: "open", resolutionNumber: "", title: "Blank Number" }, { id: "c", status: "passed", resolutionNumber: "R/2", title: "Closed" }]);
+  assert.deepEqual(rows.map((row) => row.id), ["o", "blank"]);
   assert.equal(getResolutionPdfFilename("RCPH/2026-27/RES/004"), "RCPH-2026-27-RES-004.pdf");
+  assert.equal(getResolutionPdfFilename("", "Bylaws"), "resolution-Bylaws.pdf");
 });
 
 test("final PDF vote rows include frozen names, positions, choices, and timestamps", () => {
@@ -181,6 +190,24 @@ test("final PDF vote rows include frozen names, positions, choices, and timestam
   assert.equal(rows[0].position, "Secretary");
   assert.equal(rows[0].vote, "Approve");
   assert.match(rows[0].submittedAt, /2026/);
+});
+
+test("final PDF vote rows preserve Club Advisor and Co-position labels without duplicates", () => {
+  const rows = buildResolutionVoteRows({
+    resolution: {
+      eligibleVoters: [
+        { uid: "advisor", name: "Advisor", position: "Club Advisor" },
+        { uid: "co", name: "Co Holder", position: "Co-Secretary, Co-Website Director" },
+        { uid: "co", name: "Duplicate Co Holder", position: "Co-Secretary" },
+      ],
+    },
+    votes: [
+      { voterUid: "advisor", choice: "approve", submittedAt: "2026-07-02T10:00:00Z" },
+      { voterUid: "co", choice: "abstain", submittedAt: "2026-07-02T10:05:00Z" },
+    ],
+  });
+  assert.deepEqual(rows.map((row) => row.position), ["Club Advisor", "Co-Secretary, Co-Website Director"]);
+  assert.deepEqual(rows.map((row) => row.vote), ["Approve", "Abstain"]);
 });
 
 test("new-mode hybrid PDF rows include submitted authenticated votes without email verification", () => {

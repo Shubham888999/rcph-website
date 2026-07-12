@@ -11,6 +11,7 @@ export const DEFAULT_GENERATED_PAGE_ORDER = Object.freeze(["resolution_page", "v
 
 const LEGACY_RESOLUTION_STATEMENT =
   "This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled Board Meeting, have considered and passed the resolution stated below in accordance with the applicable voting requirements and the records maintained by the Club.";
+const RESOLUTION_SUBJECT_PLACEHOLDER = "[RESOLUTION SUBJECT]";
 
 function resolutionSubjectMatter(resolution = {}) {
   const title = cleanText(resolution.title || resolution.subject, 300);
@@ -25,6 +26,15 @@ function createDefaultResolutionStatement(resolution = {}) {
   const subject = resolutionSubjectMatter(resolution);
 
   return `This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled board meeting with a majority of _____, have passed the Resolution of ${subject} of Rotaract Club of Pune Heritage for Rotary International Year 2026-27 by signing the attached document.`;
+}
+
+function isUntouchedDefaultStatementWithPlaceholder(value) {
+  return value === createDefaultResolutionStatement({})
+    || (
+      value.includes(RESOLUTION_SUBJECT_PLACEHOLDER)
+      && value.replace(RESOLUTION_SUBJECT_PLACEHOLDER, "").trim()
+        === createDefaultResolutionStatement({ title: "" }).replace(RESOLUTION_SUBJECT_PLACEHOLDER, "").trim()
+    );
 }
 function cleanText(value, max = 50000) {
   if (typeof value !== "string") return "";
@@ -303,9 +313,12 @@ export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
     RESOLUTION_PAGE_LIMITS.paragraphCharacters,
   );
 
+  const defaultStatement = createDefaultResolutionStatement(defaults);
+  const hasDefaultSubject = resolutionSubjectMatter(defaults) !== RESOLUTION_SUBJECT_PLACEHOLDER;
   const useNewDefaultStatement =
     !existingStatementText ||
-    existingStatementText === LEGACY_RESOLUTION_STATEMENT;
+    existingStatementText === LEGACY_RESOLUTION_STATEMENT ||
+    (hasDefaultSubject && isUntouchedDefaultStatementWithPlaceholder(existingStatementText));
 
   if (
     legacyTemplate &&
@@ -377,7 +390,7 @@ export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
         spaceAfter: 24,
       }),
       text: useNewDefaultStatement
-        ? createDefaultResolutionStatement(defaults)
+        ? defaultStatement
         : existingStatementText,
     },
 

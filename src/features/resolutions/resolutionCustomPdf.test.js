@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCustomResolutionPdfPages, buildCustomVotesRows, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
+import { buildCustomResolutionPdfPages, buildCustomVotesRows, buildResolutionPagePdfPages, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
 import { RESOLUTION_CONTENT_BOUNDS, buildResolutionPdfDocument, buildResolutionPdfPages } from "./resolutionPdf.js";
 import { createCustomResolutionPdfFixtures } from "./resolutionPdfFixture.js";
 import { createDefaultResolutionPageConfig, normalizeResolutionSection } from "./resolutionSectionsModel.js";
@@ -66,9 +66,17 @@ test("custom tables wrap rows intact, normalize widths, repeat headers, and neve
 test("Votes Table derives safe authoritative rows for submitted and all-voter scopes", () => {
   const details = createCustomResolutionPdfFixtures().votesWithSignature;
   details.canonicalVoters = [{ uid: "older", name: "Canonical Name", position: "Canonical Position" }];
-  details.resolution.eligibleVoters.push({ uid: "older", name: "", position: "" }, { uid: "missing", name: "Known Name", position: "" });
+  details.resolution.eligibleVoters.push(
+    { uid: "advisor", name: "Advisor", position: "Club Advisor" },
+    { uid: "co", name: "Co Holder", position: "Co-Secretary, Co-Website Director" },
+    { uid: "co", name: "Duplicate Co Holder", position: "Co-Secretary" },
+    { uid: "older", name: "", position: "" },
+    { uid: "missing", name: "Known Name", position: "" },
+  );
   const section = details.resolution.finalizedPdfSectionsSnapshot[0];
   let rows = buildCustomVotesRows(details, section);
+  assert.equal(rows.filter((row) => row.position.includes("Co-Secretary")).length, 1);
+  assert.ok(rows.some((row) => row.position === "Club Advisor"));
   assert.equal(rows.at(-2).position, "Canonical Position");
   assert.equal(rows.at(-1).position, "Not available");
   assert.equal(rows.at(-1).vote, "Did not vote");
@@ -145,6 +153,41 @@ test("generated Resolution Page and vote table use official letterhead without p
   assert.equal((pdf.match(/595 0 0 842 0 0 cm\n\/OfficialBG Do/g) || []).length, generated.length);
   assert.equal((pdf.match(/Page \d+ of \d+/g) || []).length, pages.length - generated.length);
   assert.doesNotMatch(pdf, /Page 2 of 3/);
+});
+
+test("generated Resolution Page heading and details rows use the official layout", () => {
+  const config = createDefaultResolutionPageConfig({
+    title: "BYLAWS",
+    meetingDate: "12/07/2026",
+    meetingLocation: "GMEET",
+  });
+  config.details.boardMembersPresent = "16";
+  config.details.totalBoardMembers = "16";
+  const [page] = buildResolutionPagePdfPages({ resolution: { title: "BYLAWS" } }, config);
+  const text = (value) => page.find((item) => item.kind === "text" && item.text === value);
+  const heading = text("RESOLUTION");
+  const date = text("Date - 12/07/2026");
+  const place = text("Place - GMEET");
+  const present = text("No. of Board Members - 16");
+  const total = text("Total No. of Board Members - 16");
+  const statement = page.find((item) =>
+    item.kind === "text" &&
+    item.text.includes("Resolution of BYLAWS"),
+  );
+
+  assert.equal(heading.size, 16);
+  assert.equal(heading.bold, true);
+  assert.equal(heading.underline, true);
+  assert.ok(heading.x > RESOLUTION_CONTENT_BOUNDS.left);
+  assert.ok(heading.x + heading.width < RESOLUTION_CONTENT_BOUNDS.right);
+  assert.equal(date.y, place.y);
+  assert.equal(present.y, total.y);
+  assert.ok(place.x > date.x);
+  assert.ok(total.x > present.x);
+  assert.equal(place.x, total.x);
+  assert.ok(total.x + total.width <= RESOLUTION_CONTENT_BOUNDS.right + 1);
+  assert.ok(statement);
+  assert.ok(!page.some((item) => item.text?.includes("[RESOLUTION SUBJECT]")));
 });
 
 test("forced breaks create a full next page without an unnecessary blank final page", () => {

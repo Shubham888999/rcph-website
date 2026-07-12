@@ -7,6 +7,11 @@ const GENDER_OPTIONS = [
   ["prefer-not-to-say", "Prefer not to say"],
 ];
 
+function todayDateString() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function FieldError({ id, message }) {
   return message ? <p id={id} className="signup-field-error" role="alert">{message}</p> : null;
 }
@@ -40,20 +45,37 @@ export default function SignupCommonFields({
         <FieldError id="signup-name-error" message={errors.name} />
       </div>
       {!compactProfile ? (
-        <div className="signup-field">
-          <label htmlFor="signup-phone">Phone number</label>
-          <input
-            id="signup-phone"
-            type="tel"
-            autoComplete="tel"
-            value={form.phone}
-            disabled={disabled}
-            aria-invalid={Boolean(errors.phone)}
-            aria-describedby={errors.phone ? "signup-phone-error" : "signup-phone-help"}
-            onChange={(event) => onChange("phone", event.target.value)}
-          />
-          <FieldError id="signup-phone-error" message={errors.phone} />
-        </div>
+        <>
+          <div className="signup-field">
+            <label htmlFor="signup-phone">Phone number</label>
+            <input
+              id="signup-phone"
+              type="tel"
+              autoComplete="tel"
+              value={form.phone}
+              disabled={disabled}
+              aria-invalid={Boolean(errors.phone)}
+              aria-describedby={errors.phone ? "signup-phone-error" : "signup-phone-help"}
+              onChange={(event) => onChange("phone", event.target.value)}
+            />
+            <FieldError id="signup-phone-error" message={errors.phone} />
+          </div>
+          <div className="signup-field">
+            <label htmlFor="signup-dateOfBirth">Date of birth</label>
+            <input
+              id="signup-dateOfBirth"
+              type="date"
+              min="1900-01-01"
+              max={todayDateString()}
+              value={form.dateOfBirth}
+              disabled={disabled}
+              aria-invalid={Boolean(errors.dateOfBirth)}
+              aria-describedby={errors.dateOfBirth ? "signup-dateOfBirth-error" : undefined}
+              onChange={(event) => onChange("dateOfBirth", event.target.value)}
+            />
+            <FieldError id="signup-dateOfBirth-error" message={errors.dateOfBirth} />
+          </div>
+        </>
       ) : null}
       <div className="signup-field">
         <label htmlFor="signup-email">Email address</label>

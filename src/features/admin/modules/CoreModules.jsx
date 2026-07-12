@@ -17,6 +17,7 @@ import {
 import useAdminMutation from "../shared/useAdminMutation";
 import { formatRotaractorName, stripRotaractorPrefix } from "../../../utils/memberName";
 import { getMemberOperationsModel } from "./memberOperationsModel";
+import ProfileEditorDialog, { ProfileHistoryDialog } from "../../profile/ProfileEditorDialog";
 
 export function CommandCenter({ data, access, uid, onNotice }) {
   const [ranking, setRanking] = useState({
@@ -230,7 +231,7 @@ export function CommandCenter({ data, access, uid, onNotice }) {
         <Metric
           label="Active members"
           value={activeMembers.length}
-          detail={`${data.members.length} total roster records`}
+          detail={`${data.members.length} total member records`}
           accent="teal"
         />
 
@@ -577,7 +578,7 @@ export function AccountsModule({ users, access, uid, onNotice }) {
     setEditor({ user, role, selectedPositionKeys: applyPositionRole(role, initial.selectedKeys), unknownPositionValues: initial.unknownValues, positionSearch: "", selectionError: "", jointConflict: null, pendingPayload: null, reason: "" });
   }
   function changeRole(role) {
-    setEditor((current) => ({ ...current, role, selectedPositionKeys: applyPositionRole(role, current.selectedPositionKeys), unknownPositionValues: role === "gbm" ? [] : current.unknownPositionValues, selectionError: "", jointConflict: null, pendingPayload: null }));
+    setEditor((current) => ({ ...current, role, selectedPositionKeys: applyPositionRole(role, current.selectedPositionKeys), selectionError: "", jointConflict: null, pendingPayload: null }));
   }
   function handleAccessError(error, payload) {
     const conflict = extractJointPositionConflict(error);
@@ -592,7 +593,7 @@ export function AccountsModule({ users, access, uid, onNotice }) {
   async function save() {
     const validation = validatePositionRole(editor.role, editor.selectedPositionKeys, editor.unknownPositionValues);
     if (!validation.ok) return setEditor({ ...editor, selectionError: validation.message, jointConflict: null, pendingPayload: null });
-    const payload = buildAccessPayload({ targetUid: editor.user.id, role: editor.role, positionKeys: validation.positionKeys, confirmJointPositionKeys: [], mode: editor.user.status === "pending" ? "approval" : "maintenance" });
+    const payload = buildAccessPayload({ targetUid: editor.user.id, role: validation.effectiveRole, positionKeys: validation.positionKeys, confirmJointPositionKeys: [], mode: editor.user.status === "pending" ? "approval" : "maintenance" });
     if (!payload.targetUid || !payload.role) return onNotice({ type: "error", message: "Choose a valid role." });
     await submitAccess(payload);
   }
@@ -613,7 +614,8 @@ export function AccountsModule({ users, access, uid, onNotice }) {
     {editor ? <AdminDialog title={`Manage ${formatRotaractorName(editor.user.name, editor.user)}`} busy={busy} onClose={() => setEditor(null)}><div className="admin-form">
       {protectedPresident ? <p>This President account can only be changed by trusted President controls.</p> : <>
         <label>Access role<select value={editor.role} onChange={(event) => changeRole(event.target.value)}>{roles.map((role) => <option key={role}>{role}</option>)}</select></label>
-        {editor.role === "gbm" ? <p className="admin-position-picker__role-note">GBM accounts do not receive BOD position assignments. Saving sends an empty position list.</p> : <PositionMultiSelect
+        <p className="admin-position-picker__role-note">Selected positions determine the saved effective access role. Leave positions empty for a plain GBM/Admin role assignment.</p>
+        <PositionMultiSelect
           selectedKeys={editor.selectedPositionKeys}
           onChange={(selectedPositionKeys) => setEditor({ ...editor, selectedPositionKeys, selectionError: "", jointConflict: null, pendingPayload: null })}
           disabledKeys={access.canAccessPresidentControls ? [] : [WEBSITE_DIRECTOR_POSITION_KEY]}
@@ -621,7 +623,7 @@ export function AccountsModule({ users, access, uid, onNotice }) {
           onSearchChange={(positionSearch) => setEditor({ ...editor, positionSearch })}
           error={editor.selectionError}
           unknownValues={editor.unknownPositionValues}
-        />}
+        />
         {editor.jointConflict ? <section className="admin-position-conflict" role="alert" aria-labelledby="joint-position-conflict-title">
           <h3 id="joint-position-conflict-title">Confirm joint position assignment</h3>
           <p>The following positions already have active holders. Confirming retains those holders and adds this user jointly.</p>
@@ -633,6 +635,43 @@ export function AccountsModule({ users, access, uid, onNotice }) {
       <div className="admin-actions"><button type="button" onClick={() => setEditor(null)} disabled={busy}>Cancel</button>{!protectedPresident && editor.user.status === "pending" ? <button className="danger" type="button" onClick={reject} disabled={busy}>Reject</button> : null}{!protectedPresident ? <button type="button" onClick={save} disabled={busy || Boolean(editor.jointConflict)}>{editor.user.status === "pending" ? "Approve" : "Save access"}</button> : null}</div>
     </div></AdminDialog> : null}
   </>;
+}
+
+function linkedProfileUidForMember(member) {
+  return member?.linkedAccount?.id || "";
+}
+
+const MEMBER_GENDER_LABELS = {
+  woman: "Woman",
+  man: "Man",
+  "non-binary": "Non-binary",
+  "self-describe": "Prefer to self-describe",
+  "prefer-not-to-say": "Prefer not to say",
+};
+
+function recordedProfileValue(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : "Not recorded";
+}
+
+function formatMemberDateOfBirth(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return "Not recorded";
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatMemberGender(value) {
+  return MEMBER_GENDER_LABELS[value] || recordedProfileValue(value);
+}
+
+function formatMissingCompletenessLabel(label) {
+  if (label === "RID") return "RID";
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export function MembersModule({
@@ -647,6 +686,7 @@ export function MembersModule({
   const [name, setName] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [profileEditor, setProfileEditor] = useState(null);
+  const [historyTarget, setHistoryTarget] = useState(null);
   const [target, setTarget] = useState(null);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
@@ -702,31 +742,44 @@ export function MembersModule({
     });
   }
 
-  function openProfileEditor(member) {
-    setProfileEditor({
-      id: member.id,
-      name: member.name || "",
-      email: member.email || "",
-      rid: member.rid || "",
-      active: member.active !== false,
-    });
+  function profileTargetForMember(member) {
+    const linked = member?.linkedAccount || null;
+    const targetUid = linkedProfileUidForMember(member);
+    if (!targetUid) return null;
+    return {
+      targetUid,
+      name: linked?.name || member?.name || "",
+      email: linked?.email || member?.email || "",
+      role: linked?.role || member?.role || "gbm",
+      phone: linked?.phone || "",
+      dateOfBirth: linked?.dateOfBirth || "",
+      gender: linked?.gender || "",
+      genderSelfDescribe: linked?.genderSelfDescribe || "",
+      hobbies: linked?.hobbies || "",
+    };
   }
 
-  function saveProfile(event) {
-    event.preventDefault();
-    run(
-      "update-member-profile",
-      () => adminCalls.updateMemberProfile({
-        memberId: profileEditor.id,
-        name: profileEditor.name,
-        email: profileEditor.email,
-        rid: profileEditor.rid,
-        active: profileEditor.active === true,
-      }),
-      "Member profile updated.",
-    ).then((result) => {
-      if (result !== null) setProfileEditor(null);
+  function openProfileEditor(member) {
+    const targetProfile = profileTargetForMember(member);
+    if (targetProfile) setProfileEditor(targetProfile);
+  }
+
+  function openProfileHistory(member) {
+    const targetProfile = profileTargetForMember(member);
+    if (targetProfile) setHistoryTarget(targetProfile);
+  }
+
+  async function saveProfile(payload) {
+    if (!profileEditor?.targetUid) throw new Error("Linked user account required.");
+    const result = await adminCalls.updateMemberProfile({
+      targetUid: profileEditor.targetUid,
+      ...payload,
     });
+    onNotice?.({
+      type: "success",
+      message: result.changed ? "Member profile updated." : "Member profile already matched those details.",
+    });
+    return result;
   }
 
   function clearFilters() {
@@ -754,7 +807,7 @@ export function MembersModule({
           </p>
         </div>
 
-        <dl className="member-ops-hero__metrics" aria-label="Member roster intelligence">
+        <dl className="member-ops-hero__metrics" aria-label="Member records intelligence">
           <div>
             <dt>Total members</dt>
             <dd>{model.metrics.total}</dd>
@@ -835,7 +888,7 @@ export function MembersModule({
         </label>
 
         <div className="member-ops-command__actions">
-          <div className="member-ops-view-toggle" role="group" aria-label="Roster density">
+          <div className="member-ops-view-toggle" role="group" aria-label="Member record density">
             <button
               className={viewMode === "detailed" ? "is-active" : ""}
               type="button"
@@ -865,73 +918,84 @@ export function MembersModule({
       ) : null}
 
       <section className="member-ops-workspace" aria-label="Member workspace">
-        <div className={`member-ops-roster member-ops-roster--${viewMode}`}>
-          <header>
-            <div>
-              <p className="admin-kicker">Club directory</p>
-              <h3>Member workspace</h3>
-            </div>
-            <span>{model.filteredRows.length} of {model.metrics.total}</span>
-          </header>
+        <div className="member-ops-workspace__grid">
+          <div className={`member-ops-roster member-ops-roster--${viewMode}`}>
+            <header>
+              <div>
+                <p className="admin-kicker">Club directory</p>
+                <h3>Member workspace</h3>
+              </div>
+              <span>{model.filteredRows.length} of {model.metrics.total}</span>
+            </header>
 
-          {model.filteredRows.length ? (
-            <div className="member-ops-rows" role="listbox" aria-label="Filtered member records" aria-activedescendant={selectedMember ? `member-${selectedMember.id}` : undefined}>
-              {model.filteredRows.map((member) => (
-                <article
-                  aria-selected={selectedMember?.id === member.id}
-                  className={selectedMember?.id === member.id ? "member-ops-row is-selected" : "member-ops-row"}
-                  key={member.id}
-                  role="option"
-                  tabIndex={0}
-                  onClick={() => setSelectedId(member.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setSelectedId(member.id);
-                    }
-                  }}
-                >
-                  <div className="member-ops-row__initials" aria-hidden="true">{member.initials}</div>
+            {model.filteredRows.length ? (
+              <div className="member-ops-rows" role="listbox" aria-label="Filtered member records" aria-activedescendant={selectedMember ? `member-${selectedMember.id}` : undefined}>
+                {model.filteredRows.map((member) => {
+                  const hasLinkedProfile = Boolean(linkedProfileUidForMember(member));
+                  return (
+                  <article
+                    aria-selected={selectedMember?.id === member.id}
+                    className={selectedMember?.id === member.id ? "member-ops-row is-selected" : "member-ops-row"}
+                    key={member.id}
+                    role="option"
+                    tabIndex={0}
+                    onClick={() => setSelectedId(member.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedId(member.id);
+                      }
+                    }}
+                  >
+                    <div className="member-ops-row__initials" aria-hidden="true">{member.initials}</div>
 
-                  <div className="member-ops-row__main">
-                    <h4>{formatRotaractorName(member.name, true)}</h4>
-                    <p>{member.email || "No email in records"}</p>
-                  </div>
+                    <div className="member-ops-row__main">
+                      <h4>{formatRotaractorName(member.name, true)}</h4>
+                      <p>{member.email || "No email in records"}</p>
+                    </div>
 
-                  <div className="member-ops-row__facts">
-                    <span className={member.active !== false ? "member-status member-status--active" : "member-status member-status--inactive"}>
-                      {member.active !== false ? "Active" : "Inactive"}
-                    </span>
-                    <span>{member.positionLabel || "No role or position"}</span>
-                    <span>{member.normalizedRid ? `RID ${member.normalizedRid}` : "RID not recorded"}</span>
-                    <span>{member.accountLinked ? "Approved account linked" : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</span>
-                    {member.attendanceSummary.recorded ? <span>{member.attendanceSummary.rate}% attendance</span> : <span>No attendance responses</span>}
-                    {member.fineSummary.count ? <span>{member.fineSummary.count} fine record{member.fineSummary.count === 1 ? "" : "s"}</span> : <span>No fine records</span>}
-                  </div>
+                    <div className="member-ops-row__facts">
+                      <span className={member.active !== false ? "member-status member-status--active" : "member-status member-status--inactive"}>
+                        {member.active !== false ? "Active" : "Inactive"}
+                      </span>
+                      <span>{member.positionLabel || "No role or position"}</span>
+                      <span>{member.normalizedRid ? `RID ${member.normalizedRid}` : "RID not recorded"}</span>
+                      <span>{member.accountLinked ? "Approved account linked" : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</span>
+                      {member.attendanceSummary.recorded ? <span>{member.attendanceSummary.rate}% attendance</span> : <span>No attendance responses</span>}
+                      {member.fineSummary.count ? <span>{member.fineSummary.count} fine record{member.fineSummary.count === 1 ? "" : "s"}</span> : <span>No fine records</span>}
+                    </div>
 
-                  <div className="member-ops-row__quality">
-                    <span>Record completeness: {member.completeness.score}%</span>
-                    <i style={{ "--member-completeness": `${member.completeness.score}%` }} />
-                  </div>
+                    <div className="member-ops-row__quality">
+                      <span>Record completeness: {member.completeness.score}%</span>
+                      <i style={{ "--member-completeness": `${member.completeness.score}%` }} />
+                    </div>
 
-                  <div className="member-ops-row__actions">
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); }}>View</button>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); openProfileEditor(member); }}>Edit</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <AdminEmpty message="No member records match this workspace view." />
-          )}
+                    <div className="member-ops-row__actions">
+                      <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); }}>View</button>
+                      {hasLinkedProfile ? (
+                        <>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); openProfileEditor(member); }}>Edit Profile</button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); openProfileHistory(member); }}>View History</button>
+                        </>
+                      ) : <span>No account linked</span>}
+                    </div>
+                  </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <AdminEmpty message="No member records match this workspace view." />
+            )}
+          </div>
+
+          <MemberInspector
+            busy={busy}
+            member={selectedMember}
+            onEdit={openProfileEditor}
+            onHistory={openProfileHistory}
+            onRemove={setTarget}
+          />
         </div>
-
-        <MemberInspector
-          busy={busy}
-          member={selectedMember}
-          onEdit={openProfileEditor}
-          onRemove={setTarget}
-        />
       </section>
 
       <section className="member-ops-insights" aria-labelledby="member-insights-title">
@@ -974,57 +1038,19 @@ export function MembersModule({
       ) : null}
 
       {profileEditor ? (
-        <AdminDialog
+        <ProfileEditorDialog
+          profile={profileEditor}
           title={`Edit ${formatRotaractorName(profileEditor.name, true)}`}
-          busy={busy}
           onClose={() => setProfileEditor(null)}
-        >
-          <form className="admin-form" onSubmit={saveProfile}>
-            <label>
-              Full name
-              <input
-                value={profileEditor.name}
-                onChange={(event) => setProfileEditor({ ...profileEditor, name: event.target.value })}
-                required
-                autoFocus
-              />
-            </label>
-
-            <label>
-              Email address
-              <input
-                type="email"
-                inputMode="email"
-                value={profileEditor.email}
-                onChange={(event) => setProfileEditor({ ...profileEditor, email: event.target.value })}
-                maxLength="320"
-              />
-            </label>
-
-            <label>
-              RID
-              <input
-                value={profileEditor.rid}
-                onChange={(event) => setProfileEditor({ ...profileEditor, rid: event.target.value })}
-                maxLength="40"
-              />
-            </label>
-
-            <label className="admin-checkbox">
-              <input
-                type="checkbox"
-                checked={profileEditor.active}
-                onChange={(event) => setProfileEditor({ ...profileEditor, active: event.target.checked })}
-              />
-              Active member
-            </label>
-
-            <div className="admin-actions">
-              <button type="button" onClick={() => setProfileEditor(null)} disabled={busy}>Cancel</button>
-              <button disabled={busy}>{busy ? "Saving..." : "Save profile"}</button>
-            </div>
-          </form>
-        </AdminDialog>
+          onSave={saveProfile}
+        />
+      ) : null}
+      {historyTarget ? (
+        <ProfileHistoryDialog
+          target={historyTarget}
+          loadHistory={adminCalls.profileHistory}
+          onClose={() => setHistoryTarget(null)}
+        />
       ) : null}
       {target ? (
         <AdminDialog
@@ -1033,7 +1059,7 @@ export function MembersModule({
           onClose={() => setTarget(null)}
         >
           <p>
-            This permanently removes the production member roster document and
+            This permanently removes the production member document and
             its attendance document, matching current production behavior.
           </p>
 
@@ -1068,18 +1094,18 @@ export function MembersModule({
   );
 }
 
-function MemberInspector({ member, busy, onEdit, onRemove }) {
+function MemberInspector({ member, busy, onEdit, onHistory, onRemove }) {
   if (!member) {
     return (
       <aside className="member-ops-inspector" aria-label="Member inspector">
-        <AdminEmpty message="Select a member to inspect their roster record." />
+        <AdminEmpty message="Select a member to inspect their club record." />
       </aside>
     );
   }
 
-  const missingText = member.completeness.missing.length
-    ? member.completeness.missing.join(", ")
-    : "No missing fields in the current completeness checks.";
+  const linkedProfile = member.linkedAccount || {};
+  const missingItems = member.completeness.missing.map(formatMissingCompletenessLabel);
+  const hasLinkedProfile = Boolean(linkedProfileUidForMember(member));
 
   return (
     <aside className="member-ops-inspector" aria-label={`Inspector for ${member.name}`}>
@@ -1092,13 +1118,20 @@ function MemberInspector({ member, busy, onEdit, onRemove }) {
       </header>
 
       <section>
-        <h4>Overview</h4>
+        <h4>Overview / Profile</h4>
         <dl>
-          <div><dt>Email</dt><dd>{member.email || "No email in roster"}</dd></div>
-          <div><dt>RID</dt><dd>{member.normalizedRid || "RID not recorded"}</dd></div>
-          <div><dt>Role</dt><dd>{member.role || "Not recorded"}</dd></div>
-          <div><dt>Position</dt><dd>{member.position || "Not recorded"}</dd></div>
-          <div><dt>Account linkage</dt><dd>{member.accountLinked ? `Confirmed by email: ${member.linkedAccount.email}` : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</dd></div>
+          <div><dt>Email</dt><dd>{recordedProfileValue(member.email)}</dd></div>
+          <div><dt>Phone</dt><dd>{recordedProfileValue(linkedProfile.phone)}</dd></div>
+          <div><dt>Date of birth</dt><dd>{formatMemberDateOfBirth(linkedProfile.dateOfBirth)}</dd></div>
+          <div><dt>Gender</dt><dd>{formatMemberGender(linkedProfile.gender)}</dd></div>
+          {linkedProfile.gender === "self-describe" ? (
+            <div><dt>Gender description</dt><dd>{recordedProfileValue(linkedProfile.genderSelfDescribe)}</dd></div>
+          ) : null}
+          <div><dt>Hobbies and interests</dt><dd>{recordedProfileValue(linkedProfile.hobbies)}</dd></div>
+          <div><dt>RID</dt><dd>{member.normalizedRid || "Not recorded"}</dd></div>
+          <div><dt>Trusted role</dt><dd>{recordedProfileValue(member.trustedRole)}</dd></div>
+          <div><dt>Club position</dt><dd>{recordedProfileValue(member.clubPosition || member.position)}</dd></div>
+          <div><dt>Account linkage</dt><dd>{member.accountLinked ? `Approved account linked${linkedProfile.email ? `: ${linkedProfile.email}` : ""}` : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</dd></div>
           {member.accountEmailMismatch ? (
             <div><dt>Account email mismatch</dt><dd>{member.possibleNameMatches.map((user) => user.email).join(", ")}</dd></div>
           ) : null}
@@ -1126,13 +1159,27 @@ function MemberInspector({ member, busy, onEdit, onRemove }) {
         <h4>Record quality</h4>
         <p>Record completeness: {member.completeness.score}%</p>
         <div className="member-ops-progress" aria-hidden="true"><i style={{ "--member-completeness": `${member.completeness.score}%` }} /></div>
-        <p>{missingText}</p>
+        {missingItems.length ? (
+          <div className="member-ops-missing">
+            <strong>Missing:</strong>
+            <ul>
+              {missingItems.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+        ) : (
+          <p>No missing fields in the current completeness checks.</p>
+        )}
       </section>
 
       <section>
         <h4>Actions</h4>
         <div className="admin-actions">
-          <button type="button" onClick={() => onEdit(member)} disabled={busy}>Edit member</button>
+          {hasLinkedProfile ? (
+            <>
+              <button type="button" onClick={() => onEdit(member)} disabled={busy}>Edit Profile</button>
+              <button type="button" onClick={() => onHistory(member)} disabled={busy}>View History</button>
+            </>
+          ) : <span>No account linked</span>}
           <button type="button" className="danger" onClick={() => onRemove(member)} disabled={busy}>Remove member</button>
         </div>
       </section>

@@ -4,7 +4,7 @@ import { getPositionLabels } from "./accessHubModel";
 import { getRoleLabel } from "./dashboardPresentationModel";
 import { formatRotaractorName } from "../../utils/memberName";
 
-export default function DashboardHeader({ profile, mode, access, onSignOut }) {
+export default function DashboardHeader({ profile, mode, access, onEditProfile, onSignOut }) {
   const reduceMotion = useReducedMotion();
   const name = formatRotaractorName(profile.name || profile.memberName || (mode === "prospect" ? "Prospect" : "RCPH Member"), mode === "prospect" ? { role: "prospect" } : profile);
   const canonicalPositions = getPositionLabels(profile.positionKeys);
@@ -50,6 +50,7 @@ export default function DashboardHeader({ profile, mode, access, onSignOut }) {
       </div>
 
       <motion.nav aria-label="Dashboard actions" variants={reduceMotion ? undefined : mastheadItem}>
+        <button type="button" onClick={onEditProfile}>Edit profile</button>
         <Link to="/access">Access Hub</Link>
         <Link to="/">Public homepage</Link>
         <button type="button" onClick={onSignOut}>Sign out</button>

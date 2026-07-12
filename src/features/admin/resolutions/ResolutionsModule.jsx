@@ -22,6 +22,7 @@ import {
   cancelResolution,
   closeResolutionVoting,
   createResolutionDraft,
+  deleteResolution,
   getResolutionErrorMessage,
   loadAdminResolutions,
   loadResolutionDetails,
@@ -75,6 +76,9 @@ function resolutionApprovalMethodLabel(resolution) {
 }
 
 function buildHybridEmailPlaceholder(value, meeting) {
+  const resolutionLine = value.resolutionNumber
+    ? `Resolution ${value.resolutionNumber}: ${value.title || "[TITLE]"}`
+    : `Resolution: ${value.title || "[TITLE]"}`;
   return [
     "Dear Board Members,",
     "",
@@ -88,7 +92,7 @@ function buildHybridEmailPlaceholder(value, meeting) {
     "",
     "A confirmed vote submitted through the authenticated RCPH Member Dashboard is official, final, and counted immediately.",
     "",
-    `Resolution ${value.resolutionNumber || "[NUMBER]"}: ${value.title || "[TITLE]"}`,
+    resolutionLine,
     "",
     "Document Fingerprint:",
     value.originalDocumentShortHash || "[SHORT HASH]",
@@ -104,7 +108,13 @@ function buildHybridEmailPlaceholder(value, meeting) {
 }
 
 function buildHybridEmailSubject(value) {
-  return `Resolution ${value.resolutionNumber || "[NUMBER]"} - ${value.title || "[TITLE]"}`;
+  return value.resolutionNumber
+    ? `Resolution ${value.resolutionNumber} - ${value.title || "[TITLE]"}`
+    : `Resolution - ${value.title || "[TITLE]"}`;
+}
+
+function resolutionDisplayTitle(resolution, fallback = "Resolution") {
+  return resolution?.resolutionNumber || resolution?.title || fallback;
 }
 
 function hasSavedHybridEmail(value) {
@@ -268,7 +278,7 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
     <ApprovalMethodSelector value={approvalMethod} onChange={setApprovalMethod} disabled={busy || (value.status && value.status !== "draft")} nameSuffix={value.id || "new"} />
     <div className="admin-form-grid">
       <label>BOD meeting<select value={value.meetingId} onChange={set("meetingId")} required><option value="">Choose meeting</option>{meetings.map((item) => <option key={item.id} value={item.id}>{item.name} - {item.date}</option>)}</select></label>
-      <label>Resolution number<input value={value.resolutionNumber} onChange={set("resolutionNumber")} placeholder="RCPH/2026-27/RES/004" maxLength="80" required /></label>
+      <label>Resolution number <span className="admin-optional">Optional</span><input value={value.resolutionNumber} onChange={set("resolutionNumber")} placeholder="RCPH/2026-27/RES/004" maxLength="80" /></label>
       <label>Title<input value={value.title} onChange={set("title")} maxLength="220" required /></label>
       {!isRecordOnly ? <label>Voting rule<select value={value.votingRule} onChange={set("votingRule")}>{Object.entries(RULE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label> : null}
       {!isRecordOnly ? <EligibleVotersSelector value={value} roster={roster} onChange={onChange} disabled={formLocked} /> : null}
@@ -291,13 +301,13 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
   </form>;
 }
 
-function ResolutionCard({ item, busy, onEdit, onEditLayout, onOpen, onClose, onCancel, onView }) {
+function ResolutionCard({ item, busy, onEdit, onEditLayout, onOpen, onClose, onCancel, onDelete, onView }) {
   const completed = FINAL_RESOLUTION_STATUSES.includes(item.status);
   const recordOnly = item.approvalMethod === "record_only";
   const authenticatedFinal = isAuthenticatedFinalHybrid(item);
   const methodLabel = resolutionApprovalMethodLabel(item);
   return <article className={`resolution-admin-card is-${item.status}`}>
-    <header><div><span>{item.resolutionNumber}</span><h4>{item.title}</h4></div><strong>{statusLabel(item.status)}</strong></header>
+    <header><div>{item.resolutionNumber ? <span>{item.resolutionNumber}</span> : null}<h4>{item.title}</h4></div><strong>{statusLabel(item.status)}</strong></header>
     <p>{item.meetingTitle || "Linked BOD meeting"} - {item.meetingDate || "Date unavailable"}</p>
     <small>{methodLabel}{item.originalDocumentShortHash ? ` - ${item.originalDocumentShortHash}` : ""}</small>
     <dl><div><dt>{authenticatedFinal ? "Recorded" : item.approvalMethod === "hybrid_email" ? "Verified" : "Received"}</dt><dd>{item.votesReceivedCount}/{item.eligibleVoterCount}</dd></div><div><dt>Approve</dt><dd>{item.approveCount}</dd></div><div><dt>Reject</dt><dd>{item.rejectCount}</dd></div><div><dt>Abstain</dt><dd>{item.abstainCount}</dd></div></dl>
@@ -308,6 +318,7 @@ function ResolutionCard({ item, busy, onEdit, onEditLayout, onOpen, onClose, onC
       {item.status === "draft" ? <button disabled={busy} onClick={() => onEditLayout(item)}>Edit PDF layout</button> : null}
       {completed ? <button disabled={busy} onClick={() => onView(item)}>View details and PDF</button> : null}
       {item.status === "cancelled" ? <button disabled={busy} onClick={() => onView(item)}>View audit history</button> : null}
+      {["draft", "cancelled"].includes(item.status) ? <button className="danger" disabled={busy} onClick={() => onDelete(item)}>Delete</button> : null}
       {["draft", "open"].includes(item.status) ? <button className="danger" disabled={busy} onClick={() => onCancel(item)}>Cancel</button> : null}
     </div>
   </article>;
@@ -359,7 +370,7 @@ function ResolutionDetails({ details, busy, onRefresh, onDownload, onRetry, onVe
   const metricLabel = authenticatedFinal ? "Recorded" : hybrid ? "Verified" : "Received";
   const verificationHeading = authenticatedFinal ? "Recorded votes" : "Email verification";
   return <div className="resolution-details">
-    <div className="resolution-details__summary"><span>{resolution.resolutionNumber}</span><strong>{statusLabel(resolution.status)}</strong><p>{resolution.meetingTitle} - {resolution.meetingDate}</p><p><b>Method:</b> {resolutionApprovalMethodLabel(resolution)}</p>{resolution.originalDocumentShortHash ? <p><b>Document fingerprint:</b> {resolution.originalDocumentShortHash}</p> : null}{resolution.proposedByName ? <p><b>Proposed by:</b> {formatRotaractorName(resolution.proposedByName, true)}{resolution.proposedByPosition ? ` - ${resolution.proposedByPosition}` : ""}</p> : null}{resolution.secondedByName ? <p><b>Seconded by:</b> {formatRotaractorName(resolution.secondedByName, true)}{resolution.secondedByPosition ? ` - ${resolution.secondedByPosition}` : ""}</p> : null}{resolution.body ? <p>{resolution.body}</p> : null}{resolution.notes ? <p><b>Notes:</b> {resolution.notes}</p> : null}</div>
+    <div className="resolution-details__summary">{resolution.resolutionNumber ? <span>{resolution.resolutionNumber}</span> : null}<strong>{statusLabel(resolution.status)}</strong><p>{resolution.meetingTitle} - {resolution.meetingDate}</p><p><b>Method:</b> {resolutionApprovalMethodLabel(resolution)}</p>{resolution.originalDocumentShortHash ? <p><b>Document fingerprint:</b> {resolution.originalDocumentShortHash}</p> : null}{resolution.proposedByName ? <p><b>Proposed by:</b> {formatRotaractorName(resolution.proposedByName, true)}{resolution.proposedByPosition ? ` - ${resolution.proposedByPosition}` : ""}</p> : null}{resolution.secondedByName ? <p><b>Seconded by:</b> {formatRotaractorName(resolution.secondedByName, true)}{resolution.secondedByPosition ? ` - ${resolution.secondedByPosition}` : ""}</p> : null}{resolution.body ? <p>{resolution.body}</p> : null}{resolution.notes ? <p><b>Notes:</b> {resolution.notes}</p> : null}</div>
     <div className="resolution-live-metrics"><div><span>Eligible</span><strong>{resolution.eligibleVoterCount}</strong></div><div><span>{metricLabel}</span><strong>{resolution.votesReceivedCount}</strong></div><div><span>Approve</span><strong>{resolution.approveCount}</strong></div><div><span>Reject</span><strong>{resolution.rejectCount}</strong></div><div><span>Abstain</span><strong>{resolution.abstainCount}</strong></div></div>
     <p><b>PDF format:</b> {resolution.documentSourceMode === "uploadedPdf" ? "Uploaded PDF with voting record" : (resolution.finalizedPdfLayoutMode || resolution.pdfLayoutMode) === "custom" ? "Custom Section Layout" : "Standard Resolution Format"}</p>
     <p><b>Append vote table:</b> {resolution.appendVoteTable === false ? "No" : "Yes"}</p>
@@ -449,7 +460,7 @@ export default function ResolutionsModule({ uid, onNotice }) {
 
   async function performConfirmed() {
     if (!confirm) return;
-    const operations = { open: [openResolutionVoting, confirm.item.approvalMethod === "record_only" ? "Resolution archived as record-only." : "Voting opened."], close: [closeResolutionVoting, "Voting closed and result finalized."], cancel: [cancelResolution, "Resolution cancelled."] };
+    const operations = { open: [openResolutionVoting, confirm.item.approvalMethod === "record_only" ? "Resolution archived as record-only." : "Voting opened."], close: [closeResolutionVoting, "Voting closed and result finalized."], cancel: [cancelResolution, "Resolution cancelled."], delete: [deleteResolution, "Resolution deleted."] };
     const [request, message] = operations[confirm.type];
     const result = await run(`${confirm.type}-resolution`, () => request(confirm.item.id), message, { onError(error) { onNotice({ type: "error", message: getResolutionErrorMessage(error) }); return true; } });
     if (result) { setConfirm(null); setDetails(null); await load(); }
@@ -517,7 +528,7 @@ export default function ResolutionsModule({ uid, onNotice }) {
   if (state.status === "loading") return <AdminLoading label="Loading resolutions..." />;
   if (state.status === "error") return <AdminError message="Resolution records could not be loaded." onRetry={load} />;
 
-  const common = { busy, onEdit: (item) => setEditing({ ...item }), onEditLayout: editLayout, onOpen: requestOpen, onClose: (item) => setConfirm({ type: "close", item }), onCancel: (item) => setConfirm({ type: "cancel", item }), onView: showDetails };
+  const common = { busy, onEdit: (item) => setEditing({ ...item }), onEditLayout: editLayout, onOpen: requestOpen, onClose: (item) => setConfirm({ type: "close", item }), onCancel: (item) => setConfirm({ type: "cancel", item }), onDelete: (item) => setConfirm({ type: "delete", item }), onView: showDetails };
   return <>
     <AdminModuleHeader title="Resolutions" description="Meeting-linked BOD resolution drafts, live voting, final records, and audit history." action={<button onClick={load} disabled={busy}>Refresh</button>} />
     {!state.meetings.length || !state.roster.length ? <div className="admin-notice admin-notice--error" role="alert">A valid BOD meeting is required. Website and hybrid voting also require at least one UID-linked active BOD position assignment.</div> : null}
@@ -526,9 +537,9 @@ export default function ResolutionsModule({ uid, onNotice }) {
     <ResolutionGroup title="Drafts" items={state.resolutions.filter((item) => item.status === "draft")} {...common} />
     <ResolutionGroup title="Completed" items={state.resolutions.filter((item) => FINAL_RESOLUTION_STATUSES.includes(item.status))} {...common} />
     <ResolutionGroup title="Cancelled" items={state.resolutions.filter((item) => item.status === "cancelled")} {...common} />
-    {editing ? <AdminDialog title={`Edit ${editing.resolutionNumber}`} busy={busy} className="admin-dialog--wide" onClose={() => setEditing(null)}><ResolutionForm value={editing} onChange={setEditing} meetings={state.meetings} roster={state.roster} busy={busy} submitLabel="Save draft changes" onSubmit={update} onPreview={() => downloadPreview(editing)} onGeneratedPagesPreview={(options) => previewGeneratedPages(editing, options)} onNotice={onNotice} onPersisted={(uploadedSource) => setEditing((current) => current ? { ...current, uploadedSource } : current)} /></AdminDialog> : null}
-    {layoutEditing ? <AdminDialog title={`PDF layout - ${layoutEditing.resolution.resolutionNumber}`} busy={busy} className="admin-dialog--wide" onClose={() => setLayoutEditing(null)}><form className="admin-form" onSubmit={saveLayout}><ResolutionPdfBuilder value={layoutEditing.resolution} onChange={(resolution) => setLayoutEditing({ ...layoutEditing, resolution })} disabled={busy} onPreview={() => downloadPreview(layoutEditing.resolution, layoutEditing)} onGeneratedPagesPreview={(options) => previewGeneratedPages(layoutEditing.resolution, options, layoutEditing)} onNotice={onNotice} /><button disabled={busy}>Save PDF layout</button></form></AdminDialog> : null}
-    {confirm ? <AdminDialog title={`${statusLabel(confirm.type)} ${confirm.item.resolutionNumber}?`} busy={busy} onClose={() => setConfirm(null)}><p>{confirm.type === "open" ? confirm.item.approvalMethod === "record_only" ? "This will archive the resolution without opening a voting process." : `${confirm.item.eligibleVoterCount} selected eligible voter${confirm.item.eligibleVoterCount === 1 ? "" : "s"} will be frozen as the voting snapshot.` : confirm.type === "close" ? "Votes will be frozen and the final result calculated server-side. This cannot be reopened." : "The resolution will stop accepting votes and cannot be reopened."}</p><div className="admin-actions"><button onClick={() => setConfirm(null)}>Back</button><button className={confirm.type === "cancel" ? "danger" : ""} onClick={performConfirmed}>{confirm.item.approvalMethod === "record_only" && confirm.type === "open" ? "Archive record" : `${statusLabel(confirm.type)} resolution`}</button></div></AdminDialog> : null}
-    {details ? <AdminDialog title={details.resolution.resolutionNumber} busy={busy} className="admin-dialog--wide" onClose={() => setDetails(null)}><ResolutionDetails details={details} busy={busy} onRefresh={() => showDetails(details.resolution)} onVerify={verifyEmail} onRetry={async () => { const result = await run("retry-resolution-pdf", () => retryResolutionPdfMerge(details.resolution.id), "Final PDF generated.", { onError(error) { onNotice({ type: "error", message: getResolutionErrorMessage(error) }); return true; } }); if (result) await showDetails(details.resolution); }} onDownload={async () => { try { if (details.resolution.documentSourceMode === "uploadedPdf") await downloadFinalizedResolutionPdf(details.resolution.id, details.resolution.resolutionNumber); else await generateResolutionPdf(details); } catch (error) { onNotice({ type: "error", message: error.message }); } }} /></AdminDialog> : null}
+    {editing ? <AdminDialog title={`Edit ${resolutionDisplayTitle(editing)}`} busy={busy} className="admin-dialog--wide" onClose={() => setEditing(null)}><ResolutionForm value={editing} onChange={setEditing} meetings={state.meetings} roster={state.roster} busy={busy} submitLabel="Save draft changes" onSubmit={update} onPreview={() => downloadPreview(editing)} onGeneratedPagesPreview={(options) => previewGeneratedPages(editing, options)} onNotice={onNotice} onPersisted={(uploadedSource) => setEditing((current) => current ? { ...current, uploadedSource } : current)} /></AdminDialog> : null}
+    {layoutEditing ? <AdminDialog title={`PDF layout - ${resolutionDisplayTitle(layoutEditing.resolution)}`} busy={busy} className="admin-dialog--wide" onClose={() => setLayoutEditing(null)}><form className="admin-form" onSubmit={saveLayout}><ResolutionPdfBuilder value={layoutEditing.resolution} onChange={(resolution) => setLayoutEditing({ ...layoutEditing, resolution })} disabled={busy} onPreview={() => downloadPreview(layoutEditing.resolution, layoutEditing)} onGeneratedPagesPreview={(options) => previewGeneratedPages(layoutEditing.resolution, options, layoutEditing)} onNotice={onNotice} /><button disabled={busy}>Save PDF layout</button></form></AdminDialog> : null}
+    {confirm ? <AdminDialog title={`${statusLabel(confirm.type)} ${resolutionDisplayTitle(confirm.item)}?`} busy={busy} onClose={() => setConfirm(null)}><p>{confirm.type === "open" ? confirm.item.approvalMethod === "record_only" ? "This will archive the resolution without opening a voting process." : `${confirm.item.eligibleVoterCount} selected eligible voter${confirm.item.eligibleVoterCount === 1 ? "" : "s"} will be frozen as the voting snapshot.` : confirm.type === "close" ? "Votes will be frozen and the final result calculated server-side. This cannot be reopened." : confirm.type === "delete" ? "The server will delete this draft or cancelled resolution only if it has no votes or finalized artifacts. Audit details are preserved separately." : "The resolution will stop accepting votes and cannot be reopened."}</p><div className="admin-actions"><button onClick={() => setConfirm(null)}>Back</button><button className={["cancel", "delete"].includes(confirm.type) ? "danger" : ""} onClick={performConfirmed}>{confirm.item.approvalMethod === "record_only" && confirm.type === "open" ? "Archive record" : `${statusLabel(confirm.type)} resolution`}</button></div></AdminDialog> : null}
+    {details ? <AdminDialog title={resolutionDisplayTitle(details.resolution)} busy={busy} className="admin-dialog--wide" onClose={() => setDetails(null)}><ResolutionDetails details={details} busy={busy} onRefresh={() => showDetails(details.resolution)} onVerify={verifyEmail} onRetry={async () => { const result = await run("retry-resolution-pdf", () => retryResolutionPdfMerge(details.resolution.id), "Final PDF generated.", { onError(error) { onNotice({ type: "error", message: getResolutionErrorMessage(error) }); return true; } }); if (result) await showDetails(details.resolution); }} onDownload={async () => { try { if (details.resolution.documentSourceMode === "uploadedPdf") await downloadFinalizedResolutionPdf(details.resolution.id, details.resolution.resolutionNumber, details.resolution.title || details.resolution.id); else await generateResolutionPdf(details); } catch (error) { onNotice({ type: "error", message: error.message }); } }} /></AdminDialog> : null}
   </>;
 }

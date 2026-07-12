@@ -173,3 +173,58 @@ test("payload builder requires a complete selected-avenue description map", () =
     assert.ok(result.errors.avenueDescriptions);
   }
 });
+
+test(
+  "empty conductor is preserved by event normalization",
+  () => {
+    const event = normalizeBodEvent(
+      "event-empty-conductor",
+      {
+        ...base,
+        conductedBy: "",
+      },
+    );
+
+    assert.equal(
+      event.conductedBy,
+      "",
+    );
+  },
+);
+
+test(
+  "BOD event payload allows an optional empty conductor",
+  () => {
+    const result =
+      buildBodEventPayload({
+        name: "General Body Meeting",
+        conductedBy: "",
+        startDate: "2026-07-20",
+        endDate: "",
+        time: "",
+        avenues: ["GBM"],
+        description:
+          "Monthly general body meeting.",
+        avenueDescriptions: {
+          GBM:
+            "Monthly general body meeting.",
+        },
+        rcphRole: "host",
+        hostClub:
+          "Rotaract Club of Pune Heritage",
+        collaborators: [],
+        collaborationNotes: "",
+        driveFolder: "",
+      });
+
+    assert.deepEqual(
+      result.errors,
+      {},
+    );
+
+    assert.equal(
+      result.payload.conductedBy,
+      "",
+    );
+  },
+);

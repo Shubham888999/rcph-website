@@ -1,24 +1,6 @@
-const POSITION_LABELS = {
-  president: "President",
-  "immediate-past-president": "Immediate Past President",
-  "vice-president": "Vice President",
-  secretary: "Secretary",
-  "joint-secretary": "Joint Secretary",
-  treasurer: "Treasurer",
-  csd: "Club Service Director",
-  cmd: "Community Service Director",
-  isd: "International Service Director",
-  pdd: "Professional Development Director",
-  rrro: "Rotary Rotaract Relations Officer",
-  pro: "Public Relations Officer",
-  dei: "DEI Director",
-  editor: "Editor",
-  cwd: "Website Director",
-  "sports-representative": "Sports Representative",
-  wrwc: "World Rotaract Week Chairperson",
-  wr: "Women's Representative",
-  saa: "Sergeant-at-Arms",
-};
+import { POSITION_CATALOG } from "../admin/shared/positionCatalog.js";
+
+const POSITION_LABELS = Object.fromEntries(POSITION_CATALOG.map((position) => [position.key, position.displayTitle]));
 
 export function getPositionLabels(keys) {
   if (!Array.isArray(keys)) return [];

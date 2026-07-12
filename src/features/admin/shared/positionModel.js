@@ -1,6 +1,7 @@
 import { POSITION_CATALOG, POSITION_GROUPS } from "./positionCatalog.js";
 
 const BY_KEY = new Map(POSITION_CATALOG.map((position) => [position.key, position]));
+const ROLE_RANK = Object.freeze({ prospect: 0, gbm: 1, bod: 2, admin: 3, president: 4 });
 
 function lookupText(value) {
   return typeof value === "string"
@@ -50,15 +51,40 @@ export function groupedPositionOptions(options) {
   })).filter((group) => group.options.length > 0);
 }
 
+export function effectiveRoleForPosition(position) {
+  const key = canonicalPositionKey(position);
+  return key ? BY_KEY.get(key)?.effectiveRole || "gbm" : "gbm";
+}
+
+export function isResolutionVoterPosition(position) {
+  const key = canonicalPositionKey(position);
+  const definition = key ? BY_KEY.get(key) : null;
+  return definition?.active === true && definition.resolutionVoter === true;
+}
+
+export function hasResolutionVoterPosition(selectedKeys) {
+  return normalizePositionSelection(selectedKeys).selectedKeys.some(isResolutionVoterPosition);
+}
+
+export function deriveEffectiveRole(selectedKeys, fallbackRole = "gbm") {
+  const normalized = normalizePositionSelection(selectedKeys);
+  if (!normalized.selectedKeys.length) return ROLE_RANK[fallbackRole] != null ? fallbackRole : "gbm";
+  return normalized.selectedKeys.reduce((best, key) => {
+    const role = effectiveRoleForPosition(key);
+    return ROLE_RANK[role] > ROLE_RANK[best] ? role : best;
+  }, "gbm");
+}
+
 export function applyPositionRole(role, selectedKeys) {
-  return role === "gbm" ? [] : normalizePositionSelection(selectedKeys).selectedKeys;
+  return normalizePositionSelection(selectedKeys).selectedKeys;
 }
 
 export function validatePositionRole(role, selectedKeys, unknownValues = []) {
   const keys = applyPositionRole(role, selectedKeys);
-  if (role === "bod" && keys.length === 0) return { ok: false, message: "BOD access requires at least one club position.", positionKeys: keys };
+  const effectiveRole = deriveEffectiveRole(keys, role);
+  if (role === "bod" && keys.length === 0) return { ok: false, message: "BOD access requires at least one club position.", positionKeys: keys, effectiveRole };
   if (role !== "gbm" && unknownValues.length > 0 && keys.length === 0) return { ok: false, message: "Select the correct positions before replacing unresolved legacy position data.", positionKeys: keys };
-  return { ok: true, message: "", positionKeys: keys };
+  return { ok: true, message: "", positionKeys: keys, effectiveRole };
 }
 
 function errorDetails(error) {

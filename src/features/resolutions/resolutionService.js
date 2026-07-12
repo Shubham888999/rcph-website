@@ -54,6 +54,12 @@ export async function cancelResolution(resolutionId) {
   return result;
 }
 
+export async function deleteResolution(resolutionId) {
+  const result = await call("deleteResolution", { resolutionId });
+  clearDashboardDataCache();
+  return result;
+}
+
 export async function submitResolutionVote(uid, resolutionId, choice) {
   requireUser(uid);
   const result = await call("submitResolutionVote", { resolutionId, choice });

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  mergeDashboardProfile,
+} from "./dashboardModel";
+import {
   getDashboardData,
   getDashboardErrorDiagnostic,
   reloadDashboardData,
@@ -60,5 +63,12 @@ export default function useDashboardData({ uid, enabled }) {
     });
   }, []);
 
-  return { ...state, reload, updateAnnouncements, updateOpenResolutions };
+  const updateProfile = useCallback((profile) => {
+    setState((current) => {
+      if (current.status !== "success" || !current.data) return current;
+      return { ...current, data: mergeDashboardProfile(current.data, profile) };
+    });
+  }, []);
+
+  return { ...state, reload, updateAnnouncements, updateOpenResolutions, updateProfile };
 }

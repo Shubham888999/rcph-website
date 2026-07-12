@@ -48,3 +48,20 @@ test("upload failure preserves the announcement draft and email label reflects r
   assert.match(source, /setStage\("Upload failed"\)/);
   assert.match(source, /Also send email to the same eligible recipients\{draft\.attachment \? " with the attachment" : ""\}/);
 });
+
+test("Prospect deletion is exposed only through the server callable confirmation path", () => {
+  assert.match(source, /deleteProspect\(deleteConfirm\.uid\)/);
+  assert.match(source, /Delete Prospect/);
+  assert.match(source, /setDeleteConfirm\(prospect\)/);
+  assert.match(source, /prospect\.status !== "promoted"/);
+  assert.match(source, /Auth user, attendance rows, Prospect progress, and dashboard delivery records/);
+});
+
+test("announcement history archives published records and deletes only unpublished records", () => {
+  assert.match(source, /archiveAnnouncement\(historyAction\.item\.id\)/);
+  assert.match(source, /deleteAnnouncement\(historyAction\.item\.id\)/);
+  assert.match(source, /item\.status === "published"/);
+  assert.match(source, /item\.status !== "archived"/);
+  assert.match(source, /This hides the published announcement from dashboards while preserving its delivery history and metadata/);
+  assert.match(source, /This permanently deletes the unpublished announcement/);
+});

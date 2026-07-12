@@ -19,7 +19,14 @@ export default function BodEventDetailsDialog({ event, onClose }) {
         <dl className="bod-detail-list">
           <div><dt>Status</dt><dd>{event.isActive ? "Active" : "Archived"}; {event.isSynced ? "synchronized" : "not synchronized"}</dd></div>
           <div><dt>Date</dt><dd>{event.startDate}{event.endDate && event.endDate !== event.startDate ? ` – ${event.endDate}` : ""}{event.time ? ` at ${event.time}` : ""}</dd></div>
-          <div><dt>Conducted by</dt><dd>{event.conductedBy}</dd></div>
+<div>
+  <dt>Conducted by</dt>
+
+  <dd>
+    {event.conductedBy ||
+      "Not recorded"}
+  </dd>
+</div>
           <div><dt>Avenues</dt><dd>{event.avenues.join(", ") || "Unavailable"}</dd></div>
           <div><dt>RCPH role</dt><dd>{ROLE_LABELS[event.rcphRole]}</dd></div>
           <div><dt>Host club</dt><dd>{event.hostClub}</dd></div>

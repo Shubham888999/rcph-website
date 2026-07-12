@@ -6,24 +6,73 @@ import { ANNOUNCEMENT_ATTACHMENT_MAX_BYTES, ANNOUNCEMENT_ATTACHMENT_TYPES, build
 import { adminCalls, clearAdminCaches, loadAdminCallable, uploadAnnouncementAttachment } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
 import { formatRotaractorName } from "../../../utils/memberName";
+import ProfileEditorDialog, { ProfileHistoryDialog } from "../../profile/ProfileEditorDialog";
 
 export function ProspectsModule({ uid, onNotice }) {
   const [state, setState] = useState({ status: "loading", prospects: [], summary: {} });
   const [confirm, setConfirm] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [profileEditor, setProfileEditor] = useState(null);
+  const [historyTarget, setHistoryTarget] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "prospects", onNotice });
   const load = useCallback((refresh = false) => {
     if (refresh) clearAdminCaches(uid, ["getProspectManagementData"]);
     loadAdminCallable(uid, "getProspectManagementData", refresh).then((data) => setState({ status: "success", prospects: Array.isArray(data.prospects) ? data.prospects : [], summary: data.summary || {} })).catch(() => setState({ status: "error", prospects: [], summary: {} }));
   }, [uid]);
   useEffect(() => { load(); }, [load]);
+  function profileFromProspect(prospect) {
+    return {
+      targetUid: prospect.uid,
+      name: prospect.name || "",
+      email: prospect.email || "",
+      role: "prospect",
+      phone: prospect.phone || "",
+      dateOfBirth: prospect.dateOfBirth || "",
+      gender: prospect.gender || "",
+      genderSelfDescribe: prospect.genderSelfDescribe || "",
+      hobbies: prospect.hobbies || "",
+      previousRotaract: prospect.previousRotaract === true,
+      previousRotaractDetails: prospect.previousRotaractDetails || "",
+      joinReason: prospect.joinReason || "",
+      referred: prospect.referred === true,
+      referredBy: prospect.referredBy || "",
+    };
+  }
+  async function saveProfile(payload) {
+    const result = await adminCalls.updateMemberProfile({ targetUid: profileEditor.targetUid, ...payload });
+    onNotice?.({ type: "success", message: result.changed ? "Prospect profile updated." : "Prospect profile already matched those details." });
+    load(true);
+    return result;
+  }
   if (state.status === "loading") return <AdminLoading label="Loading and recalculating Prospect progress…" />;
   if (state.status === "error") return <AdminError message="Prospect management data could not be loaded." onRetry={() => load(true)} />;
   return <>
     <AdminModuleHeader title="Prospect Management" description="Server-calculated consecutive attendance, dues, and induction readiness." action={<button onClick={() => load(true)}>Refresh progress</button>} />
     <section className="admin-metric-grid"><Metric label="Active" value={state.summary.active ?? state.summary.total ?? 0} /><Metric label="Attendance complete" value={state.summary.attendanceComplete || 0} /><Metric label="Dues pending" value={state.summary.duesPending || 0} /><Metric label="Ready" value={state.summary.ready || 0} /></section>
-    <div className="admin-card-grid">{state.prospects.map((prospect) => <article className="admin-record-card" key={prospect.uid}><h3>{prospect.name || "Prospect"}</h3><p>{prospect.email || "No email"}</p><p>Current streak: {prospect.currentConsecutiveAttendance || 0} / {prospect.requiredConsecutiveAttendance || 3}</p><p>Attendance: {prospect.attendanceRequirementMet ? "Complete" : "In progress"}</p><label><input type="checkbox" checked={prospect.duesPaid === true} disabled={busy || prospect.status === "promoted"} onChange={(event) => run("update-dues", () => adminCalls.updateDues(prospect.uid, event.target.checked), "Prospect dues updated.").then(() => load(true))} /> Dues paid</label><p>{prospect.ready ? "Ready for induction" : prospect.status === "promoted" ? "Promoted" : "Not yet ready"}</p>{prospect.status !== "promoted" ? <button disabled={!prospect.ready || busy} onClick={() => setConfirm(prospect)}>Promote to GBM</button> : null}</article>)}</div>
+    <div className="admin-card-grid">
+      {state.prospects.map((prospect) => (
+        <article className="admin-record-card" key={prospect.uid}>
+          <h3>{prospect.name || "Prospect"}</h3>
+          <p>{prospect.email || "No email"}</p>
+          <p>Current streak: {prospect.currentConsecutiveAttendance || 0} / {prospect.requiredConsecutiveAttendance || 3}</p>
+          <p>Attendance: {prospect.attendanceRequirementMet ? "Complete" : "In progress"}</p>
+          <p>{prospect.phone || "Phone not recorded"}</p>
+          <label><input type="checkbox" checked={prospect.duesPaid === true} disabled={busy || prospect.status === "promoted"} onChange={(event) => run("update-dues", () => adminCalls.updateDues(prospect.uid, event.target.checked), "Prospect dues updated.").then(() => load(true))} /> Dues paid</label>
+          <p>{prospect.ready ? "Ready for induction" : prospect.status === "promoted" ? "Promoted" : "Not yet ready"}</p>
+          <div className="admin-actions">
+            <button type="button" disabled={busy} onClick={() => setProfileEditor(profileFromProspect(prospect))}>Edit profile</button>
+            <button type="button" disabled={busy} onClick={() => setHistoryTarget(profileFromProspect(prospect))}>History</button>
+            {prospect.status !== "promoted" ? <button disabled={!prospect.ready || busy} onClick={() => setConfirm(prospect)}>Promote to GBM</button> : null}
+            {prospect.status !== "promoted" ? <button className="danger" disabled={busy} onClick={() => setDeleteConfirm(prospect)}>Delete Prospect</button> : null}
+          </div>
+        </article>
+      ))}
+    </div>
     {!state.prospects.length ? <AdminEmpty message="No Prospect records are available." /> : null}
     {confirm ? <AdminDialog title={`Promote ${confirm.name || "Prospect"}?`} busy={busy} onClose={() => setConfirm(null)}><p>This creates or updates GBM member, attendance, district attendance, role, user, and Prospect progress records through the existing server transaction.</p><div className="admin-actions"><button onClick={() => setConfirm(null)}>Cancel</button><button onClick={() => run("promote-prospect", () => adminCalls.promoteProspect(confirm.uid), "Prospect promoted to GBM.").then((result) => { if (result) { setConfirm(null); load(true); } })}>Promote</button></div></AdminDialog> : null}
+    {deleteConfirm ? <AdminDialog title={`Delete ${deleteConfirm.name || "Prospect"}?`} busy={busy} onClose={() => setDeleteConfirm(null)}><p>This permanently removes the current Prospect account, Auth user, attendance rows, Prospect progress, and dashboard delivery records through the server audit path.</p><div className="admin-actions"><button onClick={() => setDeleteConfirm(null)}>Cancel</button><button className="danger" onClick={() => run("delete-prospect", () => adminCalls.deleteProspect(deleteConfirm.uid), "Prospect deleted.").then((result) => { if (result) { setDeleteConfirm(null); load(true); } })}>Delete Prospect</button></div></AdminDialog> : null}
+    {profileEditor ? <ProfileEditorDialog profile={profileEditor} title={`Edit ${profileEditor.name || "Prospect"}`} onClose={() => setProfileEditor(null)} onSave={saveProfile} /> : null}
+    {historyTarget ? <ProfileHistoryDialog target={historyTarget} loadHistory={adminCalls.profileHistory} onClose={() => setHistoryTarget(null)} /> : null}
   </>;
 }
 
@@ -112,6 +161,7 @@ export function AnnouncementsModule({ uid, onNotice }) {
   const [status, setStatus] = useState("loading");
   const [historyBusy, setHistoryBusy] = useState(false);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [historyAction, setHistoryAction] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "announcements", onNotice });
   const load = useCallback((refresh = false) => {
     Promise.all([loadAdminCallable(uid, "getAnnouncementRecipientOptions", refresh), adminCalls.announcementHistory({ limit: 20, cursor: null })]).then(([directory, log]) => {
@@ -141,6 +191,17 @@ export function AnnouncementsModule({ uid, onNotice }) {
     } catch { onNotice({ type: "error", message: "Announcement history could not be loaded." }); }
     finally { setHistoryBusy(false); }
   }
+  async function performHistoryAction() {
+    if (!historyAction) return;
+    const request = historyAction.type === "archive"
+      ? () => adminCalls.archiveAnnouncement(historyAction.item.id)
+      : () => adminCalls.deleteAnnouncement(historyAction.item.id);
+    const result = await run(`${historyAction.type}-announcement`, request, historyAction.type === "archive" ? "Announcement archived." : "Announcement deleted.");
+    if (result) {
+      setHistoryAction(null);
+      load(true);
+    }
+  }
   if (status === "loading") return <AdminLoading label="Loading announcement recipients and history…" />;
   if (status === "error") return <AdminError message="Announcement tools could not be loaded." onRetry={() => load(true)} />;
   return <>
@@ -164,6 +225,7 @@ export function AnnouncementsModule({ uid, onNotice }) {
         <button disabled={busy || attachmentBusy}>Publish announcement</button>
       </form>
     </section>
-    <section className="admin-panel"><h3>Announcement History</h3>{history.length ? <div className="admin-card-grid">{history.map((item) => <article className="admin-record-card" key={item.id}><h4>{item.title}</h4><p>{item.bodyPreview || "No preview"}</p><p>{item.status} · {item.priority}</p><p>{item.recipientCount || 0} dashboard recipients</p><p>{item.emailRequested ? `${item.emailSummary?.sent || 0} emails sent; ${item.emailSummary?.failed || 0} failed` : "Dashboard only"}</p></article>)}</div> : <AdminEmpty message="No announcements have been published." />}{cursor ? <button disabled={historyBusy} onClick={loadMore}>{historyBusy ? "Loading…" : "Load more"}</button> : null}</section>
+    <section className="admin-panel"><h3>Announcement History</h3>{history.length ? <div className="admin-card-grid">{history.map((item) => <article className="admin-record-card" key={item.id}><h4>{item.title}</h4><p>{item.bodyPreview || "No preview"}</p><p>{item.status} · {item.priority}</p><p>{item.recipientCount || 0} dashboard recipients</p><p>{item.emailRequested ? `${item.emailSummary?.sent || 0} emails sent; ${item.emailSummary?.failed || 0} failed` : "Dashboard only"}</p>{item.status === "published" ? <button disabled={busy} onClick={() => setHistoryAction({ type: "archive", item })}>Archive</button> : item.status !== "archived" ? <button className="danger" disabled={busy} onClick={() => setHistoryAction({ type: "delete", item })}>Delete</button> : null}</article>)}</div> : <AdminEmpty message="No announcements have been published." />}{cursor ? <button disabled={historyBusy} onClick={loadMore}>{historyBusy ? "Loading…" : "Load more"}</button> : null}</section>
+    {historyAction ? <AdminDialog title={`${historyAction.type === "archive" ? "Archive" : "Delete"} ${historyAction.item.title}?`} busy={busy} onClose={() => setHistoryAction(null)}><p>{historyAction.type === "archive" ? "This hides the published announcement from dashboards while preserving its delivery history and metadata." : "This permanently deletes the unpublished announcement, its dashboard deliveries, and any private attachment through the server audit path."}</p><div className="admin-actions"><button onClick={() => setHistoryAction(null)}>Cancel</button><button className={historyAction.type === "delete" ? "danger" : ""} onClick={performHistoryAction}>{historyAction.type === "archive" ? "Archive" : "Delete"}</button></div></AdminDialog> : null}
   </>;
 }

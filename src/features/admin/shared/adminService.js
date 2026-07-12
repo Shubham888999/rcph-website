@@ -43,9 +43,10 @@ registerAdminCacheClear((uid) => clearAdminCaches(uid));
 export const adminCalls = {
   updateAccess: (payload) => callable("updateUserAccessAndPositions", payload), rejectAccess: (payload) => callable("rejectUserRoleRequest", payload),
   updateMemberProfile: (payload) => callable("updateMemberProfile", payload),
+  profileHistory: (payload) => callable("getProfileChangeHistory", payload),
   dashboard: () => callable("getMyDashboardStats", {}), updateRanking: (payload) => callable("updateClubRanking", payload),
-  prospects: () => callable("getProspectManagementData", {}), recalcProspect: (uid) => callable("recalculateProspectProgress", { uid }), updateDues: (uid, duesPaid) => callable("updateProspectDues", { uid, duesPaid }), promoteProspect: (uid) => callable("promoteProspectToGbm", { uid }),
-  announcementRecipients: () => callable("getAnnouncementRecipientOptions", {}), announcementHistory: (payload) => callable("getAnnouncementHistory", payload), publishAnnouncement: (payload) => callable("publishAnnouncement", payload),
+  prospects: () => callable("getProspectManagementData", {}), recalcProspect: (uid) => callable("recalculateProspectProgress", { uid }), updateDues: (uid, duesPaid) => callable("updateProspectDues", { uid, duesPaid }), promoteProspect: (uid) => callable("promoteProspectToGbm", { uid }), deleteProspect: (uid) => callable("deleteProspectAccount", { uid }),
+  announcementRecipients: () => callable("getAnnouncementRecipientOptions", {}), announcementHistory: (payload) => callable("getAnnouncementHistory", payload), publishAnnouncement: (payload) => callable("publishAnnouncement", payload), archiveAnnouncement: (announcementId) => callable("archiveAnnouncement", { announcementId }), deleteAnnouncement: (announcementId) => callable("deleteAnnouncement", { announcementId }),
   createAnnouncementAttachmentSession: (payload) => callable("createAnnouncementAttachmentUploadSession", payload), removeAnnouncementAttachmentUpload: (sessionId) => callable("removeAnnouncementAttachmentUpload", { sessionId }),
   createClubEvent: (payload) => callable("createAdminClubEvent", payload), updateClubEvent: (payload) => callable("updateAdminClubEvent", payload), archiveClubEvent: (eventId) => callable("archiveAdminClubEvent", { eventId }),
   createBodMeeting: (payload) => callable("createBodMeetingSynced", payload), updateBodMeeting: (payload) => callable("updateBodMeetingSynced", payload), archiveBodMeeting: (meetingId) => callable("archiveBodMeetingSynced", { meetingId }),
@@ -59,8 +60,25 @@ export async function setAttendanceRow(collectionName, recordId, eventIds, value
 export async function addRosterMember(collectionName, payload) { requireUser(); return addDoc(collection(db, collectionName), payload); }
 export async function updateRosterMember(collectionName, id, payload) { requireUser(); return updateDoc(doc(db, collectionName, id), payload); }
 export async function deleteRosterMember(collectionName, attendanceCollection, id) { requireUser(); const batch = writeBatch(db); batch.delete(doc(db, collectionName, id)); batch.delete(doc(db, attendanceCollection, id)); await batch.commit(); }
-export async function addFine(payload) { const uid = requireUser(); return addDoc(collection(db, "fines"), { ...payload, createdAt: serverTimestamp(), createdBy: uid }); }
-export async function deleteFine(id) { requireUser(); return deleteDoc(doc(db, "fines", id)); }
+export async function addFine(payload) {
+  requireUser();
+
+  const fineId =
+    doc(collection(db, "fines")).id;
+
+  return callable("createFine", {
+    ...payload,
+    fineId,
+  });
+}
+
+export async function deleteFine(id) {
+  requireUser();
+
+  return callable("deleteFine", {
+    fineId: id,
+  });
+}
 export async function addTreasury(payload) { requireUser(); const target = doc(collection(db, "treasury")); await setDoc(target, { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); return target.id; }
 export function newTreasuryId() { requireUser(); return doc(collection(db, "treasury")).id; }
 export async function setTreasuryById(id, payload) { requireUser(); await setDoc(doc(db, "treasury", id), { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); return id; }

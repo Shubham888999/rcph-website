@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getDashboardErrorMessage,
+  mergeDashboardProfile,
   normalizeDashboardAnnouncements,
   normalizeDashboardResponse,
 } from "./dashboardModel.js";
@@ -51,6 +52,30 @@ test("raw server objects are not exposed", () => {
   const model = normalizeDashboardResponse(raw);
   assert.notEqual(model.profile, raw.profile);
   assert.equal("uid" in model.profile, false);
+});
+test("dashboard profile normalizes editable profile fields", () => {
+  const model = normalizeDashboardResponse(memberResponse({
+    profile: {
+      uid: "secret",
+      name: "Member",
+      email: "m@example.com",
+      role: "gbm",
+      phone: "123",
+      dateOfBirth: "1998-02-28",
+      gender: "woman",
+      hobbies: "Reading",
+    },
+  }));
+  assert.equal(model.profile.dateOfBirth, "1998-02-28");
+  assert.equal(model.profile.phone, "123");
+  assert.equal(model.profile.hobbies, "Reading");
+  assert.equal("uid" in model.profile, false);
+});
+test("profile merge keeps trusted dashboard role", () => {
+  const model = normalizeDashboardResponse(memberResponse());
+  const merged = mergeDashboardProfile(model, { role: "president", phone: "999" });
+  assert.equal(merged.profile.role, "gbm");
+  assert.equal(merged.profile.phone, "999");
 });
 test("malformed top-level response fails closed", () => assert.throws(() => normalizeDashboardResponse({ ok: false })));
 test("only supplied targeted announcements render", () => {

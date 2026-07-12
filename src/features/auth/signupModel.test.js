@@ -8,6 +8,7 @@ import {
   clearSignupSensitiveFields,
   createSignupForm,
   normalizeSignupEmail,
+  normalizeSignupDateOfBirth,
   normalizeSignupName,
   normalizeSignupPassword,
   normalizeSignupPhone,
@@ -15,6 +16,7 @@ import {
   selectSignupPath,
   updateSignupField,
   validateSignup,
+  validateSignupDateOfBirth,
   validateSignupRid,
   normalizeSignupText,
 } from "./signupModel.js";
@@ -104,6 +106,18 @@ test("signup validation uses the latest edited email value", () => {
 });
 test("phone normalization preserves practical formatting and plus", () => {
   assert.equal(normalizeSignupPhone(" +91 98765-43210 "), "+91 98765-43210");
+});
+test("date of birth is optional date-only profile data", () => {
+  assert.equal(normalizeSignupDateOfBirth(""), "");
+  assert.equal(normalizeSignupDateOfBirth("1998-02-28"), "1998-02-28");
+  assert.equal(normalizeSignupDateOfBirth("1998-02-31"), "");
+  assert.equal(validateSignupDateOfBirth(""), "");
+  assert.match(validateSignupDateOfBirth("02/28/1998"), /YYYY-MM-DD/);
+});
+test("signup payload includes optional DOB only as a date string", () => {
+  const payload = buildSignupPayload({ ...validMember(), dateOfBirth: " 1998-02-28 " });
+  assert.equal(payload.dateOfBirth, "1998-02-28");
+  assert.equal(String(payload.dateOfBirth).includes("T"), false);
 });
 test("RID normalization trims without changing case", () => {
   assert.equal(normalizeSignupRid("  rId-3131-A  "), "rId-3131-A");

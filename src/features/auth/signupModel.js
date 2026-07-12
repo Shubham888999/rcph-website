@@ -29,6 +29,7 @@ export function createSignupForm() {
     path: SIGNUP_PATHS.CHOICE,
     name: "",
     phone: "",
+    dateOfBirth: "",
     email: "",
     rid: "",
     gender: "",
@@ -58,6 +59,29 @@ export function normalizeSignupText(value) {
 
 export function normalizeSignupPhone(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+export function normalizeSignupDateOfBirth(value) {
+  const date = typeof value === "string" ? value.trim() : "";
+  if (!date) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "";
+  const [year, month, day] = date.split("-").map(Number);
+  const monthDays = month === 2
+    ? year % 400 === 0 || (year % 4 === 0 && year % 100 !== 0) ? 29 : 28
+    : [4, 6, 9, 11].includes(month) ? 30 : 31;
+  if (year < 1900 || month < 1 || month > 12 || day < 1 || day > monthDays) return "";
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (date > today) return "";
+  return date;
+}
+
+export function validateSignupDateOfBirth(value) {
+  const date = typeof value === "string" ? value.trim() : "";
+  if (!date) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "Use YYYY-MM-DD.";
+  if (!normalizeSignupDateOfBirth(date)) return "Enter a valid date of birth.";
+  return "";
 }
 
 export function normalizeSignupRid(value) {
@@ -135,12 +159,14 @@ export function validateSignup(form, options = {}) {
   const name = normalizeSignupName(form.name);
   const phone = normalizeSignupPhone(form.phone);
   const rid = normalizeSignupRid(form.rid);
+  const dateOfBirthError = validateSignupDateOfBirth(form.dateOfBirth);
   const email = normalizeSignupEmail(options.identityEmail || form.email);
   const password = normalizeSignupPassword(form.password);
   const confirmation = normalizeSignupPassword(form.confirmPassword);
 
   if (!name) errors.name = "Enter your full name.";
   if (!minimalProfileCompletion && !phone) errors.phone = "Enter your phone number.";
+  if (!minimalProfileCompletion && dateOfBirthError) errors.dateOfBirth = dateOfBirthError;
   if (!email) errors.email = "Enter your email address.";
   else if (!isValidAuthEmail(email)) errors.email = "Enter a valid email address.";
   if (!minimalProfileCompletion && !SIGNUP_GENDERS.includes(form.gender)) {
@@ -227,6 +253,7 @@ export function buildSignupPayload(form, options = {}) {
   const base = {
     name: normalizeSignupName(form.name),
     phone: normalizeSignupPhone(form.phone),
+    dateOfBirth: normalizeSignupDateOfBirth(form.dateOfBirth),
     email: normalizeSignupEmail(options.identityEmail || form.email),
     requestedRole: form.path === SIGNUP_PATHS.PROSPECT ? "prospect" : form.requestedRole,
     provider,

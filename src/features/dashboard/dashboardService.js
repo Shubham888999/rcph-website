@@ -52,6 +52,18 @@ export function dismissDashboardAnnouncement(uid, announcementId) {
   return mutateAnnouncement(uid, "dismissAnnouncement", announcementId);
 }
 
+export async function updateMyDashboardProfile(uid, payload) {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    throw new Error("An authenticated user is required.");
+  }
+  const callable = httpsCallable(functions, "updateMyProfile");
+  const result = await callable(payload);
+  const data = result?.data && typeof result.data === "object" ? result.data : {};
+  if (data.ok !== true) throw new Error("Profile update failed.");
+  cache.clear(uid);
+  return data;
+}
+
 export async function fetchAnnouncementAttachment(uid, announcementId, { download = false } = {}) {
   if (!auth.currentUser || auth.currentUser.uid !== uid) throw new Error("An authenticated user is required.");
   const token = await auth.currentUser.getIdToken();

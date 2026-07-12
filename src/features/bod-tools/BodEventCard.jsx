@@ -16,7 +16,11 @@ export default function BodEventCard({ event, permissions, onDetails, onEdit, on
       <p className="bod-event-card__date">{dateLabel(event)}{event.time ? ` · ${event.time}` : ""}</p>
       <p>{event.description || "No description supplied."}</p>
       {event.avenues.length ? <ul className="bod-chip-list" aria-label="Avenues">{event.avenues.map((avenue) => <li key={avenue}>{avenue}</li>)}</ul> : null}
-      <p className="bod-event-card__meta">Conducted by {event.conductedBy}</p>
+      <p className="bod-event-card__meta">
+  Conducted by{" "}
+  {event.conductedBy ||
+    "Not recorded"}
+</p>
       <div className="bod-event-card__actions">
         <button type="button" onClick={() => onDetails(event)}>View details</button>
         {permissions.canEdit ? <button type="button" onClick={() => onEdit(event)}>Edit</button> : null}

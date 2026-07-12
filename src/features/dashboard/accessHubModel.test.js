@@ -56,6 +56,7 @@ test("destinations remain unique and secondary ordering is deterministic", () =>
 
 test("multiple positions format cleanly and missing positions have a fallback", () => {
   assert.deepEqual(getPositionLabels(["vice-president", "cwd"]), ["Vice President", "Website Director"]);
+  assert.deepEqual(getPositionLabels(["club-advisor", "co-secretary", "co-cwd"]), ["Club Advisor", "Co-Secretary", "Co-Website Director"]);
   assert.equal(getAccessHubViewModel(access("bod", { positionKeys: ["vice-president", "cwd"] })).positionSummary, "Vice President · Website Director");
   assert.equal(getAccessHubViewModel(access("gbm")).positionSummary, "No approved club position");
 });

@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AdminModuleHeader from "../AdminModuleHeader";
 import AdminDialog from "../shared/AdminDialog";
 import { AdminEmpty } from "../shared/AdminStates";
-import { buildFinePayload, formatInr } from "../shared/adminModel";
+import {
+  buildFineEventGroups,
+  buildFinePayload,
+  findFineEventOption,
+  formatInr,
+} from "../shared/adminModel";
 import { addFine, deleteFine, deleteTreasury, newTreasuryId, setTreasuryById, updateTreasury, uploadTreasuryBill } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
 import TreasuryAttachments from "../treasury/TreasuryAttachments";
@@ -36,18 +41,99 @@ import {
 } from "../treasury/treasuryModel";
 import { formatRotaractorName } from "../../../utils/memberName";
 
-export function FinesModule({ fines, members, lock, uid, onNotice }) {
-  const empty = { memberId: "", reason: "", eventName: "", date: "", amount: "" };
+export function FinesModule({
+  fines,
+  members,
+  events,
+  bodMeetings,
+  districtEvents,
+  lock,
+  uid,
+  onNotice,
+}) {
+const empty = {
+  memberId: "",
+  reason: "",
+  eventSelection: "",
+  eventId: "",
+  eventSource: "",
+  eventType: "",
+  eventName: "",
+  eventDate: "",
+  date: "",
+  amount: "",
+};
   const [draft, setDraft] = useState(empty);
   const [target, setTarget] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "fines", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const total = fines.reduce((sum, fine) => sum + fine.amount, 0);
+  const eventGroups = useMemo(
+  () =>
+    buildFineEventGroups({
+      events,
+      bodMeetings,
+      districtEvents,
+    }),
+  [
+    events,
+    bodMeetings,
+    districtEvents,
+  ],
+);
+function selectEvent(value) {
+  const selected =
+    findFineEventOption(
+      eventGroups,
+      value,
+    );
+
+  if (!selected) {
+    setDraft({
+      ...draft,
+      eventSelection: "",
+      eventId: "",
+      eventSource: "",
+      eventType: "",
+      eventName: "",
+      eventDate: "",
+    });
+
+    return;
+  }
+
+  setDraft({
+    ...draft,
+    eventSelection: selected.value,
+    eventId: selected.id,
+    eventSource: selected.source,
+    eventType: selected.type,
+    eventName: selected.name,
+    eventDate: selected.date,
+
+    // Default the Fine/Treasury date
+    // from the selected event.
+    date: selected.date,
+  });
+}
   function submit(e) {
     e.preventDefault();
     const member = members.find((item) => item.id === draft.memberId);
     const payload = buildFinePayload({ ...draft, memberName: member?.name || "" });
-    if (!payload.memberId || !payload.reason || !payload.eventName || !payload.date || payload.amount === null) return;
+if (
+  !payload.memberId ||
+  !payload.reason ||
+  !payload.eventId ||
+  !payload.eventSource ||
+  !payload.eventType ||
+  !payload.eventName ||
+  !payload.eventDate ||
+  !payload.date ||
+  payload.amount === null ||
+  payload.amount <= 0
+) {
+  return;
+}
     run("add-fine", () => addFine(payload), "Fine added.").then((result) => { if (result) setDraft(empty); });
   }
   return (
@@ -58,7 +144,37 @@ export function FinesModule({ fines, members, lock, uid, onNotice }) {
         <form className="admin-form admin-form--inline" onSubmit={submit}>
           <label>Member<select value={draft.memberId} onChange={(e) => setDraft({ ...draft, memberId: e.target.value })} required><option value="">Choose member</option>{members.map((m) => <option key={m.id} value={m.id}>{formatRotaractorName(m.name, true)}</option>)}</select></label>
           <label>Reason<select value={draft.reason} onChange={(e) => setDraft({ ...draft, reason: e.target.value })} required><option value="">Choose reason</option><option value="missing_badge">Missing badge</option><option value="late">Late to event/meeting</option></select></label>
-          <label>Event/meeting<input value={draft.eventName} onChange={(e) => setDraft({ ...draft, eventName: e.target.value })} required /></label>
+<label>
+  Event/meeting
+
+  <select
+    value={draft.eventSelection}
+    onChange={(event) =>
+      selectEvent(event.target.value)
+    }
+    required
+  >
+    <option value="">
+      Choose event or meeting
+    </option>
+
+    {eventGroups.map((group) => (
+      <optgroup
+        key={group.key}
+        label={group.label}
+      >
+        {group.options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+          >
+            {option.label}
+          </option>
+        ))}
+      </optgroup>
+    ))}
+  </select>
+</label>
           <label>Date<input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} required /></label>
           <label>Amount INR<input type="number" min="0" step="1" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} required /></label>
           <button disabled={locked || busy}>Add fine</button>

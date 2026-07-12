@@ -1,9 +1,18 @@
-import { useState } from "react";
+import {
+  useMemo,
+  useState,
+} from "react";
 import AttendanceMark from "../../../components/status/AttendanceMark";
 import AdminModuleHeader from "../AdminModuleHeader";
 import AdminDialog from "../shared/AdminDialog";
 import { AdminEmpty } from "../shared/AdminStates";
-import { AVENUES, buildEventPayload, normalizeAttendance } from "../shared/adminModel";
+import {
+  AVENUES,
+  buildAttendanceParticipants,
+  buildEventAttendanceSummary,
+  buildEventPayload,
+  normalizeAttendance,
+} from "../shared/adminModel";
 import { adminCalls, addRosterMember, deleteRosterMember, setAttendanceBulk, setAttendanceCell, setAttendanceRow, updateRosterMember } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
 import AttendanceExportPanel from "../attendance-export/AttendanceExportPanel";
@@ -57,6 +66,20 @@ function AttendanceGrid({
     module: collectionName,
     onNotice,
   });
+  const eventSummaries = useMemo(
+  () =>
+    new Map(
+      events.map((event) => [
+        event.id,
+        buildEventAttendanceSummary({
+          participants: members,
+          attendance,
+          eventId: event.id,
+        }),
+      ]),
+    ),
+  [attendance, events, members],
+);
 
   if (!members.length || !events.length) {
     return (
@@ -177,46 +200,97 @@ function AttendanceGrid({
                 <small>Participation overview</small>
               </th>
 
-              {events.map((event) => (
-                <th
-                  key={event.id}
-                  className="attendance-event-header"
-                >
-                  <div className="attendance-event-header__content">
-                    <span className="attendance-event-header__avenue">
-                      {event.avenue.join(" · ") || "Club event"}
-                    </span>
+              {events.map((event) => {
+  const summary =
+    eventSummaries.get(event.id);
 
-                    <strong>{event.name}</strong>
+  const hasMarkedAttendance =
+    summary &&
+    summary.eligibleCount > 0;
 
-                    <small>
-                      {event.date}
-                      {event.endDate && event.endDate !== event.date
-                        ? ` – ${event.endDate}`
-                        : ""}
-                    </small>
+  const summaryLabel =
+    hasMarkedAttendance
+      ? `${summary.presentCount} present out of ${summary.eligibleCount} marked attendees, ${summary.percentage.toFixed(1)} percent attendance`
+      : "No attendance has been marked";
 
-                    <select
-                      aria-label={`Bulk attendance for ${event.name}`}
-                      disabled={locked || busy}
-                      defaultValue=""
-                      onChange={(change) => {
-                        bulkEvent(
-                          event.id,
-                          change.target.value
-                        );
-                        change.target.value = "";
-                      }}
-                    >
-                      {options.map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </th>
-              ))}
+  return (
+    <th
+      key={event.id}
+      className="attendance-event-header"
+    >
+      <div className="attendance-event-header__content">
+        <span className="attendance-event-header__avenue">
+          {event.avenue.join(" · ") ||
+            "Club event"}
+        </span>
+
+        <strong>{event.name}</strong>
+
+        <small>
+          {event.date}
+          {event.endDate &&
+          event.endDate !== event.date
+            ? ` – ${event.endDate}`
+            : ""}
+        </small>
+
+        <div
+          className={`attendance-event-summary ${
+            hasMarkedAttendance
+              ? ""
+              : "is-empty"
+          }`.trim()}
+          aria-label={summaryLabel}
+          title="N/A and unmarked rows are excluded."
+        >
+          {hasMarkedAttendance ? (
+            <>
+              <span>
+                Present{" "}
+                <b>
+                  {summary.presentCount}/
+                  {summary.eligibleCount}
+                </b>
+              </span>
+
+              <em>
+                {summary.percentage.toFixed(1)}%
+                attendance
+              </em>
+            </>
+          ) : (
+            <span>No attendance marked</span>
+          )}
+        </div>
+
+        <select
+          aria-label={`Bulk attendance for ${event.name}`}
+          disabled={locked || busy}
+          defaultValue=""
+          onChange={(change) => {
+            bulkEvent(
+              event.id,
+              change.target.value,
+            );
+
+            change.target.value = "";
+          }}
+        >
+          {options.map(
+            ([value, label]) => (
+              <option
+                key={value}
+                value={value}
+              >
+                {label}
+              </option>
+            ),
+          )}
+        </select>
+      </div>
+    </th>
+  );
+})}
             </tr>
           </thead>
 
@@ -228,8 +302,8 @@ function AttendanceGrid({
                 attendance
               );
 
-              const isProspect =
-                member.role?.toLowerCase() === "prospect";
+              const role = member.role?.toLowerCase();
+              const roleLabel = role === "prospect" ? "Prospect" : role === "gbm" ? "GBM" : "";
               const memberDisplayName = formatRotaractorName(member.name, member.role ? member : true);
 
               return (
@@ -262,9 +336,9 @@ function AttendanceGrid({
       <div className="attendance-member-row__identity">
         <strong>{memberDisplayName}</strong>
 
-        {isProspect ? (
+        {roleLabel ? (
           <span className="attendance-member-role">
-            Prospect
+            {roleLabel}
           </span>
         ) : null}
       </div>
@@ -376,7 +450,12 @@ export function ClubAttendanceModule({ data, lock, uid, onNotice }) {
   const { busy, run } = useAdminMutation({ uid, module: "club-attendance", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const events = data.events.filter((event) => !event.archived);
-  const overallValues = data.members.flatMap((member) =>
+  const attendanceParticipants = buildAttendanceParticipants({
+    members: data.members,
+    users: data.users,
+    attendance: data.attendance,
+  });
+  const overallValues = attendanceParticipants.flatMap((member) =>
   events
     .map((event) =>
       normalizeAttendance(
@@ -397,7 +476,7 @@ const overallAttendance = overallValues.length
 const completedRecords = overallValues.length;
 
 const pendingRecords =
-  data.members.length * events.length -
+  attendanceParticipants.length * events.length -
   completedRecords;
   return <>
     <AdminModuleHeader title="Club Events & Attendance" />
@@ -491,8 +570,8 @@ const pendingRecords =
   </article>
 
   <article>
-    <span>Members</span>
-    <strong>{data.members.length}</strong>
+    <span>Participants</span>
+    <strong>{attendanceParticipants.length}</strong>
     <small>Current attendance roster</small>
   </article>
 
@@ -519,9 +598,9 @@ const pendingRecords =
   </article>
 </section>
     
-    <AttendanceExportPanel panelKey="club" members={data.members} events={events} attendance={data.attendance} onNotice={onNotice} />
-    <AttendanceGrid members={data.members} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} />
-    <MailDraftTool members={data.members} title="GBM" />
+    <AttendanceExportPanel panelKey="club" members={attendanceParticipants} events={events} attendance={data.attendance} onNotice={onNotice} />
+    <AttendanceGrid members={attendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} />
+    <MailDraftTool members={attendanceParticipants} title="GBM" />
     {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><ClubEventForm initial={editing} busy={busy} submitLabel="Save event" onSave={(payload) => run("update-event", () => adminCalls.updateClubEvent({ ...payload, eventId: editing.id }), "Club event updated.").then((result) => { if (result) setEditing(null); })} /></AdminDialog> : null}
     {archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This soft-archives club event records and preserves attendance history.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-event", () => adminCalls.archiveClubEvent(archive.id), "Club event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;
@@ -906,6 +985,11 @@ export function DistrictModule({ data, lock, uid, onNotice }) {
   const { busy, run } = useAdminMutation({ uid, module: "district", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const events = data.districtEvents.filter((item) => !item.archived);
+  const attendanceParticipants = buildAttendanceParticipants({
+    members: data.members,
+    users: data.users,
+    attendance: data.districtAttendance,
+  });
   const payload = (value) => ({ name: value.name.trim(), date: value.date, endDate: value.endDate, desc: value.desc.trim(), visibility: value.public ? "public" : "internal", showOnHomepage: value.public });
   function submit(event) { event.preventDefault(); run("create-district", () => adminCalls.createDistrictEvent(payload(draft)), "District event synchronized and attendance initialized.").then((result) => { if (result) setDraft(empty); }); }
   function save(event) { event.preventDefault(); run("update-district", () => adminCalls.updateDistrictEvent({ ...payload(editing), districtEventId: editing.id }), "District event updated.").then((result) => { if (result) setEditing(null); }); }
@@ -915,8 +999,8 @@ export function DistrictModule({ data, lock, uid, onNotice }) {
     <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{locked ? "District changes are locked or unavailable." : "District changes are open."}</div>
     <section className="admin-panel">{form(draft, setDraft, submit, "Add district event")}</section>
     <div className="admin-card-grid">{events.map((event) => <article className="admin-record-card" key={event.id}><h3>{event.name}</h3><p>{event.date} · {event.visibility}</p><div className="admin-actions"><button disabled={locked} onClick={() => setEditing({ ...event, public: event.visibility === "public" })}>Edit</button><button className="danger" disabled={locked} onClick={() => setArchive(event)}>Archive</button></div></article>)}</div>
-    <AttendanceExportPanel panelKey="district" members={data.members} events={events} attendance={data.districtAttendance} onNotice={onNotice} />
-    <AttendanceGrid members={data.members} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} />
+    <AttendanceExportPanel panelKey="district" members={attendanceParticipants} events={events} attendance={data.districtAttendance} onNotice={onNotice} />
+    <AttendanceGrid members={attendanceParticipants} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} />
     {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}>{form(editing, setEditing, save, "Save district event")}</AdminDialog> : null}
     {archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This archives district, mirrored BOD, and conditional public records while preserving attendance.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-district", () => adminCalls.archiveDistrictEvent(archive.id), "District event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;

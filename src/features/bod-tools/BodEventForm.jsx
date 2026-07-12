@@ -13,9 +13,16 @@ import useAccessibleDialog from "./useAccessibleDialog";
 
 function initialDraft(event, displayName) {
   const avenues = event?.avenues || [];
+
+  const conductedBy = event
+    ? event.conductedBy === "Unavailable"
+      ? ""
+      : event.conductedBy || ""
+    : displayName || "";
+
   return {
     name: event?.name || "",
-    conductedBy: event?.conductedBy === "Unavailable" ? displayName : event?.conductedBy || displayName,
+    conductedBy,
     startDate: event?.startDate || "",
     endDate: event?.endDate || "",
     time: event?.time || "",
@@ -204,8 +211,22 @@ if (completed.length) {
         <form onSubmit={handleSubmit} noValidate>
           <div className="bod-form-grid">
             <label>Event name *<input name="name" value={draft.name} onChange={(e) => update("name", e.target.value)} maxLength="180" aria-invalid={Boolean(errors.name)} aria-describedby={described("name")} />{errors.name ? <span id="bod-name-error" className="bod-field-error">{errors.name}</span> : null}</label>
-            <label>Conducted by *<input name="conductedBy" value={draft.conductedBy} onChange={(e) => update("conductedBy", e.target.value)} maxLength="140" aria-invalid={Boolean(errors.conductedBy)} aria-describedby={described("conductedBy")} />{errors.conductedBy ? <span id="bod-conductedBy-error" className="bod-field-error">{errors.conductedBy}</span> : null}</label>
-            <label>Start date *<input type="date" name="startDate" value={draft.startDate} onChange={(e) => update("startDate", e.target.value)} aria-invalid={Boolean(errors.startDate)} aria-describedby={described("startDate")} />{errors.startDate ? <span id="bod-startDate-error" className="bod-field-error">{errors.startDate}</span> : null}</label>
+<label>
+  Who conducted (optional)
+
+  <input
+    name="conductedBy"
+    value={draft.conductedBy}
+    onChange={(event) =>
+      update(
+        "conductedBy",
+        event.target.value,
+      )
+    }
+    maxLength="140"
+    placeholder="Leave empty for GBMs or shared events"
+  />
+</label>            <label>Start date *<input type="date" name="startDate" value={draft.startDate} onChange={(e) => update("startDate", e.target.value)} aria-invalid={Boolean(errors.startDate)} aria-describedby={described("startDate")} />{errors.startDate ? <span id="bod-startDate-error" className="bod-field-error">{errors.startDate}</span> : null}</label>
             <label>End date<input type="date" name="endDate" value={draft.endDate} min={draft.startDate || undefined} onChange={(e) => update("endDate", e.target.value)} aria-invalid={Boolean(errors.endDate)} aria-describedby={described("endDate")} />{errors.endDate ? <span id="bod-endDate-error" className="bod-field-error">{errors.endDate}</span> : null}</label>
             <label>Time<input type="time" name="time" value={draft.time} onChange={(e) => update("time", e.target.value)} aria-invalid={Boolean(errors.time)} aria-describedby={described("time")} />{errors.time ? <span id="bod-time-error" className="bod-field-error">{errors.time}</span> : null}</label>
             <label>RCPH role<select value={draft.rcphRole} onChange={(e) => update("rcphRole", e.target.value)}><option value="host">Host</option><option value="cohost">Co-host</option><option value="collaborator">Collaborator</option><option value="participant">Participant</option></select></label>

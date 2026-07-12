@@ -57,9 +57,10 @@ export async function previewResolutionSourcePdf(resolutionId) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export async function downloadFinalizedResolutionPdf(resolutionId, resolutionNumber) {
+export async function downloadFinalizedResolutionPdf(resolutionId, resolutionNumber, fallback = "") {
   const blob = await fetchAuthorizedPdf("downloadFinalizedResolutionPdf", resolutionId);
-  const safe = String(resolutionNumber || "Resolution").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const source = resolutionNumber || fallback || resolutionId || "Resolution";
+  const safe = String(source).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

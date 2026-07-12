@@ -12,10 +12,12 @@ import {
   getAnnouncementMutationErrorMessage,
   markDashboardAnnouncementRead,
   markDashboardAnnouncementUnread,
+  updateMyDashboardProfile,
 } from "../../features/dashboard/dashboardService";
 import useDashboardData from "../../features/dashboard/useDashboardData";
 import { getResolutionErrorMessage, loadMyOpenResolutions, markResolutionEmailSent, submitResolutionVote } from "../../features/resolutions/resolutionService";
 import { isAuthenticatedFinalHybrid, isHybridVoteChoiceLocked } from "../../features/resolutions/resolutionModel";
+import ProfileEditorDialog from "../../features/profile/ProfileEditorDialog";
 import ProspectProgress from "../../features/prospect/ProspectProgress";
 import useAuth from "../../hooks/useAuth";
 import "../../styles/components/member-dashboard.css";
@@ -23,10 +25,11 @@ import "../../styles/components/member-dashboard.css";
 export default function DashboardPage() {
   const { access, user, signOut } = useAuth();
   const enabled = canRequestDashboard(user?.uid, access);
-  const { status, data, reload, updateAnnouncements, updateOpenResolutions } = useDashboardData({ uid: user?.uid || "", enabled });
+  const { status, data, reload, updateAnnouncements, updateOpenResolutions, updateProfile } = useDashboardData({ uid: user?.uid || "", enabled });
   const [announcementBusyId, setAnnouncementBusyId] = useState("");
   const [resolutionBusyId, setResolutionBusyId] = useState("");
   const [dashboardNotice, setDashboardNotice] = useState(null);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
 
   const refreshOpenResolutions = useCallback(async () => {
     if (!user?.uid || !enabled) return;
@@ -42,6 +45,17 @@ export default function DashboardPage() {
   async function handleSignOut() {
     clearDashboardDataCache(user?.uid);
     await signOut();
+  }
+
+  async function saveProfile(payload) {
+    if (!user?.uid) throw new Error("Sign in required.");
+    const result = await updateMyDashboardProfile(user.uid, payload);
+    updateProfile(result.profile);
+    setDashboardNotice({
+      type: "success",
+      message: result.changed ? "Profile updated." : "Profile already matched those details.",
+    });
+    return result;
   }
 
   async function updateReadState(announcement) {
@@ -153,12 +167,21 @@ export default function DashboardPage() {
           profile={data.profile}
           mode={data.mode}
           access={access}
+          onEditProfile={() => setProfileEditorOpen(true)}
           onSignOut={handleSignOut}
         />
         {dashboardNotice ? <div className={`dashboard-announcement-notice dashboard-announcement-notice--${dashboardNotice.type}`} role={dashboardNotice.type === "error" ? "alert" : "status"} aria-live="polite"><span>{dashboardNotice.message}</span><button type="button" onClick={() => setDashboardNotice(null)} aria-label="Dismiss dashboard notice">×</button></div> : null}
         <MemberAnnouncements uid={user?.uid || ""} announcements={data.announcements} busyId={announcementBusyId} onToggleRead={updateReadState} onDismiss={dismissAnnouncement} />
         <MemberResolutions resolutions={data.openResolutions} busyId={resolutionBusyId} onVote={voteOnResolution} onClaimEmailSent={claimResolutionEmailSent} onRefresh={refreshOpenResolutions} />
         {prospect ? <ProspectProgress data={data} /> : <MemberOverview data={data} />}
+        {profileEditorOpen ? (
+          <ProfileEditorDialog
+            profile={data.profile}
+            title="Edit profile"
+            onClose={() => setProfileEditorOpen(false)}
+            onSave={saveProfile}
+          />
+        ) : null}
       </div>
     </main>
   );

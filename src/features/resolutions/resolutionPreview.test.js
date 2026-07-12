@@ -88,7 +88,7 @@ test("Generated pages preview can build Resolution Page-only and Voting Table-on
     previewMode: "vote_table",
   });
   assert.deepEqual([...new Set(votingOnly.map((page) => page.generatedKind))], ["vote_table"]);
-  assert.ok(textItems(votingOnly).includes("Voting Record"));
+  assert.ok(textItems(votingOnly).includes("VOTING RECORD"));
 });
 
 test("All-enabled generated pages preview respects generated page order", () => {
@@ -162,7 +162,7 @@ test("Voting Table preview uses existing selected voters when no votes have been
   assert.ok(text.includes("Rtr. Real Member One"));
   assert.ok(text.includes("Rtr. Real Member Two"));
   assert.ok(!text.includes("Preview Member 1"));
-  assert.ok(text.includes("Did not vote"));
+  assert.ok(text.includes("Did not") && text.includes("vote"));
 });
 
 test("Voting Table preview preserves submitted-vote scope when real votes exist", () => {

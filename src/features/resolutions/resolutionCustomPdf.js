@@ -11,6 +11,7 @@ const RESOLUTION_PAGE_WIDTH =
   WIDTH - RESOLUTION_PAGE_SIDE_INSET * 2;
 const RESOLUTION_STATEMENT_WIDTH = WIDTH;
 const START_Y = BOUNDS.top - 10;
+const RESOLUTION_PAGE_START_Y = START_Y + 28;
 const PAGE_HEIGHT = START_Y - BOUNDS.bottom;
 
 function printable(value, fallback = "") {
@@ -63,13 +64,13 @@ function alignedX(text, style, width = WIDTH, left = BOUNDS.left) {
   return left;
 }
 
-function createPaginator() {
+function createPaginator(startY = START_Y) {
   const pages = [[]];
-  let y = START_Y;
+  let y = startY;
   const current = () => pages.at(-1);
   const newPage = (force = false) => {
     if (current().length || force) pages.push([]);
-    y = START_Y;
+    y = startY;
   };
   const ensure = (height) => {
     if (height > PAGE_HEIGHT) throw new Error("A PDF row is taller than the complete Resolution content area. Shorten the row before generating the PDF.");
@@ -350,7 +351,13 @@ export function buildCustomVotesRows(details, section) {
     if (method === "hybrid_email" && !authenticatedFinal) return vote?.emailConfirmationStatus === "email_verified";
     return true;
   });
-  const eligible = Array.isArray(details?.resolution?.eligibleVoters) ? details.resolution.eligibleVoters : [];
+  const seenEligible = new Set();
+  const eligible = (Array.isArray(details?.resolution?.eligibleVoters) ? details.resolution.eligibleVoters : []).filter((voter) => {
+    const uid = typeof voter?.uid === "string" ? voter.uid.trim() : "";
+    if (uid && seenEligible.has(uid)) return false;
+    if (uid) seenEligible.add(uid);
+    return true;
+  });
   const canonical = new Map((details?.canonicalVoters || []).map((voter) => [voter.uid, voter]));
   const voteByUid = new Map(votes.map((vote) => [vote.voterUid, vote]));
   if (section.options.voterScope === "submitted") return votes.map((vote) => {
@@ -837,129 +844,193 @@ function renderResolutionDetails(pager, normalized) {
   const halfWidth =
     (RESOLUTION_PAGE_WIDTH - columnGap) / 2;
 
+  const rightColumnLeft =
+    RESOLUTION_PAGE_LEFT +
+    halfWidth +
+    columnGap;
+
+  const lineHeight =
+    style.fontSize * style.lineSpacing;
+
+  const renderTwoColumnRow = (
+    leftText,
+    rightText,
+  ) => {
+    const leftLines = wrap(
+      leftText,
+      halfWidth,
+      style,
+    );
+
+    const rightLines = wrap(
+      rightText,
+      halfWidth,
+      style,
+    );
+
+    const rowLines = Math.max(
+      leftLines.length,
+      rightLines.length,
+    );
+
+    const rowY = pager.y;
+
+    pager.ensure(
+      rowLines * lineHeight,
+    );
+
+    leftLines.forEach(
+      (line, index) => {
+        pager.y =
+          rowY -
+          index * lineHeight;
+
+        pager.addText(
+          line,
+          style,
+          {
+            left:
+              RESOLUTION_PAGE_LEFT,
+            width: halfWidth,
+          },
+        );
+      },
+    );
+
+    rightLines.forEach(
+      (line, index) => {
+        pager.y =
+          rowY -
+          index * lineHeight;
+
+        pager.addText(
+          line,
+          {
+            ...style,
+            alignment: "left",
+          },
+          {
+            left: rightColumnLeft,
+            width: halfWidth,
+          },
+        );
+      },
+    );
+
+    pager.y =
+      rowY -
+      rowLines * lineHeight;
+  };
+
   pager.space(style.spaceBefore);
 
   const subjectLines = wrap(
-    `Subject: ${normalized.details.subject || ""}`,
+    `Subject: ${
+      normalized.details.subject || ""
+    }`,
     RESOLUTION_PAGE_WIDTH,
     style,
   );
 
   subjectLines.forEach((line) => {
-    pager.addText(line, style, {
-      left: RESOLUTION_PAGE_LEFT,
-      width: RESOLUTION_PAGE_WIDTH,
-    });
+    pager.addText(
+      line,
+      style,
+      {
+        left:
+          RESOLUTION_PAGE_LEFT,
+        width:
+          RESOLUTION_PAGE_WIDTH,
+      },
+    );
   });
 
-  // Visible blank space after Subject.
   pager.space(10);
 
-  const sharedY = pager.y;
-
-  pager.addText(
-    `Date - ${normalized.details.date || ""}`,
-    style,
-    {
-      left: RESOLUTION_PAGE_LEFT,
-      width: halfWidth,
-    },
+  renderTwoColumnRow(
+    `Date - ${
+      normalized.details.date || ""
+    }`,
+    `Place - ${
+      normalized.details.place || ""
+    }`,
   );
 
-  pager.y = sharedY;
-
-  pager.addText(
-    `Place - ${normalized.details.place || ""}`,
-    {
-      ...style,
-      alignment: "right",
-    },
-    {
-      left:
-        RESOLUTION_PAGE_LEFT +
-        halfWidth +
-        columnGap,
-      width: halfWidth,
-    },
-  );
-
-  // Visible blank space after Date/Place.
   pager.space(10);
 
-  pager.addText(
+  renderTwoColumnRow(
     `No. of Board Members - ${
-      normalized.details.boardMembersPresent || ""
+      normalized.details
+        .boardMembersPresent || ""
     }`,
-    style,
-    {
-      left: RESOLUTION_PAGE_LEFT,
-      width: RESOLUTION_PAGE_WIDTH,
-    },
-  );
-
-  // Visible blank space between the two member rows.
-  pager.space(10);
-
-  pager.addText(
     `Total No. of Board Members - ${
-      normalized.details.totalBoardMembers || ""
+      normalized.details
+        .totalBoardMembers || ""
     }`,
-    style,
-    {
-      left: RESOLUTION_PAGE_LEFT,
-      width: RESOLUTION_PAGE_WIDTH,
-    },
   );
 
-  // Large old-template gap before the formal paragraph.
   pager.space(32);
 }
 
 export function buildResolutionPagePdfPages(details, config) {
-  const pager = createPaginator();
+  const pager = createPaginator(RESOLUTION_PAGE_START_Y);
 
   const normalized = normalizeResolutionPageConfig(
     config,
     details?.resolution || {},
   );
 
+  renderTextSection(
+    pager,
+    {
+      id: "resolution_page_heading",
+      type: "heading",
+      text: normalized.heading.text,
+      style: normalized.heading,
+    },
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_PAGE_WIDTH,
+    },
+  );
+
   renderResolutionDetails(pager, normalized);
 
-renderTextSection(
-  pager,
-  {
-    id: "resolution_page_statement",
-    type: "paragraph",
-    text: normalized.mainStatement.text,
-    listStyle: "none",
-    style: {
-      ...normalized.mainStatement,
-      lineSpacing: 1.45,
-    },
-  },
-{
-  left: RESOLUTION_PAGE_LEFT,
-  width: RESOLUTION_STATEMENT_WIDTH,
-},
-);
-
-normalized.blocks.forEach((block) => {
-  if (block.type === "paragraph") {
-    renderTextSection(
-      pager,
-      {
-        ...block,
-        listStyle: "none",
+  renderTextSection(
+    pager,
+    {
+      id: "resolution_page_statement",
+      type: "paragraph",
+      text: normalized.mainStatement.text,
+      listStyle: "none",
+      style: {
+        ...normalized.mainStatement,
+        lineSpacing: 1.45,
       },
-{
-  left: RESOLUTION_PAGE_LEFT,
-  width: RESOLUTION_STATEMENT_WIDTH,
-},
-    );
-  } else if (block.type === "table") {
-    renderCustomTable(pager, block);
-  }
-});
+    },
+    {
+      left: RESOLUTION_PAGE_LEFT,
+      width: RESOLUTION_STATEMENT_WIDTH,
+    },
+  );
+
+  normalized.blocks.forEach((block) => {
+    if (block.type === "paragraph") {
+      renderTextSection(
+        pager,
+        {
+          ...block,
+          listStyle: "none",
+        },
+        {
+          left: RESOLUTION_PAGE_LEFT,
+          width: RESOLUTION_STATEMENT_WIDTH,
+        },
+      );
+    } else if (block.type === "table") {
+      renderCustomTable(pager, block);
+    }
+  });
 
   return finishGeneratedPages(pager, "resolution_page");
 }

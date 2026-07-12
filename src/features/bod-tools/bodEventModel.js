@@ -183,7 +183,9 @@ export function normalizeBodEvent(id, raw) {
     name,
     description: cleanString(raw.description || raw.desc).slice(0, BOD_EVENT_DESCRIPTION_LIMIT),
     avenueDescriptions: normalizeAvenueDescriptions(raw.avenueDescriptions, avenues),
-    conductedBy: cleanString(raw.conductedBy, "Unavailable"),
+    conductedBy: cleanString(
+  raw.conductedBy,
+),
     createdBy: cleanString(raw.createdBy),
     createdByName: cleanString(raw.createdByName, "Unavailable"),
     createdAt: timestampToIso(raw.createdAt),
@@ -232,7 +234,6 @@ export function getBodEventPermissions(event, access, lockState = "unlocked") {
 export function validateBodEventDraft(draft) {
   const errors = {};
   if (!cleanString(draft?.name)) errors.name = "Event name is required.";
-  if (!cleanString(draft?.conductedBy)) errors.conductedBy = "Conducted by is required.";
   const startDate = cleanString(draft?.startDate);
   const endDate = cleanString(draft?.endDate);
   if (!isValidDateOnly(startDate)) errors.startDate = "Enter a valid start date.";

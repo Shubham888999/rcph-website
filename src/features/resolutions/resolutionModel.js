@@ -22,6 +22,13 @@ function text(value, max = 5000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function resolutionTitleReference(resolutionNumber, title, separator = " - ") {
+  const number = text(resolutionNumber, 80);
+  const name = text(title, 220);
+  if (!name) return number ? `Resolution ${number}` : "Resolution";
+  return number ? `Resolution ${number}${separator}${name}` : `Resolution${separator}${name}`;
+}
+
 function optionalText(value, max = 5000, label, errors) {
   if (value == null || value === "") return "";
   if (typeof value !== "string") {
@@ -162,7 +169,6 @@ export function validateResolutionDraft(draft, eligibleVoterCount = 0) {
   payload.generatedPageOrder = layout.payload.generatedPageOrder;
   errors.push(...layout.errors);
   if (!payload.meetingId) errors.push("Choose a BOD meeting.");
-  if (!payload.resolutionNumber) errors.push("Enter a resolution number.");
   if (!payload.title) errors.push("Enter a resolution title.");
   if (payload.proposedByUid && payload.proposedByUid === payload.secondedByUid) errors.push("Proposer and seconder must be different members.");
   if (!isRecordOnly && !payload.votingRule) errors.push("Choose a valid voting rule.");
@@ -218,7 +224,7 @@ export function normalizeResolution(raw) {
   const status = normalizeResolutionStatus(raw.status);
   const resolutionNumber = text(raw.resolutionNumber, 80);
   const title = text(raw.title, 220);
-  if (!id || !status || !resolutionNumber || !title) return null;
+  if (!id || !status || !title) return null;
   return {
     id,
     resolutionNumber,
@@ -341,9 +347,11 @@ export function normalizeDashboardResolutions(raw) {
   return raw.map(normalizeResolution).filter((item) => item?.status === "open").sort((a, b) => Date.parse(b.openedAt || 0) - Date.parse(a.openedAt || 0) || b.id.localeCompare(a.id));
 }
 
-export function getResolutionPdfFilename(number) {
-  const safe = text(number, 80).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return `${safe || "RCPH-Resolution"}.pdf`;
+export function getResolutionPdfFilename(number, fallback = "") {
+  const safeNumber = text(number, 80).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (safeNumber) return `${safeNumber}.pdf`;
+  const safeFallback = text(fallback, 220).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${safeFallback ? `resolution-${safeFallback}` : "RCPH-Resolution"}.pdf`;
 }
 
 export function normalizeResolutionVote(raw) {
@@ -389,7 +397,7 @@ export function buildPreparedReplyText({ voterName, resolutionNumber, title, cho
     "",
     statement,
     "",
-    `Resolution ${text(resolutionNumber, 80)}: ${text(title, 220)}`,
+    resolutionTitleReference(resolutionNumber, title, ": "),
     "",
     `Vote: ${vote.toUpperCase()}`,
     "",
@@ -401,7 +409,7 @@ export function buildPreparedReplyText({ voterName, resolutionNumber, title, cho
 }
 
 export function buildPreparedReplySubject(resolution) {
-  return `Re: Resolution ${text(resolution?.resolutionNumber, 80)} - ${text(resolution?.title, 220)}`;
+  return `Re: ${resolutionTitleReference(resolution?.resolutionNumber, resolution?.title)}`;
 }
 
 export function buildPreparedEmailLinks({ to, subject, body }) {

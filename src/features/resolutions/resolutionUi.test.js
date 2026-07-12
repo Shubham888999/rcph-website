@@ -50,10 +50,12 @@ test("uploaded-PDF dark admin panel uses readable theme tokens", () => {
 });
 
 test("Admin resolution tool exposes lifecycle groups and permission-scoped actions", () => {
-  for (const label of ["Open voting", "Drafts", "Completed", "Cancelled", "Download completed resolution PDF", "Audit history"]) assert.match(adminModule, new RegExp(label));
+  for (const label of ["Open voting", "Drafts", "Completed", "Cancelled", "Download completed resolution PDF", "Audit history", "Delete"]) assert.match(adminModule, new RegExp(label));
   for (const label of ["Approval Method", "Website Voting", "Website Vote with Prepared Email", "Hybrid Email Confirmation", "Record Only / No Voting", "Append submitted vote table to final PDF", "Email configuration", "Mark email verified", "Reject email confirmation"]) assert.match(adminModule + model, new RegExp(label));
   assert.match(adminModule, /item\.status === "draft"/);
   assert.match(adminModule, /item\.status === "open"/);
+  assert.match(adminModule, /\["draft", "cancelled"\]\.includes\(item\.status\)/);
+  assert.match(adminModule, /deleteResolution/);
   for (const label of ["Edit PDF layout", "Custom Section Layout", "Download Preview PDF"]) assert.match(adminModule + readFileSync(new URL("../admin/resolutions/ResolutionPdfBuilder.jsx", import.meta.url), "utf8"), new RegExp(label));
   assert.match(adminModule, /updateResolutionPdfLayout/);
 });
@@ -97,6 +99,8 @@ test("Admin resolution creator exposes eligible voter selection controls", () =>
   assert.match(adminModule, /member\.active === false \? "Inactive" : "Active"/);
   assert.match(adminModule, /!isRecordOnly \? <EligibleVotersSelector/);
   assert.match(model, /Select at least one eligible voter before saving or opening voting/);
+  assert.match(adminModule, /Resolution number <span className="admin-optional">Optional<\/span>/);
+  assert.doesNotMatch(model + adminModule, /Enter a resolution number|Resolution number is required/);
 });
 
 test("dashboard voting is textual, optimistic, and rollback-capable", () => {
