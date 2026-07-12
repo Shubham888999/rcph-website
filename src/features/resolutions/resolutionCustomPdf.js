@@ -1,4 +1,4 @@
-import { normalizeResolutionSections, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
+import { normalizeGeneratedPageOrder, normalizeResolutionPageConfig, normalizeResolutionSections, normalizeUploadedVotesTableConfig, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
 import { isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 
@@ -144,13 +144,14 @@ export function buildCustomVotesRows(details, section) {
 
 function tableRowModel(values, columns, style, header = false, signature = false) {
   const fontSize = header && style.headerFontSize ? style.headerFontSize : style.fontSize;
-  const rowStyle = { fontFamily: style.fontFamily, fontSize, bold: header ? (style.headerBold ?? style.boldHeader) : false, italic: false, underline: false, alignment: "left", lineSpacing: 1.2 };
+  const lineSpacing = style.compactRows ? 1.05 : 1.2;
+  const rowStyle = { fontFamily: header && style.headerFontFamily ? style.headerFontFamily : style.fontFamily, fontSize, bold: header ? (style.headerBold ?? style.boldHeader) : false, italic: false, underline: false, alignment: "left", lineSpacing };
   const cells = columns.map((column, index) => {
     const width = WIDTH * (column.widthPercent ?? column.width) / 100;
     return { width, alignment: column.alignment || "left", lines: wrap(values[index] || "", width - style.cellPadding * 2, rowStyle) };
   });
   const lineCount = Math.max(1, ...cells.map((cell) => cell.lines.length));
-  const height = Math.max(signature ? 28 : 0, lineCount * fontSize * 1.2 + style.cellPadding * 2);
+  const height = Math.max(signature ? 28 : 0, lineCount * fontSize * lineSpacing + style.cellPadding * 2);
   return { cells, height, style: rowStyle };
 }
 
@@ -168,7 +169,7 @@ function drawTableRow(pager, model, showBorders) {
     }
     cell.lines.forEach((line, index) => {
       const lineStyle = { ...model.style, alignment: cell.alignment };
-      const y = top - model.style.fontSize - model.style.fontSize * 1.2 * index - 2;
+      const y = top - model.style.fontSize - model.style.fontSize * model.style.lineSpacing * index - 2;
       const textX = alignedX(line, lineStyle, cell.width - 8, x + 4);
       pager.current().push({ kind: "text", text: line, x: textX, y, size: model.style.fontSize, fontFamily: model.style.fontFamily, bold: model.style.bold, italic: false, underline: false, width: approximateTextWidth(line, model.style.fontSize, model.style.fontFamily, model.style.bold) });
     });
@@ -194,8 +195,9 @@ function renderTable(pager, section, rows, columns, options = {}) {
 }
 
 function renderCustomTable(pager, section) {
+  if (section.title) renderTextSection(pager, { id: `${section.id}_title`, type: "heading", text: section.title, style: { fontFamily: section.style.headerFontFamily || section.style.fontFamily, fontSize: Math.max(10, section.style.headerFontSize || section.style.fontSize), bold: true, italic: false, underline: false, alignment: "left", lineSpacing: 1.2, spaceBefore: section.style.spaceBefore, spaceAfter: 5 } });
   const rows = section.rows.map((row) => section.columns.map((column) => row.cells[column.id] || ""));
-  renderTable(pager, section, rows, section.columns, {
+  renderTable(pager, { ...section, style: { ...section.style, spaceBefore: section.title ? 0 : section.style.spaceBefore, compactRows: section.options.compactRows } }, rows, section.columns, {
     headerIndex: section.options.hasHeaderRow ? 0 : -1,
     repeatHeader: section.options.hasHeaderRow && section.options.repeatHeader,
     showBorders: section.options.showBorders,
@@ -225,6 +227,75 @@ export function buildCustomResolutionPdfPages(details, sections) {
   });
   if (pager.pages.length > 1 && !pager.pages.at(-1).length) pager.pages.pop();
   return pager.pages;
+}
+
+function finalizedResolutionPageConfig(resolution, preview) {
+  if (!preview && resolution.finalizedResolutionPageConfigSnapshot) return normalizeResolutionPageConfig(resolution.finalizedResolutionPageConfigSnapshot, resolution);
+  return normalizeResolutionPageConfig(resolution.resolutionPageConfig, resolution);
+}
+
+function finalizedGeneratedPageOrder(resolution, preview) {
+  if (!preview && resolution.finalizedGeneratedPageOrderSnapshot) return normalizeGeneratedPageOrder(resolution.finalizedGeneratedPageOrderSnapshot);
+  return normalizeGeneratedPageOrder(resolution.generatedPageOrder);
+}
+
+function markGeneratedPages(pages, kind) {
+  pages.forEach((page) => {
+    page.letterhead = "official";
+    page.pageNumber = false;
+    page.generatedKind = kind;
+  });
+  return pages;
+}
+
+function finishGeneratedPages(pager, kind) {
+  if (pager.pages.length > 1 && !pager.pages.at(-1).length) pager.pages.pop();
+  return markGeneratedPages(pager.pages, kind);
+}
+
+export function buildResolutionPagePdfPages(details, config) {
+  const pager = createPaginator();
+  const normalized = normalizeResolutionPageConfig(config, details?.resolution || {});
+  renderTextSection(pager, { id: "resolution_page_heading", type: "heading", text: normalized.heading.text, style: normalized.heading });
+  const detailLines = [
+    ["Subject", normalized.details.subject],
+    ["Date", normalized.details.date],
+    ["Place", normalized.details.place],
+    ["No. of Board Members", normalized.details.boardMembersPresent],
+    ["Total No. of Board Members", normalized.details.totalBoardMembers],
+  ].map(([label, value]) => `${label}: ${value || ""}`);
+  renderTextSection(pager, { id: "resolution_page_details", type: "paragraph", text: detailLines.join("\n"), listStyle: "none", style: normalized.detailsStyle });
+  renderTextSection(pager, { id: "resolution_page_statement", type: "paragraph", text: normalized.mainStatement.text, listStyle: "none", style: normalized.mainStatement });
+  normalized.blocks.forEach((block) => {
+    if (block.type === "paragraph") renderTextSection(pager, { ...block, listStyle: "none" });
+    else if (block.type === "table") renderCustomTable(pager, block);
+  });
+  return finishGeneratedPages(pager, "resolution_page");
+}
+
+export function buildGeneratedVotesTablePdfPages(details, config) {
+  const normalized = normalizeUploadedVotesTableConfig(config);
+  const pager = createPaginator();
+  renderVotesTable(pager, {
+    id: "generated_vote_table",
+    type: "votesTable",
+    title: "Voting Record",
+    columns: normalized.columns,
+    options: normalized,
+    style: { fontFamily: "Helvetica", fontSize: 9, headerFontSize: 9, headerBold: true, cellPadding: 4, spaceBefore: 0, spaceAfter: 8 },
+  }, details);
+  return finishGeneratedPages(pager, "vote_table");
+}
+
+export function buildGeneratedResolutionAppendixPages(details, preview = false) {
+  const resolution = details?.resolution || {};
+  const pageConfig = finalizedResolutionPageConfig(resolution, preview);
+  if (!pageConfig.enabled) return [];
+  const pagesByType = {
+    resolution_page: () => buildResolutionPagePdfPages(details, pageConfig),
+    vote_table: () => resolution.appendVoteTable === false ? [] : buildGeneratedVotesTablePdfPages(details, resolution.uploadedVotesTableConfig),
+  };
+  return finalizedGeneratedPageOrder(resolution, preview).flatMap((type) => pagesByType[type]?.() || []);
 }
 
 export function getResolutionRenderLayout(details, preview = false) {

@@ -2,9 +2,14 @@ export const PDF_LAYOUT_MODES = Object.freeze(["standard", "custom"]);
 export const DOCUMENT_SOURCE_MODES = Object.freeze(["standard", "custom", "uploadedPdf"]);
 export const RESOLUTION_SECTION_TYPES = Object.freeze(["heading", "paragraph", "table", "votesTable", "spacer"]);
 export const RESOLUTION_PDF_LIMITS = Object.freeze({ sections: 100, textCharacters: 50000, tableRows: 200, tableColumns: 20 });
+export const RESOLUTION_PAGE_LIMITS = Object.freeze({ blocks: 20, paragraphCharacters: 10000, tableRows: 100, tableColumns: 10, cellCharacters: 2000 });
 export const RESOLUTION_FONTS = Object.freeze(["Helvetica", "Times Roman", "Courier"]);
 export const RESOLUTION_ALIGNMENTS = Object.freeze(["left", "center", "right"]);
 export const VOTES_TABLE_COLUMNS = Object.freeze(["name", "position", "vote", "timestamp", "signature"]);
+export const GENERATED_PAGE_TYPES = Object.freeze(["resolution_page", "vote_table"]);
+export const DEFAULT_GENERATED_PAGE_ORDER = Object.freeze(["resolution_page", "vote_table"]);
+
+const DEFAULT_RESOLUTION_STATEMENT = "This is to resolve that we, the Board Members of Rotaract Club of Pune Heritage, for the scheduled Board Meeting, have considered and passed the resolution stated below in accordance with the applicable voting requirements and the records maintained by the Club.";
 
 function cleanText(value, max = 50000) {
   if (typeof value !== "string") return "";
@@ -72,6 +77,20 @@ function normalizeTextStyle(raw = {}, heading = false) {
   };
 }
 
+function normalizeResolutionPageTextStyle(raw = {}, defaults = {}) {
+  return {
+    fontFamily: choice(raw.fontFamily, RESOLUTION_FONTS, defaults.fontFamily || "Helvetica"),
+    fontSize: number(raw.fontSize, defaults.fontSize || 10, 8, 20),
+    bold: bool(raw.bold, defaults.bold === true),
+    italic: bool(raw.italic, defaults.italic === true),
+    underline: bool(raw.underline, defaults.underline === true),
+    alignment: choice(raw.alignment, RESOLUTION_ALIGNMENTS, defaults.alignment || "left"),
+    lineSpacing: number(raw.lineSpacing, defaults.lineSpacing || 1.25, 1, 2),
+    spaceBefore: number(raw.spaceBefore, defaults.spaceBefore || 0, 0, 72),
+    spaceAfter: number(raw.spaceAfter, defaults.spaceAfter ?? 8, 0, 72),
+  };
+}
+
 function normalizedWidths(rawWidths, count) {
   const source = Array.from({ length: count }, (_, index) => number(rawWidths?.[index], 100 / count, 1, 100));
   const total = source.reduce((sum, width) => sum + width, 0) || 1;
@@ -129,6 +148,115 @@ function normalizeTable(raw, id) {
       spaceAfter: number(raw.style?.spaceAfter, 8, 0, 72),
     },
   };
+}
+
+function normalizeResolutionPageTable(raw, id) {
+  const rawRows = Array.isArray(raw.rows) ? raw.rows.slice(0, RESOLUTION_PAGE_LIMITS.tableRows) : [];
+  const inferredColumns = Math.max(1, Math.min(RESOLUTION_PAGE_LIMITS.tableColumns, Array.isArray(raw.columns) ? raw.columns.length : Math.max(0, ...rawRows.map((row) => legacyRowValues(row)?.length || 0))));
+  const widths = normalizedWidths((raw.columns || []).map((column) => column?.widthPercent ?? column?.width), inferredColumns);
+  const columns = Array.from({ length: inferredColumns }, (_, index) => ({
+    id: sectionId(raw.columns?.[index]?.id, `column_${index + 1}`),
+    label: cleanText(raw.columns?.[index]?.label, 200),
+    widthPercent: widths[index],
+    alignment: choice(raw.columns?.[index]?.alignment, RESOLUTION_ALIGNMENTS, "left"),
+  }));
+  const sourceRows = rawRows.length ? rawRows : [{ id: "row_1", cells: {} }];
+  const rows = sourceRows.map((row, rowIndex) => ({
+    id: tableRowId(row?.id, `row_${rowIndex + 1}`),
+    cells: Object.fromEntries(columns.map((column, columnIndex) => [column.id, cleanText(cellValue(row, column, columnIndex), RESOLUTION_PAGE_LIMITS.cellCharacters)])),
+  }));
+  return {
+    id,
+    type: "table",
+    title: cleanText(raw.title, 200),
+    columns,
+    rows,
+    options: {
+      hasHeaderRow: bool(raw.options?.hasHeaderRow, true),
+      repeatHeader: bool(raw.options?.repeatHeader, true),
+      showBorders: bool(raw.options?.showBorders, true),
+      compactRows: bool(raw.options?.compactRows, false),
+    },
+    style: {
+      fontFamily: choice(raw.style?.fontFamily, RESOLUTION_FONTS, "Helvetica"),
+      fontSize: number(raw.style?.fontSize, 9, 8, 20),
+      headerFontFamily: choice(raw.style?.headerFontFamily, RESOLUTION_FONTS, raw.style?.fontFamily || "Helvetica"),
+      headerFontSize: number(raw.style?.headerFontSize, 9, 8, 20),
+      boldHeader: bool(raw.style?.boldHeader, true),
+      alignment: choice(raw.style?.alignment, RESOLUTION_ALIGNMENTS, "left"),
+      cellPadding: number(raw.style?.cellPadding, 4, 1, 12),
+      spaceBefore: number(raw.style?.spaceBefore, 8, 0, 72),
+      spaceAfter: number(raw.style?.spaceAfter, 8, 0, 72),
+    },
+  };
+}
+
+export function normalizeResolutionPageBlock(raw, fallbackId = createSectionId()) {
+  if (!raw || typeof raw !== "object") return null;
+  const type = choice(raw.type, ["paragraph", "table"], "");
+  if (!type) return null;
+  const id = sectionId(raw.id, fallbackId);
+  if (type === "paragraph") {
+    return {
+      id,
+      type,
+      text: cleanText(raw.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters),
+      style: normalizeResolutionPageTextStyle(raw.style, { fontFamily: "Helvetica", fontSize: 10, alignment: "left", lineSpacing: 1.25, spaceBefore: 6, spaceAfter: 8 }),
+    };
+  }
+  return normalizeResolutionPageTable(raw, id);
+}
+
+export function normalizeResolutionPageBlocks(raw) {
+  const seen = new Set();
+  return (Array.isArray(raw) ? raw : []).slice(0, RESOLUTION_PAGE_LIMITS.blocks).map((block, index) => normalizeResolutionPageBlock(block, `block_${index + 1}`)).filter(Boolean).map((block) => {
+    let id = block.id;
+    let suffix = 2;
+    while (seen.has(id)) id = `${block.id}_${suffix++}`;
+    seen.add(id);
+    return { ...block, id };
+  });
+}
+
+function normalizeResolutionPageDetails(raw = {}, defaults = {}) {
+  return {
+    subject: cleanText(raw.subject, 300) || cleanText(defaults.subject || defaults.title, 300),
+    date: cleanText(raw.date, 80) || cleanText(defaults.date || defaults.meetingDate, 80),
+    place: cleanText(raw.place || defaults.place || defaults.meetingLocation, 160),
+    boardMembersPresent: cleanText(raw.boardMembersPresent, 80),
+    totalBoardMembers: cleanText(raw.totalBoardMembers, 80),
+  };
+}
+
+export function normalizeGeneratedPageOrder(raw) {
+  const source = Array.isArray(raw) ? raw : DEFAULT_GENERATED_PAGE_ORDER;
+  const seen = new Set();
+  const order = source.filter((item) => GENERATED_PAGE_TYPES.includes(item) && !seen.has(item) && seen.add(item));
+  DEFAULT_GENERATED_PAGE_ORDER.forEach((item) => { if (!seen.has(item)) order.push(item); });
+  return order;
+}
+
+export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  return {
+    enabled: source.enabled === true,
+    version: 1,
+    heading: {
+      ...normalizeResolutionPageTextStyle(source.heading, { fontFamily: "Helvetica", fontSize: 16, bold: true, underline: true, alignment: "center", lineSpacing: 1.2, spaceBefore: 0, spaceAfter: 12 }),
+      text: cleanText(source.heading?.text ?? source.headingText, 120) || "RESOLUTION",
+    },
+    details: normalizeResolutionPageDetails(source.details, defaults),
+    detailsStyle: normalizeResolutionPageTextStyle(source.detailsStyle, { fontFamily: "Helvetica", fontSize: 10, bold: true, alignment: "left", lineSpacing: 1.25, spaceBefore: 0, spaceAfter: 10 }),
+    mainStatement: {
+      ...normalizeResolutionPageTextStyle(source.mainStatement, { fontFamily: "Helvetica", fontSize: 12, bold: true, alignment: "left", lineSpacing: 1.25, spaceBefore: 4, spaceAfter: 10 }),
+      text: cleanText(source.mainStatement?.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters) || DEFAULT_RESOLUTION_STATEMENT,
+    },
+    blocks: normalizeResolutionPageBlocks(source.blocks),
+  };
+}
+
+export function createDefaultResolutionPageConfig(resolution = {}) {
+  return { ...normalizeResolutionPageConfig({}, { subject: resolution.title, date: resolution.meetingDate || resolution.date, place: resolution.meetingLocation }), enabled: true };
 }
 
 function normalizeVotesTable(raw, id) {
@@ -192,12 +320,79 @@ function rawTextCharacterCount(sections) {
   }, 0);
 }
 
+function rawResolutionPageTextCount(config = {}) {
+  const blocks = Array.isArray(config.blocks) ? config.blocks : [];
+  return blocks.reduce((total, block) => {
+    if (block?.type === "paragraph") return total + (typeof block.text === "string" ? block.text.length : 0);
+    if (block?.type === "table") {
+      return total + (typeof block.title === "string" ? block.title.length : 0) + (Array.isArray(block.rows) ? block.rows.reduce((rowTotal, row) => {
+        const values = legacyRowValues(row) || (row?.cells && typeof row.cells === "object" ? Object.values(row.cells) : []);
+        return rowTotal + values.reduce((sum, cell) => sum + (typeof cell === "string" ? cell.length : 0), 0);
+      }, 0) : 0);
+    }
+    return total;
+  }, 0);
+}
+
+function validateResolutionPageStyle(style, label, errors) {
+  if (!RESOLUTION_FONTS.includes(style?.fontFamily)) errors.push(`${label} has an invalid font.`);
+  if (!Number.isFinite(Number(style?.fontSize)) || Number(style.fontSize) < 8 || Number(style.fontSize) > 20) errors.push(`${label} font size must be between 8 and 20.`);
+  if (!RESOLUTION_ALIGNMENTS.includes(style?.alignment)) errors.push(`${label} has an invalid alignment.`);
+}
+
+function validateResolutionPageConfig(raw = {}, errors) {
+  const config = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  if (config.enabled !== true) return;
+  validateResolutionPageStyle(config.heading, "Resolution Page heading", errors);
+  validateResolutionPageStyle(config.detailsStyle, "Resolution Page details", errors);
+  validateResolutionPageStyle(config.mainStatement, "Resolution Page main statement", errors);
+  if (typeof config.heading?.text === "string" && config.heading.text.length > 120) errors.push("Resolution Page heading must be 120 characters or fewer.");
+  if (typeof config.mainStatement?.text === "string" && config.mainStatement.text.length > RESOLUTION_PAGE_LIMITS.paragraphCharacters) errors.push(`Resolution Page main statement must be ${RESOLUTION_PAGE_LIMITS.paragraphCharacters.toLocaleString()} characters or fewer.`);
+  if (Array.isArray(config.blocks) && config.blocks.length > RESOLUTION_PAGE_LIMITS.blocks) errors.push(`Resolution Page may contain at most ${RESOLUTION_PAGE_LIMITS.blocks} custom blocks.`);
+  if (rawResolutionPageTextCount(config) > RESOLUTION_PAGE_LIMITS.blocks * RESOLUTION_PAGE_LIMITS.paragraphCharacters) errors.push("Resolution Page content is too large.");
+  (Array.isArray(config.blocks) ? config.blocks : []).forEach((block, index) => {
+    const label = `Resolution Page block ${index + 1}`;
+    if (!["paragraph", "table"].includes(block?.type)) errors.push(`${label} has an unsupported type.`);
+    if (block?.type === "paragraph") {
+      if (typeof block.text === "string" && block.text.length > RESOLUTION_PAGE_LIMITS.paragraphCharacters) errors.push(`${label} text must be ${RESOLUTION_PAGE_LIMITS.paragraphCharacters.toLocaleString()} characters or fewer.`);
+      validateResolutionPageStyle(block.style, label, errors);
+    }
+    if (block?.type === "table") {
+      if (!Array.isArray(block.columns) || block.columns.length < 1 || block.columns.length > RESOLUTION_PAGE_LIMITS.tableColumns) errors.push(`${label} must have 1 to ${RESOLUTION_PAGE_LIMITS.tableColumns} columns.`);
+      if (!Array.isArray(block.rows) || block.rows.length < 1 || block.rows.length > RESOLUTION_PAGE_LIMITS.tableRows) errors.push(`${label} must have 1 to ${RESOLUTION_PAGE_LIMITS.tableRows} rows.`);
+      validateResolutionPageStyle(block.style, label, errors);
+      if (block.style?.headerFontFamily && !RESOLUTION_FONTS.includes(block.style.headerFontFamily)) errors.push(`${label} has an invalid header font.`);
+      if (block.style?.headerFontSize && (!Number.isFinite(Number(block.style.headerFontSize)) || Number(block.style.headerFontSize) < 8 || Number(block.style.headerFontSize) > 20)) errors.push(`${label} header font size must be between 8 and 20.`);
+      (Array.isArray(block.rows) ? block.rows : []).forEach((row, rowIndex) => {
+        const values = legacyRowValues(row) || (row?.cells && typeof row.cells === "object" ? Object.values(row.cells) : []);
+        values.forEach((cell) => { if (typeof cell === "string" && cell.length > RESOLUTION_PAGE_LIMITS.cellCharacters) errors.push(`${label} row ${rowIndex + 1} has a cell over ${RESOLUTION_PAGE_LIMITS.cellCharacters.toLocaleString()} characters.`); });
+      });
+    }
+  });
+}
+
+function validateGeneratedPageOrder(raw, errors) {
+  if (raw == null) return;
+  if (!Array.isArray(raw)) {
+    errors.push("Generated page order must be a list.");
+    return;
+  }
+  const seen = new Set();
+  raw.forEach((item) => {
+    if (!GENERATED_PAGE_TYPES.includes(item)) errors.push("Generated page order has an unsupported value.");
+    if (seen.has(item)) errors.push("Generated page order cannot contain duplicates.");
+    seen.add(item);
+  });
+}
+
 export function validateResolutionPdfLayout(raw = {}) {
   const errors = [];
   const requestedMode = raw.pdfLayoutMode == null || raw.pdfLayoutMode === "" ? "standard" : cleanText(raw.pdfLayoutMode, 20).toLowerCase();
   const requestedSourceMode = raw.documentSourceMode == null || raw.documentSourceMode === "" ? null : cleanText(raw.documentSourceMode, 30);
   if (!PDF_LAYOUT_MODES.includes(requestedMode)) errors.push("Choose a valid PDF layout mode.");
   if (requestedSourceMode && !DOCUMENT_SOURCE_MODES.includes(requestedSourceMode)) errors.push("Choose a valid Resolution document source.");
+  validateResolutionPageConfig(raw.resolutionPageConfig, errors);
+  validateGeneratedPageOrder(raw.generatedPageOrder, errors);
   const source = Array.isArray(raw.pdfSections) ? raw.pdfSections : [];
   if (source.length > RESOLUTION_PDF_LIMITS.sections) errors.push(`A custom layout may contain at most ${RESOLUTION_PDF_LIMITS.sections} sections.`);
   if (rawTextCharacterCount(source) > RESOLUTION_PDF_LIMITS.textCharacters) errors.push(`Custom layout text may contain at most ${RESOLUTION_PDF_LIMITS.textCharacters.toLocaleString()} characters.`);
@@ -224,7 +419,11 @@ export function validateResolutionPdfLayout(raw = {}) {
   catch (error) { errors.push(error.message); }
   const documentSourceMode = normalizeDocumentSourceMode(requestedSourceMode, pdfLayoutMode);
   const uploadedVotesTableConfig = normalizeUploadedVotesTableConfig(raw.uploadedVotesTableConfig);
-  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode, pdfSections, documentSourceMode, uploadedVotesTableConfig } };
+  const resolutionPageConfig = normalizeResolutionPageConfig(raw.resolutionPageConfig, raw);
+  const generatedPageOrder = normalizeGeneratedPageOrder(raw.generatedPageOrder);
+  try { assertNoNestedArrays(resolutionPageConfig, "resolutionPageConfig"); }
+  catch (error) { errors.push(error.message); }
+  return { ok: errors.length === 0, errors, payload: { pdfLayoutMode, pdfSections, documentSourceMode, uploadedVotesTableConfig, resolutionPageConfig, generatedPageOrder } };
 }
 
 export function assertNoNestedArrays(value, path = "value") {
@@ -277,6 +476,40 @@ export function moveResolutionSection(sections, id, direction) {
   return normalized;
 }
 
+export function createResolutionPageBlock(type, id = createSectionId()) {
+  if (type === "table") return normalizeResolutionPageBlock({ id, type, columns: [{ id: "column_1", label: "Column 1", widthPercent: 50 }, { id: "column_2", label: "Column 2", widthPercent: 50 }], rows: [{ id: "row_1", cells: { column_1: "Column 1", column_2: "Column 2" } }, { id: "row_2", cells: { column_1: "", column_2: "" } }], options: { hasHeaderRow: true, repeatHeader: true, showBorders: true }, style: {} }, id);
+  return normalizeResolutionPageBlock({ id, type: "paragraph", text: "Paragraph text", style: { fontFamily: "Helvetica", fontSize: 10, alignment: "left" } }, id);
+}
+
+export function addResolutionPageBlock(blocks, type, id) {
+  return [...normalizeResolutionPageBlocks(blocks), createResolutionPageBlock(type, id)];
+}
+
+export function updateResolutionPageBlock(blocks, id, changes) {
+  return normalizeResolutionPageBlocks(blocks).map((block) => block.id === id ? normalizeResolutionPageBlock({ ...block, ...changes, id: block.id, type: block.type }, block.id) : block);
+}
+
+export function deleteResolutionPageBlock(blocks, id) {
+  return normalizeResolutionPageBlocks(blocks).filter((block) => block.id !== id);
+}
+
+export function duplicateResolutionPageBlock(blocks, id, newId = createSectionId()) {
+  const normalized = normalizeResolutionPageBlocks(blocks);
+  const index = normalized.findIndex((block) => block.id === id);
+  if (index < 0) return normalized;
+  const copy = normalizeResolutionPageBlock({ ...structuredClone(normalized[index]), id: newId }, newId);
+  return [...normalized.slice(0, index + 1), copy, ...normalized.slice(index + 1)];
+}
+
+export function moveResolutionPageBlock(blocks, id, direction) {
+  const normalized = normalizeResolutionPageBlocks(blocks);
+  const index = normalized.findIndex((block) => block.id === id);
+  const target = direction === "up" ? index - 1 : direction === "down" ? index + 1 : index;
+  if (index < 0 || target < 0 || target >= normalized.length) return normalized;
+  [normalized[index], normalized[target]] = [normalized[target], normalized[index]];
+  return normalized;
+}
+
 export function createDefaultResolutionSections() {
   return [
     createResolutionSection("heading"),
@@ -292,4 +525,9 @@ export function describeResolutionSection(section) {
   if (section.type === "votesTable") return VOTES_TABLE_COLUMNS.filter((key) => section.columns[key]).join(", ");
   if (section.type === "spacer") return section.mode === "pageBreak" ? "Forced page break" : `${section.mode} spacer`;
   return section.text.slice(0, 100) || "Empty text";
+}
+
+export function describeResolutionPageBlock(block) {
+  if (block.type === "table") return `${block.rows.length} rows x ${block.columns.length} columns`;
+  return block.text.slice(0, 100) || "Empty paragraph";
 }

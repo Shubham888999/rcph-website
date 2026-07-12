@@ -1,14 +1,24 @@
 import {
   addResolutionSection,
+  addResolutionPageBlock,
+  createDefaultResolutionPageConfig,
   createDefaultResolutionSections,
+  deleteResolutionPageBlock,
   deleteResolutionSection,
+  describeResolutionPageBlock,
   describeResolutionSection,
+  duplicateResolutionPageBlock,
   duplicateResolutionSection,
+  moveResolutionPageBlock,
   moveResolutionSection,
+  normalizeResolutionPageConfig,
   normalizeResolutionSection,
+  normalizeResolutionPageBlock,
+  RESOLUTION_PAGE_LIMITS,
   RESOLUTION_ALIGNMENTS,
   RESOLUTION_FONTS,
   RESOLUTION_SECTION_TYPES,
+  updateResolutionPageBlock,
   updateResolutionSection,
   VOTES_TABLE_COLUMNS,
 } from "../../resolutions/resolutionSectionsModel";
@@ -36,20 +46,20 @@ function TextStyleEditor({ style, onChange, paragraph = false }) {
   </div>;
 }
 
-function TableEditor({ section, onChange }) {
-  const set = (changes) => onChange(normalizeResolutionSection({ ...section, ...changes }, section.id));
+function TableEditor({ section, onChange, maxRows = 200, maxColumns = 20, normalize = normalizeResolutionSection }) {
+  const set = (changes) => onChange(normalize({ ...section, ...changes }, section.id));
   const setCell = (rowId, columnId, value) => {
     const rows = section.rows.map((row) => row.id === rowId ? { ...row, cells: { ...row.cells, [columnId]: value } } : row);
     set({ rows });
   };
   const addRow = () => {
-    if (section.rows.length >= 200) return;
+    if (section.rows.length >= maxRows) return;
     const rowNumber = section.rows.length + 1;
     set({ rows: [...section.rows, { id: `row_${rowNumber}`, cells: Object.fromEntries(section.columns.map((column) => [column.id, ""])) }] });
   };
   const removeRow = () => section.rows.length > 1 && set({ rows: section.rows.slice(0, -1) });
   const addColumn = () => {
-    if (section.columns.length >= 20) return;
+    if (section.columns.length >= maxColumns) return;
     const columnId = `column_${section.columns.length + 1}`;
     set({ columns: [...section.columns, { id: columnId, label: "", widthPercent: 1, alignment: "left" }], rows: section.rows.map((row) => ({ ...row, cells: { ...row.cells, [columnId]: "" } })) });
   };
@@ -59,7 +69,7 @@ function TableEditor({ section, onChange }) {
     set({ columns: section.columns.slice(0, -1), rows: section.rows.map((row) => ({ ...row, cells: Object.fromEntries(Object.entries(row.cells).filter(([key]) => key !== removed)) })) });
   };
   return <div className="resolution-builder__table-editor">
-    <div className="admin-actions"><button type="button" onClick={addRow} disabled={section.rows.length >= 200}>Add row</button><button type="button" onClick={removeRow} disabled={section.rows.length <= 1}>Remove row</button><button type="button" onClick={addColumn} disabled={section.columns.length >= 20}>Add column</button><button type="button" onClick={removeColumn} disabled={section.columns.length <= 1}>Remove column</button></div>
+    <div className="admin-actions"><button type="button" onClick={addRow} disabled={section.rows.length >= maxRows}>Add row</button><button type="button" onClick={removeRow} disabled={section.rows.length <= 1}>Remove row</button><button type="button" onClick={addColumn} disabled={section.columns.length >= maxColumns}>Add column</button><button type="button" onClick={removeColumn} disabled={section.columns.length <= 1}>Remove column</button></div>
     <div className="admin-table-wrap"><table><caption>Custom table cells</caption><thead><tr>{section.columns.map((column, index) => <th key={column.id}><span>Column {index + 1}</span><input aria-label={`Column ${index + 1} label`} placeholder="Optional label" value={column.label} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} /><select aria-label={`Column ${index + 1} alignment`} value={column.alignment} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, alignment: event.target.value } : item) })}>{RESOLUTION_ALIGNMENTS.map((alignment) => <option key={alignment}>{alignment}</option>)}</select><input aria-label={`Column ${index + 1} width percentage`} type="number" min="1" max="100" value={Number(column.widthPercent.toFixed(2))} onChange={(event) => set({ columns: section.columns.map((item, itemIndex) => itemIndex === index ? { ...item, widthPercent: Number(event.target.value) } : item) })} /></th>)}</tr></thead><tbody>{section.rows.map((row, rowIndex) => <tr key={row.id}>{section.columns.map((column, columnIndex) => <td key={`${row.id}_${column.id}`}><textarea aria-label={`Row ${rowIndex + 1}, column ${columnIndex + 1}`} rows="2" value={row.cells[column.id] || ""} onChange={(event) => setCell(row.id, column.id, event.target.value)} /></td>)}</tr>)}</tbody></table></div>
     <div className="resolution-builder__checks">
       <label><input type="checkbox" checked={section.options.hasHeaderRow} onChange={(event) => set({ options: { ...section.options, hasHeaderRow: event.target.checked } })} /> Header row</label>
@@ -69,6 +79,66 @@ function TableEditor({ section, onChange }) {
     </div>
     <div className="admin-form-grid"><label>Font<select value={section.style.fontFamily} onChange={(event) => set({ style: { ...section.style, fontFamily: event.target.value } })}>{RESOLUTION_FONTS.map((font) => <option key={font}>{font}</option>)}</select></label><NumberField label="Font size" min={8} max={20} value={section.style.fontSize} onChange={(value) => set({ style: { ...section.style, fontSize: value } })} /><NumberField label="Cell padding" min={1} max={12} value={section.style.cellPadding} onChange={(value) => set({ style: { ...section.style, cellPadding: value } })} /><NumberField label="Space before" min={0} max={72} value={section.style.spaceBefore} onChange={(value) => set({ style: { ...section.style, spaceBefore: value } })} /><NumberField label="Space after" min={0} max={72} value={section.style.spaceAfter} onChange={(value) => set({ style: { ...section.style, spaceAfter: value } })} /></div>
   </div>;
+}
+
+function ResolutionPageTableEditor({ block, onChange }) {
+  const set = (changes) => onChange(normalizeResolutionPageBlock({ ...block, ...changes }, block.id));
+  return <div className="resolution-page-builder__table">
+    <label>Table title <span className="admin-optional">Optional</span><input value={block.title || ""} maxLength="200" onChange={(event) => set({ title: event.target.value })} /></label>
+    <TableEditor section={block} maxRows={RESOLUTION_PAGE_LIMITS.tableRows} maxColumns={RESOLUTION_PAGE_LIMITS.tableColumns} normalize={normalizeResolutionPageBlock} onChange={onChange} />
+    <div className="admin-form-grid">
+      <label>Header font<select value={block.style.headerFontFamily || block.style.fontFamily} onChange={(event) => set({ style: { ...block.style, headerFontFamily: event.target.value } })}>{RESOLUTION_FONTS.map((font) => <option key={font}>{font}</option>)}</select></label>
+      <NumberField label="Header size" min={8} max={20} value={block.style.headerFontSize || block.style.fontSize} onChange={(value) => set({ style: { ...block.style, headerFontSize: value } })} />
+      <label>Row spacing<select value={block.options.compactRows ? "compact" : "standard"} onChange={(event) => set({ options: { ...block.options, compactRows: event.target.value === "compact" } })}><option value="standard">Standard</option><option value="compact">Compact</option></select></label>
+    </div>
+  </div>;
+}
+
+function ResolutionPageBlockEditor({ block, index, total, onUpdate, onDelete, onDuplicate, onMove }) {
+  const setStyle = (style) => onUpdate({ style });
+  return <details className="resolution-builder__section resolution-page-builder__block" open>
+    <summary><span>{index + 1}. {block.type === "table" ? "Table" : "Paragraph"}</span><small>{describeResolutionPageBlock(block)}</small></summary>
+    <div className="resolution-builder__section-body">
+      {block.type === "paragraph" ? <><label>Paragraph text<textarea rows="5" maxLength={RESOLUTION_PAGE_LIMITS.paragraphCharacters} value={block.text} onChange={(event) => onUpdate({ text: event.target.value })} /></label><TextStyleEditor style={block.style} paragraph onChange={setStyle} /></> : null}
+      {block.type === "table" ? <ResolutionPageTableEditor block={block} onChange={(next) => onUpdate(next)} /> : null}
+      <div className="resolution-builder__section-actions"><button type="button" aria-label={`Move Resolution Page block ${index + 1} up`} disabled={index === 0} onClick={() => onMove("up")}>Move up</button><button type="button" aria-label={`Move Resolution Page block ${index + 1} down`} disabled={index === total - 1} onClick={() => onMove("down")}>Move down</button><button type="button" onClick={onDuplicate}>Duplicate</button><button type="button" className="danger" onClick={onDelete}>Delete block</button></div>
+    </div>
+  </details>;
+}
+
+function ResolutionPageEditor({ resolution, config, onChange }) {
+  const set = (changes) => onChange(normalizeResolutionPageConfig({ ...config, ...changes }, resolution));
+  const setDetails = (key) => (event) => set({ details: { ...config.details, [key]: event.target.value } });
+  const setHeading = (changes) => set({ heading: { ...config.heading, ...changes } });
+  const setMainStatement = (changes) => set({ mainStatement: { ...config.mainStatement, ...changes } });
+  const setBlocks = (blocks) => set({ blocks });
+  return <section className="resolution-page-builder" aria-label="Generated Resolution Page editor">
+    <div className="resolution-page-builder__heading">
+      <h4>Generated Resolution Page</h4>
+      <p className="admin-help">Generate an editable official resolution page on the RCPH letterhead and include it in the final PDF.</p>
+    </div>
+    <label>Page heading<input value={config.heading.text} maxLength="120" onChange={(event) => setHeading({ text: event.target.value })} /></label>
+    <TextStyleEditor style={config.heading} onChange={(style) => setHeading(style)} />
+    <fieldset className="resolution-page-builder__details">
+      <legend>Resolution details</legend>
+      <div className="admin-form-grid">
+        <label>Subject<input value={config.details.subject} maxLength="300" onChange={setDetails("subject")} /></label>
+        <label>Date<input value={config.details.date} maxLength="80" onChange={setDetails("date")} /></label>
+        <label>Place<input value={config.details.place} maxLength="160" onChange={setDetails("place")} /></label>
+        <label>No. of Board Members<input value={config.details.boardMembersPresent} maxLength="80" onChange={setDetails("boardMembersPresent")} /></label>
+        <label>Total No. of Board Members<input value={config.details.totalBoardMembers} maxLength="80" onChange={setDetails("totalBoardMembers")} /></label>
+      </div>
+      <TextStyleEditor style={config.detailsStyle} onChange={(detailsStyle) => set({ detailsStyle })} />
+    </fieldset>
+    <label>Main statement<textarea rows="5" maxLength={RESOLUTION_PAGE_LIMITS.paragraphCharacters} value={config.mainStatement.text} onChange={(event) => setMainStatement({ text: event.target.value })} /></label>
+    <TextStyleEditor style={config.mainStatement} paragraph onChange={(style) => setMainStatement(style)} />
+    <div className="resolution-page-builder__custom">
+      <div className="resolution-page-builder__subhead"><h4>Additional content</h4><span>{config.blocks.length}/{RESOLUTION_PAGE_LIMITS.blocks}</span></div>
+      <div className="admin-actions resolution-builder__add"><button type="button" disabled={config.blocks.length >= RESOLUTION_PAGE_LIMITS.blocks} onClick={() => setBlocks(addResolutionPageBlock(config.blocks, "paragraph"))}>Add paragraph</button><button type="button" disabled={config.blocks.length >= RESOLUTION_PAGE_LIMITS.blocks} onClick={() => setBlocks(addResolutionPageBlock(config.blocks, "table"))}>Add table</button></div>
+      <div className="resolution-builder__sections">{config.blocks.map((block, index) => <ResolutionPageBlockEditor key={block.id} block={block} index={index} total={config.blocks.length} onUpdate={(changes) => setBlocks(updateResolutionPageBlock(config.blocks, block.id, changes))} onDelete={() => setBlocks(deleteResolutionPageBlock(config.blocks, block.id))} onDuplicate={() => setBlocks(duplicateResolutionPageBlock(config.blocks, block.id))} onMove={(direction) => setBlocks(moveResolutionPageBlock(config.blocks, block.id, direction))} />)}</div>
+      {!config.blocks.length ? <p className="admin-empty">No additional content blocks.</p> : null}
+    </div>
+  </section>;
 }
 
 function VotesTableEditor({ section, onChange }) {
@@ -99,8 +169,14 @@ function SectionEditor({ section, index, total, onUpdate, onDelete, onDuplicate,
 export default function ResolutionPdfBuilder({ value, onChange, disabled = false, onPreview, onNotice, onPersisted, onEnsurePersisted }) {
   const mode = value.documentSourceMode || (value.pdfLayoutMode === "custom" ? "custom" : "standard");
   const sections = value.pdfSections || [];
+  const resolutionPageConfig = normalizeResolutionPageConfig(value.resolutionPageConfig, value);
+  const generatedPageOrder = Array.isArray(value.generatedPageOrder) ? value.generatedPageOrder : ["resolution_page", "vote_table"];
   const setSections = (pdfSections) => onChange({ ...value, pdfSections });
   const setMode = (documentSourceMode) => onChange({ ...value, documentSourceMode, pdfLayoutMode: documentSourceMode === "custom" ? "custom" : "standard" });
+  const setResolutionPageConfig = (config) => onChange({ ...value, resolutionPageConfig: normalizeResolutionPageConfig(config, value) });
+  const setGeneratedPageOrder = (order) => onChange({ ...value, generatedPageOrder: order });
+  const toggleResolutionPage = (enabled) => setResolutionPageConfig(enabled ? { ...(value.resolutionPageConfig ? resolutionPageConfig : createDefaultResolutionPageConfig(value)), enabled: true } : { ...resolutionPageConfig, enabled: false });
+  const generatedOrderValue = generatedPageOrder[0] === "vote_table" ? "vote_table_first" : "resolution_page_first";
   const modeLocked = !["draft", undefined, ""].includes(value.status) || (mode === "uploadedPdf" && value.uploadedSource?.status === "ready");
   return <fieldset className="resolution-builder" disabled={disabled}>
     <legend>Resolution PDF Source</legend>
@@ -112,5 +188,15 @@ export default function ResolutionPdfBuilder({ value, onChange, disabled = false
       {!sections.length ? <p className="admin-empty">This custom layout is empty. Add a section or use the starter template.</p> : null}
       <section className="resolution-builder__preview" aria-label="Ordered PDF section preview"><h4>Preview summary</h4><ol>{sections.map((section) => <li key={section.id}><strong>{TYPE_LABELS[section.type]}</strong><span>{describeResolutionSection(section)}</span></li>)}</ol>{onPreview ? <button type="button" onClick={onPreview}>Download Preview PDF</button> : null}</section>
     </div> : mode === "uploadedPdf" ? <ResolutionPdfUploadPanel value={value} onChange={onChange} disabled={disabled} onNotice={onNotice} onPersisted={onPersisted} onEnsurePersisted={onEnsurePersisted} /> : <p className="admin-help">Uses the existing standard Resolution PDF layout.</p>}
+    <section className="resolution-builder__generated">
+      <label className="resolution-append-toggle"><input type="checkbox" checked={resolutionPageConfig.enabled} onChange={(event) => toggleResolutionPage(event.target.checked)} /> Add Resolution Page</label>
+      <p className="admin-help">Generate an editable official resolution page on the RCPH letterhead and include it in the final PDF.</p>
+      {resolutionPageConfig.enabled ? <ResolutionPageEditor resolution={value} config={resolutionPageConfig} onChange={setResolutionPageConfig} /> : null}
+      {resolutionPageConfig.enabled && value.appendVoteTable !== false ? <fieldset className="resolution-builder__generated-order">
+        <legend>Generated page order</legend>
+        <label><input type="radio" name={`generated-page-order-${value.id || "new"}`} checked={generatedOrderValue === "resolution_page_first"} onChange={() => setGeneratedPageOrder(["resolution_page", "vote_table"])} /> Resolution Page -&gt; Voting Table</label>
+        <label><input type="radio" name={`generated-page-order-${value.id || "new"}`} checked={generatedOrderValue === "vote_table_first"} onChange={() => setGeneratedPageOrder(["vote_table", "resolution_page"])} /> Voting Table -&gt; Resolution Page</label>
+      </fieldset> : null}
+    </section>
   </fieldset>;
 }

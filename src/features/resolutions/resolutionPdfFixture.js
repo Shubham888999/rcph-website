@@ -33,6 +33,19 @@ export function createResolutionPdfFixture(targetPageCount) {
   if (![1, 2, 4].includes(targetPageCount)) throw new TypeError("Fixture page count must be 1, 2, or 4.");
   for (let repetitions = 1; repetitions <= 1800; repetitions += 1) {
     const fixture = baseFixture("Resolved that this fixture verifies safe letterhead pagination. ".repeat(repetitions));
+    if (targetPageCount === 1) {
+      Object.assign(fixture.resolution, {
+        resolutionNumber: "R/1",
+        title: "Fixture",
+        meetingTitle: "BOD Meeting",
+        proposedByName: "",
+        proposedByPosition: "",
+        secondedByName: "",
+        secondedByPosition: "",
+        notes: "",
+        appendVoteTable: false,
+      });
+    }
     const pageCount = buildResolutionPdfPages(fixture).length;
     if (pageCount === targetPageCount) return fixture;
     if (pageCount > targetPageCount) break;

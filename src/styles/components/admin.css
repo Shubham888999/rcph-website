@@ -3408,14 +3408,65 @@ min-width: 250px;
 }
 
 .resolution-builder__custom,
+.resolution-builder__generated,
 .resolution-builder__sections,
 .resolution-builder__section-body,
 .resolution-builder__table-editor,
 .resolution-builder__votes,
-.resolution-builder__preview {
+.resolution-builder__preview,
+.resolution-page-builder,
+.resolution-page-builder__table,
+.resolution-page-builder__custom {
   display: grid;
   gap: 0.9rem;
   min-width: 0;
+}
+
+.resolution-builder__generated {
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.resolution-builder__generated-order,
+.resolution-page-builder__details {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.resolution-builder__generated-order label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.resolution-page-builder {
+  padding-top: 0.35rem;
+}
+
+.resolution-page-builder__heading h4,
+.resolution-page-builder__subhead h4 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.resolution-page-builder__subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.resolution-page-builder__subhead span {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
 .resolution-builder__section {
@@ -3556,6 +3607,20 @@ min-width: 250px;
 }
 
 @media (max-width: 520px) {
+  .resolution-builder {
+    padding: 0.75rem;
+  }
+
+  .resolution-builder__section > summary,
+  .resolution-page-builder__subhead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .resolution-builder__section > summary small {
+    max-width: 100%;
+  }
+
   .resolution-upload button {
     width: 100%;
     justify-content: center;
@@ -5073,52 +5138,146 @@ min-width: 250px;
   display: none;
 }
 
-.treasury-card-list {
+.treasury-mobile-list {
   display: grid;
-  gap: 0.7rem;
+  border-top: 1px solid rgba(244,180,58,0.14);
 }
 
-.treasury-transaction-card {
+.treasury-mobile-row {
+  --treasury-mobile-accent: rgba(240,109,125,0.62);
+  position: relative;
   display: grid;
-  gap: 0.65rem;
-  padding: 0.9rem 0;
+  gap: 0.32rem;
+  min-width: 0;
+  padding: 0.72rem 0.2rem 0.72rem 0.7rem;
   border: 0;
-  border-top: 1px solid rgba(244,180,58,0.14);
+  border-bottom: 1px solid rgba(244,180,58,0.14);
+  border-left: 3px solid var(--treasury-mobile-accent);
   border-radius: 0;
   background: transparent;
 }
 
-.treasury-transaction-card.is-income {
-  border-top-color: rgba(96,195,196,0.32);
+.treasury-mobile-row.is-income {
+  --treasury-mobile-accent: rgba(96,195,196,0.72);
 }
 
-.treasury-transaction-card header,
-.treasury-transaction-card footer {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.treasury-transaction-card header div {
+.treasury-mobile-row__top {
   display: grid;
-  gap: 0.2rem;
+  grid-template-columns: auto auto minmax(0, 1fr) 2rem;
+  align-items: center;
+  gap: 0.42rem;
   min-width: 0;
 }
 
-.treasury-transaction-card header span,
-.treasury-transaction-card footer span {
+.treasury-mobile-row__date {
   color: var(--color-muted);
-  font-size: 0.86rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
-.treasury-transaction-card header b {
-  flex: 0 0 auto;
+.treasury-mobile-row__amount {
+  justify-self: end;
+  min-width: 0;
   color: var(--color-gold-soft);
+  font-size: 0.96rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.treasury-transaction-card p {
+.treasury-mobile-row__title {
+  min-width: 0;
+  color: var(--color-cream);
+  display: -webkit-box;
+  font-size: 0.98rem;
+  line-height: 1.24;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.treasury-mobile-row__party,
+.treasury-mobile-row__meta {
   margin: 0;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  line-height: 1.32;
+  min-width: 0;
+}
+
+.treasury-mobile-row__party {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.treasury-mobile-row__party span {
+  color: var(--color-gold-soft);
+  font-weight: 850;
+}
+
+.treasury-mobile-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.24rem 0.48rem;
+}
+
+.treasury-mobile-row__meta span:not(:last-child)::after {
+  content: "/";
+  margin-left: 0.48rem;
+  color: rgba(244,180,58,0.4);
+}
+
+.treasury-mobile-row__actions {
+  position: relative;
+  justify-self: end;
+  z-index: 2;
+}
+
+.treasury-mobile-row__menu-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.treasury-mobile-row__menu-dots {
+  display: grid;
+  gap: 0.14rem;
+}
+
+.treasury-mobile-row__menu-dots span {
+  display: block;
+  width: 0.24rem;
+  height: 0.24rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.treasury-mobile-row__menu {
+  position: absolute;
+  top: calc(100% + 0.28rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 11.4rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(244,180,58,0.25);
+  border-radius: var(--radius-sm);
+  background: rgba(39,31,26,0.98);
+  box-shadow: 0 16px 32px rgba(0,0,0,0.32);
+}
+
+.treasury-mobile-row__menu button {
+  justify-content: flex-start;
+  min-height: 2.25rem;
+  padding: 0.48rem 0.65rem;
+  border: 0;
+  text-align: left;
 }
 
 .treasury-details {
@@ -5181,7 +5340,9 @@ min-width: 250px;
     justify-self: stretch;
     width: 100%;
   }
+}
 
+@media (max-width: 620px) {
   .treasury-history__desktop {
     display: none;
   }
@@ -5213,9 +5374,7 @@ min-width: 250px;
   }
 
   .treasury-section-heading,
-  .treasury-month-group > header,
-  .treasury-transaction-card header,
-  .treasury-transaction-card footer {
+  .treasury-month-group > header {
     align-items: flex-start;
     flex-direction: column;
   }

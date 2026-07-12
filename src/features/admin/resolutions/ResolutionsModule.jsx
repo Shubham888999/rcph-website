@@ -51,6 +51,8 @@ const EMPTY_DRAFT = {
   pdfLayoutMode: "standard",
   pdfSections: [],
   uploadedVotesTableConfig: { columns: { name: true, position: true, vote: true, timestamp: true, signature: false }, voterScope: "submitted", showTitle: true, repeatHeader: true, showResultSummary: true },
+  resolutionPageConfig: { enabled: false, version: 1 },
+  generatedPageOrder: ["resolution_page", "vote_table"],
 };
 const RULE_LABELS = { simple_majority: "Simple majority", majority_of_eligible: "Majority of eligible voters", two_thirds: "Two-thirds of eligible voters", unanimous: "Unanimous non-abstaining votes", custom_approval_count: "Custom approval count" };
 
@@ -360,6 +362,7 @@ function ResolutionDetails({ details, busy, onRefresh, onDownload, onRetry, onVe
     <div className="resolution-live-metrics"><div><span>Eligible</span><strong>{resolution.eligibleVoterCount}</strong></div><div><span>{metricLabel}</span><strong>{resolution.votesReceivedCount}</strong></div><div><span>Approve</span><strong>{resolution.approveCount}</strong></div><div><span>Reject</span><strong>{resolution.rejectCount}</strong></div><div><span>Abstain</span><strong>{resolution.abstainCount}</strong></div></div>
     <p><b>PDF format:</b> {resolution.documentSourceMode === "uploadedPdf" ? "Uploaded PDF with voting record" : (resolution.finalizedPdfLayoutMode || resolution.pdfLayoutMode) === "custom" ? "Custom Section Layout" : "Standard Resolution Format"}</p>
     <p><b>Append vote table:</b> {resolution.appendVoteTable === false ? "No" : "Yes"}</p>
+    <p><b>Resolution Page:</b> {resolution.resolutionPageConfig?.enabled ? "Included" : "Not included"}</p>
     {hybrid ? <section className="resolution-email-snapshot"><h3>{authenticatedFinal ? "Prepared email snapshot" : "Hybrid email snapshot"}</h3><p><b>Official subject:</b> {resolution.officialEmailSubject || "Not prepared"}</p><p><b>Official sent:</b> {resolution.officialEmailSentAt ? formatDateTime(resolution.officialEmailSentAt) : "Prepared / pending send"}</p><textarea readOnly rows="8" value={resolution.officialEmailBody} /></section> : null}
     {resolution.documentSourceMode === "uploadedPdf" ? <p><b>Final PDF:</b> {statusLabel(resolution.merge.status || "pending")}{resolution.merge.finalPageCount ? ` - ${resolution.merge.finalPageCount} pages` : ""}</p> : null}
     <div className="admin-actions"><button type="button" disabled={busy} onClick={onRefresh}>Refresh vote counts</button>{FINAL_RESOLUTION_STATUSES.includes(resolution.status) && (resolution.documentSourceMode !== "uploadedPdf" || resolution.canDownloadFinal) ? <button type="button" disabled={busy} onClick={onDownload}>Download completed resolution PDF</button> : null}{resolution.canRetryMerge ? <button type="button" disabled={busy} onClick={onRetry}>Retry final PDF</button> : null}</div>

@@ -163,7 +163,18 @@ test("Resolution PDF uses A4 safe-area pagination and a shared letterhead XObjec
   assert.match(pdf, /wrapText/);
   assert.match(pdf, /paginateBlocks/);
   assert.match(pdf, /buildResolutionVoteRows/);
-  assert.match(pdf, /\/XObject << \/BG/);
+  assert.match(pdf, /const xObjects = `\/BG/);
+  assert.match(pdf, /OfficialBG/);
+});
+
+test("Resolution PDF builder exposes the generated Resolution Page editor", () => {
+  for (const label of ["Add Resolution Page", "Generated Resolution Page", "Resolution details", "Main statement", "Additional content", "Generated page order", "Resolution Page -&gt; Voting Table", "Voting Table -&gt; Resolution Page"]) {
+    assert.match(pdfBuilder, new RegExp(label));
+  }
+  assert.match(pdfBuilder, /createDefaultResolutionPageConfig/);
+  assert.match(pdfBuilder, /addResolutionPageBlock/);
+  assert.match(pdfBuilder, /moveResolutionPageBlock/);
+  assert.match(pdfBuilder, /deleteResolutionPageBlock/);
 });
 
 test("Resolution letterhead integration remains isolated from the BOD Avenue renderer", () => {

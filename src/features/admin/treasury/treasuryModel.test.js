@@ -155,7 +155,7 @@ test("Treasury module source keeps the intended workflow safeguards", () => {
   assert.match(source, /item\.description/);
   assert.match(source, /treasury-filterbar__search/);
   assert.match(source, /treasury-filterbar__clear/);
-  assert.match(source, /TreasuryMobileCard/);
+  assert.match(source, /TreasuryMobileRow/);
   assert.match(source, /setTreasuryById\(id, value\)/);
   assert.match(source, /updateTreasury\(editing\.id, value\)/);
   assert.match(source, /Delete transaction\?/);
@@ -163,6 +163,30 @@ test("Treasury module source keeps the intended workflow safeguards", () => {
   assert.match(source, /Clear form/);
   assert.match(source, /Cancel edit/);
   assert.match(source, /External supporting link/);
+});
+
+test("Treasury mobile history uses compact rows and an accessible action menu", () => {
+  const source = readFileSync(new URL("../modules/FinanceModules.jsx", import.meta.url), "utf8");
+  assert.match(source, /compactTransactionParty/);
+  assert.match(source, /Party not recorded/);
+  assert.match(source, /activeMobileMenuId/);
+  assert.match(source, /document\.addEventListener\("pointerdown", closeOnOutsideClick\)/);
+  assert.match(source, /document\.addEventListener\("keydown", closeOnEscape\)/);
+  assert.match(source, /event\.key === "Escape"/);
+  assert.match(source, /activeMobileMenuRef\.current\.contains\(event\.target\)/);
+  assert.match(source, /treasury-mobile-row__top/);
+  assert.match(source, /aria-haspopup="menu"/);
+  assert.match(source, /aria-expanded=\{menuOpen\}/);
+  assert.match(source, /role="menu"/);
+  assert.match(source, /role="menuitem"/);
+  assert.match(source, /View details/);
+  assert.match(source, /Edit transaction/);
+  assert.match(source, /Delete transaction/);
+  assert.match(source, /runMobileAction\(onDetails, item\)/);
+  assert.match(source, /runMobileAction\(onEdit, item\)/);
+  assert.match(source, /runMobileAction\(onDelete, item\)/);
+  assert.doesNotMatch(source, /treasury-card-list/);
+  assert.doesNotMatch(source, /treasury-transaction-card/);
 });
 
 test("Treasury CSS anchors review, wraps filters, and disables sticky on smaller screens", () => {
@@ -175,5 +199,18 @@ test("Treasury CSS anchors review, wraps filters, and disables sticky on smaller
   assert.match(css, /\.treasury-filterbar__search \{[\s\S]*?grid-column: span 2/);
   assert.match(css, /\.treasury-filterbar__clear \{[\s\S]*?justify-self: end/);
   assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.treasury-filterbar__clear \{[\s\S]*?width: 100%/);
-  assert.match(css, /\.treasury-transaction-card \{[\s\S]*?border-top: 1px solid/);
+});
+
+test("Treasury mobile CSS keeps history rows compact without a full-width button stack", () => {
+  const css = readFileSync(new URL("../../../styles/components/admin.css", import.meta.url), "utf8");
+  assert.match(css, /\.treasury-mobile-list \{[\s\S]*?border-top: 1px solid/);
+  assert.match(css, /\.treasury-mobile-row \{[\s\S]*?gap: 0\.32rem/);
+  assert.match(css, /\.treasury-mobile-row__top \{[\s\S]*?grid-template-columns: auto auto minmax\(0, 1fr\) 2rem/);
+  assert.match(css, /\.treasury-mobile-row__title \{[\s\S]*?-webkit-line-clamp: 2/);
+  assert.match(css, /\.treasury-mobile-row__menu \{[\s\S]*?position: absolute;[\s\S]*?right: 0/);
+  assert.match(css, /\.treasury-mobile-row__menu button \{[\s\S]*?min-height: 2\.25rem/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.treasury-history__desktop \{[\s\S]*?display: none/);
+  assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.treasury-history__mobile \{[\s\S]*?display: grid/);
+  assert.doesNotMatch(css, /\.treasury-transaction-card \{/);
+  assert.doesNotMatch(css, /\.treasury-card-list/);
 });

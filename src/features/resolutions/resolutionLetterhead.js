@@ -1,8 +1,10 @@
 export const RESOLUTION_LETTERHEAD_URL = "/images/resolution_letterhead.png";
+export const RESOLUTION_OFFICIAL_LETTERHEAD_URL = "/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png";
 export const RESOLUTION_LETTERHEAD_JPEG_QUALITY = 0.97;
 
 const USER_MESSAGE = "The Resolution letterhead could not be loaded. Please try again.";
 let cachedLetterheadPromise = null;
+let cachedOfficialLetterheadPromise = null;
 
 function bytesFromDataUrl(value) {
   const encoded = String(value || "").split(",")[1] || "";
@@ -85,17 +87,25 @@ export async function convertResolutionLetterheadBlobToJpeg(blob, options = {}) 
 }
 
 export async function loadResolutionLetterheadJpeg(options = {}) {
+  return loadResolutionLetterheadJpegFromUrl(RESOLUTION_LETTERHEAD_URL, options);
+}
+
+export async function loadResolutionOfficialLetterheadJpeg(options = {}) {
+  return loadResolutionLetterheadJpegFromUrl(RESOLUTION_OFFICIAL_LETTERHEAD_URL, options);
+}
+
+async function loadResolutionLetterheadJpegFromUrl(assetUrl, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const converter = options.convertBlob || convertResolutionLetterheadBlobToJpeg;
   const logger = options.logger || console;
   try {
     if (typeof fetchImpl !== "function") throw new Error("Asset loading is unavailable.");
-    const response = await fetchImpl(RESOLUTION_LETTERHEAD_URL, { cache: "force-cache" });
+    const response = await fetchImpl(assetUrl, { cache: "force-cache" });
     if (!response?.ok) throw new Error(`Asset request failed with status ${response?.status || "unknown"}.`);
     return await converter(await response.blob(), options);
   } catch (error) {
     logger?.error?.("Resolution letterhead preparation failed.", {
-      assetUrl: RESOLUTION_LETTERHEAD_URL,
+      assetUrl,
       errorName: typeof error?.name === "string" ? error.name : "Error",
     });
     throw new Error(USER_MESSAGE, { cause: error });
@@ -110,4 +120,14 @@ export function getResolutionLetterheadJpeg() {
     });
   }
   return cachedLetterheadPromise;
+}
+
+export function getResolutionOfficialLetterheadJpeg() {
+  if (!cachedOfficialLetterheadPromise) {
+    cachedOfficialLetterheadPromise = loadResolutionOfficialLetterheadJpeg().catch((error) => {
+      cachedOfficialLetterheadPromise = null;
+      throw error;
+    });
+  }
+  return cachedOfficialLetterheadPromise;
 }

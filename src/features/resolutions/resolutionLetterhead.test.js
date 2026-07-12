@@ -4,8 +4,10 @@ import test from "node:test";
 import {
   RESOLUTION_LETTERHEAD_JPEG_QUALITY,
   RESOLUTION_LETTERHEAD_URL,
+  RESOLUTION_OFFICIAL_LETTERHEAD_URL,
   convertResolutionLetterheadBlobToJpeg,
   loadResolutionLetterheadJpeg,
+  loadResolutionOfficialLetterheadJpeg,
 } from "./resolutionLetterhead.js";
 
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
@@ -16,6 +18,14 @@ test("Resolution letterhead uses the canonical public asset URL", () => {
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(png.readUInt32BE(16), 1138);
   assert.equal(png.readUInt32BE(20), 1600);
+});
+
+test("official generated Resolution pages use the BOD Avenue Report A4 letterhead asset", () => {
+  assert.equal(RESOLUTION_OFFICIAL_LETTERHEAD_URL, "/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png");
+  const png = readFileSync(new URL("../../../public/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png", import.meta.url));
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(png.readUInt32BE(16), 1414);
+  assert.equal(png.readUInt32BE(20), 2000);
 });
 
 test("browser conversion preserves source dimensions and requests high-quality JPEG", async () => {
@@ -50,6 +60,21 @@ test("asset loading passes only the public blob into the injectable converter", 
     logger: { error() {} },
   });
   assert.equal(requestedUrl, RESOLUTION_LETTERHEAD_URL);
+  assert.equal(result, expected);
+});
+
+test("official asset loading uses the same safe conversion path", async () => {
+  let requestedUrl = "";
+  const expected = { bytes: new Uint8Array([0xff, 0xd8, 1, 0xff, 0xd9]), width: 1138, height: 1600 };
+  const result = await loadResolutionOfficialLetterheadJpeg({
+    fetchImpl: async (url) => { requestedUrl = url; return { ok: true, blob: async () => new Blob(["official"]) }; },
+    convertBlob: async (blob) => {
+      assert.equal(await blob.text(), "official");
+      return expected;
+    },
+    logger: { error() {} },
+  });
+  assert.equal(requestedUrl, RESOLUTION_OFFICIAL_LETTERHEAD_URL);
   assert.equal(result, expected);
 });
 

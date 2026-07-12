@@ -148,6 +148,27 @@ test("create and update draft payloads serialize custom tables without nested ar
   assert.doesNotMatch(JSON.stringify(result.payload.pdfSections), /\[\s*\[[^\]]/);
 });
 
+test("draft validation persists Resolution Page config and generated page order", () => {
+  const base = { meetingId: "m1", resolutionNumber: "R/1", title: "Title", body: "Body", proposedByUid: "u1", secondedByUid: "u2", eligibleVoterIds: ["u1", "u2"], votingRule: "simple_majority" };
+  const result = validateResolutionDraft({
+    ...base,
+    resolutionPageConfig: {
+      enabled: true,
+      heading: { text: "RESOLUTION", fontFamily: "Helvetica", fontSize: 16, bold: true, underline: true, alignment: "center" },
+      details: { subject: "Title", date: "2026-07-02", place: "Pune", boardMembersPresent: "5", totalBoardMembers: "7" },
+      detailsStyle: { fontFamily: "Helvetica", fontSize: 10, bold: true, alignment: "left" },
+      mainStatement: { text: "Resolved statement.", fontFamily: "Helvetica", fontSize: 12, bold: true, alignment: "left" },
+      blocks: [{ id: "p1", type: "paragraph", text: "Extra paragraph", style: { fontFamily: "Courier", fontSize: 9, alignment: "left" } }],
+    },
+    generatedPageOrder: ["vote_table", "resolution_page"],
+  }, 2);
+  assert.equal(result.ok, true);
+  assert.equal(result.payload.resolutionPageConfig.enabled, true);
+  assert.equal(result.payload.resolutionPageConfig.heading.text, "RESOLUTION");
+  assert.deepEqual(result.payload.generatedPageOrder, ["vote_table", "resolution_page"]);
+  assert.equal(result.payload.resolutionPageConfig.blocks[0].style.fontFamily, "Courier");
+});
+
 test("dashboard includes only open resolutions and filename is sanitized", () => {
   const rows = normalizeDashboardResolutions([{ id: "o", status: "open", resolutionNumber: "R/1", title: "Open" }, { id: "c", status: "passed", resolutionNumber: "R/2", title: "Closed" }]);
   assert.deepEqual(rows.map((row) => row.id), ["o"]);

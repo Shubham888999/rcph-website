@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AdminModuleHeader from "../AdminModuleHeader";
 import AdminDialog from "../shared/AdminDialog";
 import { AdminEmpty } from "../shared/AdminStates";
@@ -93,6 +93,12 @@ function reimbursementLabel(value) {
 function transactionTypeLabel(record) {
   if (record.type === "income") return "Income";
   return isReimbursementRecord(record) ? "Reimbursement" : "Expense";
+}
+
+function compactTransactionParty(record) {
+  if (record.type === "income") return { label: "From", value: record.paidBy || "Party not recorded" };
+  if (isReimbursementRecord(record)) return { label: "To", value: record.reimbursedTo || record.paidTo || "Party not recorded" };
+  return { label: "To", value: record.paidTo || "Party not recorded" };
 }
 
 function formatTimestamp(value) {
@@ -595,7 +601,31 @@ function TreasuryReviewPanel({ value, upload, errors, compact = false }) {
 }
 
 function TreasuryHistory({ transactions, filteredTransactions, groupedTransactions, filters, monthOptions, avenueOptions, locked, onFilter, onClearFilters, onDetails, onEdit, onDelete }) {
+  const [activeMobileMenuId, setActiveMobileMenuId] = useState("");
+  const activeMobileMenuRef = useRef(null);
   const activeFilters = Object.entries(filters).some(([key, value]) => key !== "sort" && Boolean(value)) || filters.sort !== DEFAULT_TREASURY_FILTERS.sort;
+
+  useEffect(() => {
+    if (!activeMobileMenuId) return undefined;
+    function closeOnOutsideClick(event) {
+      if (activeMobileMenuRef.current && !activeMobileMenuRef.current.contains(event.target)) setActiveMobileMenuId("");
+    }
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setActiveMobileMenuId("");
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activeMobileMenuId]);
+
+  function runMobileAction(action, item) {
+    setActiveMobileMenuId("");
+    action(item);
+  }
+
   return (
     <section className="admin-panel treasury-history" aria-labelledby="treasury-history-title">
       <div className="treasury-section-heading">
@@ -632,8 +662,20 @@ function TreasuryHistory({ transactions, filteredTransactions, groupedTransactio
                   <h4>{group.label}</h4>
                   <span>Net {formatInr(group.net)}</span>
                 </header>
-                <div className="treasury-card-list">
-                  {group.items.map((item) => <TreasuryMobileCard key={item.id} item={item} locked={locked} onDetails={onDetails} onEdit={onEdit} onDelete={onDelete} />)}
+                <div className="treasury-mobile-list">
+                  {group.items.map((item) => (
+                    <TreasuryMobileRow
+                      key={item.id}
+                      item={item}
+                      locked={locked}
+                      menuOpen={activeMobileMenuId === item.id}
+                      menuRef={activeMobileMenuId === item.id ? activeMobileMenuRef : null}
+                      onToggleMenu={() => setActiveMobileMenuId((current) => (current === item.id ? "" : item.id))}
+                      onDetails={() => runMobileAction(onDetails, item)}
+                      onEdit={() => runMobileAction(onEdit, item)}
+                      onDelete={() => runMobileAction(onDelete, item)}
+                    />
+                  ))}
                 </div>
               </section>
             ))}
@@ -722,28 +764,44 @@ function TreasuryTableRow({ item, locked, onDetails, onEdit, onDelete }) {
   );
 }
 
-function TreasuryMobileCard({ item, locked, onDetails, onEdit, onDelete }) {
+function TreasuryMobileRow({ item, locked, menuOpen, menuRef, onToggleMenu, onDetails, onEdit, onDelete }) {
   const type = transactionTypeLabel(item);
+  const party = compactTransactionParty(item);
+  const menuId = `treasury-mobile-actions-${item.id}`;
   return (
-    <article className={`treasury-transaction-card is-${item.type}`}>
-      <header>
-        <div>
-          <strong>{item.title || "Untitled transaction"}</strong>
-          <span>{type} - {formatTreasuryDate(item.date)}</span>
+    <article className={`treasury-mobile-row is-${item.type}`}>
+      <div className="treasury-mobile-row__top">
+        <span className="treasury-mobile-row__date">{formatTreasuryDate(item.date)}</span>
+        <span className={`treasury-chip is-${type.toLowerCase()}`}>{type}</span>
+        <strong className={`treasury-mobile-row__amount treasury-amount is-${item.type}`}>{formatInr(item.amount)}</strong>
+        <div className="treasury-mobile-row__actions" ref={menuRef}>
+          <button
+            type="button"
+            className="treasury-mobile-row__menu-trigger"
+            aria-label={`Actions for ${item.title || "untitled transaction"}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-controls={menuOpen ? menuId : undefined}
+            onClick={onToggleMenu}
+          >
+            <span className="treasury-mobile-row__menu-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          </button>
+          {menuOpen ? (
+            <div className="treasury-mobile-row__menu" id={menuId} role="menu" aria-label="Transaction actions">
+              <button type="button" role="menuitem" onClick={onDetails}>View details</button>
+              <button type="button" role="menuitem" disabled={locked} onClick={onEdit}>Edit transaction</button>
+              <button type="button" role="menuitem" className="danger" disabled={locked} onClick={onDelete}>Delete transaction</button>
+            </div>
+          ) : null}
         </div>
-        <b>{formatInr(item.amount)}</b>
-      </header>
-      <p>{transactionPartyLabel(item)}</p>
-      <footer>
+      </div>
+      <strong className="treasury-mobile-row__title">{item.title || "Untitled transaction"}</strong>
+      <p className="treasury-mobile-row__party"><span>{party.label}</span> {party.value}</p>
+      <p className="treasury-mobile-row__meta">
         <span>{normalizeTreasuryAvenue(item.avenue) || "No avenue"}</span>
         <span>{item.paymentMode || "No mode"}</span>
         <span>{treasuryHasSupportingFile(item) ? "File attached" : "No file"}</span>
-      </footer>
-      <div className="admin-actions">
-        <button type="button" onClick={() => onDetails(item)}>View</button>
-        <button type="button" disabled={locked} onClick={() => onEdit(item)}>Edit</button>
-        <button type="button" className="danger" disabled={locked} onClick={() => onDelete(item)}>Delete</button>
-      </div>
+      </p>
     </article>
   );
 }

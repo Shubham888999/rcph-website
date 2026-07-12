@@ -158,6 +158,8 @@ export function validateResolutionDraft(draft, eligibleVoterCount = 0) {
   payload.pdfSections = layout.payload.pdfSections;
   payload.documentSourceMode = layout.payload.documentSourceMode;
   payload.uploadedVotesTableConfig = layout.payload.uploadedVotesTableConfig;
+  payload.resolutionPageConfig = layout.payload.resolutionPageConfig;
+  payload.generatedPageOrder = layout.payload.generatedPageOrder;
   errors.push(...layout.errors);
   if (!payload.meetingId) errors.push("Choose a BOD meeting.");
   if (!payload.resolutionNumber) errors.push("Enter a resolution number.");
@@ -283,6 +285,10 @@ export function normalizeResolution(raw) {
     finalizedPdfSectionsSnapshot: normalizeResolutionSections(raw.finalizedPdfSectionsSnapshot),
     documentSourceMode: normalizeDocumentSourceMode(raw.documentSourceMode, normalizePdfLayoutMode(raw.pdfLayoutMode)),
     uploadedVotesTableConfig: normalizeUploadedVotesTableConfig(raw.uploadedVotesTableConfig),
+    resolutionPageConfig: normalizeResolutionPageConfig(raw.resolutionPageConfig, raw),
+    generatedPageOrder: normalizeGeneratedPageOrder(raw.generatedPageOrder),
+    finalizedResolutionPageConfigSnapshot: raw.finalizedResolutionPageConfigSnapshot ? normalizeResolutionPageConfig(raw.finalizedResolutionPageConfigSnapshot, raw) : null,
+    finalizedGeneratedPageOrderSnapshot: raw.finalizedGeneratedPageOrderSnapshot ? normalizeGeneratedPageOrder(raw.finalizedGeneratedPageOrderSnapshot) : null,
     uploadedSource: raw.uploadedSource && typeof raw.uploadedSource === "object" ? {
       uploadId: text(raw.uploadedSource.uploadId, 160),
       status: text(raw.uploadedSource.status, 40),
@@ -407,4 +413,4 @@ export function buildPreparedEmailLinks({ to, subject, body }) {
     gmail: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodedSubject}&body=${encodedBody}`,
   };
 }
-import { normalizeDocumentSourceMode, normalizePdfLayoutMode, normalizeResolutionSections, normalizeUploadedVotesTableConfig, validateResolutionPdfLayout } from "./resolutionSectionsModel.js";
+import { normalizeDocumentSourceMode, normalizeGeneratedPageOrder, normalizePdfLayoutMode, normalizeResolutionPageConfig, normalizeResolutionSections, normalizeUploadedVotesTableConfig, validateResolutionPdfLayout } from "./resolutionSectionsModel.js";

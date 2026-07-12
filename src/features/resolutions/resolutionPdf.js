@@ -1,6 +1,6 @@
 import { FINAL_RESOLUTION_STATUSES, approvalMethodLabel, getResolutionPdfFilename, isAuthenticatedFinalHybrid } from "./resolutionModel.js";
-import { buildCustomResolutionPdfPages, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
-import { getResolutionLetterheadJpeg } from "./resolutionLetterhead.js";
+import { buildCustomResolutionPdfPages, buildGeneratedResolutionAppendixPages, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
+import { getResolutionLetterheadJpeg, getResolutionOfficialLetterheadJpeg } from "./resolutionLetterhead.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
 
 export const RESOLUTION_PDF_PAGE = Object.freeze({ width: 595, height: 842 });
@@ -106,7 +106,7 @@ export function buildResolutionVoteRows(details) {
   });
 }
 
-function buildDocumentBlocks(details) {
+function buildDocumentBlocks(details, options = {}) {
   const resolution = details.resolution;
   const authenticatedFinal = isAuthenticatedFinalHybrid(resolution);
   const legacyHybrid = resolution.approvalMethod === "hybrid_email" && !authenticatedFinal;
@@ -165,7 +165,7 @@ function buildDocumentBlocks(details) {
     ...(legacyHybrid ? wrappedLines("Only votes with verified email confirmation were included in the official tally.", { size: 8.5, gap: 4 }) : []),
     ...(authenticatedFinal ? wrappedLines("Authenticated dashboard votes were recorded and counted immediately. Prepared confirmation emails are optional supporting records.", { size: 8.5, gap: 4 }) : []),
   ], 2));
-  if (resolution.appendVoteTable !== false) {
+  if (resolution.appendVoteTable !== false && options.includeVoteTable !== false) {
     blocks.push(block([
       ...wrappedLines("Final vote table", { size: 10.5, bold: true, gap: 2 }),
       ...wrappedLines("Name                 | Position                 | Vote     | Verification     | Submitted", { size: 7.2, bold: true, mono: true }),
@@ -232,9 +232,11 @@ function assertRenderable(details, preview) {
 
 export function buildResolutionPdfPages(details, options = {}) {
   assertRenderable(details, options.preview === true);
+  const generatedPages = buildGeneratedResolutionAppendixPages(details, options.preview === true);
+  const generatedVoteTable = generatedPages.some((page) => page.generatedKind === "vote_table");
   const layout = getResolutionRenderLayout(details, options.preview === true);
-  if (layout.mode === "custom") return buildCustomResolutionPdfPages(details, layout.sections);
-  return paginateBlocks(buildDocumentBlocks(details));
+  const primaryPages = layout.mode === "custom" ? buildCustomResolutionPdfPages(details, layout.sections) : paginateBlocks(buildDocumentBlocks(details, { includeVoteTable: !generatedVoteTable }));
+  return [...primaryPages, ...generatedPages];
 }
 
 function fontResource(line) {
@@ -300,13 +302,21 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
   if (!(letterhead?.bytes instanceof Uint8Array) || !letterhead.bytes.length || !Number.isInteger(letterhead.width) || !Number.isInteger(letterhead.height)) {
     throw new TypeError("A valid Resolution letterhead JPEG is required.");
   }
-  const pages = buildResolutionPdfPages(details, options);
+  const pages = options.pages || buildResolutionPdfPages(details, options);
+  const needsOfficialLetterhead = pages.some((page) => page.letterhead === "official");
+  const officialLetterhead = options.officialLetterhead || letterhead;
+  if (needsOfficialLetterhead && (!(officialLetterhead?.bytes instanceof Uint8Array) || !officialLetterhead.bytes.length || !Number.isInteger(officialLetterhead.width) || !Number.isInteger(officialLetterhead.height))) {
+    throw new TypeError("A valid official Resolution letterhead JPEG is required.");
+  }
   const customMode = getResolutionRenderLayout(details, options.preview === true).mode === "custom";
+  const includeExtendedFonts = customMode || needsOfficialLetterhead;
   const objects = [];
   const imageId = 6;
-  const pageIds = pages.map((_, index) => 7 + index * 2);
-  const extraFontStart = 7 + pages.length * 2;
-  const extraFonts = customMode ? [
+  const officialImageId = needsOfficialLetterhead ? 7 : 0;
+  const pageStartId = needsOfficialLetterhead ? 8 : 7;
+  const pageIds = pages.map((_, index) => pageStartId + index * 2);
+  const extraFontStart = pageStartId + pages.length * 2;
+  const extraFonts = includeExtendedFonts ? [
     ["F4", "Helvetica-Oblique"], ["F5", "Helvetica-BoldOblique"],
     ["F6", "Times-Roman"], ["F7", "Times-Bold"], ["F8", "Times-Italic"], ["F9", "Times-BoldItalic"],
     ["F10", "Courier-Bold"], ["F11", "Courier-Oblique"], ["F12", "Courier-BoldOblique"],
@@ -319,18 +329,21 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
   objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
   objects[5] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
   objects[imageId] = imageObject(letterhead);
+  if (needsOfficialLetterhead) objects[officialImageId] = imageObject(officialLetterhead);
   extraFonts.forEach(([, baseFont], index) => { objects[extraFontStart + index] = ascii(`<< /Type /Font /Subtype /Type1 /BaseFont /${baseFont} >>`); });
   pages.forEach((page, index) => {
     const pageId = pageIds[index];
     const contentId = pageId + 1;
+    const backgroundName = page.letterhead === "official" ? "OfficialBG" : "BG";
     const commands = [
-      `q\n${RESOLUTION_PDF_PAGE.width} 0 0 ${RESOLUTION_PDF_PAGE.height} 0 0 cm\n/BG Do\nQ`,
+      `q\n${RESOLUTION_PDF_PAGE.width} 0 0 ${RESOLUTION_PDF_PAGE.height} 0 0 cm\n/${backgroundName} Do\nQ`,
       ...(options.preview === true ? [`BT /F2 8 Tf ${RESOLUTION_CONTENT_BOUNDS.left} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (DRAFT PREVIEW) Tj ET`] : []),
-      `BT /F1 8 Tf ${RESOLUTION_PAGE_NUMBER_POSITION.x} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (Page ${index + 1} of ${pages.length}) Tj ET`,
+      ...(page.pageNumber === false ? [] : [`BT /F1 8 Tf ${RESOLUTION_PAGE_NUMBER_POSITION.x} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (Page ${index + 1} of ${pages.length}) Tj ET`]),
       ...page.map(textCommand),
     ];
     const content = ascii(commands.join("\n"));
-    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${RESOLUTION_PDF_PAGE.width} ${RESOLUTION_PDF_PAGE.height}] /Resources << /Font << ${fontResources} >> /XObject << /BG ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    const xObjects = `/BG ${imageId} 0 R${needsOfficialLetterhead ? ` /OfficialBG ${officialImageId} 0 R` : ""}`;
+    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${RESOLUTION_PDF_PAGE.width} ${RESOLUTION_PDF_PAGE.height}] /Resources << /Font << ${fontResources} >> /XObject << ${xObjects} >> >> /Contents ${contentId} 0 R >>`);
     objects[contentId] = streamObject(content);
   });
   return assemblePdf(objects);
@@ -339,8 +352,11 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
 export async function generateResolutionPdf(details, options = {}) {
   const resolution = assertFinalized(details);
   const loadLetterhead = options.loadLetterhead || getResolutionLetterheadJpeg;
+  const loadOfficialLetterhead = options.loadOfficialLetterhead || getResolutionOfficialLetterheadJpeg;
   const letterhead = await loadLetterhead();
-  const pdf = buildResolutionPdfDocument(details, letterhead);
+  const pages = buildResolutionPdfPages(details);
+  const officialLetterhead = pages.some((page) => page.letterhead === "official") ? await loadOfficialLetterhead() : undefined;
+  const pdf = buildResolutionPdfDocument(details, letterhead, { officialLetterhead, pages });
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
@@ -352,8 +368,11 @@ export async function generateResolutionPdf(details, options = {}) {
 export async function generateResolutionPreviewPdf(details, options = {}) {
   const resolution = assertRenderable(details, true);
   const loadLetterhead = options.loadLetterhead || getResolutionLetterheadJpeg;
+  const loadOfficialLetterhead = options.loadOfficialLetterhead || getResolutionOfficialLetterheadJpeg;
   const letterhead = await loadLetterhead();
-  const pdf = buildResolutionPdfDocument(details, letterhead, { preview: true });
+  const pages = buildResolutionPdfPages(details, { preview: true });
+  const officialLetterhead = pages.some((page) => page.letterhead === "official") ? await loadOfficialLetterhead() : undefined;
+  const pdf = buildResolutionPdfDocument(details, letterhead, { preview: true, officialLetterhead, pages });
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;

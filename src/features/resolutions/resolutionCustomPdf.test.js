@@ -3,9 +3,10 @@ import test from "node:test";
 import { buildCustomResolutionPdfPages, buildCustomVotesRows, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
 import { RESOLUTION_CONTENT_BOUNDS, buildResolutionPdfDocument, buildResolutionPdfPages } from "./resolutionPdf.js";
 import { createCustomResolutionPdfFixtures } from "./resolutionPdfFixture.js";
-import { normalizeResolutionSection } from "./resolutionSectionsModel.js";
+import { createDefaultResolutionPageConfig, normalizeResolutionSection } from "./resolutionSectionsModel.js";
 
 const LETTERHEAD = { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), width: 1138, height: 1600 };
+const OFFICIAL_LETTERHEAD = { bytes: new Uint8Array([0xff, 0xd8, 0x11, 0x22, 0xff, 0xd9]), width: 1138, height: 1600 };
 const decode = (value) => new TextDecoder("latin1").decode(value);
 
 test("custom fixture set covers one page, two pages, long tables, votes variants, forced break, and standard control", () => {
@@ -106,6 +107,44 @@ test("Votes Table supports a Name-only layout with result summary disabled", () 
   assert.ok(!text.includes("Vote"));
   assert.ok(!text.includes("Timestamp"));
   assert.ok(!text.some((value) => value.startsWith("Approve count:")));
+});
+
+test("generated Resolution Page and vote table use official letterhead without page numbers", () => {
+  const details = {
+    resolution: {
+      status: "passed",
+      result: "passed",
+      resolutionNumber: "RCPH/RES/1",
+      title: "Official page test",
+      meetingTitle: "BOD Meeting",
+      meetingDate: "2026-07-02",
+      body: "",
+      notes: "",
+      appendVoteTable: true,
+      eligibleVoters: [{ uid: "u1", name: "Member One", position: "Secretary" }],
+      eligibleVoterCount: 1,
+      votesReceivedCount: 1,
+      approveCount: 1,
+      rejectCount: 0,
+      abstainCount: 0,
+      uploadedVotesTableConfig: { columns: { name: true, position: true, vote: true, timestamp: false, signature: false }, voterScope: "all", showTitle: true, repeatHeader: true, showResultSummary: true },
+      resolutionPageConfig: { ...createDefaultResolutionPageConfig({ title: "Official page test", meetingDate: "2026-07-02" }), blocks: [{ id: "p1", type: "paragraph", text: "Additional official paragraph.", style: { fontFamily: "Times Roman", fontSize: 11, alignment: "left" } }] },
+      generatedPageOrder: ["vote_table", "resolution_page"],
+    },
+    votes: [{ voterUid: "u1", voterName: "Member One", voterPosition: "Secretary", choice: "approve", submittedAt: "2026-07-02T10:00:00.000Z" }],
+  };
+  const pages = buildResolutionPdfPages(details);
+  const generated = pages.filter((page) => page.letterhead === "official");
+  assert.deepEqual(generated.map((page) => page.generatedKind), ["vote_table", "resolution_page"]);
+  assert.ok(generated.every((page) => page.pageNumber === false));
+  assert.ok(generated[1].some((line) => line.text === "RESOLUTION"));
+  const pdf = decode(buildResolutionPdfDocument(details, LETTERHEAD, { officialLetterhead: OFFICIAL_LETTERHEAD }));
+  assert.equal((pdf.match(/\/Subtype \/Image/g) || []).length, 2);
+  assert.match(pdf, /\/F6 \d+ 0 R/);
+  assert.match(pdf, /\/F7 \d+ 0 R/);
+  assert.equal((pdf.match(/595 0 0 842 0 0 cm\n\/OfficialBG Do/g) || []).length, generated.length);
+  assert.equal((pdf.match(/Page \d+ of \d+/g) || []).length, pages.length - generated.length);
+  assert.doesNotMatch(pdf, /Page 2 of 3/);
 });
 
 test("forced breaks create a full next page without an unnecessary blank final page", () => {

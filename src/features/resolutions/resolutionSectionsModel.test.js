@@ -2,15 +2,23 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addResolutionSection,
+  addResolutionPageBlock,
   assertNoNestedArrays,
+  createDefaultResolutionPageConfig,
   createDefaultResolutionSections,
+  deleteResolutionPageBlock,
   deleteResolutionSection,
+  duplicateResolutionPageBlock,
   duplicateResolutionSection,
+  moveResolutionPageBlock,
   moveResolutionSection,
+  normalizeGeneratedPageOrder,
   normalizeDocumentSourceMode,
   normalizePdfLayoutMode,
+  normalizeResolutionPageConfig,
   normalizeResolutionSection,
   normalizeResolutionSections,
+  updateResolutionPageBlock,
   updateResolutionSection,
   validateResolutionPdfLayout,
 } from "./resolutionSectionsModel.js";
@@ -28,6 +36,33 @@ test("uploaded Votes Table configuration is normalized and Firestore safe", () =
   assert.equal(payload.uploadedVotesTableConfig.columns.signature, true);
   assert.equal(payload.uploadedVotesTableConfig.voterScope, "all");
   assert.equal(assertNoNestedArrays(payload.uploadedVotesTableConfig, "uploadedVotesTableConfig"), true);
+});
+
+test("Resolution Page config defaults disabled and initializes the official template", () => {
+  const legacy = validateResolutionPdfLayout({}).payload;
+  assert.equal(legacy.resolutionPageConfig.enabled, false);
+  assert.deepEqual(legacy.generatedPageOrder, ["resolution_page", "vote_table"]);
+  const config = createDefaultResolutionPageConfig({ title: "Budget approval", meetingDate: "2026-07-02" });
+  assert.equal(config.enabled, true);
+  assert.equal(config.heading.text, "RESOLUTION");
+  assert.deepEqual({ size: config.heading.fontSize, bold: config.heading.bold, underline: config.heading.underline, alignment: config.heading.alignment }, { size: 16, bold: true, underline: true, alignment: "center" });
+  assert.equal(config.details.subject, "Budget approval");
+  assert.equal(config.details.date, "2026-07-02");
+  assert.deepEqual({ size: config.detailsStyle.fontSize, bold: config.detailsStyle.bold }, { size: 10, bold: true });
+  assert.deepEqual({ size: config.mainStatement.fontSize, bold: config.mainStatement.bold }, { size: 12, bold: true });
+  assert.equal(assertNoNestedArrays(config, "resolutionPageConfig"), true);
+});
+
+test("Resolution Page block helpers add, update, duplicate, move, and delete", () => {
+  let blocks = addResolutionPageBlock([], "paragraph", "p1");
+  blocks = addResolutionPageBlock(blocks, "table", "t1");
+  blocks = updateResolutionPageBlock(blocks, "p1", { text: "Updated paragraph", style: { fontFamily: "Times Roman", fontSize: 12, alignment: "center" } });
+  blocks = duplicateResolutionPageBlock(blocks, "p1", "p2");
+  blocks = moveResolutionPageBlock(blocks, "t1", "up");
+  assert.deepEqual(blocks.map((block) => block.id), ["p1", "t1", "p2"]);
+  assert.equal(blocks[0].text, "Updated paragraph");
+  blocks = deleteResolutionPageBlock(blocks, "t1");
+  assert.deepEqual(blocks.map((block) => block.type), ["paragraph", "paragraph"]);
 });
 
 test("builder add, edit, duplicate, move, and delete preserve unique stable IDs", () => {
@@ -89,6 +124,32 @@ test("validation enforces section, table, typography, and Votes Table limits", (
   assert.equal(validateResolutionPdfLayout({ pdfLayoutMode: "custom", pdfSections: tooMany }).ok, false);
   const invalidTable = { id: "table", type: "table", columns: [], rows: [], options: {}, style: {} };
   assert.equal(validateResolutionPdfLayout({ pdfLayoutMode: "custom", pdfSections: [invalidTable] }).ok, false);
+});
+
+test("Resolution Page validation rejects unsafe config and page order values", () => {
+  const invalid = validateResolutionPdfLayout({
+    resolutionPageConfig: {
+      enabled: true,
+      heading: { text: "RESOLUTION", fontFamily: "Comic Sans", fontSize: 16, alignment: "center" },
+      detailsStyle: { fontFamily: "Helvetica", fontSize: 7, alignment: "left" },
+      mainStatement: { text: "x", fontFamily: "Helvetica", fontSize: 12, alignment: "justify" },
+      blocks: [{ id: "bad", type: "image" }],
+    },
+    generatedPageOrder: ["vote_table", "vote_table", "bad"],
+  });
+  assert.equal(invalid.ok, false);
+  assert.match(invalid.errors.join(" "), /invalid font|font size|alignment|unsupported type|duplicates|unsupported value/i);
+  const valid = validateResolutionPdfLayout({
+    resolutionPageConfig: {
+      ...createDefaultResolutionPageConfig({ title: "Subject" }),
+      blocks: addResolutionPageBlock([], "table", "table"),
+    },
+    generatedPageOrder: ["vote_table", "resolution_page"],
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(valid.payload.resolutionPageConfig.blocks[0].columns.length, 2);
+  assert.deepEqual(normalizeGeneratedPageOrder(["vote_table"]), ["vote_table", "resolution_page"]);
+  assert.equal(normalizeResolutionPageConfig(valid.payload.resolutionPageConfig).enabled, true);
 });
 
 test("duplicate IDs normalize uniquely and starter template is optional and valid", () => {
