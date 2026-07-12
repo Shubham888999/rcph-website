@@ -9,6 +9,7 @@ const RESOLUTION_PAGE_LEFT =
   BOUNDS.left + RESOLUTION_PAGE_SIDE_INSET;
 const RESOLUTION_PAGE_WIDTH =
   WIDTH - RESOLUTION_PAGE_SIDE_INSET * 2;
+const RESOLUTION_STATEMENT_WIDTH = WIDTH;
 const START_Y = BOUNDS.top - 10;
 const PAGE_HEIGHT = START_Y - BOUNDS.bottom;
 
@@ -936,10 +937,10 @@ renderTextSection(
       lineSpacing: 1.45,
     },
   },
-  {
-    left: RESOLUTION_PAGE_LEFT,
-    width: RESOLUTION_PAGE_WIDTH,
-  },
+{
+  left: RESOLUTION_PAGE_LEFT,
+  width: RESOLUTION_STATEMENT_WIDTH,
+},
 );
 
 normalized.blocks.forEach((block) => {
@@ -950,10 +951,10 @@ normalized.blocks.forEach((block) => {
         ...block,
         listStyle: "none",
       },
-      {
-        left: RESOLUTION_PAGE_LEFT,
-        width: RESOLUTION_PAGE_WIDTH,
-      },
+{
+  left: RESOLUTION_PAGE_LEFT,
+  width: RESOLUTION_STATEMENT_WIDTH,
+},
     );
   } else if (block.type === "table") {
     renderCustomTable(pager, block);

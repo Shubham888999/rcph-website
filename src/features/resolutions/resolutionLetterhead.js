@@ -4,7 +4,6 @@ export const RESOLUTION_LETTERHEAD_JPEG_QUALITY = 0.97;
 
 const USER_MESSAGE = "The Resolution letterhead could not be loaded. Please try again.";
 let cachedLetterheadPromise = null;
-let cachedOfficialLetterheadPromise = null;
 
 function bytesFromDataUrl(value) {
   const encoded = String(value || "").split(",")[1] || "";
@@ -91,16 +90,20 @@ export async function loadResolutionLetterheadJpeg(options = {}) {
 }
 
 export async function loadResolutionOfficialLetterheadJpeg(options = {}) {
-  return loadResolutionLetterheadJpegFromUrl(RESOLUTION_OFFICIAL_LETTERHEAD_URL, options);
+  return loadResolutionLetterheadJpegFromUrl(RESOLUTION_OFFICIAL_LETTERHEAD_URL, {
+    cache: "no-store",
+    ...options,
+  });
 }
 
 async function loadResolutionLetterheadJpegFromUrl(assetUrl, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const converter = options.convertBlob || convertResolutionLetterheadBlobToJpeg;
   const logger = options.logger || console;
+  const cache = options.cache || "force-cache";
   try {
     if (typeof fetchImpl !== "function") throw new Error("Asset loading is unavailable.");
-    const response = await fetchImpl(assetUrl, { cache: "force-cache" });
+    const response = await fetchImpl(assetUrl, { cache });
     if (!response?.ok) throw new Error(`Asset request failed with status ${response?.status || "unknown"}.`);
     return await converter(await response.blob(), options);
   } catch (error) {
@@ -123,11 +126,5 @@ export function getResolutionLetterheadJpeg() {
 }
 
 export function getResolutionOfficialLetterheadJpeg() {
-  if (!cachedOfficialLetterheadPromise) {
-    cachedOfficialLetterheadPromise = loadResolutionOfficialLetterheadJpeg().catch((error) => {
-      cachedOfficialLetterheadPromise = null;
-      throw error;
-    });
-  }
-  return cachedOfficialLetterheadPromise;
+  return loadResolutionOfficialLetterheadJpeg();
 }

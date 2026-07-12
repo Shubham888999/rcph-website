@@ -6,6 +6,7 @@ import {
   RESOLUTION_LETTERHEAD_URL,
   RESOLUTION_OFFICIAL_LETTERHEAD_URL,
   convertResolutionLetterheadBlobToJpeg,
+  getResolutionOfficialLetterheadJpeg,
   loadResolutionLetterheadJpeg,
   loadResolutionOfficialLetterheadJpeg,
 } from "./resolutionLetterhead.js";
@@ -53,21 +54,32 @@ test("browser conversion preserves source dimensions and requests high-quality J
 
 test("asset loading passes only the public blob into the injectable converter", async () => {
   let requestedUrl = "";
+  let requestedOptions = null;
   const expected = { bytes: JPEG_BYTES, width: 2, height: 3 };
   const result = await loadResolutionLetterheadJpeg({
-    fetchImpl: async (url) => { requestedUrl = url; return { ok: true, blob: async () => new Blob(["png"]) }; },
+    fetchImpl: async (url, options) => {
+      requestedUrl = url;
+      requestedOptions = options;
+      return { ok: true, blob: async () => new Blob(["png"]) };
+    },
     convertBlob: async () => expected,
     logger: { error() {} },
   });
   assert.equal(requestedUrl, RESOLUTION_LETTERHEAD_URL);
+  assert.equal(requestedOptions.cache, "force-cache");
   assert.equal(result, expected);
 });
 
-test("official asset loading uses the same safe conversion path", async () => {
+test("official asset loading bypasses fetch cache and uses the same safe conversion path", async () => {
   let requestedUrl = "";
+  let requestedOptions = null;
   const expected = { bytes: new Uint8Array([0xff, 0xd8, 1, 0xff, 0xd9]), width: 1138, height: 1600 };
   const result = await loadResolutionOfficialLetterheadJpeg({
-    fetchImpl: async (url) => { requestedUrl = url; return { ok: true, blob: async () => new Blob(["official"]) }; },
+    fetchImpl: async (url, options) => {
+      requestedUrl = url;
+      requestedOptions = options;
+      return { ok: true, blob: async () => new Blob(["official"]) };
+    },
     convertBlob: async (blob) => {
       assert.equal(await blob.text(), "official");
       return expected;
@@ -75,7 +87,40 @@ test("official asset loading uses the same safe conversion path", async () => {
     logger: { error() {} },
   });
   assert.equal(requestedUrl, RESOLUTION_OFFICIAL_LETTERHEAD_URL);
+  assert.equal(requestedOptions.cache, "no-store");
   assert.equal(result, expected);
+});
+
+test("official generated-page letterhead is loaded fresh for each request", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalCreateImageBitmap = globalThis.createImageBitmap;
+  const originalDocument = globalThis.document;
+  const calls = [];
+  try {
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url, cache: options?.cache });
+      return { ok: true, blob: async () => new Blob([`official-${calls.length}`]) };
+    };
+    globalThis.createImageBitmap = async () => ({ width: 2, height: 3, close() {} });
+    globalThis.document = {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({ fillRect() {}, drawImage() {} }),
+        toBlob: (callback) => callback(new Blob([JPEG_BYTES], { type: "image/jpeg" })),
+      }),
+    };
+    await getResolutionOfficialLetterheadJpeg();
+    await getResolutionOfficialLetterheadJpeg();
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.createImageBitmap = originalCreateImageBitmap;
+    globalThis.document = originalDocument;
+  }
+  assert.deepEqual(calls, [
+    { url: RESOLUTION_OFFICIAL_LETTERHEAD_URL, cache: "no-store" },
+    { url: RESOLUTION_OFFICIAL_LETTERHEAD_URL, cache: "no-store" },
+  ]);
 });
 
 test("asset failures are logged without Resolution data and return safe user copy", async () => {
