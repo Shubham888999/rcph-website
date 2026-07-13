@@ -5,8 +5,9 @@ import {
   pdfFillRectCommand,
   pdfLineCommand,
 } from "../pdf/simplePdf.js";
+import { RESOLUTION_OFFICIAL_LETTERHEAD_URL } from "../resolutions/resolutionLetterhead.js";
 
-export const BOD_AVENUE_REPORT_LETTERHEAD_URL = "/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png";
+export const BOD_AVENUE_REPORT_LETTERHEAD_URL = RESOLUTION_OFFICIAL_LETTERHEAD_URL;
 
 export const BOD_AVENUE_REPORT_LAYOUT = Object.freeze({
   page: A4_PDF_SIZE,
@@ -77,7 +78,6 @@ const DENSITY_STYLES = Object.freeze({
 const USER_MESSAGE = "The BOD Avenue Report letterhead could not be loaded. Please try again.";
 const PNG_SIGNATURE = Object.freeze([137, 80, 78, 71, 13, 10, 26, 10]);
 const encoder = new TextEncoder();
-let cachedLetterheadPromise = null;
 
 function asBytes(value) {
   if (value instanceof Uint8Array) return value;
@@ -146,9 +146,10 @@ export async function loadBodAvenueReportLetterheadPng(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const parser = options.parsePng || parseBodAvenueReportLetterheadPng;
   const logger = options.logger || console;
+  const cache = options.cache || "no-store";
   try {
     if (typeof fetchImpl !== "function") throw new Error("Asset loading is unavailable.");
-    const response = await fetchImpl(BOD_AVENUE_REPORT_LETTERHEAD_URL, { cache: "force-cache" });
+    const response = await fetchImpl(BOD_AVENUE_REPORT_LETTERHEAD_URL, { cache });
     if (!response?.ok) throw new Error(`Asset request failed with status ${response?.status || "unknown"}.`);
     return parser(await response.arrayBuffer());
   } catch (error) {
@@ -160,14 +161,8 @@ export async function loadBodAvenueReportLetterheadPng(options = {}) {
   }
 }
 
-export function getBodAvenueReportLetterheadPng() {
-  if (!cachedLetterheadPromise) {
-    cachedLetterheadPromise = loadBodAvenueReportLetterheadPng().catch((error) => {
-      cachedLetterheadPromise = null;
-      throw error;
-    });
-  }
-  return cachedLetterheadPromise;
+export function getBodAvenueReportLetterheadPng(options = {}) {
+  return loadBodAvenueReportLetterheadPng(options);
 }
 
 function fontFamilyName(value) {

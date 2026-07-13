@@ -7,9 +7,11 @@ import {
   BOD_AVENUE_REPORT_LETTERHEAD_URL,
   buildBodAvenueReportPdfDocument,
   buildBodAvenueReportPdfPages,
+  getBodAvenueReportLetterheadPng,
   loadBodAvenueReportLetterheadPng,
   parseBodAvenueReportLetterheadPng,
 } from "./bodAvenueReportPdf.js";
+import { RESOLUTION_OFFICIAL_LETTERHEAD_URL } from "../resolutions/resolutionLetterhead.js";
 
 const MOCK_LETTERHEAD = Object.freeze({
   bytes: new Uint8Array([0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01]),
@@ -55,8 +57,8 @@ function report(events, options = {}) {
   });
 }
 
-test("canonical BOD Avenue Report letterhead asset is an A4 RGB PNG", () => {
-  assert.equal(BOD_AVENUE_REPORT_LETTERHEAD_URL, "/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png");
+test("canonical BOD Avenue Report letterhead asset is the shared official Resolution A4 RGB PNG", () => {
+  assert.equal(BOD_AVENUE_REPORT_LETTERHEAD_URL, RESOLUTION_OFFICIAL_LETTERHEAD_URL);
   const png = readFileSync(new URL("../../../public/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png", import.meta.url));
   const parsed = parseBodAvenueReportLetterheadPng(png);
   assert.equal(parsed.width, 1414);
@@ -64,6 +66,23 @@ test("canonical BOD Avenue Report letterhead asset is an A4 RGB PNG", () => {
   assert.equal(parsed.bitsPerComponent, 8);
   assert.equal(parsed.colorSpace, "DeviceRGB");
   assert.ok(parsed.bytes.length > 400000);
+});
+
+test("BOD Avenue Report letterhead loads fresh so replaced public assets are not reused from browser cache", async () => {
+  const requests = [];
+  const fetchImpl = async (url, init) => {
+    requests.push({ url, cache: init?.cache });
+    return { ok: true, arrayBuffer: async () => new Uint8Array([requests.length]).buffer };
+  };
+  const parsePng = (value) => ({ ...MOCK_LETTERHEAD, bytes: new Uint8Array(value) });
+  const first = await getBodAvenueReportLetterheadPng({ fetchImpl, parsePng });
+  const second = await getBodAvenueReportLetterheadPng({ fetchImpl, parsePng });
+  assert.deepEqual(requests, [
+    { url: RESOLUTION_OFFICIAL_LETTERHEAD_URL, cache: "no-store" },
+    { url: RESOLUTION_OFFICIAL_LETTERHEAD_URL, cache: "no-store" },
+  ]);
+  assert.deepEqual([...first.bytes], [1]);
+  assert.deepEqual([...second.bytes], [2]);
 });
 
 test("finalized report produces an A4 portrait PDF with one shared full-page PNG background", () => {

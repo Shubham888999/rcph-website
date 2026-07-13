@@ -37,7 +37,7 @@ test("uploaded-PDF creation auto-saves one draft before allowing source upload",
   assert.match(adminModule, /createResolutionDraft\(payload\)/);
   assert.match(adminModule, /persistedDraftId\(result\)/);
   assert.match(adminModule, /documentSourceMode: "uploadedPdf"/);
-  assert.match(adminModule, /draft\.id \? \(\) => updateResolutionDraft\(draft\.id, payload\) : \(\) => createResolutionDraft\(payload\)/);
+  assert.match(adminModule, /const request = draft\.id[\s\S]*updateResolutionDraft\(draft\.id, payload\)[\s\S]*createResolutionDraft\(payload\)/);
 });
 
 test("uploaded-PDF dark admin panel uses readable theme tokens", () => {
@@ -181,8 +181,9 @@ test("Resolution PDF builder exposes the generated Resolution Page editor", () =
   assert.match(pdfBuilder, /deleteResolutionPageBlock/);
 });
 
-test("Resolution letterhead integration remains isolated from the BOD Avenue renderer", () => {
-  assert.doesNotMatch(bodPdf, /resolutionLetterhead|resolution_letterhead|RESOLUTION_CONTENT_BOUNDS/);
+test("Resolution and BOD letterhead integrations share only the official asset source", () => {
+  assert.match(bodPdf, /RESOLUTION_OFFICIAL_LETTERHEAD_URL/);
+  assert.doesNotMatch(bodPdf, /getResolutionLetterheadJpeg|getResolutionOfficialLetterheadJpeg|convertResolutionLetterheadBlobToJpeg|RESOLUTION_CONTENT_BOUNDS|DCTDecode/);
   assert.match(bodPdf, /BOD_AVENUE_REPORT_LETTERHEAD_URL/);
   assert.match(bodPdf, /parseBodAvenueReportLetterheadPng/);
   assert.match(bodPdf, /\/XObject << \/BG/);

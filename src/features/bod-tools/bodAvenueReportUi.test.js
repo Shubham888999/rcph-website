@@ -8,7 +8,7 @@ const service = readFileSync(new URL("./bodEventService.js", import.meta.url), "
 const styles = readFileSync(new URL("../../styles/components/bod-tools.css", import.meta.url), "utf8");
 
 test("authorized BOD Tools page mounts the monthly avenue report without changing route policy", () => {
-  assert.match(page, /<BodAvenueReportPanel events=\{events\}/);
+  assert.match(page, /<BodAvenueReportPanel[\s\S]*events=\{events\}/);
   assert.match(page, /useBodEvents\(\{ uid, enabled: Boolean\(uid && access\?\.canAccessBodTools\) \}\)/);
 });
 
