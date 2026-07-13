@@ -447,7 +447,7 @@ function ClubEventForm({ initial = emptyEvent, onSave, busy, submitLabel }) {
 export function ClubAttendanceModule({ data, lock, uid, onNotice }) {
   const [editing, setEditing] = useState(null);
   const [archive, setArchive] = useState(null);
-  const [eventsExpanded, setEventsExpanded] = useState(true);
+  const [eventsExpanded, setEventsExpanded] = useState(false);
   const { busy, run } = useAdminMutation({ uid, module: "club-attendance", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const events = data.events.filter((event) => !event.archived);
