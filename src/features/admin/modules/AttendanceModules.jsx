@@ -447,9 +447,11 @@ function ClubEventForm({ initial = emptyEvent, onSave, busy, submitLabel }) {
 export function ClubAttendanceModule({ data, lock, uid, onNotice }) {
   const [editing, setEditing] = useState(null);
   const [archive, setArchive] = useState(null);
+  const [eventsExpanded, setEventsExpanded] = useState(true);
   const { busy, run } = useAdminMutation({ uid, module: "club-attendance", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const events = data.events.filter((event) => !event.archived);
+  const activeEventsListId = "active-club-events-list";
   const attendanceParticipants = buildAttendanceParticipants({
     members: data.members,
     users: data.users,
@@ -481,68 +483,87 @@ const pendingRecords =
   return <>
     <AdminModuleHeader title="Club Events & Attendance" />
     <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{lock.status === "error" ? "Lock status unavailable; changes disabled." : locked ? "Attendance Manager is locked." : "Attendance Manager is open."}</div>
-   <section className="attendance-event-list">
-  <header className="attendance-section-heading">
-    <div>
-      <p className="admin-kicker">Event register</p>
-      <h3>Active club events</h3>
+    <section className="attendance-event-list">
+      <button
+        type="button"
+        className="attendance-section-heading attendance-section-heading--button"
+        aria-expanded={eventsExpanded}
+        aria-controls={activeEventsListId}
+        onClick={() => setEventsExpanded((current) => !current)}
+      >
+        <span className="attendance-section-heading__text">
+          <span className="admin-kicker">Event register</span>
+          <span className="attendance-section-heading__title">Active club events</span>
+        </span>
 
-    </div>
+        <span className="attendance-section-heading__meta">
+          <strong>{events.length}</strong>
+          <span
+            className={`attendance-section-heading__chevron ${
+              eventsExpanded ? "is-expanded" : ""
+            }`}
+            aria-hidden="true"
+          >
+            &gt;
+          </span>
+        </span>
+      </button>
 
-    <strong>{events.length}</strong>
-  </header>
+      {eventsExpanded ? (
+        <div className="attendance-event-list__rows" id={activeEventsListId}>
+          {events.length ? events.map((event) => (
+            <article
+              className="attendance-event-row"
+              key={event.id}
+            >
+              <header>
+                <span>
+                  {event.avenue.join(" · ") || "Club event"}
+                </span>
 
-  <div className="attendance-event-list__grid">
-    {/* event cards */}
-  </div>
-</section>
-    <section className="admin-panel attendance-event-list">
-  <h3>Active club events</h3><div className="admin-card-grid">{events.map((event) => <article
-  className="attendance-event-card"
-  key={event.id}
->
-  <header>
-    <span>
-      {event.avenue.join(" · ") || "Club event"}
-    </span>
+                <strong>{event.name}</strong>
+              </header>
 
-    <strong>{event.name}</strong>
-  </header>
+              <p className="attendance-event-row__date">
+                {event.date}
+                {event.endDate && event.endDate !== event.date
+                  ? ` – ${event.endDate}`
+                  : ""}
+              </p>
 
-  <p className="attendance-event-card__date">
-    {event.date}
-    {event.endDate && event.endDate !== event.date
-      ? ` – ${event.endDate}`
-      : ""}
-  </p>
+              {event.desc ? (
+                <p className="attendance-event-row__description">
+                  {event.desc}
+                </p>
+              ) : null}
 
-  {event.desc ? (
-    <p className="attendance-event-card__description">
-      {event.desc}
-    </p>
-  ) : null}
+              <div className="attendance-event-row__actions">
+                <button
+                  type="button"
+                  className="admin-text-action"
+                  disabled={locked || busy}
+                  onClick={() => setEditing(event)}
+                >
+                  Edit event
+                </button>
 
-  <div className="attendance-event-card__actions">
-    <button
-      type="button"
-      className="admin-text-action"
-      disabled={locked || busy}
-      onClick={() => setEditing(event)}
-    >
-      Edit event
-    </button>
-
-    <button
-      type="button"
-      className="admin-text-action admin-text-action--danger"
-      disabled={locked || busy}
-      onClick={() => setArchive(event)}
-    >
-      Archive
-    </button>
-  </div>
-</article>)}</div></section>
-<section
+                <button
+                  type="button"
+                  className="admin-text-action admin-text-action--danger"
+                  disabled={locked || busy}
+                  onClick={() => setArchive(event)}
+                >
+                  Archive
+                </button>
+              </div>
+            </article>
+          )) : (
+            <AdminEmpty message="No active club events are available." />
+          )}
+        </div>
+      ) : null}
+    </section>
+    <section
   className="attendance-overview"
   aria-label="Attendance overview"
 >

@@ -68,10 +68,10 @@ export default function BodToolsHeader({
             Event operations
           </span>
 
-          <strong>Create and manage club submissions</strong>
+          <strong>Create and manage Club Events</strong>
 
           <p>
-            Maintain one canonical event across the public calendar,
+            Maintain events across the public calendar,
             attendance, and avenue reports.
           </p>
 
