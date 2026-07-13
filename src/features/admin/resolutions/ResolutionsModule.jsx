@@ -214,6 +214,13 @@ function EligibleVotersSelector({ value, roster, onChange, disabled }) {
   </section>;
 }
 
+function hasResolutionOptionalText(value) {
+  return Boolean(
+    String(value?.body || "").trim()
+    || String(value?.notes || "").trim()
+  );
+}
+
 function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, onSubmit, onPreview, onGeneratedPagesPreview, onNotice, onPersisted, onEnsurePersisted }) {
   const set = (key) => (event) => onChange({ ...value, [key]: event.target.value });
   const approvalMethod = value.approvalMethod || "website";
@@ -226,8 +233,22 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
   const generatedEmailSubject = buildHybridEmailSubject(value);
   const generatedEmailBody = buildHybridEmailPlaceholder(value, meeting);
   const emailStateKey = value.id || "new";
-  const [customizedEmailState, setCustomizedEmail] = useState(() => ({ key: emailStateKey, ...hasSavedHybridEmail(value) }));
+  const optionalTextKey = value.id || "new";
+  const optionalTextId = `resolution-optional-text-${optionalTextKey}`;
+
+  const [customizedEmailState, setCustomizedEmail] = useState(() => ({
+    key: emailStateKey,
+    ...hasSavedHybridEmail(value),
+  }));
   const [confirmEmailReset, setConfirmEmailReset] = useState(null);
+  const [optionalTextState, setOptionalTextState] = useState(() => ({
+    key: optionalTextKey,
+    expanded: hasResolutionOptionalText(value),
+  }));
+
+  const optionalTextExpanded = optionalTextState.key === optionalTextKey
+    ? optionalTextState.expanded
+    : hasResolutionOptionalText(value);
   const customizedEmail = customizedEmailState.key === emailStateKey
     ? customizedEmailState
     : { key: emailStateKey, ...hasSavedHybridEmail(value) };
@@ -284,11 +305,55 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
       {!isRecordOnly ? <EligibleVotersSelector value={value} roster={roster} onChange={onChange} disabled={formLocked} /> : null}
       <label>Proposed by <span className="admin-optional">Optional</span><select value={value.proposedByUid} onChange={set("proposedByUid")}><option value="">Not recorded</option>{roster.map((member) => <option key={member.uid} value={member.uid}>{formatRotaractorName(member.name, true)} - {member.position}</option>)}</select></label>
       <label>Seconded by <span className="admin-optional">Optional</span><select value={value.secondedByUid} onChange={set("secondedByUid")}><option value="">Not recorded</option>{roster.map((member) => <option key={member.uid} value={member.uid}>{formatRotaractorName(member.name, true)} - {member.position}</option>)}</select></label>
+            <button
+        type="button"
+        className="resolution-optional-toggle"
+        aria-expanded={optionalTextExpanded}
+        aria-controls={optionalTextId}
+        onClick={() => setOptionalTextState({
+          key: optionalTextKey,
+          expanded: !optionalTextExpanded,
+        })}
+      >
+        <span>Resolution text and background notes</span>
+        <span
+          className="resolution-optional-toggle__chevron"
+          aria-hidden="true"
+        >
+          ›
+        </span>
+      </button>
       {!isRecordOnly && value.votingRule === "custom_approval_count" ? <label>Approvals required<input type="number" min="1" max={selectedVoterIds.length || undefined} step="1" value={value.customApprovalCount} onChange={set("customApprovalCount")} required /></label> : null}
     </div>
     {!isRecordOnly ? <label className="resolution-append-toggle"><input type="checkbox" checked={value.appendVoteTable !== false} onChange={(event) => onChange({ ...value, appendVoteTable: event.target.checked })} /> Append submitted vote table to final PDF</label> : null}
-    <label>Full resolution text <span className="admin-optional">Optional</span><textarea rows="8" maxLength="20000" value={value.body} onChange={set("body")} /></label>
-    <label>Background or notes <span className="admin-optional">Optional</span><textarea rows="4" maxLength="10000" value={value.notes} onChange={set("notes")} /></label>
+    {optionalTextExpanded ? (
+      <div
+        id={optionalTextId}
+        className="resolution-optional-fields"
+      >
+        <label>
+          Full resolution text
+          <span className="admin-optional">Optional</span>
+          <textarea
+            rows="8"
+            maxLength="20000"
+            value={value.body}
+            onChange={set("body")}
+          />
+        </label>
+
+        <label>
+          Background or notes
+          <span className="admin-optional">Optional</span>
+          <textarea
+            rows="4"
+            maxLength="10000"
+            value={value.notes}
+            onChange={set("notes")}
+          />
+        </label>
+      </div>
+    ) : null}
     {isHybrid ? <fieldset className="resolution-email-config">
       <legend>Email configuration</legend>
       <div className="resolution-email-config__field"><label>Official email subject<input value={value.officialEmailSubject} placeholder={generatedEmailSubject} maxLength="220" onChange={setEmailField("officialEmailSubject")} /></label><div className="resolution-email-config__tools"><span>{customizedEmail.subject ? "Customized" : "Generated template"}</span><button type="button" onClick={() => requestEmailReset("subject")}>Reset subject</button></div>{confirmEmailReset === "subject" ? <p className="admin-help" role="alert">Reset subject to the generated template? <button type="button" onClick={() => resetEmailField("subject")}>Confirm reset</button></p> : null}</div>
@@ -393,6 +458,7 @@ function ResolutionDetails({ details, busy, onRefresh, onDownload, onRetry, onVe
 export default function ResolutionsModule({ uid, onNotice }) {
   const [state, setState] = useState({ status: "loading", resolutions: [], meetings: [], roster: [] });
   const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [draftFormVersion, setDraftFormVersion] = useState(0);
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [details, setDetails] = useState(null);
@@ -424,9 +490,33 @@ export default function ResolutionsModule({ uid, onNotice }) {
     event.preventDefault();
     const payload = validated(draft);
     if (!payload) return;
-    const request = draft.id ? () => updateResolutionDraft(draft.id, payload) : () => createResolutionDraft(payload);
-    const result = await run(draft.id ? "update-auto-saved-resolution" : "create-resolution", request, draft.id ? "Resolution draft updated." : "Resolution draft created.", { onError(error) { onNotice({ type: "error", message: getResolutionErrorMessage(error) }); return true; } });
-    if (result) { setDraft({ ...EMPTY_DRAFT }); await load(); }
+
+    const request = draft.id
+      ? () => updateResolutionDraft(draft.id, payload)
+      : () => createResolutionDraft(payload);
+
+    const result = await run(
+      draft.id ? "update-auto-saved-resolution" : "create-resolution",
+      request,
+      draft.id
+        ? "Resolution draft updated."
+        : "Resolution draft created.",
+      {
+        onError(error) {
+          onNotice({
+            type: "error",
+            message: getResolutionErrorMessage(error),
+          });
+          return true;
+        },
+      },
+    );
+
+    if (result) {
+      setDraft({ ...EMPTY_DRAFT });
+      setDraftFormVersion((current) => current + 1);
+      await load();
+    }
   }
 
   async function ensureDraftPersisted(value) {
@@ -532,7 +622,7 @@ export default function ResolutionsModule({ uid, onNotice }) {
   return <>
     <AdminModuleHeader title="Resolutions" description="Meeting-linked BOD resolution drafts, live voting, final records, and audit history." action={<button onClick={load} disabled={busy}>Refresh</button>} />
     {!state.meetings.length || !state.roster.length ? <div className="admin-notice admin-notice--error" role="alert">A valid BOD meeting is required. Website and hybrid voting also require at least one UID-linked active BOD position assignment.</div> : null}
-    <section className="admin-panel"><h3>Create draft resolution</h3><ResolutionForm value={draft} onChange={setDraft} meetings={state.meetings} roster={state.roster} busy={busy || !state.meetings.length} submitLabel={draft.id ? "Save draft changes" : "Save draft"} onSubmit={create} onPreview={() => downloadPreview(draft)} onGeneratedPagesPreview={(options) => previewGeneratedPages(draft, options)} onNotice={onNotice} onPersisted={(uploadedSource) => setDraft((current) => ({ ...current, uploadedSource }))} onEnsurePersisted={ensureDraftPersisted} /></section>
+    <section className="admin-panel"><h3>Create draft resolution</h3><ResolutionForm key={`resolution-create-form-${draftFormVersion}`} value={draft} onChange={setDraft} meetings={state.meetings} roster={state.roster} busy={busy || !state.meetings.length} submitLabel={draft.id ? "Save draft changes" : "Save draft"} onSubmit={create} onPreview={() => downloadPreview(draft)} onGeneratedPagesPreview={(options) => previewGeneratedPages(draft, options)} onNotice={onNotice} onPersisted={(uploadedSource) => setDraft((current) => ({ ...current, uploadedSource }))} onEnsurePersisted={ensureDraftPersisted} /></section>
     <ResolutionGroup title="Open voting" items={state.resolutions.filter((item) => item.status === "open")} {...common} />
     <ResolutionGroup title="Drafts" items={state.resolutions.filter((item) => item.status === "draft")} {...common} />
     <ResolutionGroup title="Completed" items={state.resolutions.filter((item) => FINAL_RESOLUTION_STATUSES.includes(item.status))} {...common} />

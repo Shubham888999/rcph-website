@@ -187,3 +187,40 @@ test("Resolution letterhead integration remains isolated from the BOD Avenue ren
   assert.match(bodPdf, /parseBodAvenueReportLetterheadPng/);
   assert.match(bodPdf, /\/XObject << \/BG/);
 });
+
+test("Resolution body and notes use one accessible progressive disclosure", () => {
+  for (const label of [
+    "Resolution text and background notes",
+    "Full resolution text",
+    "Background or notes",
+  ]) {
+    assert.match(adminModule, new RegExp(label));
+  }
+
+  assert.match(adminModule, /function hasResolutionOptionalText/);
+  assert.match(adminModule, /optionalTextExpanded/);
+  assert.match(adminModule, /aria-expanded=\{optionalTextExpanded\}/);
+  assert.match(adminModule, /aria-controls=\{optionalTextId\}/);
+  assert.match(adminModule, /className="resolution-optional-toggle"/);
+  assert.match(adminModule, /className="resolution-optional-fields"/);
+  assert.match(adminModule, /aria-hidden="true"/);
+});
+
+test("Generated Page Preview renders after the optional Resolution Page editor", () => {
+  const editorIndex = pdfBuilder.indexOf(
+    "{resolutionPageConfig.enabled ? <ResolutionPageEditor",
+  );
+  const previewIndex = pdfBuilder.indexOf(
+    '<section className="resolution-builder__generated-preview"',
+  );
+
+  assert.notEqual(editorIndex, -1);
+  assert.notEqual(previewIndex, -1);
+  assert.ok(
+    editorIndex < previewIndex,
+    "Resolution Page editor must render before Generated Page Preview.",
+  );
+  assert.match(pdfBuilder, /Generated Page Preview/);
+  assert.match(pdfBuilder, /Open Preview/);
+  assert.match(pdfBuilder, /Download Preview/);
+});

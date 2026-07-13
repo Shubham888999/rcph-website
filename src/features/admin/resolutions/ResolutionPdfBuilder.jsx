@@ -226,6 +226,9 @@ export default function ResolutionPdfBuilder({ value, onChange, disabled = false
         <label><input type="radio" name={`generated-page-order-${value.id || "new"}`} checked={generatedOrderValue === "resolution_page_first"} onChange={() => setGeneratedPageOrder(["resolution_page", "vote_table"])} /> Resolution Page -&gt; Voting Table</label>
         <label><input type="radio" name={`generated-page-order-${value.id || "new"}`} checked={generatedOrderValue === "vote_table_first"} onChange={() => setGeneratedPageOrder(["vote_table", "resolution_page"])} /> Voting Table -&gt; Resolution Page</label>
       </fieldset> : null}
+
+            {resolutionPageConfig.enabled ? <ResolutionPageEditor resolution={value} config={resolutionPageConfig} onChange={setResolutionPageConfig} /> : null}
+
       <section className="resolution-builder__generated-preview" aria-label="Generated page preview">
         <div>
           <h4>Generated Page Preview</h4>
@@ -247,7 +250,6 @@ export default function ResolutionPdfBuilder({ value, onChange, disabled = false
         {generatedPreviewMessage ? <p className="resolution-builder__preview-status" role="status">{generatedPreviewMessage}</p> : null}
         {generatedPreview.error ? <p className="resolution-builder__preview-error" role="alert">{generatedPreview.error}</p> : null}
       </section>
-      {resolutionPageConfig.enabled ? <ResolutionPageEditor resolution={value} config={resolutionPageConfig} onChange={setResolutionPageConfig} /> : null}
     </section>
   </fieldset>;
 }
