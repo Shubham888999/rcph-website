@@ -1,6 +1,6 @@
 .access-command-page {
   display: block;
-  padding: clamp(1rem, 4vw, 3.5rem);
+  padding: clamp(0.75rem, 2vw, 1.35rem) clamp(1rem, 4vw, 3.5rem) clamp(2rem, 4vw, 3.5rem);
   overflow: hidden;
   background:
     radial-gradient(ellipse at 6% 0%, rgba(229, 194, 104, 0.13), transparent 34%),
@@ -30,12 +30,12 @@
 .access-hub__masthead {
   position: relative;
   isolation: isolate;
-  min-height: 22rem;
-  padding: clamp(2.5rem, 7vw, 6rem) 0 clamp(2rem, 5vw, 4rem);
+  min-height: auto;
+  padding: clamp(0.55rem, 1.6vw, 1.25rem) 0 clamp(1rem, 2.5vw, 1.75rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 2rem clamp(2rem, 6vw, 6rem);
-  align-items: end;
+  align-items: start;
 }
 
 .access-hub__masthead::after {
@@ -105,7 +105,7 @@
 
 .access-hub__summary {
   margin: 0;
-  padding: clamp(1.4rem, 4vw, 2.5rem) 0;
+  padding: clamp(0.9rem, 2vw, 1.5rem) 0;
   display: grid;
   grid-template-columns: 0.55fr 1fr 1.35fr;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -145,52 +145,13 @@
 
 .access-hub__authority {
   max-width: 56rem;
-  margin: 1.5rem 0 0;
+  margin: 0.85rem 0 0;
   padding-left: 1rem;
   border-left: 2px solid var(--color-pink);
   color: var(--color-muted);
   line-height: 1.6;
 }
 
-.access-hub__primary {
-  margin-top: clamp(3rem, 7vw, 6rem);
-}
-
-.access-hub__primary > a {
-  position: relative;
-  min-height: 18rem;
-  padding: clamp(2rem, 6vw, 5rem);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2rem 4rem;
-  align-items: end;
-  overflow: hidden;
-  border-block: 1px solid rgba(229, 194, 104, 0.4);
-  color: inherit;
-  background:
-    linear-gradient(110deg, rgba(229, 194, 104, 0.12), transparent 52%),
-    linear-gradient(290deg, rgba(96, 195, 196, 0.08), transparent 44%);
-  text-decoration: none;
-}
-
-.access-hub__primary > a::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 36%;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-gold), var(--color-gold-soft), var(--color-teal));
-  transition: width var(--transition-standard);
-}
-
-.access-hub__primary-copy {
-  max-width: 49rem;
-  display: grid;
-  gap: 0.8rem;
-}
-
-.access-hub__primary-copy small,
 .access-hub__destination-meta {
   color: var(--color-teal);
   font-size: 0.74rem;
@@ -199,36 +160,8 @@
   text-transform: uppercase;
 }
 
-.access-hub__primary-copy strong {
-  font-size: clamp(2.4rem, 6vw, 5rem);
-  line-height: 0.96;
-  letter-spacing: -0.05em;
-}
-
-.access-hub__primary-copy > span {
-  max-width: 42rem;
-  color: var(--color-muted);
-  font-size: clamp(1rem, 1.5vw, 1.15rem);
-  line-height: 1.65;
-}
-
-.access-hub__primary-action {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--color-gold-soft);
-  font-weight: 850;
-  white-space: nowrap;
-}
-
-.access-hub__primary-action span {
-  color: var(--color-teal);
-  font-size: 1.35rem;
-}
-
 .access-hub__unavailable {
-  margin-top: 3rem;
+  margin-top: 1.5rem;
   padding: 2rem 0 2rem 1.25rem;
   border-left: 2px solid var(--color-pink);
 }
@@ -242,11 +175,11 @@
 }
 
 .access-hub__destinations {
-  margin-top: clamp(4rem, 8vw, 7rem);
+  margin-top: clamp(1.35rem, 3vw, 2.5rem);
 }
 
 .access-hub__destinations > header {
-  margin-bottom: clamp(1.5rem, 4vw, 2.75rem);
+  margin-bottom: clamp(1rem, 2.5vw, 1.6rem);
 }
 
 .access-hub__destinations h2 {
@@ -268,6 +201,10 @@
 .access-hub__destinations li {
   min-width: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.access-hub__destination--full {
+  grid-column: 1 / -1;
 }
 
 .access-hub__destinations li:nth-last-child(-n + 2) {
@@ -335,11 +272,6 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .access-hub__primary > a:hover::before {
-    width: 72%;
-  }
-
-  .access-hub__primary > a:hover,
   .access-hub__destinations li > a:hover {
     transform: translateY(-2px);
   }
@@ -351,7 +283,7 @@
 
 @media (max-width: 64rem) {
   .access-hub__masthead {
-    min-height: 19rem;
+    min-height: auto;
     grid-template-columns: 1fr;
     align-items: start;
   }
@@ -393,7 +325,7 @@
 
   .access-hub__masthead {
     min-height: auto;
-    padding-top: 1.5rem;
+    padding-top: 1rem;
   }
 
   .access-hub__masthead::after {
@@ -422,17 +354,6 @@
 
   .access-hub__summary > div:last-child {
     border-bottom: 0;
-  }
-
-  .access-hub__primary > a {
-    min-height: 16rem;
-    padding: 2rem 1.25rem;
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
-  .access-hub__primary-action {
-    align-self: end;
   }
 
   .access-hub__destinations li > a {

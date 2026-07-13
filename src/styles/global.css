@@ -508,7 +508,6 @@ select { color-scheme: var(--control-color-scheme, dark); }
   .join-benefit-card,
   .join-journey-list li,
   .join-cta,
-  .access-hub__primary > a,
   .access-hub__destinations li,
   .dashboard-loading,
   .dashboard-error,

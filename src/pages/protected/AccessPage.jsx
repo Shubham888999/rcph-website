@@ -8,6 +8,7 @@ import "../../styles/components/access-hub.css";
 import ProspectWhatsAppGroup from "../../features/prospect/ProspectWhatsAppGroup";
 import { formatRotaractorName } from "../../utils/memberName";
 import "../../styles/components/member-dashboard.css";
+
 const revealItem = {
   hidden: { opacity: 1, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] } },
@@ -21,6 +22,7 @@ export default function AccessPage() {
   const email = profile.email || user?.email || "";
   const hub = getAccessHubViewModel(access);
   const isProspect = access?.canAccessProspectDashboard === true;
+
   async function handleSignOut() {
     clearDashboardDataCache(user?.uid);
     await signOut();
@@ -38,13 +40,10 @@ export default function AccessPage() {
         <header className="access-hub__masthead">
           <div className="access-hub__identity">
             <motion.p className="access-hub__eyebrow" variants={reduceMotion ? undefined : revealItem}>Rotaract Club of Pune Heritage</motion.p>
-<motion.h1
-  id="access-hub-title"
-  variants={reduceMotion ? undefined : revealItem}
->
-  <span className="access-hub__welcome-line">Welcome,</span>
-  <span className="access-hub__member-name">{displayName}</span>
-</motion.h1>
+            <motion.h1 id="access-hub-title" variants={reduceMotion ? undefined : revealItem}>
+              <span className="access-hub__welcome-line">Welcome,</span>
+              <span className="access-hub__member-name">{displayName}</span>
+            </motion.h1>
             {email ? <motion.p className="access-hub__email" variants={reduceMotion ? undefined : revealItem}>{email}</motion.p> : null}
             <motion.p className="access-hub__intro" variants={reduceMotion ? undefined : revealItem}>Choose where you want to continue.</motion.p>
           </div>
@@ -65,48 +64,38 @@ export default function AccessPage() {
             Administrative access is available through server-verified Website Director authority. Your approved role remains {hub.role}.
           </motion.p>
         ) : null}
-{hub.hasDelegatedSergeantAuthority ? (
-  <motion.p
-    className="access-hub__authority"
-    variants={reduceMotion ? undefined : revealItem}
-  >
-    Administrative access is available through your server-verified
-    Sergeant-at-Arms assignment. Your approved role remains {hub.role}.
-  </motion.p>
-) : null}
-        {hub.primary ? (
-          <motion.nav className="access-hub__primary" aria-label="Recommended destination" variants={reduceMotion ? undefined : revealItem}>
-            <Link to={hub.primary.href}>
-              <span className="access-hub__primary-copy">
-                <small>{hub.primary.category}</small>
-                <strong>{hub.primary.title}</strong>
-                <span>{hub.primary.description}</span>
-              </span>
-              <span className="access-hub__primary-action">Continue <span aria-hidden="true">→</span></span>
-            </Link>
-          </motion.nav>
-        ) : (
+
+        {hub.hasDelegatedSergeantAuthority ? (
+          <motion.p className="access-hub__authority" variants={reduceMotion ? undefined : revealItem}>
+            Administrative access is available through your server-verified Sergeant-at-Arms assignment. Your approved role remains {hub.role}.
+          </motion.p>
+        ) : null}
+
+        {hub.destinations.length ? null : (
           <motion.section className="access-hub__unavailable" variants={reduceMotion ? undefined : revealItem}>
             <h2>No dashboard destination available</h2>
             <p>Your trusted account is approved, but no personal dashboard capability is currently available.</p>
           </motion.section>
         )}
-{isProspect ? (
-  <motion.div
-    className="access-hub__prospect-whatsapp"
-    variants={reduceMotion ? undefined : revealItem}
-  >
-    <ProspectWhatsAppGroup />
-  </motion.div>
-) : null}
+
+        {isProspect ? (
+          <motion.div className="access-hub__prospect-whatsapp" variants={reduceMotion ? undefined : revealItem}>
+            <ProspectWhatsAppGroup />
+          </motion.div>
+        ) : null}
+
         <nav className="access-hub__destinations" aria-labelledby="access-destinations-title">
           <motion.header variants={reduceMotion ? undefined : revealItem}>
             <p className="access-hub__eyebrow">Available areas</p>
             <h2 id="access-destinations-title">Continue through RCPH</h2>
           </motion.header>
           <motion.ul variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
-            {hub.secondary.map((destination) => (
-              <motion.li key={destination.key} variants={reduceMotion ? undefined : revealItem}>
+            {hub.destinations.map((destination) => (
+              <motion.li
+                key={destination.key}
+                className={destination.fullWidth ? "access-hub__destination--full" : undefined}
+                variants={reduceMotion ? undefined : revealItem}
+              >
                 <Link to={destination.href}>
                   <span className="access-hub__destination-meta">{destination.category}</span>
                   <span className="access-hub__destination-copy">

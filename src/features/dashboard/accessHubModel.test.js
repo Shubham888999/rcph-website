@@ -35,9 +35,12 @@ test("Prospect receives one primary journey and no BOD or Admin tools", () => {
   assert.equal(model.secondary.some(({ key }) => ["bod", "admin", "dashboard"].includes(key)), false);
 });
 
-test("GBM receives the member dashboard as primary", () => {
+test("GBM receives the member dashboard as the first full-width destination", () => {
   const model = getAccessHubViewModel(access("gbm"));
   assert.equal(model.primary.key, "dashboard");
+  assert.equal(model.destinations[0].key, "dashboard");
+  assert.equal(model.destinations[0].title, "My Member Dashboard");
+  assert.equal(model.destinations[0].fullWidth, true);
   assert.equal(model.secondary.some(({ key }) => key === "bod"), false);
 });
 
@@ -52,6 +55,26 @@ test("destinations remain unique and secondary ordering is deterministic", () =>
   const destinations = getAccessHubDestinations(access("admin"));
   assert.equal(new Set(destinations.map(({ href }) => href)).size, destinations.length);
   assert.deepEqual(destinations.filter(({ primary }) => !primary).map(({ key }) => key), ["bod", "admin", "calendar", "home"]);
+});
+
+test("visible access list order keeps Member Dashboard first before permitted tools", () => {
+  const model = getAccessHubViewModel(access("president", {
+    canAccessVisitSubmissions: true,
+    canAccessResolutionTools: true,
+  }));
+  assert.deepEqual(model.destinations.map(({ key }) => key), ["dashboard", "bod", "club-visits", "admin", "resolutions", "calendar", "home"]);
+  assert.equal(model.destinations.filter(({ title }) => title === "My Member Dashboard").length, 1);
+  assert.equal(model.destinations[0].fullWidth, true);
+});
+
+test("destination list still renders a subset without unauthorized dashboard or tools", () => {
+  const model = getAccessHubViewModel(access("gbm", {
+    canAccessMemberDashboard: false,
+    canAccessBodTools: false,
+    canAccessAdminTools: false,
+  }));
+  assert.deepEqual(model.destinations.map(({ key }) => key), ["calendar", "home"]);
+  assert.equal(model.primary, null);
 });
 
 test("multiple positions format cleanly and missing positions have a fallback", () => {

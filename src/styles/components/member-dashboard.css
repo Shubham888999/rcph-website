@@ -1,7 +1,7 @@
 .member-dashboard-page {
   min-height: 100vh;
   overflow: hidden;
-  padding: clamp(1rem, 4vw, 3.5rem);
+  padding: clamp(0.75rem, 2vw, 1.35rem) clamp(1rem, 4vw, 3.5rem) clamp(2rem, 4vw, 3.5rem);
   color: var(--color-text);
   background:
     radial-gradient(ellipse at 8% 0%, rgba(229, 194, 104, 0.12), transparent 34%),
@@ -11,9 +11,9 @@
 
 .member-dashboard-shell {
   width: min(1240px, 100%);
-  margin: auto;
+  margin: 0 auto;
   display: grid;
-  gap: clamp(2.5rem, 6vw, 5.5rem);
+  gap: clamp(1.8rem, 4vw, 3.8rem);
 }
 
 .dashboard-eyebrow {
@@ -28,12 +28,12 @@
 .dashboard-masthead {
   position: relative;
   isolation: isolate;
-  min-height: 21rem;
-  padding: clamp(2rem, 6vw, 5rem) 0 clamp(2rem, 5vw, 3.8rem);
+  min-height: auto;
+  padding: clamp(0.55rem, 1.6vw, 1.25rem) 0 clamp(1rem, 2.5vw, 1.75rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 2rem clamp(2rem, 6vw, 6rem);
-  align-items: end;
+  align-items: start;
 }
 
 .dashboard-masthead::after {
@@ -1367,7 +1367,7 @@
 
 @media (max-width: 64rem) {
   .dashboard-masthead {
-    min-height: 18rem;
+    min-height: auto;
     grid-template-columns: 1fr;
     align-items: start;
   }
@@ -1400,7 +1400,7 @@
   }
 
   .member-dashboard-shell {
-    gap: 3.5rem;
+    gap: 2.75rem;
   }
 
   .dashboard-masthead,
@@ -1417,7 +1417,7 @@
 
   .dashboard-masthead {
     min-height: auto;
-    padding-top: 2.5rem;
+    padding-top: 1rem;
   }
 
 .dashboard-masthead h1,

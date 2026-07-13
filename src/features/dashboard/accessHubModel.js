@@ -26,6 +26,7 @@ export function getAccessHubDestinations(access) {
       description: "Track your membership criteria, qualifying activities, and verified next steps.",
       href: "/dashboard",
       primary: true,
+      fullWidth: true,
     });
   } else if (access.canAccessMemberDashboard) {
     destinations.push({
@@ -35,16 +36,17 @@ export function getAccessHubDestinations(access) {
       description: "View your attendance, upcoming events, announcements, and verified club statistics.",
       href: "/dashboard",
       primary: true,
+      fullWidth: true,
     });
   }
   if (access.canAccessBodTools) {
-    destinations.push({ key: "bod", category: "Leadership access", title: "BOD Tools", description: "Create and manage club events through your approved BOD capability.", href: "/bod-tools", primary: false });
+    destinations.push({ key: "bod", category: "Leadership access", title: "BOD Tools", description: "Create and manage Club Events.", href: "/bod-tools", primary: false });
   }
   if (access.canAccessVisitSubmissions) {
     destinations.push({ key: "club-visits", category: "Club reporting", title: "Club Visits", description: "Upload and manage supporting files for Club Assembly, DZR Visit, and DRR Visit.", href: "/admin/visit-submissions", primary: false });
   }
   if (access.canAccessAdminTools) {
-    destinations.push({ key: "admin", category: "Administration", title: "Admin Tools", description: "Manage protected club operations available to your account.", href: "/admin", primary: false });
+    destinations.push({ key: "admin", category: "Administration", title: "Admin Tools", description: "Manage Club Operations.", href: "/admin", primary: false });
   }
   if (access.canAccessResolutionTools) {
     destinations.push({ key: "resolutions", category: "BOD governance", title: "Resolutions", description: "Create, manage, and finalize meeting-linked BOD resolutions.", href: "/admin/resolutions", primary: false });
@@ -71,6 +73,7 @@ export function getAccessHubViewModel(access) {
     positionSummary: positions.length ? positions.join(" · ") : "No approved club position",
     capabilityLabels,
     capabilitySummary: capabilityLabels.length ? capabilityLabels.join(" · ") : "No additional tools available",
+    destinations,
     primary: destinations.find(({ primary }) => primary) || null,
     secondary: destinations.filter(({ primary }) => !primary),
     hasDelegatedWebsiteAuthority: Boolean(access?.hasWebsiteDirectorPosition && access?.hasPresidentAuthority),
