@@ -5355,6 +5355,22 @@ min-width: 250px;
   box-shadow: none;
 }
 
+.treasury-history__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+}
+
+.treasury-export-actions {
+  justify-content: flex-end;
+}
+
+.treasury-export-actions button {
+  white-space: nowrap;
+}
+
 .treasury-month-group {
   display: grid;
   gap: 0.65rem;
@@ -5673,6 +5689,12 @@ min-width: 250px;
   .treasury-month-group > header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .treasury-history__actions,
+  .treasury-export-actions {
+    justify-content: stretch;
+    width: 100%;
   }
 
   .treasury-form {

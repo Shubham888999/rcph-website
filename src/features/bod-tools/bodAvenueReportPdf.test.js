@@ -237,7 +237,7 @@ test("multi-page reports repeat table headers and resolve Page X of Y after pagi
 
 test("event rows are measured and moved wholly to the next page when they do not fit", () => {
   const events = [
-    makeEvent("Tall", "Tall project detail ".repeat(80), "2026-07-01"),
+    makeEvent("Tall", "Tall project detail ".repeat(100), "2026-07-01"),
     makeEvent("Moved", "Moved project detail ".repeat(20), "2026-07-02"),
   ];
   const pages = buildBodAvenueReportPdfPages(report(events));
@@ -265,7 +265,9 @@ test("exceptionally tall rows use a bounded continuation fallback instead of loo
 test("report body content stays inside the declared top and bottom safe boundaries", () => {
   const pages = buildBodAvenueReportPdfPages(report(Array.from({ length: 6 }, (_, index) => makeEvent(`Safe-${index + 1}`, "Safe content detail ".repeat(35)))));
   const { safeArea, topMeta, generatedMeta } = BOD_AVENUE_REPORT_LAYOUT;
-  assert.equal(topMeta.y, 715);
+  assert.equal(topMeta.y, 735);
+  assert.equal(safeArea.top, 670);
+assert.equal(BOD_AVENUE_REPORT_LAYOUT.summary.top, 670);
   assert.equal(topMeta.gray, 0.2);
   assert.equal(generatedMeta.y, 85);
   assert.equal(generatedMeta.fontSize, 8.2);

@@ -12,6 +12,9 @@ import { addFine, deleteFine, deleteTreasury, newTreasuryId, setTreasuryById, up
 import useAdminMutation from "../shared/useAdminMutation";
 import TreasuryAttachments from "../treasury/TreasuryAttachments";
 import TreasuryFileField from "../treasury/TreasuryFileField";
+import { buildTreasuryExportReport } from "../treasury/treasuryExportModel";
+import { downloadTreasuryWorkbook } from "../treasury/treasuryExcel";
+import { downloadTreasuryPdf } from "../treasury/treasuryPdf";
 import { createTreasuryUploadState, getSafeTreasuryUploadError, validateTreasuryUploadFile } from "../treasury/treasuryUploadModel";
 import {
   DEFAULT_TREASURY_FILTERS,
@@ -236,6 +239,7 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const [details, setDetails] = useState(null);
   const [target, setTarget] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_TREASURY_FILTERS);
+  const [exporting, setExporting] = useState("");
   const { busy, run } = useAdminMutation({ uid, module: "treasury", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const summary = useMemo(() => buildTreasurySummary(transactions), [transactions]);
@@ -368,6 +372,32 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
+  async function exportTreasury(format) {
+    if (exporting) return;
+    setExporting(format);
+    try {
+      const report = buildTreasuryExportReport({
+        transactions,
+        members,
+        filters,
+        generatedAt: new Date(),
+      });
+      if (format === "excel") await downloadTreasuryWorkbook(report);
+      else await downloadTreasuryPdf(report);
+      onNotice?.({
+        type: "success",
+        message: `${report.transactionCount} Treasury transaction${report.transactionCount === 1 ? "" : "s"} exported to ${format === "excel" ? "Excel" : "PDF"}.`,
+      });
+    } catch {
+      onNotice?.({
+        type: "error",
+        message: `The Treasury ${format === "excel" ? "Excel workbook" : "PDF"} could not be generated. No Treasury data was changed.`,
+      });
+    } finally {
+      setExporting("");
+    }
+  }
+
   return (
     <>
       <AdminModuleHeader title="Treasury Command Center" description="Income, expenses, reimbursements, documents, and transaction history." />
@@ -416,6 +446,9 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
         onDetails={setDetails}
         onEdit={startEdit}
         onDelete={setTarget}
+        exporting={exporting}
+        onExportExcel={() => exportTreasury("excel")}
+        onExportPdf={() => exportTreasury("pdf")}
       />
       {editing ? (
         <AdminDialog title={`Editing transaction: ${editing.title || "Untitled transaction"}`} busy={busy} onClose={() => setEditing(null)} className="admin-dialog--wide">
@@ -716,7 +749,7 @@ function TreasuryReviewPanel({ value, upload, errors, compact = false }) {
   );
 }
 
-function TreasuryHistory({ transactions, filteredTransactions, groupedTransactions, filters, monthOptions, avenueOptions, locked, onFilter, onClearFilters, onDetails, onEdit, onDelete }) {
+function TreasuryHistory({ transactions, filteredTransactions, groupedTransactions, filters, monthOptions, avenueOptions, locked, onFilter, onClearFilters, onDetails, onEdit, onDelete, exporting, onExportExcel, onExportPdf }) {
   const [activeMobileMenuId, setActiveMobileMenuId] = useState("");
   const activeMobileMenuRef = useRef(null);
   const activeFilters = Object.entries(filters).some(([key, value]) => key !== "sort" && Boolean(value)) || filters.sort !== DEFAULT_TREASURY_FILTERS.sort;
@@ -749,7 +782,13 @@ function TreasuryHistory({ transactions, filteredTransactions, groupedTransactio
           <span>History</span>
           <h3 id="treasury-history-title">Transaction history</h3>
         </div>
-        <strong>{filteredTransactions.length} of {transactions.length}</strong>
+        <div className="treasury-history__actions">
+          <strong>{filteredTransactions.length} of {transactions.length}</strong>
+          <div className="admin-actions treasury-export-actions" aria-label="Treasury export actions">
+            <button type="button" onClick={onExportExcel} disabled={Boolean(exporting)}>{exporting === "excel" ? "Generating Excel..." : "Export Excel"}</button>
+            <button type="button" onClick={onExportPdf} disabled={Boolean(exporting)}>{exporting === "pdf" ? "Generating PDF..." : "Export PDF"}</button>
+          </div>
+        </div>
       </div>
       <TreasuryFilterBar filters={filters} monthOptions={monthOptions} avenueOptions={avenueOptions} onFilter={onFilter} onClear={onClearFilters} activeFilters={activeFilters} />
       {filteredTransactions.length ? (
