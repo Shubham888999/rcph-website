@@ -7,6 +7,7 @@ import DzrVisitModule from "../../features/admin/modules/DzrVisitModule";
 import { AnnouncementsModule, ProspectsModule } from "../../features/admin/modules/EngagementModules";
 import { FinesModule, TreasuryModule } from "../../features/admin/modules/FinanceModules";
 import LocksModule from "../../features/admin/modules/LocksModule";
+import RemindersModule from "../../features/admin/reminders/RemindersModule";
 import ResolutionsModule from "../../features/admin/resolutions/ResolutionsModule";
 import { AdminError, AdminLoading, AdminNotice } from "../../features/admin/shared/AdminStates";
 import { clearAdminCaches } from "../../features/admin/shared/adminService";
@@ -20,7 +21,8 @@ import "../../styles/components/admin.css";
 
 export default function AdminPage() {
   const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, ""); const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools) });
-  const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "users", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "users", "districtEvents", "districtAttendance"], fines: ["members", "fines", "events", "bodMeetings", "districtEvents"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
+  const displayName = formatRotaractorName(access?.user?.name || user?.displayName || "RCPH Admin", access?.user || access?.storedRole);
+  const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "users", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "users", "districtEvents", "districtAttendance"], reminders: ["events", "bodMeetings", "districtEvents", "reminders"], fines: ["members", "fines", "events", "bodMeetings", "districtEvents"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
   const canAccessLockTools = access?.canAccessLockTools === true || access?.canAccessPresidentControls === true;
   const canAccessResolutionTools = access?.canAccessResolutionTools === true;
   const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools);
@@ -38,6 +40,7 @@ export default function AdminPage() {
   else if (segment === "district") content = <DistrictModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;
   else if (segment === "prospects") content = <ProspectsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "announcements") content = <AnnouncementsModule uid={uid} onNotice={setNotice} />;
+  else if (segment === "reminders") content = <RemindersModule data={data} access={access} uid={uid} actorName={displayName} onNotice={setNotice} />;
   else if (segment === "resolutions") content = <ResolutionsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "fines") content = <FinesModule
   fines={data.fines}
@@ -55,5 +58,5 @@ export default function AdminPage() {
   else if (segment === "visit-submissions") content = <VisitSubmissionsModule onNotice={setNotice} />;
   else if (segment === "dzr-visit") content = <DzrVisitModule data={data} />;
   else content = <AdminError message="This Admin module does not exist." />;
-  return <main className="admin-page"><AdminShell access={access} displayName={formatRotaractorName(access?.user?.name || user?.displayName || "RCPH Admin", access?.user || access?.storedRole)} onSignOut={handleSignOut}><AdminNotice notice={notice} onDismiss={() => setNotice(null)} />{content}</AdminShell></main>;
+  return <main className="admin-page"><AdminShell access={access} displayName={displayName} onSignOut={handleSignOut}><AdminNotice notice={notice} onDismiss={() => setNotice(null)} />{content}</AdminShell></main>;
 }

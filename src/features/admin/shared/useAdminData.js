@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { adminDiagnostic, safeAdminError } from "./adminErrors";
+import { normalizeReminder } from "../reminders/reminderModel";
 import { normalizeAdminUser, normalizeEvent, normalizeFine, normalizeMember, normalizeTreasury } from "./adminModel";
 import { subscribeAdminCollection, subscribeAdminLock } from "./adminService";
 
-const COLLECTIONS = ["users", "members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "districtEvents", "districtAttendance", "fines", "treasury"];
+const COLLECTIONS = ["users", "members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "districtEvents", "districtAttendance", "fines", "treasury", "reminders"];
+const OPTIONAL_COLLECTIONS = new Set(["reminders"]);
 const LOCKS = [
   "attendance",
   "bodAttendance",
@@ -13,7 +15,7 @@ const LOCKS = [
 ];
 function normalize(module, rows) {
   if (["attendance", "bodAttendance", "districtAttendance"].includes(module)) return Object.fromEntries(rows.map((row) => [row.id, { ...row.data }]));
-  const fn = module === "users" ? normalizeAdminUser : ["members", "bodMembers"].includes(module) ? normalizeMember : module === "events" ? (id, raw) => normalizeEvent(id, raw, "club") : module === "bodMeetings" ? (id, raw) => normalizeEvent(id, raw, "bodMeeting") : module === "districtEvents" ? (id, raw) => normalizeEvent(id, raw, "districtEvent") : module === "fines" ? normalizeFine : normalizeTreasury;
+  const fn = module === "users" ? normalizeAdminUser : ["members", "bodMembers"].includes(module) ? normalizeMember : module === "events" ? (id, raw) => normalizeEvent(id, raw, "club") : module === "bodMeetings" ? (id, raw) => normalizeEvent(id, raw, "bodMeeting") : module === "districtEvents" ? (id, raw) => normalizeEvent(id, raw, "districtEvent") : module === "fines" ? normalizeFine : module === "reminders" ? normalizeReminder : normalizeTreasury;
   return rows.map((row) => fn(row.id, row.data)).filter(Boolean);
 }
 
@@ -34,6 +36,12 @@ export default function useAdminData({ uid, enabled }) {
       setErrors((current) => { const next = { ...current }; delete next[module]; return next; });
     }, (error) => {
       if (import.meta.env.DEV) console.error("Admin collection failed.", adminDiagnostic(error, "read", module, uid, "listener"));
+      if (OPTIONAL_COLLECTIONS.has(module)) {
+        setData((current) => ({ ...current, [module]: [] }));
+        setLoaded((current) => new Set(current).add(module));
+        setErrors((current) => { const next = { ...current }; delete next[module]; return next; });
+        return;
+      }
       setErrors((current) => ({ ...current, [module]: safeAdminError(error, `Could not load ${module}.`) }));
       setLoaded((current) => new Set(current).add(module));
     }));

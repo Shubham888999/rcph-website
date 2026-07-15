@@ -13,9 +13,38 @@ const MESSAGES = {
   "firestore/unavailable": "Protected data is temporarily unavailable.",
   "firestore/failed-precondition": "This operation is currently locked.",
   "firestore/aborted": "The record changed while saving. Refresh and try again.",
+  "permission-denied": "Your trusted access does not permit this operation.",
+  "unavailable": "Protected data is temporarily unavailable.",
+  "failed-precondition": "This operation is currently locked.",
+  "aborted": "The record changed while saving. Refresh and try again.",
+  "not-found": "The record no longer exists.",
 };
-export function adminErrorCode(error) { return typeof error?.code === "string" ? error.code.toLowerCase() : "unknown"; }
-export function safeAdminError(error, fallback = "The Admin operation could not be completed.") { return MESSAGES[adminErrorCode(error)] || fallback; }
-export function adminDiagnostic(error, operation, module, uid = "", phase = "mutation") {
-  return { code: adminErrorCode(error), operation, module, phase, uidSuffix: uid ? `…${uid.slice(-4)}` : "none" };
+
+export function adminErrorCode(error) {
+  return typeof error?.code === "string"
+    ? error.code.toLowerCase()
+    : "unknown";
+}
+
+export function safeAdminError(
+  error,
+  fallback = "The Admin operation could not be completed.",
+) {
+  return MESSAGES[adminErrorCode(error)] || fallback;
+}
+
+export function adminDiagnostic(
+  error,
+  operation,
+  module,
+  uid = "",
+  phase = "mutation",
+) {
+  return {
+    code: adminErrorCode(error),
+    operation,
+    module,
+    phase,
+    uidSuffix: uid ? `...${uid.slice(-4)}` : "none",
+  };
 }

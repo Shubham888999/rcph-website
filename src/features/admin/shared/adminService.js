@@ -20,7 +20,7 @@ import {
 const QUERY_CONFIG = {
   users: ["users", "createdAt", "desc"], members: ["members", "name", "asc"], events: ["events", "date", "desc"], attendance: ["attendance"],
   bodMembers: ["bodMembers", "name", "asc"], bodMeetings: ["bodMeetings", "date", "desc"], bodAttendance: ["bodAttendance"],
-  districtEvents: ["districtEvents", "date", "desc"], districtAttendance: ["districtAttendance"], fines: ["fines", "date", "desc"], treasury: ["treasury", "date", "desc"],
+  districtEvents: ["districtEvents", "date", "desc"], districtAttendance: ["districtAttendance"], fines: ["fines", "date", "desc"], treasury: ["treasury", "date", "desc"], reminders: ["reminders"],
 };
 
 function requireUser(uid = "") { if (!auth.currentUser || (uid && auth.currentUser.uid !== uid)) throw new Error("Authenticated user required."); return auth.currentUser.uid; }
