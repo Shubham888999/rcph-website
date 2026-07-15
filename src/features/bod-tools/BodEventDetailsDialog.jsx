@@ -1,13 +1,16 @@
 import useAccessibleDialog from "./useAccessibleDialog";
+import MomSection from "../mom/MomSection";
+import { getBodMomTarget } from "../mom/momModel";
 import { getBodEventAttachments, getEventDescriptionForAvenue } from "./bodEventModel";
 
 const TYPE_LABELS = { clubEvent: "Club Event", bodMeeting: "BOD Meeting", districtEvent: "District Event", unknown: "Unknown type" };
 const ROLE_LABELS = { host: "Host", cohost: "Co-host", collaborator: "Collaborator", participant: "Participant" };
 
-export default function BodEventDetailsDialog({ event, onClose }) {
+export default function BodEventDetailsDialog({ event, access, uid, onNotice, onUploaded, onClose }) {
   const dialogRef = useAccessibleDialog({ open: Boolean(event), onClose });
   if (!event) return null;
   const attachments = getBodEventAttachments(event);
+  const momTarget = getBodMomTarget(event);
   const driveUrl = event.driveFolder || (/^[a-zA-Z0-9_-]+$/.test(event.driveFolderId) ? `https://drive.google.com/drive/folders/${event.driveFolderId}` : "");
   const created = event.createdAt ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.createdAt)) : "Unavailable";
   return (
@@ -44,6 +47,16 @@ export default function BodEventDetailsDialog({ event, onClose }) {
           </section>
         ) : null}
         {event.collaborationNotes ? <section><h3>Collaboration notes</h3><p>{event.collaborationNotes}</p></section> : null}
+        {momTarget ? (
+          <MomSection
+            className="mom-section--bod-detail"
+            target={momTarget}
+            access={access}
+            uid={uid}
+            onNotice={onNotice}
+            onUploaded={onUploaded}
+          />
+        ) : null}
         {driveUrl ? <a href={driveUrl} target="_blank" rel="noopener noreferrer">Open Drive folder <span className="sr-only">(opens in a new tab)</span></a> : null}
         {attachments.length ? (
           <section className="bod-detail-files" aria-labelledby="bod-detail-files-title">

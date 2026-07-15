@@ -34,6 +34,25 @@ test("dates include valid leap years",()=>{assert.equal(validDate("2028-02-29"),
 test("club event payload has only verified fields",()=>{const p=buildEventPayload({name:"E",date:"2026-07-01",endDate:"",desc:"D",avenue:["CMD"],raw:true},"e");assert.deepEqual(Object.keys(p),["name","date","endDate","desc","avenue","eventId"])});
 test("event normalizer rejects invalid essential date",()=>assert.equal(normalizeEvent("e",{name:"E",date:"bad"}),null));
 
+test("event normalizer preserves MOM metadata without public Drive links", () => {
+  const event = normalizeEvent("meeting-1", {
+    name: "BOD Meeting",
+    date: "2026-07-10",
+    momDriveFileId: "drive-file-1",
+    momFileName: "mom.pdf",
+    momMimeType: "application/pdf",
+    momUploadedByName: "Secretary",
+    momUploadedAt: new Date("2026-07-10T12:00:00.000Z"),
+    momUrl: "https://drive.google.com/file/d/drive-file-1/view",
+  }, "bodMeeting");
+
+  assert.equal(event.mom.momTargetType, "bod_meeting");
+  assert.equal(event.mom.momTargetId, "meeting-1");
+  assert.equal(event.mom.momFileName, "mom.pdf");
+  assert.equal(event.mom.momUploadedByName, "Secretary");
+  assert.equal(Object.hasOwn(event.mom, "momUrl"), false);
+});
+
 test("attendance accepts production states and patches one dynamic field",()=>{assert.equal(normalizeAttendance("bad"),"NA");assert.deepEqual(attendancePatch("event",true),{event:true});assert.throws(()=>attendancePatch("bad/id",true))});
 test(
   "fine model preserves stable event metadata and rejects invalid amounts",

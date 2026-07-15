@@ -24,6 +24,16 @@ test("BOD details show avenue-specific report descriptions but cards keep the pu
   assert.doesNotMatch(card, /avenueDescriptions/);
 });
 
+test("BOD details render MOM for synced club events and BOD meetings", () => {
+  assert.match(details, /import MomSection/);
+  assert.match(details, /getBodMomTarget\(event\)/);
+  assert.match(details, /momTarget \? \(/);
+  assert.match(details, /target=\{momTarget\}/);
+  assert.doesNotMatch(details, /isCanonicalBodMomTarget/);
+  assert.match(details, /onUploaded=\{onUploaded\}/);
+  assert.match(details, /uid=\{uid\}/);
+});
+
 test("callable sync remains canonical-event based and public events ignore avenue descriptions", () => {
   assert.match(service, /export function syncBodEventToAttendance\(bodEventId\) \{\s*return call\("syncBodEventToAttendance", \{ bodEventId \}\);/);
   assert.match(service, /submitBodEvent\(payload\)/);

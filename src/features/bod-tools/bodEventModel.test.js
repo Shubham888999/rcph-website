@@ -26,6 +26,23 @@ test("club event normalizes without exposing unknown fields", () => {
   assert.equal(Object.hasOwn(event, "secret"), false);
 });
 
+test("BOD event normalizer preserves MOM metadata on canonical records", () => {
+  const event = normalizeBodEvent("event-1", {
+    ...base,
+    momDriveFileId: "mom-file-1",
+    momFileName: "project-mom.pdf",
+    momMimeType: "application/pdf",
+    momUploadedByName: "Secretary",
+    momUploadedAt: "2026-07-05T12:00:00.000Z",
+    momPublicUrl: "https://drive.google.com/file/d/mom-file-1/view",
+  });
+
+  assert.equal(event.mom.momTargetType, "bod_event");
+  assert.equal(event.mom.momTargetId, "event-1");
+  assert.equal(event.mom.momFileName, "project-mom.pdf");
+  assert.equal(Object.hasOwn(event.mom, "momPublicUrl"), false);
+});
+
 test("BOD meetings and district events stay read-only", () => {
   for (const type of ["bodMeeting", "districtEvent"]) {
     const event = normalizeBodEvent(type, { ...base, type });

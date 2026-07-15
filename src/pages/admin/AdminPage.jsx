@@ -35,9 +35,9 @@ export default function AdminPage() {
   else if (segment === "") content = <CommandCenter data={data} access={access} uid={uid} onNotice={setNotice} />;
   else if (segment === "requests") content = <AccountsModule users={data.users} access={access} uid={uid} onNotice={setNotice} />;
   else if (segment === "members") content = <MembersModule members={data.members} users={data.users} events={data.events} attendance={data.attendance} fines={data.fines} uid={uid} onNotice={setNotice} />;
-  else if (segment === "attendance") content = <ClubAttendanceModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;
-  else if (segment === "bod") content = <BodOperationsModule data={data} lock={locks.bodAttendance} uid={uid} onNotice={setNotice} />;
-  else if (segment === "district") content = <DistrictModule data={data} lock={locks.attendance} uid={uid} onNotice={setNotice} />;
+  else if (segment === "attendance") content = <ClubAttendanceModule data={data} lock={locks.attendance} uid={uid} access={access} onNotice={setNotice} />;
+  else if (segment === "bod") content = <BodOperationsModule data={data} lock={locks.bodAttendance} uid={uid} access={access} onNotice={setNotice} />;
+  else if (segment === "district") content = <DistrictModule data={data} lock={locks.attendance} uid={uid} access={access} onNotice={setNotice} />;
   else if (segment === "prospects") content = <ProspectsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "announcements") content = <AnnouncementsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "reminders") content = <RemindersModule data={data} access={access} uid={uid} actorName={displayName} onNotice={setNotice} />;

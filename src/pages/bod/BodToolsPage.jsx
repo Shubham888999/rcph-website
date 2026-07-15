@@ -218,7 +218,17 @@ export default function BodToolsPage() {
     />
   </>
 ) : null}      </BodToolsShell>
-      <BodEventDetailsDialog event={details} onClose={() => setDetails(null)} />
+      <BodEventDetailsDialog
+        event={details}
+        access={access}
+        uid={uid}
+        onNotice={setNotice}
+        onUploaded={(mom) => {
+          setDetails((current) => current ? { ...current, mom } : current);
+          reload();
+        }}
+        onClose={() => setDetails(null)}
+      />
       {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
       <BodEventArchiveDialog event={confirmation?.event || null} mode={confirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmMutation} />
     

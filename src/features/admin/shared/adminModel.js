@@ -1,4 +1,5 @@
 import { stripRotaractorPrefix } from "../../../utils/memberName.js";
+import { MOM_TARGET_TYPES, normalizeMomMetadata } from "../../mom/momModel.js";
 
 export const ADMIN_ROLES = ["gbm", "bod", "admin", "president"];
 export const ATTENDANCE_VALUES = [true, false, "NA"];
@@ -118,7 +119,8 @@ export function normalizeEvent(id, raw, kind = "club") {
   if (!id || !raw || typeof raw !== "object") return null;
   const date = text(raw.date || raw.eventStart, 20); if (!text(raw.name, 180) || !validDate(date)) return null;
   const end = text(raw.endDate || raw.eventEnd, 20);
-  return { id, name: text(raw.name, 180), date, endDate: validDate(end) && end >= date ? end : "", desc: text(raw.desc || raw.description, 2500), avenue: cleanAvenues(raw.avenue), visibility: text(raw.visibility, 20) || "public", archived: raw.archived === true, kind, rcphRole: text(raw.rcphRole, 30), hostClub: text(raw.hostClub, 180), collaborators: Array.isArray(raw.collaborators) ? raw.collaborators.map((x) => text(typeof x === "string" ? x : x?.name, 180)).filter(Boolean) : [], createdByName: text(raw.createdByName, 160) };
+  const momTargetType = kind === "bodMeeting" ? MOM_TARGET_TYPES.BOD_MEETING : kind === "districtEvent" ? MOM_TARGET_TYPES.DISTRICT_EVENT : MOM_TARGET_TYPES.CLUB_EVENT;
+  return { id, name: text(raw.name, 180), date, endDate: validDate(end) && end >= date ? end : "", desc: text(raw.desc || raw.description, 2500), avenue: cleanAvenues(raw.avenue), visibility: text(raw.visibility, 20) || "public", archived: raw.archived === true, kind, rcphRole: text(raw.rcphRole, 30), hostClub: text(raw.hostClub, 180), collaborators: Array.isArray(raw.collaborators) ? raw.collaborators.map((x) => text(typeof x === "string" ? x : x?.name, 180)).filter(Boolean) : [], createdByName: text(raw.createdByName, 160), mom: normalizeMomMetadata(raw, { momTargetType, momTargetId: id }) };
 }
 export function normalizeFine(id, raw) {
   const amount = money(raw?.amount);

@@ -1,3 +1,5 @@
+import { MOM_TARGET_TYPES, normalizeMomMetadata } from "../mom/momModel.js";
+
 const EVENT_KINDS = new Set(["clubEvent", "bodMeeting", "districtEvent"]);
 const RCPH_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
 export const BOD_AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
@@ -209,6 +211,10 @@ export function normalizeBodEvent(id, raw) {
     imageLinks: cleanStrings(raw.imageLinks).map(safeExternalUrl).filter(Boolean),
     driveLinks: cleanStrings(raw.driveLinks).map(safeExternalUrl).filter(Boolean),
     uploadedFileUrls: cleanStrings(raw.uploadedFileUrls).map(safeExternalUrl).filter(Boolean),
+    mom: normalizeMomMetadata(raw, {
+      momTargetType: MOM_TARGET_TYPES.BOD_EVENT,
+      momTargetId: eventId,
+    }),
     syncedEventId,
     syncedMeetingId,
     syncedDistrictEventId,

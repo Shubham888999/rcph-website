@@ -17,6 +17,8 @@ import { adminCalls, addRosterMember, deleteRosterMember, setAttendanceBulk, set
 import useAdminMutation from "../shared/useAdminMutation";
 import AttendanceExportPanel from "../attendance-export/AttendanceExportPanel";
 import { formatRotaractorName, stripRotaractorPrefix } from "../../../utils/memberName";
+import MomSection from "../../mom/MomSection";
+import { MOM_TARGET_TYPES } from "../../mom/momModel";
 
 function nextAttendance(value) { return value === true ? false : value === false ? "NA" : true; }
 function getAttendanceStats(memberId, events, attendance) {
@@ -438,13 +440,23 @@ function MailDraftTool({ members, title }) {
 }
 
 const emptyEvent = { name: "", date: "", endDate: "", desc: "", avenue: [] };
+function momTarget(record, targetType) {
+  return {
+    targetType,
+    targetId: record.id,
+    title: record.name,
+    date: record.date,
+    mom: record.mom,
+  };
+}
+
 function ClubEventForm({ initial = emptyEvent, onSave, busy, submitLabel }) {
   const [draft, setDraft] = useState({ ...emptyEvent, ...initial });
   function submit(event) { event.preventDefault(); const payload = buildEventPayload(draft); if (!payload.name || !payload.date || (payload.endDate && payload.endDate < payload.date) || !payload.avenue.length) return; onSave(payload); }
   return <form className="admin-form" onSubmit={submit}><div className="admin-form-grid"><label>Name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required /></label><label>Start date<input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} required /></label><label>End date<input type="date" min={draft.date} value={draft.endDate} onChange={(event) => setDraft({ ...draft, endDate: event.target.value })} /></label><label>Description<textarea value={draft.desc} onChange={(event) => setDraft({ ...draft, desc: event.target.value })} /></label></div><fieldset><legend>Avenues</legend><div className="admin-check-grid">{AVENUES.map((avenue) => <label key={avenue}><input type="checkbox" checked={draft.avenue.includes(avenue)} onChange={(event) => setDraft({ ...draft, avenue: event.target.checked ? [...draft.avenue, avenue] : draft.avenue.filter((item) => item !== avenue) })} /> {avenue}</label>)}</div></fieldset><button disabled={busy}>{submitLabel}</button></form>;
 }
 
-export function ClubAttendanceModule({ data, lock, uid, onNotice }) {
+export function ClubAttendanceModule({ data, lock, uid, access, onNotice }) {
   const [editing, setEditing] = useState(null);
   const [archive, setArchive] = useState(null);
   const [eventsExpanded, setEventsExpanded] = useState(true);
@@ -537,6 +549,14 @@ const pendingRecords =
                 </p>
               ) : null}
 
+              <MomSection
+                className="mom-section--event-row"
+                target={momTarget(event, MOM_TARGET_TYPES.CLUB_EVENT)}
+                access={access}
+                uid={uid}
+                onNotice={onNotice}
+              />
+
               <div className="attendance-event-row__actions">
                 <button
                   type="button"
@@ -627,7 +647,7 @@ const pendingRecords =
   </>;
 }
 
-export function BodOperationsModule({ data, lock, uid, onNotice }) {
+export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
   const [member, setMember] = useState({ name: "", position: "" });
   const [meeting, setMeeting] = useState({ name: "", date: "" });
   const [editMember, setEditMember] = useState(null);
@@ -946,6 +966,14 @@ export function BodOperationsModule({ data, lock, uid, onNotice }) {
           <p>{item.date}</p>
         </div>
 
+<MomSection
+  className="mom-section--bod-row"
+  target={momTarget(item, MOM_TARGET_TYPES.BOD_MEETING)}
+  access={access}
+  uid={uid}
+  onNotice={onNotice}
+/>
+
 <div className="bod-meeting-row__actions">
   <button
     type="button"
@@ -998,7 +1026,7 @@ export function BodOperationsModule({ data, lock, uid, onNotice }) {
   </>;
 }
 
-export function DistrictModule({ data, lock, uid, onNotice }) {
+export function DistrictModule({ data, lock, uid, access, onNotice }) {
   const empty = { name: "", date: "", endDate: "", desc: "", public: false };
   const [draft, setDraft] = useState(empty);
   const [editing, setEditing] = useState(null);
@@ -1019,7 +1047,7 @@ export function DistrictModule({ data, lock, uid, onNotice }) {
     <AdminModuleHeader title="District Events & Attendance" />
     <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{locked ? "District changes are locked or unavailable." : "District changes are open."}</div>
     <section className="admin-panel">{form(draft, setDraft, submit, "Add district event")}</section>
-    <div className="admin-card-grid">{events.map((event) => <article className="admin-record-card" key={event.id}><h3>{event.name}</h3><p>{event.date} · {event.visibility}</p><div className="admin-actions"><button disabled={locked} onClick={() => setEditing({ ...event, public: event.visibility === "public" })}>Edit</button><button className="danger" disabled={locked} onClick={() => setArchive(event)}>Archive</button></div></article>)}</div>
+    <div className="admin-card-grid">{events.map((event) => <article className="admin-record-card" key={event.id}><h3>{event.name}</h3><p>{event.date} · {event.visibility}</p><MomSection className="mom-section--card" target={momTarget(event, MOM_TARGET_TYPES.DISTRICT_EVENT)} access={access} uid={uid} onNotice={onNotice} /><div className="admin-actions"><button disabled={locked} onClick={() => setEditing({ ...event, public: event.visibility === "public" })}>Edit</button><button className="danger" disabled={locked} onClick={() => setArchive(event)}>Archive</button></div></article>)}</div>
     <AttendanceExportPanel panelKey="district" members={attendanceParticipants} events={events} attendance={data.districtAttendance} onNotice={onNotice} />
     <AttendanceGrid members={attendanceParticipants} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} />
     {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}>{form(editing, setEditing, save, "Save district event")}</AdminDialog> : null}

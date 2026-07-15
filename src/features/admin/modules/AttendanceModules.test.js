@@ -103,12 +103,25 @@ test("Active club events renders a conditional compact list while preserving act
   assert.doesNotMatch(clubSource, /attendance-event-list__grid/);
 });
 
+test("event and meeting lists expose MOM sections without changing attendance calls", () => {
+  assert.match(source, /import MomSection/);
+  assert.match(source, /MOM_TARGET_TYPES\.CLUB_EVENT/);
+  assert.match(source, /MOM_TARGET_TYPES\.BOD_MEETING/);
+  assert.match(source, /MOM_TARGET_TYPES\.DISTRICT_EVENT/);
+  assert.match(source, /access=\{access\}/);
+  assert.match(source, /target=\{momTarget\(event, MOM_TARGET_TYPES\.CLUB_EVENT\)\}/);
+  assert.match(source, /target=\{momTarget\(item, MOM_TARGET_TYPES\.BOD_MEETING\)\}/);
+  assert.match(source, /target=\{momTarget\(event, MOM_TARGET_TYPES\.DISTRICT_EVENT\)\}/);
+  assert.doesNotMatch(source, /send.*mom.*email/i);
+});
+
 test("Active club events CSS uses compact rows, clamped descriptions, and mobile stacking", () => {
-  assert.match(adminCss, /\.attendance-event-row \{[\s\S]*grid-template-areas:[\s\S]*"avenue title actions"[\s\S]*"date description actions"/);
+  assert.match(adminCss, /\.attendance-event-row \{[\s\S]*grid-template-areas:[\s\S]*"avenue title actions"[\s\S]*"date description actions"[\s\S]*"mom mom actions"/);
   assert.match(adminCss, /\.attendance-event-row__description \{[\s\S]*-webkit-line-clamp: 2/);
   assert.match(adminCss, /\.attendance-event-row__actions \{[\s\S]*justify-content: flex-end/);
+  assert.match(adminCss, /\.mom-section--event-row \{[\s\S]*grid-area: mom/);
   assert.match(adminCss, /\.attendance-section-heading__chevron\.is-expanded \{[\s\S]*transform: rotate\(90deg\)/);
-  assert.match(adminCss, /@media \(max-width: 768px\) \{[\s\S]*\.attendance-event-row \{[\s\S]*"avenue"[\s\S]*"title"[\s\S]*"date"[\s\S]*"description"[\s\S]*"actions"/);
+  assert.match(adminCss, /@media \(max-width: 768px\) \{[\s\S]*\.attendance-event-row \{[\s\S]*"avenue"[\s\S]*"title"[\s\S]*"date"[\s\S]*"description"[\s\S]*"mom"[\s\S]*"actions"/);
   assert.doesNotMatch(adminCss, /attendance-event-card/);
   assert.doesNotMatch(adminCss, /attendance-event-list__grid/);
 });
