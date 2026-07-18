@@ -5,8 +5,7 @@ const TYPE_OPTIONS = [
 export default function BodEventFilters({ filters, onChange, onReset, avenues, months, resultCount }) {
   const set = (key) => (event) => onChange({ ...filters, [key]: event.target.type === "checkbox" ? event.target.checked : event.target.value });
   return (
-    <section className="bod-event-filters" aria-labelledby="bod-filter-title">
-      <div className="bod-filter-heading"><h2 id="bod-filter-title">Submissions</h2><span aria-live="polite">{resultCount} results</span></div>
+    <div className="bod-event-filters" aria-label="Submission filters" data-result-count={resultCount}>
       <div className="bod-filter-grid">
         <label>Search<input type="search" value={filters.search} onChange={set("search")} placeholder="Name, description, host…" /></label>
         <label>Status<select value={filters.status} onChange={set("status")}><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></label>
@@ -16,6 +15,6 @@ export default function BodEventFilters({ filters, onChange, onReset, avenues, m
         <label className="bod-filter-check"><input type="checkbox" checked={filters.mine} onChange={set("mine")} /> My submissions</label>
       </div>
       <button type="button" className="bod-button bod-button--quiet" onClick={onReset}>Reset filters</button>
-    </section>
+    </div>
   );
 }

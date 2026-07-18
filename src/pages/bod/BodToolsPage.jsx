@@ -39,6 +39,7 @@ export default function BodToolsPage() {
   const [notice, setNotice] = useState(null);
   const [mutationError, setMutationError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
   const mutationLockRef = useRef(false);
   const sessionUidRef = useRef(uid);
   useEffect(() => { sessionUidRef.current = uid; }, [uid]);
@@ -183,34 +184,60 @@ export default function BodToolsPage() {
         {status === "error" ? <BodToolsErrorState onRetry={reload} onSignOut={handleSignOut} /> : null}
 {status === "success" ? (
   <>
-    <BodEventFilters
-      filters={filters}
-      onChange={setFilters}
-      onReset={() => setFilters(DEFAULT_FILTERS)}
-      avenues={avenues}
-      months={months}
-      resultCount={visibleEvents.length}
-    />
+    <section className="bod-submissions" aria-labelledby="bod-submissions-title">
+      <header className="bod-submissions__header">
+        <div>
+          <p className="bod-tools-kicker">Created events</p>
+          <h2 id="bod-submissions-title">Submissions</h2>
+        </div>
+        <div className="bod-submissions__summary">
+          <span aria-live="polite">{visibleEvents.length} results</span>
+          <button
+            type="button"
+            className="bod-submissions__toggle"
+            aria-expanded={submissionsExpanded}
+            aria-controls="bod-submissions-panel"
+            onClick={() => setSubmissionsExpanded((current) => !current)}
+          >
+            {submissionsExpanded ? "Hide submissions" : "Show submissions"}
+          </button>
+        </div>
+      </header>
 
-    <BodEventList
-      events={visibleEvents}
-      access={access}
-      lockState={lockState}
-      onDetails={setDetails}
-      onEdit={(event) => {
-        setMutationError("");
-        setForm({ event });
-      }}
-      onArchive={(event) => {
-        setMutationError("");
-        setConfirmation({ event, mode: "archive" });
-      }}
-      onSync={(event) => {
-        setMutationError("");
-        setConfirmation({ event, mode: "sync" });
-      }}
-      onReset={() => setFilters(DEFAULT_FILTERS)}
-    />
+      <div
+        id="bod-submissions-panel"
+        className={`bod-submissions__panel ${submissionsExpanded ? "is-open" : ""}`}
+      >
+        <BodEventFilters
+          filters={filters}
+          onChange={setFilters}
+          onReset={() => setFilters(DEFAULT_FILTERS)}
+          avenues={avenues}
+          months={months}
+          resultCount={visibleEvents.length}
+        />
+
+        <BodEventList
+          events={visibleEvents}
+          access={access}
+          lockState={lockState}
+          onDetails={setDetails}
+          onEdit={(event) => {
+            setMutationError("");
+            setForm({ event });
+          }}
+          onArchive={(event) => {
+            setMutationError("");
+            setConfirmation({ event, mode: "archive" });
+          }}
+          onSync={(event) => {
+            setMutationError("");
+            setConfirmation({ event, mode: "sync" });
+          }}
+          onReset={() => setFilters(DEFAULT_FILTERS)}
+        />
+      </div>
+    </section>
 
     <BodAvenueReportPanel
       events={events}

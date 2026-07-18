@@ -5,7 +5,11 @@ import test from "node:test";
 const form = readFileSync(new URL("./BodEventForm.jsx", import.meta.url), "utf8");
 const details = readFileSync(new URL("./BodEventDetailsDialog.jsx", import.meta.url), "utf8");
 const card = readFileSync(new URL("./BodEventCard.jsx", import.meta.url), "utf8");
+const filters = readFileSync(new URL("./BodEventFilters.jsx", import.meta.url), "utf8");
+const list = readFileSync(new URL("./BodEventList.jsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("../../pages/bod/BodToolsPage.jsx", import.meta.url), "utf8");
 const service = readFileSync(new URL("./bodEventService.js", import.meta.url), "utf8");
+const styles = readFileSync(new URL("../../styles/components/bod-tools.css", import.meta.url), "utf8");
 const publicEventModel = readFileSync(new URL("../events/eventModel.js", import.meta.url), "utf8");
 
 test("BOD event form keeps public and per-avenue descriptions separate", () => {
@@ -17,11 +21,38 @@ test("BOD event form keeps public and per-avenue descriptions separate", () => {
   assert.match(form, /window\.confirm\(`Remove the \$\{avenue\} report description\?`\)/);
 });
 
-test("BOD details show avenue-specific report descriptions but cards keep the public summary", () => {
+test("BOD details show avenue-specific report descriptions but rows keep the public summary", () => {
   assert.match(details, /getEventDescriptionForAvenue\(event, avenue\)/);
   assert.match(details, /Avenue report descriptions/);
   assert.match(card, /event\.description \|\| "No description supplied\."/);
   assert.doesNotMatch(card, /avenueDescriptions/);
+});
+
+test("BOD submissions render as a collapsible compact list without the card grid contract", () => {
+  assert.match(page, /submissionsExpanded/);
+  assert.match(page, /useState\(false\)/);
+  assert.match(page, /aria-expanded=\{submissionsExpanded\}/);
+  assert.match(page, /aria-controls="bod-submissions-panel"/);
+  assert.match(page, /id="bod-submissions-panel"/);
+  assert.match(page, /className=\{`bod-submissions__panel \$\{submissionsExpanded \? "is-open" : ""\}`\}/);
+  assert.doesNotMatch(page, /hidden=\{!submissionsExpanded\}/);
+  assert.match(page, /Show submissions/);
+  assert.match(page, /Hide submissions/);
+  assert.match(page, /visibleEvents\.length\} results/);
+  assert.match(filters, /Search<input/);
+  assert.match(filters, /My submissions/);
+  assert.match(filters, /Reset filters/);
+  assert.match(list, /className="bod-event-list"/);
+  assert.match(card, /className=\{`bod-event-row/);
+  assert.match(card, /bod-event-row__side/);
+  assert.match(card, /bod-event-row__actions/);
+  for (const action of ["View details", "Edit", "Archive"]) assert.match(card, new RegExp(action));
+  assert.match(styles, /\.bod-event-list/);
+  assert.match(styles, /\.bod-event-row/);
+  assert.match(styles, /\.bod-event-row__side[\s\S]*justify-items: end/);
+  assert.match(styles, /\.bod-submissions__panel \{[\s\S]*display: none/);
+  assert.match(styles, /\.bod-submissions__panel\.is-open \{[\s\S]*display: grid/);
+  assert.doesNotMatch(styles, /bod-event-grid/);
 });
 
 test("BOD details render MOM for synced club events and BOD meetings", () => {

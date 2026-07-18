@@ -150,7 +150,7 @@ test("Member announcement guide preview renders as a static dashboard announceme
 
 test("Website Guide route and dashboard links are static frontend navigation only", () => {
   assert.match(routerSource, /path: "\/website-guide"/);
-  assert.match(dashboardHeaderSource, /to="\/website-guide">Website Guide/);
+  assert.match(dashboardHeaderSource, /<Link\s+to="\/website-guide"(?:\s+onClick=\{closeActions\})?>Website Guide<\/Link>/);
   assert.match(adminShellSource, /to="\/website-guide">Website Guide/);
   assert.doesNotMatch(pageSource, /firebase|firestore|functions|httpsCallable|getDocs|setDoc|updateDoc|deleteDoc/i);
 });
