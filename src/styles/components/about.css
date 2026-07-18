@@ -608,3 +608,34 @@
     white-space: normal;
   }
 }
+
+@media (max-width: 768px) {
+  .about-feature-card {
+    gap: 1.2rem;
+  }
+
+  .about-feature-card__media {
+    width: min(100%, 12.75rem);
+    min-height: 0;
+    aspect-ratio: 1;
+    padding: 0.7rem;
+    border-radius: 1rem;
+    box-shadow:
+      0 0.7rem 1.6rem rgba(0, 0, 0, 0.22),
+      inset 0 0 0 1px rgba(var(--lakshya-cream-rgb), 0.045);
+  }
+
+  .about-feature-card__logo {
+    --rcph-logo-mark-scale: 1;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .about-feature-card__media {
+    width: min(100%, 11.75rem);
+    padding: 0.6rem;
+  }
+}

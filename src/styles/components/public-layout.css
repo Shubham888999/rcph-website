@@ -591,12 +591,33 @@
 
   .public-footer-inner {
     grid-template-columns: 1fr;
-    gap: 2rem;
+    gap: 1.15rem;
+    padding-block: 1.55rem 1.25rem;
+  }
+
+  .public-footer-links {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem 0.75rem;
+  }
+
+  .public-footer-links a {
+    min-height: 2.35rem;
+    display: flex;
+    align-items: center;
+    font-size: 0.88rem;
+  }
+
+  .public-footer-contact {
+    gap: 0.45rem;
   }
 
   .public-footer-bottom {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.35rem;
+    padding-block: 0.85rem 1rem;
   }
 }
 
@@ -629,6 +650,21 @@
 
   .public-footer-identity {
     align-items: flex-start;
+    gap: 0.8rem;
+  }
+
+  .public-footer-logo {
+    width: 56px;
+    height: 56px;
+  }
+
+  .public-footer-identity strong {
+    margin-bottom: 0.2rem;
+  }
+
+  .public-footer-identity p,
+  .public-footer-contact a {
+    font-size: 0.9rem;
   }
 }
 
