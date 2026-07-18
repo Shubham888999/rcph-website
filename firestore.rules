@@ -24,7 +24,6 @@ service cloud.firestore {
     function saaAssignmentPath() {
   return /databases/$(database)/documents/bodPositionAssignments/$(("saa_" + request.auth.uid));
 }
-
     function hasRole(role) {
       return signedIn()
         && exists(rolePath())
@@ -89,6 +88,13 @@ function hasActiveSaaAssignment() {
 
 function isAdmin() {
   return hasRole('admin')
+    || hasPresidentAuthority()
+    || hasActiveSaaAssignment();
+}
+
+function hasAdminPanelAuthority() {
+  return hasApprovedActiveRole('admin')
+    || hasApprovedActiveRole('president')
     || hasPresidentAuthority()
     || hasActiveSaaAssignment();
 }
@@ -205,6 +211,26 @@ function isFineLinkedTreasury(data) {
       allow read, write: if false;
     }
 
+    match /bodSettings/{document} {
+      allow read, write: if false;
+    }
+
+    match /bodBoards/{boardId} {
+      allow read, write: if false;
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /bodProfilePhotoUploadSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /bodProfilePhotoUploadRateLimits/{rateLimitId} {
+      allow read, write: if false;
+    }
+
     match /visitSubmissionConfig/{visitType} {
       allow read, write: if false;
     }
@@ -318,6 +344,9 @@ match /treasury/{transactionId} {
     );
 }
 
+    match /reminders/{reminderId} {
+      allow read, create, update, delete: if hasAdminPanelAuthority();
+    }
     match /locks/{panelId} {
       allow read: if signedIn();
       allow create, update, delete: if hasLockTools();

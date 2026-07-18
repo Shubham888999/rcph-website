@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+﻿const functions = require('firebase-functions');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
@@ -29,6 +29,10 @@ const {
 } = require('./lib/announcement-attachments');
 const bodAvenueReport = require('./lib/bod-avenue-report');
 const bodEventSchema = require('./lib/bod-event-schema');
+const { createBodManagementService } = require('./lib/bod-management');
+const { createBodPhotoUploadService } = require('./lib/bod-photo-upload');
+const momFunctions = require('./lib/momFunctions');
+const reminderFunctions = require('./lib/reminderFunctions');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 const {
   MemberProfileValidationError,
@@ -89,6 +93,11 @@ const CALLABLE_OPTIONS = {
     'https://www.rcph3131.org',
     'https://rcph-admin.web.app',
     'https://rcph-admin.firebaseapp.com',
+
+    'https://rcph-admin-staging-2.web.app',
+    'https://rcph-admin-staging-2.firebaseapp.com',
+    /^https:\/\/rcph-admin-staging-2--[a-z0-9-]+\.web\.app$/,
+
     'http://localhost:5000',
     'http://localhost:5500',
     'http://127.0.0.1:5500',
@@ -98,6 +107,7 @@ const CALLABLE_OPTIONS = {
 };
 const RESOLUTION_DRIVE_SECRETS = [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN];
 const RESOLUTION_PDF_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: '1GiB', secrets: RESOLUTION_DRIVE_SECRETS };
+const BOD_PHOTO_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: RESOLUTION_DRIVE_SECRETS };
 const ANNOUNCEMENT_ATTACHMENT_SECRETS = RESOLUTION_DRIVE_SECRETS;
 const ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: ANNOUNCEMENT_ATTACHMENT_SECRETS };
 const resolutionDrive = createResolutionDriveService({
@@ -123,6 +133,24 @@ const announcementAttachments = createAnnouncementAttachmentService({
   },
   logger: console,
   uploadEndpoint: 'https://us-central1-rcph-admin.cloudfunctions.net/uploadAnnouncementAttachment',
+});
+const bodManagement = createBodManagementService({
+  db,
+  admin,
+  HttpsError,
+  assertApprovedActiveCallableAccount,
+  getAuthorityContext,
+  logger: console,
+});
+const bodPhotoUploads = createBodPhotoUploadService({
+  db,
+  admin,
+  HttpsError,
+  bodManagement,
+  env: process.env,
+  secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
+  allowedOrigins: CALLABLE_OPTIONS.cors,
+  logger: console,
 });
 
 const transporter = nodemailer.createTransport({
@@ -7111,6 +7139,135 @@ exports.createBodUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
   };
 });
 
+exports.getBodManagementBoard = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodManagement.getBodManagementBoard(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not load BOD Management board.');
+  }
+});
+
+exports.saveBodSectionPublication = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodManagement.saveBodSectionPublication(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not save BOD Management status.');
+  }
+});
+
+exports.publishBodSection = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodManagement.publishBodSection(
+      request.data || {},
+      actorUid
+    );
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not publish BOD section.');
+  }
+});
+
+exports.upsertBodProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodManagement.upsertBodProfile(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not save BOD profile.');
+  }
+});
+
+exports.archiveBodProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodManagement.archiveBodProfile(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not archive BOD profile.');
+  }
+});
+
+exports.restoreBodProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodManagement.restoreBodProfile(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not restore BOD profile.');
+  }
+});
+
+exports.reorderBodProfiles = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodManagement.reorderBodProfiles(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not reorder BOD profiles.');
+  }
+});
+
+exports.createBodPhotoUploadSession = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodPhotoUploads.createUploadSession(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not create BOD photo upload session.');
+  }
+});
+
+exports.finalizeBodPhotoUpload = onCall(BOD_PHOTO_CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodPhotoUploads.finalizeUpload(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not finalize BOD photo upload.');
+  }
+});
+
+exports.removeBodProfilePhoto = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodPhotoUploads.removePhoto(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not remove BOD profile photo.');
+  }
+});
+
+exports.cleanupExpiredBodPhotoUploadSessions = onCall(BOD_PHOTO_CALLABLE_OPTIONS, async (request) => {
+  try {
+    const actorUid = requireAuth(request);
+    return await bodPhotoUploads.cleanupExpiredSessions(request.data || {}, actorUid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not clean up BOD photo upload sessions.');
+  }
+});
+
+exports.uploadBodProfilePhoto = onRequest(
+  { region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', maxInstances: 5, concurrency: 10, secrets: RESOLUTION_DRIVE_SECRETS },
+  (req, res) => bodPhotoUploads.uploadHttp(req, res)
+);
+exports.getPublicBodBoard = onRequest(
+  {
+    region: 'us-central1',
+    cors: CALLABLE_OPTIONS.cors,
+  },
+  (req, res) =>
+    bodManagement.handlePublicBodBoardRequest(req, res)
+);
+
+exports.downloadPublishedBodPhoto = onRequest(
+  {
+    region: 'us-central1',
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    maxInstances: 5,
+    concurrency: 10,
+    secrets: RESOLUTION_DRIVE_SECRETS,
+  },
+  (req, res) =>
+    bodPhotoUploads.downloadPublishedPhotoHttp(req, res)
+);
+
+
 exports.createTreasuryUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   const authority = await assertAdminOrPresidentAuthority(uid);
@@ -7786,3 +7943,13 @@ exports.cleanSlateForNewRiy = onCall(CALLABLE_OPTIONS, async (request) => {
     counts: results,
   };
 });
+exports.getMomEmailRecipientOptions = momFunctions.getMomEmailRecipientOptions;
+exports.createMomUploadSession = momFunctions.createMomUploadSession;
+exports.uploadMomPdf = momFunctions.uploadMomPdf;
+exports.finalizeMomUpload = momFunctions.finalizeMomUpload;
+exports.downloadMomPdf = momFunctions.downloadMomPdf;
+exports.sendMomEmail = momFunctions.sendMomEmail;
+exports.sendScheduledReminderEmails = reminderFunctions.sendScheduledReminderEmails;
+exports.runReminderEmailSweep = reminderFunctions.runReminderEmailSweep;
+exports.sendReminderTemplateTestEmail = reminderFunctions.sendReminderTemplateTestEmail;
+exports.unlockAvenueReportingWindow = reminderFunctions.unlockAvenueReportingWindow;
