@@ -22,7 +22,9 @@ test("Access Hub renders one unified destination list with Member Dashboard elig
 });
 
 test("Access Hub CSS removes the oversized primary card and keeps the first destination full width", () => {
+  const shellRule = cssRule(accessCss, ".auth-access-page .access-hub");
   const mastheadRule = cssRule(accessCss, ".access-hub__masthead");
+  const watermarkRule = cssRule(accessCss, ".access-hub__masthead::after");
   const destinationRule = cssRule(accessCss, ".access-hub__destinations li > a");
   const summaryRule = cssRule(accessCss, ".access-hub__summary");
 
@@ -30,13 +32,20 @@ test("Access Hub CSS removes the oversized primary card and keeps the first dest
   assert.doesNotMatch(accessCss, /\.access-hub__primary > a/);
   assert.doesNotMatch(accessCss, /min-height: 22rem/);
   assert.doesNotMatch(accessCss, /min-height: 19rem/);
+  assert.match(shellRule, /width: min\(1160px, 100%\);[\s\S]*margin: 0 auto;/);
   assert.match(mastheadRule, /min-height: auto;[\s\S]*?align-items: start/);
-  assert.match(summaryRule, /border: 1px solid var\(--internal-border\);/);
+  assert.match(mastheadRule, /border-top: 3px solid var\(--internal-accent\);/);
+  assert.match(watermarkRule, /content: none;/);
+  assert.match(summaryRule, /border: 1px solid var\(--internal-border-strong\);/);
   assert.match(summaryRule, /border-radius: var\(--internal-radius-panel\);/);
-  assert.match(destinationRule, /border: 1px solid var\(--internal-border\);/);
+  assert.match(destinationRule, /grid-template-areas:[\s\S]*"meta action"[\s\S]*"copy action"/);
+  assert.match(destinationRule, /border: 1px solid var\(--internal-border-strong\);/);
   assert.match(destinationRule, /background:[\s\S]*var\(--internal-surface\);/);
   assert.match(destinationRule, /box-shadow: var\(--internal-shadow-card\);/);
   assert.match(accessCss, /\.access-hub__destinations li > a::before \{[\s\S]*var\(--internal-accent\)[\s\S]*var\(--internal-accent-secondary\)/);
+  assert.match(accessCss, /\.access-hub__destination-meta \{[\s\S]*grid-area: meta;/);
+  assert.match(accessCss, /\.access-hub__destination-copy \{[\s\S]*grid-area: copy;/);
+  assert.match(accessCss, /\.access-hub__destination-action \{[\s\S]*grid-area: action;/);
   assert.doesNotMatch(globalCss, /access-hub__primary/);
 });
 
