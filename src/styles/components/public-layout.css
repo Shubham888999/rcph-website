@@ -156,21 +156,18 @@
 
 .public-affiliation-logo {
   width: auto;
-  object-fit: contain;
   filter: drop-shadow(0 0.35rem 0.8rem rgba(0, 0, 0, 0.28));
 }
 
 .public-affiliation-logo--district-3131 {
   height: clamp(2.6rem, 4vw, 3.25rem);
   max-width: min(19rem, 48vw);
+  object-fit: contain;
 }
 
 .public-affiliation-logo--lakshya {
   width: clamp(3.75rem, 5vw, 4.5rem);
   height: clamp(3.75rem, 5vw, 4.5rem);
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--lakshya-cream);
   box-shadow:
     0 0 0 1px rgba(var(--lakshya-cream-rgb), 0.16),
     0 0.45rem 1rem rgba(17, 1, 5, 0.28);
@@ -214,9 +211,7 @@
 .public-brand-logo {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--lakshya-cream);
+  flex: 0 0 auto;
 }
 
 .public-brand-copy strong,
@@ -426,9 +421,7 @@
 .public-footer-logo {
   width: 68px;
   height: 68px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--lakshya-cream);
+  flex: 0 0 auto;
 }
 
 .public-footer-identity strong {

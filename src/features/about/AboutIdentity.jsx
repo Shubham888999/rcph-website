@@ -5,12 +5,14 @@ export default function AboutIdentity() {
     <AboutReveal className="about-section" labelledBy="about-identity-title">
       <article className="about-feature-card">
         <div className="about-feature-card__media">
+          <span className="about-feature-card__logo rcph-logo-mark">
           <img
             src="/images/rcph-lakshya-logo.webp"
             alt="Rotaract Club of Pune Heritage Lakshya RIY 2026-27 logo"
             loading="lazy"
             decoding="async"
           />
+          </span>
         </div>
         <div className="about-feature-card__copy">
           <p className="about-kicker">Lakshya identity</p>

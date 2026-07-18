@@ -45,22 +45,23 @@ export default function PublicLayout() {
           className="public-affiliation-logo public-affiliation-logo--district-3131"
         />
 
-        <img
-          src="/images/rcph-lakshya-logo.webp"
-          alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
-          className="public-affiliation-logo public-affiliation-logo--lakshya"
-        />
+        <span className="public-affiliation-logo public-affiliation-logo--lakshya rcph-logo-mark">
+          <img
+            src="/images/rcph-lakshya-logo.webp"
+            alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+          />
+        </span>
       </div>
 
       <header className="public-header">
         <div className="public-header-inner">
           <NavLink className="public-brand" to="/" aria-label="RCPH home" onClick={closeMenu}>
-            <img
-              src="/images/rcph-lakshya-logo.webp"
-              alt=""
-              className="public-brand-logo"
-              aria-hidden="true"
-            />
+            <span className="public-brand-logo rcph-logo-mark" aria-hidden="true">
+              <img
+                src="/images/rcph-lakshya-logo.webp"
+                alt=""
+              />
+            </span>
 
             <span className="public-brand-copy">
               <strong>RCPH</strong>
@@ -118,11 +119,12 @@ export default function PublicLayout() {
       <footer className="public-footer">
         <div className="public-footer-inner">
           <div className="public-footer-identity">
-            <img
-              src="/images/rcph-lakshya-logo.webp"
-              alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
-              className="public-footer-logo"
-            />
+            <span className="public-footer-logo rcph-logo-mark">
+              <img
+                src="/images/rcph-lakshya-logo.webp"
+                alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+              />
+            </span>
 
             <div>
               <strong>Rotaract Club of Pune Heritage</strong>

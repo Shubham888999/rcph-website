@@ -22,7 +22,7 @@ export default function AboutValues() {
   return (
     <AboutReveal className="about-section" labelledBy="about-theme-title">
       <div className="about-theme-header">
-        <div className="about-theme-header__mark" aria-hidden="true">
+        <div className="about-theme-header__mark rcph-logo-mark" aria-hidden="true">
           <img src="/images/rcph-lakshya-logo.webp" alt="" loading="lazy" decoding="async" />
         </div>
         <div>

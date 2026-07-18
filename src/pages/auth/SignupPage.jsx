@@ -52,7 +52,9 @@ function SignupVerification({ message = "Checking your account setup..." }) {
   return (
     <main className="login-page-react">
       <section className="login-verification" role="status" aria-live="polite">
-        <img src="/images/rcph-lakshya-logo.webp" alt="" aria-hidden="true" />
+        <span className="login-verification-logo rcph-logo-mark" aria-hidden="true">
+          <img src="/images/rcph-lakshya-logo.webp" alt="" />
+        </span>
         <p className="login-kicker">Secure account creation</p>
         <h1>Verifying your account</h1>
         <p>{message}</p>
@@ -257,10 +259,12 @@ return (
     >
       <header className="signup-brand-header">
         <Link className="login-brand" to="/" aria-label="RCPH public homepage">
-          <img
-            src="/images/rcph-lakshya-logo.webp"
-            alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
-          />
+          <span className="login-brand-logo rcph-logo-mark">
+            <img
+              src="/images/rcph-lakshya-logo.webp"
+              alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+            />
+          </span>
           <span>
             <strong>RCPH</strong>
             <small>RID 3131 - Zone 4</small>
