@@ -102,6 +102,15 @@ test("Website Guide page renders selectors, guide sections, empty state, and sta
   assert.match(pageSource, /No live module data is loaded/);
 });
 
+test("Website Guide CSS keeps Phase 3 internal card and selector surfaces tokenized", () => {
+  assert.match(guideCss, /\.website-guide-controls \{[\s\S]*border: 1px solid var\(--internal-border\);[\s\S]*var\(--internal-surface\);[\s\S]*box-shadow: var\(--internal-shadow-card\);/);
+  assert.match(guideCss, /\.website-guide-controls select \{[\s\S]*border-radius: var\(--internal-radius-control\);[\s\S]*background:[\s\S]*var\(--internal-control-bg\);/);
+  assert.match(guideCss, /\.website-guide-role-card \{[\s\S]*border-top: 3px solid var\(--internal-accent\);[\s\S]*border-radius: var\(--internal-radius-panel\);[\s\S]*box-shadow: var\(--internal-shadow-panel\);/);
+  assert.match(guideCss, /\.website-guide-entry__steps \{[\s\S]*border-left: 3px solid var\(--internal-accent-secondary\);[\s\S]*border-radius: var\(--internal-radius-card\);[\s\S]*box-shadow: var\(--internal-shadow-card\);/);
+  assert.match(guideCss, /\.website-guide-empty \{[\s\S]*border-left: 3px solid var\(--internal-accent-secondary\);[\s\S]*var\(--internal-surface-soft\);/);
+  assert.match(guideCss, /\.website-guide-page a:focus-visible,[\s\S]*\.website-guide-page select:focus-visible \{[\s\S]*box-shadow: var\(--internal-focus-ring\);/);
+});
+
 test("Announcements guide preview renders as a static non-interactive mock UI", () => {
   const previewSource = pageSource.match(/function AnnouncementFormPreview\(\) \{[\s\S]*?\n\}\n\nfunction GuideEmptyState/)?.[0] || "";
   assert.match(previewSource, /Announcements/);

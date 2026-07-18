@@ -23,12 +23,20 @@ test("Access Hub renders one unified destination list with Member Dashboard elig
 
 test("Access Hub CSS removes the oversized primary card and keeps the first destination full width", () => {
   const mastheadRule = cssRule(accessCss, ".access-hub__masthead");
+  const destinationRule = cssRule(accessCss, ".access-hub__destinations li > a");
+  const summaryRule = cssRule(accessCss, ".access-hub__summary");
 
   assert.match(accessCss, /\.access-hub__destination--full \{[\s\S]*?grid-column: 1 \/ -1/);
   assert.doesNotMatch(accessCss, /\.access-hub__primary > a/);
   assert.doesNotMatch(accessCss, /min-height: 22rem/);
   assert.doesNotMatch(accessCss, /min-height: 19rem/);
   assert.match(mastheadRule, /min-height: auto;[\s\S]*?align-items: start/);
+  assert.match(summaryRule, /border: 1px solid var\(--internal-border\);/);
+  assert.match(summaryRule, /border-radius: var\(--internal-radius-panel\);/);
+  assert.match(destinationRule, /border: 1px solid var\(--internal-border\);/);
+  assert.match(destinationRule, /background:[\s\S]*var\(--internal-surface\);/);
+  assert.match(destinationRule, /box-shadow: var\(--internal-shadow-card\);/);
+  assert.match(accessCss, /\.access-hub__destinations li > a::before \{[\s\S]*var\(--internal-accent\)[\s\S]*var\(--internal-accent-secondary\)/);
   assert.doesNotMatch(globalCss, /access-hub__primary/);
 });
 
