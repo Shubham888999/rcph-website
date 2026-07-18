@@ -72,6 +72,37 @@
   --transition-fast: 160ms ease;
   --transition-standard: 260ms cubic-bezier(0.2, 0.75, 0.25, 1);
 
+  /* Internal ERP theme foundation: aliases only, for phased admin/member refresh work. */
+  --color-primary: var(--color-teal);
+  --color-cream: var(--color-text);
+  --color-surface-muted: var(--color-surface-soft);
+  --internal-page-bg: var(--color-bg-deep);
+  --internal-page-bg-end: var(--color-bg);
+  --internal-surface: var(--color-surface);
+  --internal-surface-soft: var(--color-surface-soft);
+  --internal-surface-raised: var(--color-surface-raised);
+  --internal-border: var(--color-border);
+  --internal-border-strong: var(--color-border-strong);
+  --internal-text: var(--color-text);
+  --internal-text-muted: var(--color-muted);
+  --internal-accent: var(--color-gold);
+  --internal-accent-soft: var(--color-gold-soft);
+  --internal-accent-secondary: var(--color-teal);
+  --internal-accent-rose: var(--color-pink);
+  --internal-control-bg: var(--color-control-bg);
+  --internal-control-bg-focus: var(--color-control-bg-focus);
+  --internal-control-bg-disabled: var(--color-control-bg-disabled);
+  --internal-radius-control: var(--radius-sm);
+  --internal-radius-card: var(--radius-md);
+  --internal-radius-panel: var(--radius-lg);
+  --internal-shadow-card: var(--shadow-sm);
+  --internal-shadow-panel: var(--shadow-md);
+  --internal-focus-ring: var(--focus-ring);
+  --internal-status-success: var(--color-success);
+  --internal-status-warning: var(--color-gold);
+  --internal-status-danger: var(--color-danger);
+  --internal-status-info: var(--color-teal);
+
   /* Layering */
   --z-header: 50;
   --z-dialog: 1000;
