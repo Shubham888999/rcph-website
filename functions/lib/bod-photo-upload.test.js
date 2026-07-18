@@ -12,7 +12,10 @@ const {
   RATE_LIMIT_COUNT,
   SESSION_COLLECTION,
   RATE_LIMIT_COLLECTION,
+  DEFAULT_ROOT_FOLDER_NAME,
+  createBodPhotoDriveService,
   createBodPhotoUploadService,
+  getBodPhotoDriveConfig,
   hashProof,
   proofMatches,
   sniffMimeType,
@@ -751,6 +754,105 @@ test('create session uses configured upload endpoint with production fallback', 
   assert.equal(
     productionSession.uploadEndpoint,
     'https://us-central1-rcph-admin.cloudfunctions.net/uploadBodProfilePhoto'
+  );
+});
+
+test('Drive config prefers explicit BOD root and can fall back to a private OAuth root folder', () => {
+  assert.deepEqual(
+    getBodPhotoDriveConfig({
+      BOD_PHOTO_DRIVE_AUTH_MODE: 'oauth',
+      BOD_PHOTO_ROOT_FOLDER_ID: 'configured-root',
+      BOD_PHOTO_ROOT_FOLDER_NAME: 'Ignored name when ID is set',
+    }),
+    {
+      authMode: 'oauth',
+      rootFolderId: 'configured-root',
+      parentFolderId: '',
+      rootFolderName: 'Ignored name when ID is set',
+    }
+  );
+
+  assert.deepEqual(
+    getBodPhotoDriveConfig({
+      BOD_PHOTO_DRIVE_AUTH_MODE: 'oauth',
+    }),
+    {
+      authMode: 'oauth',
+      rootFolderId: '',
+      parentFolderId: '',
+      rootFolderName: DEFAULT_ROOT_FOLDER_NAME,
+    }
+  );
+
+  assert.deepEqual(
+    getBodPhotoDriveConfig({
+      BOD_PHOTO_DRIVE_AUTH_MODE: 'shared-drive',
+      BOD_PHOTO_PARENT_FOLDER_ID: 'shared-parent',
+      BOD_PHOTO_ROOT_FOLDER_NAME: 'Leadership Root',
+    }),
+    {
+      authMode: 'shared-drive',
+      rootFolderId: '',
+      parentFolderId: 'shared-parent',
+      rootFolderName: 'Leadership Root',
+    }
+  );
+
+  assert.throws(
+    () => getBodPhotoDriveConfig({
+      BOD_PHOTO_DRIVE_AUTH_MODE: 'shared-drive',
+    }),
+    /BOD photo storage is not configured/
+  );
+});
+
+test('Drive service creates the private BOD photo root when no root ID is configured', async () => {
+  const created = [];
+  const driveClient = {
+    files: {
+      async list() {
+        return { data: { files: [] } };
+      },
+      async create(input) {
+        const name = input.requestBody.name;
+        const id = `folder-${created.length + 1}`;
+        created.push({
+          id,
+          name,
+          parents: input.requestBody.parents,
+          mimeType: input.requestBody.mimeType,
+        });
+        return { data: { id, name } };
+      },
+    },
+  };
+  const service = createBodPhotoDriveService({
+    driveClient,
+    env: {
+      BOD_PHOTO_DRIVE_AUTH_MODE: 'oauth',
+    },
+  });
+
+  const folder = await service.ensureProfileFolder({
+    boardId: DEFAULT_BOARD_ID,
+    sectionKey: 'clubBoard',
+    profileId: 'p1',
+  });
+
+  assert.equal(folder.rootFolderId, 'folder-1');
+  assert.equal(folder.profileFolderId, 'folder-4');
+  assert.deepEqual(
+    created.map((item) => [item.name, item.parents]),
+    [
+      [DEFAULT_ROOT_FOLDER_NAME, ['root']],
+      ['RIY 2026-27', ['folder-1']],
+      ['Club Board', ['folder-2']],
+      ['p1', ['folder-3']],
+    ]
+  );
+  assert.equal(
+    created.every((item) => item.mimeType === 'application/vnd.google-apps.folder'),
+    true
   );
 });
 test('HTTP multipart upload accepts private JPEG/PNG/WebP uploads and excludes Drive IDs from responses', async () => {

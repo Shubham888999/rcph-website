@@ -39,6 +39,7 @@ const RATE_LIMIT_COUNT = 12;
 const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_LIMIT = 25;
 const DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder';
+const DEFAULT_ROOT_FOLDER_NAME = 'RCPH Public Leadership';
 const SECTION_FOLDER_NAMES = Object.freeze({
   [CLUB_BOARD_SECTION]: 'Club Board',
   [LEADERSHIP_SECTION]: 'Leadership Beyond Our Club',
@@ -230,13 +231,15 @@ function getSecretValue(options, name) {
 function getBodPhotoDriveConfig(env = process.env) {
   const authMode = text(env.BOD_PHOTO_DRIVE_AUTH_MODE || env.RESOLUTION_DRIVE_AUTH_MODE || env.VISIT_DRIVE_AUTH_MODE || 'oauth', 40).toLowerCase();
   const rootFolderId = text(env.BOD_PHOTO_ROOT_FOLDER_ID, 300);
-  if (!['oauth', 'shared-drive'].includes(authMode) || !rootFolderId) {
+  const parentFolderId = text(env.BOD_PHOTO_PARENT_FOLDER_ID, 300);
+  const rootFolderName = normalizeFolderName(env.BOD_PHOTO_ROOT_FOLDER_NAME || DEFAULT_ROOT_FOLDER_NAME, DEFAULT_ROOT_FOLDER_NAME);
+  if (!['oauth', 'shared-drive'].includes(authMode) || (!rootFolderId && authMode === 'shared-drive' && !parentFolderId)) {
     const err = new Error('BOD photo storage is not configured.');
     err.code = 'failed-precondition';
     err.status = 500;
     throw err;
   }
-  return { authMode, rootFolderId };
+  return { authMode, rootFolderId, parentFolderId, rootFolderName };
 }
 
 function boardFolderName(boardId) {
@@ -309,11 +312,14 @@ function createBodPhotoDriveService(options = {}) {
 
   async function ensureProfileFolder({ boardId, sectionKey, profileId }) {
     const config = getConfig();
-    const riyFolder = await getOrCreateUniqueFolder(config.rootFolderId, boardFolderName(boardId));
+    const rootFolder = config.rootFolderId
+      ? { id: config.rootFolderId, name: config.rootFolderName || DEFAULT_ROOT_FOLDER_NAME }
+      : await getOrCreateUniqueFolder(config.parentFolderId || 'root', config.rootFolderName || DEFAULT_ROOT_FOLDER_NAME);
+    const riyFolder = await getOrCreateUniqueFolder(rootFolder.id, boardFolderName(boardId));
     const sectionFolder = await getOrCreateUniqueFolder(riyFolder.id, SECTION_FOLDER_NAMES[sectionKey] || sectionKey);
     const profileFolder = await getOrCreateUniqueFolder(sectionFolder.id, profileId);
     return {
-      rootFolderId: config.rootFolderId,
+      rootFolderId: rootFolder.id,
       riyFolderId: riyFolder.id,
       sectionFolderId: sectionFolder.id,
       profileFolderId: profileFolder.id,
@@ -1426,6 +1432,7 @@ module.exports = {
   ORPHAN_GRACE_MS,
   PHOTO_MAX_BYTES,
   PHOTO_MIME_TYPES,
+  DEFAULT_ROOT_FOLDER_NAME,
   getBodPhotoDriveConfig,
   createBodPhotoDriveService,
   createBodPhotoUploadService,
