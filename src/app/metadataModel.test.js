@@ -26,7 +26,7 @@ test("canonical construction normalizes trailing and duplicate slashes", () => {
 });
 
 test("absolute images resolve against the canonical apex", () => {
-  assert.equal(absoluteSiteUrl("/images/logo3.webp"), "https://rcph3131.org/images/logo3.webp");
+  assert.equal(absoluteSiteUrl("/images/rcph-lakshya-logo.webp"), "https://rcph3131.org/images/rcph-lakshya-logo.webp");
   assert.equal(absoluteSiteUrl("javascript:alert(1)"), "https://rcph3131.org/");
 });
 

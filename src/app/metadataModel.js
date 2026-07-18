@@ -1,5 +1,5 @@
 export const SITE_ORIGIN = "https://rcph3131.org";
-export const DEFAULT_SOCIAL_IMAGE = "/images/logo3.webp";
+export const DEFAULT_SOCIAL_IMAGE = "/images/rcph-lakshya-logo.webp";
 export const DEFAULT_SOCIAL_IMAGE_ALT = "Rotaract Club of Pune Heritage official logo";
 
 export const PUBLIC_ROUTES = Object.freeze([

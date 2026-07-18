@@ -5,5 +5,5 @@
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#f4b43a",
-  "icons": [{ "src": "/images/logo3.webp", "sizes": "any", "type": "image/webp" }]
+  "icons": [{ "src": "/images/rcph-lakshya-logo.webp", "sizes": "any", "type": "image/webp" }]
 }
