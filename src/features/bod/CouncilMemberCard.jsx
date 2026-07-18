@@ -19,7 +19,11 @@ export default function CouncilMemberCard({ member, active, onToggle, reduceMoti
             decoding="async"
             onError={(event) => { event.currentTarget.hidden = true; }}
           />
-        ) : null}
+        ) : (
+          <span className="bod-member-card__photo-placeholder">
+            {member.photoLabel || "Protected photo"}
+          </span>
+        )}
         <span className="bod-member-card__shade" aria-hidden="true" />
       </span>
       <span className="bod-member-card__closed-copy">

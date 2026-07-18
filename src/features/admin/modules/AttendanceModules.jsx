@@ -447,6 +447,7 @@ function momTarget(record, targetType) {
     title: record.name,
     date: record.date,
     mom: record.mom,
+    momEmail: record.momEmail,
   };
 }
 

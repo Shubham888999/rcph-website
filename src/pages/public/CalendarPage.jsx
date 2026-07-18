@@ -23,7 +23,7 @@ export default function CalendarPage() {
       </section>
       <section className="calendar-cta" aria-labelledby="calendar-cta-title">
         <div>
-          <p className="calendar-kicker">Create · Connect · Contribute</p>
+          <p className="calendar-kicker">Lakshya · RIY 2026–27</p>
           <h2 id="calendar-cta-title">Take the next step</h2>
           <p>See what RCPH has been doing, become a member, or start a conversation with the club.</p>
         </div>

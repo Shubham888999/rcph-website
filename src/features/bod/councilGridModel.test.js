@@ -23,6 +23,17 @@ test("Council members preserve canonical group and member order exactly once", (
   assert.deepEqual(chunkCouncilMembers(councilMembers).flat(), councilMembers);
 });
 
+test("Council member identity inherits stable public profile identifiers", () => {
+  assert.equal(
+    getCouncilMemberId({
+      profileId: "external-profile-1",
+      name: "Changed External",
+      role: "Changed Role",
+    }),
+    "council-external-profile-1",
+  );
+});
+
 test("Council grid remains three columns on mobile, tablet, and desktop", () => {
   assert.equal(getCouncilColumnCount(390), 3);
   assert.equal(getCouncilColumnCount(430), 3);

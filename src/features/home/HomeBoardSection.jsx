@@ -13,7 +13,7 @@ export default function HomeBoardSection() {
         viewport={{ once: true, amount: 0.4 }}
         transition={{ duration: reduceMotion ? 0 : 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        <p className="home-kicker">Leadership · RIY 2025–26</p>
+        <p className="home-kicker">Leadership · RIY 2026-27</p>
         <h2 id="home-board-title">Meet the Board</h2>
         <span className="home-board-section__rule" aria-hidden="true" />
         <p>The people leading Rotaract Club of Pune Heritage through service, fellowship, growth, and meaningful impact.</p>

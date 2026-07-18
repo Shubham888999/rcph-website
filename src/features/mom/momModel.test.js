@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  MOM_RECIPIENT_GROUP_OPTIONS,
   MOM_PDF_MAX_BYTES,
+  buildMomEmailDefaults,
+  canSendMomEmail,
   canUploadMom,
   canViewMom,
   getBodMomTarget,
   momDriveSubfolderName,
+  momUploadError,
+  normalizeMomEmailHistory,
   normalizeMomMetadata,
+  normalizeMomRecipientOptions,
+  validateMomEmailDraft,
   validateMomPdfFile,
 } from "./momModel.js";
 
@@ -16,6 +23,8 @@ test("MOM permissions allow upload for admin, president, and secretary only", ()
   assert.equal(canUploadMom({ isApproved: true, storedRole: "bod", positionKeys: ["secretary"] }), true);
   assert.equal(canUploadMom({ isApproved: true, storedRole: "bod", positionKeys: ["csd"] }), false);
   assert.equal(canUploadMom({ isApproved: true, storedRole: "gbm" }), false);
+  assert.equal(canSendMomEmail({ isApproved: true, storedRole: "bod", positionKeys: ["secretary"] }), true);
+  assert.equal(canSendMomEmail({ isApproved: true, storedRole: "bod", positionKeys: ["cmd"] }), false);
 });
 
 test("MOM permissions allow view for BOD/directors without upload access", () => {
@@ -64,6 +73,46 @@ test("MOM Drive folder hints use the dedicated upload tree", () => {
   assert.equal(momDriveSubfolderName("unknown"), "Other MOM");
 });
 
+test("MOM email defaults and validation stay attachment-first", () => {
+  const defaults = buildMomEmailDefaults({ title: "BOD Meeting 2", date: "2026-07-12" });
+  assert.equal(defaults.subject, "MOM for BOD Meeting 2");
+  assert.match(defaults.body, /Please find attached the Minutes of Meeting for "BOD Meeting 2", conducted on 2026-07-12\./);
+  assert.deepEqual(defaults.recipientGroups, ["bod"]);
+  assert.equal(validateMomEmailDraft(defaults), "");
+  assert.deepEqual(MOM_RECIPIENT_GROUP_OPTIONS.map((item) => item.value), ["all", "bod", "gbm", "prospect", "president", "secretary", "saa", "admin"]);
+  assert.equal(validateMomEmailDraft({ ...defaults, recipientGroups: [], targetUserIds: ["uid-one"] }), "");
+  assert.match(validateMomEmailDraft({ ...defaults, recipientGroups: [], targetUserIds: [] }), /recipient group or specific member/);
+  assert.match(validateMomEmailDraft({ ...defaults, recipientGroups: ["bad"] }), /valid recipient group/);
+  assert.match(validateMomEmailDraft({ ...defaults, recipientGroups: [], targetUserIds: ["user@example.com"] }), /member list/);
+  assert.equal(momUploadError({ code: "functions/failed-precondition", message: "Email sending is not configured for MOM." }), "Email sending is not configured for MOM.");
+  assert.equal(momUploadError({ code: "functions/failed-precondition", message: "No eligible recipients found for President." }), "No eligible recipients found for President.");
+});
+
+test("MOM specific member recipient options normalize UID-backed users only", () => {
+  const options = normalizeMomRecipientOptions([
+    { uid: "uid-b", name: "Beta", email: "BETA@example.com", role: "gbm" },
+    { uid: "uid-a", name: "Alpha", email: "alpha@example.com", role: "bod", positionKeys: ["Secretary"] },
+    { uid: "raw@example.com", name: "Raw", email: "raw@example.com" },
+    { uid: "uid-a", name: "Duplicate", email: "dupe@example.com" },
+  ]);
+  assert.deepEqual(options.map((item) => item.uid), ["uid-a", "uid-b"]);
+  assert.deepEqual(options[0].positionKeys, ["secretary"]);
+});
+
+test("MOM email history summary normalizes safe display fields", () => {
+  const history = normalizeMomEmailHistory({
+    sentAt: "2026-07-13T12:00:00.000Z",
+    recipientGroups: ["bod", "gbm", "bod"],
+    recipientCount: 10,
+    sentByName: "Secretary",
+    status: "partial",
+    emailSummary: { attempted: 10, sent: 9, failed: 1, skippedInvalidEmail: 1 },
+  });
+  assert.deepEqual(history.recipientGroups, ["bod", "gbm"]);
+  assert.equal(history.emailSummary.sent, 9);
+  assert.equal(history.sentByName, "Secretary");
+});
+
 test("BOD MOM target resolves synced copies to canonical records", () => {
   assert.deepEqual(getBodMomTarget({
     id: "bod-copy-1",
@@ -78,6 +127,7 @@ test("BOD MOM target resolves synced copies to canonical records", () => {
     title: "Cheers to Chapters",
     date: "2026-07-10",
     mom: null,
+    momEmail: null,
   });
 
   assert.deepEqual(getBodMomTarget({
@@ -92,6 +142,7 @@ test("BOD MOM target resolves synced copies to canonical records", () => {
     title: "BOD Meeting 2",
     date: "2026-07-12",
     mom: null,
+    momEmail: null,
   });
 
   assert.deepEqual(getBodMomTarget({
@@ -106,5 +157,6 @@ test("BOD MOM target resolves synced copies to canonical records", () => {
     title: "Internal BOD event",
     date: "2026-07-15",
     mom: null,
+    momEmail: null,
   });
 });

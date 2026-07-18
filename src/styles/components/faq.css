@@ -2,8 +2,8 @@
   overflow: hidden;
   color: var(--color-text);
   background:
-    radial-gradient(ellipse at 7% 2%, rgba(229, 194, 104, 0.1), transparent 31%),
-    radial-gradient(ellipse at 94% 17%, rgba(96, 195, 196, 0.07), transparent 29%),
+    radial-gradient(ellipse at 7% 2%, rgba(var(--lakshya-gold-rgb), 0.1), transparent 31%),
+    radial-gradient(ellipse at 94% 17%, rgba(var(--lakshya-rose-rgb), 0.07), transparent 29%),
     linear-gradient(180deg, var(--color-bg-deep), var(--color-bg));
 }
 
@@ -68,7 +68,7 @@
   bottom: 0;
   left: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--color-gold), rgba(229, 194, 104, 0.26) 45%, var(--color-teal), transparent 92%);
+  background: linear-gradient(90deg, var(--color-gold), rgba(var(--lakshya-gold-rgb), 0.26) 45%, var(--color-teal), transparent 92%);
   transform-origin: left;
 }
 
@@ -120,7 +120,7 @@
 
 .faq-search > div:focus-within {
   border-color: var(--color-gold);
-  box-shadow: 0 2px 0 rgba(229, 194, 104, 0.18);
+  box-shadow: 0 2px 0 rgba(var(--lakshya-gold-rgb), 0.18);
 }
 
 .faq-search button,
@@ -206,7 +206,7 @@
 }
 
 .faq-content__controls button {
-  border-bottom: 1px solid rgba(229, 194, 104, 0.35);
+  border-bottom: 1px solid rgba(var(--lakshya-gold-rgb), 0.35);
   color: var(--color-gold-soft);
   white-space: nowrap;
 }
@@ -295,7 +295,7 @@
   height: 2rem;
   display: grid;
   place-items: center;
-  border-left: 1px solid rgba(229, 194, 104, 0.45);
+  border-left: 1px solid rgba(var(--lakshya-gold-rgb), 0.45);
   color: var(--color-gold-soft);
   font-size: 1.35rem;
   font-weight: 500;
@@ -313,7 +313,7 @@
   max-width: 46rem;
   margin: 0;
   padding: 0 2rem clamp(1.5rem, 3vw, 2.25rem) 3.75rem;
-  border-left: 2px solid rgba(96, 195, 196, 0.42);
+  border-left: 2px solid rgba(var(--lakshya-rose-rgb), 0.42);
   color: var(--color-muted);
   line-height: 1.75;
 }
@@ -367,8 +367,8 @@
   gap: 2rem clamp(2rem, 7vw, 6rem);
   align-items: end;
   border-top: 2px solid transparent;
-  border-image: linear-gradient(90deg, var(--color-gold), rgba(229, 194, 104, 0.25), var(--color-teal), transparent) 1;
-  background: radial-gradient(ellipse at 38% 50%, rgba(229, 194, 104, 0.08), transparent 60%);
+  border-image: linear-gradient(90deg, var(--color-gold), rgba(var(--lakshya-gold-rgb), 0.25), var(--color-teal), transparent) 1;
+  background: radial-gradient(ellipse at 38% 50%, rgba(var(--lakshya-gold-rgb), 0.08), transparent 60%);
 }
 
 .faq-contact h2 {
@@ -389,7 +389,7 @@
 }
 
 .faq-page .button-primary {
-  border-color: rgba(229, 194, 104, 0.72);
+  border-color: rgba(var(--lakshya-gold-rgb), 0.72);
   color: var(--color-button-text);
   background: linear-gradient(135deg, var(--color-gold), var(--color-gold-soft));
   box-shadow: var(--shadow-gold);

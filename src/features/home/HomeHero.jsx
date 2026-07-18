@@ -13,7 +13,7 @@ export default function HomeHero() {
           width="2048"
           height="1004"
           fetchPriority="high"
-          decoding="async"
+          decoding="sync"
         />
       </div>
 
@@ -47,14 +47,20 @@ export default function HomeHero() {
           RID 3131 <span aria-hidden="true">|</span> ZONE 4
         </motion.p>
 
-        <motion.p
-          className="home-hero__motto"
-          initial={reduceMotion ? false : { opacity: 1, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.4, delay: reduceMotion ? 0 : 0.66 }}
-        >
-          Create. Connect. Contribute.
-        </motion.p>
+<motion.p
+  className="home-hero__motto"
+  initial={reduceMotion ? false : { opacity: 1, y: 8 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{
+    duration: reduceMotion ? 0 : 0.4,
+    delay: reduceMotion ? 0 : 0.66,
+  }}
+>
+  <span className="home-hero__theme-name">Lakshya</span>
+  <span className="home-hero__theme-tagline">
+    Shaping Aim Through Experience.
+  </span>
+</motion.p>
       </div>
     </section>
   );

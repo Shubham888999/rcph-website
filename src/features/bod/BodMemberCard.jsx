@@ -28,12 +28,18 @@ export default function BodMemberCard({ member, active, onToggle, reduceMotion, 
         onClick={() => onToggle(member)}
       >
         <span className="bod-member-card__portrait">
-          <img
-            src={member.image}
-            alt={`${displayName}, ${member.role} at Rotaract Club of Pune Heritage`}
-            loading="lazy"
-            decoding="async"
-          />
+          {member.image ? (
+            <img
+              src={member.image}
+              alt={`${displayName}, ${member.role} at Rotaract Club of Pune Heritage`}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <span className="bod-member-card__photo-placeholder">
+              {member.photoLabel || "Protected photo"}
+            </span>
+          )}
           <span className="bod-member-card__shade" aria-hidden="true" />
         </span>
 

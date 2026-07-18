@@ -1,13 +1,64 @@
 .login-page-react {
+  --lakshya-burgundy-950: #24030a;
+  --lakshya-burgundy-900: #310611;
+  --lakshya-burgundy-800: #430a17;
+  --lakshya-burgundy-700: #5b1021;
+  --lakshya-burgundy-600: #791b2b;
+  --lakshya-rose: #c65a70;
+  --lakshya-rose-deep: #9d2940;
+  --lakshya-cream: #fff8ed;
+  --lakshya-cream-soft: #f7ead6;
+  --lakshya-gold: #e8c791;
+  --lakshya-muted: #d6bec1;
+  --lakshya-burgundy-950-rgb: 36, 3, 10;
+  --lakshya-burgundy-900-rgb: 49, 6, 17;
+  --lakshya-burgundy-800-rgb: 67, 10, 23;
+  --lakshya-burgundy-700-rgb: 91, 16, 33;
+  --lakshya-burgundy-600-rgb: 121, 27, 43;
+  --lakshya-rose-rgb: 198, 90, 112;
+  --lakshya-rose-deep-rgb: 157, 41, 64;
+  --lakshya-cream-rgb: 255, 248, 237;
+  --lakshya-cream-soft-rgb: 247, 234, 214;
+  --lakshya-gold-rgb: 232, 199, 145;
+  --lakshya-muted-rgb: 214, 190, 193;
+  --color-bg: var(--lakshya-burgundy-900);
+  --color-bg-deep: var(--lakshya-burgundy-950);
+  --color-surface: var(--lakshya-burgundy-800);
+  --color-surface-soft: var(--lakshya-burgundy-700);
+  --color-surface-raised: rgba(var(--lakshya-burgundy-600-rgb), 0.88);
+  --color-text: var(--lakshya-cream);
+  --color-text-muted: var(--lakshya-muted);
+  --color-muted: var(--lakshya-muted);
+  --color-subtle: #b79aa0;
+  --color-border: rgba(var(--lakshya-cream-rgb), 0.16);
+  --color-border-strong: rgba(var(--lakshya-gold-rgb), 0.48);
+  --color-gold: var(--lakshya-gold);
+  --color-gold-soft: var(--lakshya-cream-soft);
+  --color-gold-deep: #b8874e;
+  --color-teal: var(--lakshya-rose);
+  --color-pink: var(--lakshya-rose-deep);
+  --color-pink-deep: #73162c;
+  --color-button-text: var(--lakshya-burgundy-900);
+  --color-glass: rgba(var(--lakshya-burgundy-900-rgb), 0.82);
+  --color-control-bg: rgba(var(--lakshya-burgundy-950-rgb), 0.74);
+  --color-control-bg-focus: rgba(var(--lakshya-burgundy-900-rgb), 0.94);
+  --shadow-gold:
+    0 0.8rem 2rem rgba(17, 1, 5, 0.28),
+    0 0 1.25rem rgba(var(--lakshya-gold-rgb), 0.12);
+  --shadow-brand:
+    0 1rem 2.4rem rgba(17, 1, 5, 0.34),
+    0 0 2.25rem rgba(var(--lakshya-rose-rgb), 0.08);
+
   min-height: 100vh;
   padding: clamp(1rem, 4vw, 3.5rem);
   display: grid;
   place-items: center;
   color: var(--color-text);
   background:
-    radial-gradient(circle at 18% 10%, rgba(244, 180, 58, 0.16), transparent 31%),
-    radial-gradient(circle at 84% 60%, rgba(96, 195, 196, 0.12), transparent 34%),
-    linear-gradient(145deg, #030303, var(--color-bg) 52%, #11100d);
+    radial-gradient(circle at 18% 10%, rgba(var(--lakshya-gold-rgb), 0.14), transparent 31%),
+    radial-gradient(circle at 84% 60%, rgba(var(--lakshya-rose-rgb), 0.14), transparent 34%),
+    linear-gradient(145deg, var(--color-bg-deep), var(--color-bg) 52%, var(--color-shell-end, var(--color-bg-deep)));
+  color-scheme: dark;
 }
 
 .login-page-react::before {
@@ -17,8 +68,8 @@
   pointer-events: none;
   opacity: 0.38;
   background:
-    linear-gradient(rgba(244, 180, 58, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(244, 180, 58, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(var(--lakshya-gold-rgb), 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--lakshya-gold-rgb), 0.035) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(circle at 50% 45%, #000, transparent 72%);
 }
@@ -40,8 +91,8 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
-    rgba(16, 15, 13, 0.9);
+    linear-gradient(145deg, rgba(var(--lakshya-cream-rgb), 0.055), rgba(var(--lakshya-cream-rgb), 0.018)),
+    rgba(var(--lakshya-burgundy-900-rgb), 0.9);
   box-shadow: var(--shadow-brand);
   backdrop-filter: blur(18px);
 }
@@ -59,10 +110,10 @@
   background:
     linear-gradient(
       145deg,
-      rgba(255, 255, 255, 0.045),
-      rgba(255, 255, 255, 0.012)
+      rgba(var(--lakshya-cream-rgb), 0.045),
+      rgba(var(--lakshya-cream-rgb), 0.012)
     ),
-    rgba(17, 17, 16, 0.96);
+    rgba(var(--lakshya-burgundy-950-rgb), 0.96);
 }
 .login-brand-panel::after {
   content: "";
@@ -72,12 +123,12 @@
   opacity: 0.2;
   background:
     linear-gradient(
-      rgba(229, 194, 104, 0.035) 1px,
+      rgba(var(--lakshya-gold-rgb), 0.035) 1px,
       transparent 1px
     ),
     linear-gradient(
       90deg,
-      rgba(229, 194, 104, 0.03) 1px,
+      rgba(var(--lakshya-gold-rgb), 0.03) 1px,
       transparent 1px
     );
   background-size: 56px 56px;
@@ -97,7 +148,7 @@
   pointer-events: none;
   background: radial-gradient(
     circle,
-    rgba(229, 194, 104, 0.19),
+    rgba(var(--lakshya-gold-rgb), 0.18),
     transparent 68%
   );
   filter: blur(0.5rem);
@@ -115,9 +166,10 @@
   width: 74px;
   height: 74px;
   padding: 0.5rem;
-  border: 1px solid rgba(229, 194, 104, 0.4);
-  border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.4);
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff8ed;
 }
 
 .login-brand--portal strong {
@@ -165,10 +217,11 @@
 
 .login-brand-panel__values span {
   color: var(--color-text);
-  font-size: clamp(2.2rem, 4.7vw, 3.7rem);
+  font-size: clamp(2rem, 4.2vw, 3.35rem);
   font-weight: 850;
   line-height: 1;
   letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
 }
 
 .login-brand-panel__values span:first-child {
@@ -186,10 +239,10 @@
   width: 62px;
   height: 62px;
   padding: 0.4rem;
-  object-fit: contain;
+  object-fit: cover;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  background: #fff8ed;
 }
 
 .login-brand strong,
@@ -337,7 +390,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(244, 180, 58, 0.78);
+  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.78);
   color: var(--color-button-text);
   background: linear-gradient(135deg, var(--color-gold), var(--color-gold-soft));
   box-shadow: var(--shadow-gold);
@@ -425,9 +478,9 @@
 }
 
 .login-notice--info {
-  border: 1px solid rgba(96, 195, 196, 0.36);
-  color: #d9ffff;
-  background: rgba(96, 195, 196, 0.08);
+  border: 1px solid rgba(var(--lakshya-rose-rgb), 0.38);
+  color: var(--lakshya-cream-soft);
+  background: rgba(var(--lakshya-rose-rgb), 0.1);
 }
 
 .login-verification,
@@ -441,7 +494,9 @@
   width: 76px;
   height: 76px;
   margin-bottom: var(--space-5);
-  object-fit: contain;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff8ed;
 }
 
 .auth-migration-card .login-submit-button {
@@ -453,6 +508,128 @@
 .login-page-react input:focus-visible {
   outline: 3px solid var(--color-gold-soft);
   outline-offset: 3px;
+}
+
+:root[data-theme="light"] .login-page-react {
+  --color-bg: var(--lakshya-cream);
+  --color-bg-deep: var(--lakshya-cream-soft);
+  --color-surface: #fffdf8;
+  --color-surface-soft: #fff3df;
+  --color-surface-raised: #ffffff;
+  --color-text: var(--lakshya-burgundy-900);
+  --color-text-muted: #704f58;
+  --color-muted: #704f58;
+  --color-subtle: #8b6770;
+  --color-border: rgba(var(--lakshya-burgundy-700-rgb), 0.18);
+  --color-border-strong: rgba(var(--lakshya-rose-deep-rgb), 0.34);
+  --color-gold: #b8874e;
+  --color-gold-soft: #7a4d22;
+  --color-gold-deep: #613911;
+  --color-teal: var(--lakshya-rose-deep);
+  --color-pink: var(--lakshya-burgundy-600);
+  --color-pink-deep: var(--lakshya-burgundy-700);
+  --color-button-text: var(--lakshya-cream);
+  --color-glass: rgba(var(--lakshya-cream-rgb), 0.86);
+  --color-control-bg: rgba(255, 253, 248, 0.96);
+  --color-control-bg-focus: #ffffff;
+  --shadow-gold: 0 0.8rem 2rem rgba(var(--lakshya-burgundy-700-rgb), 0.14);
+  --shadow-brand:
+    0 1rem 2.4rem rgba(var(--lakshya-burgundy-700-rgb), 0.12),
+    0 0 2.25rem rgba(var(--lakshya-rose-rgb), 0.08);
+
+  background:
+    radial-gradient(circle at 10% 4%, rgba(var(--lakshya-burgundy-600-rgb), 0.075), transparent 28rem),
+    radial-gradient(circle at 90% 14%, rgba(var(--lakshya-gold-rgb), 0.11), transparent 30rem),
+    linear-gradient(180deg, var(--color-bg), #fffdf8 48%, var(--color-bg-deep));
+  color-scheme: light;
+}
+
+:root[data-theme="light"] .login-page-react::before {
+  opacity: 0.16;
+}
+
+:root[data-theme="light"] .login-page-react :where(
+  .login-brand-panel,
+  .login-card,
+  .login-verification,
+  .auth-migration-card,
+  .signup-brand-header,
+  .signup-card,
+  .signup-success,
+  .recovery-card
+) {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background:
+    linear-gradient(145deg, rgba(var(--lakshya-gold-rgb), 0.075), rgba(var(--lakshya-rose-rgb), 0.045)),
+    var(--color-surface);
+  box-shadow: var(--shadow-brand);
+}
+
+:root[data-theme="light"] .login-page-react :where(
+  .login-field input,
+  .signup-field input,
+  .signup-field select,
+  .signup-field textarea,
+  .recovery-field input
+) {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background: var(--color-control-bg);
+}
+
+:root[data-theme="light"] .login-page-react :where(
+  .login-field input,
+  .signup-field input,
+  .signup-field select,
+  .signup-field textarea,
+  .recovery-field input
+):focus-visible {
+  background: var(--color-control-bg-focus);
+  border-color: var(--color-teal);
+}
+
+:root[data-theme="light"] .login-page-react :where(
+  .login-brand img,
+  .login-brand--portal img,
+  .login-verification img
+) {
+  background: var(--lakshya-cream);
+}
+
+:root[data-theme="light"] .login-page-react :where(
+  .login-notice--info,
+  .recovery-email-context
+) {
+  color: var(--color-text);
+  background: rgba(var(--lakshya-rose-rgb), 0.09);
+}
+
+body:has(.login-page-react) .theme-toggle {
+  border-color: rgba(232, 199, 145, 0.45);
+  color: #f7ead6;
+  background:
+    linear-gradient(135deg, rgba(232, 199, 145, 0.14), rgba(198, 90, 112, 0.12)),
+    rgba(49, 6, 17, 0.86);
+  box-shadow:
+    0 0.85rem 2rem rgba(17, 1, 5, 0.3),
+    0 0 0 1px rgba(232, 199, 145, 0.08);
+}
+
+body:has(.login-page-react) .theme-toggle:hover {
+  border-color: #e8c791;
+  color: #fff8ed;
+}
+
+:root[data-theme="light"] body:has(.login-page-react) .theme-toggle {
+  border-color: rgba(91, 16, 33, 0.24);
+  color: #5b1021;
+  background:
+    linear-gradient(135deg, rgba(232, 199, 145, 0.18), rgba(157, 41, 64, 0.08)),
+    rgba(255, 248, 237, 0.9);
+  box-shadow:
+    0 0.85rem 2rem rgba(91, 16, 33, 0.14),
+    0 0 0 1px rgba(91, 16, 33, 0.08);
 }
 
 @media (max-width: 850px) {

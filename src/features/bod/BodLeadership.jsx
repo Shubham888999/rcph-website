@@ -1,10 +1,17 @@
 import BodInteractiveGrid from "./BodInteractiveGrid";
 import BodReveal from "./BodReveal";
-import { boardMembers } from "./bodData";
 
-export default function BodLeadership() {
+export default function BodLeadership({
+  members = [],
+  kicker = "The team behind the year",
+  title = "Club Leadership",
+  statusLabel = "",
+}) {
   return (
-    <BodReveal className="bod-section-react" labelledBy="bod-leadership-title">
+    <BodReveal
+      className="bod-section-react"
+      labelledBy="bod-leadership-title"
+    >
       <div
         id="club-leadership"
         className="bod-section-react__anchor"
@@ -12,11 +19,16 @@ export default function BodLeadership() {
       />
 
       <div className="bod-section-react__heading">
-        <p className="bod-kicker">The team behind the year</p>
-        <h2 id="bod-leadership-title">Club Leadership</h2>
+        <p className="bod-kicker">{kicker}</p>
+        <div className="bod-section-react__heading-row">
+          <h2 id="bod-leadership-title">{title}</h2>
+          {statusLabel ? (
+            <span className="bod-section-react__status">{statusLabel}</span>
+          ) : null}
+        </div>
       </div>
 
-      <BodInteractiveGrid members={boardMembers} />
+      <BodInteractiveGrid members={members} />
     </BodReveal>
   );
 }

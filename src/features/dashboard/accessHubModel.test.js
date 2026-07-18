@@ -45,8 +45,8 @@ test("GBM receives the member dashboard as the first full-width destination", ()
 });
 
 test("BOD and Admin destinations are included only by trusted capability", () => {
-  assert.deepEqual(getAccessHubDestinations(access("bod")).map(({ key }) => key), ["dashboard", "bod", "calendar", "home"]);
-  assert.deepEqual(getAccessHubDestinations(access("admin")).map(({ key }) => key), ["dashboard", "bod", "admin", "calendar", "home"]);
+  assert.deepEqual(getAccessHubDestinations(access("bod")).map(({ key }) => key), ["dashboard", "bod", "calendar", "home", "website-guide"]);
+  assert.deepEqual(getAccessHubDestinations(access("admin")).map(({ key }) => key), ["dashboard", "bod", "admin", "calendar", "home", "website-guide"]);
   const denied = getAccessHubDestinations(access("gbm", { canAccessAdminTools: false }));
   assert.equal(denied.some(({ key }) => key === "admin"), false);
 });
@@ -54,7 +54,7 @@ test("BOD and Admin destinations are included only by trusted capability", () =>
 test("destinations remain unique and secondary ordering is deterministic", () => {
   const destinations = getAccessHubDestinations(access("admin"));
   assert.equal(new Set(destinations.map(({ href }) => href)).size, destinations.length);
-  assert.deepEqual(destinations.filter(({ primary }) => !primary).map(({ key }) => key), ["bod", "admin", "calendar", "home"]);
+  assert.deepEqual(destinations.filter(({ primary }) => !primary).map(({ key }) => key), ["bod", "admin", "calendar", "home", "website-guide"]);
 });
 
 test("visible access list order keeps Member Dashboard first before permitted tools", () => {
@@ -62,7 +62,7 @@ test("visible access list order keeps Member Dashboard first before permitted to
     canAccessVisitSubmissions: true,
     canAccessResolutionTools: true,
   }));
-  assert.deepEqual(model.destinations.map(({ key }) => key), ["dashboard", "bod", "club-visits", "admin", "resolutions", "calendar", "home"]);
+  assert.deepEqual(model.destinations.map(({ key }) => key), ["dashboard", "bod", "club-visits", "admin", "resolutions", "calendar", "home", "website-guide"]);
   assert.equal(model.destinations.filter(({ title }) => title === "My Member Dashboard").length, 1);
   assert.equal(model.destinations[0].fullWidth, true);
 });
@@ -73,8 +73,20 @@ test("destination list still renders a subset without unauthorized dashboard or 
     canAccessBodTools: false,
     canAccessAdminTools: false,
   }));
-  assert.deepEqual(model.destinations.map(({ key }) => key), ["calendar", "home"]);
+  assert.deepEqual(model.destinations.map(({ key }) => key), ["calendar", "home", "website-guide"]);
   assert.equal(model.primary, null);
+});
+
+test("Website Guide is the final Help Center destination with static guide copy", () => {
+  const guide = getAccessHubDestinations(access("gbm")).at(-1);
+  assert.deepEqual(guide, {
+    key: "website-guide",
+    category: "Help Center",
+    title: "Website Guide",
+    description: "Learn how to use the club website features.",
+    href: "/website-guide",
+    primary: false,
+  });
 });
 
 test("multiple positions format cleanly and missing positions have a fallback", () => {

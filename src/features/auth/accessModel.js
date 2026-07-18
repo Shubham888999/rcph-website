@@ -30,6 +30,7 @@ hasPresidentAuthority: false,
     canAccessProspectDashboard: false,
     canAccessBodTools: false,
     canAccessAdminTools: false,
+    canManageBodManagement: false,
     canAccessLockTools: false,
     canAccessResolutionTools: false,
     canAccessVisitSubmissions: false,
@@ -108,6 +109,7 @@ canAccessAdminTools: isApproved
     || hasPresidentAuthority
     || hasSergeantAtArmsPosition
   ),
+    canManageBodManagement: isApproved && ["admin", "president"].includes(storedRole),
     canAccessLockTools: isApproved
       && (trustedLockTools || hasPresidentAuthority),
     canAccessResolutionTools: isApproved && trustedResolutionTools,
@@ -134,6 +136,7 @@ export function hasCapability(access, capability) {
     prospectDashboard: "canAccessProspectDashboard",
     bodTools: "canAccessBodTools",
     adminTools: "canAccessAdminTools",
+    bodManagement: "canManageBodManagement",
     resolutionTools: "canAccessResolutionTools",
     lockTools: "canAccessLockTools",
     visitSubmissions: "canAccessVisitSubmissions",
@@ -141,4 +144,8 @@ export function hasCapability(access, capability) {
   };
   const field = capabilityFields[capability];
   return Boolean(field && access?.isApproved && access[field] === true);
+}
+
+export function canManageBodManagement(access) {
+  return Boolean(access?.isApproved === true && ["admin", "president"].includes(access.storedRole));
 }

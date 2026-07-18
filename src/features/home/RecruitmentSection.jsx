@@ -16,7 +16,7 @@ export default function RecruitmentSection() {
     >
       <div className="home-recruitment__content">
         <motion.h2 variants={reduceMotion ? undefined : headingReveal} id="recruitment-title">
-          Membership for RIY 2026 - 2027 is Open
+          Membership for RIY 2026-27 is Open
         </motion.h2>
 
         <motion.div

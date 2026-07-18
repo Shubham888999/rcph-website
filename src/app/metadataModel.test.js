@@ -31,7 +31,7 @@ test("absolute images resolve against the canonical apex", () => {
 });
 
 test("auth, protected, nested Admin, and unknown routes are noindex", () => {
-  for (const path of ["/login", "/signup", "/forgot-password", "/access", "/dashboard", "/bod-tools", "/admin", "/admin/dzr-visit", "/missing"]) {
+  for (const path of ["/login", "/signup", "/forgot-password", "/access", "/website-guide", "/dashboard", "/bod-tools", "/admin", "/admin/dzr-visit", "/missing"]) {
     const metadata = getRouteMetadata(path);
     assert.equal(metadata.robots, "noindex, nofollow");
     assert.equal(metadata.structuredData, null);

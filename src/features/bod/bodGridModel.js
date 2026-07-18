@@ -13,8 +13,15 @@ function slug(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function stableIdentifier(value) {
+  const text = cleanText(value);
+  return text && !/[\s/]/.test(text) ? text : "";
+}
+
 export function getBodMemberId(member = {}) {
-  return slug(`${cleanText(member.name)}-${cleanText(member.role)}`);
+  return stableIdentifier(member.profileId)
+    || stableIdentifier(member.id)
+    || slug(`${cleanText(member.name)}-${cleanText(member.role)}`);
 }
 
 export function getBodColumnCount() {

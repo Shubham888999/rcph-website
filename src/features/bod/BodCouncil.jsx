@@ -1,19 +1,30 @@
 import BodReveal from "./BodReveal";
 import CouncilInteractiveGrid from "./CouncilInteractiveGrid";
-import { councilGroups } from "./bodData";
-import { getCouncilMembers } from "./councilGridModel";
 
-const councilMembers = getCouncilMembers(councilGroups);
-
-export default function BodCouncil() {
+export default function BodCouncil({
+  members = [],
+  kicker = "Leadership beyond the club",
+  title = "Leadership Beyond Our Club",
+  statusLabel = "",
+}) {
   return (
-    <BodReveal className="bod-section-react" labelledBy="bod-council-title">
+    <BodReveal
+      className="bod-section-react"
+      labelledBy="bod-council-title"
+    >
       <div className="bod-section-react__heading">
-        <p className="bod-kicker">Leadership beyond the club</p>
-        <h2 id="bod-council-title">Council Members</h2>
+        <p className="bod-kicker">{kicker}</p>
+        <div className="bod-section-react__heading-row">
+          <h2 id="bod-council-title">
+            {title}
+          </h2>
+          {statusLabel ? (
+            <span className="bod-section-react__status">{statusLabel}</span>
+          ) : null}
+        </div>
       </div>
 
-      <CouncilInteractiveGrid members={councilMembers} />
+      <CouncilInteractiveGrid members={members} />
     </BodReveal>
   );
 }

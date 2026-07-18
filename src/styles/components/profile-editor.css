@@ -125,14 +125,24 @@
 }
 
 .profile-field-error,
+.profile-field-help,
 .profile-editor-alert {
   margin: 0;
-  color: var(--color-danger);
   font-size: 0.84rem;
   line-height: 1.45;
 }
 
+.profile-field-error {
+  color: var(--color-danger);
+}
+
+.profile-field-help {
+  color: var(--color-muted);
+  font-weight: 650;
+}
+
 .profile-editor-alert {
+  color: var(--color-danger);
   padding: 0.75rem 0.85rem;
   border: 1px solid rgba(240, 109, 125, 0.42);
   border-radius: var(--radius-sm);

@@ -1,8 +1,8 @@
 .calendar-page {
   overflow: hidden;
   background:
-    radial-gradient(circle at 10% 4%, rgba(244, 180, 58, 0.11), transparent 25%),
-    radial-gradient(circle at 92% 16%, rgba(96, 195, 196, 0.07), transparent 28%);
+    radial-gradient(circle at 10% 4%, rgba(var(--lakshya-gold-rgb), 0.11), transparent 25%),
+    radial-gradient(circle at 92% 16%, rgba(var(--lakshya-rose-rgb), 0.07), transparent 28%);
 }
 
 .calendar-hero,
@@ -46,7 +46,7 @@
 }
 
 .calendar-page .button-primary {
-  border-color: rgba(244, 180, 58, 0.74);
+  border-color: rgba(var(--lakshya-gold-rgb), 0.74);
   color: var(--color-button-text);
   background: linear-gradient(135deg, var(--color-gold), var(--color-gold-soft));
   box-shadow: var(--shadow-gold);
@@ -151,14 +151,14 @@
 }
 
 .calendar-page .fc {
-  --fc-border-color: rgba(244, 180, 58, 0.18);
-  --fc-button-bg-color: #b98213;
-  --fc-button-border-color: #d49a27;
-  --fc-button-hover-bg-color: #f4b43a;
-  --fc-button-hover-border-color: #f4b43a;
-  --fc-button-active-bg-color: #60c3c4;
-  --fc-button-active-border-color: #60c3c4;
-  --fc-today-bg-color: rgba(244, 180, 58, 0.1);
+  --fc-border-color: rgba(var(--lakshya-gold-rgb), 0.18);
+  --fc-button-bg-color: var(--color-gold);
+  --fc-button-border-color: var(--color-gold-deep);
+  --fc-button-hover-bg-color: var(--color-gold-soft);
+  --fc-button-hover-border-color: var(--color-gold);
+  --fc-button-active-bg-color: var(--color-teal);
+  --fc-button-active-border-color: var(--color-teal);
+  --fc-today-bg-color: rgba(var(--lakshya-gold-rgb), 0.1);
   color: var(--color-text);
 }
 
@@ -167,9 +167,13 @@
 }
 
 .calendar-page .fc .fc-button {
-  color: #101010;
+  color: var(--color-button-text);
   font-weight: 800;
   box-shadow: none;
+}
+
+.calendar-page .fc .fc-button-primary:not(:disabled).fc-button-active {
+  color: var(--lakshya-cream);
 }
 
 .calendar-page .fc .fc-button:focus-visible,
@@ -183,7 +187,7 @@
 .calendar-page .fc-theme-standard td,
 .calendar-page .fc-theme-standard th,
 .calendar-page .fc-theme-standard .fc-list {
-  border-color: rgba(244, 180, 58, 0.18);
+  border-color: rgba(var(--lakshya-gold-rgb), 0.18);
 }
 
 .calendar-page .fc .fc-col-header-cell-cushion,
@@ -230,9 +234,9 @@
   min-height: 520px;
   border-radius: var(--radius-md);
   background:
-    linear-gradient(90deg, transparent, rgba(244, 180, 58, 0.09), transparent),
-    repeating-linear-gradient(90deg, transparent 0 calc(14.28% - 1px), rgba(244, 180, 58, 0.11) calc(14.28% - 1px) 14.28%),
-    repeating-linear-gradient(0deg, var(--color-surface) 0 82px, rgba(244, 180, 58, 0.1) 82px 83px);
+    linear-gradient(90deg, transparent, rgba(var(--lakshya-gold-rgb), 0.09), transparent),
+    repeating-linear-gradient(90deg, transparent 0 calc(14.28% - 1px), rgba(var(--lakshya-gold-rgb), 0.11) calc(14.28% - 1px) 14.28%),
+    repeating-linear-gradient(0deg, var(--color-surface) 0 82px, rgba(var(--lakshya-gold-rgb), 0.1) 82px 83px);
   background-size: 200% 100%, auto, auto;
   animation: calendar-shimmer 1.5s linear infinite;
 }
@@ -255,7 +259,7 @@
 }
 
 .calendar-state--error {
-  border-color: rgba(153, 40, 87, 0.65);
+  border-color: rgba(var(--lakshya-rose-deep-rgb), 0.65);
 }
 
 .calendar-state--empty {
@@ -324,7 +328,7 @@
   gap: clamp(2rem, 7vw, 6rem);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(244, 180, 58, 0.13), transparent 48%), var(--color-surface);
+  background: linear-gradient(135deg, rgba(var(--lakshya-gold-rgb), 0.13), transparent 48%), var(--color-surface);
   box-shadow: var(--shadow-brand);
 }
 
@@ -383,18 +387,18 @@
 }
 
 /* Editorial public-page treatment */
-.calendar-page { position:relative; isolation:isolate; background:linear-gradient(180deg,#090a0a,#0a100f 46%,#090909); }
+.calendar-page { position:relative; isolation:isolate; background:linear-gradient(180deg,var(--color-bg-deep),var(--color-bg) 48%,var(--color-bg-deep)); }
 .calendar-hero { min-height:auto; padding-block:clamp(4rem,8vw,6rem); position:relative; }
-.calendar-hero::after { content:""; position:absolute; right:0; top:50%; width:min(29vw,310px); height:190px; transform:translateY(-50%); border-top:1px solid rgba(229,194,104,.28); border-right:1px solid rgba(96,195,196,.24); background:repeating-linear-gradient(0deg,transparent 0 37px,rgba(96,195,196,.08) 37px 38px),repeating-linear-gradient(90deg,transparent 0 50px,rgba(229,194,104,.08) 50px 51px); pointer-events:none; }
+.calendar-hero::after { content:""; position:absolute; right:0; top:50%; width:min(29vw,310px); height:190px; transform:translateY(-50%); border-top:1px solid rgba(var(--lakshya-gold-rgb),.28); border-right:1px solid rgba(var(--lakshya-rose-rgb),.24); background:repeating-linear-gradient(0deg,transparent 0 37px,rgba(var(--lakshya-rose-rgb),.08) 37px 38px),repeating-linear-gradient(90deg,transparent 0 50px,rgba(var(--lakshya-gold-rgb),.08) 50px 51px); pointer-events:none; }
 .calendar-hero > div { position:relative; z-index:1; max-width:78%; }
 .calendar-kicker::before { content:""; display:inline-block; width:2rem; height:1px; margin-right:.65rem; vertical-align:middle; background:linear-gradient(90deg,var(--color-gold),var(--color-teal)); }
 .calendar-section { position:relative; isolation:isolate; padding-block:clamp(4.5rem,8vw,7rem); border-top:0; }
-.calendar-section::before,.calendar-cta::before { content:""; position:absolute; top:0; left:5%; width:90%; height:2px; background:linear-gradient(90deg,transparent,rgba(96,195,196,.35),rgba(229,194,104,.8),rgba(255,248,224,.36),transparent); }
-.calendar-section::after { content:""; position:absolute; z-index:-1; inset:10% -15%; background:radial-gradient(ellipse at 90% 45%,rgba(96,195,196,.055),transparent 42%); pointer-events:none; }
-.calendar-legend,.calendar-view { border-radius:var(--radius-sm); border-color:rgba(229,194,104,.16); background:linear-gradient(155deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); box-shadow:none; }
-.calendar-legend { border-top:2px solid rgba(96,195,196,.5); }
-.calendar-view { border-top:2px solid rgba(229,194,104,.45); }
-.calendar-cta { position:relative; padding:clamp(4rem,8vw,7rem) 0; border:0; border-radius:0; background:radial-gradient(ellipse at 50% 45%,rgba(229,194,104,.075),transparent 60%); box-shadow:none; }
-.calendar-cta nav a { padding:.72rem 0; border:0; border-bottom:1px solid rgba(96,195,196,.22); border-radius:0; background:transparent; }
+.calendar-section::before,.calendar-cta::before { content:""; position:absolute; top:0; left:5%; width:90%; height:2px; background:linear-gradient(90deg,transparent,rgba(var(--lakshya-rose-rgb),.35),rgba(var(--lakshya-gold-rgb),.8),rgba(255,248,224,.36),transparent); }
+.calendar-section::after { content:""; position:absolute; z-index:-1; inset:10% -15%; background:radial-gradient(ellipse at 90% 45%,rgba(var(--lakshya-rose-rgb),.055),transparent 42%); pointer-events:none; }
+.calendar-legend,.calendar-view { border-radius:var(--radius-sm); border-color:rgba(var(--lakshya-gold-rgb),.16); background:linear-gradient(155deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); box-shadow:none; }
+.calendar-legend { border-top:2px solid rgba(var(--lakshya-rose-rgb),.5); }
+.calendar-view { border-top:2px solid rgba(var(--lakshya-gold-rgb),.45); }
+.calendar-cta { position:relative; padding:clamp(4rem,8vw,7rem) 0; border:0; border-radius:0; background:radial-gradient(ellipse at 50% 45%,rgba(var(--lakshya-gold-rgb),.075),transparent 60%); box-shadow:none; }
+.calendar-cta nav a { padding:.72rem 0; border:0; border-bottom:1px solid rgba(var(--lakshya-rose-rgb),.22); border-radius:0; background:transparent; }
 @media (max-width:850px) { .calendar-hero > div { max-width:100%; } .calendar-hero::after { width:38%; height:130px; top:auto; bottom:1rem; transform:none; opacity:.42; } }
 @media (max-width:699px) { .calendar-hero { padding-block:3.5rem 4.5rem; } .calendar-section::before,.calendar-cta::before { left:0; width:100%; } .calendar-layout { gap:var(--space-4); } .calendar-view { padding:.65rem; } }

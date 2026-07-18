@@ -1,14 +1,19 @@
 import { useRef, useState } from "react";
 import {
+  MOM_RECIPIENT_GROUP_OPTIONS,
   MOM_PDF_ACCEPT,
+  buildMomEmailDefaults,
+  canSendMomEmail,
   canUploadMom,
   canViewMom,
   formatMomTimestamp,
   momUploadError,
+  normalizeMomEmailHistory,
   normalizeMomMetadata,
+  validateMomEmailDraft,
   validateMomPdfFile,
 } from "./momModel";
-import { uploadMomPdf, viewMomPdf } from "./momService";
+import { getMomEmailRecipientOptions, sendMomEmail, uploadMomPdf, viewMomPdf } from "./momService";
 
 const STAGE_LABELS = {
   authorizing: "Authorizing upload...",
@@ -16,6 +21,7 @@ const STAGE_LABELS = {
   finalizing: "Saving MOM metadata...",
   ready: "MOM saved.",
   viewing: "Opening MOM...",
+  sending: "Sending MOM email...",
 };
 
 export default function MomSection({
@@ -29,11 +35,19 @@ export default function MomSection({
   const inputRef = useRef(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendDraft, setSendDraft] = useState(() => buildMomEmailDefaults(target));
+  const [sentHistory, setSentHistory] = useState(null);
+  const [recipientOptions, setRecipientOptions] = useState([]);
+  const [recipientStatus, setRecipientStatus] = useState("idle");
+  const [recipientQuery, setRecipientQuery] = useState("");
   const metadata = normalizeMomMetadata(target?.mom || target, {
     momTargetType: target?.targetType,
     momTargetId: target?.targetId,
   });
+  const latestHistory = sentHistory || normalizeMomEmailHistory(target?.momEmail || target?.momEmailLast || target);
   const uploadAllowed = canUploadMom(access);
+  const sendAllowed = canSendMomEmail(access);
   const viewAllowed = canViewMom(access);
   const busy = Boolean(status);
 
@@ -49,6 +63,18 @@ export default function MomSection({
       setError(momUploadError(requestError));
     } finally {
       setStatus("");
+    }
+  }
+
+  async function loadRecipientOptions(refresh = false) {
+    setRecipientStatus("loading");
+    try {
+      const options = await getMomEmailRecipientOptions(refresh);
+      setRecipientOptions(options);
+      setRecipientStatus("ready");
+    } catch {
+      setRecipientOptions([]);
+      setRecipientStatus("error");
     }
   }
 
@@ -76,7 +102,104 @@ export default function MomSection({
     }
   }
 
+  function openSendPanel() {
+    if (!metadata || busy) return;
+    setError("");
+    setSendDraft(buildMomEmailDefaults(target));
+    setRecipientQuery("");
+    setSendOpen(true);
+    if (!recipientOptions.length && recipientStatus !== "loading") loadRecipientOptions();
+  }
+
+  function updateRecipientGroup(group, checked) {
+    setSendDraft((current) => {
+      const existing = Array.isArray(current.recipientGroups) ? current.recipientGroups : [];
+      const recipientGroups = checked
+        ? [...new Set([...existing, group])]
+        : existing.filter((item) => item !== group);
+      return { ...current, recipientGroups };
+    });
+  }
+
+  function addSpecificRecipient(uid) {
+    setSendDraft((current) => {
+      const existing = Array.isArray(current.targetUserIds) ? current.targetUserIds : [];
+      return { ...current, targetUserIds: [...new Set([...existing, uid])] };
+    });
+  }
+
+  function removeSpecificRecipient(uid) {
+    setSendDraft((current) => {
+      const existing = Array.isArray(current.targetUserIds) ? current.targetUserIds : [];
+      return { ...current, targetUserIds: existing.filter((item) => item !== uid) };
+    });
+  }
+
+  async function submitMomEmail(event) {
+    event.preventDefault();
+    if (!metadata || busy) return;
+    const validationError = validateMomEmailDraft(sendDraft);
+    if (validationError) {
+      setError(validationError);
+      onNotice?.({ type: "error", message: validationError });
+      return;
+    }
+    const selectedSpecificCount = Array.isArray(sendDraft.targetUserIds) ? sendDraft.targetUserIds.length : 0;
+    const selectedGroupCount = Array.isArray(sendDraft.recipientGroups) ? sendDraft.recipientGroups.length : 0;
+    if (!window.confirm(`Send MOM email to ${selectedGroupCount} group(s) and ${selectedSpecificCount} specific member(s) with ${metadata.momFileName} attached?`)) return;
+
+    setError("");
+    setStatus("sending");
+    try {
+      const result = await sendMomEmail(target, sendDraft);
+      const history = normalizeMomEmailHistory(result.history || result.momEmail || result);
+      setSentHistory(history);
+      setSendOpen(false);
+      const summary = result.emailSummary || history?.emailSummary || {};
+      let message = `MOM email sent to ${summary.sent || 0} recipient${summary.sent === 1 ? "" : "s"}.`;
+      if (!summary.attempted) {
+        message = "No MOM email recipients were found.";
+      } else if (summary.failed) {
+        message = `MOM email sent to ${summary.sent || 0}; ${summary.failed} failed.`;
+      }
+      onNotice?.({ type: summary.failed || !summary.sent ? "error" : "success", message });
+    } catch (sendError) {
+      const message = momUploadError(sendError);
+      setError(message);
+      onNotice?.({ type: "error", message });
+    } finally {
+      setStatus("");
+    }
+  }
+
   const sectionClass = ["mom-section", className].filter(Boolean).join(" ");
+  const historyGroups = latestHistory?.recipientGroups?.length
+    ? latestHistory.recipientGroups.join(", ")
+    : "Unavailable";
+  const historySummary = latestHistory?.emailSummary
+    ? `${latestHistory.emailSummary.sent}/${latestHistory.emailSummary.attempted} sent${latestHistory.emailSummary.failed ? `, ${latestHistory.emailSummary.failed} failed` : ""}`
+    : "";
+  const groupLabelByValue = new Map(MOM_RECIPIENT_GROUP_OPTIONS.map((item) => [item.value, item.label]));
+  const selectedGroups = Array.isArray(sendDraft.recipientGroups) ? sendDraft.recipientGroups : [];
+  const selectedUserIds = Array.isArray(sendDraft.targetUserIds) ? sendDraft.targetUserIds : [];
+  const selectedRecipients = selectedUserIds.map((userId) => recipientOptions.find((recipient) => recipient.uid === userId)).filter(Boolean);
+  const normalizedQuery = recipientQuery.trim().toLowerCase();
+  const visibleRecipientOptions = recipientOptions
+    .filter((recipient) => !selectedUserIds.includes(recipient.uid))
+    .filter((recipient) => {
+      if (!normalizedQuery) return true;
+      return [recipient.name, recipient.email, recipient.role, ...(recipient.positionKeys || [])]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+    })
+    .slice(0, 8);
+  const selectedGroupLabels = selectedGroups.map((group) => groupLabelByValue.get(group) || group);
+  const selectedHistorySpecificCount = latestHistory?.explicitRecipientCount || latestHistory?.targetUserIds?.length || 0;
+  const historyRecipientLabel = [
+    historyGroups !== "Unavailable" ? historyGroups : "",
+    selectedHistorySpecificCount ? `${selectedHistorySpecificCount} specific` : "",
+  ].filter(Boolean).join(" + ") || "Unavailable";
 
   return (
     <section className={sectionClass} aria-label={`Minutes of Meeting for ${target.title || "record"}`}>
@@ -113,6 +236,27 @@ export default function MomSection({
         <p>No MOM uploaded yet.</p>
       )}
 
+      {latestHistory ? (
+        <dl className="mom-section__history">
+          <div>
+            <dt>Last sent</dt>
+            <dd>{formatMomTimestamp(latestHistory.sentAt)}</dd>
+          </div>
+          <div>
+            <dt>Recipients</dt>
+            <dd>{historyRecipientLabel}</dd>
+          </div>
+          <div>
+            <dt>Sent by</dt>
+            <dd>{latestHistory.sentByName}</dd>
+          </div>
+          <div>
+            <dt>Summary</dt>
+            <dd>{historySummary}</dd>
+          </div>
+        </dl>
+      ) : null}
+
       {status ? <p className="mom-section__status" aria-live="polite">{STAGE_LABELS[status] || status}</p> : null}
       {error ? <p className="mom-section__error" role="alert">{error}</p> : null}
 
@@ -136,7 +280,111 @@ export default function MomSection({
             />
           </>
         ) : null}
+        {metadata && sendAllowed ? (
+          <button type="button" disabled={busy} onClick={openSendPanel}>
+            Send MOM Email
+          </button>
+        ) : null}
       </div>
+
+      {sendOpen ? (
+        <form className="mom-email-panel" role="dialog" aria-label="Send MOM email" onSubmit={submitMomEmail}>
+          <fieldset>
+            <legend>Recipient group</legend>
+            <div className="mom-email-panel__groups">
+              {MOM_RECIPIENT_GROUP_OPTIONS.map((group) => (
+                <label key={group.value}>
+                  <input
+                    type="checkbox"
+                    checked={selectedGroups.includes(group.value)}
+                    onChange={(event) => updateRecipientGroup(group.value, event.target.checked)}
+                  />
+                  {group.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="mom-email-panel__specific">
+            <legend>Specific members</legend>
+            <label>
+              Search members
+              <input
+                type="search"
+                value={recipientQuery}
+                onChange={(event) => setRecipientQuery(event.target.value)}
+                placeholder="Name, email, role, or position"
+              />
+            </label>
+            {recipientStatus === "loading" ? <p className="mom-email-panel__hint">Loading members...</p> : null}
+            {recipientStatus === "error" ? (
+              <p className="mom-section__error">
+                Recipient list unavailable.
+                <button type="button" disabled={busy} onClick={() => loadRecipientOptions(true)}>Retry</button>
+              </p>
+            ) : null}
+            {recipientStatus !== "loading" && visibleRecipientOptions.length ? (
+              <div className="mom-email-panel__member-list">
+                {visibleRecipientOptions.map((recipient) => (
+                  <button
+                    type="button"
+                    key={recipient.uid}
+                    disabled={busy}
+                    onClick={() => addSpecificRecipient(recipient.uid)}
+                  >
+                    <strong>{recipient.name}</strong>
+                    <span>{recipient.email}</span>
+                    <small>{recipient.role || recipient.positionKeys.join(", ") || "member"}</small>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {recipientStatus === "ready" && !visibleRecipientOptions.length ? (
+              <p className="mom-email-panel__hint">No matching eligible members.</p>
+            ) : null}
+            {selectedRecipients.length ? (
+              <div className="mom-email-panel__selected" aria-label="Selected specific members">
+                {selectedRecipients.map((recipient) => (
+                  <span key={recipient.uid}>
+                    {recipient.name}
+                    <button type="button" disabled={busy} onClick={() => removeSpecificRecipient(recipient.uid)}>
+                      Remove
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </fieldset>
+          <label>
+            Subject
+            <input
+              value={sendDraft.subject}
+              onChange={(event) => setSendDraft({ ...sendDraft, subject: event.target.value })}
+              maxLength={180}
+              required
+            />
+          </label>
+          <label>
+            Message body
+            <textarea
+              value={sendDraft.body}
+              onChange={(event) => setSendDraft({ ...sendDraft, body: event.target.value })}
+              rows={6}
+              maxLength={6000}
+              required
+            />
+          </label>
+          <div className="mom-email-panel__summary">
+            <strong>Send summary</strong>
+            <span>Groups: {selectedGroupLabels.join(", ") || "None"}</span>
+            <span>Specific members: {selectedUserIds.length}</span>
+            <span>Attached MOM: {metadata.momFileName}</span>
+          </div>
+          <div className="mom-email-panel__actions">
+            <button type="submit" disabled={busy}>Send</button>
+            <button type="button" disabled={busy} onClick={() => setSendOpen(false)}>Cancel</button>
+          </div>
+        </form>
+      ) : null}
     </section>
   );
 }

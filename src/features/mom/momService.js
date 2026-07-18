@@ -1,8 +1,15 @@
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../app/firebase";
-import { MOM_DRIVE_FOLDER_NAME, momDriveSubfolderName, validateMomPdfFile } from "./momModel";
+import {
+  MOM_DRIVE_FOLDER_NAME,
+  momDriveSubfolderName,
+  normalizeMomRecipientOptions,
+  validateMomEmailDraft,
+  validateMomPdfFile,
+} from "./momModel";
 
 const REGION_BASE = "https://us-central1-rcph-admin.cloudfunctions.net";
+let momRecipientOptionsPromise = null;
 
 function endpoint(name, override) {
   return String(override || `${REGION_BASE}/${name}`).replace(/\/$/, "");
@@ -100,4 +107,24 @@ export async function viewMomPdf(target) {
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank", "noopener,noreferrer");
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export async function sendMomEmail(target, draft) {
+  const validationError = validateMomEmailDraft(draft);
+  if (validationError) throw new Error(validationError);
+  return call("sendMomEmail", {
+    ...targetPayload(target),
+    recipientGroups: draft.recipientGroups,
+    targetUserIds: draft.targetUserIds,
+    subject: draft.subject,
+    body: draft.body,
+  });
+}
+
+export async function getMomEmailRecipientOptions(refresh = false) {
+  if (!momRecipientOptionsPromise || refresh) {
+    momRecipientOptionsPromise = call("getMomEmailRecipientOptions", {})
+      .then((result) => normalizeMomRecipientOptions(result.recipients));
+  }
+  return momRecipientOptionsPromise;
 }

@@ -752,6 +752,7 @@ export function MembersModule({
       email: linked?.email || member?.email || "",
       role: linked?.role || member?.role || "gbm",
       phone: linked?.phone || "",
+      rotaryId: linked?.rotaryId || linked?.requestedRid || "",
       dateOfBirth: linked?.dateOfBirth || "",
       gender: linked?.gender || "",
       genderSelfDescribe: linked?.genderSelfDescribe || "",
@@ -1122,13 +1123,14 @@ function MemberInspector({ member, busy, onEdit, onHistory, onRemove }) {
         <dl>
           <div><dt>Email</dt><dd>{recordedProfileValue(member.email)}</dd></div>
           <div><dt>Phone</dt><dd>{recordedProfileValue(linkedProfile.phone)}</dd></div>
+          <div><dt>RID / Rotary ID</dt><dd>{recordedProfileValue(linkedProfile.rotaryId || linkedProfile.requestedRid)}</dd></div>
           <div><dt>Date of birth</dt><dd>{formatMemberDateOfBirth(linkedProfile.dateOfBirth)}</dd></div>
           <div><dt>Gender</dt><dd>{formatMemberGender(linkedProfile.gender)}</dd></div>
           {linkedProfile.gender === "self-describe" ? (
             <div><dt>Gender description</dt><dd>{recordedProfileValue(linkedProfile.genderSelfDescribe)}</dd></div>
           ) : null}
           <div><dt>Hobbies and interests</dt><dd>{recordedProfileValue(linkedProfile.hobbies)}</dd></div>
-          <div><dt>RID</dt><dd>{member.normalizedRid || "Not recorded"}</dd></div>
+          <div><dt>Roster RID</dt><dd>{member.normalizedRid || "Not recorded"}</dd></div>
           <div><dt>Trusted role</dt><dd>{recordedProfileValue(member.trustedRole)}</dd></div>
           <div><dt>Club position</dt><dd>{recordedProfileValue(member.clubPosition || member.position)}</dd></div>
           <div><dt>Account linkage</dt><dd>{member.accountLinked ? `Approved account linked${linkedProfile.email ? `: ${linkedProfile.email}` : ""}` : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</dd></div>

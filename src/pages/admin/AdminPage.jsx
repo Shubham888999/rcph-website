@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import AdminShell from "../../features/admin/AdminShell";
+import BodManagementModule from "../../features/admin/bod-management/BodManagementModule";
 import { BodOperationsModule, ClubAttendanceModule, DistrictModule } from "../../features/admin/modules/AttendanceModules";
 import { AccountsModule, CommandCenter, MembersModule, ReportsModule } from "../../features/admin/modules/CoreModules";
 import DzrVisitModule from "../../features/admin/modules/DzrVisitModule";
@@ -12,6 +13,7 @@ import ResolutionsModule from "../../features/admin/resolutions/ResolutionsModul
 import { AdminError, AdminLoading, AdminNotice } from "../../features/admin/shared/AdminStates";
 import { clearAdminCaches } from "../../features/admin/shared/adminService";
 import useAdminData from "../../features/admin/shared/useAdminData";
+import { canManageBodManagement } from "../../features/auth/accessModel";
 import VisitSubmissionsModule from "../../features/admin/visit/VisitSubmissionsModule";
 import { clearBodEventCache } from "../../features/bod-tools/bodEventService";
 import { clearDashboardDataCache } from "../../features/dashboard/dashboardService";
@@ -25,7 +27,8 @@ export default function AdminPage() {
   const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "users", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "users", "districtEvents", "districtAttendance"], reminders: ["events", "bodMeetings", "districtEvents", "reminders"], fines: ["members", "fines", "events", "bodMeetings", "districtEvents"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
   const canAccessLockTools = access?.canAccessLockTools === true || access?.canAccessPresidentControls === true;
   const canAccessResolutionTools = access?.canAccessResolutionTools === true;
-  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools);
+  const canAccessBodManagement = canManageBodManagement(access);
+  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools) || (segment === "bod-management" && !canAccessBodManagement);
   const state = moduleState(...(requirements[segment] || []));
   async function handleSignOut() { clearAdminCaches(uid); clearBodEventCache(uid); clearDashboardDataCache(uid); await signOut(); }
   let content;
@@ -57,6 +60,7 @@ export default function AdminPage() {
   else if (segment === "reports") content = <ReportsModule events={data.events} />;
   else if (segment === "visit-submissions") content = <VisitSubmissionsModule onNotice={setNotice} />;
   else if (segment === "dzr-visit") content = <DzrVisitModule data={data} />;
+  else if (segment === "bod-management") content = <BodManagementModule uid={uid} access={access} onNotice={setNotice} />;
   else content = <AdminError message="This Admin module does not exist." />;
   return <main className="admin-page"><AdminShell access={access} displayName={displayName} onSignOut={handleSignOut}><AdminNotice notice={notice} onDismiss={() => setNotice(null)} />{content}</AdminShell></main>;
 }

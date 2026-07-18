@@ -155,6 +155,7 @@ export function normalizeDashboardProfile(raw) {
     email: text(raw.email, 320),
     role,
     phone: text(raw.phone, 40),
+    rotaryId: text(raw.rotaryId || raw.rid, 40),
     dateOfBirth: normalizeDateOnly(raw.dateOfBirth),
     gender: text(raw.gender, 40).toLowerCase(),
     genderSelfDescribe: text(raw.genderSelfDescribe, 160),

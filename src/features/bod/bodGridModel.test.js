@@ -21,6 +21,35 @@ test("canonical board members receive stable unique derived IDs without changing
   assert.deepEqual(ids, boardMembers.map(getBodMemberId));
 });
 
+test("member identity prefers profileId or id before the legacy name-role slug", () => {
+  assert.equal(
+    getBodMemberId({
+      profileId: "profile-123",
+      id: "legacy-id",
+      name: "Changed Name",
+      role: "Changed Role",
+    }),
+    "profile-123",
+  );
+
+  assert.equal(
+    getBodMemberId({
+      id: "public-id-456",
+      name: "Changed Again",
+      role: "Another Role",
+    }),
+    "public-id-456",
+  );
+
+  assert.equal(
+    getBodMemberId({
+      name: "Legacy Member",
+      role: "Legacy Role",
+    }),
+    "legacy-member-legacy-role",
+  );
+});
+
 test("responsive column count stays at three across mobile, tablet, and desktop", () => {
   assert.equal(getBodColumnCount(1440), 3);
   assert.equal(getBodColumnCount(1024), 3);

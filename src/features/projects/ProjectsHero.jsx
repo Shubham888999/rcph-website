@@ -12,7 +12,12 @@ export default function ProjectsHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       >
-        <h1 id="projects-page-title">Projects by Rotaract Club of Pune Heritage</h1>
+        <h1 id="projects-page-title">
+          Projects by
+          <span className="projects-hero__club-name">
+            Rotaract Club of Pune Heritage
+          </span>
+        </h1>
         <p>
           Every RCPH project starts with a simple idea: bring people together
           and do something useful with the time, energy, and skills we have. Our
@@ -24,18 +29,6 @@ export default function ProjectsHero() {
           <Link className="button button-primary" to="/events">See Events</Link>
           <Link className="button button-secondary" to="/contact">Collaborate</Link>
         </div>
-      </motion.div>
-
-      <motion.div
-        className="projects-hero__motif"
-        initial={reduceMotion ? false : { opacity: 1, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: reduceMotion ? 0 : 0.5 }}
-        aria-hidden="true"
-      >
-        <span>Service</span>
-        <span>Leadership</span>
-        <span>Fellowship</span>
       </motion.div>
     </section>
   );

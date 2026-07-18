@@ -40,21 +40,15 @@ export default function PublicLayout() {
     <div className="public-site-shell">
       <div className="public-logo-strip" aria-label="RCPH affiliations">
         <img
-          src="/images/logo1.png"
-          alt="Rotaract annual theme"
-          className="public-affiliation-logo"
-        />
-
-        <img
-          src="/images/logo2.png"
+          src="/images/rotaract-district-3131.webp"
           alt="Rotaract District 3131"
-          className="public-affiliation-logo public-affiliation-logo-wide"
+          className="public-affiliation-logo public-affiliation-logo--district-3131"
         />
 
         <img
-          src="/images/logo3.webp"
-          alt="Rotaract Club of Pune Heritage"
-          className="public-affiliation-logo"
+          src="/images/rcph-lakshya-logo.webp"
+          alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+          className="public-affiliation-logo public-affiliation-logo--lakshya"
         />
       </div>
 
@@ -62,7 +56,7 @@ export default function PublicLayout() {
         <div className="public-header-inner">
           <NavLink className="public-brand" to="/" aria-label="RCPH home" onClick={closeMenu}>
             <img
-              src="/images/logo3.webp"
+              src="/images/rcph-lakshya-logo.webp"
               alt=""
               className="public-brand-logo"
               aria-hidden="true"
@@ -125,8 +119,8 @@ export default function PublicLayout() {
         <div className="public-footer-inner">
           <div className="public-footer-identity">
             <img
-              src="/images/logo3.webp"
-              alt="Rotaract Club of Pune Heritage"
+              src="/images/rcph-lakshya-logo.webp"
+              alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
               className="public-footer-logo"
             />
 
@@ -161,10 +155,8 @@ export default function PublicLayout() {
         </div>
 
         <div className="public-footer-bottom">
-          <span>
-            © {new Date().getFullYear()} Rotaract Club of Pune Heritage
-          </span>
-          <span>Create · Connect · Contribute</span>
+          <span>© {new Date().getFullYear()} Rotaract Club of Pune Heritage</span>
+          <span>Lakshya · Shaping Aim Through Experience</span>
         </div>
       </footer>
     </div>

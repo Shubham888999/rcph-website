@@ -18,7 +18,7 @@ function LoginVerificationState({ message = "Verifying your trusted RCPH access�
   return (
     <main className="login-page-react">
       <section className="login-verification" role="status" aria-live="polite">
-        <img src="/images/logo3.webp" alt="" aria-hidden="true" />
+        <img src="/images/rcph-lakshya-logo.webp" alt="" aria-hidden="true" />
         <p className="login-kicker">Secure member access</p>
         <h1>Checking your account</h1>
         <p>{message}</p>
@@ -128,8 +128,8 @@ export default function LoginPage() {
     aria-label="RCPH public homepage"
   >
     <img
-      src="/images/logo3.webp"
-      alt="Rotaract Club of Pune Heritage"
+      src="/images/rcph-lakshya-logo.webp"
+      alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
     />
 
     <span>
@@ -147,10 +147,10 @@ export default function LoginPage() {
   </div>
 
   <div className="login-brand-panel__footer">
-    <div className="login-brand-panel__values" aria-label="Club values">
-      <span>Create</span>
-      <span>Connect</span>
-      <span>Contribute</span>
+    <div className="login-brand-panel__values" aria-label="Club theme">
+      <span>Lakshya</span>
+      <span>Shaping Aim</span>
+      <span>Through Experience</span>
     </div>
 
 

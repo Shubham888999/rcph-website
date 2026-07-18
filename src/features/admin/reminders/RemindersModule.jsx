@@ -5,40 +5,49 @@ import {
 } from "react";
 import AdminModuleHeader from "../AdminModuleHeader";
 import { AdminEmpty } from "../shared/AdminStates";
-import { AVENUES } from "../shared/adminModel";
 import useAdminMutation from "../shared/useAdminMutation";
 import { fetchBodEvents } from "../../bod-tools/bodEventService";
 import {
   buildConductedReminderEvents,
   buildEventReminderConfigPayload,
+  buildReminderTemplateTestPayload,
   buildReportingWindowPayload,
+  buildReminderStatusSummaries,
   canManageReminders,
   EVENT_REMINDER_RECORD_TYPE,
   EVENT_REMINDER_TYPES,
   findEventReminderConfig,
+  reportingWindowSentText,
+  reportingWindowStatusNote,
+  reportingWindowStatusText,
+  reportingWindowStatusTone,
+  reminderStatusText,
+  REMINDER_TEMPLATE_TEST_OPTIONS,
+  REPORTING_WINDOW_AVENUE_OPTIONS,
   REPORTING_WINDOW_RECORD_TYPE,
-  summarizeEventReminderStatus,
+  safeFormatReminderDateTime,
 } from "./reminderModel";
 import {
   createReportingWindowReminder,
+  runReminderEmailSweep,
+  sendReminderTemplateTestEmail,
+  unlockAvenueReportingWindow,
   upsertEventReminderConfig,
 } from "./reminderService";
 
-const emptyReportingWindow = {
-  avenue: AVENUES[0],
+const createEmptyReportingWindow = () => ({
+  avenue: REPORTING_WINDOW_AVENUE_OPTIONS[0],
+  targetName: "",
   eventConductedDate: "",
   eventTime: "",
-};
+  remindersEnabled: true,
+  lockEnabled: true,
+});
 
-function formatDateTime(value) {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not recorded";
-  return date.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
+const emptyReminderTemplateTest = {
+  templateType: REMINDER_TEMPLATE_TEST_OPTIONS[0].value,
+  recipientEmail: "",
+};
 
 function ReminderActionMenu({
   event,
@@ -75,7 +84,7 @@ function ReminderActionMenu({
             onClick={() => onConfigure(event, "mom_submission")}
           >
             MOM Submission Reminder
-            {mom ? <small>Configured</small> : null}
+            {mom ? <small>{reminderStatusText(mom)}</small> : null}
           </button>
 
           <button
@@ -85,12 +94,66 @@ function ReminderActionMenu({
             onClick={() => onConfigure(event, "attendance_marking")}
           >
             Attendance Marking Reminder
-            {attendance ? <small>Configured</small> : null}
+            {attendance ? <small>{reminderStatusText(attendance)}</small> : null}
           </button>
         </div>
       ) : null}
     </div>
   );
+}
+
+function ReminderStatusBadges({ summaries }) {
+  if (!summaries.length) return <span className="reminders-status-empty">Not configured</span>;
+
+  return (
+    <div className="reminders-status-badges">
+      {summaries.map((item) => (
+        <div className="reminders-status-item" key={item.reminderType}>
+          <span className={`reminders-status-badge reminders-status-badge--${item.tone}`}>
+            {item.shortLabel}: {item.text}
+          </span>
+          {item.lastReminderSentAt ? (
+            <small>Last sent {safeFormatReminderDateTime(item.lastReminderSentAt)}</small>
+          ) : null}
+          {item.completionReason ? <small>{item.completionReason}</small> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReportingWindowNote({ item }) {
+  const notes = [];
+  const statusNote = reportingWindowStatusNote(item);
+  if (statusNote) notes.push(statusNote);
+  if (item.lockedAt) notes.push(`Locked ${safeFormatReminderDateTime(item.lockedAt)}`);
+  if (item.unlockedAt) notes.push(`Unlocked ${safeFormatReminderDateTime(item.unlockedAt)}`);
+
+  return (
+    <span className="reminders-window-note">
+      {notes.join(" / ") || "None"}
+    </span>
+  );
+}
+
+function sweepSummaryText(summary) {
+  if (!summary) return "";
+  return [
+    `processed ${summary.processed}`,
+    `sent ${summary.sent}`,
+    `skipped ${summary.skipped}`,
+    `failed ${summary.failed}`,
+    `completed ${summary.completed}`,
+    `no recipient ${summary.noRecipient}`,
+    `locked ${summary.locked}`,
+    `already submitted ${summary.alreadySubmitted}`,
+  ].join(" / ");
+}
+
+function reminderTemplateTestLabel(templateType) {
+  return REMINDER_TEMPLATE_TEST_OPTIONS.find((option) =>
+    option.value === templateType
+  )?.label || "Reminder template";
 }
 
 export default function RemindersModule({
@@ -100,9 +163,12 @@ export default function RemindersModule({
   actorName,
   onNotice,
 }) {
-  const [draft, setDraft] = useState(emptyReportingWindow);
+  const [draft, setDraft] = useState(createEmptyReportingWindow);
   const [conductedExpanded, setConductedExpanded] = useState(true);
   const [menuKey, setMenuKey] = useState("");
+  const [sweepSummary, setSweepSummary] = useState(null);
+  const [templateTestDraft, setTemplateTestDraft] = useState(emptyReminderTemplateTest);
+  const [templateTestMessage, setTemplateTestMessage] = useState(null);
   const [bodEventState, setBodEventState] = useState({
     uid: "",
     status: "idle",
@@ -179,7 +245,7 @@ export default function RemindersModule({
     if (!canManage) {
       onNotice?.({
         type: "error",
-        message: "Admin or president-level access is required for Reminders.",
+        message: "Admin panel authority is required to create reporting windows.",
       });
       return;
     }
@@ -202,7 +268,70 @@ export default function RemindersModule({
       }),
       "Reporting window saved.",
     ).then((saved) => {
-      if (saved) setDraft(emptyReportingWindow);
+      if (saved) setDraft(createEmptyReportingWindow());
+    });
+  }
+
+  function runManualSweep() {
+    if (!canManage) {
+      onNotice?.({
+        type: "error",
+        message: "Admin panel authority is required to create reporting windows.",
+      });
+      return;
+    }
+
+    if (!window.confirm("Run reminder email sweep now?")) return;
+
+    setSweepSummary(null);
+    run(
+      "run-reminder-email-sweep",
+      runReminderEmailSweep,
+      "Reminder email sweep complete.",
+    ).then((summary) => {
+      if (summary) setSweepSummary(summary);
+    });
+  }
+
+  function sendTemplateTest(event) {
+    event.preventDefault();
+
+    if (!canManage) {
+      onNotice?.({
+        type: "error",
+        message: "Admin panel authority is required to send reminder test emails.",
+      });
+      return;
+    }
+
+    const result = buildReminderTemplateTestPayload(templateTestDraft);
+    if (!result.ok) {
+      const message = result.errors[0];
+      setTemplateTestMessage({ type: "error", message });
+      onNotice?.({ type: "error", message });
+      return;
+    }
+
+    setTemplateTestMessage(null);
+    run(
+      "send-reminder-template-test-email",
+      () => sendReminderTemplateTestEmail(result.payload),
+      "Reminder test email sent.",
+      {
+        onError: () => {
+          setTemplateTestMessage({
+            type: "error",
+            message: "Reminder test email could not be sent.",
+          });
+          return false;
+        },
+      },
+    ).then((sent) => {
+      if (!sent) return;
+      setTemplateTestMessage({
+        type: "success",
+        message: `${reminderTemplateTestLabel(result.payload.templateType)} test sent to ${sent.recipientEmail}.`,
+      });
     });
   }
 
@@ -210,7 +339,7 @@ export default function RemindersModule({
     if (!canManage) {
       onNotice?.({
         type: "error",
-        message: "Admin or president-level access is required for Reminders.",
+        message: "Admin panel authority is required to create reporting windows.",
       });
       return;
     }
@@ -236,17 +365,54 @@ export default function RemindersModule({
     );
   }
 
+  function unlockReportingWindow(item) {
+    if (!canManage) {
+      onNotice?.({
+        type: "error",
+        message: "Admin panel authority is required to unlock reporting windows.",
+      });
+      return;
+    }
+
+    const label = item.targetName || item.avenue || "this reporting window";
+    if (!window.confirm(`Unlock reporting window for ${label}?`)) return;
+    const unlockReason = window.prompt("Unlock reason", "Administrative override");
+    if (unlockReason === null) return;
+
+    run(
+      "unlock-avenue-reporting-window",
+      () => unlockAvenueReportingWindow(item.id, unlockReason),
+      "Reporting window unlocked.",
+    );
+  }
+
   return (
     <>
       <AdminModuleHeader
         title="Reminders"
-        description="Phase 1 reminder setup for reporting windows and conducted event follow-ups."
+        description="Reminder setup and automated follow-up status for conducted events and meetings."
+        action={canManage ? (
+          <button
+            type="button"
+            className="reminders-sweep-button"
+            disabled={busy}
+            onClick={runManualSweep}
+          >
+            Run reminder email sweep
+          </button>
+        ) : null}
       />
 
       {!canManage ? (
         <div className="admin-lock-banner is-locked">
-          Admin or president-level access is required to create reminder records.
+          Admin panel authority is required to create reporting windows.
         </div>
+      ) : null}
+
+      {sweepSummary ? (
+        <p className="reminders-inline-note reminders-sweep-summary">
+          Reminder sweep: {sweepSummaryText(sweepSummary)}
+        </p>
       ) : null}
 
       <section className="admin-panel reminders-window-panel">
@@ -254,6 +420,9 @@ export default function RemindersModule({
           <div>
             <p className="admin-kicker">Avenue Reporting Window</p>
             <h3>Reporting window setup</h3>
+            <p className="reminders-section-note">
+              Reporting reminders are sent to the mapped Avenue Director. GBM/BOD Meeting reminders go to Secretary.
+            </p>
           </div>
         </header>
 
@@ -269,12 +438,25 @@ export default function RemindersModule({
                 })}
                 required
               >
-                {AVENUES.map((avenue) => (
+                {REPORTING_WINDOW_AVENUE_OPTIONS.map((avenue) => (
                   <option key={avenue} value={avenue}>
                     {avenue}
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label>
+              Event/meeting name
+              <input
+                type="text"
+                value={draft.targetName}
+                placeholder="Optional"
+                onChange={(event) => setDraft({
+                  ...draft,
+                  targetName: event.target.value,
+                })}
+              />
             </label>
 
             <label>
@@ -303,6 +485,32 @@ export default function RemindersModule({
             </label>
           </div>
 
+          <div className="reminders-window-toggles">
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.remindersEnabled}
+                onChange={(event) => setDraft({
+                  ...draft,
+                  remindersEnabled: event.target.checked,
+                })}
+              />
+              Send reminder emails
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.lockEnabled}
+                onChange={(event) => setDraft({
+                  ...draft,
+                  lockEnabled: event.target.checked,
+                })}
+              />
+              Lock after deadline
+            </label>
+          </div>
+
           <button type="submit" disabled={!canManage || busy}>
             Save reporting window
           </button>
@@ -317,28 +525,61 @@ export default function RemindersModule({
                 <thead>
                   <tr>
                     <th>Avenue</th>
+                    <th>Event/meeting</th>
                     <th>Conducted</th>
                     <th>Opens</th>
                     <th>Due</th>
                     <th>Lock target</th>
+                    <th>Reminders</th>
+                    <th>Lock</th>
                     <th>Status</th>
+                    <th>Sent</th>
+                    <th>Last sent</th>
+                    <th>Note</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reportingWindows.map((item) => (
                     <tr key={item.id}>
                       <td>{item.avenue}</td>
+                      <td>{item.targetName || "Not recorded"}</td>
                       <td>
-                        {item.eventConductedDate}
+                        {safeFormatReminderDateTime(item.conductedDate || item.eventConductedDate)}
                         {item.eventTime ? ` at ${item.eventTime}` : ""}
                       </td>
-                      <td>{formatDateTime(item.reportingOpensAt)}</td>
-                      <td>{formatDateTime(item.reportingDueAt)}</td>
-                      <td>{formatDateTime(item.lockAt)}</td>
+                      <td>{safeFormatReminderDateTime(item.windowOpensAt || item.reportingOpensAt)}</td>
+                      <td>{safeFormatReminderDateTime(item.reportDueAt || item.reportingDueAt)}</td>
+                      <td>{safeFormatReminderDateTime(item.lockAt)}</td>
                       <td>
-                        {item.remindersEnabled ? "Reminders enabled" : "Reminders off"}
-                        {" / "}
-                        {item.lockEnabled ? "Lock enabled" : "Lock off"}
+                        {item.remindersEnabled ? "On" : "Off"}
+                      </td>
+                      <td>
+                        {item.lockEnabled ? "On" : "Off"}
+                      </td>
+                      <td>
+                        <span className={`reminders-status-badge reminders-status-badge--${reportingWindowStatusTone(item)}`}>
+                          {reportingWindowStatusText(item)}
+                        </span>
+                      </td>
+                      <td>{reportingWindowSentText(item)}</td>
+                      <td>{safeFormatReminderDateTime(item.lastReminderSentAt)}</td>
+                      <td>
+                        <ReportingWindowNote item={item} />
+                      </td>
+                      <td>
+                        {item.status === "locked" && canManage ? (
+                          <button
+                            type="button"
+                            className="reminders-inline-action"
+                            disabled={busy}
+                            onClick={() => unlockReportingWindow(item)}
+                          >
+                            Unlock
+                          </button>
+                        ) : (
+                          <span className="reminders-window-note">None</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -409,7 +650,11 @@ export default function RemindersModule({
                         <td>{row.type}</td>
                         <td>{row.avenue.join(", ") || "Not available"}</td>
                         <td>{row.date}</td>
-                        <td>{summarizeEventReminderStatus(eventReminderConfigs, row)}</td>
+                        <td>
+                          <ReminderStatusBadges
+                            summaries={buildReminderStatusSummaries(eventReminderConfigs, row)}
+                          />
+                        </td>
                         <td>
                           <ReminderActionMenu
                             event={row}
@@ -434,6 +679,76 @@ export default function RemindersModule({
           </div>
         ) : null}
       </section>
+
+      {canManage ? (
+        <section className="admin-panel reminders-test-panel">
+          <header className="reminders-section-header">
+            <div>
+              <p className="admin-kicker">Reminder Email Test</p>
+              <h3>Template preview sender</h3>
+              <p className="reminders-section-note">
+                Test only. Does not create reminder configs, update counts, or change locks.
+              </p>
+            </div>
+          </header>
+
+          <form className="admin-form reminders-test-form" onSubmit={sendTemplateTest}>
+            <div className="admin-form-grid">
+              <label>
+                Template
+                <select
+                  value={templateTestDraft.templateType}
+                  onChange={(event) => {
+                    setTemplateTestMessage(null);
+                    setTemplateTestDraft({
+                      ...templateTestDraft,
+                      templateType: event.target.value,
+                    });
+                  }}
+                  required
+                >
+                  {REMINDER_TEMPLATE_TEST_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Recipient email
+                <input
+                  type="email"
+                  inputMode="email"
+                  value={templateTestDraft.recipientEmail}
+                  placeholder="name@example.com"
+                  onChange={(event) => {
+                    setTemplateTestMessage(null);
+                    setTemplateTestDraft({
+                      ...templateTestDraft,
+                      recipientEmail: event.target.value,
+                    });
+                  }}
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="reminders-test-actions">
+              <span>Uses test placeholders and sends one email to the address above.</span>
+              <button type="submit" disabled={busy}>
+                {busy ? "Sending..." : "Send test email"}
+              </button>
+            </div>
+          </form>
+
+          {templateTestMessage ? (
+            <p className={`reminders-inline-${templateTestMessage.type === "error" ? "error" : "note"}`}>
+              {templateTestMessage.message}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
     </>
   );
 }

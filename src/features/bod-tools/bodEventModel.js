@@ -1,4 +1,4 @@
-import { MOM_TARGET_TYPES, normalizeMomMetadata } from "../mom/momModel.js";
+import { MOM_TARGET_TYPES, normalizeMomEmailHistory, normalizeMomMetadata } from "../mom/momModel.js";
 
 const EVENT_KINDS = new Set(["clubEvent", "bodMeeting", "districtEvent"]);
 const RCPH_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
@@ -215,6 +215,7 @@ export function normalizeBodEvent(id, raw) {
       momTargetType: MOM_TARGET_TYPES.BOD_EVENT,
       momTargetId: eventId,
     }),
+    momEmail: normalizeMomEmailHistory(raw.momEmail || raw),
     syncedEventId,
     syncedMeetingId,
     syncedDistrictEventId,

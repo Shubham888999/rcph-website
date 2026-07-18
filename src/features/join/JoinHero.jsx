@@ -12,7 +12,12 @@ export default function JoinHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       >
-        <h1 id="join-page-title">Join Rotaract Club of Pune Heritage</h1>
+        <h1 id="join-page-title">
+          Join
+          <span className="join-hero__club-name">
+            Rotaract Club of Pune Heritage
+          </span>
+        </h1>
         <p>
           Rotaract Club of Pune Heritage welcomes students and young
           professionals who want to create impact, connect with people, and
@@ -28,17 +33,6 @@ export default function JoinHero() {
         </div>
       </motion.div>
 
-      <motion.div
-        className="join-hero__motif"
-        initial={reduceMotion ? false : { opacity: 1, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: reduceMotion ? 0 : 0.5 }}
-        aria-hidden="true"
-      >
-        <span>Create</span>
-        <span>Connect</span>
-        <span>Contribute</span>
-      </motion.div>
     </section>
   );
 }

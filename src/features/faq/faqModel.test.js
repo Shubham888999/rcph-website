@@ -37,3 +37,12 @@ test("featured questions are unique and sourced from visible FAQ items", () => {
   assert.equal(new Set(featured.map(({ id }) => id)).size, featured.length);
   assert.ok(featured.every((item) => faqItems.includes(item)));
 });
+
+test("membership dues use the current published amount", () => {
+  const membershipDues = faqItems.filter(({ id }) => ["annual-dues", "dues-utilization"].includes(id));
+  const serialized = JSON.stringify(membershipDues);
+
+  assert.equal(membershipDues.length, 2);
+  assert.match(serialized, /₹3,131/);
+  assert.doesNotMatch(serialized, /₹3,000|3000/);
+});

@@ -53,6 +53,7 @@ export function getAccessHubDestinations(access) {
   }
   destinations.push({ key: "calendar", category: "Club calendar", title: "Public Event Calendar", description: "See upcoming RCPH activities and district opportunities.", href: "/calendar", primary: false });
   destinations.push({ key: "home", category: "Public website", title: "RCPH Homepage", description: "Return to the public club website.", href: "/", primary: false });
+  destinations.push({ key: "website-guide", category: "Help Center", title: "Website Guide", description: "Learn how to use the club website features.", href: "/website-guide", primary: false });
   return destinations;
 }
 

@@ -2,19 +2,19 @@ import AboutReveal from "./AboutReveal";
 
 const values = [
   {
-    title: "Create",
+    title: "Aim",
     description:
-      "This stands for innovation, leadership, and fresh ideas. As Rotaractors, we are creators of change, building impactful projects, nurturing team spirit, and shaping a better future through creativity and purpose.",
+      "Lakshya begins with clarity. Members learn to set direction, focus their energy, and turn shared intent into purposeful club action.",
   },
   {
-    title: "Connect",
+    title: "Experience",
     description:
-      "At the heart of Rotaract lie strong connections: bonding with fellow club members, collaborating with other clubs, forming ties with our Rotary family, and engaging with the community. Every connection strengthens our impact.",
+      "The theme is shaped through participation: planning, leading, collaborating, serving, and growing through real Rotaract experiences.",
   },
   {
-    title: "Contribute",
+    title: "Impact",
     description:
-      "Our ultimate goal is to give back to society, to our club, and to ourselves. Whether it is time, effort, knowledge, or service, every contribution matters. Together, we make a difference.",
+      "Every project, meeting, and fellowship moment should move toward meaningful service, stronger friendships, and a more capable club.",
   },
 ];
 
@@ -23,11 +23,11 @@ export default function AboutValues() {
     <AboutReveal className="about-section" labelledBy="about-theme-title">
       <div className="about-theme-header">
         <div className="about-theme-header__mark" aria-hidden="true">
-          <img src="/images/logo3.webp" alt="" loading="lazy" decoding="async" />
+          <img src="/images/rcph-lakshya-logo.webp" alt="" loading="lazy" decoding="async" />
         </div>
         <div>
-          <p className="about-kicker">Create · Connect · Contribute</p>
-          <h2 id="about-theme-title">About This Year’s Theme</h2>
+          <p className="about-kicker">Lakshya · RIY 2026–27</p>
+          <h2 id="about-theme-title">Shaping Aim Through Experience</h2>
         </div>
       </div>
 

@@ -61,6 +61,7 @@ test("dashboard profile normalizes editable profile fields", () => {
       email: "m@example.com",
       role: "gbm",
       phone: "123",
+      rotaryId: " RI-3131A ",
       dateOfBirth: "1998-02-28",
       gender: "woman",
       hobbies: "Reading",
@@ -68,6 +69,7 @@ test("dashboard profile normalizes editable profile fields", () => {
   }));
   assert.equal(model.profile.dateOfBirth, "1998-02-28");
   assert.equal(model.profile.phone, "123");
+  assert.equal(model.profile.rotaryId, "RI-3131A");
   assert.equal(model.profile.hobbies, "Reading");
   assert.equal("uid" in model.profile, false);
 });

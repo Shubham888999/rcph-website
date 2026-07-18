@@ -504,7 +504,6 @@ select { color-scheme: var(--control-color-scheme, dark); }
   .projects-hero__motif,
   .projects-card,
   .projects-cta,
-  .join-hero__motif,
   .join-benefit-card,
   .join-journey-list li,
   .join-cta,

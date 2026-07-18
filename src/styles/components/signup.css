@@ -110,14 +110,14 @@
 
 .signup-choice-card {
   padding: clamp(1.1rem, 3vw, 1.6rem);
-  border: 1px solid rgba(244, 180, 58, 0.28);
+  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.28);
   border-radius: var(--radius-lg);
-  background: rgba(244, 180, 58, 0.045);
+  background: rgba(var(--lakshya-gold-rgb), 0.045);
 }
 
 .signup-choice-card--prospect {
-  border-color: rgba(96, 195, 196, 0.32);
-  background: rgba(96, 195, 196, 0.05);
+  border-color: rgba(var(--lakshya-rose-rgb), 0.32);
+  background: rgba(var(--lakshya-rose-rgb), 0.055);
 }
 
 .signup-card-label {
@@ -151,7 +151,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(244, 180, 58, 0.75);
+  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.75);
   color: var(--color-button-text);
   background: linear-gradient(135deg, var(--color-gold), var(--color-gold-soft));
   box-shadow: var(--shadow-gold);
@@ -196,7 +196,7 @@
   padding: var(--space-5);
   display: grid;
   gap: var(--space-4);
-  border: 1px solid rgba(244, 180, 58, 0.25);
+  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.25);
   border-radius: var(--radius-lg);
 }
 

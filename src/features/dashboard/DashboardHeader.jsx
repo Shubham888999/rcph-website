@@ -53,6 +53,7 @@ export default function DashboardHeader({ profile, mode, access, onEditProfile, 
         <button type="button" onClick={onEditProfile}>Edit profile</button>
         <Link to="/access">Access Hub</Link>
         <Link to="/">Public homepage</Link>
+        <Link to="/website-guide">Website Guide</Link>
         <button type="button" onClick={onSignOut}>Sign out</button>
       </motion.nav>
       <motion.span className="dashboard-masthead__rule" aria-hidden="true" variants={reduceMotion ? undefined : ruleReveal} />

@@ -11,6 +11,7 @@ export const PROFILE_GENDERS = [
 export const PROFILE_FIELD_LABELS = {
   name: "Full name",
   phone: "Phone",
+  rotaryId: "RID / Rotary ID",
   dateOfBirth: "Date of birth",
   gender: "Gender",
   genderSelfDescribe: "Gender description",
@@ -24,6 +25,14 @@ export const PROFILE_FIELD_LABELS = {
 
 function text(value, max = 5000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function hasControlChars(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
 }
 
 export function todayDateString(now = new Date()) {
@@ -74,6 +83,7 @@ export function createProfileDraft(profile = {}) {
     email: text(profile.email, 320).toLowerCase(),
     role: text(profile.role, 40).toLowerCase(),
     phone: text(profile.phone, 40),
+    rotaryId: text(profile.rotaryId || profile.rid || profile.requestedRid, 40),
     dateOfBirth: normalizeProfileDateOfBirth(profile.dateOfBirth),
     gender: PROFILE_GENDERS.includes(text(profile.gender, 40).toLowerCase())
       ? text(profile.gender, 40).toLowerCase()
@@ -108,6 +118,10 @@ export function validateProfileDraft(draft, options = {}) {
 
   if (!name) errors.name = "Enter a full name.";
   errors.phone = maxError(draft.phone, 40, "Phone");
+  errors.rotaryId = maxError(draft.rotaryId, 40, "RID / Rotary ID");
+  if (!errors.rotaryId && hasControlChars(text(draft.rotaryId))) {
+    errors.rotaryId = "RID / Rotary ID cannot include control characters.";
+  }
   errors.dateOfBirth = getProfileDateOfBirthError(draft.dateOfBirth, options.today || todayDateString());
   if (draft.gender && !PROFILE_GENDERS.includes(draft.gender)) errors.gender = "Select a gender option.";
   if (draft.gender === "self-describe" && !text(draft.genderSelfDescribe, 160)) {
@@ -150,7 +164,7 @@ export function buildProfileUpdatePayload(draft, options = {}) {
     genderSelfDescribe: draft.gender === "self-describe" ? text(draft.genderSelfDescribe, 160) : "",
     hobbies: text(draft.hobbies, 600),
   };
-  if (!prospect) return payload;
+  if (!prospect) return { ...payload, rotaryId: text(draft.rotaryId, 40) };
   return {
     ...payload,
     previousRotaract: draft.previousRotaract === "yes",

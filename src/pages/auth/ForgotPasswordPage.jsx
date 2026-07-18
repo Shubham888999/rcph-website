@@ -110,7 +110,10 @@ export default function ForgotPasswordPage() {
       <div className="recovery-shell">
         <header className="recovery-header">
           <Link className="login-brand" to="/" aria-label="RCPH public homepage">
-            <img src="/images/logo3.webp" alt="Rotaract Club of Pune Heritage" />
+            <img
+              src="/images/rcph-lakshya-logo.webp"
+              alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+            />
             <span><strong>RCPH</strong><small>Secure account recovery</small></span>
           </Link>
           <p className="login-kicker">Member access</p>

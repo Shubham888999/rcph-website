@@ -55,9 +55,9 @@ export const faqItems = [
   {
     id: "motto",
     category: "club",
-    keywords: ["motto", "theme", "create", "connect", "contribute"],
+    keywords: ["motto", "theme", "lakshya", "aim", "experience"],
     question: "What is the motto or theme of RCPH?",
-    answer: [text("The club’s guiding line is “Create. Connect. Contribute.”")],
+    answer: [text("The club’s RIY 2026–27 theme is “Lakshya: Shaping Aim Through Experience.”")],
   },
   {
     id: "events",
@@ -110,16 +110,16 @@ export const faqItems = [
   {
     id: "annual-dues",
     category: "membership",
-    keywords: ["dues", "fee", "3000", "rotary year"],
+    keywords: ["dues", "fee", "3131", "rotary year"],
     question: "What are the annual membership dues for RCPH and why are they required?",
-    answer: [text("RCPH membership dues are ₹3,000 per Rotary Year. These dues help the club operate smoothly by supporting administrative requirements, club activities, member resources, event logistics, district obligations, and initiatives that directly benefit members throughout the year. Membership dues ensure that the club can continue creating meaningful service, leadership, fellowship, and professional development opportunities.")],
+    answer: [text("RCPH membership dues are ₹3,131 per Rotary Year. These dues help the club operate smoothly by supporting administrative requirements, club activities, member resources, event logistics, district obligations, and initiatives that directly benefit members throughout the year. Membership dues ensure that the club can continue creating meaningful service, leadership, fellowship, and professional development opportunities.")],
   },
   {
     id: "dues-utilization",
     category: "membership",
     keywords: ["dues", "fee", "district dues", "rotary international", "utilization"],
-    question: "How is my ₹3,000 membership fee utilized?",
-    answer: [text("RCPH is transparent about how membership dues are used. Out of the annual ₹3,000 membership fee, ₹300 per member is paid as District Dues to Rotaract District 3131, and USD $8 (approximately ₹760) is paid as Rotary International dues. The remaining amount supports club operations, member development initiatives, event infrastructure, fellowship activities, club administration, recognition programs, communication platforms, and various projects and opportunities throughout the Rotary Year.")],
+    question: "How is my ₹3,131 membership fee utilized?",
+    answer: [text("RCPH is transparent about how membership dues are used. Out of the annual ₹3,131 membership fee, ₹300 per member is paid as District Dues to Rotaract District 3131, and USD $8 (approximately ₹760) is paid as Rotary International dues. The remaining amount supports club operations, member development initiatives, event infrastructure, fellowship activities, club administration, recognition programs, communication platforms, and various projects and opportunities throughout the Rotary Year.")],
   },
   {
     id: "collaborations",

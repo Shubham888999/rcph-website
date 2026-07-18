@@ -43,6 +43,7 @@ export default function ProfileEditorDialog({
   const today = todayDateString();
   const role = profile?.role || draft.role;
   const prospect = isProspectProfile(role);
+  const canEditRotaryId = !prospect;
   const validation = useMemo(
     () => validateProfileDraft(draft, { role, today }),
     [draft, role, today],
@@ -111,6 +112,23 @@ export default function ProfileEditorDialog({
             />
             <FieldError id={fieldId(prefix, "phone-error")} message={validation.errors.phone} />
           </label>
+
+          {canEditRotaryId ? (
+            <label>
+              <span>RID / Rotary ID</span>
+              <input
+                value={draft.rotaryId}
+                maxLength="40"
+                placeholder="Enter your Rotary ID if available"
+                disabled={disabled}
+                aria-invalid={Boolean(validation.errors.rotaryId)}
+                aria-describedby={`${fieldId(prefix, "rotaryId-help")}${validation.errors.rotaryId ? ` ${fieldId(prefix, "rotaryId-error")}` : ""}`}
+                onChange={(event) => change("rotaryId", event.target.value)}
+              />
+              <p id={fieldId(prefix, "rotaryId-help")} className="profile-field-help">Add this only if you already have a Rotary International ID.</p>
+              <FieldError id={fieldId(prefix, "rotaryId-error")} message={validation.errors.rotaryId} />
+            </label>
+          ) : null}
 
           <label>
             <span>Date of birth</span>

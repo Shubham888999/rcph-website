@@ -30,6 +30,7 @@ test("Members workspace preserves add, profile edit, and remove service calls", 
 test("Members profile actions require a verified linked account", () => {
   assert.match(source, /function linkedProfileUidForMember\(member\)/);
   assert.match(source, /member\?\.linkedAccount\?\.id \|\| ""/);
+  assert.match(source, /rotaryId: linked\?\.rotaryId \|\| linked\?\.requestedRid \|\| ""/);
   assert.match(source, /const hasLinkedProfile = Boolean\(linkedProfileUidForMember\(member\)\)/);
   assert.match(source, />Edit Profile</);
   assert.match(source, />View History</);
@@ -76,11 +77,13 @@ test("Member inspector keeps destructive remove behind the existing confirmation
 test("Member inspector shows protected profile details and labeled missing fields", () => {
   assert.match(source, />Overview \/ Profile</);
   assert.match(source, /<dt>Phone<\/dt>/);
+  assert.match(source, /<dt>RID \/ Rotary ID<\/dt>/);
   assert.match(source, /<dt>Date of birth<\/dt>/);
   assert.match(source, /<dt>Gender<\/dt>/);
   assert.match(source, /linkedProfile\.gender === "self-describe"/);
   assert.match(source, /<dt>Gender description<\/dt>/);
   assert.match(source, /<dt>Hobbies and interests<\/dt>/);
+  assert.match(source, /<dt>Roster RID<\/dt>/);
   assert.match(source, /<dt>Trusted role<\/dt>/);
   assert.match(source, /<dt>Club position<\/dt>/);
   assert.match(source, /className="member-ops-missing"/);

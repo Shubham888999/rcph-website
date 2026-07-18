@@ -39,6 +39,7 @@ export const router = createBrowserRouter([{
         element: <ApprovedRoute />,
         children: [
           { path: "/access", element: lazyRoute(lazy(() => import("../pages/protected/AccessPage"))) },
+          { path: "/website-guide", element: lazyRoute(lazy(() => import("../features/websiteGuide/WebsiteGuidePage"))) },
           {
             element: <RoleRoute capability="memberDashboard" />,
             children: [{ path: "/dashboard", element: lazyRoute(lazy(() => import("../pages/dashboard/DashboardPage"))) }],
@@ -58,6 +59,10 @@ export const router = createBrowserRouter([{
           {
             element: <RoleRoute capability="visitSubmissions" />,
             children: [{ path: "/admin/visit-submissions", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
+          },
+          {
+            element: <RoleRoute capability="bodManagement" />,
+            children: [{ path: "/admin/bod-management", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
           },
           {
             element: <RoleRoute capability="adminTools" />,

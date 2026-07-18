@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canManageBodManagement,
   createDeniedAccess,
   getAccountState,
   hasCapability,
@@ -69,7 +70,11 @@ test("BOD without a canonical position cannot enter Club Visits", () => {
 });
 
 test("approved Admin gets Admin access", () => {
-  assert.equal(approved("admin").canAccessAdminTools, true);
+  const access = approved("admin");
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canManageBodManagement, true);
+  assert.equal(canManageBodManagement(access), true);
+  assert.equal(hasCapability(access, "bodManagement"), true);
   assert.equal(approved("admin").canAccessLockTools, false);
   assert.equal(approved("admin").canAccessResolutionTools, false);
 });
@@ -89,6 +94,7 @@ test("approved Admin receives Locks and Resolutions only from trusted capability
 test("approved President with canonical authority gets Admin and President access", () => {
   const access = approved("president", { isPresidentRole: true, hasPresidentAuthority: true }, true);
   assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canManageBodManagement, true);
   assert.equal(access.canAccessLockTools, true);
   assert.equal(access.canAccessPresidentControls, true);
   assert.equal(access.canAccessResolutionTools, true);
@@ -103,6 +109,8 @@ test("President role label without canonical authority gets no President control
 test("BOD role with canonical active President authority gets President controls", () => {
   const access = approved("bod", { hasPresidentAuthority: true });
   assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canManageBodManagement, false);
+  assert.equal(canManageBodManagement(access), false);
   assert.equal(access.canAccessLockTools, true);
   assert.equal(access.canAccessPresidentControls, true);
 });
@@ -126,6 +134,7 @@ test("BOD with trusted Website Director authority gets delegated Admin access", 
   });
   assert.equal(access.hasWebsiteDirectorPosition, true);
   assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canManageBodManagement, false);
   assert.equal(access.canAccessPresidentControls, true);
 });
 
@@ -213,6 +222,7 @@ test("BOD with trusted Sergeant-at-Arms authority gets ordinary Admin access", (
 
   assert.equal(access.hasSergeantAtArmsPosition, true);
   assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canManageBodManagement, false);
   assert.equal(access.canAccessPresidentControls, false);
   assert.equal(access.canAccessLockTools, false);
   assert.equal(access.canAccessResolutionTools, false);
@@ -244,4 +254,15 @@ test("pending Sergeant authority grants no Admin access", () => {
 
   assert.equal(access.isPending, true);
   assert.equal(access.canAccessAdminTools, false);
+  assert.equal(access.canManageBodManagement, false);
+});
+
+test("BOD Management access is canonical Admin or President only", () => {
+  assert.equal(canManageBodManagement(approved("admin")), true);
+  assert.equal(canManageBodManagement(approved("president")), true);
+  assert.equal(canManageBodManagement(approved("bod", { hasSergeantAtArmsPosition: true })), false);
+  assert.equal(canManageBodManagement(approved("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true })), false);
+  assert.equal(canManageBodManagement(approved("bod")), false);
+  assert.equal(canManageBodManagement(approved("gbm")), false);
+  assert.equal(canManageBodManagement({ isApproved: false, storedRole: "admin" }), false);
 });

@@ -11,7 +11,12 @@ export default function EventsHero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       >
-        <h1 id="events-page-title">Events by Rotaract Club of Pune Heritage</h1>
+        <h1 id="events-page-title">
+          Events by
+          <span className="events-hero__club-name">
+            Rotaract Club of Pune Heritage
+          </span>
+        </h1>
         <p>
           Our events range from service drives and General Meetings to workshops,
           fellowships, district initiatives, and collaborations across Pune. Some

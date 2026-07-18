@@ -48,6 +48,17 @@ export const adminCalls = {
   prospects: () => callable("getProspectManagementData", {}), recalcProspect: (uid) => callable("recalculateProspectProgress", { uid }), updateDues: (uid, duesPaid) => callable("updateProspectDues", { uid, duesPaid }), promoteProspect: (uid) => callable("promoteProspectToGbm", { uid }), deleteProspect: (uid) => callable("deleteProspectAccount", { uid }),
   announcementRecipients: () => callable("getAnnouncementRecipientOptions", {}), announcementHistory: (payload) => callable("getAnnouncementHistory", payload), publishAnnouncement: (payload) => callable("publishAnnouncement", payload), archiveAnnouncement: (announcementId) => callable("archiveAnnouncement", { announcementId }), deleteAnnouncement: (announcementId) => callable("deleteAnnouncement", { announcementId }),
   createAnnouncementAttachmentSession: (payload) => callable("createAnnouncementAttachmentUploadSession", payload), removeAnnouncementAttachmentUpload: (sessionId) => callable("removeAnnouncementAttachmentUpload", { sessionId }),
+  getBodManagementBoard: (payload = {}) => callable("getBodManagementBoard", payload),
+  saveBodSectionPublication: (payload) => callable("saveBodSectionPublication", payload),
+  publishBodSection: (payload) => callable("publishBodSection", payload),
+  upsertBodProfile: (payload) => callable("upsertBodProfile", payload),
+  archiveBodProfile: (payload) => callable("archiveBodProfile", payload),
+  restoreBodProfile: (payload) => callable("restoreBodProfile", payload),
+  reorderBodProfiles: (payload) => callable("reorderBodProfiles", payload),
+  createBodPhotoUploadSession: (payload) => callable("createBodPhotoUploadSession", payload),
+  finalizeBodPhotoUpload: (payload) => callable("finalizeBodPhotoUpload", payload),
+  removeBodProfilePhoto: (payload) => callable("removeBodProfilePhoto", payload),
+  cleanupExpiredBodPhotoUploadSessions: (payload = {}) => callable("cleanupExpiredBodPhotoUploadSessions", payload),
   createClubEvent: (payload) => callable("createAdminClubEvent", payload), updateClubEvent: (payload) => callable("updateAdminClubEvent", payload), archiveClubEvent: (eventId) => callable("archiveAdminClubEvent", { eventId }),
   createBodMeeting: (payload) => callable("createBodMeetingSynced", payload), updateBodMeeting: (payload) => callable("updateBodMeetingSynced", payload), archiveBodMeeting: (meetingId) => callable("archiveBodMeetingSynced", { meetingId }),
   createDistrictEvent: (payload) => callable("createDistrictEventSynced", payload), updateDistrictEvent: (payload) => callable("updateDistrictEventSynced", payload), archiveDistrictEvent: (districtEventId) => callable("archiveDistrictEventSynced", { districtEventId }),
@@ -125,6 +136,69 @@ export async function uploadAnnouncementAttachment(file, onStage) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok !== true || !data.attachment) throw new Error(data?.message || "The attachment upload was rejected.");
   return { sessionId: data.sessionId || session.sessionId, attachment: data.attachment, maxSizeBytes: session.maxSizeBytes };
+}
+
+export function uploadBodProfilePhoto(file, session, metadata, { onProgress, signal } = {}) {
+  requireUser();
+  if (!file || !session?.sessionId || !session?.proof || !session?.uploadEndpoint) {
+    return Promise.reject(new Error("Photo upload authorization was incomplete."));
+  }
+  if (signal?.aborted) {
+  return Promise.reject(new Error("Photo upload was aborted."));
+}
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener?.("abort", abort);
+      callback(value);
+    };
+    const abort = () => {
+      xhr.abort();
+      finish(reject, new Error("Photo upload was aborted."));
+    };
+signal?.addEventListener?.("abort", abort, { once: true });
+
+if (signal?.aborted) {
+  abort();
+  return;
+}
+
+xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress?.(Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100))));
+      }
+    };
+    xhr.onerror = () => finish(reject, new Error("The private photo upload failed. Please retry."));
+    xhr.onabort = () => finish(reject, new Error("Photo upload was aborted."));
+    xhr.onload = () => {
+      let data;
+      try { data = JSON.parse(xhr.responseText || "{}"); } catch { data = {}; }
+      if (xhr.status < 200 || xhr.status >= 300 || data?.ok !== true) {
+        finish(reject, new Error(data?.message || "The private photo upload was rejected."));
+        return;
+      }
+      onProgress?.(100);
+      finish(resolve, {
+        sessionId: data.sessionId || session.sessionId,
+        uploaded: data.uploaded || null,
+      });
+    };
+    const form = new FormData();
+    form.append("sessionId", session.sessionId);
+    form.append("proof", session.proof);
+    form.append("boardId", metadata.boardId);
+    form.append("profileId", metadata.profileId);
+    form.append("sectionKey", metadata.sectionKey);
+    form.append("fileName", metadata.fileName);
+    form.append("mimeType", metadata.mimeType);
+    form.append("sizeBytes", String(metadata.sizeBytes));
+    form.append("file", file, file.name);
+    xhr.open("POST", session.uploadEndpoint);
+    xhr.send(form);
+  });
 }
 
 function readFileAsBase64(file) {

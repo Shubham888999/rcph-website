@@ -79,6 +79,7 @@ const PRIVATE_TITLES = Object.freeze({
   "/signup": "Create an Account | RCPH",
   "/forgot-password": "Password Recovery | RCPH",
   "/access": "Access Hub | RCPH",
+  "/website-guide": "Website Guide | RCPH",
   "/dashboard": "Member Dashboard | RCPH",
   "/bod-tools": "BOD Event Manager | RCPH",
 });

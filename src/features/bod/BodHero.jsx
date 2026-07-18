@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
-export default function BodHero() {
-  const reduceMotion = useReducedMotion();
+export default function BodHero({
+  riyLabel = "RIY 2026\u201327",
+}) {  const reduceMotion = useReducedMotion();
 
   return (
     <section className="bod-hero-react" aria-labelledby="bod-page-title">
@@ -14,7 +15,9 @@ export default function BodHero() {
         }}
       >
         <div className="bod-hero-react__copy">
-          <p className="bod-kicker">Leadership · RIY 2025–26</p>
+          <p className="bod-kicker">
+  Leadership {"\u00b7"} {riyLabel}
+</p>
 
           <h1 id="bod-page-title">Meet the Board</h1>
 
