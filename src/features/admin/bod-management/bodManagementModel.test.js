@@ -884,10 +884,15 @@ test("Phase 4 photo upload stays private and does not add public delivery or bas
   assert.match(bodUploadSource, /xhr\.upload\.onprogress/);
   assert.match(bodUploadSource, /FormData/);
   assert.doesNotMatch(bodUploadSource, /FileReader|readAsDataURL|readFileAsBase64|base64/i);
-assert.doesNotMatch(
-  `${serviceSource}\n${moduleSource}`,
-  /downloadPublishedBodPhoto|getPublishedBodPhoto|photoUrl|photoPath|publicDrive/i,
-);});
+  assert.doesNotMatch(
+    bodUploadSource,
+    /BOD photo storage is not configured/
+  );
+  assert.doesNotMatch(
+    `${serviceSource}\n${moduleSource}`,
+    /downloadPublishedBodPhoto|getPublishedBodPhoto|photoUrl|photoPath|publicDrive/i,
+  );
+});
 
 test("Phase 4 photo dialog guards duplicate starts and stale async updates", () => {
   assert.match(

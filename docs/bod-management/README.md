@@ -129,8 +129,8 @@ Local backend Phase 4 implementation:
 - Added `functions/lib/bod-photo-upload.js`.
 - Exported `createBodPhotoUploadSession`, `uploadBodProfilePhoto`, `finalizeBodPhotoUpload`, `removeBodProfilePhoto`, and `cleanupExpiredBodPhotoUploadSessions`.
 - Added private Google Drive upload sessions with 30 minute expiry, proof-hash validation, 12-session-per-user-per-hour rate limiting, strict CORS, multipart-only upload, forbidden destination fields, JPEG/PNG/WebP magic-byte sniffing, and a 5 MB limit.
-- Reused existing Drive OAuth secret names (`VISIT_DRIVE_CLIENT_ID`, `VISIT_DRIVE_CLIENT_SECRET`, `VISIT_DRIVE_REFRESH_TOKEN`) through the existing Drive helper path. Phase 4 additionally requires `BOD_PHOTO_ROOT_FOLDER_ID` before deployment; the configured root is expected to be the private `RCPH Public Leadership` Drive folder.
-- Stores private Drive files under the configured root by RIY, section, and profile ID, with versioned filenames and Drive `appProperties` including `photoVersionCandidate`, `uploadSessionId`, `uploaderUid`, and `sha256`.
+- Reused existing Drive OAuth secret names (`VISIT_DRIVE_CLIENT_ID`, `VISIT_DRIVE_CLIENT_SECRET`, `VISIT_DRIVE_REFRESH_TOKEN`) through the existing Drive helper path. `BOD_PHOTO_ROOT_FOLDER_ID` is preferred for production; when it is absent in OAuth mode, the backend creates or reuses a private `RCPH Public Leadership` root folder before creating RIY, section, and profile folders below it.
+- Stores private Drive files under the configured or backend-created private root by RIY, section, and profile ID, with versioned filenames and Drive `appProperties` including `photoVersionCandidate`, `uploadSessionId`, `uploaderUid`, and `sha256`.
 - Finalization verifies Drive metadata before writing `photo.status: "ready"` to the profile, increments only the affected section draft revision, and keeps previous photos as private retained metadata.
 - Removal writes a private `removed` tombstone and does not delete Drive files immediately.
 - Cleanup expires pending/uploading/failed sessions, and after the orphan grace period deletes only uploaded orphan Drive files that are not referenced by current, removed, or previous photo metadata.
@@ -196,5 +196,5 @@ Manual actions required now:
 
 Conditional before a future Phase 4 deployment:
 
-- Verify or set `BOD_PHOTO_ROOT_FOLDER_ID` for the private `RCPH Public Leadership` Drive root.
+- Prefer setting `BOD_PHOTO_ROOT_FOLDER_ID` for the private `RCPH Public Leadership` Drive root. If it is not set in OAuth mode, verify that the Drive OAuth account can create the private root folder automatically.
 - Verify the existing Drive OAuth secrets/scopes used by Visit/Resolution Drive uploads can create folders, upload private files, and read metadata in that root.
