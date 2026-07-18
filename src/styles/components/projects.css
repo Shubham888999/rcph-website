@@ -342,21 +342,23 @@
   }
 }
 
-/* Mobile hero title — compact single line */
+/* Mobile hero title — title first line, club name second line */
 @media (max-width: 620px) {
   .projects-hero h1 {
     max-width: none;
-    font-size: clamp(0.9rem, 4.25vw, 1.45rem);
-    line-height: 1.15;
-    letter-spacing: -0.035em;
-    white-space: nowrap;
-    text-wrap: nowrap;
+    font-size: clamp(2.6rem, 12vw, 4rem);
+    line-height: 0.96;
+    letter-spacing: -0.055em;
+    white-space: normal;
+    text-wrap: balance;
   }
 
   .projects-hero__club-name {
-    display: inline;
-    margin-left: 0.22em;
-    font-size: inherit;
-    white-space: inherit;
+    display: block;
+    margin-top: 0.25rem;
+    font-size: clamp(1.35rem, 5.6vw, 2rem);
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+    white-space: normal;
   }
 }
