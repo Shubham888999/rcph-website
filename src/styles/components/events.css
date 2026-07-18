@@ -316,3 +316,22 @@
 .events-cta__links a { padding:.72rem 0; border:0; border-bottom:1px solid rgba(var(--lakshya-rose-rgb),.22); border-radius:0; background:transparent; }
 @media (hover:hover) and (pointer:fine) { .event-card-react,.event-avenue-card { transition:transform .24s ease,border-color .24s ease; } .event-card-react:hover,.event-avenue-card:hover { transform:translateY(-4px); border-color:rgba(var(--lakshya-gold-rgb),.36); } }
 @media (max-width:760px) { .events-hero-react { padding-block:3.5rem 4.5rem; } .events-hero-react > div { max-width:100%; } .event-card-react time { padding-left:0; padding-top:var(--space-3); border-left:0; border-top:1px solid rgba(var(--lakshya-gold-rgb),.18); } .events-section-react + .events-section-react::before { left:0; width:100%; } }
+
+/* Mobile hero title — compact single line */
+@media (max-width: 620px) {
+  .events-hero-react h1 {
+    max-width: none;
+    font-size: clamp(0.9rem, 4.25vw, 1.45rem);
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+    white-space: nowrap;
+    text-wrap: nowrap;
+  }
+
+  .events-hero__club-name {
+    display: inline;
+    margin-left: 0.22em;
+    font-size: inherit;
+    white-space: inherit;
+  }
+}

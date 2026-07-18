@@ -341,3 +341,22 @@
     gap: 2rem;
   }
 }
+
+/* Mobile hero title — compact single line */
+@media (max-width: 620px) {
+  .projects-hero h1 {
+    max-width: none;
+    font-size: clamp(0.9rem, 4.25vw, 1.45rem);
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+    white-space: nowrap;
+    text-wrap: nowrap;
+  }
+
+  .projects-hero__club-name {
+    display: inline;
+    margin-left: 0.22em;
+    font-size: inherit;
+    white-space: inherit;
+  }
+}
