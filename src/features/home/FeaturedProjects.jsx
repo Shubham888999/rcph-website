@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { cardReveal, copyReveal, headingReveal, imageSettle, staggerContainer } from "./homeMotion";
@@ -28,6 +29,19 @@ const projects = [
 
 export default function FeaturedProjects() {
   const reduceMotion = useReducedMotion();
+  const descriptionBaseId = useId();
+  const featuredProjects = projects.slice(0, 2);
+  const [expandedProject, setExpandedProject] = useState("");
+
+  function toggleProject(title) {
+    setExpandedProject((current) => (current === title ? "" : title));
+  }
+
+  function handleProjectKeyDown(event, title) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggleProject(title);
+  }
 
   return (
     <section className="home-section home-projects" aria-labelledby="featured-projects-title">
@@ -54,25 +68,51 @@ export default function FeaturedProjects() {
         whileInView={reduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.15 }}
       >
-        {projects.map((project) => (
-          <motion.article
-            className="home-project-card"
-            key={project.title}
-            variants={reduceMotion ? undefined : cardReveal}
-          >
-            <motion.div className="home-project-card__image" variants={reduceMotion ? undefined : imageSettle}>
-              <img src={project.image} alt={project.alt} loading="lazy" decoding="async" />
-            </motion.div>
-            <div className="home-project-card__copy">
-              <h3>{project.title}</h3>
-              <p>{project.description}</p>
-            </div>
-          </motion.article>
-        ))}
+        {featuredProjects.map((project, index) => {
+          const isExpanded = expandedProject === project.title;
+          const descriptionId = `${descriptionBaseId}-project-${index}`;
+
+          return (
+            <motion.article
+              className={`home-project-card${isExpanded ? " home-project-card--expanded" : ""}`}
+              key={project.title}
+              variants={reduceMotion ? undefined : cardReveal}
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExpanded}
+              aria-controls={descriptionId}
+              onClick={() => toggleProject(project.title)}
+              onKeyDown={(event) => handleProjectKeyDown(event, project.title)}
+            >
+              <motion.div className="home-project-card__image" variants={reduceMotion ? undefined : imageSettle}>
+                <img src={project.image} alt={project.alt} loading="lazy" decoding="async" />
+              </motion.div>
+              <div className="home-project-card__copy">
+                <h3>{project.title}</h3>
+                <p id={descriptionId} className="home-project-card__description">
+                  {project.description}
+                </p>
+              </div>
+              <button
+                className="home-project-card__toggle"
+                type="button"
+                aria-label={`${isExpanded ? "Collapse" : "Expand"} ${project.title} description`}
+                aria-expanded={isExpanded}
+                aria-controls={descriptionId}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleProject(project.title);
+                }}
+              >
+                <span aria-hidden="true" />
+              </button>
+            </motion.article>
+          );
+        })}
       </motion.div>
 
       <div className="home-projects__action">
-        <Link className="button button-secondary" to="/projects">View all projects</Link>
+        <Link className="button button-secondary" to="/projects">Explore more projects</Link>
       </div>
     </section>
   );

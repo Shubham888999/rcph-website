@@ -3,6 +3,10 @@ const homeGalleryItems = [
     title: "Project EduReach",
     image: "/images/Edureach3.jpg",
     alt: "RCPH members and students during Project EduReach",
+    photos: [
+      { image: "/images/Edureach3.jpg", alt: "RCPH members and students during Project EduReach" },
+      { image: "/images/Edureach1.jpg", alt: "Students receiving e-learning kits through Project EduReach" },
+    ],
   },
   {
     title: "Sports RYLA",
