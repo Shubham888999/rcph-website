@@ -38,12 +38,12 @@
 .signup-brand-header,
 .signup-card,
 .signup-success {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-panel);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
-    rgba(16, 15, 13, 0.92);
-  box-shadow: var(--shadow-brand);
+    var(--internal-surface);
+  box-shadow: var(--internal-shadow-panel);
   backdrop-filter: blur(18px);
 }
 
@@ -78,7 +78,7 @@
   margin: 0;
 }
 .signup-brand-header {
-  border-top: 2px solid var(--color-gold);
+  border-top: 2px solid var(--internal-accent);
 }
 
 .signup-brand-header > div > p:last-child,
@@ -110,14 +110,18 @@
 
 .signup-choice-card {
   padding: clamp(1.1rem, 3vw, 1.6rem);
-  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.28);
-  border-radius: var(--radius-lg);
-  background: rgba(var(--lakshya-gold-rgb), 0.045);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-card);
+  background:
+    linear-gradient(145deg, rgba(var(--lakshya-gold-rgb), 0.045), rgba(var(--lakshya-rose-rgb), 0.025)),
+    var(--internal-surface-soft);
 }
 
 .signup-choice-card--prospect {
   border-color: rgba(var(--lakshya-rose-rgb), 0.32);
-  background: rgba(var(--lakshya-rose-rgb), 0.055);
+  background:
+    linear-gradient(145deg, rgba(var(--lakshya-rose-rgb), 0.06), rgba(var(--lakshya-gold-rgb), 0.025)),
+    var(--internal-surface-soft);
 }
 
 .signup-card-label {
@@ -140,7 +144,7 @@
   width: 100%;
   min-height: 50px;
   padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--internal-radius-control);
   font: inherit;
   font-weight: 850;
   cursor: pointer;
@@ -180,8 +184,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-card);
 }
 
 .signup-fieldset legend {
@@ -196,8 +200,8 @@
   padding: var(--space-5);
   display: grid;
   gap: var(--space-4);
-  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.25);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-card);
 }
 
 .signup-consents legend {
@@ -214,12 +218,12 @@
   grid-template-columns: 1.4rem minmax(0, 1fr);
   gap: var(--space-3);
   align-items: start;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+  background: var(--internal-surface-raised);
 }
 
-.signup-consent-row.has-error { border-color: var(--color-danger); }
+.signup-consent-row.has-error { border-color: var(--internal-status-danger); }
 
 .signup-consent-row input[type="checkbox"] {
   width: 1.25rem;
@@ -263,10 +267,10 @@
   width: 100%;
   min-height: 50px;
   padding: 0.8rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-text);
+  background: var(--internal-control-bg);
   font: inherit;
 }
 
@@ -283,12 +287,12 @@
 .signup-field input[aria-invalid="true"],
 .signup-field select[aria-invalid="true"],
 .signup-field textarea[aria-invalid="true"] {
-  border-color: var(--color-danger);
+  border-color: var(--internal-status-danger);
 }
 
 .signup-field input[readonly] {
-  color: var(--color-muted);
-  background: rgba(255, 255, 255, 0.035);
+  color: var(--internal-text-muted);
+  background: var(--internal-control-bg-disabled);
 }
 
 .signup-help,
@@ -298,11 +302,11 @@
 }
 
 .signup-help {
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
 }
 
 .signup-field-error {
-  color: #ffd7dc;
+  color: var(--internal-status-danger);
 }
 
 .signup-password-control {
@@ -319,7 +323,7 @@
   right: 0.45rem;
   min-height: 36px;
   border: 0;
-  color: var(--color-teal);
+  color: var(--internal-accent-secondary);
   background: transparent;
   font: inherit;
   font-weight: 800;
@@ -332,9 +336,9 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: var(--color-text);
-  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--internal-border);
+  color: var(--internal-text);
+  background: var(--internal-surface-raised);
 }
 
 .signup-google-button span {
@@ -397,8 +401,8 @@
 .signup-page select:focus-visible,
 .signup-page textarea:focus-visible,
 .signup-page [tabindex="-1"]:focus-visible {
-  outline: 3px solid var(--color-gold-soft);
-  outline-offset: 3px;
+  outline: none;
+  box-shadow: var(--internal-focus-ring);
 }
 
 @media (max-width: 900px) {
