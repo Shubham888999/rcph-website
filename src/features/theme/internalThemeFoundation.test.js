@@ -7,6 +7,7 @@ const accessHubCss = readFileSync(new URL("../../styles/components/access-hub.cs
 const authAccessCss = readFileSync(new URL("../../styles/components/auth-access.css", import.meta.url), "utf8");
 const dashboardCss = readFileSync(new URL("../../styles/components/member-dashboard.css", import.meta.url), "utf8");
 const adminCss = readFileSync(new URL("../../styles/components/admin.css", import.meta.url), "utf8");
+const bodToolsCss = readFileSync(new URL("../../styles/components/bod-tools.css", import.meta.url), "utf8");
 const profileCss = readFileSync(new URL("../../styles/components/profile-editor.css", import.meta.url), "utf8");
 const guideCss = readFileSync(new URL("../../styles/components/website-guide.css", import.meta.url), "utf8");
 
@@ -39,6 +40,23 @@ test("internal ERP theme tokens provide reusable page, surface, control, and sta
   }
 });
 
+test("internal ERP tokens carry the Lakshya maroon, cream, gold, and rose palette", () => {
+  for (const declaration of [
+    "--internal-page-bg: #17050b;",
+    "--internal-page-bg-end: #2a0b16;",
+    "--internal-surface: #211014;",
+    "--internal-surface-soft: #2a1419;",
+    "--internal-surface-raised: #341922;",
+    "--internal-text: #fff4e4;",
+    "--internal-text-muted: #d8c9b4;",
+    "--internal-accent: #e5c268;",
+    "--internal-accent-soft: #f3dc98;",
+    "--internal-accent-rose: var(--color-pink);",
+  ]) {
+    assert.match(tokens, new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
 test("Phase 1 shared internal surfaces use internal theme tokens", () => {
   assert.match(authAccessCss, /\.auth-access-page \{[\s\S]*var\(--internal-page-bg\)[\s\S]*var\(--internal-focus-ring\)/);
   assert.match(accessHubCss, /\.access-command-page \{[\s\S]*var\(--internal-page-bg\)/);
@@ -47,6 +65,16 @@ test("Phase 1 shared internal surfaces use internal theme tokens", () => {
   assert.match(dashboardCss, /\.dashboard-loading,[\s\S]*\.dashboard-error \{[\s\S]*var\(--internal-shadow-panel\)/);
   assert.match(guideCss, /\.website-guide-page \{[\s\S]*var\(--internal-page-bg\)/);
   assert.match(guideCss, /\.website-guide-role-card \{[\s\S]*var\(--internal-shadow-card\)/);
+});
+
+test("dashboard-style internal pages use the internal palette without changing class contracts", () => {
+  assert.match(accessHubCss, /\.access-hub__destinations li > a \{[\s\S]*grid-template-columns: minmax\(8rem, 0\.42fr\) minmax\(0, 1fr\) auto;/);
+  assert.match(dashboardCss, /\.dashboard-metric-rail \{[\s\S]*border-block: 1px solid var\(--internal-border\)/);
+  assert.match(adminCss, /\.command-center-hero \{[\s\S]*var\(--internal-surface\)/);
+  assert.match(adminCss, /\.command-center-section \{[\s\S]*var\(--internal-surface\)/);
+  assert.match(bodToolsCss, /\.bod-tools-page \{[\s\S]*var\(--internal-page-bg\)/);
+  assert.match(bodToolsCss, /\.bod-tools-header \{[\s\S]*var\(--internal-surface\)/);
+  assert.match(guideCss, /\.website-guide-page \{[\s\S]*rgba\(216, 91, 150, 0\.11\)/);
 });
 
 test("Phase 1 admin shell, controls, states, and dialogs use internal theme tokens", () => {
