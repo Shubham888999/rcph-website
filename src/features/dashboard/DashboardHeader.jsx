@@ -1,3 +1,4 @@
+import { useEffect, useId, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { getPositionLabels } from "./accessHubModel";
@@ -6,6 +7,25 @@ import { formatRotaractorName } from "../../utils/memberName";
 
 export default function DashboardHeader({ profile, mode, access, onEditProfile, onSignOut }) {
   const reduceMotion = useReducedMotion();
+  const [actionsOpen, setActionsOpen] = useState(false);
+const actionsId = useId();
+
+useEffect(() => {
+  if (!actionsOpen) return undefined;
+
+  function closeOnEscape(event) {
+    if (event.key === "Escape") {
+      setActionsOpen(false);
+    }
+  }
+
+  window.addEventListener("keydown", closeOnEscape);
+  return () => window.removeEventListener("keydown", closeOnEscape);
+}, [actionsOpen]);
+
+function closeActions() {
+  setActionsOpen(false);
+}
   const name = formatRotaractorName(profile.name || profile.memberName || (mode === "prospect" ? "Prospect" : "RCPH Member"), mode === "prospect" ? { role: "prospect" } : profile);
   const canonicalPositions = getPositionLabels(profile.positionKeys);
   const legacyPosition = profile.memberPosition || profile.clubPosition;
@@ -49,13 +69,34 @@ export default function DashboardHeader({ profile, mode, access, onEditProfile, 
         ) : null}
       </div>
 
-      <motion.nav aria-label="Dashboard actions" variants={reduceMotion ? undefined : mastheadItem}>
-        <button type="button" onClick={onEditProfile}>Edit profile</button>
-        <Link to="/access">Access Hub</Link>
-        <Link to="/">Public homepage</Link>
-        <Link to="/website-guide">Website Guide</Link>
-        <button type="button" onClick={onSignOut}>Sign out</button>
-      </motion.nav>
+<motion.div className="dashboard-masthead__actions" variants={reduceMotion ? undefined : mastheadItem}>
+<button
+  type="button"
+  className="dashboard-masthead__menu-button"
+  aria-expanded={actionsOpen}
+  aria-controls={actionsId}
+  onClick={() => setActionsOpen((current) => !current)}
+>
+  <span className="dashboard-masthead__menu-icon" aria-hidden="true">
+    <span></span>
+    <span></span>
+    <span></span>
+  </span>
+  <span>Dashboard actions</span>
+</button>
+
+  <nav
+    id={actionsId}
+    className={actionsOpen ? "is-open" : ""}
+    aria-label="Dashboard actions"
+  >
+    <button type="button" onClick={() => { onEditProfile(); closeActions(); }}>Edit profile</button>
+    <Link to="/access" onClick={closeActions}>Access Hub</Link>
+    <Link to="/" onClick={closeActions}>Public homepage</Link>
+    <Link to="/website-guide" onClick={closeActions}>Website Guide</Link>
+    <button type="button" onClick={() => { closeActions(); onSignOut(); }}>Sign out</button>
+  </nav>
+</motion.div>
       <motion.span className="dashboard-masthead__rule" aria-hidden="true" variants={reduceMotion ? undefined : ruleReveal} />
     </motion.header>
   );

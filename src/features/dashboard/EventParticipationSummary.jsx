@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
@@ -46,21 +47,40 @@ export function EventList({ events, emptyTitle, emptyText, emptyHref = "", empty
 
 export default function EventParticipationSummary({ recent, districtAttendance, upcoming }) {
   const districtRecent = districtAttendance.recent;
+  const [recentOpen, setRecentOpen] = useState(false);
+  const recentPanelId = useId();
+
   return (
     <section className="dashboard-activity" aria-labelledby="activity-title">
       <header className="dashboard-section-heading">
         <div><p className="dashboard-eyebrow">Recent and upcoming</p><h2 id="activity-title">Your club activity</h2></div>
       </header>
       <div className="dashboard-activity__primary">
-        <section aria-labelledby="recent-attendance-title">
-          <h3 id="recent-attendance-title">Recent attendance</h3>
-          <EventList
-            events={recent}
-            attendance
-            emptyTitle="No attendance records yet"
-            emptyText="Your recent club-event attendance will appear after the next recorded event."
-          />
-        </section>
+<section className="dashboard-activity__recent" aria-labelledby="recent-attendance-title">
+  <div className="dashboard-collapsible-heading">
+    <h3 id="recent-attendance-title">Recent attendance</h3>
+    <button
+      type="button"
+      aria-expanded={recentOpen}
+      aria-controls={recentPanelId}
+      onClick={() => setRecentOpen((current) => !current)}
+    >
+      {recentOpen ? "Hide" : "Show"}
+    </button>
+  </div>
+
+  <div
+    id={recentPanelId}
+    className={recentOpen ? "dashboard-collapsible-panel is-open" : "dashboard-collapsible-panel"}
+  >
+    <EventList
+      events={recent}
+      attendance
+      emptyTitle="No attendance records yet"
+      emptyText="Your recent club-event attendance will appear after the next recorded event."
+    />
+  </div>
+</section>
         <section aria-labelledby="upcoming-events-title">
           <h3 id="upcoming-events-title">Upcoming events</h3>
           <EventList
