@@ -661,9 +661,11 @@ body:has(.login-page-react) .theme-toggle:hover {
   }
 
 .login-brand-panel {
-  min-height: 560px;
-  padding: 1.35rem;
-  gap: 2.5rem;
+  min-height: 0;
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  padding: clamp(1.5rem, 8vw, 2rem);
+  gap: clamp(1.1rem, 5vw, 1.6rem);
 }
 
 .login-brand--portal {
@@ -684,7 +686,19 @@ body:has(.login-page-react) .theme-toggle:hover {
 }
 
 .login-brand-panel__main h1 {
-  font-size: clamp(3.7rem, 17vw, 5.2rem);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.3em;
+  max-width: 100%;
+  font-size: clamp(1.45rem, 7vw, 2.25rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+.login-brand-panel__main h1 span {
+  display: inline;
 }
 
 .login-brand-panel__values {
@@ -697,6 +711,18 @@ body:has(.login-page-react) .theme-toggle:hover {
 
   .login-support-links {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-brand-panel {
+    padding: 1.15rem;
+  }
+
+  .login-brand-panel__main h1 {
+    gap: 0.24em;
+    font-size: clamp(1.35rem, 6.8vw, 1.55rem);
+    letter-spacing: -0.045em;
   }
 }
 

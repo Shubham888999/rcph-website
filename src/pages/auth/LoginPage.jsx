@@ -132,7 +132,7 @@ export default function LoginPage() {
     <span className="login-brand-logo rcph-logo-mark">
       <img
         src="/images/rcph-lakshya-logo.webp"
-        alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+        alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026-27"
       />
     </span>
 
@@ -152,9 +152,7 @@ export default function LoginPage() {
 
   <div className="login-brand-panel__footer">
     <div className="login-brand-panel__values" aria-label="Club theme">
-      <span>Lakshya</span>
-      <span>Shaping Aim</span>
-      <span>Through Experience</span>
+
     </div>
 
 

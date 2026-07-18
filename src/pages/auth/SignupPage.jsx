@@ -262,7 +262,7 @@ return (
           <span className="login-brand-logo rcph-logo-mark">
             <img
               src="/images/rcph-lakshya-logo.webp"
-              alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+              alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026-27"
             />
           </span>
           <span>
@@ -272,7 +272,7 @@ return (
         </Link>
 
         <div>
-          <p className="login-kicker">LAKSHYA · RIY 2026–27</p>
+          <p className="login-kicker">LAKSHYA · RIY 2026-27</p>
           <h1>Create your RCPH account</h1>
         </div>
       </header>
