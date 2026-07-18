@@ -2,10 +2,11 @@
   display: block;
   padding: clamp(0.75rem, 2vw, 1.35rem) clamp(1rem, 4vw, 3.5rem) clamp(2rem, 4vw, 3.5rem);
   overflow: hidden;
+  color: var(--internal-text);
   background:
     radial-gradient(ellipse at 6% 0%, rgba(229, 194, 104, 0.13), transparent 34%),
     radial-gradient(ellipse at 94% 20%, rgba(96, 195, 196, 0.09), transparent 32%),
-    linear-gradient(145deg, var(--color-bg-deep), var(--color-bg));
+    linear-gradient(145deg, var(--internal-page-bg), var(--internal-page-bg-end));
 }
 
 .auth-access-page .access-hub {
@@ -20,7 +21,7 @@
 
 .access-hub__eyebrow {
   margin: 0 0 0.65rem;
-  color: var(--color-teal);
+  color: var(--internal-accent-secondary);
   font-size: 0.74rem;
   font-weight: 850;
   letter-spacing: 0.16em;
@@ -75,13 +76,13 @@
 .access-hub__email {
   margin: 1.2rem 0 0;
   overflow-wrap: anywhere;
-  color: var(--color-gold-soft);
+  color: var(--internal-accent-soft);
   font-weight: 750;
 }
 
 .access-hub__intro {
   margin: 0.55rem 0 0;
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
   font-size: clamp(1rem, 1.5vw, 1.15rem);
 }
 
@@ -90,7 +91,7 @@
 }
 
 .access-hub__actions .auth-signout-button {
-  border-radius: var(--radius-sm);
+  border-radius: var(--internal-radius-control);
 }
 
 .access-hub__rule {
@@ -99,7 +100,7 @@
   bottom: 0;
   left: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--color-gold), rgba(229, 194, 104, 0.28) 46%, var(--color-teal), transparent 92%);
+  background: linear-gradient(90deg, var(--internal-accent), rgba(229, 194, 104, 0.28) 46%, var(--internal-accent-secondary), transparent 92%);
   transform-origin: left;
 }
 
@@ -108,13 +109,13 @@
   padding: clamp(0.9rem, 2vw, 1.5rem) 0;
   display: grid;
   grid-template-columns: 0.55fr 1fr 1.35fr;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--internal-border);
 }
 
 .access-hub__summary > div {
   min-width: 0;
   padding: 0 clamp(1rem, 3vw, 2.5rem);
-  border-right: 1px solid rgba(255, 255, 255, 0.09);
+  border-right: 1px solid var(--internal-border);
 }
 
 .access-hub__summary > div:first-child {
@@ -127,7 +128,7 @@
 }
 
 .access-hub__summary dt {
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -137,7 +138,7 @@
 .access-hub__summary dd {
   margin: 0.55rem 0 0;
   overflow-wrap: anywhere;
-  color: var(--color-gold-soft);
+  color: var(--internal-accent-soft);
   font-size: clamp(1rem, 2vw, 1.3rem);
   font-weight: 800;
   line-height: 1.45;
@@ -147,13 +148,13 @@
   max-width: 56rem;
   margin: 0.85rem 0 0;
   padding-left: 1rem;
-  border-left: 2px solid var(--color-pink);
-  color: var(--color-muted);
+  border-left: 2px solid var(--internal-accent-rose);
+  color: var(--internal-text-muted);
   line-height: 1.6;
 }
 
 .access-hub__destination-meta {
-  color: var(--color-teal);
+  color: var(--internal-accent-secondary);
   font-size: 0.74rem;
   font-weight: 850;
   letter-spacing: 0.14em;
@@ -163,7 +164,7 @@
 .access-hub__unavailable {
   margin-top: 1.5rem;
   padding: 2rem 0 2rem 1.25rem;
-  border-left: 2px solid var(--color-pink);
+  border-left: 2px solid var(--internal-accent-rose);
 }
 
 .access-hub__unavailable h2 {
@@ -171,7 +172,7 @@
 }
 
 .access-hub__unavailable p {
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
 }
 
 .access-hub__destinations {
@@ -200,7 +201,7 @@
 
 .access-hub__destinations li {
   min-width: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--internal-border);
 }
 
 .access-hub__destination--full {
@@ -208,7 +209,7 @@
 }
 
 .access-hub__destinations li:nth-last-child(-n + 2) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--internal-border);
 }
 
 .access-hub__destinations li > a {
@@ -219,7 +220,9 @@
   grid-template-columns: minmax(8rem, 0.42fr) minmax(0, 1fr) auto;
   gap: 1rem 1.5rem;
   align-items: start;
+  border-radius: var(--internal-radius-card);
   color: inherit;
+  background: transparent;
   text-decoration: none;
   transition: background var(--transition-fast), transform var(--transition-fast);
 }
@@ -231,17 +234,17 @@
 }
 
 .access-hub__destination-copy strong {
-  color: var(--color-text);
+  color: var(--internal-text);
   font-size: clamp(1.15rem, 2vw, 1.45rem);
 }
 
 .access-hub__destination-copy > span {
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
   line-height: 1.55;
 }
 
 .access-hub__destination-action {
-  color: var(--color-gold-soft);
+  color: var(--internal-accent-soft);
   font-size: 1.25rem;
 }
 
@@ -252,23 +255,23 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--internal-border);
 }
 
 .access-hub__footer p {
   margin: 0;
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
 }
 
 .access-hub__footer a {
-  color: var(--color-teal);
+  color: var(--internal-accent-secondary);
   font-weight: 800;
 }
 
 .auth-access-page .access-hub a:focus-visible,
 .auth-access-page .access-hub button:focus-visible {
-  outline: 3px solid var(--color-gold-soft);
-  outline-offset: 4px;
+  outline: none;
+  box-shadow: var(--internal-focus-ring);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -277,7 +280,9 @@
   }
 
   .access-hub__destinations li > a:hover {
-    background: linear-gradient(90deg, rgba(96, 195, 196, 0.055), transparent 78%);
+    background:
+      linear-gradient(90deg, rgba(96, 195, 196, 0.055), transparent 78%),
+      var(--internal-surface-soft);
   }
 }
 
@@ -310,7 +315,7 @@
   }
 
   .access-hub__destinations li:last-child {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--internal-border);
   }
 
   .access-hub__destinations li > a {
@@ -349,7 +354,7 @@
   .access-hub__summary > div:last-child {
     padding: 1rem 0;
     border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--internal-border);
   }
 
   .access-hub__summary > div:last-child {

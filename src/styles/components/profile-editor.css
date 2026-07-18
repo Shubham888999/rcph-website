@@ -14,11 +14,11 @@
   max-height: calc(100vh - 2rem);
   overflow: auto;
   padding: 1.2rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  color: var(--color-text);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-brand);
+  border: 1px solid var(--internal-border-strong);
+  border-radius: var(--internal-radius-panel);
+  color: var(--internal-text);
+  background: var(--internal-surface);
+  box-shadow: var(--internal-shadow-panel);
 }
 
 .admin-dialog > header {
@@ -38,10 +38,10 @@
 .profile-history-dialog button {
   min-height: 2.5rem;
   padding: 0.55rem 0.8rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  background: var(--color-surface-raised);
+  border: 1px solid var(--internal-border-strong);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-text);
+  background: var(--internal-surface-raised);
   font: inherit;
   cursor: pointer;
 }
@@ -71,13 +71,13 @@
   display: grid;
   gap: 0.35rem;
   min-width: 0;
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
   font-weight: 760;
 }
 
 .profile-editor-form label > span,
 .profile-editor-fieldset legend {
-  color: var(--color-gold-soft);
+  color: var(--internal-accent-soft);
   font-size: 0.82rem;
   font-weight: 850;
 }
@@ -88,10 +88,10 @@
   width: 100%;
   min-height: 2.65rem;
   padding: 0.6rem 0.7rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  background: var(--color-bg);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-text);
+  background: var(--internal-control-bg);
   font: inherit;
 }
 
@@ -119,8 +119,8 @@
   gap: 0.9rem;
   margin: 0;
   padding: 0.95rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
   background: rgba(255, 255, 255, 0.018);
 }
 
@@ -133,19 +133,19 @@
 }
 
 .profile-field-error {
-  color: var(--color-danger);
+  color: var(--internal-status-danger);
 }
 
 .profile-field-help {
-  color: var(--color-muted);
+  color: var(--internal-text-muted);
   font-weight: 650;
 }
 
 .profile-editor-alert {
-  color: var(--color-danger);
+  color: var(--internal-status-danger);
   padding: 0.75rem 0.85rem;
   border: 1px solid rgba(240, 109, 125, 0.42);
-  border-radius: var(--radius-sm);
+  border-radius: var(--internal-radius-control);
   background: rgba(153, 40, 87, 0.14);
 }
 
