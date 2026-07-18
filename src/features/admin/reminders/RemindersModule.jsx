@@ -699,10 +699,10 @@ export default function RemindersModule({
             </span>
             <span className="reminders-conducted-list__help">
               <span>
-                <strong>MOM Submission Reminder:</strong> nudges responsible members to submit or upload event minutes/documentation.
+                <strong>MOM Submission Reminder:</strong> Sets reminder for Secretary to submit or upload event minutes/documentation.
               </span>
               <span>
-                <strong>Attendance Marking Reminder:</strong> nudges the responsible team to mark or review attendance after a conducted event.
+                <strong>Attendance Marking Reminder:</strong> Sets reminder for Seargeant-At-Arms to mark or review attendance after a conducted event.
               </span>
             </span>
           </span>
