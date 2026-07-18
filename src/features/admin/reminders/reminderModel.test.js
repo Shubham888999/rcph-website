@@ -8,6 +8,7 @@ import {
   buildReportingWindowPayload,
   calculateReportingWindowDates,
   canManageReminders,
+  canStopEventReminderConfig,
   EVENT_REMINDER_RECORD_TYPE,
   eventReminderConfigId,
   normalizeReminder,
@@ -252,10 +253,17 @@ test("MOM reminder config creates the expected record shape", () => {
     reminderType: "mom_submission",
     recipientRole: "secretary",
     enabled: true,
+    disabled: false,
     status: "configured",
     remindersSent: 0,
     maxReminders: 3,
     reminderTime: "00:00",
+    lastReminderSentAt: null,
+    completedAt: null,
+    stoppedAt: null,
+    completionReason: "",
+    failureReason: "",
+    stoppedReason: "",
   });
 });
 
@@ -273,10 +281,13 @@ test("Attendance reminder config creates the expected record shape", () => {
   assert.equal(result.payload.reminderType, "attendance_marking");
   assert.equal(result.payload.recipientRole, "sergeant");
   assert.equal(result.payload.enabled, true);
+  assert.equal(result.payload.disabled, false);
   assert.equal(result.payload.status, "configured");
   assert.equal(result.payload.remindersSent, 0);
   assert.equal(result.payload.maxReminders, 3);
   assert.equal(result.payload.reminderTime, "00:00");
+  assert.equal(result.payload.stoppedAt, null);
+  assert.equal(result.payload.stoppedReason, "");
 });
 
 test("reminder status helpers render Phase 4 send states", () => {
@@ -361,6 +372,27 @@ test("reminder status summaries include labels, tones, last sent, and completion
   ]);
   assert.equal(summaries[0].lastReminderSentAt, "2026-07-15T00:00:00.000Z");
   assert.equal(summaries[1].completionReason, "Max reminders sent");
+});
+
+test("stopped event reminder configs are treated as inactive row state without losing raw status semantics", () => {
+  const event = { source: "events", id: "event-1" };
+  const stopped = {
+    recordType: EVENT_REMINDER_RECORD_TYPE,
+    source: "events",
+    eventId: "event-1",
+    reminderType: "mom_submission",
+    enabled: false,
+    status: "stopped",
+    remindersSent: 1,
+    maxReminders: 3,
+    stoppedReason: "admin_removed",
+  };
+
+  assert.equal(reminderStatusText(stopped), "Stopped");
+  assert.deepEqual(buildReminderStatusSummaries([stopped], event), []);
+  assert.equal(canStopEventReminderConfig(stopped), false);
+  assert.equal(canStopEventReminderConfig({ ...stopped, enabled: true, status: "completed" }), false);
+  assert.equal(canStopEventReminderConfig({ ...stopped, enabled: true, status: "active" }), true);
 });
 
 test("conducted reminder list includes past sources and excludes future records", () => {

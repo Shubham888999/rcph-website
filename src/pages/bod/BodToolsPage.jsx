@@ -15,7 +15,6 @@ import {
   syncBodEventToAttendance,
   updateBodEvent,
 } from "../../features/bod-tools/bodEventService";
-import BodLockNotice from "../../features/bod-tools/BodLockNotice";
 import BodToolsErrorState from "../../features/bod-tools/BodToolsErrorState";
 import BodToolsHeader from "../../features/bod-tools/BodToolsHeader";
 import BodToolsShell from "../../features/bod-tools/BodToolsShell";
@@ -127,12 +126,13 @@ export default function BodToolsPage() {
   displayName={displayName}
   onSignOut={handleSignOut}
   canCreateEvent={canMutate}
+  lock={lock}
+  canBypassLock={access.canAccessPresidentControls}
   onCreateEvent={() => {
     setMutationError("");
     setForm({ event: null });
   }}
 />
-        <BodLockNotice lock={lock} canBypass={access.canAccessPresidentControls} />
         <BodEventMutationNotice notice={notice} onDismiss={() => setNotice(null)} />
 <section
   className="bod-tools-metrics"

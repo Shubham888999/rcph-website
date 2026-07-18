@@ -330,10 +330,17 @@ export function buildEventReminderConfigPayload(event = {}, reminderType = "") {
       reminderType: definition.reminderType,
       recipientRole: definition.recipientRole,
       enabled: true,
+      disabled: false,
       status: "configured",
       remindersSent: 0,
       maxReminders: 3,
       reminderTime: "00:00",
+      lastReminderSentAt: null,
+      completedAt: null,
+      stoppedAt: null,
+      completionReason: "",
+      failureReason: "",
+      stoppedReason: "",
     },
   };
 }
@@ -550,7 +557,19 @@ export function findEventReminderConfig(reminders = [], event = {}, reminderType
       && item.source === event.source
       && item.eventId === event.id
       && item.reminderType === reminderType
+      && item.enabled !== false
+      && item.status !== "stopped"
   ) || null;
+}
+
+export function canStopEventReminderConfig(config) {
+  return Boolean(
+    config
+      && config.recordType === EVENT_REMINDER_RECORD_TYPE
+      && config.enabled !== false
+      && config.status !== "stopped"
+      && config.status !== "completed"
+  );
 }
 
 export function summarizeEventReminderStatus(reminders = [], event = {}) {

@@ -6625,6 +6625,22 @@ min-width: 250px;
   border-top: 1px solid var(--color-border);
 }
 
+.reminders-conducted-list__help {
+  max-width: 46rem;
+  margin-top: 0.45rem;
+  display: grid;
+  gap: 0.28rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid rgba(229, 194, 104, 0.46);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.reminders-conducted-list__help strong {
+  color: var(--color-gold-soft);
+}
+
 .reminders-inline-error,
 .reminders-inline-note {
   margin: 0;
@@ -6698,6 +6714,17 @@ min-width: 250px;
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.admin-page .reminders-action-menu__panel .reminders-action-menu__remove {
+  color: #ffd8dd;
+}
+
+.reminders-action-menu__panel .reminders-action-menu__note {
+  padding: 0.42rem 0.65rem 0.5rem;
+  color: var(--color-muted);
+  line-height: 1.35;
+  text-transform: none;
 }
 
 .reminders-status-badges {

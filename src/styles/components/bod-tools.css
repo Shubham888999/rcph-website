@@ -99,6 +99,7 @@
 
 .bod-tools-header__brand {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.65rem;
   color: var(--internal-text);
@@ -119,6 +120,23 @@
   letter-spacing: 0.12em;
 }
 
+.bod-tools-header__status {
+  padding: 0.28rem 0.55rem;
+  border-left: 2px solid var(--internal-accent-secondary);
+  color: var(--internal-accent-secondary);
+  background: rgba(96, 195, 196, 0.06);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.bod-tools-header__status.is-locked {
+  border-left-color: var(--internal-accent-rose);
+  color: #ffbdc7;
+  background: rgba(216, 91, 150, 0.08);
+}
+
 .bod-tools-header__hero {
   position: relative;
   z-index: 1;
@@ -130,7 +148,7 @@
 }
 
 .bod-tools-header__copy {
-  max-width: 48rem;
+  max-width: 54rem;
 }
 
 .bod-tools-kicker {
@@ -144,9 +162,9 @@
 
 .bod-tools-header h1 {
   margin: 0;
-  font-size: clamp(2.5rem, 6vw, 5.5rem);
-  line-height: 0.92;
-  letter-spacing: -0.065em;
+  font-size: clamp(2.45rem, 5.5vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
 }
 
 .bod-tools-header h1 span {
@@ -156,7 +174,15 @@
 .bod-tools-header h1 span:last-child {
   color: var(--internal-accent-soft);
 }
+.bod-tools-header h1 span:first-child {
+  white-space: nowrap;
+}
 
+.bod-tools-header h1 span:last-child {
+  max-width: none;
+  white-space: nowrap;
+  font-size: clamp(2.2rem, 4.4vw, 4.35rem);
+}
 .bod-tools-header__intro {
   max-width: 42rem;
   margin: 1.4rem 0 0;

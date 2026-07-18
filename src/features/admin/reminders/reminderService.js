@@ -10,6 +10,7 @@ import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../../app/firebase";
 import { db } from "../../../app/firestore";
 import {
+  EVENT_REMINDER_RECORD_TYPE,
   REMINDERS_COLLECTION,
 } from "./reminderModel";
 
@@ -72,6 +73,27 @@ export async function upsertEventReminderConfig(payload, actor) {
   }
 
   return target.id;
+}
+
+export async function stopEventReminderConfig(config, actor) {
+  const { uid, name } = actorFields(actor);
+  if (!config?.id || config.recordType !== EVENT_REMINDER_RECORD_TYPE) {
+    throw new Error("Choose a valid reminder configuration.");
+  }
+
+  const target = doc(db, REMINDERS_COLLECTION, config.id);
+  await updateDoc(target, {
+    enabled: false,
+    disabled: true,
+    status: "stopped",
+    stoppedAt: serverTimestamp(),
+    stoppedReason: "admin_removed",
+    updatedBy: uid,
+    updatedByName: name,
+    updatedAt: serverTimestamp(),
+  });
+
+  return config.id;
 }
 
 function count(value) {

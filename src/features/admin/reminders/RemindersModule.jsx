@@ -13,6 +13,7 @@ import {
   buildReminderTemplateTestPayload,
   buildReportingWindowPayload,
   buildReminderStatusSummaries,
+  canStopEventReminderConfig,
   canManageReminders,
   EVENT_REMINDER_RECORD_TYPE,
   EVENT_REMINDER_TYPES,
@@ -31,6 +32,7 @@ import {
   createReportingWindowReminder,
   runReminderEmailSweep,
   sendReminderTemplateTestEmail,
+  stopEventReminderConfig,
   unlockAvenueReportingWindow,
   upsertEventReminderConfig,
 } from "./reminderService";
@@ -57,9 +59,12 @@ function ReminderActionMenu({
   open,
   onToggle,
   onConfigure,
+  onStop,
 }) {
   const mom = findEventReminderConfig(reminders, event, "mom_submission");
   const attendance = findEventReminderConfig(reminders, event, "attendance_marking");
+  const momCanStop = canStopEventReminderConfig(mom);
+  const attendanceCanStop = canStopEventReminderConfig(attendance);
 
   return (
     <div className="reminders-action-menu">
@@ -77,25 +82,75 @@ function ReminderActionMenu({
 
       {open ? (
         <div className="reminders-action-menu__panel" role="menu">
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!canManage || busy}
-            onClick={() => onConfigure(event, "mom_submission")}
-          >
-            MOM Submission Reminder
-            {mom ? <small>{reminderStatusText(mom)}</small> : null}
-          </button>
+          {mom ? (
+            <>
+              <button type="button" role="menuitem" disabled>
+                MOM Submission Reminder
+                <small>{reminderStatusText(mom)}</small>
+              </button>
+              {momCanStop ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="reminders-action-menu__remove"
+                  disabled={!canManage || busy}
+                  onClick={() => onStop(event, "mom_submission", mom)}
+                >
+                  Remove MOM Reminder
+                  <small>Stops future sends</small>
+                </button>
+              ) : (
+                <small className="reminders-action-menu__note">
+                  {mom.completionReason === "mom_uploaded"
+                    ? "MOM completed; reminder no longer needs reset."
+                    : "MOM reminder completed; no reset needed."}
+                </small>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!canManage || busy}
+              onClick={() => onConfigure(event, "mom_submission")}
+            >
+              MOM Submission Reminder
+            </button>
+          )}
 
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!canManage || busy}
-            onClick={() => onConfigure(event, "attendance_marking")}
-          >
-            Attendance Marking Reminder
-            {attendance ? <small>{reminderStatusText(attendance)}</small> : null}
-          </button>
+          {attendance ? (
+            <>
+              <button type="button" role="menuitem" disabled>
+                Attendance Marking Reminder
+                <small>{reminderStatusText(attendance)}</small>
+              </button>
+              {attendanceCanStop ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="reminders-action-menu__remove"
+                  disabled={!canManage || busy}
+                  onClick={() => onStop(event, "attendance_marking", attendance)}
+                >
+                  Remove Attendance Reminder
+                  <small>Stops future sends</small>
+                </button>
+              ) : (
+                <small className="reminders-action-menu__note">
+                  Attendance reminder completed; no reset needed.
+                </small>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!canManage || busy}
+              onClick={() => onConfigure(event, "attendance_marking")}
+            >
+              Attendance Marking Reminder
+            </button>
+          )}
         </div>
       ) : null}
     </div>
@@ -245,7 +300,7 @@ export default function RemindersModule({
     if (!canManage) {
       onNotice?.({
         type: "error",
-        message: "Admin panel authority is required to create reporting windows.",
+        message: "Admin panel authority is required to remove reminder configurations.",
       });
       return;
     }
@@ -362,6 +417,43 @@ export default function RemindersModule({
         canManage,
       }),
       `${EVENT_REMINDER_TYPES[reminderType].label} configured.`,
+    );
+  }
+
+  function stopReminder(row, reminderType, config) {
+    if (!canManage) {
+      onNotice?.({
+        type: "error",
+        message: "Admin panel authority is required to create reporting windows.",
+      });
+      return;
+    }
+
+    if (!canStopEventReminderConfig(config)) {
+      onNotice?.({
+        type: "error",
+        message: "Completed reminders do not need to be removed.",
+      });
+      return;
+    }
+
+    const label = EVENT_REMINDER_TYPES[reminderType]?.label || "Reminder";
+    const target = row?.name || "this event";
+    const confirmMessage = reminderType === "mom_submission"
+      ? `Remove this MOM reminder configuration for ${target}? This will stop future MOM reminder sends for this event.`
+      : `Remove this attendance reminder configuration for ${target}? This will stop future attendance reminder sends for this event.`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setMenuKey("");
+    run(
+      "stop-event-reminder",
+      () => stopEventReminderConfig(config, {
+        uid,
+        name: actorName,
+        canManage,
+      }),
+      `${label} removed.`,
     );
   }
 
@@ -605,6 +697,14 @@ export default function RemindersModule({
             <span className="attendance-section-heading__title">
               Past event reminder configs
             </span>
+            <span className="reminders-conducted-list__help">
+              <span>
+                <strong>MOM Submission Reminder:</strong> nudges responsible members to submit or upload event minutes/documentation.
+              </span>
+              <span>
+                <strong>Attendance Marking Reminder:</strong> nudges the responsible team to mark or review attendance after a conducted event.
+              </span>
+            </span>
           </span>
 
           <span className="attendance-section-heading__meta">
@@ -666,6 +766,7 @@ export default function RemindersModule({
                               current === row.key ? "" : row.key
                             )}
                             onConfigure={configureReminder}
+                            onStop={stopReminder}
                           />
                         </td>
                       </tr>

@@ -40,6 +40,8 @@ test("Reminders UI exposes the required subsections and actions", () => {
   assert.match(moduleSource, /Send test email/);
   assert.match(moduleSource, /MOM Submission Reminder/);
   assert.match(moduleSource, /Attendance Marking Reminder/);
+  assert.match(moduleSource, /Sets reminder for Secretary to submit or upload event minutes\/documentation/);
+  assert.match(moduleSource, /Sets reminder for Seargeant-At-Arms to mark or review attendance/);
   assert.match(moduleSource, /aria-expanded=\{conductedExpanded\}/);
   assert.match(moduleSource, /reminders-action-menu__trigger/);
 });
@@ -84,6 +86,32 @@ test("Reminders UI renders Phase 4 status badges without sending email from the 
   assert.match(moduleSource, /Last sent/);
   assert.match(moduleSource, /completionReason/);
   assert.doesNotMatch(moduleSource, /sendScheduledReminderEmails|httpsCallable/);
+});
+
+test("event reminder configs can be stopped from the action menu without deleting records", () => {
+  assert.match(moduleSource, /canStopEventReminderConfig/);
+  assert.match(moduleSource, /Remove MOM Reminder/);
+  assert.match(moduleSource, /Remove Attendance Reminder/);
+  assert.match(moduleSource, /Stops future sends/);
+  assert.match(moduleSource, /MOM completed; reminder no longer needs reset\./);
+  assert.match(moduleSource, /Attendance reminder completed; no reset needed\./);
+  assert.match(moduleSource, /window\.confirm\(confirmMessage\)/);
+  assert.match(moduleSource, /stopEventReminderConfig\(config/);
+  assert.match(serviceSource, /export async function stopEventReminderConfig/);
+  assert.match(serviceSource, /enabled: false/);
+  assert.match(serviceSource, /disabled: true/);
+  assert.match(serviceSource, /status: "stopped"/);
+  assert.match(serviceSource, /stoppedAt: serverTimestamp\(\)/);
+  assert.match(serviceSource, /stoppedReason: "admin_removed"/);
+  assert.doesNotMatch(serviceSource, /deleteDoc|firebase\/storage/);
+});
+
+test("event reminder configure payload clears stale stopped flags when re-enabled", () => {
+  assert.match(modelSource, /disabled: false/);
+  assert.match(modelSource, /stoppedAt: null/);
+  assert.match(modelSource, /stoppedReason: ""/);
+  assert.match(modelSource, /failureReason: ""/);
+  assert.match(modelSource, /canStopEventReminderConfig/);
 });
 
 test("Reminders UI renders Phase 5 avenue window statuses and unlock action", () => {
