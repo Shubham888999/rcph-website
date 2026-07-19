@@ -308,7 +308,7 @@ export default function BodManagementModule({ uid, onNotice }) {
 
       <section className="admin-panel bod-management-summary" aria-labelledby="bod-management-riy-title">
         <div>
-          <p className="admin-kicker">Active board</p>
+          <p className="admin-kicker">Active RIY</p>
           <h3 id="bod-management-riy-title">{board.riyLabel || BOD_MANAGEMENT_RIY_LABEL}</h3>
           <p>Board ID: {board.boardId}</p>
         </div>

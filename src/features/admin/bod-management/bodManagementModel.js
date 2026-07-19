@@ -1,5 +1,5 @@
 export const BOD_MANAGEMENT_BOARD_ID = "riy-2026-27";
-export const BOD_MANAGEMENT_RIY_LABEL = "RIY 2026\u201327";
+export const BOD_MANAGEMENT_RIY_LABEL = "RIY 2026 - 27";
 export const BOD_PROFILE_SECTION_KEY = "clubBoard";
 export const LEADERSHIP_PROFILE_SECTION_KEY = "leadershipBeyondClub";
 export const BOD_PROFILE_SECTION_KEYS = Object.freeze([
