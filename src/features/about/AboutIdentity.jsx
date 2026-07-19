@@ -19,7 +19,7 @@ export default function AboutIdentity() {
           <h2 id="about-identity-title">RIY 2026-27 Theme</h2>
           <p>
             Lakshya presents the club's RIY 2026-27 focus:
-            <strong> Shaping Aim Through Experience</strong>. Add club logo description later.
+            <strong> Shaping Aim Through Experience</strong>
           </p>
           <p>
             The theme anchors how RCPH frames growth: setting a clear aim,

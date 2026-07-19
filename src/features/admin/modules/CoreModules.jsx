@@ -695,6 +695,11 @@ export function MembersModule({
   const [sort, setSort] = useState("nameAsc");
   const [issueFilter, setIssueFilter] = useState("");
   const [viewMode, setViewMode] = useState("detailed");
+  const [membersOpen, setMembersOpen] = useState(() => {
+  if (typeof window === "undefined") return true;
+  return !window.matchMedia("(max-width: 700px)").matches;
+});
+const [openMemberActionId, setOpenMemberActionId] = useState("");
   const searchRef = useRef(null);
   const { busy, run } = useAdminMutation({ uid, module: "members", onNotice });
 
@@ -921,17 +926,35 @@ export function MembersModule({
       <section className="member-ops-workspace" aria-label="Member workspace">
         <div className="member-ops-workspace__grid">
           <div className={`member-ops-roster member-ops-roster--${viewMode}`}>
-            <header>
-              <div>
-                <p className="admin-kicker">Club directory</p>
-                <h3>Member workspace</h3>
-              </div>
-              <span>{model.filteredRows.length} of {model.metrics.total}</span>
-            </header>
+<header>
+  <div>
+    <p className="admin-kicker">Club directory</p>
+    <h3>Member workspace</h3>
+  </div>
+
+  <div className="member-ops-roster__summary">
+    <span>{model.filteredRows.length} of {model.metrics.total}</span>
+    <button
+      type="button"
+      className="member-ops-roster__toggle"
+      aria-expanded={membersOpen}
+      aria-controls="member-ops-list"
+      onClick={() => setMembersOpen((current) => !current)}
+    >
+      {membersOpen ? "Hide members" : "Show members"}
+    </button>
+  </div>
+</header>
 
             {model.filteredRows.length ? (
-              <div className="member-ops-rows" role="listbox" aria-label="Filtered member records" aria-activedescendant={selectedMember ? `member-${selectedMember.id}` : undefined}>
-                {model.filteredRows.map((member) => {
+<div
+  id="member-ops-list"
+  className={membersOpen ? "member-ops-rows is-open" : "member-ops-rows"}
+  role="listbox"
+  aria-label="Filtered member records"
+  aria-activedescendant={selectedMember ? `member-${selectedMember.id}` : undefined}
+>
+                  {model.filteredRows.map((member) => {
                   const hasLinkedProfile = Boolean(linkedProfileUidForMember(member));
                   return (
                   <article
@@ -953,6 +976,9 @@ export function MembersModule({
                     <div className="member-ops-row__main">
                       <h4>{formatRotaractorName(member.name, true)}</h4>
                       <p>{member.email || "No email in records"}</p>
+                      <p className="member-ops-row__mobile-role">
+  {member.positionLabel || "No role or position"}
+</p>
                     </div>
 
                     <div className="member-ops-row__facts">
@@ -971,15 +997,30 @@ export function MembersModule({
                       <i style={{ "--member-completeness": `${member.completeness.score}%` }} />
                     </div>
 
-                    <div className="member-ops-row__actions">
-                      <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); }}>View</button>
-                      {hasLinkedProfile ? (
-                        <>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); openProfileEditor(member); }}>Edit Profile</button>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); openProfileHistory(member); }}>View History</button>
-                        </>
-                      ) : <span>No account linked</span>}
-                    </div>
+<div className={openMemberActionId === member.id ? "member-ops-row__actions is-open" : "member-ops-row__actions"}>
+  <button
+    type="button"
+    className="member-ops-row__action-toggle"
+    aria-expanded={openMemberActionId === member.id}
+    aria-label={`Open actions for ${formatRotaractorName(member.name, true)}`}
+    onClick={(event) => {
+      event.stopPropagation();
+      setOpenMemberActionId((current) => current === member.id ? "" : member.id);
+    }}
+  >
+    ☰
+  </button>
+
+  <div className="member-ops-row__action-menu">
+    <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); setOpenMemberActionId(""); }}>View</button>
+    {hasLinkedProfile ? (
+      <>
+        <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); setOpenMemberActionId(""); openProfileEditor(member); }}>Edit Profile</button>
+        <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(member.id); setOpenMemberActionId(""); openProfileHistory(member); }}>View History</button>
+      </>
+    ) : <span>No account linked</span>}
+  </div>
+</div>
                   </article>
                   );
                 })}

@@ -54,7 +54,9 @@ import {
 import "../../../styles/components/bod.css";
 
 const CHANGE_NOTICE = "BOD Management changed elsewhere. The latest profile data is being loaded.";
-
+function formatRiyLabel(label) {
+  return String(label || "").replace(/(\d{4})\s*-\s*(\d{2})/, "$1 - $2");
+}
 export default function BodManagementModule({ uid, onNotice }) {
   const [state, setState] = useState({
     status: "loading",
@@ -309,8 +311,10 @@ export default function BodManagementModule({ uid, onNotice }) {
       <section className="admin-panel bod-management-summary" aria-labelledby="bod-management-riy-title">
         <div>
           <p className="admin-kicker">Active RIY</p>
-          <h3 id="bod-management-riy-title">{board.riyLabel || BOD_MANAGEMENT_RIY_LABEL}</h3>
-          <p>Board ID: {board.boardId}</p>
+<h3 id="bod-management-riy-title">
+  {formatRiyLabel(board.riyLabel || BOD_MANAGEMENT_RIY_LABEL)}
+</h3>
+          <p>Board ID: {formatRiyLabel(board.boardId)}</p>
         </div>
         <span className={board.initialized ? "bod-management-badge is-public" : "bod-management-badge is-draft"}>
           {board.initialized ? "Initialized" : "Not initialized"}
@@ -319,8 +323,10 @@ export default function BodManagementModule({ uid, onNotice }) {
 
       {!board.initialized ? (
         <section className="admin-panel bod-management-notice" role="status">
-          <p>BOD Management has not been initialized yet. Saving either section as Draft will create the {BOD_MANAGEMENT_RIY_LABEL} configuration.</p>
-        </section>
+<p>
+  BOD Management has not been initialized yet. Saving either section as Draft will create the{" "}
+  {formatRiyLabel(BOD_MANAGEMENT_RIY_LABEL)} configuration.
+</p>        </section>
       ) : null}
 
       <div className="admin-card-grid bod-management-grid">
