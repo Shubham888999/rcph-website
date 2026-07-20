@@ -174,7 +174,31 @@ test("reporting window normalization accepts timestamp aliases and canonical ave
   assert.equal(normalized.lockAt, "2026-07-17T18:30:00.000Z");
   assert.equal(reportingWindowStatusText(normalized), "Locked");
 });
+test("reporting window normalization preserves manual notes and stopped reminder metadata", () => {
+  const reminder = normalizeReminder("window-1", {
+    recordType: REPORTING_WINDOW_RECORD_TYPE,
+    avenue: "RRRO",
+    targetName: "Mega Tree Plantation Drive",
+    eventConductedDate: "2026-07-19",
+    reportingOpensAt: new Date("2026-07-19T18:30:00.000Z"),
+    reportingDueAt: new Date("2026-07-22T18:29:00.000Z"),
+    lockAt: new Date("2026-07-22T18:30:00.000Z"),
+    remindersEnabled: false,
+    lockEnabled: true,
+    status: "active",
+    completionReason: "reminders_disabled",
+    stoppedReason: "reminders_disabled",
+    stoppedAt: new Date("2026-07-20T15:00:00.000Z"),
+    adminNote: "RRRO confirmed report submitted.",
+    stoppedByName: "Rtr. Admin",
+  });
 
+  assert.equal(reminder.adminNote, "RRRO confirmed report submitted.");
+  assert.equal(reminder.completionReason, "reminders_disabled");
+  assert.equal(reminder.stoppedReason, "reminders_disabled");
+  assert.equal(reminder.stoppedAt, "2026-07-20T15:00:00.000Z");
+  assert.equal(reminder.stoppedByName, "Rtr. Admin");
+});
 test("safe reminder date formatting handles supported timestamp shapes", () => {
   assert.match(
     safeFormatReminderDateTime("2026-07-14T18:30:00.000Z"),

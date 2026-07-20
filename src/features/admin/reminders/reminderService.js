@@ -12,6 +12,7 @@ import { db } from "../../../app/firestore";
 import {
   EVENT_REMINDER_RECORD_TYPE,
   REMINDERS_COLLECTION,
+  REPORTING_WINDOW_RECORD_TYPE,
 } from "./reminderModel";
 
 function requireUser(uid = "") {
@@ -30,6 +31,18 @@ function actorFields(actor = {}) {
     uid,
     name: typeof actor.name === "string" ? actor.name.trim().slice(0, 160) : "",
   };
+}
+
+function reportingWindowRef(item) {
+  if (!item?.id || item.recordType !== REPORTING_WINDOW_RECORD_TYPE) {
+    throw new Error("Choose a valid reporting window.");
+  }
+
+  return doc(db, REMINDERS_COLLECTION, item.id);
+}
+
+function cleanAdminNote(value) {
+  return typeof value === "string" ? value.trim().slice(0, 500) : "";
 }
 
 export async function createReportingWindowReminder(payload, actor) {
@@ -94,6 +107,66 @@ export async function stopEventReminderConfig(config, actor) {
   });
 
   return config.id;
+}
+
+export async function markReportingWindowSubmitted(item, adminNote, actor) {
+  const { uid, name } = actorFields(actor);
+  const target = reportingWindowRef(item);
+  const note = cleanAdminNote(adminNote);
+
+  await updateDoc(target, {
+    remindersEnabled: false,
+    status: "completed",
+    completedAt: serverTimestamp(),
+    completedBy: uid,
+    completedByName: name,
+    completionReason: "report_submitted",
+    failureReason: "",
+    adminNote: note,
+    updatedBy: uid,
+    updatedByName: name,
+    updatedAt: serverTimestamp(),
+  });
+
+  return item.id;
+}
+
+export async function stopReportingWindowReminders(item, adminNote, actor) {
+  const { uid, name } = actorFields(actor);
+  const target = reportingWindowRef(item);
+  const note = cleanAdminNote(adminNote);
+
+  await updateDoc(target, {
+    remindersEnabled: false,
+    completionReason: "reminders_disabled",
+    stoppedAt: serverTimestamp(),
+    stoppedBy: uid,
+    stoppedByName: name,
+    stoppedReason: "reminders_disabled",
+    adminNote: note,
+    updatedBy: uid,
+    updatedByName: name,
+    updatedAt: serverTimestamp(),
+  });
+
+  return item.id;
+}
+
+export async function updateReportingWindowAdminNote(item, adminNote, actor) {
+  const { uid, name } = actorFields(actor);
+  const target = reportingWindowRef(item);
+
+  await updateDoc(target, {
+    adminNote: cleanAdminNote(adminNote),
+    noteUpdatedAt: serverTimestamp(),
+    noteUpdatedBy: uid,
+    noteUpdatedByName: name,
+    updatedBy: uid,
+    updatedByName: name,
+    updatedAt: serverTimestamp(),
+  });
+
+  return item.id;
 }
 
 function count(value) {

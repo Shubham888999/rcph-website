@@ -30,10 +30,13 @@ import {
 } from "./reminderModel";
 import {
   createReportingWindowReminder,
+  markReportingWindowSubmitted,
   runReminderEmailSweep,
   sendReminderTemplateTestEmail,
   stopEventReminderConfig,
+  stopReportingWindowReminders,
   unlockAvenueReportingWindow,
+  updateReportingWindowAdminNote,
   upsertEventReminderConfig,
 } from "./reminderService";
 
@@ -181,6 +184,8 @@ function ReportingWindowNote({ item }) {
   const notes = [];
   const statusNote = reportingWindowStatusNote(item);
   if (statusNote) notes.push(statusNote);
+  if (item.adminNote) notes.push(item.adminNote);
+  if (item.stoppedAt) notes.push(`Reminders stopped ${safeFormatReminderDateTime(item.stoppedAt)}`);
   if (item.lockedAt) notes.push(`Locked ${safeFormatReminderDateTime(item.lockedAt)}`);
   if (item.unlockedAt) notes.push(`Unlocked ${safeFormatReminderDateTime(item.unlockedAt)}`);
 
@@ -478,6 +483,88 @@ export default function RemindersModule({
     );
   }
 
+    function markReportingSubmitted(item) {
+    if (!canManage) {
+      onNotice?.({
+        type: "error",
+        message: "Admin panel authority is required to manage reporting windows.",
+      });
+      return;
+    }
+
+    const label = item.targetName || item.avenue || "this reporting window";
+    if (!window.confirm(`Mark reporting completed for ${label}? This will stop future reporting reminder emails for this avenue window.`)) return;
+
+    const adminNote = window.prompt(
+      "Optional admin note",
+      item.adminNote || "Report submitted manually confirmed by Admin",
+    );
+
+    if (adminNote === null) return;
+
+    run(
+      "mark-reporting-window-submitted",
+      () => markReportingWindowSubmitted(item, adminNote, {
+        uid,
+        name: actorName,
+        canManage,
+      }),
+      "Reporting window marked as submitted.",
+    );
+  }
+
+  function stopReportingReminders(item) {
+    if (!canManage) {
+      onNotice?.({
+        type: "error",
+        message: "Admin panel authority is required to manage reporting windows.",
+      });
+      return;
+    }
+
+    const label = item.targetName || item.avenue || "this reporting window";
+    if (!window.confirm(`Stop future reporting reminder emails for ${label}?`)) return;
+
+    const adminNote = window.prompt(
+      "Optional admin note",
+      item.adminNote || "Reminder emails stopped after manual review",
+    );
+
+    if (adminNote === null) return;
+
+    run(
+      "stop-reporting-window-reminders",
+      () => stopReportingWindowReminders(item, adminNote, {
+        uid,
+        name: actorName,
+        canManage,
+      }),
+      "Reporting reminder emails stopped.",
+    );
+  }
+
+  function editReportingWindowNote(item) {
+    if (!canManage) {
+      onNotice?.({
+        type: "error",
+        message: "Admin panel authority is required to manage reporting windows.",
+      });
+      return;
+    }
+
+    const adminNote = window.prompt("Admin note", item.adminNote || "");
+    if (adminNote === null) return;
+
+    run(
+      "update-reporting-window-note",
+      () => updateReportingWindowAdminNote(item, adminNote, {
+        uid,
+        name: actorName,
+        canManage,
+      }),
+      "Reporting window note saved.",
+    );
+  }
   return (
     <>
       <AdminModuleHeader
@@ -659,20 +746,55 @@ export default function RemindersModule({
                       <td>
                         <ReportingWindowNote item={item} />
                       </td>
-                      <td>
-                        {item.status === "locked" && canManage ? (
-                          <button
-                            type="button"
-                            className="reminders-inline-action"
-                            disabled={busy}
-                            onClick={() => unlockReportingWindow(item)}
-                          >
-                            Unlock
-                          </button>
-                        ) : (
-                          <span className="reminders-window-note">None</span>
-                        )}
-                      </td>
+<td>
+  {canManage ? (
+    <div className="reminders-window-actions">
+      {item.status !== "completed" && item.status !== "locked" ? (
+        <button
+          type="button"
+          className="reminders-inline-action"
+          disabled={busy}
+          onClick={() => markReportingSubmitted(item)}
+        >
+          Mark submitted
+        </button>
+      ) : null}
+
+      {item.remindersEnabled && item.status !== "completed" && item.status !== "locked" ? (
+        <button
+          type="button"
+          className="reminders-inline-action reminders-inline-action--danger"
+          disabled={busy}
+          onClick={() => stopReportingReminders(item)}
+        >
+          Stop reminders
+        </button>
+      ) : null}
+
+      <button
+        type="button"
+        className="reminders-inline-action"
+        disabled={busy}
+        onClick={() => editReportingWindowNote(item)}
+      >
+        {item.adminNote ? "Edit note" : "Add note"}
+      </button>
+
+      {item.status === "locked" ? (
+        <button
+          type="button"
+          className="reminders-inline-action"
+          disabled={busy}
+          onClick={() => unlockReportingWindow(item)}
+        >
+          Unlock
+        </button>
+      ) : null}
+    </div>
+  ) : (
+    <span className="reminders-window-note">None</span>
+  )}
+</td>
                     </tr>
                   ))}
                 </tbody>

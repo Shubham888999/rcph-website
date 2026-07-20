@@ -388,11 +388,16 @@ export function normalizeReminder(id, raw) {
       lockedAt: reminderTimestamp(raw.lockedAt),
       unlockedAt: reminderTimestamp(raw.unlockedAt),
       lockId: text(raw.lockId, 180),
-      completionReason: text(raw.completionReason, 160),
-      failureReason: text(raw.failureReason, 160),
-      lockReason: text(raw.lockReason, 160),
-      unlockReason: text(raw.unlockReason, 500),
-      unlockedByName: text(raw.unlockedByName, 160),
+completionReason: text(raw.completionReason || raw.stoppedReason, 160),
+failureReason: text(raw.failureReason, 160),
+lockReason: text(raw.lockReason, 160),
+unlockReason: text(raw.unlockReason, 500),
+adminNote: text(raw.adminNote || raw.note, 500),
+stoppedAt: reminderTimestamp(raw.stoppedAt),
+stoppedReason: text(raw.stoppedReason, 160),
+completedByName: text(raw.completedByName, 160),
+stoppedByName: text(raw.stoppedByName, 160),
+unlockedByName: text(raw.unlockedByName, 160),
     };
   }
 

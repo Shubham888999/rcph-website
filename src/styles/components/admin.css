@@ -7092,7 +7092,7 @@ min-width: 250px;
 }
 
 .reminders-table-wrap table {
-  min-width: 1120px;
+  min-width: 1280px;
 }
 
 .reminders-conducted-list {
@@ -7282,7 +7282,17 @@ min-width: 250px;
   background: rgba(96, 195, 196, 0.08);
   font-size: 0.76rem;
 }
+.reminders-window-actions {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 8.5rem;
+}
 
+.admin-page .reminders-inline-action--danger {
+  border-color: rgba(240, 109, 125, 0.34);
+  color: var(--color-danger);
+  background: rgba(153, 40, 87, 0.1);
+}
 @media (max-width: 768px) {
   .reminders-window-form .admin-form-grid {
     grid-template-columns: 1fr;

@@ -138,7 +138,29 @@ test("Reminders UI renders Phase 5 avenue window statuses and unlock action", ()
   assert.match(moduleSource, /unlockAvenueReportingWindow\(item\.id, unlockReason\)/);
   assert.match(serviceSource, /httpsCallable\(functions, "unlockAvenueReportingWindow"\)/);
 });
+test("reporting window rows support manual completion, stopped reminders, and admin notes", () => {
+  assert.match(moduleSource, /markReportingWindowSubmitted/);
+  assert.match(moduleSource, /stopReportingWindowReminders/);
+  assert.match(moduleSource, /updateReportingWindowAdminNote/);
+  assert.match(moduleSource, /Mark submitted/);
+  assert.match(moduleSource, /Stop reminders/);
+  assert.match(moduleSource, /Add note/);
+  assert.match(moduleSource, /Edit note/);
+  assert.match(moduleSource, /markReportingSubmitted\(item\)/);
+  assert.match(moduleSource, /stopReportingReminders\(item\)/);
+  assert.match(moduleSource, /editReportingWindowNote\(item\)/);
+  assert.match(moduleSource, /item\.status !== "completed" && item\.status !== "locked"/);
+  assert.match(moduleSource, /Reporting window note saved\./);
 
+  assert.match(serviceSource, /export async function markReportingWindowSubmitted/);
+  assert.match(serviceSource, /status: "completed"/);
+  assert.match(serviceSource, /completionReason: "report_submitted"/);
+  assert.match(serviceSource, /export async function stopReportingWindowReminders/);
+  assert.match(serviceSource, /remindersEnabled: false/);
+  assert.match(serviceSource, /stoppedReason: "reminders_disabled"/);
+  assert.match(serviceSource, /export async function updateReportingWindowAdminNote/);
+  assert.doesNotMatch(serviceSource, /deleteDoc|firebase\/storage/);
+});
 test("Reminders UI does not call browser date formatters directly during render", () => {
   assert.doesNotMatch(moduleSource, /toLocaleString|toLocaleDateString|toLocaleTimeString|Intl\.DateTimeFormat/);
 });
