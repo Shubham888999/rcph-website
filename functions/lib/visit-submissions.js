@@ -1041,6 +1041,23 @@ function createVisitSubmissionService(options) {
       : access.positionKeys.slice();
   }
 
+  function dashboardAccessPayload(access) {
+    return {
+      role: access.role,
+      positionKeys: access.positionKeys.slice(),
+      canManage: access.canManageVisitSystem === true,
+    };
+  }
+
+  function uninitializedDashboardPayload(access) {
+    return {
+      initialized: false,
+      canInitialize: access.canManageVisitSystem === true,
+      access: dashboardAccessPayload(access),
+      visits: [],
+    };
+  }
+
   async function getDashboard(uid) {
     const access = await resolveAccessContext(uid);
     const allowedPositions = accessiblePositionKeys(access);
@@ -1072,7 +1089,14 @@ function createVisitSubmissionService(options) {
         });
       }
     } catch (err) {
-      if ((err?.httpsCode || err?.code) === 'not-found') {
+      const code = err?.httpsCode || err?.code;
+      const message = err?.message || '';
+      const missingConfig = code === 'failed-precondition'
+        && message === 'Visit Submission structure has not been initialized.';
+      if (access.canManageVisitSystem && (code === 'not-found' || missingConfig)) {
+        return uninitializedDashboardPayload(access);
+      }
+      if (code === 'not-found') {
         throw makeVisitSubmissionError(
           'failed-precondition',
           'Visit Submission structure is incomplete.'
@@ -1082,11 +1106,7 @@ function createVisitSubmissionService(options) {
     }
 
     return {
-      access: {
-        role: access.role,
-        positionKeys: access.positionKeys.slice(),
-        canManage: access.canManageVisitSystem === true,
-      },
+      access: dashboardAccessPayload(access),
       visits,
     };
   }

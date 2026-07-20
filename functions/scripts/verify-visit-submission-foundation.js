@@ -87,11 +87,17 @@ function assertVisitRuleDenyBlock(rules, collection) {
   assert.strictEqual(positionHelpers.POSITION_KEYS.length, 38, 'exactly 38 canonical positions are used');
 
   const uninitialized = createEnv();
-  await rejectsWithCode(
-    () => uninitialized.service.getDashboard('president-uid'),
-    'failed-precondition',
-    'dashboard before initialization fails'
-  );
+  const uninitializedPresidentDashboard = await uninitialized.service.getDashboard('president-uid');
+  assert.strictEqual(uninitializedPresidentDashboard.initialized, false, 'President dashboard reports uninitialized structure');
+  assert.strictEqual(uninitializedPresidentDashboard.canInitialize, true, 'President can initialize missing structure');
+  assert.deepStrictEqual(uninitializedPresidentDashboard.visits, [], 'uninitialized dashboard returns no visits');
+  assert.strictEqual(uninitializedPresidentDashboard.access.role, 'president');
+  assert.strictEqual(uninitializedPresidentDashboard.access.canManage, true);
+  assert.deepStrictEqual(uninitializedPresidentDashboard.access.positionKeys, ['president']);
+  const uninitializedAdminDashboard = await uninitialized.service.getDashboard('admin-uid');
+  assert.strictEqual(uninitializedAdminDashboard.initialized, false, 'Admin dashboard reports uninitialized structure');
+  assert.strictEqual(uninitializedAdminDashboard.canInitialize, true, 'Admin can initialize missing structure');
+  assert.deepStrictEqual(uninitializedAdminDashboard.visits, []);
   await rejectsWithCode(
     () => uninitialized.service.getFolders('president-uid', 'clubAssembly'),
     'failed-precondition',
@@ -245,14 +251,17 @@ await rejectsWithCode(
 
   const missingConfigEnv = await initializedEnv();
   delete missingConfigEnv.adapter.store.visitSubmissionConfig.drrVisit;
-  await rejectsWithCode(
-    () => missingConfigEnv.service.getDashboard('president-uid'),
-    'failed-precondition',
-    'missing one config after initialization fails'
-  );
+  const missingConfigDashboard = await missingConfigEnv.service.getDashboard('president-uid');
+  assert.strictEqual(missingConfigDashboard.initialized, false, 'missing one config reports uninitialized');
+  assert.strictEqual(missingConfigDashboard.canInitialize, true, 'manager can repair missing config through initialize');
+  assert.deepStrictEqual(missingConfigDashboard.visits, []);
 
   const missingPositionEnv = await initializedEnv();
   delete missingPositionEnv.adapter.store.visitSubmissionPositions.clubAssembly_secretary;
+  const missingPositionManagerDashboard = await missingPositionEnv.service.getDashboard('admin-uid');
+  assert.strictEqual(missingPositionManagerDashboard.initialized, false, 'missing one folder reports uninitialized for manager');
+  assert.strictEqual(missingPositionManagerDashboard.canInitialize, true, 'manager can repair missing folder through initialize');
+  assert.deepStrictEqual(missingPositionManagerDashboard.visits, []);
   await rejectsWithCode(
     () => missingPositionEnv.service.getDashboard('bod-secretary'),
     'failed-precondition',
