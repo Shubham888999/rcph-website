@@ -331,7 +331,8 @@ const ADMIN_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_C
 const BOD_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_CATALOG[key].group === 'bod'));
 const CO_ADMIN_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_CATALOG[key].group === 'co-admin'));
 const CO_BOD_POSITION_KEYS = Object.freeze(POSITION_KEYS.filter(key => POSITION_CATALOG[key].group === 'co-bod'));
-const ROLE_PRECEDENCE = Object.freeze({ prospect: 0, gbm: 1, bod: 2, admin: 3, president: 4 });
+const DISTRICT_OFFICIAL_ROLE = 'districtOfficial';
+const ROLE_PRECEDENCE = Object.freeze({ prospect: 0, gbm: 1, districtOfficial: 1, bod: 2, admin: 3, president: 4 });
 
 const SORT_ORDER_BY_KEY = POSITION_KEYS.reduce((map, key, index) => {
   map[key] = POSITION_CATALOG[key].sortOrder || index + 1;
@@ -507,8 +508,11 @@ function buildPresidentAuthority(role, positionKeys) {
 
 function normalizeRole(role) {
   if (typeof role !== 'string') return null;
-  const normalizedRole = role.trim().toLowerCase();
-  return normalizedRole || null;
+  const normalizedRole = role.trim();
+  if (normalizedRole.toLowerCase().replace(/[\s_-]+/g, '') === 'districtofficial') {
+    return DISTRICT_OFFICIAL_ROLE;
+  }
+  return normalizedRole.toLowerCase() || null;
 }
 
 function validationFailure(code, message, details) {
@@ -521,7 +525,7 @@ function validationFailure(code, message, details) {
 
 function validateRolePositionCombination(role, positionKeys) {
   const normalizedRole = normalizeRole(role);
-  const allowedRoles = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
+  const allowedRoles = new Set(['prospect', 'gbm', 'bod', 'admin', 'president', DISTRICT_OFFICIAL_ROLE]);
   if (!allowedRoles.has(normalizedRole)) {
     return validationFailure('invalid-role', 'Unknown system access role.', { normalizedRole });
   }
@@ -549,6 +553,14 @@ function validateRolePositionCombination(role, positionKeys) {
     return validationFailure('position-required', 'BOD role requires at least one active club position.', {
       normalizedRole,
       positionKeys: [],
+      metadata,
+    });
+  }
+
+  if (normalizedRole === DISTRICT_OFFICIAL_ROLE && metadata.positionKeys.length > 0) {
+    return validationFailure('positions-not-allowed', 'District Official role cannot include club positions.', {
+      normalizedRole,
+      positionKeys: metadata.positionKeys.slice(),
       metadata,
     });
   }

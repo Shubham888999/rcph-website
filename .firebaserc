@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "rcph-admin"
-  }
+    "default": "rcph-admin",
+    "staging": "rcph-admin-staging-2"
+  },
+  "targets": {},
+  "etags": {}
 }
