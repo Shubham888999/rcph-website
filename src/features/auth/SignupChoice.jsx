@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-export default function SignupChoice({ onSelect }) {
+export default function SignupChoice({ districtOfficialAvailable = false, onSelect }) {
   return (
     <section className="signup-choice" aria-labelledby="signup-choice-title">
       <p className="login-kicker">Choose your path</p>
@@ -22,6 +22,16 @@ export default function SignupChoice({ onSelect }) {
             Continue as a Prospect
           </button>
         </article>
+        {districtOfficialAvailable ? (
+          <article className="signup-choice-card signup-choice-card--district">
+            <p className="signup-card-label">District visit team</p>
+            <h3>District Official</h3>
+            <p>Request access for an active Club Assembly, DZR Visit, or DRR Visit.</p>
+            <button type="button" onClick={() => onSelect("district-official")}>
+              Continue as District Official
+            </button>
+          </article>
+        ) : null}
       </div>
       <Link className="signup-text-link" to="/login">Back to sign in</Link>
     </section>

@@ -5,6 +5,7 @@ import PublicLayout from "../components/layout/PublicLayout";
 import ApprovedRoute from "../features/auth/ApprovedRoute";
 import AuthenticatedRoute from "../features/auth/AuthenticatedRoute";
 import RoleRoute from "../features/auth/RoleRoute";
+import VisitDashboardRoute from "../features/auth/VisitDashboardRoute";
 import RouteMetadata from "./RouteMetadata";
 
 function lazyRoute(Page) {
@@ -59,6 +60,10 @@ export const router = createBrowserRouter([{
           {
             element: <RoleRoute capability="visitSubmissions" />,
             children: [{ path: "/admin/visit-submissions", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
+          },
+          {
+            element: <VisitDashboardRoute />,
+            children: [{ path: "/visits/:visitSlug", element: lazyRoute(lazy(() => import("../pages/visits/VisitDashboardPage"))) }],
           },
           {
             element: <RoleRoute capability="bodManagement" />,

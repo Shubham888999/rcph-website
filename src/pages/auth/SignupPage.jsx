@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthStateScreen from "../../features/auth/AuthStateScreen";
+import DistrictOfficialSignupForm from "../../features/auth/DistrictOfficialSignupForm";
 import ExistingMemberSignupForm from "../../features/auth/ExistingMemberSignupForm";
 import ProspectSignupForm from "../../features/auth/ProspectSignupForm";
 import SignupChoice from "../../features/auth/SignupChoice";
@@ -9,6 +10,7 @@ import {
   createPasswordSignupAccount,
   createUserProfileAfterSignup,
   deleteCurrentAuthUserForFailedSignup,
+  getVisitSignupAvailability,
   signInOrCreateGoogleSignup,
 } from "../../features/auth/authService";
 import {
@@ -72,6 +74,7 @@ export default function SignupPage() {
   const [busyAction, setBusyAction] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
   const [pendingRole, setPendingRole] = useState("");
+  const [districtOfficialAvailable, setDistrictOfficialAvailable] = useState(false);
   const [awaitingTrustedAccess, setAwaitingTrustedAccess] = useState(false);
   const submissionLockRef = useRef(false);
   const profileCompletion = isAuthenticated && accountState === "profile-missing";
@@ -79,6 +82,20 @@ export default function SignupPage() {
   useEffect(() => {
     if (accountState === "approved") navigate("/access", { replace: true });
   }, [accountState, navigate]);
+
+  useEffect(() => {
+    let active = true;
+    getVisitSignupAvailability()
+      .then((result) => {
+        if (active) setDistrictOfficialAvailable(result?.available === true);
+      })
+      .catch(() => {
+        if (active) setDistrictOfficialAvailable(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const formProps = useMemo(() => ({
     form,
@@ -184,7 +201,11 @@ export default function SignupPage() {
         signOut,
       });
     } catch (error) {
-      const requestedRole = form.path === SIGNUP_PATHS.PROSPECT ? "prospect" : form.requestedRole;
+      const requestedRole = form.path === SIGNUP_PATHS.PROSPECT
+        ? "prospect"
+        : form.path === SIGNUP_PATHS.DISTRICT_OFFICIAL
+          ? "districtOfficial"
+          : form.requestedRole;
       let cleanupFailed = false;
       let cleanupAttempted = false;
       const shouldCleanup = Boolean(
@@ -279,7 +300,7 @@ return (
 
 <section className="signup-card">
   {form.path === SIGNUP_PATHS.CHOICE ? (
-    <SignupChoice onSelect={choosePath} />
+    <SignupChoice districtOfficialAvailable={districtOfficialAvailable} onSelect={choosePath} />
   ) : null}
 
   {form.path === SIGNUP_PATHS.PROSPECT ? (
@@ -295,6 +316,17 @@ return (
 
   {form.path === SIGNUP_PATHS.EXISTING_MEMBER ? (
     <ExistingMemberSignupForm
+      {...formProps}
+      onTogglePasswords={() => setShowPasswords((current) => !current)}
+      onChange={handleFieldChange}
+      onSubmit={handleSignup}
+      onGoogle={() => handleSignup("google")}
+      onBack={handleBack}
+    />
+  ) : null}
+
+  {form.path === SIGNUP_PATHS.DISTRICT_OFFICIAL ? (
+    <DistrictOfficialSignupForm
       {...formProps}
       onTogglePasswords={() => setShowPasswords((current) => !current)}
       onChange={handleFieldChange}

@@ -1,7 +1,15 @@
 import { stripRotaractorPrefix } from "../../../utils/memberName.js";
 import { MOM_TARGET_TYPES, normalizeMomEmailHistory, normalizeMomMetadata } from "../../mom/momModel.js";
 
-export const ADMIN_ROLES = ["gbm", "bod", "admin", "president"];
+export const DISTRICT_OFFICIAL_ROLE = "districtOfficial";
+export const ADMIN_ROLES = ["gbm", "bod", "admin", DISTRICT_OFFICIAL_ROLE, "president"];
+export const ADMIN_ROLE_LABELS = Object.freeze({
+  gbm: "GBM",
+  bod: "BOD",
+  admin: "Admin",
+  president: "President",
+  [DISTRICT_OFFICIAL_ROLE]: "District Official",
+});
 export const ATTENDANCE_VALUES = [true, false, "NA"];
 export const AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
 export const LOCK_KEYS = [
@@ -29,6 +37,14 @@ export function formatInr(value) { const amount = money(value); return amount ==
 export function cleanAvenues(value) { const values = Array.isArray(value) ? value : value ? [value] : []; return [...new Set(values.map((x) => text(x, 40).toUpperCase()).filter(Boolean))]; }
 export function normalizeAttendance(value) { return value === true || value === false || value === "NA" ? value : "NA"; }
 export function attendancePatch(eventId, value) { const id = text(eventId, 128); if (!id || id.includes("/")) throw new TypeError("Valid event ID required."); return { [id]: normalizeAttendance(value) }; }
+export function normalizeAdminRole(value) {
+  const raw = text(value, 60).toLowerCase();
+  if (raw.replace(/[\s_-]+/g, "") === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
+  return raw;
+}
+export function formatAdminRole(value) {
+  return ADMIN_ROLE_LABELS[normalizeAdminRole(value)] || text(value, 60) || "Unknown";
+}
 export function buildEventAttendanceSummary({
   participants = [],
   attendance = {},
@@ -112,7 +128,40 @@ export function buildEventAttendanceSummary({
 export function normalizeAdminUser(id, raw) {
   if (!id || !raw || typeof raw !== "object") return null;
   const status = text(raw.status, 30).toLowerCase() || "pending";
-  return { id, name: stripRotaractorPrefix(text(raw.name, 160)) || "Unnamed account", email: text(raw.email, 320).toLowerCase(), phone: text(raw.phone, 40), rotaryId: text(raw.rotaryId || raw.rid, 40), dateOfBirth: validDate(text(raw.dateOfBirth, 20)) ? text(raw.dateOfBirth, 20) : "", gender: text(raw.gender, 40).toLowerCase(), genderSelfDescribe: text(raw.genderSelfDescribe, 160), hobbies: text(raw.hobbies, 600), previousRotaract: raw.previousRotaract === true, previousRotaractDetails: text(raw.previousRotaractDetails === "N/A" ? "" : raw.previousRotaractDetails, 1200), joinReason: text(raw.joinReason, 1200), referred: raw.referred === true, referredBy: text(raw.referredBy === "N/A" ? "" : raw.referredBy, 160), role: text(raw.role, 30).toLowerCase(), requestedRole: text(raw.requestedRole, 30).toLowerCase(), status, provider: text(raw.provider, 40), positionKeys: Array.isArray(raw.positionKeys) ? [...new Set(raw.positionKeys.map((x) => text(x, 80)).filter(Boolean))] : [], hasExplicitPositionKeys: Array.isArray(raw.positionKeys), clubPosition: text(raw.clubPosition, 180), rejectReason: text(raw.rejectReason, 500), requestedRid: text(raw.requestedRid, 40), requestedRidStatus: text(raw.requestedRidStatus, 40), requestedRidMemberId: text(raw.requestedRidMemberId, 128), requestedRidConflict: raw.requestedRidConflict === true, createdAt: timestampIso(raw.createdAt), active: raw.active !== false };
+  const districtOfficialPosition = text(raw.districtOfficialPosition || raw.districtPosition || raw.position, 180);
+  return {
+    id,
+    name: stripRotaractorPrefix(text(raw.name, 160)) || "Unnamed account",
+    email: text(raw.email, 320).toLowerCase(),
+    phone: text(raw.phone, 40),
+    rotaryId: text(raw.rotaryId || raw.rid, 40),
+    dateOfBirth: validDate(text(raw.dateOfBirth, 20)) ? text(raw.dateOfBirth, 20) : "",
+    gender: text(raw.gender, 40).toLowerCase(),
+    genderSelfDescribe: text(raw.genderSelfDescribe, 160),
+    hobbies: text(raw.hobbies, 600),
+    previousRotaract: raw.previousRotaract === true,
+    previousRotaractDetails: text(raw.previousRotaractDetails === "N/A" ? "" : raw.previousRotaractDetails, 1200),
+    joinReason: text(raw.joinReason, 1200),
+    referred: raw.referred === true,
+    referredBy: text(raw.referredBy === "N/A" ? "" : raw.referredBy, 160),
+    role: normalizeAdminRole(raw.role),
+    requestedRole: normalizeAdminRole(raw.requestedRole),
+    status,
+    provider: text(raw.provider, 40),
+    position: text(raw.position, 180),
+    districtOfficialPosition,
+    districtPosition: text(raw.districtPosition, 180) || districtOfficialPosition,
+    positionKeys: Array.isArray(raw.positionKeys) ? [...new Set(raw.positionKeys.map((x) => text(x, 80)).filter(Boolean))] : [],
+    hasExplicitPositionKeys: Array.isArray(raw.positionKeys),
+    clubPosition: text(raw.clubPosition, 180),
+    rejectReason: text(raw.rejectReason, 500),
+    requestedRid: text(raw.requestedRid, 40),
+    requestedRidStatus: text(raw.requestedRidStatus, 40),
+    requestedRidMemberId: text(raw.requestedRidMemberId, 128),
+    requestedRidConflict: raw.requestedRidConflict === true,
+    createdAt: timestampIso(raw.createdAt),
+    active: raw.active !== false,
+  };
 }
 export function normalizeMember(id, raw) { if (!id || !raw || typeof raw !== "object") return null; return { id, userId: text(raw.userId || raw.uid, 128), name: stripRotaractorPrefix(text(raw.name, 160)) || "Unnamed member", email: text(raw.email, 320).toLowerCase(), rid: text(raw.rid, 40), role: text(raw.role, 30), position: text(raw.position || raw.clubPosition, 180), active: raw.active !== false }; }
 export function normalizeEvent(id, raw, kind = "club") {
@@ -249,7 +298,16 @@ export function buildAttendanceParticipants({ members = [], users = [], attendan
 
   return participants.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
-export function buildAccessPayload({ targetUid, role, positionKeys = [], confirmJointPositionKeys = [], mode = "maintenance" }) { return { targetUid: text(targetUid, 128), role: ADMIN_ROLES.includes(role) ? role : "", positionKeys: [...new Set(positionKeys.map((x) => text(x, 80)).filter(Boolean))], confirmJointPositionKeys: [...new Set(confirmJointPositionKeys.map((x) => text(x, 80)).filter(Boolean))], operationSource: mode === "approval" ? "accountApproval" : "roleMaintenance" }; }
+export function buildAccessPayload({ targetUid, role, positionKeys = [], confirmJointPositionKeys = [], mode = "maintenance" }) {
+  const normalizedRole = normalizeAdminRole(role);
+  return {
+    targetUid: text(targetUid, 128),
+    role: ADMIN_ROLES.includes(normalizedRole) ? normalizedRole : "",
+    positionKeys: [...new Set(positionKeys.map((x) => text(x, 80)).filter(Boolean))],
+    confirmJointPositionKeys: [...new Set(confirmJointPositionKeys.map((x) => text(x, 80)).filter(Boolean))],
+    operationSource: mode === "approval" ? "accountApproval" : "roleMaintenance",
+  };
+}
 export function buildEventPayload(draft, id = "") { const payload = { name: text(draft.name, 180), date: text(draft.date, 20), endDate: text(draft.endDate, 20) || text(draft.date, 20), desc: text(draft.desc, 2500), avenue: cleanAvenues(draft.avenue) }; if (id) payload.eventId = text(id, 128); return payload; }
 export function buildFinePayload(draft) {
   return {

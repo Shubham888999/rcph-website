@@ -22,7 +22,7 @@
       { "source": "/access.html", "destination": "/access", "type": 302 },
       { "source": "/my-dashboard.html", "destination": "/dashboard", "type": 302 },
       { "source": "/admin.html", "destination": "/admin", "type": 302 },
-      { "source": "/dzrvisit.html", "destination": "/admin/dzr-visit", "type": 302 },
+      { "source": "/dzrvisit.html", "destination": "/admin/visit-management", "type": 302 },
       { "source": "/BOD Event manager/bodlogin.html", "destination": "/bod-tools", "type": 302 },
       { "source": "/events/pages-of-hope.html", "destination": "/projects", "type": 301 }
     ],
@@ -45,6 +45,7 @@
       { "source": "/website-guide", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
       { "source": "/dashboard", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
       { "source": "/bod-tools", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+      { "source": "/visits/**", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
       { "source": "/admin", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
       { "source": "/admin/**", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
     ]

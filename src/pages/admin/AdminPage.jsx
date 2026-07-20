@@ -4,7 +4,6 @@ import AdminShell from "../../features/admin/AdminShell";
 import BodManagementModule from "../../features/admin/bod-management/BodManagementModule";
 import { BodOperationsModule, ClubAttendanceModule, DistrictModule } from "../../features/admin/modules/AttendanceModules";
 import { AccountsModule, CommandCenter, MembersModule, ReportsModule } from "../../features/admin/modules/CoreModules";
-import DzrVisitModule from "../../features/admin/modules/DzrVisitModule";
 import { AnnouncementsModule, ProspectsModule } from "../../features/admin/modules/EngagementModules";
 import { FinesModule, TreasuryModule } from "../../features/admin/modules/FinanceModules";
 import LocksModule from "../../features/admin/modules/LocksModule";
@@ -14,6 +13,7 @@ import { AdminError, AdminLoading, AdminNotice } from "../../features/admin/shar
 import { clearAdminCaches } from "../../features/admin/shared/adminService";
 import useAdminData from "../../features/admin/shared/useAdminData";
 import { canManageBodManagement } from "../../features/auth/accessModel";
+import ClubVisitManagementModule from "../../features/admin/visit-management/ClubVisitManagementModule";
 import VisitSubmissionsModule from "../../features/admin/visit/VisitSubmissionsModule";
 import { clearBodEventCache } from "../../features/bod-tools/bodEventService";
 import { clearDashboardDataCache } from "../../features/dashboard/dashboardService";
@@ -24,7 +24,7 @@ import "../../styles/components/admin.css";
 export default function AdminPage() {
   const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, ""); const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools) });
   const displayName = formatRotaractorName(access?.user?.name || user?.displayName || "RCPH Admin", access?.user || access?.storedRole);
-  const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "users", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "users", "districtEvents", "districtAttendance"], reminders: ["events", "bodMeetings", "districtEvents", "reminders"], fines: ["members", "fines", "events", "bodMeetings", "districtEvents"], treasury: ["members", "treasury"], reports: ["events"], "dzr-visit": ["members", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance", "fines", "treasury"] };
+  const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "users", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "users", "districtEvents", "districtAttendance"], reminders: ["events", "bodMeetings", "districtEvents", "reminders"], fines: ["members", "fines", "events", "bodMeetings", "districtEvents"], treasury: ["members", "treasury"], reports: ["events"] };
   const canAccessLockTools = access?.canAccessLockTools === true || access?.canAccessPresidentControls === true;
   const canAccessResolutionTools = access?.canAccessResolutionTools === true;
   const canAccessBodManagement = canManageBodManagement(access);
@@ -59,7 +59,7 @@ export default function AdminPage() {
   else if (segment === "locks") content = <LocksModule locks={locks} access={access} uid={uid} onNotice={setNotice} />;
   else if (segment === "reports") content = <ReportsModule events={data.events} />;
   else if (segment === "visit-submissions") content = <VisitSubmissionsModule onNotice={setNotice} />;
-  else if (segment === "dzr-visit") content = <DzrVisitModule data={data} />;
+  else if (segment === "visit-management") content = <ClubVisitManagementModule onNotice={setNotice} />;
   else if (segment === "bod-management") content = <BodManagementModule uid={uid} access={access} onNotice={setNotice} />;
   else content = <AdminError message="This Admin module does not exist." />;
   return <main className="admin-page"><AdminShell access={access} displayName={displayName} onSignOut={handleSignOut}><AdminNotice notice={notice} onDismiss={() => setNotice(null)} />{content}</AdminShell></main>;

@@ -13,6 +13,7 @@ const ROLE_LABELS = Object.freeze({
   bod: "Board of Directors",
   admin: "Administrator",
   president: "President",
+  districtOfficial: "District Official",
 });
 
 export function getAccessHubDestinations(access) {
@@ -45,6 +46,18 @@ export function getAccessHubDestinations(access) {
   if (access.canAccessVisitSubmissions) {
     destinations.push({ key: "club-visits", category: "Club reporting", title: "Club Visits", description: "Upload and manage supporting files for Club Assembly, DZR Visit, and DRR Visit.", href: "/admin/visit-submissions", primary: false });
   }
+  if (access.canAccessVisitDashboards && Array.isArray(access.visitDashboardEntries)) {
+    access.visitDashboardEntries.forEach((entry) => {
+      destinations.push({
+        key: `visit-dashboard-${entry.visitType}`,
+        category: "Visit dashboards",
+        title: `${entry.visitName} Dashboard`,
+        description: "Open the read-only visit dashboard workspace prepared for this visit.",
+        href: entry.path,
+        primary: false,
+      });
+    });
+  }
   if (access.canAccessAdminTools) {
     destinations.push({ key: "admin", category: "Administration", title: "Admin Tools", description: "Manage Club Operations.", href: "/admin", primary: false });
   }
@@ -66,6 +79,7 @@ export function getAccessHubViewModel(access) {
   if (access?.canAccessAdminTools) capabilityLabels.push("Admin Tools");
   if (access?.canAccessResolutionTools) capabilityLabels.push("Resolution Tools");
   if (access?.canAccessVisitSubmissions) capabilityLabels.push("Club Visits");
+  if (access?.canAccessVisitDashboards) capabilityLabels.push("Visit Dashboards");
   if (access?.canAccessPresidentControls) capabilityLabels.push("President Controls");
   const positions = getPositionLabels(access?.positionKeys);
   return {

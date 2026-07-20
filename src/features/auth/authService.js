@@ -52,6 +52,12 @@ export async function createUserProfileAfterSignup(payload) {
   return result?.data;
 }
 
+export async function getVisitSignupAvailability() {
+  const callable = httpsCallable(functions, "getVisitSignupAvailability");
+  const result = await callable({});
+  return result?.data;
+}
+
 export async function deleteCurrentAuthUserForFailedSignup(expectedUid) {
   const currentUser = auth.currentUser;
   if (!currentUser || (expectedUid && currentUser.uid !== expectedUid)) {
