@@ -11,7 +11,6 @@ import { WEBSITE_DIRECTOR_POSITION_KEY } from "../shared/positionCatalog";
 import {
   adminCalls,
   addRosterMember,
-  deleteRosterMember,
   loadAdminCallable,
 } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
@@ -640,7 +639,7 @@ export function AccountsModule({ users, access, uid, onNotice }) {
 function linkedProfileUidForMember(member) {
   return member?.linkedAccount?.id || "";
 }
-
+const REMOVE_PROFILE_CONFIRM_TEXT = "REMOVE PROFILE";
 const MEMBER_GENDER_LABELS = {
   woman: "Woman",
   man: "Man",
@@ -674,6 +673,103 @@ function formatMissingCompletenessLabel(label) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+function profileRemovalPayloadForMember(member) {
+  const linked = member?.linkedAccount || {};
+  const targetUid = linkedProfileUidForMember(member) || member?.userId || "";
+  const email = linked?.email || member?.email || "";
+
+  return {
+    ...(targetUid ? { targetUid } : {}),
+    memberId: member?.id || "",
+    email,
+    profileType: linked?.role === "bod" || member?.trustedRole === "bod" ? "bod" : "member",
+  };
+}
+
+function countLabel(value, noun) {
+  const count = Number(value || 0);
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function ProfileRemovalPreview({ preview }) {
+  if (!preview) {
+    return null;
+  }
+
+  const affected = preview.affected || {};
+  const protections = preview.protections || {};
+  const target = preview.target || {};
+  const blocked = protections.blocked === true;
+
+  const summaryRows = [
+    ["User profile", affected.userDoc ? "Will be marked removed" : "Not found"],
+    ["Role/access", affected.roleDoc ? "Will be revoked" : "Will be marked revoked if resolvable"],
+    ["Firebase Auth", affected.authUser?.exists ? "Will be disabled" : "Auth user not found"],
+    ["Member records", countLabel(affected.memberDocs?.length, "record")],
+    ["BOD records", countLabel(affected.bodMemberDocs?.length, "record")],
+    ["BOD assignments", countLabel(affected.activeBodAssignments?.length, "active assignment")],
+    ["Club attendance", affected.attendanceReferences?.count ? "Preserved" : "No direct row found"],
+    ["BOD attendance", affected.bodAttendanceReferences?.count ? "Preserved" : "No direct row found"],
+    ["District attendance", affected.districtAttendanceReferences?.count ? "Preserved" : "No direct row found"],
+    ["Fines", countLabel(affected.fineReferences, "historical reference")],
+    ["Announcements", countLabel(affected.announcementReferences, "delivery reference")],
+  ];
+
+  return (
+    <div className="profile-removal-preview">
+      <section className={blocked ? "profile-removal-warning" : "profile-removal-safe"}>
+        <h4>{blocked ? "Removal blocked" : "Safe removal preview"}</h4>
+        <p>
+          {blocked
+            ? "This profile is protected. The backend will not remove it."
+            : "This will revoke access and remove the profile from active records while preserving history."}
+        </p>
+      </section>
+
+      <dl className="profile-removal-target">
+        <div><dt>Name</dt><dd>{target.name || "Unknown"}</dd></div>
+        <div><dt>Email</dt><dd>{target.email || "Not recorded"}</dd></div>
+        <div><dt>Role</dt><dd>{formatAdminRole(target.role)}</dd></div>
+        <div><dt>Profile type</dt><dd>{target.profileType || "account"}</dd></div>
+      </dl>
+
+      {protections.reasons?.length ? (
+        <section className="profile-removal-warning">
+          <h4>Protection reasons</h4>
+          <ul>
+            {protections.reasons.map((reason) => (
+              <li key={reason}>{reason.replaceAll("_", " ")}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <section>
+        <h4>Affected records</h4>
+        <dl className="profile-removal-summary">
+          {summaryRows.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {preview.warnings?.length ? (
+        <section className="profile-removal-warning">
+          <h4>Warnings</h4>
+          <ul>
+            {preview.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 export function MembersModule({
   members,
   users = [],
@@ -687,7 +783,7 @@ export function MembersModule({
   const [addOpen, setAddOpen] = useState(false);
   const [profileEditor, setProfileEditor] = useState(null);
   const [historyTarget, setHistoryTarget] = useState(null);
-  const [target, setTarget] = useState(null);
+  const [removeFlow, setRemoveFlow] = useState(null);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -786,6 +882,57 @@ const [openMemberActionId, setOpenMemberActionId] = useState("");
       message: result.changed ? "Member profile updated." : "Member profile already matched those details.",
     });
     return result;
+  }
+
+  async function openRemoveFlow(member) {
+    const payload = profileRemovalPayloadForMember(member);
+
+    setRemoveFlow({
+      member,
+      payload,
+      preview: null,
+      previewLoading: true,
+      error: "",
+      reason: "",
+      confirmationText: "",
+    });
+
+    try {
+      const preview = await adminCalls.previewRemoveProfile(payload);
+      setRemoveFlow((current) =>
+        current?.member?.id === member.id
+          ? { ...current, preview, previewLoading: false, error: "" }
+          : current
+      );
+    } catch (error) {
+      const message = error?.message || "Profile removal preview failed.";
+      setRemoveFlow((current) =>
+        current?.member?.id === member.id
+          ? { ...current, previewLoading: false, error: message }
+          : current
+      );
+      onNotice?.({ type: "error", message });
+    }
+  }
+
+  async function confirmRemoveProfile() {
+    if (!removeFlow?.member || !removeFlow?.payload) return;
+
+    const result = await run(
+      "remove-profile",
+      () => adminCalls.removeProfile({
+        ...removeFlow.payload,
+        reason: removeFlow.reason,
+        confirmationText: removeFlow.confirmationText,
+        authAction: "disable",
+      }),
+      "Profile removed and access revoked.",
+    );
+
+    if (result) {
+      if (selectedId === removeFlow.member.id) setSelectedId("");
+      setRemoveFlow(null);
+    }
   }
 
   function clearFilters() {
@@ -1030,13 +1177,13 @@ const [openMemberActionId, setOpenMemberActionId] = useState("");
             )}
           </div>
 
-          <MemberInspector
-            busy={busy}
-            member={selectedMember}
-            onEdit={openProfileEditor}
-            onHistory={openProfileHistory}
-            onRemove={setTarget}
-          />
+<MemberInspector
+  busy={busy}
+  member={selectedMember}
+  onEdit={openProfileEditor}
+  onHistory={openProfileHistory}
+  onRemove={openRemoveFlow}
+/>
         </div>
       </section>
 
@@ -1094,41 +1241,94 @@ const [openMemberActionId, setOpenMemberActionId] = useState("");
           onClose={() => setHistoryTarget(null)}
         />
       ) : null}
-      {target ? (
+            {removeFlow ? (
         <AdminDialog
-          title={`Remove ${formatRotaractorName(target.name, true)}?`}
-          busy={busy}
-          onClose={() => setTarget(null)}
+          title={`Remove profile/account for ${formatRotaractorName(removeFlow.member.name, true)}?`}
+          busy={busy || removeFlow.previewLoading}
+          onClose={() => setRemoveFlow(null)}
         >
-          <p>
-            This permanently removes the production member document and
-            its attendance document, matching current production behavior.
-          </p>
+          <div className="profile-removal-dialog">
+            <p>
+              This is a safe profile removal flow. It revokes account access and
+              removes the person from active member/BOD records, but preserves
+              attendance, fines, treasury, events, resolutions, announcements,
+              and audit history.
+            </p>
 
-          <div className="admin-actions">
-            <button onClick={() => setTarget(null)}>
-              Cancel
-            </button>
+            {removeFlow.previewLoading ? (
+              <p>Loading removal preview…</p>
+            ) : null}
 
-            <button
-              className="danger"
-              onClick={() =>
-                run(
-                  "delete-member",
-                  () =>
-                    deleteRosterMember(
-                      "members",
-                      "attendance",
-                      target.id,
-                    ),
-                  "Member and attendance row removed.",
-                ).then((result) => {
-                  if (result !== null) setTarget(null);
-                })
-              }
-            >
-              Permanently remove
-            </button>
+            {removeFlow.error ? (
+              <section className="profile-removal-warning">
+                <h4>Preview unavailable</h4>
+                <p>{removeFlow.error}</p>
+              </section>
+            ) : null}
+
+            <ProfileRemovalPreview preview={removeFlow.preview} />
+
+            {removeFlow.preview && !removeFlow.preview.protections?.blocked ? (
+              <form
+                className="admin-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  confirmRemoveProfile();
+                }}
+              >
+                <label>
+                  Reason
+                  <textarea
+                    value={removeFlow.reason}
+                    onChange={(event) =>
+                      setRemoveFlow((current) =>
+                        current ? { ...current, reason: event.target.value } : current
+                      )
+                    }
+                    maxLength="500"
+                    placeholder="Example: Duplicate account, member left club, profile created by mistake"
+                  />
+                </label>
+
+                <label>
+                  Type {REMOVE_PROFILE_CONFIRM_TEXT} to confirm
+                  <input
+                    value={removeFlow.confirmationText}
+                    onChange={(event) =>
+                      setRemoveFlow((current) =>
+                        current ? { ...current, confirmationText: event.target.value } : current
+                      )
+                    }
+                    placeholder={REMOVE_PROFILE_CONFIRM_TEXT}
+                    autoComplete="off"
+                  />
+                </label>
+
+                <div className="admin-actions">
+                  <button type="button" onClick={() => setRemoveFlow(null)} disabled={busy}>
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="danger"
+                    disabled={
+                      busy ||
+                      removeFlow.previewLoading ||
+                      removeFlow.confirmationText !== REMOVE_PROFILE_CONFIRM_TEXT
+                    }
+                  >
+                    Remove profile/account
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="admin-actions">
+                <button type="button" onClick={() => setRemoveFlow(null)} disabled={busy}>
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </AdminDialog>
       ) : null}
@@ -1223,8 +1423,7 @@ function MemberInspector({ member, busy, onEdit, onHistory, onRemove }) {
               <button type="button" onClick={() => onHistory(member)} disabled={busy}>View History</button>
             </>
           ) : <span>No account linked</span>}
-          <button type="button" className="danger" onClick={() => onRemove(member)} disabled={busy}>Remove member</button>
-        </div>
+<button type="button" className="danger" onClick={() => onRemove(member)} disabled={busy}>Remove profile/account</button>        </div>
       </section>
     </aside>
   );

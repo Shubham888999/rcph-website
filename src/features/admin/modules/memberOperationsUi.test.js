@@ -17,13 +17,21 @@ test("Members workspace keeps one primary Add member control and uses dialog sub
   assert.match(source, /"Create member"/);
 });
 
-test("Members workspace preserves add, profile edit, and remove service calls", () => {
+test("Members workspace preserves add, profile edit, and safe profile removal calls", () => {
   assert.match(source, /addRosterMember\("members", \{ name: stripRotaractorPrefix\(name\) \}\)/);
   assert.match(source, /adminCalls\.updateMemberProfile\(\{/);
   assert.match(source, /targetUid: profileEditor\.targetUid/);
   assert.doesNotMatch(source, /memberId: profileEditor\.memberId/);
   assert.match(source, /ProfileHistoryDialog/);
-  assert.match(source, /deleteRosterMember\(\s*"members",\s*"attendance",\s*target\.id/s);
+
+  assert.match(source, /adminCalls\.previewRemoveProfile\(payload\)/);
+  assert.match(source, /adminCalls\.removeProfile\(\{/);
+  assert.match(source, /confirmationText: removeFlow\.confirmationText/);
+  assert.match(source, /authAction: "disable"/);
+  assert.match(source, /ProfileRemovalPreview/);
+
+  const hardDeleteCall = new RegExp(`${["delete", "Roster", "Member"].join("")}\\(\\s*"members",\\s*"attendance"`, "s");
+  assert.doesNotMatch(source, hardDeleteCall);
   assert.doesNotMatch(source, />Rename</);
 });
 
@@ -68,12 +76,18 @@ test("Members workspace keyboard shortcut avoids form typing and dialogs", () =>
   assert.match(source, /event\.key === "Escape" && active === searchRef\.current && search/);
 });
 
-test("Member inspector keeps destructive remove behind the existing confirmation dialog", () => {
+test("Member inspector uses the safe profile removal preview flow", () => {
   assert.match(source, /function MemberInspector/);
   assert.match(source, /onEdit\(member\)/);
   assert.match(source, /onRemove\(member\)/);
-  assert.match(source, /title=\{`Remove \$\{formatRotaractorName\(target\.name, true\)\}\?`\}/);
-  assert.match(source, /Permanently remove/);
+  assert.match(source, /Remove profile\/account/);
+  assert.match(source, /title=\{`Remove profile\/account for \$\{formatRotaractorName\(removeFlow\.member\.name, true\)\}\?`\}/);
+  assert.match(source, /<ProfileRemovalPreview preview=\{removeFlow\.preview\} \/>/);
+  assert.match(source, /Type \{REMOVE_PROFILE_CONFIRM_TEXT\} to confirm/);
+
+  const oldTitle = new RegExp("title=\\{`Remove \\$\\{formatRotaractorName\\(target\\.name, true\\)\\}\\?`\\}");
+  assert.doesNotMatch(source, oldTitle);
+  assert.doesNotMatch(source, new RegExp(["Permanently", "remove"].join(" ")));
 });
 
 test("Member inspector shows protected profile details and labeled missing fields", () => {

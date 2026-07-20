@@ -44,6 +44,8 @@ export const adminCalls = {
   updateAccess: (payload) => callable("updateUserAccessAndPositions", payload), rejectAccess: (payload) => callable("rejectUserRoleRequest", payload),
   updateMemberProfile: (payload) => callable("updateMemberProfile", payload),
   profileHistory: (payload) => callable("getProfileChangeHistory", payload),
+  previewRemoveProfile: (payload) => callable("previewRemovePersonProfile", payload),
+  removeProfile: (payload) => callable("removePersonProfile", payload),
   dashboard: () => callable("getMyDashboardStats", {}), updateRanking: (payload) => callable("updateClubRanking", payload),
   prospects: () => callable("getProspectManagementData", {}), recalcProspect: (uid) => callable("recalculateProspectProgress", { uid }), updateDues: (uid, duesPaid) => callable("updateProspectDues", { uid, duesPaid }), promoteProspect: (uid) => callable("promoteProspectToGbm", { uid }), deleteProspect: (uid) => callable("deleteProspectAccount", { uid }),
   announcementRecipients: () => callable("getAnnouncementRecipientOptions", {}), announcementHistory: (payload) => callable("getAnnouncementHistory", payload), publishAnnouncement: (payload) => callable("publishAnnouncement", payload), archiveAnnouncement: (announcementId) => callable("archiveAnnouncement", { announcementId }), deleteAnnouncement: (announcementId) => callable("deleteAnnouncement", { announcementId }),
