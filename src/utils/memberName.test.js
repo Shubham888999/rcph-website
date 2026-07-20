@@ -15,6 +15,7 @@ test("formatRotaractorName prefixes actual members only once", () => {
 
 test("formatRotaractorName leaves prospects and empty names unprefixed", () => {
   assert.equal(formatRotaractorName("Shubham Deshpande", { role: "prospect", status: "approved" }), "Shubham Deshpande");
+  assert.equal(formatRotaractorName("District Official", { role: "districtOfficial", status: "approved" }), "District Official");
   assert.equal(formatRotaractorName("", { role: "gbm", status: "approved" }), "");
 });
 test("stripRotaractorPrefix handles missing spaces after prefixes", () => {

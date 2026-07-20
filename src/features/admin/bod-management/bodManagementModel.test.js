@@ -76,7 +76,8 @@ test("BOD Management access is canonical Admin or President only", () => {
 });
 
 test("BOD Management route and navigation use the narrow capability", () => {
-  assert.match(navigation, /\["dzr-visit", "DZR Visit"\], \["bod-management", "BOD Management"\]/);
+  assert.match(navigation, /\["visit-management", "Club Visit Management"\], \["bod-management", "BOD Management"\]/);
+  assert.doesNotMatch(navigation, /\["dzr-visit", "DZR Visit"\]/);
   assert.match(shell, /path !== "bod-management" \|\| canAccessBodManagement/);
   assert.match(router, /capability="bodManagement"[\s\S]*path: "\/admin\/bod-management"/);
   assert.match(adminPage, /segment === "bod-management" && !canAccessBodManagement/);

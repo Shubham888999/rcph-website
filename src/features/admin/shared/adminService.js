@@ -105,6 +105,13 @@ export const visitCalls = {
   moderation: (payload) => callable("getVisitSubmissionModerationData", payload), reconcile: (visitType, positionKey) => callable("reconcileVisitSubmissionFolderCount", { visitType, positionKey }), cleanup: () => callable("cleanupExpiredVisitUploadSessions", { limit: 25 }),
 };
 
+export const visitDashboardCalls = {
+  configs: () => callable("getVisitDashboardConfigs", {}),
+  signupAvailability: () => callable("getVisitSignupAvailability", {}),
+  updateConfig: (payload) => callable("updateVisitDashboardConfig", payload),
+  folderOptions: (visitType) => callable("getVisitDashboardFolderOptions", { visitType }),
+};
+
 export async function uploadVisitFile(file, session, approved, onStage) {
   const endpoint = validateVisitUploadEndpoint(import.meta.env.VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT);
   if (!endpoint) throw new Error("Club Visits upload is not configured.");

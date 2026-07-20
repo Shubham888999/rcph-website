@@ -26,6 +26,9 @@ test("positions derive effective roles while empty Admin remains valid", () => {
   assert.deepEqual(applyPositionRole("gbm", ["co-cmd"]), ["co-cmd"]);
   assert.equal(validatePositionRole("bod", []).ok, false);
   assert.equal(validatePositionRole("admin", []).ok, true);
+  assert.equal(validatePositionRole("districtOfficial", []).ok, true);
+  assert.equal(validatePositionRole("district-official", []).effectiveRole, "districtOfficial");
+  assert.equal(validatePositionRole("districtOfficial", ["secretary"]).ok, false);
   assert.equal(validatePositionRole("gbm", ["co-cmd"]).effectiveRole, "bod");
   assert.equal(validatePositionRole("bod", ["co-secretary"]).effectiveRole, "admin");
   assert.equal(validatePositionRole("admin", ["co-cwd"]).effectiveRole, "bod");

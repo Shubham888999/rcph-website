@@ -77,6 +77,85 @@ test("destination list still renders a subset without unauthorized dashboard or 
   assert.equal(model.primary, null);
 });
 
+test("approved District Official has a safe Access Hub with no protected visit dashboard routes", () => {
+  const model = getAccessHubViewModel(access("districtOfficial", {
+    canAccessMemberDashboard: false,
+    canAccessProspectDashboard: false,
+    canAccessBodTools: false,
+    canAccessAdminTools: false,
+    canAccessVisitSubmissions: false,
+  }));
+  assert.equal(model.role, "District Official");
+  assert.equal(model.primary, null);
+  assert.deepEqual(model.destinations.map(({ key }) => key), ["calendar", "home", "website-guide"]);
+  assert.equal(model.destinations.some(({ href }) => href.includes("visit")), false);
+});
+
+test("District Official sees only configured visit dashboards and safe account areas", () => {
+  const model = getAccessHubViewModel(access("districtOfficial", {
+    canAccessMemberDashboard: false,
+    canAccessProspectDashboard: false,
+    canAccessBodTools: false,
+    canAccessAdminTools: false,
+    canAccessVisitSubmissions: false,
+    canAccessVisitDashboards: true,
+    visitDashboardEntries: [
+      { visitType: "clubAssembly", visitName: "Club Assembly", path: "/visits/club-assembly" },
+      { visitType: "dzrVisit", visitName: "DZR Visit", path: "/visits/dzr-visit" },
+    ],
+  }));
+
+  assert.deepEqual(model.destinations.map(({ key }) => key), [
+    "visit-dashboard-clubAssembly",
+    "visit-dashboard-dzrVisit",
+    "calendar",
+    "home",
+    "website-guide",
+  ]);
+  assert.deepEqual(model.destinations.map(({ href }) => href), [
+    "/visits/club-assembly",
+    "/visits/dzr-visit",
+    "/calendar",
+    "/",
+    "/website-guide",
+  ]);
+  assert.equal(model.destinations.some(({ href }) => ["/dashboard", "/admin", "/bod-tools"].includes(href)), false);
+  assert.ok(model.capabilityLabels.includes("Visit Dashboards"));
+});
+
+test("Admin and BOD keep existing destinations and include configured visit dashboards", () => {
+  const visitEntries = [
+    { visitType: "drrVisit", visitName: "DRR Visit", path: "/visits/drr-visit" },
+  ];
+  const adminModel = getAccessHubViewModel(access("admin", {
+    canAccessVisitDashboards: true,
+    visitDashboardEntries: visitEntries,
+  }));
+  const bodModel = getAccessHubViewModel(access("bod", {
+    canAccessVisitDashboards: true,
+    visitDashboardEntries: visitEntries,
+  }));
+
+  assert.deepEqual(adminModel.destinations.map(({ key }) => key), [
+    "dashboard",
+    "bod",
+    "visit-dashboard-drrVisit",
+    "admin",
+    "calendar",
+    "home",
+    "website-guide",
+  ]);
+  assert.deepEqual(bodModel.destinations.map(({ key }) => key), [
+    "dashboard",
+    "bod",
+    "visit-dashboard-drrVisit",
+    "calendar",
+    "home",
+    "website-guide",
+  ]);
+  assert.equal(adminModel.destinations.find((item) => item.key === "visit-dashboard-drrVisit")?.title, "DRR Visit Dashboard");
+});
+
 test("Website Guide is the final Help Center destination with static guide copy", () => {
   const guide = getAccessHubDestinations(access("gbm")).at(-1);
   assert.deepEqual(guide, {

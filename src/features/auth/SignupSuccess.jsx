@@ -6,7 +6,11 @@ export default function SignupSuccess({ requestedRole }) {
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
-  const role = requestedRole === "admin" ? "Admin" : "BOD";
+  const role = requestedRole === "admin"
+    ? "Admin"
+    : requestedRole === "districtOfficial"
+      ? "District Official"
+      : "BOD";
   return (
     <section className="signup-success" role="status" aria-live="polite">
       <p className="login-kicker">Request submitted</p>

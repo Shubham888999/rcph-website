@@ -4,6 +4,9 @@ import {
   canManageBodManagement,
   createDeniedAccess,
   getAccountState,
+  getVisitDashboardEntry,
+  getVisitTypeFromPath,
+  hasVisitDashboardAccess,
   hasCapability,
   normalizeTrustedAccess,
 } from "./accessModel.js";
@@ -77,6 +80,80 @@ test("approved Admin gets Admin access", () => {
   assert.equal(hasCapability(access, "bodManagement"), true);
   assert.equal(approved("admin").canAccessLockTools, false);
   assert.equal(approved("admin").canAccessResolutionTools, false);
+});
+
+test("approved District Official is recognized but receives no club dashboard capability", () => {
+  const access = approved("district-official");
+  assert.equal(access.isApproved, true);
+  assert.equal(access.storedRole, "districtOfficial");
+  assert.equal(access.canAccessMemberDashboard, false);
+  assert.equal(access.canAccessProspectDashboard, false);
+  assert.equal(access.canAccessBodTools, false);
+  assert.equal(access.canAccessAdminTools, false);
+  assert.equal(access.canAccessVisitSubmissions, false);
+  assert.equal(hasCapability(access, "memberDashboard"), false);
+});
+
+test("visit dashboard access fields are parsed and sanitized", () => {
+  const access = approvedWithCapabilities("districtOfficial", {
+    canAccessVisitDashboards: true,
+    visitDashboardAccess: {
+      clubAssembly: true,
+      dzrVisit: true,
+      drrVisit: false,
+      forgedVisit: true,
+    },
+    visitDashboardEntries: [
+      { visitType: "clubAssembly", visitName: "Forged name", path: "https://example.com" },
+      { visitType: "dzrVisit", visitName: "DZR Visit", path: "/visits/dzr-visit" },
+      { visitType: "clubAssembly", visitName: "Duplicate", path: "/visits/club-assembly" },
+      { visitType: "forgedVisit", visitName: "Forged", path: "/admin" },
+    ],
+  });
+
+  assert.equal(access.canAccessVisitDashboards, true);
+  assert.equal(hasCapability(access, "visitDashboards"), true);
+  assert.deepEqual(access.visitDashboardAccess, {
+    clubAssembly: true,
+    dzrVisit: true,
+    drrVisit: false,
+  });
+  assert.deepEqual(access.visitDashboardEntries, [
+    { visitType: "clubAssembly", visitName: "Club Assembly", path: "/visits/club-assembly" },
+    { visitType: "dzrVisit", visitName: "DZR Visit", path: "/visits/dzr-visit" },
+  ]);
+  assert.equal(hasVisitDashboardAccess(access, "clubAssembly"), true);
+  assert.equal(hasVisitDashboardAccess(access, "/visits/dzr-visit"), true);
+  assert.equal(hasVisitDashboardAccess(access, "drrVisit"), false);
+  assert.equal(getVisitTypeFromPath("/visits/club-assembly/"), "clubAssembly");
+  assert.deepEqual(getVisitDashboardEntry(access, "/visits/dzr-visit"), {
+    visitType: "dzrVisit",
+    visitName: "DZR Visit",
+    path: "/visits/dzr-visit",
+  });
+});
+
+test("pending accounts cannot keep forged visit dashboard fields", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "pending-district",
+    user: { status: "pending" },
+    role: { role: "districtOfficial", status: "pending" },
+    canAccessVisitDashboards: true,
+    visitDashboardAccess: { clubAssembly: true, dzrVisit: true, drrVisit: true },
+    visitDashboardEntries: [
+      { visitType: "clubAssembly", visitName: "Club Assembly", path: "/visits/club-assembly" },
+    ],
+  });
+
+  assert.equal(access.isPending, true);
+  assert.equal(access.canAccessVisitDashboards, false);
+  assert.deepEqual(access.visitDashboardAccess, {
+    clubAssembly: false,
+    dzrVisit: false,
+    drrVisit: false,
+  });
+  assert.deepEqual(access.visitDashboardEntries, []);
 });
 
 test("approved Admin receives Locks and Resolutions only from trusted capability flags", () => {

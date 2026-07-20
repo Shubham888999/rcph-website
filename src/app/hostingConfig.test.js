@@ -14,13 +14,14 @@ test("legacy public routes redirect to React routes", () => {
   assert.equal(redirects.get("/about.html"), "/about");
   assert.equal(redirects.get("/events.html"), "/events");
   assert.equal(redirects.get("/admin.html"), "/admin");
-  assert.equal(redirects.get("/dzrvisit.html"), "/admin/dzr-visit");
+  assert.equal(redirects.get("/dzrvisit.html"), "/admin/visit-management");
 });
 
 test("known private routes receive an HTTP noindex header", () => {
   const rules = config.hosting.headers.filter((entry) => entry.headers.some((header) => header.key === "X-Robots-Tag"));
   assert.ok(rules.some((entry) => entry.source.includes("login")));
   assert.ok(rules.some((entry) => entry.source.includes("website-guide")));
+  assert.ok(rules.some((entry) => entry.source.includes("visits")));
   assert.ok(rules.some((entry) => entry.source.includes("admin")));
   assert.ok(rules.every((entry) => entry.headers.some((header) => header.value === "noindex, nofollow")));
 });

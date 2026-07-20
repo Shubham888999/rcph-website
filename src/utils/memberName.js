@@ -1,5 +1,5 @@
 const MEMBER_ROLES = new Set(["gbm", "bod", "admin", "president"]);
-const NON_MEMBER_ROLES = new Set(["prospect", "pending", "rejected", "unauthenticated", "external"]);
+const NON_MEMBER_ROLES = new Set(["prospect", "pending", "rejected", "unauthenticated", "external", "districtofficial"]);
 const ROTARACTOR_PREFIX_PATTERN = /^(?:rtr\.?\s*)+/i;
 
 function cleanRole(value) {

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  DISTRICT_OFFICIAL_ROLE,
+  DISTRICT_OFFICIAL_SIGNUP_TYPE,
   SIGNUP_PATHS,
   buildSignupPayload,
   classifySignupOutcome,
@@ -13,6 +16,7 @@ import {
   normalizeSignupPassword,
   normalizeSignupPhone,
   normalizeSignupRid,
+  normalizeSignupRole,
   selectSignupPath,
   updateSignupField,
   validateSignup,
@@ -54,10 +58,33 @@ function validMember(role = "gbm") {
   };
 }
 
+function validDistrictOfficial() {
+  return {
+    ...selectSignupPath(createSignupForm(), SIGNUP_PATHS.DISTRICT_OFFICIAL),
+    name: "PHF. DZR Example",
+    email: "dzr@example.com",
+    password: "secret",
+    confirmPassword: "secret",
+    districtOfficialPosition: "DZR",
+    legalAccepted: true,
+    communicationsOptIn: true,
+  };
+}
+
 test("initial state starts at chooser", () => {
   assert.equal(createSignupForm().path, "choice");
   assert.equal(createSignupForm().legalAccepted, false);
   assert.equal(createSignupForm().communicationsOptIn, false);
+});
+test("signup page gates District Official choice on safe availability", async () => {
+  const pageSource = await readFile(new URL("../../pages/auth/SignupPage.jsx", import.meta.url), "utf8");
+  const choiceSource = await readFile(new URL("./SignupChoice.jsx", import.meta.url), "utf8");
+  assert.match(pageSource, /getVisitSignupAvailability\(\)/);
+  assert.match(pageSource, /setDistrictOfficialAvailable\(result\?\.available === true\)/);
+  assert.match(pageSource, /catch\(\(\) => \{[\s\S]*setDistrictOfficialAvailable\(false\)/);
+  assert.match(pageSource, /districtOfficialAvailable=\{districtOfficialAvailable\}/);
+  assert.match(choiceSource, /districtOfficialAvailable \? \(/);
+  assert.match(choiceSource, /Continue as District Official/);
 });
 test("selecting Prospect clears member credentials and forces role", () => {
   const next = selectSignupPath({ ...validMember("admin"), password: "x", inviteCode: "code" }, "prospect");
@@ -70,6 +97,14 @@ test("selecting Existing Member clears Prospect-only fields", () => {
   assert.equal(next.hobbies, "");
   assert.equal(next.joinReason, "");
   assert.equal(next.requestedRole, "gbm");
+});
+test("selecting District Official clears club/prospect-only fields and forces role", () => {
+  const next = selectSignupPath(validProspect(), "district-official");
+  assert.equal(next.requestedRole, DISTRICT_OFFICIAL_ROLE);
+  assert.equal(next.rid, "");
+  assert.equal(next.phone, "");
+  assert.equal(next.gender, "");
+  assert.equal(next.hobbies, "");
 });
 test("returning to chooser clears passwords and invite code", () => {
   const next = selectSignupPath(validMember("admin"), "choice");
@@ -139,6 +174,11 @@ test("signup text normalization preserves Rtr-like ordinary text", () => {
     "Rtr. is commonly used in Rotaract",
   );
 });
+test("district official role normalization preserves canonical camelCase", () => {
+  assert.equal(normalizeSignupRole("districtOfficial"), DISTRICT_OFFICIAL_ROLE);
+  assert.equal(normalizeSignupRole("district-official"), DISTRICT_OFFICIAL_ROLE);
+  assert.equal(normalizeSignupRole("District Official"), DISTRICT_OFFICIAL_ROLE);
+});
 test("mandatory legal acceptance blocks signup", () => {
   const result = validateSignup({ ...validMember(), legalAccepted: false });
   assert.match(result.errors.legalAccepted, /must accept/i);
@@ -172,6 +212,46 @@ test("Prospect role and signup type are forced in payload", () => {
   assert.equal(payload.requestedRole, "prospect");
   assert.equal(payload.signupType, "prospect");
   assert.equal(payload.consentSource, "prospect-signup");
+});
+test("District Official signup requires position but not member profile fields", () => {
+  const missing = validateSignup({ ...validDistrictOfficial(), districtOfficialPosition: "" });
+  assert.equal(missing.errors.phone, undefined);
+  assert.equal(missing.errors.gender, undefined);
+  assert.ok(missing.errors.districtOfficialPosition);
+  assert.equal(validateSignup(validDistrictOfficial()).valid, true);
+});
+test("District Official payload includes pending role shape, position, provider, and consents", () => {
+  const payload = buildSignupPayload(validDistrictOfficial(), {
+    provider: "google",
+    identityEmail: "OFFICIAL@Example.COM",
+  });
+  assert.deepEqual({
+    role: payload.role,
+    requestedRole: payload.requestedRole,
+    signupType: payload.signupType,
+    email: payload.email,
+    position: payload.position,
+    districtOfficialPosition: payload.districtOfficialPosition,
+    provider: payload.provider,
+    termsAccepted: payload.termsAccepted,
+    privacyAccepted: payload.privacyAccepted,
+    communicationsOptIn: payload.communicationsOptIn,
+    consentSource: payload.consentSource,
+  }, {
+    role: DISTRICT_OFFICIAL_ROLE,
+    requestedRole: DISTRICT_OFFICIAL_ROLE,
+    signupType: DISTRICT_OFFICIAL_SIGNUP_TYPE,
+    email: "official@example.com",
+    position: "DZR",
+    districtOfficialPosition: "DZR",
+    provider: "google",
+    termsAccepted: true,
+    privacyAccepted: true,
+    communicationsOptIn: true,
+    consentSource: "district-official-signup",
+  });
+  assert.equal("phone" in payload, false);
+  assert.equal("gender" in payload, false);
 });
 test("previous Rotaract details are conditionally required", () => {
   const result = validateSignup({ ...validProspect(), previousRotaract: "yes", previousRotaractDetails: "" });
@@ -311,6 +391,12 @@ test("BOD pending outcome signs out", () => {
 });
 test("Admin pending outcome signs out", () => {
   assert.equal(classifySignupOutcome({ status: "pending", requestedRole: "admin" }).kind, "pending");
+});
+test("District Official pending outcome signs out without lowercasing the canonical role", () => {
+  const outcome = classifySignupOutcome({ status: "pending", role: "districtOfficial", requestedRole: "district-official" });
+  assert.equal(outcome.kind, "pending");
+  assert.equal(outcome.requestedRole, DISTRICT_OFFICIAL_ROLE);
+  assert.equal(outcome.signOut, true);
 });
 test("approved existing account remains approved", () => {
   const outcome = classifySignupOutcome({ status: "approved", role: "president", existing: true });

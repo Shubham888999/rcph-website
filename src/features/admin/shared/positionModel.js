@@ -1,7 +1,14 @@
 import { POSITION_CATALOG, POSITION_GROUPS } from "./positionCatalog.js";
 
 const BY_KEY = new Map(POSITION_CATALOG.map((position) => [position.key, position]));
-const ROLE_RANK = Object.freeze({ prospect: 0, gbm: 1, bod: 2, admin: 3, president: 4 });
+const DISTRICT_OFFICIAL_ROLE = "districtOfficial";
+const ROLE_RANK = Object.freeze({ prospect: 0, gbm: 1, districtOfficial: 1, bod: 2, admin: 3, president: 4 });
+
+function normalizeRole(value) {
+  const role = typeof value === "string" ? value.trim() : "";
+  if (role.toLowerCase().replace(/[\s_-]+/g, "") === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
+  return role.toLowerCase();
+}
 
 function lookupText(value) {
   return typeof value === "string"
@@ -68,7 +75,8 @@ export function hasResolutionVoterPosition(selectedKeys) {
 
 export function deriveEffectiveRole(selectedKeys, fallbackRole = "gbm") {
   const normalized = normalizePositionSelection(selectedKeys);
-  if (!normalized.selectedKeys.length) return ROLE_RANK[fallbackRole] != null ? fallbackRole : "gbm";
+  const fallback = normalizeRole(fallbackRole);
+  if (!normalized.selectedKeys.length) return ROLE_RANK[fallback] != null ? fallback : "gbm";
   return normalized.selectedKeys.reduce((best, key) => {
     const role = effectiveRoleForPosition(key);
     return ROLE_RANK[role] > ROLE_RANK[best] ? role : best;
@@ -80,10 +88,12 @@ export function applyPositionRole(role, selectedKeys) {
 }
 
 export function validatePositionRole(role, selectedKeys, unknownValues = []) {
+  const normalizedRole = normalizeRole(role);
   const keys = applyPositionRole(role, selectedKeys);
-  const effectiveRole = deriveEffectiveRole(keys, role);
-  if (role === "bod" && keys.length === 0) return { ok: false, message: "BOD access requires at least one club position.", positionKeys: keys, effectiveRole };
-  if (role !== "gbm" && unknownValues.length > 0 && keys.length === 0) return { ok: false, message: "Select the correct positions before replacing unresolved legacy position data.", positionKeys: keys };
+  if (normalizedRole === DISTRICT_OFFICIAL_ROLE && keys.length > 0) return { ok: false, message: "District Official access cannot include club positions.", positionKeys: keys, effectiveRole: DISTRICT_OFFICIAL_ROLE };
+  const effectiveRole = deriveEffectiveRole(keys, normalizedRole);
+  if (normalizedRole === "bod" && keys.length === 0) return { ok: false, message: "BOD access requires at least one club position.", positionKeys: keys, effectiveRole };
+  if (!["gbm", DISTRICT_OFFICIAL_ROLE].includes(normalizedRole) && unknownValues.length > 0 && keys.length === 0) return { ok: false, message: "Select the correct positions before replacing unresolved legacy position data.", positionKeys: keys };
   return { ok: true, message: "", positionKeys: keys, effectiveRole };
 }
 

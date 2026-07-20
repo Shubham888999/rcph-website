@@ -41,7 +41,7 @@ test("Members profile actions require a verified linked account", () => {
 test("Members workspace uses responsive non-overlapping roster and inspector markup", () => {
   assert.match(source, /className="member-ops-workspace__grid"/);
   assert.match(source, /className="member-ops-row__quality"/);
-  assert.match(source, /className="member-ops-row__actions"/);
+  assert.match(source, /className=\{openMemberActionId === member\.id \? "member-ops-row__actions is-open" : "member-ops-row__actions"\}/);
   assert.match(adminCss, /container: member-ops-workspace \/ inline-size/);
   assert.match(adminCss, /\.member-ops-workspace__grid\s*\{\s*display: grid/);
   assert.match(adminCss, /grid-template-areas:\s*"initials main facts actions"\s*"initials quality quality actions"/);
@@ -55,7 +55,9 @@ test("Member rows preserve compact mode with wrapped readable actions", () => {
   assert.match(source, /member-ops-roster--\$\{viewMode\}/);
   assert.match(adminCss, /\.member-ops-roster--compact \.member-ops-row\s*\{[^}]*grid-template-areas: "initials main facts actions"/s);
   assert.match(adminCss, /\.member-ops-roster--compact \.member-ops-row__quality\s*\{\s*display: none;/);
-  assert.match(adminCss, /\.member-ops-row__actions\s*\{[^}]*flex-wrap: wrap/s);
+  assert.match(source, /className="member-ops-row__action-toggle"/);
+  assert.match(source, /className="member-ops-row__action-menu"/);
+  assert.match(adminCss, /\.member-ops-row__actions\.is-open \.member-ops-row__action-menu\s*\{[^}]*display: grid/s);
   assert.match(adminCss, /\.member-ops-row__actions button\s*\{[^}]*white-space: normal/s);
 });
 

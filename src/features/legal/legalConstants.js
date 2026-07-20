@@ -11,4 +11,5 @@ export const LEGAL_EFFECTIVE_DATE_LABEL = "July 2, 2026";
 export const SUPPORTED_SIGNUP_CONSENT_SOURCES = Object.freeze([
   "prospect-signup",
   "member-signup",
+  "district-official-signup",
 ]);

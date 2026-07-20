@@ -6,6 +6,7 @@ Disallow: /forgot-password
 Disallow: /access
 Disallow: /dashboard
 Disallow: /bod-tools
+Disallow: /visits
 Disallow: /admin
 
 Sitemap: https://rcph3131.org/sitemap.xml

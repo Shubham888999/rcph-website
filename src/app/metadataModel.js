@@ -82,6 +82,9 @@ const PRIVATE_TITLES = Object.freeze({
   "/website-guide": "Website Guide | RCPH",
   "/dashboard": "Member Dashboard | RCPH",
   "/bod-tools": "BOD Event Manager | RCPH",
+  "/visits/club-assembly": "Club Assembly Dashboard | RCPH",
+  "/visits/dzr-visit": "DZR Visit Dashboard | RCPH",
+  "/visits/drr-visit": "DRR Visit Dashboard | RCPH",
 });
 
 export function normalizeRoutePath(pathname) {

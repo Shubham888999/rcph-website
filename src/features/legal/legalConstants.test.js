@@ -8,7 +8,7 @@ test("legal versions and effective date have supported immutable values", () => 
   assert.deepEqual(LEGAL_VERSIONS, { terms: "1.0", privacy: "1.0", communications: "1.0" });
   assert.match(LEGAL_EFFECTIVE_DATE, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(Number.isNaN(Date.parse(`${LEGAL_EFFECTIVE_DATE}T00:00:00Z`)), false);
-  assert.deepEqual(SUPPORTED_SIGNUP_CONSENT_SOURCES, ["prospect-signup", "member-signup"]);
+  assert.deepEqual(SUPPORTED_SIGNUP_CONSENT_SOURCES, ["prospect-signup", "member-signup", "district-official-signup"]);
 });
 
 test("signup consent UI uses native separate unchecked fields and public policy links", async () => {

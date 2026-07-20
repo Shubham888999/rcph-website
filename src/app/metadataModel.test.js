@@ -30,12 +30,13 @@ test("absolute images resolve against the canonical apex", () => {
   assert.equal(absoluteSiteUrl("javascript:alert(1)"), "https://rcph3131.org/");
 });
 
-test("auth, protected, nested Admin, and unknown routes are noindex", () => {
-  for (const path of ["/login", "/signup", "/forgot-password", "/access", "/website-guide", "/dashboard", "/bod-tools", "/admin", "/admin/dzr-visit", "/missing"]) {
+test("auth, protected, nested Admin, visit dashboards, and unknown routes are noindex", () => {
+  for (const path of ["/login", "/signup", "/forgot-password", "/access", "/website-guide", "/dashboard", "/bod-tools", "/visits/club-assembly", "/visits/dzr-visit", "/visits/drr-visit", "/admin", "/admin/visit-management", "/missing"]) {
     const metadata = getRouteMetadata(path);
     assert.equal(metadata.robots, "noindex, nofollow");
     assert.equal(metadata.structuredData, null);
   }
+  assert.equal(getRouteMetadata("/visits/club-assembly").title, "Club Assembly Dashboard | RCPH");
   assert.equal(getRouteMetadata("/missing").title, "Page Not Found | RCPH");
 });
 
