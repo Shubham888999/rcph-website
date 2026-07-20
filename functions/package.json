@@ -1,8 +1,9 @@
 {
   "scripts": {
-    "test": "node scripts/verify-member-profile.js && node scripts/verify-profile-updates.js && node scripts/verify-district-official-signup.js && node scripts/verify-visit-dashboard-access.js && node scripts/verify-visit-dashboard-data.js",
+    "test": "node scripts/verify-member-profile.js && node scripts/verify-profile-updates.js && node scripts/verify-profile-removal-preview.js && node scripts/verify-district-official-signup.js && node scripts/verify-visit-dashboard-access.js && node scripts/verify-visit-dashboard-data.js",
     "test:member-profile": "node scripts/verify-member-profile.js",
     "test:profile-updates": "node scripts/verify-profile-updates.js",
+    "test:profile-removal": "node scripts/verify-profile-removal-preview.js",
     "test:district-official-signup": "node scripts/verify-district-official-signup.js",
     "test:admin-access": "node scripts/verify-admin-lock-resolution-access.js",
     "test:resolutions": "node scripts/verify-resolutions.js",

@@ -48,6 +48,8 @@ const {
   normalizeDateOfBirth,
 } = require('./lib/profile-updates');
 
+const { createProfileRemovalService } = require('./lib/profile-removal');
+
 admin.initializeApp();
 const db = admin.firestore();
 const rolePositionAssignments = createPositionAssignmentService({
@@ -60,6 +62,15 @@ const profileUpdates = createProfileUpdateService({
   db,
   admin,
   HttpsError,
+});
+
+const profileRemoval = createProfileRemovalService({
+  db,
+  admin,
+  HttpsError,
+  assertAdminOrPresidentAuthority,
+  assertApprovedActiveCallableAccount,
+  getAuthorityContext,
 });
 const visitSubmissions = createVisitSubmissionService({
   db,
@@ -4342,6 +4353,14 @@ exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) 
     bodRosterActive: result.bodRosterActive,
     attendanceSync: result.attendanceSync,
   };
+});
+
+exports.previewRemovePersonProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  return profileRemoval.previewRemovePersonProfile({
+    actorUid,
+    data: request.data || {},
+  });
 });
 
 exports.rejectUserRoleRequest = onCall(CALLABLE_OPTIONS, async (request) => {
