@@ -255,6 +255,14 @@ function isFineLinkedTreasury(data) {
       allow read, write: if false;
     }
 
+    match /visitDashboardConfig/{visitType} {
+      allow read, write: if false;
+    }
+
+    match /visitDashboardAudit/{auditId} {
+      allow read, write: if false;
+    }
+
     match /events/{eventId} {
       allow read: if true;
       allow create, update, delete: if isAdmin() && !panelLocked('attendance');

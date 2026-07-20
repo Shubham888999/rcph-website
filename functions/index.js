@@ -13,6 +13,9 @@ const {
   createVisitSubmissionService,
 } = require('./lib/visit-submissions');
 const {
+  createVisitDashboardService,
+} = require('./lib/visit-dashboards');
+const {
   createFirestoreFolderLockManager,
   createVisitHttpUploadHandler,
 } = require('./lib/visit-drive');
@@ -62,6 +65,12 @@ const visitSubmissions = createVisitSubmissionService({
   db,
   admin,
   positionHelpers,
+});
+const visitDashboards = createVisitDashboardService({
+  db,
+  admin,
+  positionHelpers,
+  assertAdmin: assertAdminOrPresidentAuthority,
 });
 const VISIT_DRIVE_CLIENT_ID = defineSecret('VISIT_DRIVE_CLIENT_ID');
 const VISIT_DRIVE_CLIENT_SECRET = defineSecret('VISIT_DRIVE_CLIENT_SECRET');
@@ -222,9 +231,19 @@ exports.resetPasswordWithOtp = functions.https.onCall(async (data) => {
   return { ok: true };
 });
 
+const DISTRICT_OFFICIAL_ROLE = 'districtOfficial';
+const DISTRICT_OFFICIAL_SIGNUP_TYPE = 'district-official';
+const DISTRICT_OFFICIAL_POSITIONS = new Set([
+  'DRR',
+  'DZR',
+  'District Secretary',
+  'District Council Member',
+  'District Official',
+  'Other',
+]);
 const ACTIVE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
-const REQUESTABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin']);
-const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
+const REQUESTABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', DISTRICT_OFFICIAL_ROLE]);
+const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin', 'president', DISTRICT_OFFICIAL_ROLE]);
 const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
 const DRIVE_UPLOAD_SHARED_SECRET = defineSecret('DRIVE_UPLOAD_SHARED_SECRET');
 const DRIVE_UPLOAD_TICKET_TTL_MS = 5 * 60 * 1000;
@@ -282,7 +301,11 @@ const FINE_REASONS = new Set([
 const RESOLUTION_DELETION_AUDIT_COLLECTION = 'resolutionDeletionAudit';
 
 function normalizeRole(value) {
-  return String(value || '').trim().toLowerCase();
+  const role = String(value || '').trim();
+  if (role.toLowerCase().replace(/[\s_-]+/g, '') === 'districtofficial') {
+    return DISTRICT_OFFICIAL_ROLE;
+  }
+  return role.toLowerCase();
 }
 
 function normalizeText(value, max = 300) {
@@ -1277,6 +1300,44 @@ function normalizeProspectSignupData(data) {
   };
 }
 
+function normalizeSignupConsentData(data, requestedRole) {
+  const termsAccepted = data.termsAccepted === true;
+  const privacyAccepted = data.privacyAccepted === true;
+  if (requestedRole === DISTRICT_OFFICIAL_ROLE && (!termsAccepted || !privacyAccepted)) {
+    throw new HttpsError('invalid-argument', 'Terms and Privacy acceptance are required.');
+  }
+  const expectedSource = requestedRole === 'prospect'
+    ? 'prospect-signup'
+    : requestedRole === DISTRICT_OFFICIAL_ROLE
+      ? 'district-official-signup'
+      : 'member-signup';
+  return {
+    termsAccepted,
+    termsVersion: normalizeText(data.termsVersion, 40),
+    privacyAccepted,
+    privacyVersion: normalizeText(data.privacyVersion, 40),
+    communicationsOptIn: data.communicationsOptIn === true,
+    communicationsVersion: normalizeText(data.communicationsVersion, 40),
+    consentSource: expectedSource,
+    legalEffectiveDate: normalizeText(data.legalEffectiveDate, 40),
+  };
+}
+
+function normalizeDistrictOfficialSignupData(data) {
+  const position = normalizeText(data.districtOfficialPosition || data.districtPosition || data.position, 120);
+  if (!DISTRICT_OFFICIAL_POSITIONS.has(position)) {
+    throw new HttpsError('invalid-argument', 'District Official position is required.');
+  }
+  return {
+    role: DISTRICT_OFFICIAL_ROLE,
+    requestedRole: DISTRICT_OFFICIAL_ROLE,
+    signupType: DISTRICT_OFFICIAL_SIGNUP_TYPE,
+    position,
+    districtOfficialPosition: position,
+    districtPosition: position,
+  };
+}
+
 function escapeEmailHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -1567,6 +1628,7 @@ function getSignupNotificationSubject(userData) {
   if (role === 'gbm') return 'New GBM Signup - RCPH';
   if (role === 'bod') return 'New BOD Access Request - RCPH';
   if (role === 'admin') return 'New Admin Access Request - RCPH';
+  if (role === DISTRICT_OFFICIAL_ROLE) return 'New District Official Access Request - RCPH';
   return 'New Account Signup - RCPH';
 }
 
@@ -1576,7 +1638,7 @@ function getSignupNotificationHighlight(userData) {
     return 'Prospect Member auto-approved. Onboarding criteria: 3 consecutive eligible meetings/events, then dues paid.';
   }
   if (role === 'gbm') return 'GBM auto-approved.';
-  if (role === 'bod' || role === 'admin') {
+  if (role === 'bod' || role === 'admin' || role === DISTRICT_OFFICIAL_ROLE) {
     return 'Pending approval. Admin action required in Account Requests.';
   }
   return 'A new RCPH account was created.';
@@ -1605,6 +1667,10 @@ function getSignupNotificationRows(userData) {
       ['Reason for joining RCPH', signupEmailValue(userData.joinReason)],
       ['Referred by', signupEmailValue(userData.referredBy)]
     );
+  }
+
+  if (role === DISTRICT_OFFICIAL_ROLE) {
+    rows.push(['District position', signupEmailValue(userData.districtOfficialPosition || userData.districtPosition || userData.position)]);
   }
 
   rows.push(
@@ -3824,14 +3890,28 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
   const signupType = normalizeRole(data.signupType);
   const requestedRole = signupType === 'prospect'
     ? 'prospect'
+    : signupType === DISTRICT_OFFICIAL_ROLE
+      ? DISTRICT_OFFICIAL_ROLE
     : normalizeRole(data.requestedRole);
 
   if (!REQUESTABLE_ROLES.has(requestedRole)) {
-    throw new HttpsError('invalid-argument', 'Choose Prospect, GBM, BOD, or Admin.');
+    throw new HttpsError('invalid-argument', 'Choose Prospect, GBM, BOD, Admin, or District Official.');
   }
   if (requestedRole === 'president') {
     throw new HttpsError('permission-denied', 'President accounts are manual-only.');
   }
+
+  if (requestedRole === DISTRICT_OFFICIAL_ROLE) {
+    const availability = await visitDashboards.getSignupAvailability();
+    if (availability?.available !== true) {
+      throw new HttpsError('failed-precondition', 'District Official signup is not currently open.');
+    }
+  }
+
+  const districtOfficialSignup = requestedRole === DISTRICT_OFFICIAL_ROLE
+    ? normalizeDistrictOfficialSignupData(data)
+    : null;
+  const signupConsent = normalizeSignupConsentData(data, requestedRole);
 
   if (requestedRole === 'admin') {
     const expected = ADMIN_INVITE_CODE;
@@ -3849,7 +3929,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
   } catch (err) {
     throwMemberProfileError(err, 'Invalid member RID.');
   }
-  if (requestedRole === 'prospect' && signupRid) {
+  if ((requestedRole === 'prospect' || requestedRole === DISTRICT_OFFICIAL_ROLE) && signupRid) {
     throw new HttpsError('invalid-argument', 'RID is only accepted for existing-member signup.');
   }
 
@@ -3888,7 +3968,8 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
     const roleData = roleSnap.exists ? (roleSnap.data() || {}) : null;
     const existingRole = roleData ? normalizeRole(roleData.role) : '';
 
-    if (roleData && ACTIVE_ROLES.has(existingRole) && isApprovedRoleDoc(roleData, existingRole)) {
+    const approvedExistingSignupRole = ACTIVE_ROLES.has(existingRole) || existingRole === DISTRICT_OFFICIAL_ROLE;
+    if (roleData && approvedExistingSignupRole && isApprovedRoleDoc(roleData, existingRole)) {
       let ridResult = ridSignupResult(signupRid ? 'unmatched' : 'not-provided');
       if (signupRid && existingRole !== 'prospect') {
         const memberMatch = await findMemberMatchForSignup(tx, uid, profile.email);
@@ -3897,6 +3978,8 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       const approvedProfile = {
         ...profile,
         ...(existingRole === 'prospect' && prospectSignup ? prospectSignup : {}),
+        ...(existingRole === DISTRICT_OFFICIAL_ROLE && districtOfficialSignup ? districtOfficialSignup : {}),
+        ...signupConsent,
         role: existingRole,
         requestedRole: existingRole === 'president' ? 'admin' : existingRole,
         status: 'approved',
@@ -3941,9 +4024,11 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       };
     }
 
+    const baseProfileData = requestedRole === DISTRICT_OFFICIAL_ROLE ? {} : commonSignupData;
     const base = {
       ...profile,
-      ...commonSignupData,
+      ...baseProfileData,
+      ...signupConsent,
       requestedRole,
       updatedAt: now,
       approvedAt: null,
@@ -4078,14 +4163,15 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
 
     tx.set(userRef, {
       ...base,
+      ...(districtOfficialSignup || {}),
       ...pendingRidMetadata,
-      role: 'pending',
+      role: requestedRole === DISTRICT_OFFICIAL_ROLE ? DISTRICT_OFFICIAL_ROLE : 'pending',
       status: 'pending',
       createdAt: userData?.createdAt || now,
     }, { merge: true });
     return {
       status: 'pending',
-      role: 'pending',
+      role: requestedRole === DISTRICT_OFFICIAL_ROLE ? DISTRICT_OFFICIAL_ROLE : 'pending',
       requestedRole,
       existing: false,
       shouldNotify: !userSnap.exists,
@@ -4102,11 +4188,16 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       rid: signupRid,
       requestedRole,
       role: result.role,
-      signupType: requestedRole === 'prospect' ? 'prospect' : 'internal',
+      signupType: requestedRole === 'prospect'
+        ? 'prospect'
+        : requestedRole === DISTRICT_OFFICIAL_ROLE
+          ? DISTRICT_OFFICIAL_SIGNUP_TYPE
+          : 'internal',
       status: result.status,
       gender: commonSignupData.gender,
       genderSelfDescribe: commonSignupData.genderSelfDescribe,
       ...(prospectSignup || {}),
+      ...(districtOfficialSignup || {}),
       createdAt: new Date().toISOString(),
     };
 
@@ -4336,6 +4427,60 @@ exports.updateUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   };
 });
 
+exports.getVisitSignupAvailability = onCall(CALLABLE_OPTIONS, async () => {
+  try {
+    return await visitDashboards.getSignupAvailability();
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit signup availability request failed.');
+  }
+});
+
+exports.getVisitDashboardConfigs = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitDashboards.getConfigs(uid);
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit dashboard config request failed.');
+  }
+});
+
+exports.updateVisitDashboardConfig = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitDashboards.updateConfig(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit dashboard config update failed.');
+  }
+});
+
+exports.getVisitDashboardFolderOptions = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitDashboards.getFolderOptions(uid, request.data?.visitType);
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit dashboard folder options request failed.');
+  }
+});
+
+exports.getVisitDashboardData = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    const [userSnap, activeRole] = await Promise.all([
+      db.collection('users').doc(uid).get(),
+      getActiveRole(uid),
+    ]);
+    return await visitDashboards.getDashboardData({
+      uid,
+      visitType: request.data?.visitType,
+      role: activeRole?.role || '',
+      roleData: activeRole?.data || null,
+      userData: userSnap.exists ? (userSnap.data() || {}) : null,
+    });
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit dashboard data request failed.');
+  }
+});
+
 exports.initializeVisitSubmissionStructure = onCall(CALLABLE_OPTIONS, async (request) => {
   try {
     const uid = requireAuth(request);
@@ -4525,6 +4670,9 @@ const authorityContext = await getAuthorityContext(uid, {
     userData,
     resolutionManager,
   });
+  const visitDashboardAccess = isApprovedActiveUserRecord(userData) && role
+    ? await visitDashboards.getAccessForRole({ role, roleData })
+    : visitDashboards.emptyAccess();
 
   return {
     ok: true,
@@ -4537,6 +4685,7 @@ const authorityContext = await getAuthorityContext(uid, {
     resolutionManager,
     canAccessLockTools,
     canAccessResolutionTools,
+    ...visitDashboardAccess,
   };
 });
 

@@ -9,11 +9,16 @@ const OPERATION_SOURCES = Object.freeze([
   'positionMaintenance',
 ]);
 const OPERATION_SOURCE_SET = new Set(OPERATION_SOURCES);
-const MANAGEABLE_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
+const DISTRICT_OFFICIAL_ROLE = 'districtOfficial';
+const MANAGEABLE_ROLES = new Set(['gbm', 'bod', 'admin', 'president', DISTRICT_OFFICIAL_ROLE]);
 const GENERAL_MEMBER_ROLES = new Set(['gbm', 'bod', 'admin', 'president']);
 
 function normalizeRoleValue(role) {
-  return String(role || '').trim().toLowerCase();
+  const normalized = String(role || '').trim();
+  if (normalized.toLowerCase().replace(/[\s_-]+/g, '') === 'districtofficial') {
+    return DISTRICT_OFFICIAL_ROLE;
+  }
+  return normalized.toLowerCase();
 }
 
 function uniqueSortedUids(values) {
@@ -66,7 +71,7 @@ function resolveRequestedPositionValues(options, positionHelpers = defaultPositi
   }
 
   if (hasOwn(options, 'legacyClubPosition')) {
-    if (role === 'gbm' || role === 'prospect') {
+    if (role === 'gbm' || role === 'prospect' || role === DISTRICT_OFFICIAL_ROLE) {
       return { positionKeys: [], unknownValues: [], source: 'roleClearsPositions' };
     }
     const normalized = positionHelpers.normalizePositionKeys(options.legacyClubPosition || []);
@@ -77,7 +82,7 @@ function resolveRequestedPositionValues(options, positionHelpers = defaultPositi
     };
   }
 
-  if (role === 'gbm' || role === 'prospect') {
+  if (role === 'gbm' || role === 'prospect' || role === DISTRICT_OFFICIAL_ROLE) {
     return { positionKeys: [], unknownValues: [], source: 'roleClearsPositions' };
   }
 
@@ -677,7 +682,9 @@ if (!actorHasAdminPanelAuthority) {
 
       tx.set(userRef, userPayload, { merge: true });
       tx.set(roleRef, rolePayload, { merge: true });
-      tx.set(memberRef, memberPayload, { merge: true });
+      if (GENERAL_MEMBER_ROLES.has(plan.role) || memberSnap.exists) {
+        tx.set(memberRef, memberPayload, { merge: true });
+      }
       if (plan.metadata.hasBodPosition || bodMemberSnap.exists) {
         tx.set(bodMemberRef, bodMemberPayload, { merge: true });
       }

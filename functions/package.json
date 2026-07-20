@@ -1,13 +1,17 @@
 {
   "scripts": {
-    "test": "node scripts/verify-member-profile.js && node scripts/verify-profile-updates.js",
+    "test": "node scripts/verify-member-profile.js && node scripts/verify-profile-updates.js && node scripts/verify-district-official-signup.js && node scripts/verify-visit-dashboard-access.js && node scripts/verify-visit-dashboard-data.js",
     "test:member-profile": "node scripts/verify-member-profile.js",
     "test:profile-updates": "node scripts/verify-profile-updates.js",
+    "test:district-official-signup": "node scripts/verify-district-official-signup.js",
     "test:admin-access": "node scripts/verify-admin-lock-resolution-access.js",
     "test:resolutions": "node scripts/verify-resolutions.js",
     "test:announcement-attachments": "node scripts/verify-announcement-attachments.js",
     "test:membership-content": "node scripts/verify-membership-content-management.js",
-    "test:bod-event-schema": "node scripts/verify-bod-event-schema.js"
+    "test:bod-event-schema": "node scripts/verify-bod-event-schema.js",
+    "test:visit-dashboards": "node scripts/verify-visit-dashboard-config.js",
+    "test:visit-dashboard-access": "node scripts/verify-visit-dashboard-access.js",
+    "test:visit-dashboard-data": "node scripts/verify-visit-dashboard-data.js"
   },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",
