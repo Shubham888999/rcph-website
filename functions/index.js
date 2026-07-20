@@ -4363,6 +4363,14 @@ exports.previewRemovePersonProfile = onCall(CALLABLE_OPTIONS, async (request) =>
   });
 });
 
+exports.removePersonProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  const actorUid = requireAuth(request);
+  return profileRemoval.removePersonProfile({
+    actorUid,
+    data: request.data || {},
+  });
+});
+
 exports.rejectUserRoleRequest = onCall(CALLABLE_OPTIONS, async (request) => {
   const approverUid = requireAuth(request);
   await assertAdminOrPresident(approverUid);

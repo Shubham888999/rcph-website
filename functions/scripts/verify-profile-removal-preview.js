@@ -17,9 +17,21 @@ const indexSource = readFileSync(
   'utf8'
 );
 
-test('profile removal preview service is exported', () => {
+test('profile removal service is exported', () => {
   assert.equal(typeof profileRemoval.createProfileRemovalService, 'function');
   assert.equal(typeof profileRemoval._private.buildProtectionReport, 'function');
+
+  const service = profileRemoval.createProfileRemovalService({
+    db: {},
+    admin: {},
+    HttpsError: class HttpsError extends Error {},
+    assertAdminOrPresidentAuthority: async () => {},
+    assertApprovedActiveCallableAccount: async () => {},
+    getAuthorityContext: async () => ({}),
+  });
+
+  assert.equal(typeof service.previewRemovePersonProfile, 'function');
+  assert.equal(typeof service.removePersonProfile, 'function');
 });
 
 test('preview callable is exported from index', () => {
@@ -27,17 +39,29 @@ test('preview callable is exported from index', () => {
   assert.match(indexSource, /const profileRemoval = createProfileRemovalService\(\{/);
   assert.match(indexSource, /exports\.previewRemovePersonProfile = onCall\(CALLABLE_OPTIONS/);
   assert.match(indexSource, /profileRemoval\.previewRemovePersonProfile/);
+  assert.match(indexSource, /exports\.removePersonProfile = onCall\(CALLABLE_OPTIONS/);
+  assert.match(indexSource, /profileRemoval\.removePersonProfile/);
 });
 
-test('preview module has no destructive Firebase writes', () => {
+test('profile removal mutation avoids hard deletes and disables Auth after Firestore cleanup', () => {
   assert.doesNotMatch(profileRemovalSource, /deleteUser\s*\(/);
-  assert.doesNotMatch(profileRemovalSource, /updateUser\s*\(/);
-  assert.doesNotMatch(profileRemovalSource, /createUser\s*\(/);
-  assert.doesNotMatch(profileRemovalSource, /\.commit\s*\(/);
-  assert.doesNotMatch(profileRemovalSource, /\.batch\s*\(/);
   assert.doesNotMatch(profileRemovalSource, /\.delete\s*\(/);
-  assert.doesNotMatch(profileRemovalSource, /\.update\s*\(/);
-  assert.doesNotMatch(profileRemovalSource, /\.set\s*\(/);
+
+  assert.match(profileRemovalSource, /buildRemovedPayload/);
+  assert.match(profileRemovalSource, /status: 'removed'/);
+  assert.match(profileRemovalSource, /active: false/);
+  assert.match(profileRemovalSource, /PROFILE_REMOVAL_AUDIT_ACTION/);
+  assert.match(profileRemovalSource, /admin\.auth\(\)\.updateUser\(targetUid, \{ disabled: true \}\)/);
+
+  const firestoreCommitIndex = profileRemovalSource.indexOf('await commitFirestoreOperations(db, operations);');
+  const authDisableIndex = profileRemovalSource.indexOf("await admin.auth().updateUser(targetUid, { disabled: true });");
+
+  assert.ok(firestoreCommitIndex > -1, 'Firestore cleanup commit should exist.');
+  assert.ok(authDisableIndex > -1, 'Auth disable should exist.');
+  assert.ok(
+    firestoreCommitIndex < authDisableIndex,
+    'Firestore cleanup and audit must happen before Auth disable.'
+  );
 });
 
 test('protection report blocks self, admin, president authority, CWD, and SAA', () => {
@@ -85,4 +109,10 @@ test('normal GBM preview protection can be allowed', () => {
 
   assert.equal(report.blocked, false);
   assert.deepEqual(report.reasons, []);
+});
+
+test('auth action normalization supports disable and none only', () => {
+  assert.equal(profileRemoval._private.normalizeAuthAction('disable'), 'disable');
+  assert.equal(profileRemoval._private.normalizeAuthAction('none'), 'none');
+  assert.equal(profileRemoval._private.normalizeAuthAction('delete'), '');
 });

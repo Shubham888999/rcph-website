@@ -1,7 +1,10 @@
 'use strict';
 
 const ADMIN_MAINTENANCE_AUDIT_COLLECTION = 'adminMaintenanceAudit';
-
+const REMOVE_PROFILE_CONFIRM_TEXT = 'REMOVE PROFILE';
+const PROFILE_REMOVAL_AUDIT_ACTION = 'profile_removed';
+const DEFAULT_AUTH_ACTION = 'disable';
+const SUPPORTED_AUTH_ACTIONS = new Set(['disable', 'none']);
 const PROTECTED_ROLES = new Set(['admin', 'president']);
 const PROTECTED_POSITION_KEYS = new Set([
   'president',
@@ -461,7 +464,299 @@ async function loadIdentityPreview({
     generatedAt: new Date().toISOString(),
   };
 }
+function normalizeRemovalReason(value) {
+  const reason = cleanText(value, 500);
+  return reason || 'Admin profile removal';
+}
 
+function normalizeAuthAction(value) {
+  const action = cleanLower(value || DEFAULT_AUTH_ACTION, 40);
+  return SUPPORTED_AUTH_ACTIONS.has(action) ? action : '';
+}
+
+function targetLookupPayload(data = {}) {
+  return {
+    targetUid: data.targetUid,
+    uid: data.uid,
+    memberId: data.memberId,
+    bodMemberId: data.bodMemberId,
+    email: data.email,
+    profileType: data.profileType,
+  };
+}
+
+function previewHasAnyAffectedIdentity(preview = {}) {
+  const affected = preview.affected || {};
+  return Boolean(
+    preview.target?.uid
+      || affected.userDoc
+      || affected.roleDoc
+      || affected.authUser?.exists
+      || affected.prospectProgressDoc
+      || affected.memberDocs?.length
+      || affected.bodMemberDocs?.length
+      || affected.activeBodAssignments?.length
+  );
+}
+
+function buildRemovedPayload({ actorUid, now, reason }) {
+  return {
+    active: false,
+    status: 'removed',
+    removed: true,
+    deleted: true,
+    accessRevoked: true,
+    removedAt: now,
+    deletedAt: now,
+    removedBy: actorUid,
+    deletedBy: actorUid,
+    removalReason: reason,
+    updatedAt: now,
+  };
+}
+
+function buildRoleRemovalPayload({ actorUid, now, reason, role }) {
+  return {
+    role: normalizeRoleValue(role),
+    status: 'removed',
+    roleStatus: 'removed',
+    active: false,
+    accessRevoked: true,
+    removedAt: now,
+    removedBy: actorUid,
+    removalReason: reason,
+    updatedAt: now,
+  };
+}
+
+function buildAuditAffectedSummary(preview = {}) {
+  const affected = preview.affected || {};
+  return {
+    userDoc: Boolean(affected.userDoc),
+    roleDoc: Boolean(affected.roleDoc),
+    authUser: affected.authUser?.exists === true,
+    prospectProgressDoc: Boolean(affected.prospectProgressDoc),
+    memberDocCount: affected.memberDocs?.length || 0,
+    bodMemberDocCount: affected.bodMemberDocs?.length || 0,
+    activeBodAssignmentCount: affected.activeBodAssignments?.length || 0,
+    attendanceReferences: affected.attendanceReferences?.count || 0,
+    bodAttendanceReferences: affected.bodAttendanceReferences?.count || 0,
+    districtAttendanceReferences: affected.districtAttendanceReferences?.count || 0,
+    fineReferences: affected.fineReferences || 0,
+    announcementReferences: affected.announcementReferences || 0,
+  };
+}
+
+async function commitFirestoreOperations(db, operations = []) {
+  let batch = db.batch();
+  let operationCount = 0;
+
+  for (const operation of operations) {
+    operation(batch);
+    operationCount += 1;
+
+    if (operationCount >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      operationCount = 0;
+    }
+  }
+
+  if (operationCount > 0) {
+    await batch.commit();
+  }
+}
+
+function addSetOperation(operations, ref, payload, options = { merge: true }) {
+  if (!ref || !payload) return;
+  operations.push(batch => batch.set(ref, payload, options));
+}
+
+async function buildPositionOccupancyRemovalOperations({
+  db,
+  operations,
+  activeAssignments,
+  targetUid,
+  actorUid,
+  now,
+}) {
+  const assignments = Array.isArray(activeAssignments) ? activeAssignments : [];
+
+  for (const assignment of assignments) {
+    const positionKey = normalizePositionKey(assignment.positionKey);
+    if (!positionKey) continue;
+
+    const assignmentRef = assignment.path
+      ? db.doc(assignment.path)
+      : db.collection('bodPositionAssignments').doc(`${positionKey}_${targetUid}`);
+
+    addSetOperation(operations, assignmentRef, {
+      active: false,
+      endedBy: actorUid,
+      endedAt: now,
+      endReason: 'profile_removed',
+      removalReason: 'profile_removed',
+      updatedAt: now,
+    });
+
+    const occupancyRef = db.collection('bodPositionOccupancy').doc(positionKey);
+    const occupancySnap = await occupancyRef.get();
+    const occupancy = occupancySnap.exists ? (occupancySnap.data() || {}) : {};
+    const holderUids = Array.isArray(occupancy.holderUids)
+      ? occupancy.holderUids.filter(uid => uid !== targetUid)
+      : [];
+
+    addSetOperation(operations, occupancyRef, {
+      holderUids,
+      active: holderUids.length > 0,
+      jointAssignment: holderUids.length > 1,
+      updatedAt: now,
+      updatedBy: actorUid,
+    });
+  }
+}
+
+async function applyProfileRemoval({
+  db,
+  admin,
+  actorUid,
+  preview,
+  reason,
+  authAction,
+}) {
+  const target = preview.target || {};
+  const affected = preview.affected || {};
+  const targetUid = safeDocId(target.uid);
+
+  if (!targetUid) {
+    throw new Error('Target UID could not be resolved.');
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const operations = [];
+  const removedPayload = buildRemovedPayload({ actorUid, now, reason });
+  const targetRole = normalizeRoleValue(target.role || affected.roleDoc?.role || affected.userDoc?.role || '');
+
+  if (affected.userDoc) {
+    addSetOperation(operations, db.collection('users').doc(targetUid), {
+      ...removedPayload,
+      previousRole: targetRole,
+      role: targetRole,
+    });
+  }
+
+  addSetOperation(operations, db.collection('roles').doc(targetUid), buildRoleRemovalPayload({
+    actorUid,
+    now,
+    reason,
+    role: targetRole,
+  }));
+
+  if (affected.prospectProgressDoc?.path) {
+    addSetOperation(operations, db.doc(affected.prospectProgressDoc.path), {
+      ...removedPayload,
+      progressStatus: 'removed',
+    });
+  }
+
+  (affected.memberDocs || []).forEach((doc) => {
+    if (!doc.path) return;
+    addSetOperation(operations, db.doc(doc.path), {
+      ...removedPayload,
+      memberStatus: 'removed',
+      membershipStatus: 'removed',
+    });
+  });
+
+  (affected.bodMemberDocs || []).forEach((doc) => {
+    if (!doc.path) return;
+    addSetOperation(operations, db.doc(doc.path), {
+      ...removedPayload,
+      bodRosterActive: false,
+      bodStatus: 'removed',
+      rosterStatus: 'removed',
+    });
+  });
+
+  await buildPositionOccupancyRemovalOperations({
+    db,
+    operations,
+    activeAssignments: affected.activeBodAssignments || [],
+    targetUid,
+    actorUid,
+    now,
+  });
+
+  const auditRef = db.collection(ADMIN_MAINTENANCE_AUDIT_COLLECTION).doc();
+  addSetOperation(operations, auditRef, {
+    action: PROFILE_REMOVAL_AUDIT_ACTION,
+    actorUid,
+    targetUid,
+    targetName: cleanText(target.name, 180),
+    targetEmail: normalizeEmail(target.email),
+    targetRole,
+    targetProfileType: cleanText(target.profileType, 80),
+    reason,
+    authAction,
+    affected: buildAuditAffectedSummary(preview),
+    protectionsAtRemoval: preview.protections || {},
+    warningsAtRemoval: preview.warnings || [],
+    preserveHistory: true,
+    historicalCollectionsPreserved: HISTORICAL_COLLECTION_NOTES.slice(),
+    createdAt: now,
+  });
+
+  await commitFirestoreOperations(db, operations);
+
+  let authResult = {
+    action: authAction,
+    disabled: false,
+    missing: false,
+    skipped: authAction === 'none',
+    errorCode: '',
+  };
+
+  if (authAction === 'disable') {
+    try {
+      await admin.auth().updateUser(targetUid, { disabled: true });
+      authResult = {
+        action: authAction,
+        disabled: true,
+        missing: false,
+        skipped: false,
+        errorCode: '',
+      };
+    } catch (error) {
+      if (error?.code === 'auth/user-not-found') {
+        authResult = {
+          action: authAction,
+          disabled: false,
+          missing: true,
+          skipped: false,
+          errorCode: 'auth/user-not-found',
+        };
+      } else {
+        authResult = {
+          action: authAction,
+          disabled: false,
+          missing: false,
+          skipped: false,
+          errorCode: cleanText(error?.code || 'auth_disable_failed', 120),
+        };
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    targetUid,
+    target,
+    auth: authResult,
+    firestoreUpdated: true,
+    auditPath: auditRef.path,
+    affected: buildAuditAffectedSummary(preview),
+  };
+}
 function createProfileRemovalService({
   db,
   admin,
@@ -503,9 +798,86 @@ function createProfileRemovalService({
       getAuthorityContext,
     });
   }
+  async function removePersonProfile({ actorUid, data }) {
+    const safeActorUid = safeDocId(actorUid);
+    if (!safeActorUid) {
+      throw new HttpsError('unauthenticated', 'Sign in required.');
+    }
 
+    await assertApprovedActiveCallableAccount(safeActorUid);
+    await assertAdminOrPresidentAuthority(safeActorUid);
+
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new HttpsError('invalid-argument', 'Removal request must be an object.');
+    }
+
+    const allowedFields = new Set([
+      'targetUid',
+      'uid',
+      'memberId',
+      'bodMemberId',
+      'email',
+      'profileType',
+      'reason',
+      'confirmationText',
+      'authAction',
+    ]);
+
+    Object.keys(data).forEach((key) => {
+      if (!allowedFields.has(key)) {
+        throw new HttpsError('invalid-argument', `Unsupported removal field: ${key}`);
+      }
+    });
+
+    const confirmationText = cleanText(data.confirmationText, 80);
+    if (confirmationText !== REMOVE_PROFILE_CONFIRM_TEXT) {
+      throw new HttpsError('failed-precondition', `Type "${REMOVE_PROFILE_CONFIRM_TEXT}" to confirm.`);
+    }
+
+    const authAction = normalizeAuthAction(data.authAction);
+    if (!authAction) {
+      throw new HttpsError('invalid-argument', 'Unsupported auth action.');
+    }
+
+    const reason = normalizeRemovalReason(data.reason);
+
+    const preview = await previewRemovePersonProfile({
+      actorUid: safeActorUid,
+      data: targetLookupPayload(data),
+    });
+
+    if (!previewHasAnyAffectedIdentity(preview)) {
+      throw new HttpsError('not-found', 'No matching profile/account was found.');
+    }
+
+    if (preview.protections?.blocked === true) {
+      throw new HttpsError(
+        'failed-precondition',
+        'This profile is protected and cannot be removed.',
+        {
+          reasons: preview.protections.reasons || [],
+          target: preview.target || {},
+        }
+      );
+    }
+
+    try {
+      return await applyProfileRemoval({
+        db,
+        admin,
+        actorUid: safeActorUid,
+        preview,
+        reason,
+        authAction,
+      });
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError('internal', error?.message || 'Profile removal failed.');
+    }
+  }
   return {
     previewRemovePersonProfile,
+    removePersonProfile,
   };
 }
 
@@ -517,5 +889,7 @@ module.exports = {
     normalizeRoleValue,
     normalizePositionKeys,
     buildProtectionReport,
+    buildAuditAffectedSummary,
+    normalizeAuthAction,
   },
 };
