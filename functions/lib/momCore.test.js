@@ -123,6 +123,9 @@ test("MOM email recipient groups include role and active position metadata", () 
   assert.equal(momRecipientMatchesGroups({ role: "prospect" }, ["prospect"]), true);
   assert.equal(momRecipientMatchesGroups({ role: "bod" }, ["all"]), true);
   assert.equal(momRecipientMatchesGroups({ role: "bod", positionKeys: ["cmd"] }, ["president"]), false);
+  assert.equal(momRecipientMatchesGroups({ role: "gbm", positionKeys: ["cmd"] }, ["bod"]), true);
+  assert.equal(momRecipientMatchesGroups({ role: "admin", positionKeys: ["treasurer"] }, ["bod"]), true);
+  assert.equal(momRecipientMatchesGroups({ role: "gbm", positionKeys: [] }, ["bod"]), false);
 });
 
 test("MOM email request accepts specific UIDs and rejects raw email IDs", () => {

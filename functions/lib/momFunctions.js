@@ -511,12 +511,12 @@ function momRecipientRoleAllowed(role) {
 }
 
 function momRecipientGroupsNeedPositionScan(groups = []) {
-  return groups.some(group => ['all', 'president', 'secretary', 'saa'].includes(group));
+  return groups.some(group => ['all', 'bod', 'president', 'secretary', 'saa'].includes(group));
 }
 
 function activeAssignmentMatchesMomGroups(positionKey, groups = []) {
   if (!groups.length) return false;
-  return momRecipientMatchesGroups({ role: 'bod', positionKeys: [positionKey] }, groups);
+  return momRecipientMatchesGroups({ role: 'gbm', positionKeys: [positionKey] }, groups);
 }
 
 async function activeMomPositionKeysByUidForGroups(groups = []) {

@@ -297,7 +297,8 @@ function momRecipientMatchesGroups(recipient = {}, groups = []) {
   const hasSecretary = hasAnyPositionKey(positionKeys, SECRETARY_POSITION_KEYS);
   const hasSergeant = hasAnyPositionKey(positionKeys, SERGEANT_POSITION_KEYS);
   return normalizedGroups.some((group) => {
-    if (['prospect', 'gbm', 'bod', 'admin'].includes(group)) return role === group;
+    if (['prospect', 'gbm', 'admin'].includes(group)) return role === group;
+    if (group === 'bod') return role === 'bod' || hasAnyPositionKey(positionKeys, BOD_POSITION_KEYS);
     if (group === 'president') return role === 'president' || hasPresident;
     if (group === 'secretary') return hasSecretary;
     if (group === 'saa') return hasSergeant;

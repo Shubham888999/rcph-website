@@ -36,3 +36,8 @@ test('MOM email callable audits failures and preserves Phase 3 boundaries', () =
   assert.match(functionsSource, /momEmail: latest/);
   assert.doesNotMatch(functionsSource, /remindersSent|lockAt|lockEnabled/);
 });
+
+test('MOM BOD recipient group scans active BOD position assignments', () => {
+  assert.match(functionsSource, /\['all', 'bod', 'president', 'secretary', 'saa'\]\.includes\(group\)/);
+  assert.match(functionsSource, /momRecipientMatchesGroups\(\{ role: 'gbm', positionKeys: \[positionKey\] \}, groups\)/);
+});
