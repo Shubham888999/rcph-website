@@ -41,3 +41,16 @@ test('MOM BOD recipient group scans active BOD position assignments', () => {
   assert.match(functionsSource, /\['all', 'bod', 'president', 'secretary', 'saa'\]\.includes\(group\)/);
   assert.match(functionsSource, /momRecipientMatchesGroups\(\{ role: 'gbm', positionKeys: \[positionKey\] \}, groups\)/);
 });
+
+test('MOM upload and email history mirror to synced BOD event copies', () => {
+  assert.match(functionsSource, /MOM_BOD_SYNC_FIELD_BY_TARGET_TYPE/);
+  assert.match(functionsSource, /syncedEventId/);
+  assert.match(functionsSource, /syncedMeetingId/);
+  assert.match(functionsSource, /syncedDistrictEventId/);
+  assert.match(functionsSource, /async function mirrorMomMetadataToSyncedBodEvents/);
+  assert.match(functionsSource, /async function mirrorMomEmailHistoryToSyncedBodEvents/);
+  assert.match(functionsSource, /await mirrorMomMetadataToSyncedBodEvents\(target, metadata\)/);
+  assert.match(functionsSource, /await mirrorMomEmailHistoryToSyncedBodEvents\(target, latest\)/);
+  assert.match(functionsSource, /momMirrorSourceType/);
+  assert.match(functionsSource, /momEmailMirrorSourceType/);
+});

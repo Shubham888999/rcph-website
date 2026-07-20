@@ -87,6 +87,12 @@ const MOM_DRIVE_OPTIONS = {
 const ROLE_COLLECTIONS = ['roles', 'userRoles', 'access'];
 const DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder';
 
+const MOM_BOD_SYNC_FIELD_BY_TARGET_TYPE = Object.freeze({
+  [MOM_TARGET_TYPES.CLUB_EVENT]: 'syncedEventId',
+  [MOM_TARGET_TYPES.BOD_MEETING]: 'syncedMeetingId',
+  [MOM_TARGET_TYPES.DISTRICT_EVENT]: 'syncedDistrictEventId',
+});
+
 function projectId() {
   if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
   if (process.env.GCP_PROJECT) return process.env.GCP_PROJECT;
@@ -449,7 +455,84 @@ function momTargetName(data = {}) {
 function momTargetDate(data = {}) {
   return cleanText(data.date || data.eventStart || data.startDate || data.eventDate, 40);
 }
+function bodSyncFieldForMomTarget(targetType) {
+  return MOM_BOD_SYNC_FIELD_BY_TARGET_TYPE[targetType] || '';
+}
 
+async function mirrorMomMetadataToSyncedBodEvents(target, metadata) {
+  const syncField = bodSyncFieldForMomTarget(target?.targetType);
+  if (!syncField || !target?.targetId) return 0;
+
+  try {
+    const snapshot = await db
+      .collection('bodEvents')
+      .where(syncField, '==', target.targetId)
+      .get();
+
+    if (snapshot.empty) return 0;
+
+    const serialized = serializeMomMetadata(metadata);
+    const batch = db.batch();
+    const mirroredAt = admin.firestore.Timestamp.now();
+
+    snapshot.docs.forEach((doc) => {
+      batch.set(doc.ref, {
+        ...serialized,
+        momMirrorSourceType: target.targetType,
+        momMirrorSourceId: target.targetId,
+        momMirrorUpdatedAt: mirroredAt,
+      }, { merge: true });
+    });
+
+    await batch.commit();
+    return snapshot.size;
+  } catch (error) {
+    logger.warn('MOM metadata mirror to synced BOD events failed.', {
+      targetType: target?.targetType || '',
+      targetId: target?.targetId || '',
+      code: error?.code || '',
+      message: error?.message || '',
+    });
+    return 0;
+  }
+}
+
+async function mirrorMomEmailHistoryToSyncedBodEvents(target, latest) {
+  const syncField = bodSyncFieldForMomTarget(target?.targetType);
+  if (!syncField || !target?.targetId || !latest) return 0;
+
+  try {
+    const snapshot = await db
+      .collection('bodEvents')
+      .where(syncField, '==', target.targetId)
+      .get();
+
+    if (snapshot.empty) return 0;
+
+    const batch = db.batch();
+    const mirroredAt = admin.firestore.Timestamp.now();
+
+    snapshot.docs.forEach((doc) => {
+      batch.set(doc.ref, {
+        momEmail: latest,
+        momEmailMirrorSourceType: target.targetType,
+        momEmailMirrorSourceId: target.targetId,
+        momEmailMirrorUpdatedAt: mirroredAt,
+      }, { merge: true });
+    });
+
+    await batch.commit();
+    return snapshot.size;
+  } catch (error) {
+    logger.warn('MOM email history mirror to synced BOD events failed.', {
+      targetType: target?.targetType || '',
+      targetId: target?.targetId || '',
+      code: error?.code || '',
+      message: error?.message || '',
+    });
+    return 0;
+  }
+}
 function escapeEmailHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -783,7 +866,10 @@ async function writeMomEmailHistory({ target, access, request, recipients, summa
   };
   await historyRef.set(history);
   const latest = { ...history, historyId: historyRef.id };
-  if (updateLatest) await target.ref.set({ momEmail: latest }, { merge: true });
+  if (updateLatest) {
+    await target.ref.set({ momEmail: latest }, { merge: true });
+    await mirrorMomEmailHistoryToSyncedBodEvents(target, latest);
+  }
   return serializeMomEmailHistory(historyRef.id, latest);
 }
 const getMomEmailRecipientOptions = onCall(MOM_BASE_OPTIONS, async (request) => {
@@ -913,6 +999,7 @@ const finalizeMomUpload = onCall(MOM_BASE_OPTIONS, async (request) => {
   const now = admin.firestore.Timestamp.now();
   const metadata = buildMomMetadata({ target, previous: target.data, upload: session.uploaded, access, now });
   await target.ref.set(metadata, { merge: true });
+  await mirrorMomMetadataToSyncedBodEvents(target, metadata);
   await sessionRef.update({ status: 'finalized', finalizedAt: now, updatedAt: now, metadata: serializeMomMetadata(metadata) });
   return { ok: true, mom: serializeMomMetadata(metadata) };
 });
