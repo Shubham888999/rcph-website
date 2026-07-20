@@ -438,8 +438,7 @@ async function loadIdentityPreview({
   if (!roleSnap?.exists) warnings.push('No roles/{uid} document found.');
   if (memberDocs.length > 1) warnings.push('Multiple member documents matched this identity.');
   if (bodMemberDocs.length > 1) warnings.push('Multiple BOD member documents matched this identity.');
-  if (activeAssignments.length) warnings.push('Active BOD position assignments would need to be ended by a later removal phase.');
-
+  if (activeAssignments.length) warnings.push('Active BOD position assignments will be ended and position occupancy will be updated during removal.');
   return {
     ok: true,
     mode: 'preview',
