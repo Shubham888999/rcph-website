@@ -25,8 +25,11 @@ test("MOM email panel pre-fills recipient, subject, body, and attachment preview
   assert.match(section, /buildMomEmailDefaults\(target\)/);
   assert.match(section, /Recipient group/);
   assert.match(section, /MOM_RECIPIENT_GROUP_OPTIONS\.map/);
-  assert.match(section, /Specific members/);
-  assert.match(section, /Search members/);
+  assert.match(section, /Estimated recipient preview/);
+  assert.match(section, /buildMomRecipientPreview\(recipientOptions, sendDraft\)/);
+  assert.match(section, /Add specific members manually/);
+  assert.match(section, /Search eligible members/);
+  assert.match(section, /Estimated recipients:/);
   assert.match(section, /addSpecificRecipient/);
   assert.match(section, /removeSpecificRecipient/);
   assert.match(section, /Send summary/);

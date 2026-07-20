@@ -3616,7 +3616,45 @@
   max-height: 12rem;
   overflow: auto;
 }
+.mom-email-panel__recipient-preview {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba(96, 195, 196, 0.22);
+  border-radius: var(--radius-sm);
+  background: rgba(96, 195, 196, 0.055);
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
 
+.mom-email-panel__recipient-preview > strong {
+  color: var(--color-text);
+}
+
+.mom-email-panel__preview-list {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 11rem;
+  overflow: auto;
+}
+
+.mom-email-panel__preview-list > span {
+  display: grid;
+  gap: 0.08rem;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.mom-email-panel__preview-list strong,
+.mom-email-panel__preview-list small {
+  overflow-wrap: anywhere;
+}
+
+.mom-email-panel__preview-list small {
+  color: var(--color-muted);
+}
 .mom-email-panel__member-list button {
   width: 100%;
   min-height: 0;

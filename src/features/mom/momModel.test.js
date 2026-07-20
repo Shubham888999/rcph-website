@@ -4,6 +4,7 @@ import {
   MOM_RECIPIENT_GROUP_OPTIONS,
   MOM_PDF_MAX_BYTES,
   buildMomEmailDefaults,
+  buildMomRecipientPreview,
   canSendMomEmail,
   canUploadMom,
   canViewMom,
@@ -12,6 +13,7 @@ import {
   momUploadError,
   normalizeMomEmailHistory,
   normalizeMomMetadata,
+  momRecipientMatchesGroups,
   normalizeMomRecipientOptions,
   validateMomEmailDraft,
   validateMomPdfFile,
@@ -97,6 +99,29 @@ test("MOM specific member recipient options normalize UID-backed users only", ()
   ]);
   assert.deepEqual(options.map((item) => item.uid), ["uid-a", "uid-b"]);
   assert.deepEqual(options[0].positionKeys, ["secretary"]);
+});
+
+test("MOM recipient preview matches groups, specific members, and active BOD positions", () => {
+  const options = normalizeMomRecipientOptions([
+    { uid: "uid-bod", name: "Alpha BOD", email: "bod@example.com", role: "bod" },
+    { uid: "uid-cmd", name: "Beta CMD", email: "cmd@example.com", role: "gbm", positionKeys: ["cmd"] },
+    { uid: "uid-gbm", name: "Gamma GBM", email: "gbm@example.com", role: "gbm" },
+    { uid: "uid-admin", name: "Delta Admin", email: "admin@example.com", role: "admin" },
+  ]);
+
+  assert.equal(momRecipientMatchesGroups(options[0], ["bod"]), true);
+  assert.equal(momRecipientMatchesGroups(options[1], ["bod"]), true);
+  assert.equal(momRecipientMatchesGroups(options[2], ["bod"]), false);
+
+  assert.deepEqual(
+    buildMomRecipientPreview(options, { recipientGroups: ["bod"], targetUserIds: [] }).map((recipient) => recipient.uid),
+    ["uid-bod", "uid-cmd"],
+  );
+
+  assert.deepEqual(
+    buildMomRecipientPreview(options, { recipientGroups: ["bod"], targetUserIds: ["uid-admin"] }).map((recipient) => recipient.uid),
+    ["uid-bod", "uid-cmd", "uid-admin"],
+  );
 });
 
 test("MOM email history summary normalizes safe display fields", () => {

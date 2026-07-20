@@ -3,10 +3,12 @@ import {
   MOM_RECIPIENT_GROUP_OPTIONS,
   MOM_PDF_ACCEPT,
   buildMomEmailDefaults,
+  buildMomRecipientPreview,
   canSendMomEmail,
   canUploadMom,
   canViewMom,
   formatMomTimestamp,
+  momRecipientMatchesGroups,
   momUploadError,
   normalizeMomEmailHistory,
   normalizeMomMetadata,
@@ -23,7 +25,16 @@ const STAGE_LABELS = {
   viewing: "Opening MOM...",
   sending: "Sending MOM email...",
 };
+const MOM_PREVIEW_LIMIT = 12;
 
+function recipientDetailLabel(recipient = {}) {
+  const role = recipient.role ? recipient.role.toUpperCase() : "MEMBER";
+  const positions = Array.isArray(recipient.positionKeys) && recipient.positionKeys.length
+    ? recipient.positionKeys.join(", ")
+    : "";
+
+  return positions ? `${role} · ${positions}` : role;
+}
 export default function MomSection({
   target,
   access,
@@ -183,6 +194,9 @@ export default function MomSection({
   const selectedGroups = Array.isArray(sendDraft.recipientGroups) ? sendDraft.recipientGroups : [];
   const selectedUserIds = Array.isArray(sendDraft.targetUserIds) ? sendDraft.targetUserIds : [];
   const selectedRecipients = selectedUserIds.map((userId) => recipientOptions.find((recipient) => recipient.uid === userId)).filter(Boolean);
+  const previewRecipients = buildMomRecipientPreview(recipientOptions, sendDraft);
+  const visiblePreviewRecipients = previewRecipients.slice(0, MOM_PREVIEW_LIMIT);
+  const hiddenPreviewCount = Math.max(0, previewRecipients.length - visiblePreviewRecipients.length);
   const normalizedQuery = recipientQuery.trim().toLowerCase();
   const visibleRecipientOptions = recipientOptions
     .filter((recipient) => !selectedUserIds.includes(recipient.uid))
@@ -304,10 +318,50 @@ export default function MomSection({
               ))}
             </div>
           </fieldset>
+          <div className="mom-email-panel__recipient-preview" aria-live="polite">
+            <strong>Estimated recipient preview</strong>
+
+            {recipientStatus === "loading" ? (
+              <span>Loading eligible recipients...</span>
+            ) : null}
+
+            {recipientStatus === "error" ? (
+              <span>Recipient preview unavailable. The backend will still validate before sending.</span>
+            ) : null}
+
+            {recipientStatus === "ready" ? (
+              <>
+                <span>
+                  {previewRecipients.length} eligible recipient{previewRecipients.length === 1 ? "" : "s"} from selected groups and specific members.
+                </span>
+
+                {visiblePreviewRecipients.length ? (
+                  <div className="mom-email-panel__preview-list">
+                    {visiblePreviewRecipients.map((recipient) => (
+                      <span key={recipient.uid}>
+                        <strong>{recipient.name}</strong>
+                        <small>{recipient.email}</small>
+                        <small>{recipientDetailLabel(recipient)}</small>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mom-email-panel__hint">No eligible recipients match the selected groups yet.</p>
+                )}
+
+                {hiddenPreviewCount ? (
+                  <p className="mom-email-panel__hint">
+                    +{hiddenPreviewCount} more eligible recipient{hiddenPreviewCount === 1 ? "" : "s"} not shown.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+
           <fieldset className="mom-email-panel__specific">
-            <legend>Specific members</legend>
+            <legend>Add specific members manually</legend>
             <label>
-              Search members
+              Search eligible members
               <input
                 type="search"
                 value={recipientQuery}
@@ -333,8 +387,8 @@ export default function MomSection({
                   >
                     <strong>{recipient.name}</strong>
                     <span>{recipient.email}</span>
-                    <small>{recipient.role || recipient.positionKeys.join(", ") || "member"}</small>
-                  </button>
+                    <small>{recipientDetailLabel(recipient)}</small>
+                                      </button>
                 ))}
               </div>
             ) : null}
@@ -377,6 +431,9 @@ export default function MomSection({
             <strong>Send summary</strong>
             <span>Groups: {selectedGroupLabels.join(", ") || "None"}</span>
             <span>Specific members: {selectedUserIds.length}</span>
+            <span>
+              Estimated recipients: {recipientStatus === "ready" ? previewRecipients.length : "Loading"}
+            </span>
             <span>Attached MOM: {metadata.momFileName}</span>
           </div>
           <div className="mom-email-panel__actions">

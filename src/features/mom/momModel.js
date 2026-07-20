@@ -26,8 +26,50 @@ const MOM_SUBFOLDER_BY_TARGET_TYPE = Object.freeze({
   [MOM_TARGET_TYPES.BOD_EVENT]: "BOD Events",
 });
 
+const PRESIDENT_POSITION_KEYS = new Set(["president", "co-president"]);
 const SECRETARY_POSITION_KEYS = new Set(["secretary", "joint-secretary", "co-secretary"]);
+const SERGEANT_POSITION_KEYS = new Set(["saa", "co-saa", "sergeant", "sergeant-at-arms"]);
 
+const BOD_POSITION_KEYS = new Set([
+  "president",
+  "immediate-past-president",
+  "vice-president",
+  "secretary",
+  "joint-secretary",
+  "treasurer",
+  "club-advisor",
+  "csd",
+  "cmd",
+  "isd",
+  "pdd",
+  "rrro",
+  "pro",
+  "dei",
+  "editor",
+  "cwd",
+  "sports-representative",
+  "wrwc",
+  "wr",
+  "saa",
+  "co-president",
+  "co-vice-president",
+  "co-secretary",
+  "co-treasurer",
+  "co-club-advisor",
+  "co-csd",
+  "co-cmd",
+  "co-isd",
+  "co-pdd",
+  "co-rrro",
+  "co-pro",
+  "co-dei",
+  "co-editor",
+  "co-cwd",
+  "co-sports-representative",
+  "co-wrwc",
+  "co-wr",
+  "co-saa",
+]);
 function text(value, max = 300) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
@@ -55,8 +97,16 @@ function cleanPositionKeys(value) {
   return Array.isArray(value) ? value.map((key) => lower(key)).filter(Boolean) : [];
 }
 
+function hasAnyPositionKey(positionKeys, allowedKeys) {
+  return cleanPositionKeys(positionKeys).some((key) => allowedKeys.has(key));
+}
+
 export function hasSecretaryPosition(access) {
-  return cleanPositionKeys(access?.positionKeys).some((key) => SECRETARY_POSITION_KEYS.has(key));
+  return hasAnyPositionKey(access?.positionKeys, SECRETARY_POSITION_KEYS);
+}
+
+export function hasBodPosition(access) {
+  return hasAnyPositionKey(access?.positionKeys, BOD_POSITION_KEYS);
 }
 
 export function canUploadMom(access) {
@@ -154,6 +204,51 @@ export function normalizeMomRecipientOptions(items = []) {
       seen.add(item.uid);
       return true;
     })
+    .sort((a, b) => a.name.localeCompare(b.name) || a.uid.localeCompare(b.uid));
+}
+
+export function momRecipientMatchesGroups(recipient = {}, groups = []) {
+  const selectedGroups = Array.isArray(groups)
+    ? groups.map((group) => lower(group, 40)).filter(Boolean)
+    : [];
+
+  if (!selectedGroups.length) return false;
+  if (selectedGroups.includes("all")) return true;
+
+  const role = lower(recipient.role || recipient.storedRole, 40);
+  const positionKeys = recipient.positionKeys || [];
+  const hasPresident = recipient.hasPresidentAuthority === true
+    || hasAnyPositionKey(positionKeys, PRESIDENT_POSITION_KEYS);
+  const hasSecretary = hasAnyPositionKey(positionKeys, SECRETARY_POSITION_KEYS);
+  const hasSergeant = hasAnyPositionKey(positionKeys, SERGEANT_POSITION_KEYS);
+  const hasBod = hasAnyPositionKey(positionKeys, BOD_POSITION_KEYS);
+
+  return selectedGroups.some((group) => {
+    if (["prospect", "gbm", "admin"].includes(group)) return role === group;
+    if (group === "bod") return role === "bod" || hasBod;
+    if (group === "president") return role === "president" || hasPresident;
+    if (group === "secretary") return hasSecretary;
+    if (group === "saa") return hasSergeant;
+    return false;
+  });
+}
+
+export function buildMomRecipientPreview(options = [], draft = {}) {
+  const recipientGroups = Array.isArray(draft.recipientGroups) ? draft.recipientGroups : [];
+  const targetUserIds = Array.isArray(draft.targetUserIds)
+    ? draft.targetUserIds.map((uid) => text(uid, 160)).filter(Boolean)
+    : [];
+
+  const selectedUidSet = new Set(targetUserIds);
+  const byUid = new Map();
+
+  normalizeMomRecipientOptions(options).forEach((recipient) => {
+    if (momRecipientMatchesGroups(recipient, recipientGroups) || selectedUidSet.has(recipient.uid)) {
+      byUid.set(recipient.uid, recipient);
+    }
+  });
+
+  return Array.from(byUid.values())
     .sort((a, b) => a.name.localeCompare(b.name) || a.uid.localeCompare(b.uid));
 }
 
