@@ -14,14 +14,22 @@ function clubAttendanceModule() {
 }
 
 test("Club and District attendance use combined members plus approved users", () => {
-  assert.match(source, /buildAttendanceParticipants/);
+  assert.match(source, /buildAttendanceParticipantGroups/);
   assert.match(source, /members: data\.members,[\s\S]*users: data\.users,[\s\S]*attendance: data\.attendance/);
   assert.match(source, /members: data\.members,[\s\S]*users: data\.users,[\s\S]*attendance: data\.districtAttendance/);
+assert.match(source, /removedParticipants: removedAttendanceParticipants/);
+assert.match(source, /removedMembers=\{removedAttendanceParticipants\}/);
+assert.match(source, /<RemovedAttendanceSection/);
 });
 
 test("BOD attendance remains limited to the director roster", () => {
+    const bodSource = source.slice(source.indexOf("export function BodOperationsModule"));
   const bodModule = source.slice(source.indexOf("export function BodOperationsModule"), source.indexOf("export function DistrictModule"));
-  assert.match(bodModule, /AttendanceGrid members=\{data\.bodMembers\}/);
+  assert.match(bodSource, /includeUsers: false/);
+assert.match(bodSource, /activeParticipants: activeBodMembers/);
+assert.match(bodSource, /removedParticipants: removedBodMembers/);
+assert.match(bodSource, /AttendanceGrid members=\{activeBodMembers\} removedMembers=\{removedBodMembers\}/);
+assert.match(bodSource, /MailDraftTool members=\{activeBodMembers\}/);
   assert.doesNotMatch(bodModule, /buildAttendanceParticipants/);
 });
 

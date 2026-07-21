@@ -25,6 +25,7 @@ import {
   safeUrl,
   validDate,
   validateAnnouncementAttachmentFile,
+    buildAttendanceParticipantGroups,
 } from "./adminModel.js";
 test("Admin capability is trusted and president controls stay separate",()=>{const a={isApproved:true,canAccessAdminTools:true,canAccessPresidentControls:false};assert.equal(canUseAdmin(a),true);assert.equal(canUsePresidentControls(a),false);assert.equal(canUseAdmin({storedRole:"admin"}),false)});
 test("delegated authority does not alter stored role",()=>{const a={isApproved:true,storedRole:"bod",canAccessAdminTools:true,canAccessPresidentControls:true};assert.equal(canUseAdmin(a),true);assert.equal(a.storedRole,"bod")});
@@ -232,6 +233,55 @@ test("announcement attachment validation accepts supported image and PDF types",
 test("announcement attachment validation rejects unsupported and oversized files before upload",()=>{assert.match(validateAnnouncementAttachmentFile({name:"notes.txt",type:"text/plain",size:20}),/PDF, JPEG, PNG, or WebP/);assert.match(validateAnnouncementAttachmentFile({name:"empty.pdf",type:"application/pdf",size:0}),/empty/);assert.match(validateAnnouncementAttachmentFile({name:"large.pdf",type:"application/pdf",size:ANNOUNCEMENT_ATTACHMENT_MAX_BYTES+1}),/10 MB or smaller/);assert.equal(formatAttachmentSize(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES),"10 MB")});
 test("external links allow HTTP(S) only",()=>{assert.equal(safeUrl("javascript:alert(1)"),"");assert.equal(safeUrl("https://example.com"),"https://example.com/")});
 test("combined attendance participants add approved prospects and preserve manual rows",()=>{const participants=buildAttendanceParticipants({members:[{id:"member-1",name:"Member One",email:"one@example.com",active:true},{id:"member-2",userId:"uid-gbm",name:"Member Two",email:"two@example.com",role:"gbm",active:true}],users:[{id:"uid-prospect",name:"Prospect One",email:"prospect@example.com",role:"prospect",status:"approved",active:true},{id:"uid-gbm",name:"Duplicate GBM",email:"two@example.com",role:"gbm",status:"approved",active:true},{id:"uid-pending",name:"Pending Prospect",email:"pending@example.com",role:"prospect",status:"pending",active:true}],attendance:{"legacy-row":{"event-1":true}}});assert.deepEqual(new Set(participants.map((item)=>item.id)),new Set(["member-1","uid-gbm","uid-prospect","legacy-row"]));assert.equal(participants.find((item)=>item.id==="member-1").role,"gbm");assert.equal(participants.find((item)=>item.id==="uid-gbm").name,"Member Two");assert.equal(participants.find((item)=>item.id==="uid-prospect").role,"prospect");assert.equal(participants.find((item)=>item.id==="legacy-row").manualAttendanceOnly,true)});
+test("attendance participants move removed profiles into a preserved archive section", () => {
+  const groups = buildAttendanceParticipantGroups({
+    members: [
+      { id: "member-active", name: "Active Member", email: "active@example.com", active: true },
+      {
+        id: "member-removed",
+        userId: "uid-removed",
+        name: "Removed Member",
+        email: "removed@example.com",
+        role: "gbm",
+        active: false,
+        removedAt: "2026-07-20T00:00:00.000Z",
+        removalReason: "Moved out",
+      },
+    ],
+    users: [
+      {
+        id: "uid-removed",
+        name: "Removed Member",
+        email: "removed@example.com",
+        role: "gbm",
+        status: "removed",
+        active: false,
+      },
+    ],
+    attendance: {
+      "uid-removed": { "event-1": true },
+      "member-removed": { "event-1": false },
+      "legacy-row": { "event-1": true },
+    },
+  });
+
+  assert.deepEqual(
+    groups.activeParticipants.map((participant) => participant.id).sort(),
+    ["legacy-row", "member-active"],
+  );
+
+  assert.deepEqual(
+    groups.removedParticipants.map((participant) => participant.id),
+    ["uid-removed"],
+  );
+
+  assert.equal(groups.removedParticipants[0].removed, true);
+  assert.equal(groups.removedParticipants[0].removalReason, "Moved out");
+  assert.deepEqual(
+    groups.removedParticipants[0].attendanceIds.sort(),
+    ["member-removed", "uid-removed"],
+  );
+});
 test(
   "treasury normalization preserves Fine linkage metadata",
   () => {
@@ -339,3 +389,18 @@ test(
     assert.equal(empty.percentage, null);
   },
 );
+test("event attendance summary checks participant attendance aliases", () => {
+  const summary = buildEventAttendanceSummary({
+    participants: [
+      { id: "uid-1", attendanceIds: ["member-doc-1", "uid-1"] },
+    ],
+    attendance: {
+      "member-doc-1": { event1: true },
+    },
+    eventId: "event1",
+  });
+
+  assert.equal(summary.presentCount, 1);
+  assert.equal(summary.eligibleCount, 1);
+  assert.equal(summary.percentage, 100);
+});

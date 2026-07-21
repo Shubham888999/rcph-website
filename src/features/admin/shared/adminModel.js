@@ -36,6 +36,24 @@ export function money(value) { const n = Number(value); return Number.isFinite(n
 export function formatInr(value) { const amount = money(value); return amount === null ? "Unavailable" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amount); }
 export function cleanAvenues(value) { const values = Array.isArray(value) ? value : value ? [value] : []; return [...new Set(values.map((x) => text(x, 40).toUpperCase()).filter(Boolean))]; }
 export function normalizeAttendance(value) { return value === true || value === false || value === "NA" ? value : "NA"; }
+export function isRemovedProfileRecord(record = {}) {
+  const status = text(record?.status || record?.roleStatus, 60).toLowerCase();
+  const removalStatus = text(record?.removalStatus || record?.profileStatus, 60).toLowerCase();
+  const removedAt = record?.removedAt || record?.profileRemovedAt || record?.removal?.removedAt;
+
+  return Boolean(
+    record?.active === false
+      || status === "removed"
+      || removalStatus === "removed"
+      || record?.accessRevoked === true
+      || removedAt,
+  );
+}
+
+function removalDateText(record = {}) {
+  const value = record?.removedAt || record?.profileRemovedAt || record?.removal?.removedAt;
+  return timestampIso(value) || text(value, 40);
+}
 export function attendancePatch(eventId, value) { const id = text(eventId, 128); if (!id || id.includes("/")) throw new TypeError("Valid event ID required."); return { [id]: normalizeAttendance(value) }; }
 export function normalizeAdminRole(value) {
   const raw = text(value, 60).toLowerCase();
@@ -67,32 +85,41 @@ export function buildEventAttendanceSummary({
   let unmarkedCount = 0;
 
   roster.forEach((participant) => {
-    const participantId = text(
+    const participantIds = [
       participant?.id,
-      128,
-    );
+      ...(Array.isArray(participant?.attendanceIds)
+        ? participant.attendanceIds
+        : []),
+    ]
+      .map((value) => text(value, 128))
+      .filter(Boolean);
 
-    const row =
-      participantId &&
-      safeAttendance[participantId] &&
-      typeof safeAttendance[participantId] === "object"
-        ? safeAttendance[participantId]
-        : null;
+    let hasAttendanceValue = false;
+    let value;
 
-    const hasAttendanceValue =
-      row &&
-      safeEventId &&
-      Object.prototype.hasOwnProperty.call(
-        row,
-        safeEventId,
-      );
+    for (const participantId of [...new Set(participantIds)]) {
+      const row =
+        participantId &&
+        safeAttendance[participantId] &&
+        typeof safeAttendance[participantId] === "object"
+          ? safeAttendance[participantId]
+          : null;
+
+      if (
+        row &&
+        safeEventId &&
+        Object.prototype.hasOwnProperty.call(row, safeEventId)
+      ) {
+        value = row[safeEventId];
+        hasAttendanceValue = true;
+        break;
+      }
+    }
 
     if (!hasAttendanceValue) {
       unmarkedCount += 1;
       return;
     }
-
-    const value = row[safeEventId];
 
     if (value === true) {
       presentCount += 1;
@@ -163,7 +190,29 @@ export function normalizeAdminUser(id, raw) {
     active: raw.active !== false,
   };
 }
-export function normalizeMember(id, raw) { if (!id || !raw || typeof raw !== "object") return null; return { id, userId: text(raw.userId || raw.uid, 128), name: stripRotaractorPrefix(text(raw.name, 160)) || "Unnamed member", email: text(raw.email, 320).toLowerCase(), rid: text(raw.rid, 40), role: text(raw.role, 30), position: text(raw.position || raw.clubPosition, 180), active: raw.active !== false }; }
+export function normalizeMember(id, raw) {
+  if (!id || !raw || typeof raw !== "object") return null;
+
+  return {
+    id,
+    userId: text(raw.userId || raw.uid, 128),
+    name: stripRotaractorPrefix(text(raw.name, 160)) || "Unnamed member",
+    email: text(raw.email, 320).toLowerCase(),
+    rid: text(raw.rid, 40),
+    role: text(raw.role, 30),
+    position: text(raw.position || raw.clubPosition, 180),
+    active: raw.active !== false,
+
+    status: text(raw.status, 60).toLowerCase(),
+    roleStatus: text(raw.roleStatus, 60).toLowerCase(),
+    removalStatus: text(raw.removalStatus || raw.profileStatus, 60).toLowerCase(),
+    accessRevoked: raw.accessRevoked === true,
+    removedAt: raw.removedAt || raw.profileRemovedAt || raw.removal?.removedAt || "",
+    profileRemovedAt: raw.profileRemovedAt || "",
+    removedByName: text(raw.removedByName || raw.removal?.removedByName, 160),
+    removalReason: text(raw.removalReason || raw.removeReason || raw.removal?.reason, 500),
+  };
+}
 export function normalizeEvent(id, raw, kind = "club") {
   if (!id || !raw || typeof raw !== "object") return null;
   const date = text(raw.date || raw.eventStart, 20); if (!text(raw.name, 180) || !validDate(date)) return null;
@@ -243,61 +292,139 @@ export function attendanceParticipantRole(value, fallback = "") {
   if (["bod", "admin", "president"].includes(role)) return role;
   return fallback;
 }
-export function buildAttendanceParticipants({ members = [], users = [], attendance = {}, includeUsers = true } = {}) {
-  const participants = [];
+
+export function buildAttendanceParticipantGroups({
+  members = [],
+  users = [],
+  attendance = {},
+  includeUsers = true,
+  memberRoleFallback = "gbm",
+} = {}) {
+  const activeParticipants = [];
+  const removedParticipants = [];
   const uidIndex = new Map();
   const emailIndex = new Map();
+  const idIndex = new Map();
 
-  function remember(participant) {
-    const uid = text(participant.userId || participant.id, 128);
+  function remember(participant, aliasIds = []) {
+    const ids = [
+      participant.id,
+      participant.userId,
+      ...(Array.isArray(aliasIds) ? aliasIds : []),
+    ]
+      .map((value) => text(value, 128))
+      .filter(Boolean);
+
     const email = text(participant.email, 320).toLowerCase();
-    if (uid) uidIndex.set(uid, participant);
+
+    ids.forEach((id) => {
+      idIndex.set(id, participant);
+      uidIndex.set(id, participant);
+    });
+
     if (email) emailIndex.set(email, participant);
   }
 
-  function add(participant) {
+  function add(participant, { aliasIds = [] } = {}) {
     const id = text(participant.id, 128);
     if (!id || id.includes("/")) return;
+
     const userId = text(participant.userId || id, 128);
     const email = text(participant.email, 320).toLowerCase();
-    if ((userId && uidIndex.has(userId)) || (email && emailIndex.has(email))) return;
+    const allIds = [
+      id,
+      userId,
+      ...(Array.isArray(aliasIds) ? aliasIds : []),
+    ]
+      .map((value) => text(value, 128))
+      .filter(Boolean);
+
+    if (allIds.some((candidate) => idIndex.has(candidate) || uidIndex.has(candidate))) return;
+    if (email && emailIndex.has(email)) return;
+
     const role = attendanceParticipantRole(participant, participant.roleFallback || "");
+    const removed = isRemovedProfileRecord(participant);
+
     const normalized = {
       id,
       userId,
+      attendanceIds: [...new Set(allIds)],
       name: stripRotaractorPrefix(text(participant.name, 160)) || participant.nameFallback || "Manual attendance row",
       email,
       role,
       memberType: text(participant.memberType, 30).toLowerCase(),
       position: text(participant.position || participant.clubPosition, 180),
-      active: participant.active !== false,
+      active: participant.active !== false && !removed,
+      removed,
+      removedAt: removalDateText(participant),
+      removedByName: text(participant.removedByName || participant.removal?.removedByName, 160),
+      removalReason: text(participant.removalReason || participant.removeReason || participant.removal?.reason, 500),
       manualAttendanceOnly: participant.manualAttendanceOnly === true,
     };
-    participants.push(normalized);
-    remember(normalized);
+
+    (removed ? removedParticipants : activeParticipants).push(normalized);
+    remember(normalized, allIds);
   }
 
   (Array.isArray(members) ? members : [])
-    .filter(member => member?.active !== false)
-    .forEach(member => {
-      const userId = text(member.userId || member.id, 128);
-      add({ ...member, id: userId || member.id, userId, roleFallback: "gbm" });
+    .forEach((member) => {
+      const recordId = text(member?.id, 128);
+      const userId = text(member?.userId || member?.id, 128);
+
+      add(
+        {
+          ...member,
+          id: userId || recordId,
+          userId,
+          roleFallback: member?.roleFallback || memberRoleFallback,
+        },
+        { aliasIds: [recordId, userId] },
+      );
     });
 
   if (includeUsers) {
     (Array.isArray(users) ? users : [])
-      .filter(user => {
-        if (!user || user.active === false || user.status !== "approved") return false;
-        return ["prospect", "gbm"].includes(attendanceParticipantRole(user));
-      })
-      .forEach(user => add({ ...user, id: user.id, userId: user.id }));
+      .forEach((user) => {
+        const role = attendanceParticipantRole(user);
+        const removed = isRemovedProfileRecord(user);
+
+        if (removed) {
+          if (["prospect", "gbm", "bod", "admin", "president"].includes(role)) {
+            add({ ...user, id: user.id, userId: user.id });
+          }
+          return;
+        }
+
+        if (!user || user.active === false || user.status !== "approved") return;
+        if (["prospect", "gbm"].includes(role)) add({ ...user, id: user.id, userId: user.id });
+      });
   }
 
   Object.keys(attendance && typeof attendance === "object" ? attendance : {})
-    .forEach((id) => add({ id, userId: id, nameFallback: `Manual row ${id.slice(0, 8)}`, manualAttendanceOnly: true }));
+    .forEach((id) => {
+      const safeId = text(id, 128);
+      if (!safeId || safeId.includes("/") || idIndex.has(safeId) || uidIndex.has(safeId)) return;
 
-  return participants.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+      add({
+        id: safeId,
+        userId: safeId,
+        nameFallback: `Manual row ${safeId.slice(0, 8)}`,
+        manualAttendanceOnly: true,
+      }, { aliasIds: [safeId] });
+    });
+
+  const sortByName = (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+
+  return {
+    activeParticipants: [...activeParticipants].sort(sortByName),
+    removedParticipants: [...removedParticipants].sort(sortByName),
+  };
 }
+
+export function buildAttendanceParticipants(options = {}) {
+  return buildAttendanceParticipantGroups(options).activeParticipants;
+}
+
 export function buildAccessPayload({ targetUid, role, positionKeys = [], confirmJointPositionKeys = [], mode = "maintenance" }) {
   const normalizedRole = normalizeAdminRole(role);
   return {

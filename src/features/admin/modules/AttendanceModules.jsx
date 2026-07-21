@@ -8,7 +8,7 @@ import AdminDialog from "../shared/AdminDialog";
 import { AdminEmpty } from "../shared/AdminStates";
 import {
   AVENUES,
-  buildAttendanceParticipants,
+  buildAttendanceParticipantGroups,
   buildEventAttendanceSummary,
   buildEventPayload,
   normalizeAttendance,
@@ -21,11 +21,11 @@ import MomSection from "../../mom/MomSection";
 import { MOM_TARGET_TYPES } from "../../mom/momModel";
 
 function nextAttendance(value) { return value === true ? false : value === false ? "NA" : true; }
-function getAttendanceStats(memberId, events, attendance) {
+function getAttendanceStats(memberOrId, events, attendance) {
   const calculate = (filteredEvents) => {
     const values = filteredEvents
       .map((event) =>
-        normalizeAttendance(attendance[memberId]?.[event.id])
+        attendanceValueForMember(attendance, memberOrId, event.id)
       )
       .filter((value) => value === true || value === false);
 
@@ -54,8 +54,154 @@ function getAttendanceStats(memberId, events, attendance) {
     ),
   };
 }
+
+function attendanceIdsForMember(memberOrId) {
+  if (typeof memberOrId === "string") return [memberOrId];
+
+  return [
+    memberOrId?.id,
+    ...(Array.isArray(memberOrId?.attendanceIds) ? memberOrId.attendanceIds : []),
+  ].filter(Boolean);
+}
+
+function attendanceValueForMember(attendance, memberOrId, eventId) {
+  const rowIds = [...new Set(attendanceIdsForMember(memberOrId))];
+
+  for (const rowId of rowIds) {
+    const row = attendance?.[rowId];
+    if (row && Object.prototype.hasOwnProperty.call(row, eventId)) {
+      return normalizeAttendance(row[eventId]);
+    }
+  }
+
+  return "NA";
+}
+
+function attendanceValueLabel(value) {
+  return value === true ? "Present" : value === false ? "Absent" : "Not applicable";
+}
+
+function RemovedAttendanceSection({
+  members = [],
+  events = [],
+  attendance = {},
+}) {
+  if (!members.length || !events.length) return null;
+
+  return (
+    <details className="removed-attendance-section">
+      <summary>
+        <span className="removed-attendance-section__heading">
+          <span className="admin-kicker">Preserved history</span>
+          <strong>Removed members</strong>
+          <small>
+            Hidden from active attendance. Historical attendance is preserved here.
+          </small>
+        </span>
+
+        <span className="removed-attendance-section__count">
+          {members.length}
+        </span>
+      </summary>
+
+      <div className="admin-table-wrap admin-attendance-grid attendance-manager-grid removed-attendance-grid">
+        <table>
+          <thead>
+            <tr>
+              <th className="attendance-member-heading">
+                <span>Removed member</span>
+                <small>Historical participation</small>
+              </th>
+
+              {events.map((event) => (
+                <th key={event.id} className="attendance-event-header">
+                  <div className="attendance-event-header__content">
+                    <span className="attendance-event-header__avenue">
+                      {event.avenue.join(" · ") || "Club event"}
+                    </span>
+                    <strong>{event.name}</strong>
+                    <small>{event.date}</small>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {members.map((member) => {
+              const stats = getAttendanceStats(member, events, attendance);
+              const memberDisplayName = formatRotaractorName(member.name, member.role ? member : true);
+              const removalDetails = [
+                member.removedAt ? `Removed ${member.removedAt.slice(0, 10)}` : "",
+                member.removedByName ? `by ${member.removedByName}` : "",
+                member.removalReason ? `Reason: ${member.removalReason}` : "",
+              ].filter(Boolean);
+
+              return (
+                <tr key={member.id} className="removed-attendance-row">
+                  <th className="attendance-member-cell">
+                    <div className="attendance-member-row">
+                      <div className="attendance-member-row__stats">
+                        <div className="attendance-member-stat">
+                          <span>All</span>
+                          <strong>{stats.all.attended}/{stats.all.counted}</strong>
+                          <em>{stats.all.percentage}%</em>
+                        </div>
+
+                        <div className="attendance-member-stat">
+                          <span>GBM</span>
+                          <strong>{stats.gbm.attended}/{stats.gbm.counted}</strong>
+                          <em>{stats.gbm.percentage}%</em>
+                        </div>
+                      </div>
+
+                      <div className="attendance-member-row__main">
+                        <div className="attendance-member-row__identity">
+                          <strong>{memberDisplayName}</strong>
+                          <span className="attendance-member-role">Removed</span>
+                        </div>
+
+                        <small className="removed-attendance-row__meta">
+                          {removalDetails.join(" · ") || "Removed profile"}
+                        </small>
+                      </div>
+                    </div>
+                  </th>
+
+                  {events.map((event) => {
+                    const value = attendanceValueForMember(attendance, member, event.id);
+                    const label = attendanceValueLabel(value);
+
+                    return (
+                      <td key={event.id} className="attendance-status-cell">
+                        <span
+                          className={`attendance-cell attendance-cell--${
+                            value === true ? "present" : value === false ? "absent" : "na"
+                          } is-read-only`}
+                          aria-label={`${memberDisplayName}, ${event.name}: ${label}`}
+                          title={label}
+                        >
+                          <AttendanceMark value={value} size="small" />
+                        </span>
+
+                        <span className="attendance-status-cell__label">
+                          {label}
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
 function AttendanceGrid({
   members,
+  removedMembers = [],
   events,
   attendance,
   collectionName,
@@ -83,7 +229,13 @@ function AttendanceGrid({
   [attendance, events, members],
 );
 
-  if (!members.length || !events.length) {
+  if (!events.length) {
+    return (
+      <AdminEmpty message="Add events before recording attendance." />
+    );
+  }
+
+  if (!members.length && !removedMembers.length) {
     return (
       <AdminEmpty message="Add roster members and events before recording attendance." />
     );
@@ -164,6 +316,8 @@ function AttendanceGrid({
   }
 
   return (
+    <>
+      {members.length ? (
     <section className="attendance-workspace">
       <header className="attendance-workspace__header">
         <div>
@@ -298,11 +452,11 @@ function AttendanceGrid({
 
           <tbody>
             {members.map((member) => {
-              const stats = getAttendanceStats(
-                member.id,
-                events,
-                attendance
-              );
+const stats = getAttendanceStats(
+  member,
+  events,
+  attendance
+);
 
               const role = member.role?.toLowerCase();
               const roleLabel = role === "prospect" ? "Prospect" : role === "gbm" ? "GBM" : "";
@@ -366,9 +520,11 @@ function AttendanceGrid({
 </th>
 
                   {events.map((event) => {
-                    const value = normalizeAttendance(
-                      attendance[member.id]?.[event.id]
-                    );
+const value = attendanceValueForMember(
+  attendance,
+  member,
+  event.id
+);
 
                     const label =
                       value === true
@@ -430,6 +586,16 @@ function AttendanceGrid({
         </table>
       </div>
     </section>
+      ) : (
+        <AdminEmpty message="No active members are available for attendance marking." />
+      )}
+
+      <RemovedAttendanceSection
+        members={removedMembers}
+        events={events}
+        attendance={attendance}
+      />
+    </>
   );
 }
 
@@ -465,7 +631,10 @@ export function ClubAttendanceModule({ data, lock, uid, access, onNotice }) {
   const locked = lock.status !== "success" || lock.locked;
   const events = data.events.filter((event) => !event.archived);
   const activeEventsListId = "active-club-events-list";
-  const attendanceParticipants = buildAttendanceParticipants({
+  const {
+    activeParticipants: attendanceParticipants,
+    removedParticipants: removedAttendanceParticipants,
+  } = buildAttendanceParticipantGroups({
     members: data.members,
     users: data.users,
     attendance: data.attendance,
@@ -641,8 +810,7 @@ const pendingRecords =
 </section>
     
     <AttendanceExportPanel panelKey="club" members={attendanceParticipants} events={events} attendance={data.attendance} onNotice={onNotice} />
-    <AttendanceGrid members={attendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} />
-    <MailDraftTool members={attendanceParticipants} title="GBM" />
+<AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} />    <MailDraftTool members={attendanceParticipants} title="GBM" />
     {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><ClubEventForm initial={editing} busy={busy} submitLabel="Save event" onSave={(payload) => run("update-event", () => adminCalls.updateClubEvent({ ...payload, eventId: editing.id }), "Club event updated.").then((result) => { if (result) setEditing(null); })} /></AdminDialog> : null}
     {archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This soft-archives club event records and preserves attendance history.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-event", () => adminCalls.archiveClubEvent(archive.id), "Club event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;
@@ -659,6 +827,15 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
   const { busy, run } = useAdminMutation({ uid, module: "bod-operations", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const meetings = data.bodMeetings.filter((item) => !item.archived);
+    const {
+    activeParticipants: activeBodMembers,
+    removedParticipants: removedBodMembers,
+  } = buildAttendanceParticipantGroups({
+    members: data.bodMembers,
+    attendance: data.bodAttendance,
+    includeUsers: false,
+    memberRoleFallback: "bod",
+  });
   function saveMember(event) { event.preventDefault(); run("edit-bod-member", () => updateRosterMember("bodMembers", editMember.id, { name: stripRotaractorPrefix(editMember.name), position: editMember.position.trim() }), "BOD member updated.").then((result) => { if (result !== null) setEditMember(null); }); }
   function saveMeeting(event) { event.preventDefault(); run("edit-bod-meeting", () => adminCalls.updateBodMeeting({ meetingId: editMeeting.id, name: editMeeting.name.trim(), date: editMeeting.date }), "BOD meeting updated.").then((result) => { if (result) setEditMeeting(null); }); }
   return <>
@@ -870,12 +1047,12 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
   </div>
 
   <strong className="bod-section-header__count">
-    {data.bodMembers.length}
+    {activeBodMembers.length}
   </strong>
 </header>
 
   <div className="bod-directory__rows">
-    {data.bodMembers.map((item) => {
+    {activeBodMembers.map((item) => {
       const initials = item.name
         .split(/\s+/)
         .filter(Boolean)
@@ -1004,7 +1181,7 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
 >
   <article>
     <span>Directors</span>
-    <strong>{data.bodMembers.length}</strong>
+    <strong>{activeBodMembers.length}</strong>
   </article>
 
   <article>
@@ -1017,9 +1194,9 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
     <strong>{locked ? "Locked" : "Open"}</strong>
   </article>
 </section>
-    <AttendanceExportPanel panelKey="bod" members={data.bodMembers} events={meetings} attendance={data.bodAttendance} onNotice={onNotice} />
-    <AttendanceGrid members={data.bodMembers} events={meetings} attendance={data.bodAttendance} collectionName="bodAttendance" locked={locked} uid={uid} onNotice={onNotice} />
-    <MailDraftTool members={data.bodMembers} title="BOD" />
+<AttendanceExportPanel panelKey="bod" members={activeBodMembers} events={meetings} attendance={data.bodAttendance} onNotice={onNotice} />
+<AttendanceGrid members={activeBodMembers} removedMembers={removedBodMembers} events={meetings} attendance={data.bodAttendance} collectionName="bodAttendance" locked={locked} uid={uid} onNotice={onNotice} />
+<MailDraftTool members={activeBodMembers} title="BOD" />
     {editMember ? <AdminDialog title={`Edit ${formatRotaractorName(editMember.name, true)}`} busy={busy} onClose={() => setEditMember(null)}><form className="admin-form" onSubmit={saveMember}><label>Name<input value={editMember.name} onChange={(event) => setEditMember({ ...editMember, name: event.target.value })} required /></label><label>Position<input value={editMember.position} onChange={(event) => setEditMember({ ...editMember, position: event.target.value })} /></label><button disabled={busy}>Save BOD member</button></form></AdminDialog> : null}
     {editMeeting ? <AdminDialog title={`Edit ${editMeeting.name}`} busy={busy} onClose={() => setEditMeeting(null)}><form className="admin-form" onSubmit={saveMeeting}><label>Name<input value={editMeeting.name} onChange={(event) => setEditMeeting({ ...editMeeting, name: event.target.value })} required /></label><label>Date<input type="date" value={editMeeting.date} onChange={(event) => setEditMeeting({ ...editMeeting, date: event.target.value })} required /></label><button disabled={busy}>Save meeting</button></form></AdminDialog> : null}
     {archiveMeeting ? <AdminDialog title={`Archive ${archiveMeeting.name}?`} busy={busy} onClose={() => setArchiveMeeting(null)}><p>This soft-archives the club meeting while preserving historical attendance.</p><div className="admin-actions"><button onClick={() => setArchiveMeeting(null)}>Cancel</button><button className="danger" onClick={() => run("archive-bod-meeting", () => adminCalls.archiveBodMeeting(archiveMeeting.id), "BOD meeting archived.").then((result) => { if (result) setArchiveMeeting(null); })}>Archive</button></div></AdminDialog> : null}
@@ -1035,7 +1212,10 @@ export function DistrictModule({ data, lock, uid, access, onNotice }) {
   const { busy, run } = useAdminMutation({ uid, module: "district", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const events = data.districtEvents.filter((item) => !item.archived);
-  const attendanceParticipants = buildAttendanceParticipants({
+  const {
+    activeParticipants: attendanceParticipants,
+    removedParticipants: removedAttendanceParticipants,
+  } = buildAttendanceParticipantGroups({
     members: data.members,
     users: data.users,
     attendance: data.districtAttendance,
@@ -1050,7 +1230,7 @@ export function DistrictModule({ data, lock, uid, access, onNotice }) {
     <section className="admin-panel">{form(draft, setDraft, submit, "Add district event")}</section>
     <div className="admin-card-grid">{events.map((event) => <article className="admin-record-card" key={event.id}><h3>{event.name}</h3><p>{event.date} · {event.visibility}</p><MomSection className="mom-section--card" target={momTarget(event, MOM_TARGET_TYPES.DISTRICT_EVENT)} access={access} uid={uid} onNotice={onNotice} /><div className="admin-actions"><button disabled={locked} onClick={() => setEditing({ ...event, public: event.visibility === "public" })}>Edit</button><button className="danger" disabled={locked} onClick={() => setArchive(event)}>Archive</button></div></article>)}</div>
     <AttendanceExportPanel panelKey="district" members={attendanceParticipants} events={events} attendance={data.districtAttendance} onNotice={onNotice} />
-    <AttendanceGrid members={attendanceParticipants} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} />
+<AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} />
     {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}>{form(editing, setEditing, save, "Save district event")}</AdminDialog> : null}
     {archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This archives district, mirrored BOD, and conditional public records while preserving attendance.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-district", () => adminCalls.archiveDistrictEvent(archive.id), "District event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;
