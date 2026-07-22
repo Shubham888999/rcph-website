@@ -93,3 +93,14 @@ export async function fetchBodAvenueReportDirectors(avenueCode) {
   const result = await httpsCallable(functions, "getBodAvenueReportDirectors")({ avenueCode });
   return result?.data && typeof result.data === "object" ? result.data : {};
 }
+
+export async function fetchBodSecretarialReportMetrics() {
+  requireCurrentUser();
+  const result = await httpsCallable(functions, "getBodSecretarialReportMetrics")({});
+  const data = result?.data && typeof result.data === "object" ? result.data : {};
+  return {
+    ok: data.ok === true,
+    clubStrength: Number.isFinite(Number(data.clubStrength)) ? Number(data.clubStrength) : "Not available",
+    generatedAt: typeof data.generatedAt === "string" ? data.generatedAt : "",
+  };
+}
