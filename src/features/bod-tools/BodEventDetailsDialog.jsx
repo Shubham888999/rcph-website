@@ -5,11 +5,18 @@ import { getBodEventAttachments, getEventDescriptionForAvenue } from "./bodEvent
 
 const TYPE_LABELS = { clubEvent: "Club Event", bodMeeting: "BOD Meeting", districtEvent: "District Event", unknown: "Unknown type" };
 const ROLE_LABELS = { host: "Host", cohost: "Co-host", collaborator: "Collaborator", participant: "Participant" };
+const FINANCE_TYPE_LABELS = { income: "Income", expense: "Expense" };
+
+function formatFinanceAmount(value) {
+  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
 
 export default function BodEventDetailsDialog({ event, access, uid, onNotice, onUploaded, onClose }) {
   const dialogRef = useAccessibleDialog({ open: Boolean(event), onClose });
   if (!event) return null;
   const attachments = getBodEventAttachments(event);
+  const showReportFinance = event.type === "clubEvent";
+  const reportFinanceEntries = showReportFinance && event.reportFinance?.hasFinance ? event.reportFinance.entries : [];
   const momTarget = getBodMomTarget(event);
   const driveUrl = event.driveFolder || (/^[a-zA-Z0-9_-]+$/.test(event.driveFolderId) ? `https://drive.google.com/drive/folders/${event.driveFolderId}` : "");
   const created = event.createdAt ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.createdAt)) : "Unavailable";
@@ -47,6 +54,23 @@ export default function BodEventDetailsDialog({ event, access, uid, onNotice, on
           </section>
         ) : null}
         {event.collaborationNotes ? <section><h3>Collaboration notes</h3><p>{event.collaborationNotes}</p></section> : null}
+        {showReportFinance ? (
+          <section className="bod-report-finance-detail">
+            <h3>Report finance</h3>
+            <p className="bod-report-finance-detail__hint">Avenue Report only. Treasury is not updated by these entries.</p>
+            {reportFinanceEntries.length ? (
+              <ul>
+                {reportFinanceEntries.map((entry, index) => (
+                  <li key={`${entry.type}-${entry.amount}-${index}`}>
+                    <strong>{FINANCE_TYPE_LABELS[entry.type]}</strong>
+                    <span>{formatFinanceAmount(entry.amount)}</span>
+                    <p>{entry.description}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="bod-report-finance-detail__empty">No report finance recorded.</p>}
+          </section>
+        ) : null}
         {momTarget ? (
           <MomSection
             className="mom-section--bod-detail"

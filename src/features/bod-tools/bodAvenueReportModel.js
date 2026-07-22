@@ -1,5 +1,5 @@
 import { AVENUES } from "../calendar/avenues.js";
-import { getEventDescriptionForAvenue } from "./bodEventModel.js";
+import { getEventDescriptionForAvenue, normalizeBodReportFinance } from "./bodEventModel.js";
 
 export const BOD_AVENUE_REPORT_LIMIT = 100;
 export const REPORTABLE_BOD_AVENUES = AVENUES;
@@ -114,10 +114,31 @@ function isReportableEvent(event) {
   );
 }
 
+function reportItemDate(event) {
+  return cleanText(event?.startDate || event?.date || event?.eventStart, 20);
+}
+
+function reportItemName(event) {
+  return cleanText(event?.name || event?.title, 180);
+}
+
+function isReportableBodMeeting(event) {
+  const recordKind = cleanText(event?.recordKind || event?.type, 40);
+  const date = reportItemDate(event);
+  return Boolean(
+    event?.id
+    && recordKind === "bodMeeting"
+    && event.isActive !== false
+    && event.archived !== true
+    && /^\d{4}-\d{2}-\d{2}$/.test(date),
+  );
+}
+
 export function getBodAvenueReportMonthOptions(events, fallbackMonth = "") {
   const months = new Set();
   for (const event of Array.isArray(events) ? events : []) {
     if (isReportableEvent(event)) months.add(event.startDate.slice(0, 7));
+    else if (isReportableBodMeeting(event)) months.add(reportItemDate(event).slice(0, 7));
   }
   if (isValidReportMonth(fallbackMonth)) months.add(fallbackMonth);
   return normalizeBodReportMonths([...months]).map((value) => ({ value, label: formatBodReportMonth(value) }));
@@ -147,6 +168,22 @@ export function filterBodAvenueReportEvents(events, options = {}) {
   }
   return [...byId.values()].sort((left, right) => (
     left.startDate.localeCompare(right.startDate) || left.name.localeCompare(right.name)
+  ));
+}
+
+export function filterBodAvenueReportMeetings(events, options = {}) {
+  const selectedMonths = selectionFromOptions(options, "");
+  if (!selectedMonths.length) return [];
+  const monthSet = new Set(selectedMonths);
+  const byId = new Map();
+  for (const event of Array.isArray(events) ? events : []) {
+    if (!isReportableBodMeeting(event) || byId.has(event.id)) continue;
+    const date = reportItemDate(event);
+    if (!monthSet.has(date.slice(0, 7))) continue;
+    byId.set(event.id, event);
+  }
+  return [...byId.values()].sort((left, right) => (
+    reportItemDate(left).localeCompare(reportItemDate(right)) || reportItemName(left).localeCompare(reportItemName(right))
   ));
 }
 
@@ -181,10 +218,40 @@ function normalizeDirectorMap({ selectedAvenueCodes, directors, directorsByAvenu
   return map;
 }
 
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function sumEventMoney(events, key) {
+  return roundMoney((Array.isArray(events) ? events : []).reduce((total, event) => total + (Number(event?.[key]) || 0), 0));
+}
+
+function reportFinanceTotals(event) {
+  const finance = normalizeBodReportFinance(event?.reportFinance);
+  return {
+    financeEntries: finance.entries,
+    expenseTotal: sumEventMoney(finance.entries.filter((entry) => entry.type === "expense"), "amount"),
+    incomeTotal: sumEventMoney(finance.entries.filter((entry) => entry.type === "income"), "amount"),
+  };
+}
+
+function directorLines(directors) {
+  return (Array.isArray(directors) ? directors : []).map((item) => `${item.name} (${item.positionTitle})`);
+}
+
+function directorTextFromLines(lines) {
+  return lines.length ? lines.join(", ") : "Not available";
+}
+
 function directorText(directors) {
-  return directors.length
-    ? directors.map((item) => `${item.name} (${item.positionTitle})`).join(", ")
-    : "Not available";
+  return directorTextFromLines(directorLines(directors));
+}
+
+function selectedIdsFromOptions(value) {
+  if (Array.isArray(value)) return new Set(value);
+  if (value instanceof Set) return new Set(value);
+  if (value && typeof value[Symbol.iterator] === "function") return new Set(value);
+  return new Set();
 }
 
 export function createBodAvenueSelection(events) {
@@ -207,6 +274,7 @@ function safeCollaborators(event) {
 }
 
 function presentationEvent(event, avenueCode = "") {
+  const finance = reportFinanceTotals(event);
   return {
     date: event.startDate,
     month: event.startDate.slice(0, 7),
@@ -218,7 +286,47 @@ function presentationEvent(event, avenueCode = "") {
     collaborators: safeCollaborators(event),
     description: cleanText(getEventDescriptionForAvenue(event, avenueCode), 2500) || "Not available",
     avenues: normalizeBodReportAvenueCodes(event.avenues),
+    financeEntries: finance.financeEntries,
+    expenseTotal: finance.expenseTotal,
+    incomeTotal: finance.incomeTotal,
   };
+}
+
+function presentationBodMeeting(event) {
+  const date = reportItemDate(event);
+  const finance = reportFinanceTotals(event);
+  return {
+    date,
+    month: date.slice(0, 7),
+    monthLabel: formatBodReportMonth(date.slice(0, 7)),
+    dateLabel: formatBodReportDate(date),
+    name: reportItemName(event) || "Unnamed BOD meeting",
+    role: "BOD Meeting",
+    hostClub: "",
+    collaborators: "None",
+    description: cleanText(event?.description || event?.desc || event?.summary || event?.notes, 2500) || "Not available",
+    avenues: [],
+    recordKind: "bodMeeting",
+    sectionType: "bodMeeting",
+    financeEntries: finance.financeEntries,
+    expenseTotal: finance.expenseTotal,
+    incomeTotal: finance.incomeTotal,
+  };
+}
+
+function monthTotalsForEvents(events, selectedMonths) {
+  return selectedMonths
+    .map((month) => {
+      const monthEvents = events.filter((event) => event.month === month);
+      return {
+        month,
+        monthLabel: formatBodReportMonth(month),
+        eventCount: monthEvents.length,
+        monthExpenseTotal: sumEventMoney(monthEvents, "expenseTotal"),
+        monthIncomeTotal: sumEventMoney(monthEvents, "incomeTotal"),
+      };
+    })
+    .filter((month) => month.eventCount);
 }
 
 function isContiguousMonthRange(months) {
@@ -253,6 +361,17 @@ function formatAvenuesSummary(codes) {
   return joined.length <= 62 ? joined : `${labels.length} avenues selected`;
 }
 
+function formatReportScopeSummary(codes, includeBodMeetings) {
+  const avenueSummary = formatAvenuesSummary(codes);
+  if (includeBodMeetings && avenueSummary) return `${avenueSummary} + BOD Meetings`;
+  return includeBodMeetings ? "BOD Meetings" : avenueSummary;
+}
+
+function reportTitleForSelection(codes, includeBodMeetings) {
+  if (!includeBodMeetings) return "";
+  return codes.length ? "BOD Monthly Report" : "BOD Meetings Report";
+}
+
 function slug(value, max = 120) {
   return cleanText(value, max)
     .normalize("NFKD")
@@ -275,64 +394,146 @@ function periodFilenamePart(months) {
 export function buildBodAvenueReportModel(options = {}) {
   const selectedMonths = normalizeBodReportMonths(options.selectedMonths ?? options.month);
   const selectedAvenueCodes = normalizeBodReportAvenueCodes(options.selectedAvenueCodes ?? options.avenueCode);
+  const includeBodMeetings = options.includeBodMeetings === true;
   if (!selectedMonths.length) throw new TypeError("Select at least one valid report month.");
-  if (!selectedAvenueCodes.length) throw new TypeError("Select at least one valid report avenue.");
+  if (!selectedAvenueCodes.length && !includeBodMeetings) throw new TypeError("Select at least one valid report avenue or include BOD meetings.");
 
-  const matching = filterBodAvenueReportEvents(options.events, { selectedMonths, selectedAvenueCodes });
-  const selected = new Set(Array.isArray(options.selectedEventIds) ? options.selectedEventIds : [...(options.selectedEventIds || [])]);
+  const matching = selectedAvenueCodes.length ? filterBodAvenueReportEvents(options.events, { selectedMonths, selectedAvenueCodes }) : [];
+  const matchingMeetings = includeBodMeetings ? filterBodAvenueReportMeetings(options.events, { selectedMonths }) : [];
+  const selected = selectedIdsFromOptions(options.selectedEventIds);
   const chosen = matching.filter((event) => selected.has(event.id));
-  if (!chosen.length) throw new TypeError("Select at least one reportable event.");
-  if (chosen.length > BOD_AVENUE_REPORT_LIMIT) throw new RangeError(`Reports are limited to ${BOD_AVENUE_REPORT_LIMIT} unique events.`);
+  const chosenMeetings = matchingMeetings.filter((event) => selected.has(event.id));
+  const selectedItemCount = chosen.length + chosenMeetings.length;
+  if (!selectedItemCount) throw new TypeError(includeBodMeetings ? "Select at least one reportable event or BOD meeting." : "Select at least one reportable event.");
+  if (selectedItemCount > BOD_AVENUE_REPORT_LIMIT) throw new RangeError(`Reports are limited to ${BOD_AVENUE_REPORT_LIMIT} unique events.`);
 
   const timestamp = new Date(options.generatedAt || Date.now());
   if (Number.isNaN(timestamp.getTime())) throw new TypeError("Generated timestamp is invalid.");
 
   const directorMap = normalizeDirectorMap({ selectedAvenueCodes, directors: options.directors, directorsByAvenue: options.directorsByAvenue });
+  const singleMonth = selectedMonths.length === 1;
+  const singleAvenue = selectedAvenueCodes.length === 1;
+  const primaryAvenueCode = selectedAvenueCodes[0];
+  const primaryDirectors = directorMap.get(primaryAvenueCode) || [];
+  const primaryDirectorLines = directorLines(primaryDirectors);
+  const reportClubEvents = chosen.map((event) => presentationEvent(event, singleAvenue ? primaryAvenueCode : ""));
+  const reportMeetingEvents = chosenMeetings.map(presentationBodMeeting);
+  const reportEvents = [...reportClubEvents, ...reportMeetingEvents];
+  const monthTotals = monthTotalsForEvents(reportEvents, selectedMonths);
+  const firstMonthTotals = monthTotals.find((month) => month.month === selectedMonths[0]);
   const groups = [];
+  const avenueGroups = [];
   for (const avenueCode of selectedAvenueCodes) {
+    const avenueDirectors = directorMap.get(avenueCode) || [];
+    const avenueDirectorLines = directorLines(avenueDirectors);
+    const avenueDirectorText = directorTextFromLines(avenueDirectorLines);
+    const avenueMonths = [];
     for (const month of selectedMonths) {
       const groupEvents = chosen
         .filter((event) => event.startDate.startsWith(`${month}-`) && event.avenues.includes(avenueCode))
         .map((event) => presentationEvent(event, avenueCode));
       if (!groupEvents.length) continue;
-      groups.push({
+      const monthGroup = {
         avenueCode,
         avenueLabel: getBodAvenueLabel(avenueCode),
         month,
         monthLabel: formatBodReportMonth(month),
-        directorText: directorText(directorMap.get(avenueCode) || []),
+        directors: avenueDirectors,
+        directorLines: avenueDirectorLines,
+        directorText: avenueDirectorText,
+        eventCount: groupEvents.length,
+        monthExpenseTotal: sumEventMoney(groupEvents, "expenseTotal"),
+        monthIncomeTotal: sumEventMoney(groupEvents, "incomeTotal"),
         events: groupEvents,
+      };
+      groups.push(monthGroup);
+      avenueMonths.push(monthGroup);
+    }
+    if (avenueMonths.length) {
+      avenueGroups.push({
+        avenueCode,
+        avenueLabel: getBodAvenueLabel(avenueCode),
+        directors: avenueDirectors,
+        directorLines: avenueDirectorLines,
+        directorText: avenueDirectorText,
+        eventCount: avenueMonths.reduce((total, month) => total + month.eventCount, 0),
+        avenueExpenseTotal: sumEventMoney(avenueMonths, "monthExpenseTotal"),
+        avenueIncomeTotal: sumEventMoney(avenueMonths, "monthIncomeTotal"),
+        months: avenueMonths,
       });
     }
   }
 
-  const singleMonth = selectedMonths.length === 1;
-  const singleAvenue = selectedAvenueCodes.length === 1;
-  const primaryAvenueCode = selectedAvenueCodes[0];
-  const primaryDirectors = directorMap.get(primaryAvenueCode) || [];
+  const meetingGroups = [];
+  for (const month of selectedMonths) {
+    const groupEvents = reportMeetingEvents.filter((event) => event.month === month);
+    if (!groupEvents.length) continue;
+    meetingGroups.push({
+      avenueCode: "BOD",
+      avenueLabel: "BOD Meetings",
+      sectionType: "bodMeetings",
+      month,
+      monthLabel: formatBodReportMonth(month),
+      directors: [],
+      directorLines: [],
+      directorText: "Not available",
+      eventCount: groupEvents.length,
+      monthExpenseTotal: sumEventMoney(groupEvents, "expenseTotal"),
+      monthIncomeTotal: sumEventMoney(groupEvents, "incomeTotal"),
+      events: groupEvents,
+    });
+  }
+  const bodMeetingSection = meetingGroups.length ? {
+    avenueCode: "BOD",
+    avenueLabel: "BOD Meetings",
+    sectionType: "bodMeetings",
+    directors: [],
+    directorLines: [],
+    directorText: "Not available",
+    eventCount: meetingGroups.reduce((total, month) => total + month.eventCount, 0),
+    avenueExpenseTotal: sumEventMoney(meetingGroups, "monthExpenseTotal"),
+    avenueIncomeTotal: sumEventMoney(meetingGroups, "monthIncomeTotal"),
+    months: meetingGroups,
+  } : null;
+  const reportAvenueGroups = bodMeetingSection ? [...avenueGroups, bodMeetingSection] : avenueGroups;
   const appearance = normalizeBodReportAppearance(options.appearance);
   const periodLabel = formatBodReportPeriod(selectedMonths);
-  const avenuesLabel = formatAvenuesSummary(selectedAvenueCodes);
+  const avenuesLabel = formatReportScopeSummary(selectedAvenueCodes, includeBodMeetings);
+  const reportTitle = reportTitleForSelection(selectedAvenueCodes, includeBodMeetings);
+  const grandExpenseTotal = sumEventMoney(reportEvents, "expenseTotal");
+  const grandIncomeTotal = sumEventMoney(reportEvents, "incomeTotal");
 
   return {
     selectedMonths,
     selectedAvenueCodes,
+    includeBodMeetings,
     month: selectedMonths[0],
     monthLabel: singleMonth ? formatBodReportMonth(selectedMonths[0]) : periodLabel,
     periodLabel,
     avenueCode: primaryAvenueCode,
-    avenueLabel: singleAvenue ? getBodAvenueLabel(primaryAvenueCode) : avenuesLabel,
+    avenueLabel: singleAvenue && !includeBodMeetings ? getBodAvenueLabel(primaryAvenueCode) : avenuesLabel,
     avenuesLabel,
+    title: reportTitle,
     directors: primaryDirectors,
-    directorText: singleAvenue ? directorText(primaryDirectors) : "Multiple avenue directors",
+    directorLines: singleAvenue ? primaryDirectorLines : [],
+    directorText: singleAvenue ? directorTextFromLines(primaryDirectorLines) : (selectedAvenueCodes.length ? "Multiple avenue directors" : "Not available"),
     directorAssignmentBasis: "Current active BOD position assignment",
-    eventCount: chosen.length,
-    groupCount: groups.length,
+    eventCount: selectedItemCount,
+    bodMeetingCount: reportMeetingEvents.length,
+    groupCount: groups.length + meetingGroups.length,
+    monthExpenseTotal: firstMonthTotals?.monthExpenseTotal || 0,
+    monthIncomeTotal: firstMonthTotals?.monthIncomeTotal || 0,
+    monthTotals,
+    grandExpenseTotal,
+    grandIncomeTotal,
     generatedAt: timestamp.toISOString(),
     appearance,
-    isCombined: !singleMonth || !singleAvenue,
-    events: chosen.map((event) => presentationEvent(event, singleAvenue ? primaryAvenueCode : "")),
+    isCombined: !singleMonth || !singleAvenue || includeBodMeetings,
+    events: reportEvents,
     groups,
+    meetingGroups,
+    bodMeetingGroups: meetingGroups,
+    avenueGroups: reportAvenueGroups,
   };
 }
 

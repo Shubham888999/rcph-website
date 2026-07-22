@@ -16,28 +16,48 @@ export const BOD_AVENUE_REPORT_LAYOUT = Object.freeze({
   safeArea: Object.freeze({ left: 36, right: 559, top: 670, bottom: 205 }),
   topMeta: Object.freeze({ y: 735, fontSize: 10, gray: 0.2 }),
   generatedMeta: Object.freeze({ x: 20, y: 85, fontSize: 8.2, gray: 0.3 }),
-  summary: Object.freeze({
+  title: Object.freeze({
     top: 670,
+    minHeight: 38,
+    padding: 8,
+    fontSize: 16,
+    lineHeight: 18,
+    fillGray: 0.82,
+    borderGray: 0,
+  }),
+  summary: Object.freeze({
+    gapAfterTitle: 8,
     labelSize: 7.4,
-    valueSize: 8.1,
+    valueSize: 8.2,
     lineHeight: 10.8,
-    rowGap: 5,
-    dividerGap: 8,
-    dividerGray: 0.62,
+    padding: 6,
+    gapAfter: 12,
+    fillGray: 0.96,
+    borderGray: 0.35,
     columns: Object.freeze([
-      Object.freeze({ key: "period", label: "Month", width: 85 }),
-      Object.freeze({ key: "director", label: "Director Name", width: 224 }),
-      Object.freeze({ key: "avenues", label: "Avenue", width: 148 }),
-      Object.freeze({ key: "events", label: "Total Events", width: 66 }),
+      Object.freeze({ key: "date", label: "Date", width: 100 }),
+      Object.freeze({ key: "director", label: "Director name", width: 323 }),
+      Object.freeze({ key: "events", label: "Total events", width: 100 }),
     ]),
   }),
   group: Object.freeze({
     groupGapAfterTable: 9,
-    headingSize: 9.2,
-    headingLineHeight: 12,
+    headingSize: 9.4,
+    headingLineHeight: 12.2,
     directorSize: 7.6,
     directorLineHeight: 9.5,
     headingToTableGap: 5,
+    monthHeadingSize: 8.8,
+    monthHeadingLineHeight: 11.4,
+  }),
+  total: Object.freeze({
+    height: 21,
+    labelSize: 8.3,
+    amountSize: 8.3,
+    padding: 6,
+    fillGray: 0.93,
+    borderGray: 0.55,
+    gapAfter: 10,
   }),
   table: Object.freeze({
     headerHeight: 23,
@@ -57,9 +77,9 @@ export const BOD_AVENUE_REPORT_CONTENT_WIDTH =
 
 export const BOD_AVENUE_REPORT_TABLE_COLUMNS = Object.freeze([
   Object.freeze({ key: "date", label: "Date", width: 58 }),
-  Object.freeze({ key: "event", label: "Event", width: 132 }),
-  Object.freeze({ key: "role", label: "Role", width: 66 }),
-  Object.freeze({ key: "details", label: "Host / Collaborators / Description", width: BOD_AVENUE_REPORT_CONTENT_WIDTH - 256 }),
+  Object.freeze({ key: "event", label: "Event", width: 116 }),
+  Object.freeze({ key: "description", label: "Description", width: 273 }),
+  Object.freeze({ key: "expense", label: "Expense", width: 76 }),
 ]);
 
 const BODY_SIZE_STYLES = Object.freeze({
@@ -269,63 +289,150 @@ function addTextLines(commands, lines, x, y, options = {}) {
   return y - Math.max(1, lines.length) * lineHeight;
 }
 
+function normalizedLine(value, max = 220) {
+  return normalizePdfText(String(value ?? "")).trim().replace(/\s+/g, " ").slice(0, max);
+}
+
+function normalizedLines(value, max = 220) {
+  const source = Array.isArray(value) ? value : String(value ?? "").split(/\n|,\s+/);
+  return source.map((item) => normalizedLine(item, max)).filter(Boolean);
+}
+
+function uniqueLines(lines) {
+  const seen = new Set();
+  const output = [];
+  for (const line of lines) {
+    const key = line.toLowerCase();
+    if (!line || seen.has(key)) continue;
+    seen.add(key);
+    output.push(line);
+  }
+  return output;
+}
+
+function strokeRect(commands, x, y, width, height, gray = 0.45, lineWidth = 0.7) {
+  commands.push(
+    pdfLineCommand({ x1: x, y1: y, x2: x + width, y2: y, gray, width: lineWidth }),
+    pdfLineCommand({ x1: x + width, y1: y, x2: x + width, y2: y - height, gray, width: lineWidth }),
+    pdfLineCommand({ x1: x + width, y1: y - height, x2: x, y2: y - height, gray, width: lineWidth }),
+    pdfLineCommand({ x1: x, y1: y - height, x2: x, y2: y, gray, width: lineWidth }),
+  );
+}
+
+function centeredTextCommand({ center, y, text, size, bold = false, gray = 0, fontFamily }) {
+  return textCommand({
+    x: center - approximateTextWidth(text, size, bold, fontFamily) / 2,
+    y,
+    text,
+    size,
+    bold,
+    gray,
+    fontFamily,
+  });
+}
+
+function selectedAvenueCodes(report) {
+  if (Array.isArray(report?.selectedAvenueCodes)) return report.selectedAvenueCodes;
+  return report?.avenueCode ? [report.avenueCode] : [];
+}
+
+function deriveReportTitle(report) {
+  const explicit = normalizedLine(report?.title, 140);
+  if (explicit) return explicit;
+  const codes = selectedAvenueCodes(report);
+  if (codes.length === 1) {
+    const avenue = normalizedLine(report?.avenueLabel || report?.avenuesLabel || codes[0], 100);
+    return `${avenue.replace(/\s+Report$/i, "")} Report`;
+  }
+  return "BOD Avenue Report";
+}
+
+function directorLinesForReport(report) {
+  const direct = normalizedLines(report?.directorLines);
+  if (direct.length) return direct;
+  const multiAvenue = selectedAvenueCodes(report).length > 1;
+  if (!multiAvenue && Array.isArray(report?.directors)) {
+    const fromDirectors = report.directors
+      .map((item) => {
+        const name = normalizedLine(item?.name, 160);
+        const title = normalizedLine(item?.positionTitle, 160);
+        return name && title ? `${name} (${title})` : "";
+      })
+      .filter(Boolean);
+    if (fromDirectors.length) return fromDirectors;
+  }
+  const fromGroups = uniqueLines((Array.isArray(report?.avenueGroups) ? report.avenueGroups : [])
+    .flatMap((group) => normalizedLines(group?.directorLines || group?.directorText)));
+  if (fromGroups.length) return fromGroups;
+  return normalizedLines(report?.directorText || "Not available");
+}
+
 function summaryFields(report) {
-  const multiMonth = (report.selectedMonths || []).length > 1;
-  const multiAvenue = (report.selectedAvenueCodes || []).length > 1;
   return {
-    period: { label: multiMonth ? "Period" : "Month", value: report.periodLabel || report.monthLabel },
-    director: { label: "Director Name", value: report.directorText },
-    avenues: { label: multiAvenue ? "Avenues" : "Avenue", value: report.avenuesLabel || report.avenueLabel },
-    events: { label: "Total Events", value: String(report.eventCount) },
+    date: { label: "Date", valueLines: [normalizedLine(report?.periodLabel || report?.monthLabel || report?.month || "Not available")] },
+    director: { label: "Director name", valueLines: directorLinesForReport(report) },
+    events: { label: "Total events", valueLines: [String(Number(report?.eventCount) || 0)] },
   };
 }
 
-function summaryNeedsTwoRows(fields, style) {
-  const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
-  return layout.columns.some((column) => {
-    const valueWidth = column.width - 6;
-    return approximateTextWidth(fields[column.key].value, layout.valueSize, false, style.fontFamily) > valueWidth;
-  });
-}
-
-function drawSummaryField(commands, field, x, y, width, style) {
-  const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
-  commands.push(textCommand({ x, y, text: field.label, size: layout.labelSize, bold: true, gray: 0.12, fontFamily: style.fontFamily }));
-  const lines = wrapText(field.value, width, layout.valueSize, style.fontFamily);
-  addTextLines(commands, lines, x, y - layout.lineHeight, {
-    size: layout.valueSize,
-    lineHeight: layout.lineHeight,
-    gray: 0.08,
+function drawTitleBox(commands, report, style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.title;
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const titleLines = wrapText(deriveReportTitle(report), BOD_AVENUE_REPORT_CONTENT_WIDTH - layout.padding * 2, layout.fontSize, style.fontFamily, true);
+  const height = Math.max(layout.minHeight, layout.padding * 2 + titleLines.length * layout.lineHeight);
+  commands.push(pdfFillRectCommand({ x: safe.left, y: layout.top - height, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height, gray: layout.fillGray }));
+  strokeRect(commands, safe.left, layout.top, BOD_AVENUE_REPORT_CONTENT_WIDTH, height, layout.borderGray, 0.8);
+  const firstBaseline = layout.top - layout.padding - layout.fontSize;
+  titleLines.forEach((line, index) => commands.push(centeredTextCommand({
+    center: safe.left + BOD_AVENUE_REPORT_CONTENT_WIDTH / 2,
+    y: firstBaseline - index * layout.lineHeight,
+    text: line,
+    size: layout.fontSize,
+    bold: true,
     fontFamily: style.fontFamily,
-  });
-  return lines.length;
+  })));
+  return layout.top - height - BOD_AVENUE_REPORT_LAYOUT.summary.gapAfterTitle;
 }
 
-function drawSummary(commands, report, style) {
+function summaryValueLines(field, width, style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
+  const lines = [];
+  field.valueLines.forEach((line) => lines.push(...wrapText(line, width, layout.valueSize, style.fontFamily)));
+  return lines.length ? lines : ["Not available"];
+}
+
+function drawSummaryRow(commands, top, report, style) {
   const layout = BOD_AVENUE_REPORT_LAYOUT.summary;
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
   const fields = summaryFields(report);
-  let y = layout.top;
-  if (!summaryNeedsTwoRows(fields, style)) {
-    let x = safe.left;
-    let maxLines = 1;
-    layout.columns.forEach((column) => {
-      maxLines = Math.max(maxLines, drawSummaryField(commands, fields[column.key], x, y, column.width - 6, style));
-      x += column.width;
+  const columns = layout.columns.map((column) => ({
+    ...column,
+    field: fields[column.key],
+    valueLines: summaryValueLines(fields[column.key], column.width - layout.padding * 2, style),
+  }));
+  const maxValueLines = Math.max(1, ...columns.map((column) => column.valueLines.length));
+  const height = layout.padding * 2 + layout.labelSize + 2 + maxValueLines * layout.lineHeight;
+  commands.push(pdfFillRectCommand({ x: safe.left, y: top - height, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height, gray: layout.fillGray }));
+  strokeRect(commands, safe.left, top, BOD_AVENUE_REPORT_CONTENT_WIDTH, height, layout.borderGray, 0.65);
+
+  let x = safe.left;
+  columns.forEach((column, index) => {
+    if (index) commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - height, gray: layout.borderGray, width: 0.55 }));
+    const labelY = top - layout.padding - layout.labelSize;
+    commands.push(textCommand({ x: x + layout.padding, y: labelY, text: column.field.label, size: layout.labelSize, bold: true, gray: 0.08, fontFamily: style.fontFamily }));
+    addTextLines(commands, column.valueLines, x + layout.padding, labelY - layout.lineHeight, {
+      size: layout.valueSize,
+      lineHeight: layout.lineHeight,
+      gray: 0.04,
+      fontFamily: style.fontFamily,
     });
-    y -= layout.lineHeight * (maxLines + 1);
-  } else {
-    const firstRow = layout.columns.filter((column) => column.key !== "director");
-    const rowWidth = BOD_AVENUE_REPORT_CONTENT_WIDTH / firstRow.length;
-    firstRow.forEach((column, index) => drawSummaryField(commands, fields[column.key], safe.left + rowWidth * index, y, rowWidth - 8, style));
-    y -= layout.lineHeight * 2 + layout.rowGap;
-    drawSummaryField(commands, fields.director, safe.left, y, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6, style);
-    const directorLines = wrapText(fields.director.value, BOD_AVENUE_REPORT_CONTENT_WIDTH - 6, layout.valueSize, style.fontFamily).length;
-    y -= layout.lineHeight * (directorLines + 1);
-  }
-  const dividerY = y - layout.dividerGap;
-  commands.push(pdfLineCommand({ x1: safe.left, y1: dividerY, x2: safe.right, y2: dividerY, width: 0.6, gray: layout.dividerGray }));
-  return dividerY - layout.dividerGap;
+    x += column.width;
+  });
+  return top - height - layout.gapAfter;
+}
+
+function drawReportHeader(commands, report, style) {
+  return drawSummaryRow(commands, drawTitleBox(commands, report, style), report, style);
 }
 
 function drawTableHeader(commands, top, style) {
@@ -344,14 +451,31 @@ function drawTableHeader(commands, top, style) {
   return top - table.headerHeight;
 }
 
+function formatExpenseAmount(value) {
+  const amount = Math.max(0, Math.round((Number(value) || 0) * 100) / 100);
+  const hasPaise = !Number.isInteger(amount);
+  return `Rs. ${new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: hasPaise ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(amount)}`;
+}
+
+function eventDescriptionText(event) {
+  const lines = [normalizedLine(event?.description || "Not available", 2500) || "Not available"];
+  const host = normalizedLine(event?.hostClub, 180);
+  const collaborators = normalizedLine(event?.collaborators, 240);
+  if (host && host !== "Not available") lines.push(`Host: ${host}`);
+  if (collaborators && !["None", "Not available"].includes(collaborators)) lines.push(`Collaborators: ${collaborators}`);
+  return lines.join("\n");
+}
+
 function eventCellLines(event, style) {
   const table = style.table;
-  const details = `Host: ${event.hostClub}\nCollaborators: ${event.collaborators}\nDescription: ${event.description}`;
   return {
     date: wrapText(event.dateLabel, BOD_AVENUE_REPORT_TABLE_COLUMNS[0].width - table.padding * 2, table.fontSize, style.fontFamily),
     event: wrapText(event.name, BOD_AVENUE_REPORT_TABLE_COLUMNS[1].width - table.padding * 2, table.fontSize, style.fontFamily),
-    role: wrapText(event.role, BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize, style.fontFamily),
-    details: wrapText(details, BOD_AVENUE_REPORT_TABLE_COLUMNS[3].width - table.padding * 2, table.fontSize, style.fontFamily),
+    description: wrapText(eventDescriptionText(event), BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize, style.fontFamily),
+    expense: wrapText(formatExpenseAmount(event?.expenseTotal), BOD_AVENUE_REPORT_TABLE_COLUMNS[3].width - table.padding * 2, table.fontSize, style.fontFamily),
   };
 }
 
@@ -394,7 +518,8 @@ function splitOversizedRow(lines, style) {
     for (const key of Object.keys(remaining)) chunk[key] = remaining[key].splice(0, availableLines);
     if (!first && !chunk.event.length) chunk.event = ["(continued)"];
     if (!first && !chunk.date.length) chunk.date = [""];
-    if (!first && !chunk.role.length) chunk.role = [""];
+    if (!first && !chunk.expense.length) chunk.expense = [""];
+    if (!first && !chunk.description.length) chunk.description = [""];
     chunks.push(chunk);
     first = false;
   }
@@ -439,22 +564,102 @@ function drawEventRows(pages, events, startY, style) {
   return y;
 }
 
-function groupIntroModel(group, style) {
-  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
-  const directorLines = wrapText(`Director: ${group.directorText}`, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.directorSize, style.fontFamily);
+function moneyNumber(value) {
+  return Math.max(0, Math.round((Number(value) || 0) * 100) / 100);
+}
+
+function sumExpense(events) {
+  return moneyNumber((Array.isArray(events) ? events : []).reduce((total, event) => total + moneyNumber(event?.expenseTotal), 0));
+}
+
+function normalizedMonth(month) {
+  const events = Array.isArray(month?.events) ? month.events : [];
   return {
-    heading: `${group.avenueLabel} - ${group.monthLabel}`,
-    directorLines,
-    height: layout.headingLineHeight + directorLines.length * layout.directorLineHeight + layout.headingToTableGap,
+    month: normalizedLine(month?.month, 20),
+    monthLabel: normalizedLine(month?.monthLabel || month?.month || "Selected month", 80),
+    monthExpenseTotal: Number.isFinite(Number(month?.monthExpenseTotal)) ? moneyNumber(month.monthExpenseTotal) : sumExpense(events),
+    events,
   };
 }
 
-function drawGroupIntro(commands, y, group, style) {
+function reportSections(report) {
+  const nested = (Array.isArray(report?.avenueGroups) ? report.avenueGroups : [])
+    .map((group) => ({
+      avenueCode: normalizedLine(group?.avenueCode, 20),
+      avenueLabel: normalizedLine(group?.avenueLabel || group?.avenueCode || "Selected avenue", 120),
+      sectionType: normalizedLine(group?.sectionType, 40),
+      directorLines: normalizedLines(group?.directorLines || group?.directorText || "Not available"),
+      months: (Array.isArray(group?.months) ? group.months : []).map(normalizedMonth).filter((month) => month.events.length),
+    }))
+    .filter((group) => group.months.length);
+  if (nested.length) return nested;
+
+  const flatGroups = Array.isArray(report?.groups) ? report.groups : [];
+  if (flatGroups.length) {
+    const map = new Map();
+    flatGroups.forEach((group) => {
+      const key = normalizedLine(group?.avenueCode || group?.avenueLabel || "Selected avenue", 120);
+      if (!map.has(key)) {
+        map.set(key, {
+          avenueCode: normalizedLine(group?.avenueCode, 20),
+          avenueLabel: normalizedLine(group?.avenueLabel || group?.avenueCode || "Selected avenue", 120),
+          sectionType: normalizedLine(group?.sectionType, 40),
+          directorLines: normalizedLines(group?.directorLines || group?.directorText || "Not available"),
+          months: [],
+        });
+      }
+      const month = normalizedMonth(group);
+      if (month.events.length) map.get(key).months.push(month);
+    });
+    return [...map.values()].filter((group) => group.months.length);
+  }
+
+  const events = Array.isArray(report?.events) ? report.events : [];
+  const monthMap = new Map();
+  events.forEach((event) => {
+    const key = normalizedLine(event?.month || String(event?.date || "").slice(0, 7) || report?.month || "Selected month", 20);
+    if (!monthMap.has(key)) {
+      monthMap.set(key, {
+        month: key,
+        monthLabel: normalizedLine(event?.monthLabel || report?.monthLabel || key, 80),
+        events: [],
+      });
+    }
+    monthMap.get(key).events.push(event);
+  });
+  return [{
+    avenueCode: normalizedLine(report?.avenueCode, 20),
+    avenueLabel: normalizedLine(report?.avenueLabel || report?.avenuesLabel || "Selected avenue", 120),
+    sectionType: "",
+    directorLines: directorLinesForReport(report),
+    months: [...monthMap.values()].map(normalizedMonth).filter((month) => month.events.length),
+  }].filter((group) => group.months.length);
+}
+
+function sectionHeadingModel(group, style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const headingLines = wrapText(group.avenueLabel, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.headingSize, style.fontFamily, true);
+  const rawDirectorLines = group.directorLines.length ? group.directorLines : ["Not available"];
+  const directorLines = rawDirectorLines.flatMap((line, index) => wrapText(index ? line : `Director name: ${line}`, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.directorSize, style.fontFamily));
+  return {
+    headingLines,
+    directorLines,
+    height: headingLines.length * layout.headingLineHeight + directorLines.length * layout.directorLineHeight + layout.headingToTableGap,
+  };
+}
+
+function drawSectionHeading(commands, y, group, style) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
   const layout = BOD_AVENUE_REPORT_LAYOUT.group;
-  const intro = groupIntroModel(group, style);
-  commands.push(textCommand({ x: safe.left, y, text: intro.heading, size: layout.headingSize, bold: true, gray: 0.08, fontFamily: style.fontFamily }));
-  y -= layout.headingLineHeight;
+  const intro = sectionHeadingModel(group, style);
+  addTextLines(commands, intro.headingLines, safe.left, y, {
+    size: layout.headingSize,
+    lineHeight: layout.headingLineHeight,
+    bold: true,
+    gray: 0.06,
+    fontFamily: style.fontFamily,
+  });
+  y -= intro.headingLines.length * layout.headingLineHeight;
   addTextLines(commands, intro.directorLines, safe.left, y, {
     size: layout.directorSize,
     lineHeight: layout.directorLineHeight,
@@ -464,28 +669,90 @@ function drawGroupIntro(commands, y, group, style) {
   return y - intro.directorLines.length * layout.directorLineHeight - layout.headingToTableGap;
 }
 
-function drawGroupedContent(pages, report, startY, style) {
+function monthHeadingHeight(show) {
+  return show ? BOD_AVENUE_REPORT_LAYOUT.group.monthHeadingLineHeight : 0;
+}
+
+function drawMonthHeading(commands, y, month, style, section = {}) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const text = section.sectionType === "bodMeetings" ? `${section.avenueLabel || "BOD Meetings"} - ${month.monthLabel}` : month.monthLabel;
+  commands.push(textCommand({ x: safe.left, y, text, size: layout.monthHeadingSize, bold: true, gray: 0.08, fontFamily: style.fontFamily }));
+  return y - layout.monthHeadingLineHeight;
+}
+
+function ensureSpace(pages, commands, y, required) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  if (y - required >= safe.bottom) return { commands, y };
+  return createBlankPage(pages);
+}
+
+function drawTotalBlock(commands, y, label, amount, style) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const layout = BOD_AVENUE_REPORT_LAYOUT.total;
+  commands.push(pdfFillRectCommand({ x: safe.left, y: y - layout.height, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: layout.height, gray: layout.fillGray }));
+  strokeRect(commands, safe.left, y, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.height, layout.borderGray, 0.55);
+  const textY = y - layout.padding - layout.labelSize;
+  commands.push(textCommand({ x: safe.left + layout.padding, y: textY, text: label, size: layout.labelSize, bold: true, gray: 0.08, fontFamily: style.fontFamily }));
+  commands.push(rightAlignedTextCommand({ right: safe.right - layout.padding, y: textY, text: formatExpenseAmount(amount), size: layout.amountSize, bold: true, gray: 0.04, fontFamily: style.fontFamily }));
+  return y - layout.height - layout.gapAfter;
+}
+
+function drawMonthTotal(pages, commands, y, month, style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.total;
+  ({ commands, y } = ensureSpace(pages, commands, y, layout.height));
+  return {
+    commands,
+    y: drawTotalBlock(commands, y, `Total expense for ${month.monthLabel}`, month.monthExpenseTotal, style),
+  };
+}
+
+function drawGrandTotal(pages, commands, y, report, style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.total;
+  ({ commands, y } = ensureSpace(pages, commands, y, layout.height));
+  return {
+    commands,
+    y: drawTotalBlock(commands, y, "Grand total expense", moneyNumber(report?.grandExpenseTotal), style),
+  };
+}
+
+function drawReportContent(pages, report, startY, style) {
   let commands = pages.at(-1);
   let y = startY;
-  let completedGroup = false;
-  for (const group of report.groups || []) {
-    const firstRow = group.events[0] ? eventCellLines(group.events[0], style) : null;
-    const firstRowHeight = firstRow ? rowHeightForLines(firstRow, style) : style.table.lineHeight + style.table.padding * 2;
-    const intro = groupIntroModel(group, style);
-    const samePageGap = completedGroup ? BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable : 0;
-    const required = samePageGap + intro.height + style.table.headerHeight + firstRowHeight;
-    if (y - required < safe.bottom) {
-      ({ commands, y } = createBlankPage(pages));
-    } else {
-      y -= samePageGap;
+  let completedMonth = false;
+  const sections = reportSections(report);
+  const showAvenueHeading = sections.some((section) => section.sectionType !== "bodMeetings")
+    && (sections.length > 1 || selectedAvenueCodes(report).length > 1);
+  const showGrandTotal = (report?.selectedMonths || []).length > 1;
+
+  for (const section of sections) {
+    const isMeetingSection = section.sectionType === "bodMeetings";
+    if (showAvenueHeading && !isMeetingSection) {
+      const firstMonth = section.months[0];
+      const firstRow = firstMonth?.events?.[0] ? eventCellLines(firstMonth.events[0], style) : null;
+      const firstRowHeight = firstRow ? rowHeightForLines(firstRow, style) : style.table.lineHeight + style.table.padding * 2;
+      const intro = sectionHeadingModel(section, style);
+      const samePageGap = completedMonth ? BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable : 0;
+      ({ commands, y } = ensureSpace(pages, commands, y - samePageGap, intro.height + monthHeadingHeight(true) + style.table.headerHeight + firstRowHeight));
+      y = drawSectionHeading(commands, y, section, style);
     }
-    y = drawGroupIntro(commands, y, group, style);
-    y = drawTableHeader(commands, y, style);
-    y = drawEventRows(pages, group.events, y, style);
-    commands = pages.at(-1);
-    completedGroup = true;
+
+    for (const month of section.months) {
+      const showMonthHeading = isMeetingSection || showAvenueHeading || section.months.length > 1 || (report?.selectedMonths || []).length > 1;
+      const firstRow = month.events[0] ? eventCellLines(month.events[0], style) : null;
+      const firstRowHeight = firstRow ? rowHeightForLines(firstRow, style) : style.table.lineHeight + style.table.padding * 2;
+      const samePageGap = completedMonth && (!showAvenueHeading || isMeetingSection) ? BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable : 0;
+      ({ commands, y } = ensureSpace(pages, commands, y - samePageGap, monthHeadingHeight(showMonthHeading) + style.table.headerHeight + firstRowHeight));
+      if (showMonthHeading) y = drawMonthHeading(commands, y, month, style, section);
+      y = drawTableHeader(commands, y, style);
+      y = drawEventRows(pages, month.events, y, style);
+      commands = pages.at(-1);
+      ({ commands, y } = drawMonthTotal(pages, commands, y, month, style));
+      completedMonth = true;
+    }
   }
+
+  if (showGrandTotal) drawGrandTotal(pages, commands, y, report, style);
 }
 
 function addPageChrome(pages, report) {
@@ -510,12 +777,7 @@ export function buildBodAvenueReportPdfPages(report) {
   const style = resolveReportStyle(report);
   const pages = [[]];
   const firstPage = pages[0];
-  const tableTop = drawSummary(firstPage, report, style);
-  if (report.isCombined) drawGroupedContent(pages, report, tableTop, style);
-  else {
-    const startY = drawTableHeader(firstPage, tableTop, style);
-    drawEventRows(pages, report.events, startY, style);
-  }
+  drawReportContent(pages, report, drawReportHeader(firstPage, report, style), style);
   addPageChrome(pages, report);
   return pages;
 }

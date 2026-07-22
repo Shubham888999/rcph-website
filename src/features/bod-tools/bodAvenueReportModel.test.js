@@ -6,6 +6,7 @@ import {
   buildBodAvenueReportModel,
   createBodAvenueSelection,
   filterBodAvenueReportEvents,
+  filterBodAvenueReportMeetings,
   formatBodReportMonth,
   formatBodReportPeriod,
   getBodAvenueReportFilename,
@@ -32,6 +33,19 @@ const event = (id, overrides = {}) => ({
   collaboratorsKnown: true,
   description: "Description",
   avenueDescriptions: {},
+  ...overrides,
+});
+
+const meeting = (id, overrides = {}) => ({
+  id,
+  name: `Meeting ${id}`,
+  date: "2026-07-12",
+  recordKind: "bodMeeting",
+  type: "bodMeeting",
+  isActive: true,
+  archived: false,
+  description: "",
+  desc: "Meeting description",
   ...overrides,
 });
 
@@ -65,14 +79,31 @@ test("reports exclude archived, deleted-like, malformed, BOD meeting, district, 
   assert.deepEqual(filterBodAvenueReportEvents([event("x")], { month: "2026-13", avenueCode: "CMD" }), []);
 });
 
+test("BOD meeting filtering uses selected months and stays separate from avenue event filtering", () => {
+  const rows = filterBodAvenueReportMeetings([
+    meeting("aug", { date: "2026-08-03" }),
+    meeting("july", { date: "2026-07-14" }),
+    meeting("duplicate", { date: "2026-07-12" }),
+    meeting("duplicate", { date: "2026-07-13" }),
+    event("club", { startDate: "2026-07-04" }),
+    meeting("archived", { archived: true }),
+    meeting("inactive", { isActive: false }),
+    meeting("malformed", { date: "July 14" }),
+  ], { selectedMonths: ["2026-07", "2026-08"] });
+  assert.deepEqual(rows.map((row) => row.id), ["duplicate", "july", "aug"]);
+  assert.deepEqual(filterBodAvenueReportEvents([meeting("only")], { month: "2026-07", avenueCode: "CMD" }), []);
+});
+
 test("month options use reportable event data with a current-month fallback", () => {
   const options = getBodAvenueReportMonthOptions([
     event("aug", { startDate: "2026-08-03" }),
+    meeting("sep", { date: "2026-09-03" }),
     event("bad", { startDate: "2026-09-03", archived: true, isActive: false }),
   ], "2026-07");
   assert.deepEqual(options, [
     { value: "2026-07", label: "July 2026" },
     { value: "2026-08", label: "August 2026" },
+    { value: "2026-09", label: "September 2026" },
   ]);
 });
 
@@ -110,6 +141,7 @@ test("single month and avenue remain compatible with the Phase 1 report shape", 
   assert.equal(report.periodLabel, "July 2026");
   assert.equal(report.avenueLabel, "Community Service Avenue");
   assert.equal(report.directorText, "Director A (Community Service Director)");
+  assert.deepEqual(report.directorLines, ["Director A (Community Service Director)"]);
   assert.equal(report.eventCount, 1);
   assert.equal(report.groupCount, 1);
   assert.equal(report.isCombined, false);
@@ -117,6 +149,126 @@ test("single month and avenue remain compatible with the Phase 1 report shape", 
   assert.equal(JSON.stringify(report).includes("hidden"), false);
   assert.equal(JSON.stringify(report).includes("private"), false);
   assert.equal(Object.hasOwn(report.events[0], "id"), false);
+});
+
+test("missing report finance defaults event, month, and grand totals to zero", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    events: [event("plain")],
+    selectedEventIds: ["plain"],
+  });
+  assert.deepEqual(report.events[0].financeEntries, []);
+  assert.equal(report.events[0].expenseTotal, 0);
+  assert.equal(report.events[0].incomeTotal, 0);
+  assert.equal(report.monthExpenseTotal, 0);
+  assert.equal(report.monthIncomeTotal, 0);
+  assert.deepEqual(report.monthTotals.map((month) => [month.month, month.monthExpenseTotal, month.monthIncomeTotal]), [["2026-07", 0, 0]]);
+  assert.equal(report.grandExpenseTotal, 0);
+  assert.equal(report.grandIncomeTotal, 0);
+  assert.equal(report.groups[0].monthExpenseTotal, 0);
+});
+
+test("expense entries produce event expense totals", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    events: [event("expense", {
+      reportFinance: {
+        hasFinance: true,
+        entries: [
+          { type: "expense", amount: "100.255", description: "Venue" },
+          { type: "expense", amount: 25, description: "Materials", ignored: true },
+        ],
+      },
+    })],
+    selectedEventIds: ["expense"],
+  });
+  assert.deepEqual(report.events[0].financeEntries, [
+    { type: "expense", amount: 100.26, description: "Venue" },
+    { type: "expense", amount: 25, description: "Materials" },
+  ]);
+  assert.equal(report.events[0].expenseTotal, 125.26);
+  assert.equal(report.grandExpenseTotal, 125.26);
+});
+
+test("income entries stay separate and do not affect expense totals", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    events: [event("income", {
+      reportFinance: {
+        hasFinance: true,
+        entries: [{ type: "income", amount: 500, description: "Ticket collection" }],
+      },
+    })],
+    selectedEventIds: ["income"],
+  });
+  assert.equal(report.events[0].expenseTotal, 0);
+  assert.equal(report.events[0].incomeTotal, 500);
+  assert.equal(report.grandExpenseTotal, 0);
+  assert.equal(report.grandIncomeTotal, 500);
+});
+
+test("mixed income and expense entries calculate separate event totals", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    events: [event("mixed", {
+      reportFinance: {
+        hasFinance: true,
+        entries: [
+          { type: "expense", amount: 100, description: "Hall" },
+          { type: "income", amount: 240, description: "Registrations" },
+          { type: "expense", amount: 50.5, description: "Snacks" },
+        ],
+      },
+    })],
+    selectedEventIds: ["mixed"],
+  });
+  assert.equal(report.events[0].expenseTotal, 150.5);
+  assert.equal(report.events[0].incomeTotal, 240);
+  assert.equal(report.monthTotals[0].monthExpenseTotal, 150.5);
+  assert.equal(report.monthTotals[0].monthIncomeTotal, 240);
+});
+
+test("multi-month reports calculate per-month and grand finance totals from selected events", () => {
+  const report = buildBodAvenueReportModel({
+    selectedMonths: ["2026-08", "2026-07"],
+    selectedAvenueCodes: ["CMD"],
+    events: [
+      event("july", { startDate: "2026-07-04", reportFinance: { hasFinance: true, entries: [{ type: "expense", amount: 10, description: "July expense" }] } }),
+      event("august", { startDate: "2026-08-05", reportFinance: { hasFinance: true, entries: [{ type: "expense", amount: 25.5, description: "August expense" }, { type: "income", amount: 300, description: "August income" }] } }),
+      event("unselected", { startDate: "2026-08-06", reportFinance: { hasFinance: true, entries: [{ type: "expense", amount: 999, description: "Not selected" }] } }),
+    ],
+    selectedEventIds: ["july", "august"],
+  });
+  assert.deepEqual(report.monthTotals.map((month) => [month.month, month.monthExpenseTotal, month.monthIncomeTotal]), [
+    ["2026-07", 10, 0],
+    ["2026-08", 25.5, 300],
+  ]);
+  assert.equal(report.monthExpenseTotal, 10);
+  assert.equal(report.grandExpenseTotal, 35.5);
+  assert.equal(report.grandIncomeTotal, 300);
+  assert.deepEqual(report.groups.map((group) => [group.month, group.monthExpenseTotal]), [["2026-07", 10], ["2026-08", 25.5]]);
+});
+
+test("director lines keep one normalized director per display line", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    events: [event("directors")],
+    selectedEventIds: ["directors"],
+    directors: [
+      { name: "Director B", positionTitle: "Joint Community Service Director" },
+      { name: "Director A", positionTitle: "Community Service Director" },
+    ],
+  });
+  assert.deepEqual(report.directorLines, [
+    "Director A (Community Service Director)",
+    "Director B (Joint Community Service Director)",
+  ]);
+  assert.equal(report.directorText, report.directorLines.join(", "));
 });
 
 test("combined reports group by avenue then month and count unique events once", () => {
@@ -142,6 +294,84 @@ test("combined reports group by avenue then month and count unique events once",
   assert.deepEqual(report.groups.map((group) => `${group.avenueCode}:${group.month}`), ["CMD:2026-07", "CMD:2026-08", "PDD:2026-07", "PDD:2026-08"]);
   assert.deepEqual(report.groups.filter((group) => group.events.some((row) => row.name === "Event multi")).map((group) => group.avenueCode), ["CMD", "PDD"]);
   assert.equal(report.groups[0].directorText, "Director C (Community Service Director)");
+  assert.deepEqual(report.avenueGroups.map((group) => `${group.avenueCode}:${group.months.map((month) => month.month).join("|")}`), ["CMD:2026-07|2026-08", "PDD:2026-07|2026-08"]);
+  assert.deepEqual(report.avenueGroups[0].directorLines, ["Director C (Community Service Director)"]);
+  assert.equal(report.avenueGroups[0].months[0].monthExpenseTotal, 0);
+});
+
+test("BOD meetings are excluded from reports unless explicitly included", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    events: [event("club"), meeting("bod", { date: "2026-07-10" })],
+    selectedEventIds: ["club", "bod"],
+  });
+  assert.equal(report.eventCount, 1);
+  assert.equal(report.bodMeetingCount, 0);
+  assert.deepEqual(report.meetingGroups, []);
+
+  const withMeetings = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    includeBodMeetings: true,
+    events: [event("club"), meeting("bod", { date: "2026-07-10" })],
+    selectedEventIds: ["club", "bod"],
+  });
+  assert.equal(withMeetings.eventCount, 2);
+  assert.equal(withMeetings.bodMeetingCount, 1);
+  assert.equal(withMeetings.avenueGroups.at(-1).avenueLabel, "BOD Meetings");
+});
+
+test("BOD meeting-only reports do not require a normal avenue", () => {
+  const report = buildBodAvenueReportModel({
+    selectedMonths: ["2026-07"],
+    selectedAvenueCodes: [],
+    includeBodMeetings: true,
+    events: [meeting("only", { date: "2026-07-19", desc: "Budget review notes" })],
+    selectedEventIds: ["only"],
+    generatedAt: "2026-07-20T12:00:00.000Z",
+  });
+  assert.equal(report.title, "BOD Meetings Report");
+  assert.equal(report.avenuesLabel, "BOD Meetings");
+  assert.equal(report.directorText, "Not available");
+  assert.equal(report.eventCount, 1);
+  assert.equal(report.bodMeetingCount, 1);
+  assert.equal(report.groupCount, 1);
+  assert.equal(report.events[0].sectionType, "bodMeeting");
+  assert.equal(report.events[0].date, "2026-07-19");
+  assert.equal(report.events[0].description, "Budget review notes");
+  assert.deepEqual(report.meetingGroups.map((group) => `${group.avenueLabel}:${group.month}`), ["BOD Meetings:2026-07"]);
+  assert.deepEqual(report.avenueGroups.map((group) => group.avenueLabel), ["BOD Meetings"]);
+});
+
+test("BOD meetings add separate deterministic groups after normal avenue groups", () => {
+  const report = buildBodAvenueReportModel({
+    selectedMonths: ["2026-08", "2026-07"],
+    selectedAvenueCodes: ["CMD"],
+    includeBodMeetings: true,
+    events: [
+      event("july-club", { startDate: "2026-07-04", reportFinance: { hasFinance: true, entries: [{ type: "expense", amount: 10, description: "Club expense" }] } }),
+      meeting("july-bod", { date: "2026-07-10" }),
+      meeting("aug-bod", {
+        date: "2026-08-02",
+        reportFinance: { hasFinance: true, entries: [{ type: "expense", amount: 40, description: "Meeting expense" }, { type: "income", amount: 900, description: "Ignored income" }] },
+      }),
+    ],
+    selectedEventIds: ["july-club", "july-bod", "aug-bod"],
+  });
+  assert.equal(report.title, "BOD Monthly Report");
+  assert.equal(report.avenuesLabel, "Community Service Avenue + BOD Meetings");
+  assert.equal(report.eventCount, 3);
+  assert.equal(report.grandExpenseTotal, 50);
+  assert.equal(report.grandIncomeTotal, 900);
+  assert.deepEqual(report.monthTotals.map((month) => [month.month, month.monthExpenseTotal, month.monthIncomeTotal]), [
+    ["2026-07", 10, 0],
+    ["2026-08", 40, 900],
+  ]);
+  assert.deepEqual(report.groups.map((group) => `${group.avenueCode}:${group.month}`), ["CMD:2026-07"]);
+  assert.deepEqual(report.meetingGroups.map((group) => `${group.avenueLabel}:${group.month}:${group.monthExpenseTotal}`), ["BOD Meetings:2026-07:0", "BOD Meetings:2026-08:40"]);
+  assert.deepEqual(report.avenueGroups.map((group) => group.avenueLabel), ["Community Service Avenue", "BOD Meetings"]);
+  assert.equal(report.avenueGroups[0].months[0].events.some((row) => row.name === "Meeting july-bod"), false);
 });
 
 test("multi-avenue canonical events use avenue-specific descriptions while counting once", () => {

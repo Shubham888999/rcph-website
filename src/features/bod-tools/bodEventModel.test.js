@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   BOD_EVENT_SOURCE,
+  BOD_REPORT_FINANCE_MAX_ROWS,
   buildAvenueDescriptionDraft,
   buildBodEventPayload,
   getEventDescriptionForAvenue,
@@ -12,6 +13,7 @@ import {
   isValidDateOnly,
   normalizeAvenueDescriptions,
   normalizeBodEvent,
+  normalizeBodReportFinance,
   safeExternalUrl,
   validateAvenueDescriptionCoverage,
 } from "./bodEventModel.js";
@@ -23,7 +25,33 @@ test("club event normalizes without exposing unknown fields", () => {
   assert.equal(event.name, "Project One");
   assert.equal(event.recordKind, "clubEvent");
   assert.deepEqual(event.collaborators, [{ name: "Club A" }]);
+  assert.deepEqual(event.reportFinance, { hasFinance: false, entries: [] });
   assert.equal(Object.hasOwn(event, "secret"), false);
+});
+
+test("report-only finance normalizes valid entries and strips unknown nested fields", () => {
+  const finance = normalizeBodReportFinance({
+    hasFinance: true,
+    entries: [
+      { type: " expense ", amount: "1250.455", description: " Venue booking ", treasuryId: "hidden" },
+      { type: "income", amount: 250, description: "Member contributions" },
+      { type: "bad", amount: 1, description: "Nope" },
+    ],
+  });
+  assert.deepEqual(finance, {
+    hasFinance: true,
+    entries: [
+      { type: "expense", amount: 1250.46, description: "Venue booking" },
+      { type: "income", amount: 250, description: "Member contributions" },
+    ],
+  });
+  assert.equal(JSON.stringify(finance).includes("treasuryId"), false);
+});
+
+test("missing, disabled, or malformed report finance normalizes to the canonical empty shape", () => {
+  assert.deepEqual(normalizeBodReportFinance(), { hasFinance: false, entries: [] });
+  assert.deepEqual(normalizeBodReportFinance({ hasFinance: false, entries: [{ type: "expense", amount: 5, description: "Old" }] }), { hasFinance: false, entries: [] });
+  assert.deepEqual(normalizeBodReportFinance({ hasFinance: true, entries: [{ type: "expense", amount: 0, description: "Bad" }] }), { hasFinance: false, entries: [] });
 });
 
 test("BOD event normalizer preserves MOM metadata on canonical records", () => {
@@ -159,7 +187,66 @@ test("payload builder whitelists fields and forces production classification", (
   assert.deepEqual(payload.avenues, ["CMD"]);
   assert.deepEqual(payload.avenueDescriptions, { CMD: "Desc" });
   assert.deepEqual(payload.collaborators, [{ name: "Partner" }]);
+  assert.deepEqual(payload.reportFinance, { hasFinance: false, entries: [] });
   assert.equal(Object.hasOwn(payload, "uiOnly"), false);
+});
+
+test("payload builder persists valid report-only finance entries", () => {
+  const { payload, errors } = buildBodEventPayload({
+    name: "Test", conductedBy: "Member", startDate: "2026-07-05", endDate: "",
+    time: "18:30", avenues: ["CMD"], description: "Desc", rcphRole: "host",
+    reportFinance: {
+      hasFinance: true,
+      entries: [
+        { type: "income", amount: "500", description: "Ticket collection", ignored: true },
+        { type: "expense", amount: "250.456", description: "Refreshments" },
+      ],
+    },
+  });
+  assert.deepEqual(errors, {});
+  assert.deepEqual(payload.reportFinance, {
+    hasFinance: true,
+    entries: [
+      { type: "income", amount: 500, description: "Ticket collection" },
+      { type: "expense", amount: 250.46, description: "Refreshments" },
+    ],
+  });
+  assert.equal(JSON.stringify(payload.reportFinance).includes("ignored"), false);
+});
+
+test("unchecked report finance clears stale entries in the payload", () => {
+  const { payload, errors } = buildBodEventPayload({
+    name: "Test", conductedBy: "Member", startDate: "2026-07-05", avenues: ["CMD"], description: "Desc",
+    reportFinance: {
+      hasFinance: false,
+      entries: [{ type: "expense", amount: "99", description: "Stale" }],
+    },
+  });
+  assert.deepEqual(errors, {});
+  assert.deepEqual(payload.reportFinance, { hasFinance: false, entries: [] });
+});
+
+test("payload builder rejects malformed report finance rows", () => {
+  const validDraft = {
+    name: "Test",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["CMD"],
+    description: "Desc",
+  };
+  for (const reportFinance of [
+    { hasFinance: true, entries: [{ type: "refund", amount: "1", description: "Invalid type" }] },
+    { hasFinance: true, entries: [{ type: "expense", amount: "0", description: "Zero" }] },
+    { hasFinance: true, entries: [{ type: "expense", amount: "-1", description: "Negative" }] },
+    { hasFinance: true, entries: [{ type: "expense", amount: "1000000.01", description: "Too high" }] },
+    { hasFinance: true, entries: [{ type: "expense", amount: "1", description: "" }] },
+    { hasFinance: true, entries: [] },
+    { hasFinance: true, entries: Array.from({ length: BOD_REPORT_FINANCE_MAX_ROWS + 1 }, () => ({ type: "expense", amount: "1", description: "Many" })) },
+  ]) {
+    const result = buildBodEventPayload({ ...validDraft, reportFinance });
+    assert.equal(result.payload, null);
+    assert.ok(result.errors.reportFinance);
+  }
 });
 
 test("payload validation rejects bad ranges and keeps no raw record fields", () => {

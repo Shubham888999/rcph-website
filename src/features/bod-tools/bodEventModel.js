@@ -2,9 +2,13 @@ import { MOM_TARGET_TYPES, normalizeMomEmailHistory, normalizeMomMetadata } from
 
 const EVENT_KINDS = new Set(["clubEvent", "bodMeeting", "districtEvent"]);
 const RCPH_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
+const REPORT_FINANCE_TYPES = new Set(["income", "expense"]);
 export const BOD_AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
 export const BOD_EVENT_SOURCE = "bodEventManager";
 export const BOD_EVENT_DESCRIPTION_LIMIT = 2500;
+export const BOD_REPORT_FINANCE_DESCRIPTION_LIMIT = 240;
+export const BOD_REPORT_FINANCE_MAX_AMOUNT = 1000000;
+export const BOD_REPORT_FINANCE_MAX_ROWS = 20;
 const BOD_AVENUE_SET = new Set(BOD_AVENUES);
 const RESERVED_DESCRIPTION_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -158,6 +162,52 @@ function normalizeCollaborators(value) {
   return [...new Set(names)].map((name) => ({ name }));
 }
 
+function normalizeReportFinanceAmount(value) {
+  const amount = typeof value === "number" ? value : Number(cleanString(value));
+  if (!Number.isFinite(amount) || amount <= 0 || amount > BOD_REPORT_FINANCE_MAX_AMOUNT) return null;
+  return Math.round(amount * 100) / 100;
+}
+
+function normalizeReportFinanceEntry(entry) {
+  if (!isPlainObject(entry)) return null;
+  const type = cleanString(entry.type).toLowerCase();
+  const amount = normalizeReportFinanceAmount(entry.amount);
+  const description = cleanString(entry.description).replace(/\s+/g, " ").slice(0, BOD_REPORT_FINANCE_DESCRIPTION_LIMIT);
+  if (!REPORT_FINANCE_TYPES.has(type) || amount === null || !description) return null;
+  return { type, amount, description };
+}
+
+export function normalizeBodReportFinance(value) {
+  if (!isPlainObject(value) || value.hasFinance !== true) return { hasFinance: false, entries: [] };
+  const entries = (Array.isArray(value.entries) ? value.entries : [])
+    .map(normalizeReportFinanceEntry)
+    .filter(Boolean)
+    .slice(0, BOD_REPORT_FINANCE_MAX_ROWS);
+  return { hasFinance: entries.length > 0, entries };
+}
+
+export function validateBodReportFinanceDraft(value) {
+  if (!isPlainObject(value) || value.hasFinance !== true) return "";
+  if (!Array.isArray(value.entries)) return "Report finance entries must be rows.";
+  if (value.entries.length < 1) return "Add at least one report finance row or uncheck the finance option.";
+  if (value.entries.length > BOD_REPORT_FINANCE_MAX_ROWS) return `Use no more than ${BOD_REPORT_FINANCE_MAX_ROWS} report finance rows.`;
+
+  for (let index = 0; index < value.entries.length; index += 1) {
+    const entry = value.entries[index];
+    if (!isPlainObject(entry)) return `Report finance row ${index + 1} is invalid.`;
+    const type = cleanString(entry.type).toLowerCase();
+    if (!REPORT_FINANCE_TYPES.has(type)) return `Choose income or expense for report finance row ${index + 1}.`;
+    if (entry.amount === undefined || entry.amount === null || (typeof entry.amount === "string" && entry.amount.trim() === "")) {
+      return `Enter an amount for report finance row ${index + 1}.`;
+    }
+    const amount = normalizeReportFinanceAmount(entry.amount);
+    if (amount === null) return `Enter a positive amount up to ${BOD_REPORT_FINANCE_MAX_AMOUNT} for report finance row ${index + 1}.`;
+    if (!cleanString(entry.description)) return `Enter a description for report finance row ${index + 1}.`;
+    if (cleanString(entry.description).length > BOD_REPORT_FINANCE_DESCRIPTION_LIMIT) return `Report finance descriptions must be ${BOD_REPORT_FINANCE_DESCRIPTION_LIMIT} characters or fewer.`;
+  }
+  return "";
+}
+
 export function normalizeBodEvent(id, raw) {
   if (!raw || typeof raw !== "object") return null;
   const eventId = cleanString(id);
@@ -205,6 +255,7 @@ export function normalizeBodEvent(id, raw) {
     collaborators: normalizeCollaborators(raw.collaborators),
     collaboratorsKnown: Array.isArray(raw.collaborators),
     collaborationNotes: cleanString(raw.collaborationNotes),
+    reportFinance: normalizeBodReportFinance(raw.reportFinance),
     driveFolder: safeExternalUrl(raw.driveFolder),
     driveFolderId: cleanString(raw.driveFolderId),
     previewLink: safeExternalUrl(raw.previewLink),
@@ -256,6 +307,8 @@ export function validateBodEventDraft(draft) {
       : draft.avenueDescriptions,
   );
   if (avenues.length && !coverage.ok) errors.avenueDescriptions = coverage.errors.at(-1);
+  const reportFinanceError = validateBodReportFinanceDraft(draft?.reportFinance);
+  if (reportFinanceError) errors.reportFinance = reportFinanceError;
   return errors;
 }
 
@@ -287,6 +340,7 @@ export function buildBodEventPayload(draft, eventId = "") {
     hostClub: cleanString(draft.hostClub, "Rotaract Club of Pune Heritage").replace(/\s+/g, " ").slice(0, 180),
     collaborators: normalizeCollaborators(draft.collaborators).slice(0, 30),
     collaborationNotes: cleanString(draft.collaborationNotes).slice(0, 1000),
+    reportFinance: normalizeBodReportFinance(draft.reportFinance),
     driveFolder: safeExternalUrl(draft.driveFolder),
   };
   if (eventId) payload.eventId = cleanString(eventId);

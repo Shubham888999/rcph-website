@@ -7,6 +7,7 @@ import {
   buildBodAvenueReportModel,
   createBodAvenueSelection,
   filterBodAvenueReportEvents,
+  filterBodAvenueReportMeetings,
   formatBodReportMonth,
   getBodAvenueReportMonthOptions,
   normalizeBodAvenueDirectors,
@@ -30,6 +31,18 @@ function eventDateLabel(value) {
     .format(new Date(year, month - 1, day, 12));
 }
 
+function reportItemDate(event) {
+  return event?.startDate || event?.date || event?.eventStart || "";
+}
+
+function isBodMeetingItem(event) {
+  return (event?.recordKind || event?.type) === "bodMeeting";
+}
+
+function formatReportAmount(value) {
+  return `INR ${new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
+}
+
 function createPreview(options) {
   try { return buildBodAvenueReportModel(options); } catch { return null; }
 }
@@ -48,6 +61,7 @@ function appearanceLabel(options, value) {
 export default function BodAvenueReportPanel({ events, onNotice }) {
   const [selectedMonths, setSelectedMonths] = useState(() => [currentMonth()]);
   const [selectedAvenueCodes, setSelectedAvenueCodes] = useState([]);
+  const [includeBodMeetings, setIncludeBodMeetings] = useState(false);
   const [selection, setSelection] = useState(() => ({ scope: "", ids: new Set() }));
   const [directorData, setDirectorData] = useState(() => ({ scope: "", state: "idle", directorsByAvenue: {} }));
   const [appearance, setAppearance] = useState(BOD_AVENUE_REPORT_DEFAULT_APPEARANCE);
@@ -59,12 +73,20 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     () => filterBodAvenueReportEvents(events, { selectedMonths, selectedAvenueCodes }),
     [events, selectedAvenueCodes, selectedMonths],
   );
-  const selectionScope = `${selectedMonths.join("|")}::${selectedAvenueCodes.join("|")}::${matchingEvents.map((event) => event.id).join("|")}`;
+  const matchingMeetings = useMemo(
+    () => includeBodMeetings ? filterBodAvenueReportMeetings(events, { selectedMonths }) : [],
+    [events, includeBodMeetings, selectedMonths],
+  );
+  const matchingReportItems = useMemo(
+    () => [...matchingEvents, ...matchingMeetings],
+    [matchingEvents, matchingMeetings],
+  );
+  const selectionScope = `${selectedMonths.join("|")}::${selectedAvenueCodes.join("|")}::${includeBodMeetings ? "meetings" : "events"}::${matchingReportItems.map((event) => event.id).join("|")}`;
   // Existing UX reset behavior: when filters change, the valid matching set is selected again.
-  const selectedIds = selection.scope === selectionScope ? selection.ids : createBodAvenueSelection(matchingEvents);
+  const selectedIds = selection.scope === selectionScope ? selection.ids : createBodAvenueSelection(matchingReportItems);
   const selectedEvents = useMemo(
-    () => matchingEvents.filter((event) => selectedIds.has(event.id)),
-    [matchingEvents, selectedIds],
+    () => matchingReportItems.filter((event) => selectedIds.has(event.id)),
+    [matchingReportItems, selectedIds],
   );
   const directorScope = selectedAvenueCodes.join("|");
   const directorsByAvenue = directorData.scope === directorScope ? directorData.directorsByAvenue : EMPTY_DIRECTOR_MAP;
@@ -92,11 +114,12 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
   const preview = useMemo(() => createPreview({
     selectedMonths,
     selectedAvenueCodes,
+    includeBodMeetings,
     events,
     selectedEventIds: selectedIds,
     directorsByAvenue,
     appearance,
-  }), [appearance, directorsByAvenue, events, selectedAvenueCodes, selectedIds, selectedMonths]);
+  }), [appearance, directorsByAvenue, events, includeBodMeetings, selectedAvenueCodes, selectedIds, selectedMonths]);
   const tooMany = selectedEvents.length > BOD_AVENUE_REPORT_LIMIT;
   const canDownload = Boolean(preview && directorState !== "loading" && !tooMany && !downloading);
 
@@ -108,6 +131,12 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
 
   function updateAvenues(next) {
     setSelectedAvenueCodes(next);
+    setShowPreview(false);
+    setMessage("");
+  }
+
+  function updateIncludeBodMeetings(checked) {
+    setIncludeBodMeetings(checked);
     setShowPreview(false);
     setMessage("");
   }
@@ -126,6 +155,7 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
       const finalized = buildBodAvenueReportModel({
         selectedMonths,
         selectedAvenueCodes,
+        includeBodMeetings,
         events,
         selectedEventIds: selectedIds,
         directorsByAvenue,
@@ -134,7 +164,7 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
       });
       const { downloadBodAvenueReportPdf } = await import("./bodAvenueReportPdf.js");
       await downloadBodAvenueReportPdf(finalized);
-      setMessage(`${finalized.eventCount} unique event${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.`);
+      setMessage(`${finalized.eventCount} report item${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.`);
       onNotice?.({ type: "success", message: "Monthly avenue report downloaded. No event records were changed." });
     } catch (error) {
       setMessage(error?.message || "The report could not be generated. Please review the selected events and try again.");
@@ -186,6 +216,10 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
         </fieldset>
       </div>
 
+      <label className="bod-avenue-report__meeting-toggle" htmlFor="bod-report-include-meetings">
+        <input id="bod-report-include-meetings" type="checkbox" checked={includeBodMeetings} onChange={(event) => updateIncludeBodMeetings(event.target.checked)} /> Include BOD meetings
+      </label>
+
       <div className="bod-avenue-report__appearance">
         <label htmlFor="bod-report-font">Font family<select id="bod-report-font" value={appearance.fontFamily} onChange={(event) => updateAppearance("fontFamily", event.target.value)}>{BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.fontFamilies.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <label htmlFor="bod-report-body-size">Body font size<select id="bod-report-body-size" value={appearance.bodySize} onChange={(event) => updateAppearance("bodySize", event.target.value)}>{BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.bodySizes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
@@ -203,21 +237,27 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
       </p> : null}
 
       <div className="bod-avenue-report__selection-actions">
-        <button type="button" onClick={() => setSelection({ scope: selectionScope, ids: createBodAvenueSelection(matchingEvents) })} disabled={!matchingEvents.length || selectedEvents.length === matchingEvents.length}>Select all events</button>
+        <button type="button" onClick={() => setSelection({ scope: selectionScope, ids: createBodAvenueSelection(matchingReportItems) })} disabled={!matchingReportItems.length || selectedEvents.length === matchingReportItems.length}>Select all report items</button>
         <button type="button" onClick={() => setSelection({ scope: selectionScope, ids: new Set() })} disabled={!selectedIds.size}>Clear selection</button>
-        <span aria-live="polite"><strong>{selectedEvents.length}</strong> selected / <strong>{matchingEvents.length}</strong> unique matching events</span>
+        <span aria-live="polite"><strong>{selectedEvents.length}</strong> selected / <strong>{matchingReportItems.length}</strong> matching report items</span>
         <span>{selectedMonths.length} month{selectedMonths.length === 1 ? "" : "s"}</span>
         <span>{selectedAvenueCodes.length} avenue{selectedAvenueCodes.length === 1 ? "" : "s"}</span>
+        {includeBodMeetings ? <span>{matchingMeetings.length} BOD meeting{matchingMeetings.length === 1 ? "" : "s"}</span> : null}
         {preview ? <span>{preview.groupCount} group{preview.groupCount === 1 ? "" : "s"}</span> : null}
         <span>{appearanceText}</span>
       </div>
 
       <fieldset className="bod-avenue-report__events">
         <legend>Eligible events</legend>
-        {!selectedMonths.length || !selectedAvenueCodes.length ? <p>Select at least one month and one avenue to find reportable events.</p> : matchingEvents.length ? <ul>{matchingEvents.map((event) => {
-          const selectedEventAvenues = event.avenues.filter((code) => selectedAvenueCodes.includes(code));
-          return <li key={event.id}><label htmlFor={`bod-report-event-${event.id}`}><input id={`bod-report-event-${event.id}`} type="checkbox" checked={selectedIds.has(event.id)} onChange={(change) => setSelection({ scope: selectionScope, ids: toggleBodAvenueEvent(selectedIds, event.id, change.target.checked) })} /><span><strong>{event.name}</strong><small>{eventDateLabel(event.startDate)} / {formatBodReportMonth(event.startDate.slice(0, 7))} / {selectedEventAvenues.join(", ")}{selectedEventAvenues.length > 1 ? " / multi-avenue match" : ""} / {event.rcphRole} / Active</small></span></label></li>;
-        })}</ul> : <p>No reportable events were found for this selection.</p>}
+        {!selectedMonths.length || (!selectedAvenueCodes.length && !includeBodMeetings) ? <p>Select at least one month and one avenue, or include BOD meetings.</p> : matchingReportItems.length ? <ul>{matchingReportItems.map((event) => {
+          const date = reportItemDate(event);
+          const meeting = isBodMeetingItem(event);
+          const selectedEventAvenues = meeting ? [] : (Array.isArray(event.avenues) ? event.avenues : []).filter((code) => selectedAvenueCodes.includes(code));
+          const scopeText = meeting
+            ? "BOD Meeting"
+            : `${selectedEventAvenues.join(", ")}${selectedEventAvenues.length > 1 ? " / multi-avenue match" : ""} / ${event.rcphRole}`;
+          return <li key={event.id}><label htmlFor={`bod-report-event-${event.id}`}><input id={`bod-report-event-${event.id}`} type="checkbox" checked={selectedIds.has(event.id)} onChange={(change) => setSelection({ scope: selectionScope, ids: toggleBodAvenueEvent(selectedIds, event.id, change.target.checked) })} /><span><strong>{event.name}</strong><small>{eventDateLabel(date)} / {formatBodReportMonth(date.slice(0, 7))} / {scopeText} / Active</small></span></label></li>;
+        })}</ul> : <p>No reportable events or BOD meetings were found for this selection.</p>}
       </fieldset>
 
       {tooMany ? <p role="alert" className="bod-avenue-report__error">Select no more than {BOD_AVENUE_REPORT_LIMIT} unique events.</p> : null}
@@ -228,8 +268,20 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
 
       {showPreview && preview ? <section className="bod-avenue-report__preview" aria-labelledby="bod-report-preview-title">
         <h3 id="bod-report-preview-title">Report preview</h3>
-        <dl><div><dt>{preview.selectedMonths.length > 1 ? "Period" : "Month"}</dt><dd>{preview.periodLabel}</dd></div><div><dt>Avenues</dt><dd>{preview.avenuesLabel}</dd></div><div><dt>Director(s)</dt><dd>{preview.directorText}</dd></div><div><dt>Unique events</dt><dd>{preview.eventCount}</dd></div><div><dt>Groups</dt><dd>{preview.groupCount}</dd></div></dl>
-        <ol>{preview.events.map((event, index) => <li key={`${event.date}-${event.name}-${index}`}><strong>{event.name}</strong><span>{event.dateLabel} / {event.avenues.join(", ")}</span></li>)}</ol>
+        <dl>
+          <div><dt>{preview.selectedMonths.length > 1 ? "Period" : "Month"}</dt><dd>{preview.periodLabel}</dd></div>
+          <div><dt>Avenues</dt><dd>{preview.avenuesLabel}</dd></div>
+          <div><dt>Director(s)</dt><dd>{preview.directorLines?.length ? preview.directorLines.map((line, index) => <span className="bod-avenue-report__director-line" key={`${line}-${index}`}>{line}</span>) : preview.directorText}</dd></div>
+          <div><dt>Selected events</dt><dd>{preview.eventCount}</dd></div>
+          {preview.includeBodMeetings ? <div><dt>BOD meetings</dt><dd>{preview.bodMeetingCount}</dd></div> : null}
+          <div><dt>Total expense</dt><dd>{formatReportAmount(preview.grandExpenseTotal)}</dd></div>
+          {preview.monthTotals?.length > 1 ? <div><dt>Month expenses</dt><dd>{preview.monthTotals.map((month) => `${month.monthLabel}: ${formatReportAmount(month.monthExpenseTotal)}`).join(" / ")}</dd></div> : null}
+          <div><dt>Groups</dt><dd>{preview.groupCount}</dd></div>
+        </dl>
+        <ol>{preview.events.map((event, index) => {
+          const scopeText = event.sectionType === "bodMeeting" ? "BOD Meetings" : event.avenues.join(", ");
+          return <li key={`${event.date}-${event.name}-${index}`}><strong>{event.name}</strong><span>{event.dateLabel} / {scopeText} / Expense {formatReportAmount(event.expenseTotal)}</span></li>;
+        })}</ol>
       </section> : null}
       {message ? <p className={message.startsWith("The report") ? "bod-avenue-report__error" : "bod-avenue-report__success"} role={message.startsWith("The report") ? "alert" : "status"} aria-live="polite">{message}</p> : null}
     </section>

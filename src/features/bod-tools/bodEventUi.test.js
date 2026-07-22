@@ -21,11 +21,31 @@ test("BOD event form keeps public and per-avenue descriptions separate", () => {
   assert.match(form, /window\.confirm\(`Remove the \$\{avenue\} report description\?`\)/);
 });
 
+test("BOD event form exposes report-only finance rows without Treasury wiring", () => {
+  assert.match(form, /Any income\/expense incurred for this event\?/);
+  assert.match(form, /Report finance/);
+  assert.match(form, /For Avenue Report generation only\. This does not update Treasury\./);
+  assert.match(form, /<option value="income">Income<\/option>/);
+  assert.match(form, /<option value="expense">Expense<\/option>/);
+  assert.match(form, /Add finance row/);
+  assert.match(form, /removeReportFinanceEntry/);
+  assert.match(form, /BOD_REPORT_FINANCE_MAX_ROWS/);
+  assert.doesNotMatch(form, /treasuryService|adminCalls\.treasury|createTreasury|updateTreasury/i);
+});
+
 test("BOD details show avenue-specific report descriptions but rows keep the public summary", () => {
   assert.match(details, /getEventDescriptionForAvenue\(event, avenue\)/);
   assert.match(details, /Avenue report descriptions/);
   assert.match(card, /event\.description \|\| "No description supplied\."/);
   assert.doesNotMatch(card, /avenueDescriptions/);
+});
+
+test("BOD details show report finance entries as Avenue Report-only data", () => {
+  assert.match(details, /Report finance/);
+  assert.match(details, /Avenue Report only\. Treasury is not updated by these entries\./);
+  assert.match(details, /No report finance recorded\./);
+  assert.match(details, /FINANCE_TYPE_LABELS/);
+  assert.match(details, /formatFinanceAmount/);
 });
 
 test("BOD submissions render as a collapsible compact list without the card grid contract", () => {

@@ -6,10 +6,26 @@ import { getSafeBodUploadError } from "./bodUploadModel";
 import {
   BOD_AVENUES,
   BOD_EVENT_DESCRIPTION_LIMIT,
+  BOD_REPORT_FINANCE_DESCRIPTION_LIMIT,
+  BOD_REPORT_FINANCE_MAX_AMOUNT,
+  BOD_REPORT_FINANCE_MAX_ROWS,
   buildAvenueDescriptionDraft,
   buildBodEventPayload,
+  normalizeBodReportFinance,
 } from "./bodEventModel";
 import useAccessibleDialog from "./useAccessibleDialog";
+
+function emptyReportFinanceEntry() {
+  return { type: "expense", amount: "", description: "" };
+}
+
+function reportFinanceDraft(event) {
+  const normalized = normalizeBodReportFinance(event?.reportFinance);
+  return {
+    hasFinance: normalized.hasFinance,
+    entries: normalized.entries.map((entry) => ({ ...entry, amount: String(entry.amount) })),
+  };
+}
 
 function initialDraft(event, displayName) {
   const avenues = event?.avenues || [];
@@ -33,6 +49,7 @@ function initialDraft(event, displayName) {
     hostClub: event?.hostClub || "Rotaract Club of Pune Heritage",
     collaborators: event?.collaborators?.length ? event.collaborators : [{ name: "" }],
     collaborationNotes: event?.collaborationNotes || "",
+    reportFinance: reportFinanceDraft(event),
     driveFolder: event?.driveFolder || "",
   };
 }
@@ -84,6 +101,30 @@ export default function BodEventForm({ event, displayName, busy, mutationError, 
 
   function removeCollaborator(index) {
     update("collaborators", draft.collaborators.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function toggleReportFinance(checked) {
+    update("reportFinance", checked
+      ? { hasFinance: true, entries: draft.reportFinance?.entries?.length ? draft.reportFinance.entries : [emptyReportFinanceEntry()] }
+      : { hasFinance: false, entries: [] });
+  }
+
+  function updateReportFinanceEntry(index, key, value) {
+    update("reportFinance", {
+      hasFinance: true,
+      entries: draft.reportFinance.entries.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item),
+    });
+  }
+
+  function addReportFinanceEntry() {
+    const entries = draft.reportFinance?.entries || [];
+    if (entries.length >= BOD_REPORT_FINANCE_MAX_ROWS) return;
+    update("reportFinance", { hasFinance: true, entries: [...entries, emptyReportFinanceEntry()] });
+  }
+
+  function removeReportFinanceEntry(index) {
+    const entries = (draft.reportFinance?.entries || []).filter((_, itemIndex) => itemIndex !== index);
+    update("reportFinance", { hasFinance: true, entries });
   }
 
   function updateUploadFile(localId, patch) {
@@ -242,6 +283,25 @@ if (completed.length) {
               {errors.avenueDescriptions ? <span id="bod-avenueDescriptions-error" className="bod-field-error">{errors.avenueDescriptions}</span> : null}
             </fieldset>
           ) : null}
+          <fieldset className="bod-report-finance" aria-describedby={described("reportFinance")}>
+            <legend>Report finance</legend>
+            <label className="bod-report-finance__toggle"><input type="checkbox" name="reportFinance" checked={draft.reportFinance.hasFinance} onChange={(event) => toggleReportFinance(event.target.checked)} /> Any income/expense incurred for this event?</label>
+            <p className="bod-report-finance__hint">For Avenue Report generation only. This does not update Treasury.</p>
+            {draft.reportFinance.hasFinance ? (
+              <div className="bod-report-finance__rows">
+                {draft.reportFinance.entries.map((entry, index) => (
+                  <div className="bod-report-finance__row" key={index}>
+                    <label>Type<select value={entry.type} onChange={(event) => updateReportFinanceEntry(index, "type", event.target.value)}><option value="income">Income</option><option value="expense">Expense</option></select></label>
+                    <label>Amount<input type="number" min="0.01" max={BOD_REPORT_FINANCE_MAX_AMOUNT} step="0.01" value={entry.amount} onChange={(event) => updateReportFinanceEntry(index, "amount", event.target.value)} /></label>
+                    <label>Description<textarea value={entry.description} onChange={(event) => updateReportFinanceEntry(index, "description", event.target.value)} maxLength={BOD_REPORT_FINANCE_DESCRIPTION_LIMIT} rows="2" /></label>
+                    <button type="button" onClick={() => removeReportFinanceEntry(index)}>Remove</button>
+                  </div>
+                ))}
+                <button type="button" className="bod-button--quiet" onClick={addReportFinanceEntry} disabled={draft.reportFinance.entries.length >= BOD_REPORT_FINANCE_MAX_ROWS}>Add finance row</button>
+              </div>
+            ) : null}
+            {errors.reportFinance ? <span id="bod-reportFinance-error" className="bod-field-error">{errors.reportFinance}</span> : null}
+          </fieldset>
           <label>Host club<input value={draft.hostClub} onChange={(e) => update("hostClub", e.target.value)} maxLength="180" /></label>
           <fieldset><legend>Collaborators</legend>{draft.collaborators.map((collaborator, index) => <div className="bod-collaborator-row" key={index}><label><span className="sr-only">Collaborator {index + 1}</span><input value={collaborator.name} onChange={(e) => updateCollaborator(index, e.target.value)} placeholder="Club or organization name" /></label><button type="button" onClick={() => removeCollaborator(index)} disabled={draft.collaborators.length === 1}>Remove</button></div>)}<button type="button" className="bod-button--quiet" onClick={() => update("collaborators", [...draft.collaborators, { name: "" }])}>Add collaborator</button></fieldset>
           <label>Collaboration notes<textarea value={draft.collaborationNotes} onChange={(e) => update("collaborationNotes", e.target.value)} maxLength="1000" rows="3" /></label>
