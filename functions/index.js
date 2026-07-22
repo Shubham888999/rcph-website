@@ -7723,10 +7723,7 @@ exports.getBodAvenueReportDirectors = onCall(CALLABLE_OPTIONS, async (request) =
   const assignmentsSnap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
   const assignments = assignmentsSnap.docs.map(doc => doc.data() || {});
   const candidateUids = Array.from(new Set(assignments
-    .filter(assignment => {
-      const definition = positionHelpers.getPositionDefinition(assignment.positionKey);
-      return definition?.active === true && definition.avenueCode === avenueCode;
-    })
+    .filter(assignment => bodAvenueReport.isReportAvenueDirectorAssignment(assignment, avenueCode, positionHelpers))
     .map(assignment => normalizeText(assignment.uid, 128))
     .filter(Boolean)));
   const [userSnaps, roleSnaps] = candidateUids.length ? await Promise.all([
