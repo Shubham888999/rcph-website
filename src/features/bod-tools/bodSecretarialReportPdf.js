@@ -1,20 +1,30 @@
 import {
   A4_PDF_SIZE,
-  buildSimpleA4Pdf,
   normalizePdfText,
   pdfFillRectCommand,
   pdfLineCommand,
   pdfTextCommand,
   wrapPdfText,
 } from "../pdf/simplePdf.js";
+import {
+  BOD_AVENUE_REPORT_LAYOUT,
+  BOD_AVENUE_REPORT_LETTERHEAD_URL,
+  getBodAvenueReportLetterheadPng,
+} from "./bodAvenueReportPdf.js";
+
+export const BOD_SECRETARIAL_REPORT_LETTERHEAD_URL = BOD_AVENUE_REPORT_LETTERHEAD_URL;
+
+const encoder = new TextEncoder();
+const SAFE_AREA = BOD_AVENUE_REPORT_LAYOUT.safeArea;
 
 export const BOD_SECRETARIAL_REPORT_PDF_LAYOUT = Object.freeze({
   page: A4_PDF_SIZE,
-  margin: 42,
-  top: 784,
-  bottom: 52,
-  titleSize: 18,
-  headingSize: 15,
+  safeArea: SAFE_AREA,
+  margin: SAFE_AREA.left,
+  top: SAFE_AREA.top,
+  bottom: SAFE_AREA.bottom,
+  titleSize: 16,
+  headingSize: 13,
   sectionSize: 12,
   bodySize: 9,
   headerSize: 8.4,
@@ -37,15 +47,15 @@ const MEETING_COLUMNS = Object.freeze([
   Object.freeze({ key: "serial", label: "Sr. No.", width: 46, maxLines: 1 }),
   Object.freeze({ key: "type", label: "Type", width: 78, maxLines: 2 }),
   Object.freeze({ key: "dateLabel", label: "Date", width: 78, maxLines: 1 }),
-  Object.freeze({ key: "description", label: "Description", width: 309, maxLines: 10 }),
+  Object.freeze({ key: "description", label: "Description", width: 321, maxLines: 10 }),
 ]);
 
 const EVENT_COLUMNS = Object.freeze([
   Object.freeze({ key: "serial", label: "Sr. No.", width: 46, maxLines: 1 }),
-  Object.freeze({ key: "avenueLabel", label: "Avenue", width: 78, maxLines: 2 }),
+  Object.freeze({ key: "avenueLabel", label: "Avenue", width: 82, maxLines: 2 }),
   Object.freeze({ key: "dateLabel", label: "Date", width: 62, maxLines: 1 }),
-  Object.freeze({ key: "name", label: "Name", width: 120, maxLines: 4 }),
-  Object.freeze({ key: "description", label: "Description", width: 205, maxLines: 10 }),
+  Object.freeze({ key: "name", label: "Name", width: 124, maxLines: 4 }),
+  Object.freeze({ key: "description", label: "Description", width: 209, maxLines: 10 }),
 ]);
 
 function cleanText(value, max = 1200) {
@@ -70,6 +80,15 @@ function text(commands, x, y, value, options = {}) {
     bold: options.bold,
     gray: options.gray || 0,
   }));
+}
+
+function approximateTextWidth(value, size, bold = false) {
+  return normalizePdfText(value).length * size * 0.52 * (bold ? 1.04 : 1);
+}
+
+function rightText(commands, right, y, value, options = {}) {
+  const size = options.size || BOD_SECRETARIAL_REPORT_PDF_LAYOUT.bodySize;
+  text(commands, right - approximateTextWidth(value, size, options.bold), y, value, options);
 }
 
 function strokeRect(commands, x, top, width, height, gray = 0.45) {
@@ -266,9 +285,10 @@ function summaryPage(report) {
 }
 
 function addPageNumbers(pages) {
-  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const safe = BOD_SECRETARIAL_REPORT_PDF_LAYOUT.safeArea;
+  const topMeta = BOD_AVENUE_REPORT_LAYOUT.topMeta;
   pages.forEach((page, index) => {
-    text(page, A4_PDF_SIZE.width - layout.margin - 70, 28, `Page ${index + 1} of ${pages.length}`, { size: 8, gray: 0.35 });
+    rightText(page, safe.right, topMeta.y, `Page ${index + 1} of ${pages.length}`, { size: topMeta.fontSize, gray: topMeta.gray });
   });
 }
 
@@ -290,8 +310,89 @@ export function buildBodSecretarialReportPdfPages(report) {
   return pages;
 }
 
-export function buildBodSecretarialReportPdfDocument(report) {
-  return buildSimpleA4Pdf(buildBodSecretarialReportPdfPages(report));
+function ascii(value) {
+  return encoder.encode(value);
+}
+
+function concatBytes(parts) {
+  const length = parts.reduce((total, part) => total + part.length, 0);
+  const output = new Uint8Array(length);
+  let offset = 0;
+  parts.forEach((part) => { output.set(part, offset); offset += part.length; });
+  return output;
+}
+
+function imagePlacement(letterhead) {
+  const page = BOD_SECRETARIAL_REPORT_PDF_LAYOUT.page;
+  const scale = Math.min(page.width / letterhead.width, page.height / letterhead.height);
+  const width = letterhead.width * scale;
+  const height = letterhead.height * scale;
+  return { x: (page.width - width) / 2, y: (page.height - height) / 2, width, height };
+}
+
+function validateLetterhead(letterhead) {
+  if (!(letterhead?.bytes instanceof Uint8Array) || !letterhead.bytes.length || !Number.isInteger(letterhead.width) || !Number.isInteger(letterhead.height)) {
+    throw new TypeError("A valid Secretarial Report letterhead PNG is required.");
+  }
+  if (letterhead.colorSpace !== "DeviceRGB" || letterhead.bitsPerComponent !== 8 || letterhead.colors !== 3) {
+    throw new TypeError("A valid 8-bit RGB Secretarial Report letterhead PNG is required.");
+  }
+}
+
+function imageObject(letterhead) {
+  return concatBytes([
+    ascii(`<< /Type /XObject /Subtype /Image /Width ${letterhead.width} /Height ${letterhead.height} /ColorSpace /${letterhead.colorSpace} /BitsPerComponent ${letterhead.bitsPerComponent} /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors ${letterhead.colors} /BitsPerComponent ${letterhead.bitsPerComponent} /Columns ${letterhead.width} >> /Length ${letterhead.bytes.length} >>\nstream\n`),
+    letterhead.bytes,
+    ascii("\nendstream"),
+  ]);
+}
+
+function streamObject(bytes) {
+  return concatBytes([ascii(`<< /Length ${bytes.length} >>\nstream\n`), bytes, ascii("\nendstream")]);
+}
+
+function assemblePdf(objects) {
+  const chunks = [ascii("%PDF-1.4\n%RCPH-BINARY\n")];
+  const offsets = [0];
+  let length = chunks[0].length;
+  for (let id = 1; id < objects.length; id += 1) {
+    offsets[id] = length;
+    const objectBytes = concatBytes([ascii(`${id} 0 obj\n`), objects[id], ascii("\nendobj\n")]);
+    chunks.push(objectBytes);
+    length += objectBytes.length;
+  }
+  const xrefOffset = length;
+  let xref = `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id += 1) xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  xref += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  chunks.push(ascii(xref));
+  return concatBytes(chunks);
+}
+
+export function buildBodSecretarialReportPdfDocument(report, letterhead) {
+  validateLetterhead(letterhead);
+  const pages = buildBodSecretarialReportPdfPages(report);
+  const imageId = 5;
+  const pageIds = pages.map((_, index) => 6 + index * 2);
+  const placement = imagePlacement(letterhead);
+  const objects = [];
+  objects[1] = ascii("<< /Type /Catalog /Pages 2 0 R >>");
+  objects[2] = ascii(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>`);
+  objects[3] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  objects[imageId] = imageObject(letterhead);
+  pages.forEach((page, index) => {
+    const pageId = pageIds[index];
+    const contentId = pageId + 1;
+    const commands = [
+      `q\n${placement.width.toFixed(2)} 0 0 ${placement.height.toFixed(2)} ${placement.x.toFixed(2)} ${placement.y.toFixed(2)} cm\n/BG Do\nQ`,
+      ...page,
+    ];
+    const content = ascii(commands.join("\n"));
+    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /BG ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    objects[contentId] = streamObject(content);
+  });
+  return assemblePdf(objects);
 }
 
 function filePart(value) {
@@ -303,7 +404,8 @@ export function getBodSecretarialReportFilename(report) {
 }
 
 export async function downloadBodSecretarialReportPdf(report, options = {}) {
-  const pdf = buildBodSecretarialReportPdfDocument(report);
+  const loadLetterhead = options.loadLetterhead || getBodAvenueReportLetterheadPng;
+  const pdf = buildBodSecretarialReportPdfDocument(report, await loadLetterhead());
   const documentRef = options.document || document;
   const urlApi = options.URL || URL;
   const setTimeoutRef = options.setTimeout || window.setTimeout;

@@ -1,11 +1,29 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { buildBodSecretarialReportModel } from "./bodSecretarialReportModel.js";
 import {
+  BOD_AVENUE_REPORT_LETTERHEAD_URL,
+} from "./bodAvenueReportPdf.js";
+import {
+  BOD_SECRETARIAL_REPORT_LETTERHEAD_URL,
   buildBodSecretarialReportPdfDocument,
   buildBodSecretarialReportPdfPages,
   getBodSecretarialReportFilename,
 } from "./bodSecretarialReportPdf.js";
+
+const source = readFileSync(new URL("./bodSecretarialReportPdf.js", import.meta.url), "utf8");
+const decodePdf = (bytes) => new TextDecoder("latin1").decode(bytes);
+const occurrences = (value, pattern) => value.match(pattern)?.length || 0;
+
+const MOCK_LETTERHEAD = Object.freeze({
+  bytes: new Uint8Array([0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01]),
+  width: 1414,
+  height: 2000,
+  bitsPerComponent: 8,
+  colorSpace: "DeviceRGB",
+  colors: 3,
+});
 
 const clubEvent = (id, overrides = {}) => ({
   id,
@@ -49,7 +67,7 @@ function report(options = {}) {
 }
 
 test("secretarial PDF contains the summary metrics page", () => {
-  const pdf = buildBodSecretarialReportPdfDocument(report());
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD));
   for (const text of [
     "Monthly Report RCPH RIY 26 - 27",
     "Club Strength",
@@ -64,15 +82,30 @@ test("secretarial PDF contains the summary metrics page", () => {
   ]) assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
+test("secretarial PDF uses the shared BOD Avenue Report letterhead asset and background XObject", () => {
+  const pages = buildBodSecretarialReportPdfPages(report());
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD));
+  assert.equal(BOD_SECRETARIAL_REPORT_LETTERHEAD_URL, BOD_AVENUE_REPORT_LETTERHEAD_URL);
+  assert.match(source, /BOD_AVENUE_REPORT_LETTERHEAD_URL/);
+  assert.match(source, /getBodAvenueReportLetterheadPng/);
+  assert.match(pdf, /^%PDF-1\.4/);
+  assert.match(pdf, /\/MediaBox \[0 0 595 842\]/);
+  assert.equal(occurrences(pdf, /\/Subtype \/Image/g), 1);
+  assert.equal(occurrences(pdf, /\/XObject << \/BG 5 0 R >>/g), pages.length);
+  assert.equal(occurrences(pdf, /\/BG Do/g), pages.length);
+  assert.match(pdf, /595\.00 0 0 841\.58 0\.00 0\.21 cm/);
+  assert.match(pdf, /Page 1 of 2/);
+});
+
 test("secretarial PDF contains month headings and meetings table headers", () => {
-  const pdf = buildBodSecretarialReportPdfDocument(report());
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD));
   for (const text of ["Monthly Report: July 2026", "Sr. No.", "Type", "Date", "Description"]) {
     assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 });
 
 test("secretarial PDF contains events table headers", () => {
-  const pdf = buildBodSecretarialReportPdfDocument(report());
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD));
   for (const text of ["Sr. No.", "Avenue", "Date", "Name", "Description"]) {
     assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -92,6 +125,21 @@ test("multi-month reports create separate month pages", () => {
   assert.match(pages[2].join("\n"), /Monthly Report: August 2026/);
 });
 
+test("overflowing month content continues on letterhead pages with repeated table headers", () => {
+  const model = report({
+    events: Array.from({ length: 28 }, (_, index) => clubEvent(`overflow-${index + 1}`, {
+      startDate: `2026-07-${String((index % 20) + 1).padStart(2, "0")}`,
+      name: `Overflow Project ${index + 1}`,
+      description: "Overflow detail ".repeat(15),
+    })),
+  });
+  const pages = buildBodSecretarialReportPdfPages(model);
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD));
+  assert.ok(pages.length > 2);
+  assert.equal(occurrences(pdf, /\/BG Do/g), pages.length);
+  assert.ok(pages.slice(1).every((page) => page.join("\n").includes("Description")));
+});
+
 test("long descriptions do not throw during PDF generation", () => {
   const model = report({
     events: [
@@ -99,8 +147,8 @@ test("long descriptions do not throw during PDF generation", () => {
       clubEvent("long-project", { description: "Long project detail ".repeat(1000) }),
     ],
   });
-  assert.doesNotThrow(() => buildBodSecretarialReportPdfDocument(model));
-  assert.match(buildBodSecretarialReportPdfDocument(model), /^%PDF-1\.4/);
+  assert.doesNotThrow(() => buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD));
+  assert.match(decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD)), /^%PDF-1\.4/);
 });
 
 test("secretarial PDF filename is period based and ends with pdf", () => {
