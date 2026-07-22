@@ -81,7 +81,7 @@ test(
 test("Active club events exposes a real disclosure button with count and controls", () => {
   const clubSource = clubAttendanceModule();
 
-  assert.match(clubSource, /const \[eventsExpanded, setEventsExpanded\] = useState\(true\)/);
+  assert.match(clubSource, /const \[eventsExpanded, setEventsExpanded\] = useState\(false\)/);
   assert.match(clubSource, /const activeEventsListId = "active-club-events-list"/);
   assert.match(clubSource, /<button[\s\S]*type="button"[\s\S]*attendance-section-heading--button/);
   assert.match(clubSource, /aria-expanded=\{eventsExpanded\}/);
