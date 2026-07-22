@@ -31,6 +31,7 @@ const {
   createAnnouncementAttachmentService,
 } = require('./lib/announcement-attachments');
 const bodAvenueReport = require('./lib/bod-avenue-report');
+const bodSecretarialReport = require('./lib/bod-secretarial-report');
 const bodEventSchema = require('./lib/bod-event-schema');
 const { createBodManagementService } = require('./lib/bod-management');
 const { createBodPhotoUploadService } = require('./lib/bod-photo-upload');
@@ -7751,6 +7752,17 @@ exports.getBodAvenueReportDirectors = onCall(CALLABLE_OPTIONS, async (request) =
       positionHelpers,
     }),
   };
+});
+
+exports.getBodSecretarialReportMetrics = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  await Promise.all([
+    assertBodAdminOrPresident(uid),
+    assertApprovedActiveCallableAccount(uid),
+  ]);
+
+  const membersSnap = await db.collection('members').get();
+  return bodSecretarialReport.buildBodSecretarialReportMetrics(membersSnap);
 });
 
 exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
