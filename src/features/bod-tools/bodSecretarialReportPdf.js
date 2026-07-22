@@ -13,9 +13,11 @@ import {
 } from "./bodAvenueReportPdf.js";
 
 export const BOD_SECRETARIAL_REPORT_LETTERHEAD_URL = BOD_AVENUE_REPORT_LETTERHEAD_URL;
+export const BOD_SECRETARIAL_REPORT_FRAME_URL = "/images/Report_Frame.png";
 
 const encoder = new TextEncoder();
 const SAFE_AREA = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+const DEFAULT_FRAME_ASPECT_RATIO = 1204 / 824;
 
 export const BOD_SECRETARIAL_REPORT_PDF_LAYOUT = Object.freeze({
   page: A4_PDF_SIZE,
@@ -31,10 +33,14 @@ export const BOD_SECRETARIAL_REPORT_PDF_LAYOUT = Object.freeze({
   lineHeight: 11.2,
   padding: 5,
   tableHeaderHeight: 22,
+  frameInset: 0,
+  frameTitleSize: 17,
+  frameStatSize: 11,
+  frameStatLineGap: 25,
 });
 
 const CONTENT_WIDTH = A4_PDF_SIZE.width - BOD_SECRETARIAL_REPORT_PDF_LAYOUT.margin * 2;
-const SUMMARY_ROWS = Object.freeze([
+const STAT_ROWS = Object.freeze([
   Object.freeze(["Club Strength", "clubStrength"]),
   Object.freeze(["Club Score", "clubScore"]),
   Object.freeze(["Club Rank (As of Now)", "clubRank"]),
@@ -89,6 +95,11 @@ function approximateTextWidth(value, size, bold = false) {
 function rightText(commands, right, y, value, options = {}) {
   const size = options.size || BOD_SECRETARIAL_REPORT_PDF_LAYOUT.bodySize;
   text(commands, right - approximateTextWidth(value, size, options.bold), y, value, options);
+}
+
+function centerText(commands, center, y, value, options = {}) {
+  const size = options.size || BOD_SECRETARIAL_REPORT_PDF_LAYOUT.bodySize;
+  text(commands, center - approximateTextWidth(value, size, options.bold) / 2, y, value, options);
 }
 
 function strokeRect(commands, x, top, width, height, gray = 0.45) {
@@ -252,35 +263,53 @@ function drawTable(state, month, sectionTitle, columns, rows, emptyText) {
   return { ...state, y: state.y - 18 };
 }
 
-function summaryPage(report) {
+function frameBox(frame) {
   const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const safe = layout.safeArea;
+  const aspect = Number(frame?.width) > 0 && Number(frame?.height) > 0
+    ? Number(frame.width) / Number(frame.height)
+    : DEFAULT_FRAME_ASPECT_RATIO;
+  const maxWidth = safe.right - safe.left - layout.frameInset * 2;
+  const maxHeight = safe.top - safe.bottom - layout.frameInset * 2;
+  let width = maxWidth;
+  let height = width / aspect;
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * aspect;
+  }
+  return {
+    x: safe.left + (maxWidth - width) / 2 + layout.frameInset,
+    y: safe.bottom + (maxHeight - height) / 2 + layout.frameInset,
+    width,
+    height,
+  };
+}
+
+function frameImageCommand(frame) {
+  const box = frameBox(frame);
+  return `q\n${box.width.toFixed(2)} 0 0 ${box.height.toFixed(2)} ${box.x.toFixed(2)} ${box.y.toFixed(2)} cm\n/FRAME Do\nQ`;
+}
+
+function summaryPage(report, frame) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const box = frameBox(frame);
   const commands = [];
+  commands.push(frameImageCommand(frame));
   const title = displayText(report?.title || "Monthly Report RCPH RIY 26 - 27");
-  const titleLines = wrapPdfText(title, CONTENT_WIDTH, layout.titleSize);
-  titleLines.forEach((line, index) => text(commands, layout.margin, layout.top - index * 22, line, {
-    size: layout.titleSize,
+  const center = box.x + box.width / 2;
+  const titleY = box.y + box.height - Math.max(56, box.height * 0.16);
+  centerText(commands, center, titleY, title, {
+    size: layout.frameTitleSize,
     bold: true,
-  }));
-
-  const boxTop = layout.top - 82;
-  const rowHeightValue = 30;
-  const boxHeight = SUMMARY_ROWS.length * rowHeightValue;
-  commands.push(pdfFillRectCommand({
-    x: layout.margin,
-    y: boxTop - boxHeight,
-    width: CONTENT_WIDTH,
-    height: boxHeight,
-    gray: 0.955,
-  }));
-  strokeRect(commands, layout.margin, boxTop, CONTENT_WIDTH, boxHeight, 0.4);
-
-  SUMMARY_ROWS.forEach(([label, key], index) => {
-    const rowTop = boxTop - index * rowHeightValue;
-    if (index) commands.push(pdfLineCommand({ x1: layout.margin, y1: rowTop, x2: layout.margin + CONTENT_WIDTH, y2: rowTop, gray: 0.7 }));
-    text(commands, layout.margin + 12, rowTop - 19, `${label}:`, { bold: true });
-    text(commands, layout.margin + 210, rowTop - 19, stringValue(report?.[key]));
   });
-  text(commands, layout.margin, boxTop - boxHeight - 34, `Period: ${displayText(report?.periodLabel)}`, { gray: 0.22 });
+
+  const lines = STAT_ROWS.map(([label, key]) => `${label}: ${stringValue(report?.[key])}`);
+  const firstLineY = titleY - 52;
+  lines.forEach((line, index) => {
+    centerText(commands, center, firstLineY - index * layout.frameStatLineGap, line, {
+      size: layout.frameStatSize,
+    });
+  });
   return commands;
 }
 
@@ -297,9 +326,9 @@ function validateReport(report) {
   if (!Array.isArray(report.months) || !report.months.length) throw new TypeError("At least one report month is required.");
 }
 
-export function buildBodSecretarialReportPdfPages(report) {
+export function buildBodSecretarialReportPdfPages(report, options = {}) {
   validateReport(report);
-  const pages = [summaryPage(report)];
+  const pages = [summaryPage(report, options.frame)];
   report.months.forEach((month) => {
     let state = monthPage(pages, month);
     state.pages = pages;
@@ -330,19 +359,23 @@ function imagePlacement(letterhead) {
   return { x: (page.width - width) / 2, y: (page.height - height) / 2, width, height };
 }
 
-function validateLetterhead(letterhead) {
-  if (!(letterhead?.bytes instanceof Uint8Array) || !letterhead.bytes.length || !Number.isInteger(letterhead.width) || !Number.isInteger(letterhead.height)) {
-    throw new TypeError("A valid Secretarial Report letterhead PNG is required.");
+function validateRgbImage(image, label) {
+  if (!(image?.bytes instanceof Uint8Array) || !image.bytes.length || !Number.isInteger(image.width) || !Number.isInteger(image.height)) {
+    throw new TypeError(`A valid Secretarial Report ${label} image is required.`);
   }
-  if (letterhead.colorSpace !== "DeviceRGB" || letterhead.bitsPerComponent !== 8 || letterhead.colors !== 3) {
-    throw new TypeError("A valid 8-bit RGB Secretarial Report letterhead PNG is required.");
+  if (image.colorSpace !== "DeviceRGB" || image.bitsPerComponent !== 8 || image.colors !== 3) {
+    throw new TypeError(`A valid 8-bit RGB Secretarial Report ${label} image is required.`);
   }
 }
 
-function imageObject(letterhead) {
+function imageObject(image) {
+  const compressed = image.raw !== true;
+  const filter = compressed
+    ? ` /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors ${image.colors} /BitsPerComponent ${image.bitsPerComponent} /Columns ${image.width} >>`
+    : "";
   return concatBytes([
-    ascii(`<< /Type /XObject /Subtype /Image /Width ${letterhead.width} /Height ${letterhead.height} /ColorSpace /${letterhead.colorSpace} /BitsPerComponent ${letterhead.bitsPerComponent} /Filter /FlateDecode /DecodeParms << /Predictor 15 /Colors ${letterhead.colors} /BitsPerComponent ${letterhead.bitsPerComponent} /Columns ${letterhead.width} >> /Length ${letterhead.bytes.length} >>\nstream\n`),
-    letterhead.bytes,
+    ascii(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /${image.colorSpace} /BitsPerComponent ${image.bitsPerComponent}${filter} /Length ${image.bytes.length} >>\nstream\n`),
+    image.bytes,
     ascii("\nendstream"),
   ]);
 }
@@ -369,11 +402,13 @@ function assemblePdf(objects) {
   return concatBytes(chunks);
 }
 
-export function buildBodSecretarialReportPdfDocument(report, letterhead) {
-  validateLetterhead(letterhead);
-  const pages = buildBodSecretarialReportPdfPages(report);
+export function buildBodSecretarialReportPdfDocument(report, letterhead, frame) {
+  validateRgbImage(letterhead, "letterhead");
+  validateRgbImage(frame, "frame");
+  const pages = buildBodSecretarialReportPdfPages(report, { frame });
   const imageId = 5;
-  const pageIds = pages.map((_, index) => 6 + index * 2);
+  const frameImageId = 6;
+  const pageIds = pages.map((_, index) => 7 + index * 2);
   const placement = imagePlacement(letterhead);
   const objects = [];
   objects[1] = ascii("<< /Type /Catalog /Pages 2 0 R >>");
@@ -381,6 +416,7 @@ export function buildBodSecretarialReportPdfDocument(report, letterhead) {
   objects[3] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
   objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
   objects[imageId] = imageObject(letterhead);
+  objects[frameImageId] = imageObject(frame);
   pages.forEach((page, index) => {
     const pageId = pageIds[index];
     const contentId = pageId + 1;
@@ -389,10 +425,90 @@ export function buildBodSecretarialReportPdfDocument(report, letterhead) {
       ...page,
     ];
     const content = ascii(commands.join("\n"));
-    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /BG ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /BG ${imageId} 0 R /FRAME ${frameImageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
     objects[contentId] = streamObject(content);
   });
   return assemblePdf(objects);
+}
+
+function loadHtmlImage(blob) {
+  if (typeof globalThis.Image !== "function" || !globalThis.URL?.createObjectURL) {
+    throw new Error("Browser image decoding is unavailable.");
+  }
+  return new Promise((resolve, reject) => {
+    const url = globalThis.URL.createObjectURL(blob);
+    const image = new globalThis.Image();
+    image.onload = () => {
+      globalThis.URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      globalThis.URL.revokeObjectURL(url);
+      reject(new Error("The Secretarial Report frame image could not be decoded."));
+    };
+    image.src = url;
+  });
+}
+
+async function decodeImage(blob) {
+  if (typeof globalThis.createImageBitmap === "function") return globalThis.createImageBitmap(blob);
+  return loadHtmlImage(blob);
+}
+
+function createCanvas(width, height) {
+  if (!globalThis.document?.createElement) throw new Error("Browser canvas APIs are unavailable.");
+  const canvas = globalThis.document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+export async function convertSecretarialReportFrameBlobToImage(blob, options = {}) {
+  const decoder = options.decodeImage || decodeImage;
+  const canvasFactory = options.createCanvas || createCanvas;
+  const image = await decoder(blob);
+  const width = Number(image?.width || image?.naturalWidth);
+  const height = Number(image?.height || image?.naturalHeight);
+  if (!Number.isInteger(width) || width < 1 || !Number.isInteger(height) || height < 1) {
+    image?.close?.();
+    throw new Error("The Secretarial Report frame dimensions are invalid.");
+  }
+  const canvas = canvasFactory(width, height);
+  const context = canvas?.getContext?.("2d");
+  if (!context) {
+    image?.close?.();
+    throw new Error("A 2D canvas context is unavailable.");
+  }
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  image?.close?.();
+  const rgba = context.getImageData(0, 0, width, height).data;
+  const bytes = new Uint8Array(width * height * 3);
+  for (let source = 0, target = 0; source < rgba.length; source += 4, target += 3) {
+    bytes[target] = rgba[source];
+    bytes[target + 1] = rgba[source + 1];
+    bytes[target + 2] = rgba[source + 2];
+  }
+  return { bytes, width, height, bitsPerComponent: 8, colorSpace: "DeviceRGB", colors: 3, raw: true };
+}
+
+export async function loadBodSecretarialReportFrameImage(options = {}) {
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const converter = options.convertBlob || convertSecretarialReportFrameBlobToImage;
+  const logger = options.logger || console;
+  try {
+    if (typeof fetchImpl !== "function") throw new Error("Asset loading is unavailable.");
+    const response = await fetchImpl(BOD_SECRETARIAL_REPORT_FRAME_URL, { cache: options.cache || "no-store" });
+    if (!response?.ok) throw new Error(`Asset request failed with status ${response?.status || "unknown"}.`);
+    return await converter(await response.blob(), options);
+  } catch (error) {
+    logger?.error?.("Secretarial Report frame preparation failed.", {
+      assetUrl: BOD_SECRETARIAL_REPORT_FRAME_URL,
+      errorName: typeof error?.name === "string" ? error.name : "Error",
+    });
+    throw new Error("The Secretarial Report frame could not be loaded. Please try again.", { cause: error });
+  }
 }
 
 function filePart(value) {
@@ -405,7 +521,9 @@ export function getBodSecretarialReportFilename(report) {
 
 export async function downloadBodSecretarialReportPdf(report, options = {}) {
   const loadLetterhead = options.loadLetterhead || getBodAvenueReportLetterheadPng;
-  const pdf = buildBodSecretarialReportPdfDocument(report, await loadLetterhead());
+  const loadFrame = options.loadFrame || loadBodSecretarialReportFrameImage;
+  const [letterhead, frame] = await Promise.all([loadLetterhead(), loadFrame()]);
+  const pdf = buildBodSecretarialReportPdfDocument(report, letterhead, frame);
   const documentRef = options.document || document;
   const urlApi = options.URL || URL;
   const setTimeoutRef = options.setTimeout || window.setTimeout;
