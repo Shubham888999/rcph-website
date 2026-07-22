@@ -286,7 +286,7 @@ if (completed.length) {
           <fieldset className="bod-report-finance" aria-describedby={described("reportFinance")}>
             <legend>Report finance</legend>
             <label className="bod-report-finance__toggle"><input type="checkbox" name="reportFinance" checked={draft.reportFinance.hasFinance} onChange={(event) => toggleReportFinance(event.target.checked)} /> Any income/expense incurred for this event?</label>
-            <p className="bod-report-finance__hint">For Avenue Report generation only. This does not update Treasury.</p>
+            <p className="bod-report-finance__hint">For Avenue Report generation only.</p>
             {draft.reportFinance.hasFinance ? (
               <div className="bod-report-finance__rows">
                 {draft.reportFinance.entries.map((entry, index) => (
