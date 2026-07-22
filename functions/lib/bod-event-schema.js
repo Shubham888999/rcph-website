@@ -5,6 +5,10 @@ const BOD_AVENUE_CODE_SET = new Set(BOD_AVENUE_CODES);
 const RESERVED_DESCRIPTION_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const BOD_EVENT_DESCRIPTION_MAX = 2500;
 const BOD_EVENT_AVENUE_MAX = 12;
+const BOD_REPORT_FINANCE_TYPES = new Set(['income', 'expense']);
+const BOD_REPORT_FINANCE_DESCRIPTION_MAX = 240;
+const BOD_REPORT_FINANCE_MAX_AMOUNT = 1000000;
+const BOD_REPORT_FINANCE_MAX_ROWS = 20;
 
 class BodEventSchemaError extends Error {
   constructor(message, details = {}) {
@@ -34,6 +38,47 @@ function normalizeText(value, max, fieldName, { required = false } = {}) {
   if (trimmed.length > max) throw new BodEventSchemaError(fieldName + ' must be ' + max + ' characters or fewer.', { fieldName, max });
   if (required && !trimmed) throw new BodEventSchemaError(fieldName + ' is required.', { fieldName });
   return trimmed;
+}
+
+function emptyBodReportFinance() {
+  return { hasFinance: false, entries: [] };
+}
+
+function normalizeReportFinanceAmount(value, fieldName) {
+  const amount = typeof value === 'number'
+    ? value
+    : (typeof value === 'string' ? Number(value.trim()) : Number.NaN);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > BOD_REPORT_FINANCE_MAX_AMOUNT) {
+    throw new BodEventSchemaError('reportFinance amount must be greater than zero and no more than ' + BOD_REPORT_FINANCE_MAX_AMOUNT + '.', { fieldName });
+  }
+  return Math.round(amount * 100) / 100;
+}
+
+function normalizeBodReportFinance(value) {
+  if (value === undefined || value === null) return emptyBodReportFinance();
+  if (!isPlainObject(value)) throw new BodEventSchemaError('reportFinance must be a plain object.', { fieldName: 'reportFinance' });
+  if (value.hasFinance !== true) return emptyBodReportFinance();
+  if (!Array.isArray(value.entries)) throw new BodEventSchemaError('reportFinance.entries must be a list.', { fieldName: 'reportFinance.entries' });
+  if (!value.entries.length) throw new BodEventSchemaError('Add at least one report finance row or disable report finance.', { fieldName: 'reportFinance.entries' });
+  if (value.entries.length > BOD_REPORT_FINANCE_MAX_ROWS) {
+    throw new BodEventSchemaError('Use no more than ' + BOD_REPORT_FINANCE_MAX_ROWS + ' report finance rows.', { fieldName: 'reportFinance.entries', maxItems: BOD_REPORT_FINANCE_MAX_ROWS });
+  }
+
+  const entries = value.entries.map((entry, index) => {
+    const prefix = 'reportFinance.entries.' + index;
+    if (!isPlainObject(entry)) throw new BodEventSchemaError(prefix + ' must be a plain object.', { fieldName: prefix });
+    const type = normalizeText(entry.type, 20, prefix + '.type').toLowerCase();
+    if (!BOD_REPORT_FINANCE_TYPES.has(type)) {
+      throw new BodEventSchemaError(prefix + '.type must be income or expense.', { fieldName: prefix + '.type' });
+    }
+    return {
+      type,
+      amount: normalizeReportFinanceAmount(entry.amount, prefix + '.amount'),
+      description: normalizeText(entry.description, BOD_REPORT_FINANCE_DESCRIPTION_MAX, prefix + '.description', { required: true }),
+    };
+  });
+
+  return { hasFinance: true, entries };
 }
 
 function normalizeBodAvenues(value, options = {}) {
@@ -152,6 +197,9 @@ module.exports = {
   BOD_AVENUE_CODES,
   BOD_EVENT_AVENUE_MAX,
   BOD_EVENT_DESCRIPTION_MAX,
+  BOD_REPORT_FINANCE_DESCRIPTION_MAX,
+  BOD_REPORT_FINANCE_MAX_AMOUNT,
+  BOD_REPORT_FINANCE_MAX_ROWS,
   BodEventSchemaError,
   getEventDescriptionForAvenue,
   isPlainObject,
@@ -159,6 +207,7 @@ module.exports = {
   normalizeBodAvenues,
   normalizeBodEventAvenues,
   normalizeBodEventDescriptionFields,
+  normalizeBodReportFinance,
   normalizeEventDescription,
   validateAvenueDescriptionCoverage,
 };

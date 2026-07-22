@@ -3121,6 +3121,7 @@ function normalizeLegacyClubEventDescriptionFields(raw) {
 function normalizeBodEventPayload(raw, options = {}) {
   const hasCollaborationFields = ['rcphRole', 'hostClub', 'collaborators', 'collaborationNotes']
     .some(field => Object.prototype.hasOwnProperty.call(raw || {}, field));
+  const hasReportFinanceField = Object.prototype.hasOwnProperty.call(raw || {}, 'reportFinance');
   const name = normalizeText(raw.name, 180);
   const conductedBy = normalizeText(raw.conductedBy, 140);
   const date = normalizeText(raw.date || raw.eventStart, 20);
@@ -3131,6 +3132,15 @@ function normalizeBodEventPayload(raw, options = {}) {
     bodDescriptionFields = options.allowNonBodAvenues
       ? normalizeLegacyClubEventDescriptionFields(raw || {})
       : bodEventSchema.normalizeBodEventDescriptionFields(raw || {});
+  } catch (error) {
+    if (error instanceof bodEventSchema.BodEventSchemaError) {
+      throw new HttpsError('invalid-argument', error.message);
+    }
+    throw error;
+  }
+  let reportFinance;
+  try {
+    reportFinance = bodEventSchema.normalizeBodReportFinance(raw.reportFinance);
   } catch (error) {
     if (error instanceof bodEventSchema.BodEventSchemaError) {
       throw new HttpsError('invalid-argument', error.message);
@@ -3176,7 +3186,9 @@ function normalizeBodEventPayload(raw, options = {}) {
     hostClub,
     collaborators,
     collaborationNotes,
+    reportFinance,
     _hasCollaborationFields: hasCollaborationFields,
+    _hasReportFinanceField: hasReportFinanceField,
   };
 }
 
@@ -3398,6 +3410,18 @@ async function initializeAttendanceFieldForCollection(memberCollection, attendan
   return rowsUpdated;
 }
 
+function normalizeStoredBodReportFinance(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    try {
+      return bodEventSchema.normalizeBodReportFinance(value);
+    } catch {
+      // Stored malformed report-only finance should not block unrelated edits.
+    }
+  }
+  return bodEventSchema.normalizeBodReportFinance();
+}
+
 async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, preserveCreatedAt = true }) {
   const bodRef = db.collection('bodEvents').doc(eventId);
   const eventRef = db.collection('events').doc(eventId);
@@ -3423,6 +3447,9 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
   const collaborationNotes = shouldUsePayloadCollab
     ? (payload.collaborationNotes || '')
     : normalizeText(existingBod.collaborationNotes || existingEvent.collaborationNotes, 1000);
+  const reportFinance = payload._hasReportFinanceField || (!bodSnap.exists && !eventSnap.exists)
+    ? (payload.reportFinance || bodEventSchema.normalizeBodReportFinance())
+    : normalizeStoredBodReportFinance(existingBod.reportFinance, existingEvent.reportFinance);
 
   const bodEventDoc = {
     name: payload.name,
@@ -3452,6 +3479,7 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     hostClub,
     collaborators,
     collaborationNotes,
+    reportFinance,
     archived: false,
     createdBy: existingBod.createdBy || uid,
     createdByEmail: existingBod.createdByEmail || userProfile.email,

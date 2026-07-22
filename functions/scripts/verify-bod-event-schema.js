@@ -26,6 +26,24 @@ assert.deepEqual(valid({ avenues: ['CMD'], avenue: ['CMD'], avenueDescriptions: 
 assert.deepEqual(schema.normalizeBodEventDescriptionFields({ desc: 'Legacy shared', avenue: ['CMD', 'PDD'] }).avenueDescriptions, { CMD: 'Legacy shared', PDD: 'Legacy shared' });
 assert.equal(schema.getEventDescriptionForAvenue({ description: 'General', avenueDescriptions: { CMD: 'Community' } }, 'CMD'), 'Community');
 assert.equal(schema.getEventDescriptionForAvenue({ description: 'General' }, 'CMD'), 'General');
+assert.deepEqual(schema.normalizeBodReportFinance(), { hasFinance: false, entries: [] });
+assert.deepEqual(schema.normalizeBodReportFinance({
+  hasFinance: false,
+  entries: [{ type: 'expense', amount: 50, description: 'Ignored when unchecked' }],
+}), { hasFinance: false, entries: [] });
+assert.deepEqual(schema.normalizeBodReportFinance({
+  hasFinance: true,
+  entries: [
+    { type: 'expense', amount: '125.455', description: ' Venue ', unknown: 'stripped' },
+    { type: 'income', amount: 75, description: 'Ticket collection' },
+  ],
+}), {
+  hasFinance: true,
+  entries: [
+    { type: 'expense', amount: 125.46, description: 'Venue' },
+    { type: 'income', amount: 75, description: 'Ticket collection' },
+  ],
+});
 
 for (const [label, payload] of [
   ['missing selected description', { avenues: ['CMD', 'PDD'], avenue: ['CMD', 'PDD'], avenueDescriptions: { CMD: 'Only CMD' } }],
@@ -41,6 +59,24 @@ for (const [label, payload] of [
   assert.throws(() => valid(payload), schema.BodEventSchemaError, label);
 }
 
+for (const [label, finance] of [
+  ['invalid type', { hasFinance: true, entries: [{ type: 'refund', amount: 50, description: 'Bad type' }] }],
+  ['zero amount', { hasFinance: true, entries: [{ type: 'expense', amount: 0, description: 'Zero' }] }],
+  ['negative amount', { hasFinance: true, entries: [{ type: 'expense', amount: -1, description: 'Negative' }] }],
+  ['over max amount', { hasFinance: true, entries: [{ type: 'expense', amount: schema.BOD_REPORT_FINANCE_MAX_AMOUNT + 1, description: 'Too much' }] }],
+  ['empty description', { hasFinance: true, entries: [{ type: 'expense', amount: 25, description: '   ' }] }],
+  ['too many rows', {
+    hasFinance: true,
+    entries: Array.from({ length: schema.BOD_REPORT_FINANCE_MAX_ROWS + 1 }, (_, index) => ({
+      type: index % 2 === 0 ? 'income' : 'expense',
+      amount: index + 1,
+      description: `Row ${index + 1}`,
+    })),
+  }],
+]) {
+  assert.throws(() => schema.normalizeBodReportFinance(finance), schema.BodEventSchemaError, label);
+}
+
 const indexSource = fs.readFileSync(path.resolve(__dirname, '../index.js'), 'utf8');
 const writeStart = indexSource.indexOf('async function writeSyncedBodEvent');
 const writeEnd = indexSource.indexOf('async function writeBodMeetingSynced');
@@ -49,6 +85,9 @@ const writeHelper = indexSource.slice(writeStart, writeEnd);
 const eventDocStart = writeHelper.indexOf('const eventDoc = {');
 const eventDocEnd = writeHelper.indexOf('  };', eventDocStart);
 const eventDocBlock = writeHelper.slice(eventDocStart, eventDocEnd);
+const bodEventDocStart = writeHelper.indexOf('const bodEventDoc = {');
+const bodEventDocEnd = writeHelper.indexOf('  };', bodEventDocStart);
+const bodEventDocBlock = writeHelper.slice(bodEventDocStart, bodEventDocEnd);
 
 for (const text of [
   "const eventRef = db.collection('events').doc(eventId)",
@@ -56,8 +95,13 @@ for (const text of [
   "batch.set(eventRef, eventDoc, { merge: true })",
   'avenueDescriptions: payload.avenueDescriptions || {}',
   'avenues: payload.avenues || payload.avenue',
+  'normalizeStoredBodReportFinance',
+  'payload._hasReportFinanceField',
 ]) assert.ok(writeHelper.includes(text), text);
+assert.ok(indexSource.includes('reportFinance = bodEventSchema.normalizeBodReportFinance(raw.reportFinance)'));
 assert.equal(eventDocBlock.includes('avenueDescriptions'), false);
+assert.equal(eventDocBlock.includes('reportFinance'), false);
+assert.ok(bodEventDocBlock.includes('reportFinance'));
 assert.ok(eventDocBlock.includes('description: payload.description || payload.desc'));
 assert.ok(eventDocBlock.includes('avenues: payload.avenues || payload.avenue'));
 
