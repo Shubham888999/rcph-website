@@ -187,6 +187,19 @@ export function filterBodAvenueReportMeetings(events, options = {}) {
   ));
 }
 
+function normalizeDirectorTitle(value) {
+  return cleanText(value, 160)
+    .toLowerCase()
+    .replace(/[-_/]+/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function directorEntryRank(item) {
+  return /\b(co|joint|deputy|associate)\b/.test(normalizeDirectorTitle(item?.positionTitle)) ? 1 : 0;
+}
+
 function normalizeDirectorEntries(items) {
   const seen = new Set();
   const directors = [];
@@ -198,7 +211,11 @@ function normalizeDirectorEntries(items) {
     seen.add(key);
     directors.push({ name, positionTitle });
   }
-  return directors.sort((left, right) => left.name.localeCompare(right.name));
+  return directors.sort((left, right) => (
+    directorEntryRank(left) - directorEntryRank(right)
+    || left.positionTitle.localeCompare(right.positionTitle)
+    || left.name.localeCompare(right.name)
+  ));
 }
 
 export function normalizeBodAvenueDirectors(payload, avenueCode) {

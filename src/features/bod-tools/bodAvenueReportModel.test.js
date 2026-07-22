@@ -260,13 +260,13 @@ test("director lines keep one normalized director per display line", () => {
     events: [event("directors")],
     selectedEventIds: ["directors"],
     directors: [
-      { name: "Director B", positionTitle: "Joint Community Service Director" },
-      { name: "Director A", positionTitle: "Community Service Director" },
+      { name: "Aarya Co", positionTitle: "Joint Community Service Director" },
+      { name: "Zara Main", positionTitle: "Community Service Director" },
     ],
   });
   assert.deepEqual(report.directorLines, [
-    "Director A (Community Service Director)",
-    "Director B (Joint Community Service Director)",
+    "Zara Main (Community Service Director)",
+    "Aarya Co (Joint Community Service Director)",
   ]);
   assert.equal(report.directorText, report.directorLines.join(", "));
 });
