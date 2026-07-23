@@ -159,7 +159,7 @@ export default function VoxThemeRevealModal() {
                 src={VOX_THEME_REVEAL_EMBED_URL}
                 title="VOX 2026 theme reveal Instagram Reel"
                 loading="lazy"
-                allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen
               />

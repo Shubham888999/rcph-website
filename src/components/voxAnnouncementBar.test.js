@@ -70,7 +70,8 @@ test("VOX theme reveal modal provides accessible embed and fallback behavior", (
   assert.match(modal, /Cueing the theme reveal/);
   assert.match(modal, /<iframe[\s\S]*className="vox-theme-modal__frame"[\s\S]*src=\{VOX_THEME_REVEAL_EMBED_URL\}/);
   assert.match(modal, /loading="lazy"/);
-  assert.match(modal, /allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"/);
+  assert.match(modal, /allow="clipboard-write; encrypted-media; picture-in-picture; web-share"/);
+assert.doesNotMatch(modal, /allow="autoplay;/);
   assert.match(modal, /title="VOX 2026 theme reveal Instagram Reel"/);
   assert.match(modal, /Open on Instagram/);
   assert.match(modal, /target="_blank"/);

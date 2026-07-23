@@ -200,7 +200,7 @@ export default function InstallationSection({ autoRevealActive = false }) {
                   src={THEME_REVEAL_EMBED_URL}
                   title="VOX 2026 theme reveal Instagram Reel"
                   loading="lazy"
-                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
                   referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                 />
