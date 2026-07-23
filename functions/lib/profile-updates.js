@@ -13,6 +13,9 @@ const COMMON_PROFILE_FIELDS = [
   'genderSelfDescribe',
   'hobbies',
 ];
+const MEMBER_PROFILE_FIELDS = [
+  'rotaryId',
+];
 const PROSPECT_PROFILE_FIELDS = [
   'previousRotaract',
   'previousRotaractDetails',
@@ -160,7 +163,7 @@ function normalizeBooleanField(value, field) {
 function profileFieldsForRole(role) {
   return normalizeRole(role) === 'prospect'
     ? [...COMMON_PROFILE_FIELDS, ...PROSPECT_PROFILE_FIELDS]
-    : COMMON_PROFILE_FIELDS.slice();
+    : [...COMMON_PROFILE_FIELDS, ...MEMBER_PROFILE_FIELDS];
 }
 
 function isSupportedProfileField(field, role) {
@@ -193,6 +196,9 @@ function normalizeProfileUpdatePayload(data, role, options = {}) {
   }
   if (hasOwn(data, 'phone')) {
     profile.phone = normalizeStringField(data.phone, { field: 'phone', max: 40 });
+  }
+  if (hasOwn(data, 'rotaryId')) {
+    profile.rotaryId = normalizeStringField(data.rotaryId, { field: 'rotaryId', max: 40 });
   }
   if (hasOwn(data, 'dateOfBirth')) {
     profile.dateOfBirth = normalizeDateOfBirth(data.dateOfBirth, options);
@@ -260,6 +266,7 @@ function safeBoolean(value) {
 function safeFieldValue(field, data = {}) {
   if (field === 'name') return stripRotaractorPrefix(safeText(data.name, 160));
   if (field === 'phone') return safeText(data.phone, 40);
+  if (field === 'rotaryId') return safeText(data.rotaryId, 40);
   if (field === 'dateOfBirth') {
     try {
       return normalizeDateOfBirth(data.dateOfBirth, { today: '9999-12-31' });
@@ -294,6 +301,9 @@ function safeProfileFromUserData(data = {}, role, extras = {}) {
     genderSelfDescribe: safeFieldValue('genderSelfDescribe', data),
     hobbies: safeFieldValue('hobbies', data),
   };
+  if (cleanRole !== 'prospect') {
+    profile.rotaryId = safeFieldValue('rotaryId', data);
+  }
   if (cleanRole === 'prospect') {
     profile.previousRotaract = safeFieldValue('previousRotaract', data);
     profile.previousRotaractDetails = safeFieldValue('previousRotaractDetails', data);

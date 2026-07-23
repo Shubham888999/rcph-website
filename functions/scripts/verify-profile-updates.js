@@ -33,16 +33,24 @@ assert.throws(() => normalizeDateOfBirth('07/12/2026', { today: '2026-07-12' }),
 assert.deepEqual(normalizeProfileUpdatePayload({
   name: ' Rtr. Asha Rao ',
   phone: ' +91 98765 43210 ',
+  rotaryId: ' 11218198 ',
   dateOfBirth: '1997-05-01',
   gender: 'woman',
   hobbies: 'Reading',
 }, 'gbm', { today: '2026-07-12' }), {
   name: 'Asha Rao',
   phone: '+91 98765 43210',
+  rotaryId: '11218198',
   dateOfBirth: '1997-05-01',
   gender: 'woman',
   genderSelfDescribe: '',
   hobbies: 'Reading',
+});
+
+assert.deepEqual(normalizeProfileUpdatePayload({
+  rotaryId: '',
+}, 'gbm', { today: '2026-07-12' }), {
+  rotaryId: '',
 });
 
 assert.deepEqual(normalizeProfileUpdatePayload({
@@ -58,6 +66,8 @@ assert.deepEqual(normalizeProfileUpdatePayload({
 });
 
 assert.throws(() => normalizeProfileUpdatePayload({ joinReason: 'hidden' }, 'gbm'), /Unsupported profile field/);
+assert.throws(() => normalizeProfileUpdatePayload({ rotaryID: '11218198' }, 'gbm'), /Unsupported profile field: rotaryID/);
+assert.throws(() => normalizeProfileUpdatePayload({ rotaryId: '11218198' }, 'prospect'), /Unsupported profile field: rotaryId/);
 assert.throws(() => normalizeProfileUpdatePayload({ email: 'new@example.com' }, 'prospect'), /cannot be updated/);
 assert.throws(() => normalizeProfileUpdatePayload({ role: 'admin' }, 'prospect'), /cannot be updated/);
 assert.throws(() => normalizeProfileUpdatePayload({ active: false }, 'gbm'), /cannot be updated/);
@@ -97,6 +107,18 @@ assert.deepEqual(safeProspect, {
   referredBy: 'Asha',
 });
 assert.equal(Object.hasOwn(safeProspect, 'rid'), false);
+assert.equal(Object.hasOwn(safeProspect, 'rotaryId'), false);
+
+const safeMember = safeProfileFromUserData({
+  name: ' Rtr. Member One ',
+  email: 'MEMBER@Example.COM',
+  phone: '123',
+  rotaryId: ' 11218198 ',
+  rid: 'must-not-leak',
+}, 'gbm', { uid: 'uid-2' });
+
+assert.equal(safeMember.rotaryId, '11218198');
+assert.equal(Object.hasOwn(safeMember, 'rid'), false);
 
 const selfBlock = blockBetween(
   functionsIndex,
