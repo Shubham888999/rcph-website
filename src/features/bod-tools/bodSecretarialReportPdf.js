@@ -33,10 +33,10 @@ export const BOD_SECRETARIAL_REPORT_PDF_LAYOUT = Object.freeze({
   lineHeight: 11.2,
   padding: 5,
   tableHeaderHeight: 22,
-  frameInset: 0,
+  frameInset: 30,
   frameTitleSize: 17,
-  frameStatSize: 11,
-  frameStatLineGap: 25,
+  frameStatSize: 14,
+  frameStatLineGap: 29,
 });
 
 const CONTENT_WIDTH = A4_PDF_SIZE.width - BOD_SECRETARIAL_REPORT_PDF_LAYOUT.margin * 2;
@@ -100,6 +100,31 @@ function rightText(commands, right, y, value, options = {}) {
 function centerText(commands, center, y, value, options = {}) {
   const size = options.size || BOD_SECRETARIAL_REPORT_PDF_LAYOUT.bodySize;
   text(commands, center - approximateTextWidth(value, size, options.bold) / 2, y, value, options);
+}
+
+function centerInlineText(commands, center, y, parts, options = {}) {
+  const size = options.size || BOD_SECRETARIAL_REPORT_PDF_LAYOUT.bodySize;
+  const gap = options.gap ?? 5;
+  const visibleParts = parts
+    .map((part) => ({
+      text: displayText(part.text, ""),
+      bold: Boolean(part.bold),
+    }))
+    .filter((part) => part.text);
+
+  const widths = visibleParts.map((part) => approximateTextWidth(part.text, size, part.bold));
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0)
+    + Math.max(0, visibleParts.length - 1) * gap;
+
+  let x = center - totalWidth / 2;
+  visibleParts.forEach((part, index) => {
+    text(commands, x, y, part.text, {
+      size,
+      bold: part.bold,
+      gray: options.gray || 0,
+    });
+    x += widths[index] + gap;
+  });
 }
 
 function strokeRect(commands, x, top, width, height, gray = 0.45) {
@@ -303,11 +328,14 @@ function summaryPage(report, frame) {
     bold: true,
   });
 
-  const lines = STAT_ROWS.map(([label, key]) => `${label}: ${stringValue(report?.[key])}`);
-  const firstLineY = titleY - 52;
-  lines.forEach((line, index) => {
-    centerText(commands, center, firstLineY - index * layout.frameStatLineGap, line, {
+  const firstLineY = titleY - 48;
+  STAT_ROWS.forEach(([label, key], index) => {
+    centerInlineText(commands, center, firstLineY - index * layout.frameStatLineGap, [
+      { text: `${label}:`, bold: true },
+      { text: stringValue(report?.[key]), bold: false },
+    ], {
       size: layout.frameStatSize,
+      gap: 5,
     });
   });
   return commands;

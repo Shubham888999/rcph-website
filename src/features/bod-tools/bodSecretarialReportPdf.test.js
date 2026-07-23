@@ -120,13 +120,21 @@ test("secretarial page one uses the uploaded frame image with stacked centered s
   assert.match(firstPage, /\/FRAME Do/);
   for (const text of [
     "Monthly Report RCPH RIY 26 - 27",
-    "Club Strength: 42",
-    "Club Score: 91",
-    "Club Rank \\(As of Now\\): 3",
-    "Overall Projects: 1",
-    "No. of meetings \\(BOD\\): 1",
-    "No. of meetings \\(GBM\\): 1",
+    "Club Strength:",
+    "42",
+    "Club Score:",
+    "91",
+    "Club Rank \\(As of Now\\):",
+    "3",
+    "Overall Projects:",
+    "1",
+    "No. of meetings \\(BOD\\):",
+    "No. of meetings \\(GBM\\):",
   ]) assert.equal(firstPage.includes(text), true, text);
+
+  assert.match(source, /frameInset:\s*30/);
+  assert.match(source, /frameStatSize:\s*14/);
+  assert.match(source, /centerInlineText/);
   assert.doesNotMatch(firstPage, /Period:/);
   assert.doesNotMatch(firstPage, /Date|Director|Total events/);
   assert.doesNotMatch(firstPage, /\bre f\b| m .* l S/);
