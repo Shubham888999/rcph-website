@@ -94,14 +94,21 @@ test("Member inspector shows protected profile details and labeled missing field
   assert.match(source, />Overview \/ Profile</);
   assert.match(source, /<dt>Phone<\/dt>/);
   assert.match(source, /<dt>RID \/ Rotary ID<\/dt>/);
+  assert.match(source, /linkedProfile\.rotaryId \|\| linkedProfile\.requestedRid/);
   assert.match(source, /<dt>Date of birth<\/dt>/);
   assert.match(source, /<dt>Gender<\/dt>/);
   assert.match(source, /linkedProfile\.gender === "self-describe"/);
   assert.match(source, /<dt>Gender description<\/dt>/);
   assert.match(source, /<dt>Hobbies and interests<\/dt>/);
   assert.match(source, /<dt>Roster RID<\/dt>/);
+  assert.match(source, /member\.normalizedRid \|\| "Not recorded"/);
   assert.match(source, /<dt>Trusted role<\/dt>/);
   assert.match(source, /<dt>Club position<\/dt>/);
   assert.match(source, /className="member-ops-missing"/);
   assert.match(source, /<strong>Missing:<\/strong>/);
+});
+
+test("Members row RID label uses profile RID while roster RID remains separate", () => {
+  assert.match(source, /member\.normalizedProfileRid \? `RID \$\{member\.normalizedProfileRid\}` : "RID not recorded"/);
+  assert.match(source, /<dt>Roster RID<\/dt><dd>\{member\.normalizedRid \|\| "Not recorded"\}<\/dd><\/div>/);
 });

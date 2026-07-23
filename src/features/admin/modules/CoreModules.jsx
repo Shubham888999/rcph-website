@@ -1133,7 +1133,7 @@ const [openMemberActionId, setOpenMemberActionId] = useState("");
                         {member.active !== false ? "Active" : "Inactive"}
                       </span>
                       <span>{member.positionLabel || "No role or position"}</span>
-                      <span>{member.normalizedRid ? `RID ${member.normalizedRid}` : "RID not recorded"}</span>
+                      <span>{member.normalizedProfileRid ? `RID ${member.normalizedProfileRid}` : "RID not recorded"}</span>
                       <span>{member.accountLinked ? "Approved account linked" : member.possibleNameMatches.length ? "Possible name match only" : "No approved account link"}</span>
                       {member.attendanceSummary.recorded ? <span>{member.attendanceSummary.rate}% attendance</span> : <span>No attendance responses</span>}
                       {member.fineSummary.count ? <span>{member.fineSummary.count} fine record{member.fineSummary.count === 1 ? "" : "s"}</span> : <span>No fine records</span>}

@@ -14,6 +14,14 @@ export function normalizeMemberRid(value) {
   return text(value, 40);
 }
 
+function memberProfileRid(member, linkedAccount) {
+  const linked = linkedAccount || null;
+  return normalizeMemberRid(linked?.rotaryId)
+    || normalizeMemberRid(linked?.rid)
+    || normalizeMemberRid(linked?.requestedRid)
+    || normalizeMemberRid(member?.rid);
+}
+
 export function normalizeMemberName(value) {
   return normalizeKey(value).replace(/^rtr\.?\s+/, "");
 }
@@ -91,7 +99,7 @@ function memberCompletenessFields(member, linkedAccount) {
     gender: linked ? text(linked.gender, 40).toLowerCase() : "",
     genderSelfDescribe: linked ? text(linked.genderSelfDescribe, 160) : "",
     hobbies: linked ? text(linked.hobbies, 600) : "",
-    rid: normalizeMemberRid(member?.rid),
+    rid: memberProfileRid(member, linked),
     roleOrPosition: text(linked?.role, 80) || text(member?.role, 80) || text(member?.position, 180),
   };
 }
@@ -147,10 +155,11 @@ export function buildMemberOperationsRows({
   return members.map((member) => {
     const email = normalizeMemberEmail(member.email);
     const name = normalizeMemberName(member.name);
-    const rid = normalizeMemberRid(member.rid);
+    const rosterRid = normalizeMemberRid(member.rid);
     const memberUserId = text(member.userId, 128);
     const linkedAccount = (memberUserId ? accounts.byUid.get(memberUserId) || null : null)
       || (email ? accounts.byEmail.get(email) || null : null);
+    const profileRid = memberProfileRid(member, linkedAccount);
     const possibleNameMatches = !linkedAccount && name ? accounts.byName.get(name) || [] : [];
     const accountEmailMismatch = Boolean(
       email
@@ -176,7 +185,8 @@ export function buildMemberOperationsRows({
       email: displayEmail,
       normalizedName: normalizeMemberName(displayName || member.name),
       normalizedEmail: displayEmail,
-      normalizedRid: rid,
+      normalizedRid: rosterRid,
+      normalizedProfileRid: profileRid,
       initials: memberInitials(displayName || member.name),
       trustedRole,
       clubPosition,
@@ -191,7 +201,7 @@ export function buildMemberOperationsRows({
       completeness,
       duplicateName: Boolean(name && nameCounts.get(name) > 1),
       duplicateEmail: Boolean(email && emailCounts.get(email) > 1),
-      duplicateRid: Boolean(rid && ridCounts.get(rid) > 1),
+      duplicateRid: Boolean(rosterRid && ridCounts.get(rosterRid) > 1),
     };
   });
 }
@@ -206,7 +216,7 @@ export function getMemberAttentionItems(rows) {
     {
       key: "missingRid",
       label: "RID not recorded",
-      count: rows.filter((row) => !row.normalizedRid).length,
+      count: rows.filter((row) => !row.normalizedProfileRid).length,
     },
     {
       key: "inactive",
@@ -251,7 +261,7 @@ export function getMemberAttentionItems(rows) {
 export function rowMatchesIssue(row, issueKey) {
   if (!issueKey) return true;
   if (issueKey === "missingEmail") return !row.normalizedEmail;
-  if (issueKey === "missingRid") return !row.normalizedRid;
+  if (issueKey === "missingRid") return !row.normalizedProfileRid;
   if (issueKey === "inactive") return row.active === false;
   if (issueKey === "missingPosition") return !row.roleOrPositionLabel;
   if (issueKey === "unlinkedAccount") return row.normalizedEmail && !row.accountLinked;
@@ -272,7 +282,7 @@ export function filterAndSortMemberRows(rows, {
 } = {}) {
   const query = normalizeKey(search);
   const filtered = rows.filter((row) => {
-    const haystack = normalizeKey(`${row.name} ${row.email} ${row.normalizedRid} ${row.positionLabel} ${row.roleOrPositionLabel}`);
+    const haystack = normalizeKey(`${row.name} ${row.email} ${row.normalizedProfileRid} ${row.normalizedRid} ${row.positionLabel} ${row.roleOrPositionLabel}`);
     if (query && !haystack.includes(query)) return false;
     if (status === "active" && row.active === false) return false;
     if (status === "inactive" && row.active !== false) return false;
@@ -308,7 +318,7 @@ export function getMemberOperationsModel(input = {}, controls = {}) {
       activePercent: rows.length ? Math.round((activeMembers / rows.length) * 100) : 0,
       linkedPercent: rows.length ? Math.round((linkedCount / rows.length) * 100) : 0,
       missingEmail: rows.filter((row) => !row.normalizedEmail).length,
-      missingRid: rows.filter((row) => !row.normalizedRid).length,
+      missingRid: rows.filter((row) => !row.normalizedProfileRid).length,
       missingPosition: rows.filter((row) => !row.roleOrPositionLabel).length,
       duplicateRid: rows.filter((row) => row.duplicateRid).length,
       accountEmailMismatch: rows.filter((row) => row.accountEmailMismatch).length,

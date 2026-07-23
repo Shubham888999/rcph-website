@@ -130,6 +130,64 @@ test("completeness gives 89% when only RID is missing", () => {
   assert.deepEqual(completeness.missing, ["RID"]);
 });
 
+test("completeness accepts canonical profile rotaryId without requiring roster RID", () => {
+  const model = getMemberOperationsModel({
+    members: [
+      completeMember({
+        id: "profile-rid",
+        userId: "uid-profile-rid",
+        rid: "",
+      }),
+    ],
+    users: [
+      completeLinkedAccount({
+        id: "uid-profile-rid",
+        rotaryId: " 11218198 ",
+      }),
+    ],
+  });
+  const row = model.rows[0];
+
+  assert.equal(row.normalizedRid, "");
+  assert.equal(row.normalizedProfileRid, "11218198");
+  assert.equal(row.completeness.score, 100);
+  assert.deepEqual(row.completeness.missing, []);
+  assert.equal(model.metrics.missingRid, 0);
+  assert.equal(Object.fromEntries(getMemberAttentionItems(model.rows).map((item) => [item.key, item.count])).missingRid, undefined);
+  assert.equal(rowMatchesMissingRid(row), false);
+});
+
+test("completeness still reports RID missing when no supported RID field exists", () => {
+  const completeness = calculateMemberCompleteness(
+    completeMember({ rid: "" }),
+    completeLinkedAccount({ rotaryId: "", rid: "", requestedRid: "" }),
+  );
+
+  assert.deepEqual(completeness.missing, ["RID"]);
+});
+
+test("legacy profile rid can satisfy completeness when rotaryId is absent", () => {
+  const completeness = calculateMemberCompleteness(
+    completeMember({ rid: "" }),
+    completeLinkedAccount({ rid: " RID-LEGACY " }),
+  );
+
+  assert.equal(completeness.score, 100);
+  assert.deepEqual(completeness.missing, []);
+});
+
+test("hobbies remain missing even when canonical profile RID is present", () => {
+  const completeness = calculateMemberCompleteness(
+    completeMember({ rid: "" }),
+    completeLinkedAccount({
+      rotaryId: "11218198",
+      hobbies: "",
+    }),
+  );
+
+  assert.deepEqual(completeness.missing, ["hobbies and interests"]);
+});
+
 test("completeness gives 44% for the linked account example with five missing profile fields and RID", () => {
   const completeness = calculateMemberCompleteness(
     completeMember({ rid: "" }),
@@ -273,3 +331,7 @@ test("attendance and fine summaries use loaded data", () => {
   assert.equal(asha.fineSummary.count, 2);
   assert.equal(asha.fineSummary.total, 75);
 });
+
+function rowMatchesMissingRid(row) {
+  return filterAndSortMemberRows([row], { issue: "missingRid" }).length === 1;
+}
