@@ -6,28 +6,6 @@ const VENUE_URL = "https://maps.app.goo.gl/iNXahK8kMDFVURij8?g_st=ac";
 const THEME_REVEAL_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/?igsh=d2VrMHh0dWZ6eGtx";
 const THEME_REVEAL_EMBED_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/embed";
 
-function useIsNarrowViewport() {
-  const [isNarrow, setIsNarrow] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return undefined;
-
-    const query = window.matchMedia("(max-width: 48rem)");
-    const update = () => setIsNarrow(query.matches);
-    update();
-
-    if (query.addEventListener) {
-      query.addEventListener("change", update);
-      return () => query.removeEventListener("change", update);
-    }
-
-    query.addListener?.(update);
-    return () => query.removeListener?.(update);
-  }, []);
-
-  return isNarrow;
-}
-
 const AUTO_REVEAL_STYLE = {
   "--installation-darkness-opacity": 0.62,
   "--installation-left-spotlight-opacity": 0.72,
@@ -64,7 +42,6 @@ export default function InstallationSection({ autoRevealActive = false }) {
   const [themeRevealState, setThemeRevealState] = useState("idle");
   const [hasScrollRevealStarted, setHasScrollRevealStarted] = useState(false);
   const reduceMotion = useReducedMotion();
-  const isNarrowViewport = useIsNarrowViewport();
   const isThemeRevealSpinning = themeRevealState === "spinning";
   const isThemeRevealRevealed = themeRevealState === "revealed";
   const { scrollYProgress } = useScroll({
@@ -212,53 +189,31 @@ export default function InstallationSection({ autoRevealActive = false }) {
 
         <div className="home-installation__visual">
           {isThemeRevealRevealed ? (
-            <div
-              className={`home-installation__inline-reveal${isNarrowViewport ? " home-installation__inline-reveal--mobile-fallback" : ""}`}
-              aria-live="polite"
-            >
+            <div className="home-installation__inline-reveal" aria-live="polite">
               <div className="home-installation__inline-header">
                 <span>VOX // '26 Theme Reveal</span>
                 <strong>Watch the reveal</strong>
               </div>
-              {isNarrowViewport ? (
-                <div className="home-installation__mobile-fallback">
-                  <span>VOX // '26 Theme Reveal</span>
-                  <p>Instagram controls playback on mobile embeds.</p>
-                  <p>Open the reel directly for the best experience.</p>
-                  <a
-                    className="home-installation__mobile-fallback-link"
-                    href={THEME_REVEAL_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open the VOX 2026 theme reveal on Instagram"
-                  >
-                    Open on Instagram
-                  </a>
-                </div>
-              ) : (
-                <>
-                  <div className="home-installation__inline-frame-shell">
-                    <iframe
-                      className="home-installation__inline-frame"
-                      src={THEME_REVEAL_EMBED_URL}
-                      title="VOX 2026 theme reveal Instagram Reel"
-                      loading="lazy"
-                      allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
-                    />
-                  </div>
-                  <a
-                    className="home-installation__inline-fallback"
-                    href={THEME_REVEAL_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open the VOX 2026 theme reveal on Instagram"
-                  >
-                    Open on Instagram
-                  </a>
-                </>
-              )}
+              <div className="home-installation__inline-frame-shell">
+                <iframe
+                  className="home-installation__inline-frame"
+                  src={THEME_REVEAL_EMBED_URL}
+                  title="VOX 2026 theme reveal Instagram Reel"
+                  loading="lazy"
+                  allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
+              </div>
+              <a
+                className="home-installation__inline-fallback"
+                href={THEME_REVEAL_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open the VOX 2026 theme reveal on Instagram"
+              >
+                Open on Instagram
+              </a>
             </div>
           ) : (
             <button

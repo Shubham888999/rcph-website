@@ -41,15 +41,8 @@ test("VOX theme reveal modal provides accessible embed and fallback behavior", (
   assert.match(modal, /window\.dispatchEvent\(new CustomEvent\(VOX_THEME_REVEAL_OPEN_EVENT/);
   assert.match(modal, /https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/embed/);
   assert.match(modal, /https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx/);
-  assert.match(modal, /function useIsNarrowViewport\(\)/);
-  assert.match(modal, /window\.matchMedia\("\(max-width: 48rem\)"\)/);
-  assert.match(modal, /query\.addEventListener\("change", update\)/);
-  assert.match(modal, /query\.removeEventListener\("change", update\)/);
-  assert.match(modal, /query\.addListener\?\.\(update\)/);
-  assert.match(modal, /query\.removeListener\?\.\(update\)/);
   assert.match(modal, /const \[themeRevealState, setThemeRevealState\] = useState\("idle"\);/);
   assert.match(modal, /const revealTimerRef = useRef\(null\);/);
-  assert.match(modal, /const isNarrowViewport = useIsNarrowViewport\(\);/);
   assert.match(modal, /themeRevealState === "spinning"/);
   assert.match(modal, /themeRevealState === "revealed"/);
   assert.match(modal, /function handleRecordRevealClick\(\)/);
@@ -75,11 +68,6 @@ test("VOX theme reveal modal provides accessible embed and fallback behavior", (
   assert.match(modal, /Spin the record/);
   assert.match(modal, /Spinning the record\.\.\./);
   assert.match(modal, /Cueing the theme reveal/);
-  assert.match(modal, /isNarrowViewport \? \(/);
-  assert.match(modal, /className="vox-theme-modal__mobile-fallback"/);
-  assert.match(modal, /className="button button-primary vox-theme-modal__mobile-fallback-link"/);
-  assert.match(modal, /Instagram controls playback on mobile embeds\./);
-  assert.match(modal, /Open the reel directly for the best experience\./);
   assert.match(modal, /<iframe[\s\S]*className="vox-theme-modal__frame"[\s\S]*src=\{VOX_THEME_REVEAL_EMBED_URL\}/);
   assert.match(modal, /loading="lazy"/);
   assert.match(modal, /allow="clipboard-write; encrypted-media; picture-in-picture; web-share"/);
@@ -88,6 +76,12 @@ test("VOX theme reveal modal provides accessible embed and fallback behavior", (
   assert.match(modal, /Open on Instagram/);
   assert.match(modal, /target="_blank"/);
   assert.match(modal, /rel="noreferrer"/);
+  assert.doesNotMatch(modal, /function useIsNarrowViewport\(\)/);
+  assert.doesNotMatch(modal, /window\.matchMedia\("\(max-width: 48rem\)"\)/);
+  assert.doesNotMatch(modal, /isNarrowViewport \? \(/);
+  assert.doesNotMatch(modal, /vox-theme-modal__mobile-fallback/);
+  assert.doesNotMatch(modal, /Instagram controls playback on mobile embeds\./);
+  assert.doesNotMatch(modal, /Open the reel directly for the best experience\./);
 });
 
 test("public and internal route structure remains present", () => {
@@ -139,13 +133,9 @@ assert.match(globalCss, /@media \(max-width: 760px\) \{[\s\S]*\.vox-announcement
   assert.match(globalCss, /@keyframes vox-theme-modal-record-spin/);
   assert.match(globalCss, /\.vox-theme-modal__stage-pass \{/);
   assert.match(globalCss, /\.vox-theme-modal__reveal \{/);
-  assert.match(globalCss, /\.vox-theme-modal__reveal\.vox-theme-modal__reveal--mobile-fallback \{/);
   assert.match(globalCss, /\.vox-theme-modal__frame-shell \{[\s\S]*aspect-ratio: 9 \/ 14;/);
-  assert.match(globalCss, /\.vox-theme-modal__mobile-fallback \{/);
-  assert.match(globalCss, /\.vox-theme-modal__mobile-fallback-link\.vox-theme-modal__mobile-fallback-link \{/);
   assert.match(globalCss, /@media \(max-width: 760px\) \{[\s\S]*\.vox-theme-modal__record-card \{[\s\S]*min-height: 20rem;/);
   assert.match(globalCss, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.vox-theme-modal__close/);
-  assert.match(globalCss, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.vox-theme-modal__mobile-fallback/);
-  assert.match(globalCss, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.vox-theme-modal__mobile-fallback-link/);
   assert.match(globalCss, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.vox-theme-modal__record-card--spinning \.vox-theme-modal__record \{[\s\S]*animation: none !important;/);
+  assert.doesNotMatch(globalCss, /vox-theme-modal__mobile-fallback/);
 });
