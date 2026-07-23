@@ -1030,7 +1030,7 @@ select { color-scheme: var(--control-color-scheme, dark); }
   .vox-announcement__inner {
     width: 100%;
     padding-inline: 0.5rem;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 0;
   }
 
@@ -1046,9 +1046,11 @@ select { color-scheme: var(--control-color-scheme, dark); }
 
   .vox-announcement__copy {
     width: 100%;
-    padding-right: 5.85rem;
+    box-sizing: border-box;
+    padding-inline: 5.85rem;
     font-size: 0.76rem;
     letter-spacing: 0.035em;
+    text-align: center;
   }
 
   .vox-announcement__actions {
@@ -1096,11 +1098,10 @@ select { color-scheme: var(--control-color-scheme, dark); }
   }
 
   .vox-announcement__copy {
-    padding-right: 5.3rem;
+    padding-inline: 5.3rem;
     font-size: 0.68rem;
     letter-spacing: 0.015em;
   }
-
   .vox-announcement__actions {
     gap: 0.25rem;
   }

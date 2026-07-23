@@ -95,8 +95,9 @@ test("VOX announcement CSS reserves top space and offsets sticky shells", () => 
   assert.match(globalCss, /\.vox-announcement__link::after \{/);
   assert.match(globalCss, /\.vox-announcement__link--rsvp \{[\s\S]*color: #ffbc59;/);
   assert.doesNotMatch(globalCss, /\.vox-announcement__link \{[\s\S]*border-radius: 999px;[\s\S]*background: rgba/);
-  assert.match(globalCss, /@media \(max-width: 760px\) \{[\s\S]*\.vox-announcement__copy \{[\s\S]*padding-right: 5\.85rem;/);
-  assert.match(globalCss, /@media \(max-width: 760px\) \{[\s\S]*\.vox-announcement__actions \{[\s\S]*position: fixed;[\s\S]*right: 0\.5rem;/);
+assert.match(globalCss, /@media \(max-width: 760px\) \{[\s\S]*\.vox-announcement__copy \{[\s\S]*padding-inline: 5\.85rem;[\s\S]*text-align: center;/);
+assert.match(globalCss, /@media \(max-width: 25rem\) \{[\s\S]*\.vox-announcement__copy \{[\s\S]*padding-inline: 5\.3rem;/);  
+assert.match(globalCss, /@media \(max-width: 760px\) \{[\s\S]*\.vox-announcement__actions \{[\s\S]*position: fixed;[\s\S]*right: 0\.5rem;/);
   assert.match(globalCss, /@media \(max-width: 25rem\) \{[\s\S]*\.vox-announcement__link \{[\s\S]*font-size: 0\.6rem;/);
   assert.match(globalCss, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.vox-announcement__link/);
   assert.match(globalCss, /\.vox-theme-modal \{[\s\S]*z-index: calc\(var\(--z-dialog\) \+ 10\);/);
