@@ -23,16 +23,40 @@ export function openVoxThemeReveal(trigger) {
 
 export default function VoxThemeRevealModal() {
   const [open, setOpen] = useState(false);
+  const [themeRevealState, setThemeRevealState] = useState("idle");
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
+  const revealTimerRef = useRef(null);
+  const isThemeRevealSpinning = themeRevealState === "spinning";
+  const isThemeRevealRevealed = themeRevealState === "revealed";
 
   const closeModal = useCallback(() => {
+    window.clearTimeout(revealTimerRef.current);
+    setThemeRevealState("idle");
     setOpen(false);
   }, []);
+
+  function handleRecordRevealClick() {
+    if (isThemeRevealSpinning || isThemeRevealRevealed) return;
+
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (reduceMotion) {
+      setThemeRevealState("revealed");
+      return;
+    }
+
+    window.clearTimeout(revealTimerRef.current);
+    setThemeRevealState("spinning");
+    revealTimerRef.current = window.setTimeout(() => {
+      setThemeRevealState("revealed");
+    }, 2000);
+  }
 
   useEffect(() => {
     function handleOpen(event) {
       returnFocusRef.current = event.detail?.trigger ?? document.activeElement;
+      window.clearTimeout(revealTimerRef.current);
+      setThemeRevealState("idle");
       setOpen(true);
     }
 
@@ -83,6 +107,10 @@ export default function VoxThemeRevealModal() {
     };
   }, [closeModal, open]);
 
+  useEffect(() => {
+    return () => window.clearTimeout(revealTimerRef.current);
+  }, []);
+
   if (!open) return null;
 
   return (
@@ -113,23 +141,50 @@ export default function VoxThemeRevealModal() {
 
         <div className="vox-theme-modal__header">
           <p className="vox-theme-modal__kicker">Theme Reveal</p>
-          <h2 id="vox-theme-modal-title">VOX // '26</h2>
+          <h2 id="vox-theme-modal-title">VOX // '26 Theme Reveal</h2>
           <p id="vox-theme-modal-description">
-            RCPH's 12th Installation Ceremony theme reveal.
+            Spin the record to cue RCPH's 12th Installation Ceremony theme reveal.
           </p>
         </div>
 
-        <div className="vox-theme-modal__frame-shell">
-          <iframe
-            className="vox-theme-modal__frame"
-            src={VOX_THEME_REVEAL_EMBED_URL}
-            title="VOX 2026 theme reveal Instagram Reel"
-            loading="lazy"
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-          />
-        </div>
+        {isThemeRevealRevealed ? (
+          <div className="vox-theme-modal__reveal" aria-live="polite">
+            <div className="vox-theme-modal__reveal-heading">
+              <span>VOX // '26 Theme Reveal</span>
+              <strong>Watch the reveal</strong>
+            </div>
+            <div className="vox-theme-modal__frame-shell">
+              <iframe
+                className="vox-theme-modal__frame"
+                src={VOX_THEME_REVEAL_EMBED_URL}
+                title="VOX 2026 theme reveal Instagram Reel"
+                loading="lazy"
+                allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`vox-theme-modal__record-card${isThemeRevealSpinning ? " vox-theme-modal__record-card--spinning" : ""}`}
+            onClick={handleRecordRevealClick}
+            aria-label="Spin the VOX 2026 record to reveal the Instagram Reel"
+            aria-busy={isThemeRevealSpinning ? "true" : undefined}
+            disabled={isThemeRevealSpinning}
+          >
+            <span className="vox-theme-modal__record" aria-hidden="true">
+              <span />
+            </span>
+            <span className="vox-theme-modal__stage-pass">
+              <span role={isThemeRevealSpinning ? "status" : undefined}>
+                {isThemeRevealSpinning ? "Spinning the record..." : "Spin the record"}
+              </span>
+              <strong>{isThemeRevealSpinning ? "Cueing the theme reveal" : "Watch the reveal"}</strong>
+            </span>
+          </button>
+        )}
 
         <div className="vox-theme-modal__actions">
           <a

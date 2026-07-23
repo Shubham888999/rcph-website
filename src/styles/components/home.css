@@ -494,6 +494,27 @@
   overflow: visible;
 }
 
+.home-installation--auto-revealed .home-installation__atmosphere::before,
+.home-installation--auto-revealed .home-installation__atmosphere::after,
+.home-installation--auto-revealed .home-installation__spotlight,
+.home-installation--auto-revealed .installation-spotlight-fixture {
+  transition:
+    opacity 720ms ease,
+    transform 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 720ms ease;
+}
+
+.home-installation--auto-revealed .home-installation__copy,
+.home-installation--auto-revealed .home-installation h2,
+.home-installation--auto-revealed .home-installation__details,
+.home-installation--auto-revealed .home-installation__reveal-card,
+.home-installation--auto-revealed .home-installation__inline-reveal {
+  transition:
+    border-color 720ms ease,
+    box-shadow 720ms ease,
+    text-shadow 720ms ease;
+}
+
 .home-installation__layout {
   position: relative;
   z-index: 2;
@@ -553,9 +574,28 @@
   transform: translateX(-50%);
 }
 
+.installation-spotlight-fixtures::before {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: clamp(0.28rem, 0.7vw, 0.5rem);
+  content: "";
+  background:
+    linear-gradient(90deg, transparent, rgba(5, 2, 4, 0.86) 14%, rgba(255, 188, 89, 0.22) 48%, rgba(5, 2, 4, 0.86) 86%, transparent),
+    linear-gradient(180deg, rgba(255, 248, 237, 0.08), rgba(3, 1, 2, 0.72));
+  box-shadow:
+    0 0.65rem 1.3rem rgba(0, 0, 0, 0.36),
+    0 0 1.2rem rgba(255, 188, 89, 0.12);
+  opacity: var(--installation-fixture-opacity);
+  pointer-events: none;
+}
+
 .installation-spotlight-fixture {
   position: absolute;
-  top: clamp(2.25rem, 3.8vw, 2.625rem);
+  z-index: 1;
+  top: clamp(-0.85rem, -1.2vw, -0.35rem);
   width: clamp(5.4rem, 7.4vw, 8.25rem);
   height: auto;
   display: block;
@@ -588,7 +628,7 @@
 .home-installation__spotlight {
   position: absolute;
   z-index: 2;
-  top: clamp(5.5rem, 7.2vw, 7.25rem);
+  top: clamp(3.8rem, 5vw, 5.75rem);
   width: clamp(24rem, 38vw, 45rem);
   height: clamp(34rem, 62vw, 60rem);
   clip-path: polygon(45% 0, 55% 0, 100% 100%, 0 100%);
@@ -2733,6 +2773,12 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   .home-installation__inline-fallback,
   .home-installation__action-link,
   .home-installation__action-link::after,
+  .home-installation--auto-revealed .home-installation__atmosphere::before,
+  .home-installation--auto-revealed .home-installation__atmosphere::after,
+  .home-installation--auto-revealed .home-installation__copy,
+  .home-installation--auto-revealed .home-installation h2,
+  .home-installation--auto-revealed .home-installation__details,
+  .installation-spotlight-fixtures::before,
   .installation-spotlight-fixture,
   .home-installation__spotlight,
   .home-installation__atmosphere,

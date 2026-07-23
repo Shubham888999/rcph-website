@@ -6,10 +6,41 @@ const VENUE_URL = "https://maps.app.goo.gl/iNXahK8kMDFVURij8?g_st=ac";
 const THEME_REVEAL_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/?igsh=d2VrMHh0dWZ6eGtx";
 const THEME_REVEAL_EMBED_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/embed";
 
-export default function InstallationSection() {
+const AUTO_REVEAL_STYLE = {
+  "--installation-darkness-opacity": 0.62,
+  "--installation-left-spotlight-opacity": 0.72,
+  "--installation-right-spotlight-opacity": 0.68,
+  "--installation-glow-opacity": 0.7,
+  "--installation-visual-glow-opacity": 0.38,
+  "--installation-spotlight-shift": "0px",
+  "--installation-spotlight-scale": 1.02,
+  "--installation-left-spotlight-x": "0vw",
+  "--installation-right-spotlight-x": "0vw",
+  "--installation-fixture-opacity": 1,
+  "--installation-fixture-drop": "0px",
+  "--installation-fixture-rotate": "0deg",
+};
+
+const INACTIVE_REVEAL_STYLE = {
+  "--installation-darkness-opacity": 0,
+  "--installation-left-spotlight-opacity": 0,
+  "--installation-right-spotlight-opacity": 0,
+  "--installation-glow-opacity": 0,
+  "--installation-visual-glow-opacity": 0,
+  "--installation-spotlight-shift": "-90px",
+  "--installation-spotlight-scale": 0.92,
+  "--installation-left-spotlight-x": "-8vw",
+  "--installation-right-spotlight-x": "8vw",
+  "--installation-fixture-opacity": 0,
+  "--installation-fixture-drop": "-90px",
+  "--installation-fixture-rotate": "-8deg",
+};
+
+export default function InstallationSection({ autoRevealActive = false }) {
   const sectionRef = useRef(null);
   const revealTimerRef = useRef(null);
   const [themeRevealState, setThemeRevealState] = useState("idle");
+  const [hasScrollRevealStarted, setHasScrollRevealStarted] = useState(false);
   const reduceMotion = useReducedMotion();
   const isThemeRevealSpinning = themeRevealState === "spinning";
   const isThemeRevealRevealed = themeRevealState === "revealed";
@@ -23,42 +54,31 @@ export default function InstallationSection() {
   const rightSpotlightOpacity = useTransform(scrollYProgress, [0, 0.24, 0.56, 0.78, 1], [0, 0.14, 0.8, 0.56, 0]);
   const glowOpacity = useTransform(scrollYProgress, [0, 0.28, 0.56, 0.82, 1], [0, 0.14, 0.86, 0.54, 0]);
   const visualGlowOpacity = useTransform(scrollYProgress, [0, 0.32, 0.58, 0.82, 1], [0, 0.12, 0.5, 0.34, 0]);
-  const spotlightShift = useTransform(scrollYProgress, [0, 0.45, 0.8, 1], ["-90px", "0px", "10px", "18px"]);
+  const spotlightShift = useTransform(scrollYProgress, [0, 0.35, 0.72, 1], ["0px", "0px", "-18px", "-48px"]);
   const spotlightScale = useTransform(scrollYProgress, [0, 0.54, 1], [0.82, 1.05, 0.94]);
   const leftSpotlightX = useTransform(scrollYProgress, [0, 0.52, 1], ["-8vw", "0vw", "3vw"]);
   const rightSpotlightX = useTransform(scrollYProgress, [0, 0.52, 1], ["8vw", "0vw", "-3vw"]);
-  const fixtureOpacity = useTransform(scrollYProgress, [0, 0.15, 0.32, 0.56, 0.85, 1], [0, 0, 0.92, 1, 0.62, 0.16]);
-  const fixtureDrop = useTransform(scrollYProgress, [0, 0.1, 0.45, 0.8, 1], ["-90px", "-90px", "0px", "10px", "18px"]);
-  const fixtureRotate = useTransform(scrollYProgress, [0, 0.45, 0.8, 1], ["-8deg", "0deg", "1.5deg", "3deg"]);
+  const fixtureOpacity = useTransform(scrollYProgress, [0, 0.15, 0.58, 0.85, 1], [1, 1, 1, 0.55, 0]);
+  const fixtureDrop = useTransform(scrollYProgress, [0, 0.35, 0.72, 1], ["0px", "0px", "-24px", "-64px"]);
+  const fixtureRotate = useTransform(scrollYProgress, [0, 0.35, 0.72, 1], ["0deg", "0deg", "1.5deg", "4deg"]);
+  const scrollRevealStyle = {
+    "--installation-darkness-opacity": darknessOpacity,
+    "--installation-left-spotlight-opacity": leftSpotlightOpacity,
+    "--installation-right-spotlight-opacity": rightSpotlightOpacity,
+    "--installation-glow-opacity": glowOpacity,
+    "--installation-visual-glow-opacity": visualGlowOpacity,
+    "--installation-spotlight-shift": spotlightShift,
+    "--installation-spotlight-scale": spotlightScale,
+    "--installation-left-spotlight-x": leftSpotlightX,
+    "--installation-right-spotlight-x": rightSpotlightX,
+    "--installation-fixture-opacity": fixtureOpacity,
+    "--installation-fixture-drop": fixtureDrop,
+    "--installation-fixture-rotate": fixtureRotate,
+  };
+  const useAutoRevealLighting = autoRevealActive && !hasScrollRevealStarted;
   const revealStyle = reduceMotion
-    ? {
-      "--installation-darkness-opacity": 0.48,
-      "--installation-left-spotlight-opacity": 0.42,
-      "--installation-right-spotlight-opacity": 0.38,
-      "--installation-glow-opacity": 0.64,
-      "--installation-visual-glow-opacity": 0.32,
-      "--installation-spotlight-shift": "0rem",
-      "--installation-spotlight-scale": 1,
-      "--installation-left-spotlight-x": "0vw",
-      "--installation-right-spotlight-x": "0vw",
-      "--installation-fixture-opacity": 0.16,
-      "--installation-fixture-drop": "0rem",
-      "--installation-fixture-rotate": "0deg",
-    }
-    : {
-      "--installation-darkness-opacity": darknessOpacity,
-      "--installation-left-spotlight-opacity": leftSpotlightOpacity,
-      "--installation-right-spotlight-opacity": rightSpotlightOpacity,
-      "--installation-glow-opacity": glowOpacity,
-      "--installation-visual-glow-opacity": visualGlowOpacity,
-      "--installation-spotlight-shift": spotlightShift,
-      "--installation-spotlight-scale": spotlightScale,
-      "--installation-left-spotlight-x": leftSpotlightX,
-      "--installation-right-spotlight-x": rightSpotlightX,
-      "--installation-fixture-opacity": fixtureOpacity,
-      "--installation-fixture-drop": fixtureDrop,
-      "--installation-fixture-rotate": fixtureRotate,
-    };
+    ? autoRevealActive ? AUTO_REVEAL_STYLE : INACTIVE_REVEAL_STYLE
+    : useAutoRevealLighting ? AUTO_REVEAL_STYLE : scrollRevealStyle;
 
   function handleInlineThemeRevealClick() {
     if (isThemeRevealSpinning || isThemeRevealRevealed) return;
@@ -79,10 +99,20 @@ export default function InstallationSection() {
     return () => window.clearTimeout(revealTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    if (!autoRevealActive || hasScrollRevealStarted) return undefined;
+
+    return scrollYProgress.on("change", (latestProgress) => {
+      if (latestProgress > 0.03) {
+        setHasScrollRevealStarted(true);
+      }
+    });
+  }, [autoRevealActive, hasScrollRevealStarted, scrollYProgress]);
+
   return (
     <motion.section
       ref={sectionRef}
-      className="home-section home-installation"
+      className={`home-section home-installation${useAutoRevealLighting ? " home-installation--auto-revealed" : ""}`}
       aria-labelledby="home-installation-title"
       style={revealStyle}
     >

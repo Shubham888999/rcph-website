@@ -33,7 +33,7 @@ export default function HomePage() {
       >
         <HomeHero />
       </div>
-      <InstallationSection />
+      <InstallationSection autoRevealActive={heroDismissed} />
       <ClubIntroduction />
       {SHOW_RECRUITMENT_SECTION ? <RecruitmentSection /> : null}
       <MonthlyHighlight />

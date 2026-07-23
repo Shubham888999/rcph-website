@@ -15,11 +15,12 @@ test("HomePage auto-collapses the hero before the VOX-first homepage flow", asyn
   assert.match(source, /window\.setTimeout\(\(\) => \{[\s\S]*setHeroDismissed\(true\);[\s\S]*\}, HERO_AUTO_FADE_DELAY_MS\);/);
   assert.match(source, /return \(\) => window\.clearTimeout\(heroTimer\);/);
   assert.match(source, /className=\{`home-hero-shell\$\{heroDismissed \? " home-hero-shell--dismissed" : ""\}`\}/);
+  assert.match(source, /<InstallationSection autoRevealActive=\{heroDismissed\} \/>/);
   assert.match(source, /SHOW_RECRUITMENT_SECTION \? <RecruitmentSection \/> : null/);
 
   const heroIndex = source.indexOf("<HomeHero />");
   const introIndex = source.indexOf("<ClubIntroduction />");
-  const installationIndex = source.indexOf("<InstallationSection />");
+  const installationIndex = source.indexOf("<InstallationSection autoRevealActive={heroDismissed} />");
   const recruitmentIndex = source.indexOf("{SHOW_RECRUITMENT_SECTION ? <RecruitmentSection /> : null}");
 
   assert.ok(heroIndex !== -1, "HomeHero should still render first");
@@ -102,6 +103,35 @@ test("InstallationSection vinyl card spins before revealing the Instagram Reel i
   }
 });
 
+test("InstallationSection auto-illuminates VOX after the hero dismisses before scroll takeover", async () => {
+  const source = await readFile(new URL("./InstallationSection.jsx", import.meta.url), "utf8");
+
+  for (const expected of [
+    /const AUTO_REVEAL_STYLE = \{/,
+    /"--installation-darkness-opacity": 0\.62/,
+    /"--installation-left-spotlight-opacity": 0\.72/,
+    /"--installation-right-spotlight-opacity": 0\.68/,
+    /"--installation-glow-opacity": 0\.7/,
+    /"--installation-visual-glow-opacity": 0\.38/,
+    /"--installation-fixture-opacity": 1/,
+    /"--installation-fixture-drop": "0px"/,
+    /"--installation-spotlight-scale": 1\.02/,
+    /const INACTIVE_REVEAL_STYLE = \{/,
+    /export default function InstallationSection\(\{ autoRevealActive = false \}\)/,
+    /const \[hasScrollRevealStarted, setHasScrollRevealStarted\] = useState\(false\);/,
+    /const scrollRevealStyle = \{/,
+    /const useAutoRevealLighting = autoRevealActive && !hasScrollRevealStarted;/,
+    /autoRevealActive \? AUTO_REVEAL_STYLE : INACTIVE_REVEAL_STYLE/,
+    /useAutoRevealLighting \? AUTO_REVEAL_STYLE : scrollRevealStyle/,
+    /scrollYProgress\.on\("change", \(latestProgress\) => \{/,
+    /latestProgress > 0\.03/,
+    /setHasScrollRevealStarted\(true\);/,
+    /home-installation--auto-revealed/,
+  ]) {
+    assert.match(source, expected);
+  }
+});
+
 test("InstallationSection uses scoped scroll variables and decorative fixture images", async () => {
   const source = await readFile(new URL("./InstallationSection.jsx", import.meta.url), "utf8");
 
@@ -118,9 +148,10 @@ test("InstallationSection uses scoped scroll variables and decorative fixture im
     /"--installation-visual-glow-opacity": visualGlowOpacity/,
     /"--installation-left-spotlight-x": leftSpotlightX/,
     /"--installation-right-spotlight-x": rightSpotlightX/,
-    /const fixtureOpacity = useTransform\(scrollYProgress, \[0, 0\.15, 0\.32, 0\.56, 0\.85, 1\], \[0, 0, 0\.92, 1, 0\.62, 0\.16\]\);/,
-    /const fixtureDrop = useTransform\(scrollYProgress, \[0, 0\.1, 0\.45, 0\.8, 1\], \["-90px", "-90px", "0px", "10px", "18px"\]\);/,
-    /const fixtureRotate = useTransform\(scrollYProgress, \[0, 0\.45, 0\.8, 1\], \["-8deg", "0deg", "1\.5deg", "3deg"\]\);/,
+    /const spotlightShift = useTransform\(scrollYProgress, \[0, 0\.35, 0\.72, 1\], \["0px", "0px", "-18px", "-48px"\]\);/,
+    /const fixtureOpacity = useTransform\(scrollYProgress, \[0, 0\.15, 0\.58, 0\.85, 1\], \[1, 1, 1, 0\.55, 0\]\);/,
+    /const fixtureDrop = useTransform\(scrollYProgress, \[0, 0\.35, 0\.72, 1\], \["0px", "0px", "-24px", "-64px"\]\);/,
+    /const fixtureRotate = useTransform\(scrollYProgress, \[0, 0\.35, 0\.72, 1\], \["0deg", "0deg", "1\.5deg", "4deg"\]\);/,
     /"--installation-fixture-opacity": fixtureOpacity/,
     /"--installation-fixture-drop": fixtureDrop/,
     /"--installation-fixture-rotate": fixtureRotate/,
@@ -151,6 +182,10 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /--installation-fixture-opacity/,
     /--installation-fixture-drop/,
     /--installation-fixture-rotate/,
+    /\.home-installation--auto-revealed \.home-installation__atmosphere::before/,
+    /\.home-installation--auto-revealed \.home-installation__spotlight/,
+    /\.home-installation--auto-revealed \.installation-spotlight-fixture/,
+    /\.home-installation--auto-revealed \.home-installation__copy/,
     /\.home-installation__layout \{/,
     /\.home-installation__atmosphere \{/,
     /\.home-installation__atmosphere \{[\s\S]*width: 100vw;[\s\S]*transform: translateX\(-50%\);/,
@@ -158,12 +193,14 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /\.home-installation__atmosphere::before/,
     /\.installation-spotlight-fixtures \{/,
     /\.installation-spotlight-fixtures \{[\s\S]*left: 50%;[\s\S]*width: 100vw;[\s\S]*overflow: visible;[\s\S]*transform: translateX\(-50%\);/,
+    /\.installation-spotlight-fixtures::before \{/,
     /\.installation-spotlight-fixture \{/,
-    /\.installation-spotlight-fixture \{[\s\S]*top: clamp\(2\.25rem, 3\.8vw, 2\.625rem\);/,
+    /\.installation-spotlight-fixture \{[\s\S]*top: clamp\(-0\.85rem, -1\.2vw, -0\.35rem\);/,
     /\.installation-spotlight-fixture--left \{/,
     /\.installation-spotlight-fixture--right \{/,
     /\.installation-spotlight-fixture \{[\s\S]*pointer-events: none;/,
     /\.home-installation__spotlight \{/,
+    /\.home-installation__spotlight \{[\s\S]*top: clamp\(3\.8rem, 5vw, 5\.75rem\);/,
     /\.home-installation__spotlight--left \{/,
     /\.home-installation__spotlight--right \{/,
     /\.home-installation__details \{/,
@@ -192,6 +229,7 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /@media \(max-width: 27rem\) \{[\s\S]*\.home-hero-shell\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*max-height: 0;[\s\S]*min-height: 0;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__reveal-card/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-hero-shell/,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation--auto-revealed \.home-installation__atmosphere::before/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__reveal-card--spinning \.home-installation__record \{[\s\S]*animation: none;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*--installation-spotlight-scale: 1;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*--installation-fixture-drop: 0rem;/,
