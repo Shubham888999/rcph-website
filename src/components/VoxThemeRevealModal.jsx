@@ -14,6 +14,28 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(", ");
 
+function useIsNarrowViewport() {
+  const [isNarrow, setIsNarrow] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+
+    const query = window.matchMedia("(max-width: 48rem)");
+    const update = () => setIsNarrow(query.matches);
+    update();
+
+    if (query.addEventListener) {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
+    }
+
+    query.addListener?.(update);
+    return () => query.removeListener?.(update);
+  }, []);
+
+  return isNarrow;
+}
+
 export function openVoxThemeReveal(trigger) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(VOX_THEME_REVEAL_OPEN_EVENT, {
@@ -27,6 +49,7 @@ export default function VoxThemeRevealModal() {
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
   const revealTimerRef = useRef(null);
+  const isNarrowViewport = useIsNarrowViewport();
   const isThemeRevealSpinning = themeRevealState === "spinning";
   const isThemeRevealRevealed = themeRevealState === "revealed";
 
@@ -148,22 +171,42 @@ export default function VoxThemeRevealModal() {
         </div>
 
         {isThemeRevealRevealed ? (
-          <div className="vox-theme-modal__reveal" aria-live="polite">
+          <div
+            className={`vox-theme-modal__reveal${isNarrowViewport ? " vox-theme-modal__reveal--mobile-fallback" : ""}`}
+            aria-live="polite"
+          >
             <div className="vox-theme-modal__reveal-heading">
               <span>VOX // '26 Theme Reveal</span>
               <strong>Watch the reveal</strong>
             </div>
-            <div className="vox-theme-modal__frame-shell">
-              <iframe
-                className="vox-theme-modal__frame"
-                src={VOX_THEME_REVEAL_EMBED_URL}
-                title="VOX 2026 theme reveal Instagram Reel"
-                loading="lazy"
-                allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            </div>
+            {isNarrowViewport ? (
+              <div className="vox-theme-modal__mobile-fallback">
+                <span>VOX // '26 Theme Reveal</span>
+                <p>Instagram controls playback on mobile embeds.</p>
+                <p>Open the reel directly for the best experience.</p>
+                <a
+                  className="button button-primary vox-theme-modal__mobile-fallback-link"
+                  href={VOX_THEME_REVEAL_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open the VOX 2026 theme reveal on Instagram"
+                >
+                  Open on Instagram
+                </a>
+              </div>
+            ) : (
+              <div className="vox-theme-modal__frame-shell">
+                <iframe
+                  className="vox-theme-modal__frame"
+                  src={VOX_THEME_REVEAL_EMBED_URL}
+                  title="VOX 2026 theme reveal Instagram Reel"
+                  loading="lazy"
+                  allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
+              </div>
+            )}
           </div>
         ) : (
           <button
@@ -186,17 +229,19 @@ export default function VoxThemeRevealModal() {
           </button>
         )}
 
-        <div className="vox-theme-modal__actions">
-          <a
-            className="button button-primary vox-theme-modal__fallback"
-            href={VOX_THEME_REVEAL_URL}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open the VOX 2026 theme reveal on Instagram"
-          >
-            Open on Instagram
-          </a>
-        </div>
+        {(!isNarrowViewport || !isThemeRevealRevealed) ? (
+          <div className="vox-theme-modal__actions">
+            <a
+              className="button button-primary vox-theme-modal__fallback"
+              href={VOX_THEME_REVEAL_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open the VOX 2026 theme reveal on Instagram"
+            >
+              Open on Instagram
+            </a>
+          </div>
+        ) : null}
       </section>
     </div>
   );

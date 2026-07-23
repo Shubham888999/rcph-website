@@ -51,6 +51,8 @@ test("InstallationSection contains emoji-free VOX event content and external act
     /RSVP Now/,
     /View Venue/,
     /Open on Instagram/,
+    /Instagram controls playback on mobile embeds\./,
+    /Open the reel directly for the best experience\./,
     /className="home-installation__action-link home-installation__action-link--rsvp"/,
     /className="home-installation__action-link home-installation__action-link--venue"/,
     /aria-label="VOX event actions"/,
@@ -76,8 +78,15 @@ test("InstallationSection vinyl card spins before revealing the Instagram Reel i
     /import \{ useEffect, useRef, useState \} from "react";/,
     /const THEME_REVEAL_URL = "https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx";/,
     /const THEME_REVEAL_EMBED_URL = "https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/embed";/,
+    /function useIsNarrowViewport\(\)/,
+    /window\.matchMedia\("\(max-width: 48rem\)"\)/,
+    /query\.addEventListener\("change", update\)/,
+    /query\.removeEventListener\("change", update\)/,
+    /query\.addListener\?\.\(update\)/,
+    /query\.removeListener\?\.\(update\)/,
     /const revealTimerRef = useRef\(null\);/,
     /const \[themeRevealState, setThemeRevealState\] = useState\("idle"\);/,
+    /const isNarrowViewport = useIsNarrowViewport\(\);/,
     /themeRevealState === "spinning"/,
     /themeRevealState === "revealed"/,
     /function handleInlineThemeRevealClick\(\)/,
@@ -93,14 +102,22 @@ test("InstallationSection vinyl card spins before revealing the Instagram Reel i
     /disabled=\{isThemeRevealSpinning\}/,
     /home-installation__reveal-card--spinning/,
     /Spinning the record\.\.\./,
+    /isNarrowViewport \? \(/,
+    /className="home-installation__mobile-fallback"/,
+    /className="home-installation__mobile-fallback-link"/,
+    /Instagram controls playback on mobile embeds\./,
+    /Open the reel directly for the best experience\./,
     /<iframe[\s\S]*className="home-installation__inline-frame"[\s\S]*src=\{THEME_REVEAL_EMBED_URL\}/,
     /title="VOX 2026 theme reveal Instagram Reel"/,
     /loading="lazy"/,
+    /allow="clipboard-write; encrypted-media; picture-in-picture; web-share"/,
     /href=\{THEME_REVEAL_URL\}/,
     /Open on Instagram/,
   ]) {
     assert.match(source, expected);
   }
+
+  assert.doesNotMatch(source, /allow="autoplay;/);
 });
 
 test("InstallationSection auto-illuminates VOX after the hero dismisses before scroll takeover", async () => {
@@ -219,8 +236,11 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /@keyframes home-installation-record-spin/,
     /\.home-installation__stage-pass \{/,
     /\.home-installation__inline-reveal \{/,
+    /\.home-installation__inline-reveal\.home-installation__inline-reveal--mobile-fallback \{/,
     /\.home-installation__inline-frame-shell \{[\s\S]*aspect-ratio: 9 \/ 14;/,
     /\.home-installation__inline-frame \{/,
+    /\.home-installation__mobile-fallback \{/,
+    /\.home-installation__mobile-fallback-link \{/,
     /\.home-installation__inline-fallback \{/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.installation-spotlight-fixtures \{[\s\S]*display: none;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__spotlight \{[\s\S]*display: none;/,
@@ -229,6 +249,8 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /@media \(max-width: 27rem\) \{[\s\S]*\.home-hero-shell\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*max-height: 0;[\s\S]*min-height: 0;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__reveal-card/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-hero-shell/,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__mobile-fallback/,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__mobile-fallback-link/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation--auto-revealed \.home-installation__atmosphere::before/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__reveal-card--spinning \.home-installation__record \{[\s\S]*animation: none;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*--installation-spotlight-scale: 1;/,
