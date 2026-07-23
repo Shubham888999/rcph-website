@@ -55,6 +55,19 @@ test("member profile optional Rotary ID can be empty", () => {
   assert.equal(payload.rotaryId, "");
 });
 
+test("member profile payload sends canonical rotaryId accepted by backend", () => {
+  const draft = {
+    ...createProfileDraft({ role: "gbm", name: "Member" }),
+    rotaryId: " 11218198 ",
+  };
+  const validation = validateProfileDraft(draft, { role: "gbm", today: "2026-07-12" });
+  const payload = buildProfileUpdatePayload(draft, { role: "gbm", today: "2026-07-12" });
+
+  assert.equal(validation.valid, true);
+  assert.equal(payload.rotaryId, "11218198");
+  assert.equal(Object.hasOwn(payload, "rid"), false);
+});
+
 test("member profile Rotary ID reloads from profile data and trims before save", () => {
   const draft = createProfileDraft({
     role: "bod",

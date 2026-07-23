@@ -9,7 +9,9 @@ test("Edit Profile renders optional RID / Rotary ID field for non-prospect profi
   assert.match(source, /const canEditRotaryId = !prospect/);
   assert.match(source, /<span>RID \/ Rotary ID<\/span>/);
   assert.match(source, /placeholder="Enter your Rotary ID if available"/);
-assert.match(source, /Add this only if you already have a Rotary International ID\./);  assert.match(source, /onChange=\{\(event\) => change\("rotaryId", event\.target\.value\)\}/);
+  assert.match(source, /Add this only if you already have a Rotary International ID\./);
+  assert.match(source, /onChange=\{\(event\) => change\("rotaryId", event\.target\.value\)\}/);
+  assert.match(source, /onSave\(buildProfileUpdatePayload\(draft, \{ role, today \}\)\)/);
 });
 
 test("Edit Profile helper text is styled separately from validation errors", () => {
