@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./app/App";
+import VoxAnnouncementBar from "./components/VoxAnnouncementBar";
+import VoxThemeRevealModal from "./components/VoxThemeRevealModal";
 import AuthProvider from "./contexts/AuthProvider";
 import ThemeProvider from "./features/theme/ThemeProvider";
 import ThemeToggle from "./features/theme/ThemeToggle";
@@ -13,7 +15,9 @@ createRoot(document.getElementById("root")).render(
   <StrictMode>
     <ThemeProvider>
       <AuthProvider>
+        <VoxAnnouncementBar />
         <App />
+        <VoxThemeRevealModal />
         <ThemeToggle />
       </AuthProvider>
     </ThemeProvider>
