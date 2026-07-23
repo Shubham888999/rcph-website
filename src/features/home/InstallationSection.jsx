@@ -1,13 +1,18 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { openVoxThemeReveal } from "../../components/VoxThemeRevealModal";
 
 const RSVP_URL = "https://forms.gle/gQ8JcgWHDHWvGakP7";
 const VENUE_URL = "https://maps.app.goo.gl/iNXahK8kMDFVURij8?g_st=ac";
+const THEME_REVEAL_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/?igsh=d2VrMHh0dWZ6eGtx";
+const THEME_REVEAL_EMBED_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/embed";
 
 export default function InstallationSection() {
   const sectionRef = useRef(null);
+  const revealTimerRef = useRef(null);
+  const [themeRevealState, setThemeRevealState] = useState("idle");
   const reduceMotion = useReducedMotion();
+  const isThemeRevealSpinning = themeRevealState === "spinning";
+  const isThemeRevealRevealed = themeRevealState === "revealed";
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start 78%", "end 16%"],
@@ -55,9 +60,24 @@ export default function InstallationSection() {
       "--installation-fixture-rotate": fixtureRotate,
     };
 
-  function handleThemeRevealClick(event) {
-    openVoxThemeReveal(event.currentTarget);
+  function handleInlineThemeRevealClick() {
+    if (isThemeRevealSpinning || isThemeRevealRevealed) return;
+
+    if (reduceMotion) {
+      setThemeRevealState("revealed");
+      return;
+    }
+
+    window.clearTimeout(revealTimerRef.current);
+    setThemeRevealState("spinning");
+    revealTimerRef.current = window.setTimeout(() => {
+      setThemeRevealState("revealed");
+    }, 2000);
   }
+
+  useEffect(() => {
+    return () => window.clearTimeout(revealTimerRef.current);
+  }, []);
 
   return (
     <motion.section
@@ -114,17 +134,9 @@ export default function InstallationSection() {
 
           <p className="home-installation__closing">See you at VOX // '26.</p>
 
-          <div className="home-actions home-installation__actions">
-            <button
-              type="button"
-              className="button button-secondary home-installation__button"
-              onClick={handleThemeRevealClick}
-              aria-label="Watch the VOX 2026 theme reveal on Instagram"
-            >
-              Watch Theme Reveal
-            </button>
+          <nav className="home-installation__actions" aria-label="VOX event actions">
             <a
-              className="button button-primary home-installation__button"
+              className="home-installation__action-link home-installation__action-link--rsvp"
               href={RSVP_URL}
               target="_blank"
               rel="noreferrer"
@@ -132,8 +144,9 @@ export default function InstallationSection() {
             >
               RSVP Now
             </a>
+            <span className="home-installation__action-separator" aria-hidden="true">/</span>
             <a
-              className="button button-secondary home-installation__button"
+              className="home-installation__action-link home-installation__action-link--venue"
               href={VENUE_URL}
               target="_blank"
               rel="noreferrer"
@@ -141,24 +154,57 @@ export default function InstallationSection() {
             >
               View Venue
             </a>
-          </div>
+          </nav>
         </div>
 
         <div className="home-installation__visual">
-          <button
-            type="button"
-            className="home-installation__reveal-card"
-            onClick={handleThemeRevealClick}
-            aria-label="Spin the record and watch the VOX 2026 theme reveal on Instagram"
-          >
-            <span className="home-installation__record" aria-hidden="true">
-              <span />
-            </span>
-            <span className="home-installation__stage-pass">
-              <span>Spin the record</span>
-              <strong>Watch the theme reveal</strong>
-            </span>
-          </button>
+          {isThemeRevealRevealed ? (
+            <div className="home-installation__inline-reveal" aria-live="polite">
+              <div className="home-installation__inline-header">
+                <span>VOX // '26 Theme Reveal</span>
+                <strong>Watch the reveal</strong>
+              </div>
+              <div className="home-installation__inline-frame-shell">
+                <iframe
+                  className="home-installation__inline-frame"
+                  src={THEME_REVEAL_EMBED_URL}
+                  title="VOX 2026 theme reveal Instagram Reel"
+                  loading="lazy"
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                />
+              </div>
+              <a
+                className="home-installation__inline-fallback"
+                href={THEME_REVEAL_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open the VOX 2026 theme reveal on Instagram"
+              >
+                Open on Instagram
+              </a>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={`home-installation__reveal-card${isThemeRevealSpinning ? " home-installation__reveal-card--spinning" : ""}`}
+              onClick={handleInlineThemeRevealClick}
+              aria-label="Watch the VOX 2026 theme reveal inside this section"
+              aria-busy={isThemeRevealSpinning ? "true" : undefined}
+              disabled={isThemeRevealSpinning}
+            >
+              <span className="home-installation__record" aria-hidden="true">
+                <span />
+              </span>
+              <span className="home-installation__stage-pass">
+                <span className="home-installation__reveal-status" role={isThemeRevealSpinning ? "status" : undefined}>
+                  {isThemeRevealSpinning ? "Spinning the record..." : "Spin the record"}
+                </span>
+                <strong>{isThemeRevealSpinning ? "Cueing the theme reveal" : "Watch the theme reveal"}</strong>
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </motion.section>

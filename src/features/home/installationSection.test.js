@@ -4,21 +4,29 @@ import test from "node:test";
 
 const emojiPattern = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 
-test("HomePage inserts InstallationSection after ClubIntroduction and gates recruitment", async () => {
+test("HomePage auto-collapses the hero before the VOX-first homepage flow", async () => {
   const source = await readFile(new URL("../../pages/public/HomePage.jsx", import.meta.url), "utf8");
 
+  assert.match(source, /import \{ useEffect, useState \} from "react";/);
   assert.match(source, /import InstallationSection from "\.\.\/\.\.\/features\/home\/InstallationSection";/);
-  assert.match(source, /const SHOW_RECRUITMENT_SECTION = false;/);
-  assert.match(source, /Temporarily hidden while VOX \/\/ '26 Installation is promoted/);
+  assert.match(source, /const HERO_AUTO_FADE_DELAY_MS = 1000;/);
+  assert.match(source, /const SHOW_RECRUITMENT_SECTION = true;/);
+  assert.match(source, /const \[heroDismissed, setHeroDismissed\] = useState\(false\);/);
+  assert.match(source, /window\.setTimeout\(\(\) => \{[\s\S]*setHeroDismissed\(true\);[\s\S]*\}, HERO_AUTO_FADE_DELAY_MS\);/);
+  assert.match(source, /return \(\) => window\.clearTimeout\(heroTimer\);/);
+  assert.match(source, /className=\{`home-hero-shell\$\{heroDismissed \? " home-hero-shell--dismissed" : ""\}`\}/);
   assert.match(source, /SHOW_RECRUITMENT_SECTION \? <RecruitmentSection \/> : null/);
 
+  const heroIndex = source.indexOf("<HomeHero />");
   const introIndex = source.indexOf("<ClubIntroduction />");
   const installationIndex = source.indexOf("<InstallationSection />");
   const recruitmentIndex = source.indexOf("{SHOW_RECRUITMENT_SECTION ? <RecruitmentSection /> : null}");
 
+  assert.ok(heroIndex !== -1, "HomeHero should still render first");
   assert.ok(introIndex !== -1, "ClubIntroduction should still render");
-  assert.ok(installationIndex > introIndex, "InstallationSection should render after ClubIntroduction");
-  assert.ok(recruitmentIndex > installationIndex, "RecruitmentSection gate should remain after InstallationSection");
+  assert.ok(installationIndex > heroIndex, "InstallationSection should render after the hero shell");
+  assert.ok(introIndex > installationIndex, "ClubIntroduction should render after InstallationSection");
+  assert.ok(recruitmentIndex > introIndex, "RecruitmentSection should be restored after ClubIntroduction");
 });
 
 test("InstallationSection contains emoji-free VOX event content and external actions", async () => {
@@ -37,21 +45,61 @@ test("InstallationSection contains emoji-free VOX event content and external act
     /See you at VOX \/\/ '26\./,
     /https:\/\/forms\.gle\/gQ8JcgWHDHWvGakP7/,
     /https:\/\/maps\.app\.goo\.gl\/iNXahK8kMDFVURij8\?g_st=ac/,
-    /Watch Theme Reveal/,
+    /https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/embed/,
+    /https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx/,
     /RSVP Now/,
     /View Venue/,
+    /Open on Instagram/,
+    /className="home-installation__action-link home-installation__action-link--rsvp"/,
+    /className="home-installation__action-link home-installation__action-link--venue"/,
+    /aria-label="VOX event actions"/,
     /aria-labelledby="home-installation-title"/,
     /target="_blank"/,
     /rel="noreferrer"/,
     /aria-hidden="true"/,
-    /import \{ openVoxThemeReveal \} from "\.\.\/\.\.\/components\/VoxThemeRevealModal";/,
-    /openVoxThemeReveal\(event\.currentTarget\)/,
   ]) {
     assert.match(source, expected);
   }
 
-  assert.equal((source.match(/onClick=\{handleThemeRevealClick\}/g) ?? []).length, 2);
-  assert.doesNotMatch(source, /role="dialog"|aria-modal="true"|<iframe|useState|useEffect|href=\{THEME_REVEAL_URL\}/);
+  assert.doesNotMatch(source, /Watch Theme Reveal/);
+  assert.doesNotMatch(source, /handleThemeRevealClick|openVoxThemeReveal|onClick=\{handleThemeRevealClick\}/);
+  assert.doesNotMatch(source, /button button-primary home-installation__button|button button-secondary home-installation__button/);
+  assert.equal((source.match(/onClick=\{handleInlineThemeRevealClick\}/g) ?? []).length, 1);
+  assert.doesNotMatch(source, /role="dialog"|aria-modal="true"/);
+});
+
+test("InstallationSection vinyl card spins before revealing the Instagram Reel inline", async () => {
+  const source = await readFile(new URL("./InstallationSection.jsx", import.meta.url), "utf8");
+
+  for (const expected of [
+    /import \{ useEffect, useRef, useState \} from "react";/,
+    /const THEME_REVEAL_URL = "https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx";/,
+    /const THEME_REVEAL_EMBED_URL = "https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/embed";/,
+    /const revealTimerRef = useRef\(null\);/,
+    /const \[themeRevealState, setThemeRevealState\] = useState\("idle"\);/,
+    /themeRevealState === "spinning"/,
+    /themeRevealState === "revealed"/,
+    /function handleInlineThemeRevealClick\(\)/,
+    /if \(isThemeRevealSpinning \|\| isThemeRevealRevealed\) return;/,
+    /if \(reduceMotion\) \{[\s\S]*setThemeRevealState\("revealed"\);/,
+    /setThemeRevealState\("spinning"\);/,
+    /window\.setTimeout\(\(\) => \{[\s\S]*setThemeRevealState\("revealed"\);[\s\S]*\}, 2000\);/,
+    /window\.clearTimeout\(revealTimerRef\.current\);/,
+    /useEffect\(\(\) => \{[\s\S]*return \(\) => window\.clearTimeout\(revealTimerRef\.current\);/,
+    /onClick=\{handleInlineThemeRevealClick\}/,
+    /aria-label="Watch the VOX 2026 theme reveal inside this section"/,
+    /aria-busy=\{isThemeRevealSpinning \? "true" : undefined\}/,
+    /disabled=\{isThemeRevealSpinning\}/,
+    /home-installation__reveal-card--spinning/,
+    /Spinning the record\.\.\./,
+    /<iframe[\s\S]*className="home-installation__inline-frame"[\s\S]*src=\{THEME_REVEAL_EMBED_URL\}/,
+    /title="VOX 2026 theme reveal Instagram Reel"/,
+    /loading="lazy"/,
+    /href=\{THEME_REVEAL_URL\}/,
+    /Open on Instagram/,
+  ]) {
+    assert.match(source, expected);
+  }
 });
 
 test("InstallationSection uses scoped scroll variables and decorative fixture images", async () => {
@@ -92,6 +140,12 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
   const css = await readFile(new URL("../../styles/components/home.css", import.meta.url), "utf8");
 
   for (const expected of [
+    /\.home-hero-shell \{/,
+    /\.home-hero-shell \{[\s\S]*max-height: 120vh;/,
+    /\.home-hero-shell--dismissed \{/,
+    /\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*opacity: 0;/,
+    /\.home-hero-shell\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*max-height: 0;[\s\S]*min-height: 0;[\s\S]*overflow: hidden;[\s\S]*pointer-events: none;/,
+    /\.home-hero-shell\.home-hero-shell--dismissed > \* \{[\s\S]*pointer-events: none;/,
     /\.home-installation \{/,
     /--installation-darkness-opacity/,
     /--installation-fixture-opacity/,
@@ -115,14 +169,30 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /\.home-installation__details \{/,
     /\.home-installation__details \{[\s\S]*padding: clamp\(0\.35rem, 1vw, 0\.55rem\);/,
     /\.home-installation__details div \{[\s\S]*padding: 1rem clamp\(1rem, 2vw, 1\.45rem\);/,
+    /\.home-installation__actions \{/,
+    /\.home-installation__action-link \{/,
+    /\.home-installation__action-link--rsvp \{/,
+    /\.home-installation__action-link--venue \{/,
+    /\.home-installation__action-separator \{/,
     /\.home-installation__visual \{[\s\S]*width: min\(100%, clamp\(21rem, 31vw, 30rem\)\);[\s\S]*overflow: visible;/,
     /\.home-installation__reveal-card \{/,
     /\.home-installation__reveal-card \{[\s\S]*width: 100%;/,
     /\.home-installation__record \{/,
+    /\.home-installation__reveal-card--spinning \.home-installation__record \{[\s\S]*animation: home-installation-record-spin 2000ms/,
+    /@keyframes home-installation-record-spin/,
     /\.home-installation__stage-pass \{/,
+    /\.home-installation__inline-reveal \{/,
+    /\.home-installation__inline-frame-shell \{[\s\S]*aspect-ratio: 9 \/ 14;/,
+    /\.home-installation__inline-frame \{/,
+    /\.home-installation__inline-fallback \{/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.installation-spotlight-fixtures \{[\s\S]*display: none;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__spotlight \{[\s\S]*display: none;/,
+    /@media \(max-width: 48rem\) \{[\s\S]*\.home-hero-shell \{[\s\S]*height: max\(32rem, calc\(100svh - var\(--header-height\) - 4\.375rem\)\);/,
+    /@media \(max-width: 48rem\) \{[\s\S]*\.home-hero-shell\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*max-height: 0;[\s\S]*min-height: 0;/,
+    /@media \(max-width: 27rem\) \{[\s\S]*\.home-hero-shell\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*max-height: 0;[\s\S]*min-height: 0;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__reveal-card/,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-hero-shell/,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__reveal-card--spinning \.home-installation__record \{[\s\S]*animation: none;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*--installation-spotlight-scale: 1;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*--installation-fixture-drop: 0rem;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.installation-spotlight-fixture/,

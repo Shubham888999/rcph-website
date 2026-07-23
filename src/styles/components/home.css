@@ -17,6 +17,59 @@
     var(--color-bg-deep);
 }
 
+.home-hero-shell {
+  height: max(31rem, calc(100svh - var(--header-height) - 4.875rem));
+  max-height: 120vh;
+  min-height: 0;
+  margin-block: 0;
+  padding-block: 0;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+  transition:
+    opacity 760ms ease,
+    height 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-block 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding-block 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 760ms ease,
+    filter 760ms ease,
+    visibility 0s linear 0s;
+}
+
+.home-hero-shell .home-hero {
+  height: 100%;
+  min-height: 100%;
+}
+
+.home-hero-shell.home-hero-shell--dismissed {
+  height: 0;
+  max-height: 0;
+  min-height: 0;
+  margin-block: 0;
+  padding-block: 0;
+  overflow: hidden;
+  opacity: 0;
+  filter: brightness(0.82);
+  pointer-events: none;
+  transform: translateY(-1rem);
+  visibility: hidden;
+  transition:
+    opacity 760ms ease,
+    height 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-block 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding-block 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 760ms ease,
+    filter 760ms ease,
+    visibility 0s linear 860ms;
+}
+
+.home-hero-shell.home-hero-shell--dismissed > * {
+  pointer-events: none;
+}
+
 .home-section {
   position: relative;
   isolation: isolate;
@@ -684,13 +737,66 @@
 }
 
 .home-installation__actions {
-  align-items: stretch;
+  margin-top: clamp(1.7rem, 3vw, 2.25rem);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
 }
 
-.home-installation__button {
-  min-height: 3.2rem;
-  padding-inline: 1.1rem;
-  border-radius: 0.5rem;
+.home-installation__action-link {
+  position: relative;
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  color: #ffbc59;
+  font-size: 0.84rem;
+  font-weight: 850;
+  letter-spacing: 0.075em;
+  line-height: 1.1;
+  text-decoration: none;
+  text-transform: uppercase;
+  text-shadow: 0 0 1.1rem rgba(255, 188, 89, 0.18);
+  transition:
+    color var(--transition-standard),
+    text-shadow var(--transition-standard);
+}
+
+.home-installation__action-link::after {
+  position: absolute;
+  right: 0;
+  bottom: 0.18rem;
+  left: 0;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, rgba(255, 188, 89, 0.92), rgba(226, 55, 126, 0.72));
+  opacity: 0.68;
+  transform: scaleX(0.72);
+  transform-origin: left center;
+  transition:
+    opacity var(--transition-standard),
+    transform var(--transition-standard);
+}
+
+.home-installation__action-link:focus-visible {
+  border-radius: 0.2rem;
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.home-installation__action-link--rsvp {
+  color: #ffbc59;
+}
+
+.home-installation__action-link--venue {
+  color: #ff8cc1;
+}
+
+.home-installation__action-separator {
+  color: rgba(255, 248, 237, 0.34);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .home-installation__visual {
@@ -740,6 +846,10 @@
   font: inherit;
   cursor: pointer;
   isolation: isolate;
+}
+
+.home-installation__reveal-card:disabled {
+  cursor: progress;
 }
 
 .home-installation__reveal-card::before,
@@ -816,6 +926,29 @@
   border: 1px solid rgba(255, 188, 89, 0.12);
 }
 
+.home-installation__reveal-card--spinning .home-installation__record {
+  animation: home-installation-record-spin 2000ms cubic-bezier(0.3, 0.02, 0.16, 1) forwards;
+  box-shadow:
+    0 1.2rem 2.8rem rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(255, 248, 237, 0.12),
+    0 0 3.4rem rgba(255, 188, 89, 0.28),
+    0 0 4.8rem rgba(226, 55, 126, 0.16);
+}
+
+@keyframes home-installation-record-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  72% {
+    transform: rotate(900deg) scale(1.045);
+  }
+
+  100% {
+    transform: rotate(1080deg) scale(1.02);
+  }
+}
+
 .home-installation__stage-pass {
   position: absolute;
   right: clamp(1.1rem, 4vw, 2.15rem);
@@ -846,6 +979,109 @@
   color: #fff8ed;
   font-size: clamp(1.2rem, 2.3vw, 1.65rem);
   line-height: 1.05;
+}
+
+.home-installation__inline-reveal {
+  position: relative;
+  width: 100%;
+  min-height: clamp(28rem, 44vw, 36rem);
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: center;
+  gap: clamp(0.85rem, 2vw, 1rem);
+  border: 1px solid rgba(255, 188, 89, 0.28);
+  border-radius: 0.5rem;
+  color: #fff8ed;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 237, 0.055), transparent 28%),
+    radial-gradient(circle at 50% 16%, rgba(226, 55, 126, 0.16), transparent 18rem),
+    linear-gradient(145deg, #070405, #21030d 62%, #090506);
+  box-shadow:
+    0 1.6rem 4rem rgba(0, 0, 0, 0.45),
+    0 0 3rem rgba(255, 188, 89, var(--installation-visual-glow-opacity)),
+    inset 0 0 0 1px rgba(255, 248, 237, 0.04);
+}
+
+.home-installation__inline-reveal::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 248, 237, 0.04) 0 1px,
+      transparent 1px 1.1rem
+    );
+  opacity: 0.22;
+}
+
+.home-installation__inline-header,
+.home-installation__inline-frame-shell,
+.home-installation__inline-fallback {
+  position: relative;
+  z-index: 1;
+}
+
+.home-installation__inline-header {
+  width: 100%;
+  display: grid;
+  gap: 0.2rem;
+  text-align: center;
+}
+
+.home-installation__inline-header span {
+  color: #ff6fb0;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.home-installation__inline-header strong {
+  color: #fff8ed;
+  font-size: clamp(1.15rem, 2.1vw, 1.45rem);
+  line-height: 1.1;
+}
+
+.home-installation__inline-frame-shell {
+  width: min(100%, 18.5rem);
+  max-height: min(32rem, 64svh);
+  aspect-ratio: 9 / 14;
+  overflow: hidden;
+  border: 1px solid rgba(255, 248, 237, 0.16);
+  border-radius: 0.42rem;
+  background: #050304;
+  box-shadow:
+    0 1.1rem 2.6rem rgba(0, 0, 0, 0.52),
+    0 0 1.6rem rgba(226, 55, 126, 0.12);
+}
+
+.home-installation__inline-frame {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: #050304;
+}
+
+.home-installation__inline-fallback {
+  color: #ffbc59;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-decoration-color: rgba(255, 188, 89, 0.62);
+  text-transform: uppercase;
+}
+
+.home-installation__inline-fallback:hover {
+  color: #fff0c2;
+  text-decoration-color: currentColor;
 }
 
 .home-recruitment {
@@ -1775,6 +2011,18 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     background-position: 100% 50%;
   }
 
+  .home-installation__action-link:hover {
+    color: #fff8ed;
+    text-shadow:
+      0 0 1.1rem rgba(255, 188, 89, 0.34),
+      0 0 1.7rem rgba(226, 55, 126, 0.18);
+  }
+
+  .home-installation__action-link:hover::after {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
   .home-highlight-awards__media:hover img {
     transform: scale(1.02);
     filter: saturate(1.03) contrast(1.015);
@@ -1855,6 +2103,10 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   min-height: 30rem;
 }
 
+.home-installation__inline-reveal {
+  min-height: 30rem;
+}
+
 .home-hero__content {
   width: min(48rem, calc(100% - (2 * var(--page-gutter))));
 }
@@ -1929,6 +2181,16 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
 
   .home-hero {
     min-height: max(32rem, calc(100svh - var(--header-height) - 4.375rem));
+  }
+
+  .home-hero-shell {
+    height: max(32rem, calc(100svh - var(--header-height) - 4.375rem));
+  }
+
+  .home-hero-shell.home-hero-shell--dismissed {
+    height: 0;
+    max-height: 0;
+    min-height: 0;
   }
 
   .home-hero__image {
@@ -2090,18 +2352,22 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
 }
 
 .home-installation__actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.65rem;
+  gap: 0.55rem 0.65rem;
 }
 
-.home-installation__button {
-  width: 100%;
-  min-height: 3rem;
+.home-installation__action-link {
+  min-height: 1.8rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
 }
 
-.home-installation__reveal-card {
-  min-height: 25rem;
+.home-installation__reveal-card,
+.home-installation__inline-reveal {
+  min-height: 32rem;
+}
+
+.home-installation__inline-frame-shell {
+  width: min(100%, 17.5rem);
 }
 
 .home-installation__record {
@@ -2340,8 +2606,13 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   line-height: 1.7;
 }
 
-.home-installation__reveal-card {
-  min-height: 22rem;
+.home-installation__reveal-card,
+.home-installation__inline-reveal {
+  min-height: 30rem;
+}
+
+.home-installation__inline-frame-shell {
+  width: min(100%, 16.5rem);
 }
 
 .home-installation__stage-pass {
@@ -2356,6 +2627,16 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
 @media (max-width: 27rem) {
   .home-hero {
     min-height: max(32rem, calc(100svh - var(--header-height) - 3.875rem));
+  }
+
+  .home-hero-shell {
+    height: max(32rem, calc(100svh - var(--header-height) - 3.875rem));
+  }
+
+  .home-hero-shell.home-hero-shell--dismissed {
+    height: 0;
+    max-height: 0;
+    min-height: 0;
   }
 
   .home-hero__image {
@@ -2405,6 +2686,11 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     --installation-fixture-rotate: 0deg;
   }
 
+  .home-hero-shell,
+  .home-hero-shell--dismissed {
+    transition: none;
+  }
+
   .home-gallery__item img {
     transition: none;
   }
@@ -2437,7 +2723,16 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     transform: none;
   }
 
+  .home-installation__reveal-card--spinning .home-installation__record {
+    animation: none;
+  }
+
   .home-installation__reveal-card,
+  .home-installation__inline-reveal,
+  .home-installation__inline-frame-shell,
+  .home-installation__inline-fallback,
+  .home-installation__action-link,
+  .home-installation__action-link::after,
   .installation-spotlight-fixture,
   .home-installation__spotlight,
   .home-installation__atmosphere,
