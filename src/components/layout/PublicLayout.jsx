@@ -78,8 +78,14 @@ export default function PublicLayout() {
             rel="noreferrer"
             aria-label="RSVP for RCPH's 12th Installation Ceremony"
           >
-            <span className="public-header__vox-ticket-kicker">VOX // '26 Admit One</span>
-            <strong className="public-header__vox-ticket-main">RSVP Now</strong>
+            <span className="public-header__vox-ticket-kicker">
+              <span className="public-header__vox-ticket-desktop">VOX // '26 Admit One</span>
+              <span className="public-header__vox-ticket-mobile">VOX // '26</span>
+            </span>
+            <strong className="public-header__vox-ticket-main">
+              <span className="public-header__vox-ticket-desktop">RSVP Now</span>
+              <span className="public-header__vox-ticket-mobile">RSVP</span>
+            </strong>
             <span className="public-header__vox-ticket-meta">09.08.26</span>
           </a>
 

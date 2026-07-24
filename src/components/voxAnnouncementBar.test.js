@@ -105,6 +105,11 @@ test("public and internal route structure remains present", () => {
 });
 
 test("public header renders a compact VOX RSVP ticket after the brand", () => {
+  assert.equal(
+    (publicLayout.match(/className="public-header__vox-ticket"/g) ?? []).length,
+    1,
+  );
+
   for (const contract of [
     /const VOX_RSVP_URL = "https:\/\/forms\.gle\/gQ8JcgWHDHWvGakP7";/,
     /className="public-header__vox-ticket"/,
@@ -112,9 +117,12 @@ test("public header renders a compact VOX RSVP ticket after the brand", () => {
     /target="_blank"/,
     /rel="noreferrer"/,
     /aria-label="RSVP for RCPH's 12th Installation Ceremony"/,
-    /className="public-header__vox-ticket-kicker">VOX \/\/ '26 Admit One/,
-    /className="public-header__vox-ticket-main">RSVP Now/,
+    /className="public-header__vox-ticket-kicker"[\s\S]*className="public-header__vox-ticket-desktop">VOX \/\/ '26 Admit One/,
+    /className="public-header__vox-ticket-kicker"[\s\S]*className="public-header__vox-ticket-mobile">VOX \/\/ '26/,
+    /className="public-header__vox-ticket-main"[\s\S]*className="public-header__vox-ticket-desktop">RSVP Now/,
+    /className="public-header__vox-ticket-main"[\s\S]*className="public-header__vox-ticket-mobile">RSVP/,
     /className="public-header__vox-ticket-meta">09\.08\.26/,
+    /className="public-menu-toggle"/,
   ]) {
     assert.match(publicLayout, contract);
   }
@@ -122,10 +130,12 @@ test("public header renders a compact VOX RSVP ticket after the brand", () => {
   const brandIndex = publicLayout.indexOf('className="public-brand"');
   const ticketIndex = publicLayout.indexOf('className="public-header__vox-ticket"');
   const navigationIndex = publicLayout.indexOf('className={`public-navigation');
+  const menuButtonIndex = publicLayout.indexOf('className="public-menu-toggle"');
 
   assert.ok(brandIndex !== -1, "public brand should exist");
   assert.ok(ticketIndex > brandIndex, "VOX ticket should render after the public brand");
   assert.ok(navigationIndex > ticketIndex, "primary navigation should render after the VOX ticket");
+  assert.ok(menuButtonIndex > navigationIndex, "hamburger should remain after the navigation");
 
   for (const contract of [
     /\.public-header__vox-ticket \{/,
@@ -135,13 +145,30 @@ test("public header renders a compact VOX RSVP ticket after the brand", () => {
     /\.public-header__vox-ticket::after/,
     /\.public-header__vox-ticket-kicker,[\s\S]*\.public-header__vox-ticket-meta \{/,
     /\.public-header__vox-ticket-main \{/,
+    /\.public-header__vox-ticket-mobile \{[\s\S]*display: none;/,
     /\.public-header__vox-ticket:focus-visible \{/,
     /\.public-header__vox-ticket:hover \{/,
     /@media \(max-width: 1240px\) \{[\s\S]*\.public-header__vox-ticket \{[\s\S]*display: none;/,
+    /@media \(max-width: 1120px\) \{[\s\S]*\.public-header-inner \{[\s\S]*padding-right: 3\.35rem;/,
+    /@media \(max-width: 1120px\) \{[\s\S]*\.public-brand \{[\s\S]*flex: 1 1 auto;[\s\S]*min-width: 0;/,
+    /@media \(max-width: 1120px\) \{[\s\S]*\.public-header__vox-ticket \{[\s\S]*min-width: 4\.75rem;[\s\S]*max-width: 5\.6rem;[\s\S]*min-height: 3rem;[\s\S]*padding: 0\.4rem 0\.52rem;[\s\S]*display: grid;/,
+    /@media \(max-width: 1120px\) \{[\s\S]*\.public-header__vox-ticket-desktop,[\s\S]*\.public-header__vox-ticket-meta \{[\s\S]*display: none;/,
+    /@media \(max-width: 1120px\) \{[\s\S]*\.public-header__vox-ticket-mobile \{[\s\S]*display: inline;/,
+    /@media \(max-width: 1120px\) \{[\s\S]*\.public-header__vox-ticket-kicker \{[\s\S]*font-size: 0\.45rem;[\s\S]*white-space: nowrap;/,
+    /@media \(max-width: 1120px\) \{[\s\S]*\.public-header__vox-ticket-main \{[\s\S]*font-size: 0\.8rem;[\s\S]*white-space: nowrap;/,
+    /@media \(max-width: 720px\) \{[\s\S]*\.public-header-inner \{[\s\S]*padding-right: calc\(1rem \+ 3\.35rem\);/,
+    /@media \(max-width: 30rem\) \{[\s\S]*\.public-header__vox-ticket \{[\s\S]*min-width: 4\.55rem;[\s\S]*max-width: 5\.2rem;/,
+    /@media \(max-width: 23rem\) \{[\s\S]*\.public-header__vox-ticket \{[\s\S]*min-width: 4\.35rem;[\s\S]*max-width: 4\.85rem;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.public-header__vox-ticket \{[\s\S]*transition: none;/,
   ]) {
     assert.match(publicLayoutCss, contract);
   }
+
+  const mobileHeaderCss = publicLayoutCss.slice(publicLayoutCss.indexOf("@media (max-width: 1120px)"));
+  assert.doesNotMatch(
+    mobileHeaderCss,
+    /@media \(max-width: (?:720px|30rem|23rem)\) \{[\s\S]*?\.public-header__vox-ticket \{[\s\S]*?display: none;/,
+  );
 });
 
 test("Phase 6B announcement work keeps the recruitment component source intact", () => {
