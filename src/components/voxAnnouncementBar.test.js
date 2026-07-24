@@ -6,6 +6,8 @@ const announcement = readFileSync(new URL("./VoxAnnouncementBar.jsx", import.met
 const modal = readFileSync(new URL("./VoxThemeRevealModal.jsx", import.meta.url), "utf8");
 const main = readFileSync(new URL("../main.jsx", import.meta.url), "utf8");
 const router = readFileSync(new URL("../app/router.jsx", import.meta.url), "utf8");
+const publicLayout = readFileSync(new URL("./layout/PublicLayout.jsx", import.meta.url), "utf8");
+const publicLayoutCss = readFileSync(new URL("../styles/components/public-layout.css", import.meta.url), "utf8");
 const recruitmentSection = readFileSync(new URL("../features/home/RecruitmentSection.jsx", import.meta.url), "utf8");
 const globalCss = readFileSync(new URL("../styles/global.css", import.meta.url), "utf8");
 const packageJson = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
@@ -18,22 +20,25 @@ test("VOX announcement bar contains the Phase 6B event copy and external actions
   assert.match(announcement, /RCPH'S 12TH INSTALLATION/);
   assert.match(announcement, /09\.08\.26/);
   assert.match(announcement, /https:\/\/forms\.gle\/gQ8JcgWHDHWvGakP7/);
-  assert.match(announcement, /import \{ openVoxThemeReveal \} from "\.\/VoxThemeRevealModal";/);
-  assert.match(announcement, /openVoxThemeReveal\(event\.currentTarget\)/);
-  assert.match(announcement, /<button[\s\S]*onClick=\{handleThemeRevealClick\}[\s\S]*Watch Theme Reveal/);
+  assert.match(announcement, /href="\/#vox-theme-reveal"/);
+  assert.match(announcement, /<a[\s\S]*className="vox-announcement__link vox-announcement__link--theme"[\s\S]*Watch Theme Reveal/);
+  assert.doesNotMatch(announcement, /import \{ openVoxThemeReveal \} from "\.\/VoxThemeRevealModal";/);
+  assert.doesNotMatch(announcement, /openVoxThemeReveal|handleThemeRevealClick|vox-theme-reveal:open|dispatchEvent/);
+  assert.doesNotMatch(announcement, /<button[\s\S]*onClick=\{handleThemeRevealClick\}[\s\S]*Watch Theme Reveal/);
   assert.doesNotMatch(announcement, /href=\{THEME_REVEAL_URL\}/);
   assert.doesNotMatch(announcement, /https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx/);
   assert.match(announcement, /target="_blank"/);
   assert.match(announcement, /rel="noreferrer"/);
-  assert.match(announcement, /aria-label="Watch the VOX 2026 theme reveal on Instagram"/);
+  assert.match(announcement, /aria-label="Watch the VOX 2026 theme reveal record on the homepage"/);
   assert.match(announcement, /aria-label="RSVP for RCPH's 12th Installation Ceremony"/);
 });
 
 test("main renders the VOX announcement bar at the app root", () => {
   assert.match(main, /import VoxAnnouncementBar from "\.\/components\/VoxAnnouncementBar";/);
-  assert.match(main, /import VoxThemeRevealModal from "\.\/components\/VoxThemeRevealModal";/);
   assert.match(main, /<VoxAnnouncementBar \/>[\s\S]*<App \/>/);
-  assert.match(main, /<App \/>[\s\S]*<VoxThemeRevealModal \/>[\s\S]*<ThemeToggle \/>/);
+  assert.match(main, /<App \/>[\s\S]*<ThemeToggle \/>/);
+  assert.doesNotMatch(main, /import VoxThemeRevealModal from "\.\/components\/VoxThemeRevealModal";/);
+  assert.doesNotMatch(main, /<VoxThemeRevealModal \/>/);
 });
 
 test("VOX theme reveal modal provides accessible embed and fallback behavior", () => {
@@ -96,6 +101,46 @@ test("public and internal route structure remains present", () => {
     /path: "\/visits\/:visitSlug"/,
   ]) {
     assert.match(router, contract);
+  }
+});
+
+test("public header renders a compact VOX RSVP ticket after the brand", () => {
+  for (const contract of [
+    /const VOX_RSVP_URL = "https:\/\/forms\.gle\/gQ8JcgWHDHWvGakP7";/,
+    /className="public-header__vox-ticket"/,
+    /href=\{VOX_RSVP_URL\}/,
+    /target="_blank"/,
+    /rel="noreferrer"/,
+    /aria-label="RSVP for RCPH's 12th Installation Ceremony"/,
+    /className="public-header__vox-ticket-kicker">VOX \/\/ '26 Admit One/,
+    /className="public-header__vox-ticket-main">RSVP Now/,
+    /className="public-header__vox-ticket-meta">09\.08\.26/,
+  ]) {
+    assert.match(publicLayout, contract);
+  }
+
+  const brandIndex = publicLayout.indexOf('className="public-brand"');
+  const ticketIndex = publicLayout.indexOf('className="public-header__vox-ticket"');
+  const navigationIndex = publicLayout.indexOf('className={`public-navigation');
+
+  assert.ok(brandIndex !== -1, "public brand should exist");
+  assert.ok(ticketIndex > brandIndex, "VOX ticket should render after the public brand");
+  assert.ok(navigationIndex > ticketIndex, "primary navigation should render after the VOX ticket");
+
+  for (const contract of [
+    /\.public-header__vox-ticket \{/,
+    /\.public-header__vox-ticket \{[\s\S]*flex: 0 1 11\.5rem;[\s\S]*min-width: 9\.75rem;[\s\S]*max-width: 12\.5rem;/,
+    /\.public-header__vox-ticket \{[\s\S]*overflow: hidden;/,
+    /\.public-header__vox-ticket::before/,
+    /\.public-header__vox-ticket::after/,
+    /\.public-header__vox-ticket-kicker,[\s\S]*\.public-header__vox-ticket-meta \{/,
+    /\.public-header__vox-ticket-main \{/,
+    /\.public-header__vox-ticket:focus-visible \{/,
+    /\.public-header__vox-ticket:hover \{/,
+    /@media \(max-width: 1240px\) \{[\s\S]*\.public-header__vox-ticket \{[\s\S]*display: none;/,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.public-header__vox-ticket \{[\s\S]*transition: none;/,
+  ]) {
+    assert.match(publicLayoutCss, contract);
   }
 });
 

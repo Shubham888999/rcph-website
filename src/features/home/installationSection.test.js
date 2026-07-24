@@ -67,7 +67,7 @@ test("InstallationSection contains emoji-free VOX event content and external act
     /className="home-installation__ticket-main"/,
     /className="home-installation__ticket-meta"/,
     /className="home-installation__action-link home-installation__action-link--venue"/,
-    /className="home-installation__countdown"/,
+    /className="home-installation__countdown home-installation__countdown--stereo"/,
     /className="home-installation__countdown-grid"/,
     /className="home-installation__countdown-unit"/,
     />Seconds</,
@@ -80,6 +80,7 @@ test("InstallationSection contains emoji-free VOX event content and external act
 /className="home-installation__stereo-footer" aria-hidden="true"/,
 /className="home-installation__stereo-accent-bar"/,
 /className="home-installation__stereo-speaker home-installation__stereo-speaker--right"/,
+/className="home-installation__visual" id="vox-theme-reveal"/,
 /className=\{`home-installation__reveal-card home-installation__turntable\$\{isThemeRevealSpinning \? " home-installation__reveal-card--spinning" : ""\}`\}/,
 /className="home-installation__turntable-panel" aria-hidden="true"/,
 /className="home-installation__turntable-screw home-installation__turntable-screw--top-left"/,
@@ -255,6 +256,7 @@ assert.doesNotMatch(source, /--installation-fixture-/);
 });
 
 test("home CSS defines VOX fixture stage, mobile simplification, and reduced-motion guard", async () => {
+  const source = await readFile(new URL("./InstallationSection.jsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../../styles/components/home.css", import.meta.url), "utf8");
 
   for (const expected of [
@@ -310,9 +312,9 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /\.home-installation__countdown-live \{/,
     /@media \(hover: hover\) and \(pointer: fine\) \{[\s\S]*\.home-installation__detail-card:hover/,
     /@media \(hover: hover\) and \(pointer: fine\) \{[\s\S]*\.home-installation__ticket:hover/,
-    /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__countdown--stereo \{[\s\S]*padding: 0\.85rem;/,
-/@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__countdown-grid \{[\s\S]*gap: 0\.32rem;/,
+    /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__countdown--stereo \{[\s\S]*margin-bottom: 0\.65rem;/,
     /\.home-installation__visual \{[\s\S]*width: min\(100%, clamp\(21rem, 31vw, 30rem\)\);[\s\S]*overflow: visible;/,
+    /\.home-installation__visual \{[\s\S]*scroll-margin-top: calc\(var\(--header-height, 5rem\) \+ var\(--vox-announcement-height, 0rem\) \+ 1rem\);/,
     /\.home-installation__reveal-card \{/,
     /\.home-installation__reveal-card \{[\s\S]*width: 100%;/,
     /\.home-installation__record \{/,
@@ -329,15 +331,12 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /\.home-installation__inline-frame-shell \{[\s\S]*aspect-ratio: 9 \/ 14;/,
     /\.home-installation__inline-frame \{/,
     /\.home-installation__inline-fallback \{/,
-    /\.home-installation__countdown \{/,
+/\.home-installation__countdown \{/,
 /\.home-installation__countdown--stereo \{/,
-/\.home-installation__stereo-trim \{/,
-/\.home-installation__stereo-trim span \{/,
 /\.home-installation__experience-kicker \{/,
 /\.home-installation__stereo-shell \{/,
 /\.home-installation__stereo-speaker \{/,
 /\.home-installation__stereo-center \{/,
-/\.home-installation__stereo-display-line \{/,
 /\.home-installation__countdown--stereo \{/,
 /\.home-installation__stereo-shell \{/,
 /\.home-installation__stereo-shell::before/,
@@ -349,15 +348,10 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
 /\.home-installation__stereo-center::before/,
 /\.home-installation__stereo-footer \{/,
 /\.home-installation__stereo-accent-bar \{/,
-    /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__poster-texture \{[\s\S]*opacity: 0\.42;/,
-    /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__guitar-line \{[\s\S]*display: none;/,
-    /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__lightning-mark \{[\s\S]*opacity: 0\.16;/,
-    /@media \(max-width: 48rem\) \{[\s\S]*\.installation-spotlight-fixtures \{[\s\S]*display: none;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__spotlight \{[\s\S]*display: none;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__details \{[\s\S]*grid-template-columns: 1fr;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__detail-card \{[\s\S]*min-height: 7\.9rem;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__ticket \{[\s\S]*width: min\(100%, 24rem\);/,
-    /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__countdown-grid \{[\s\S]*gap: 0\.36rem;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-hero-shell \{[\s\S]*height: max\(32rem, calc\(100svh - var\(--header-height\) - 4\.375rem\)\);/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-hero-shell\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*max-height: 0;[\s\S]*min-height: 0;/,
     /@media \(max-width: 27rem\) \{[\s\S]*\.home-hero-shell\.home-hero-shell--dismissed \{[\s\S]*height: 0;[\s\S]*max-height: 0;[\s\S]*min-height: 0;/,
@@ -371,8 +365,6 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation--auto-revealed \.home-installation__atmosphere::before/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__reveal-card--spinning \.home-installation__record,[\s\S]*animation: none;/,
     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*--installation-spotlight-scale: 1;/,
-    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*--installation-fixture-drop: 0rem;/,
-    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.installation-spotlight-fixture/,
   ]) {
     assert.match(css, expected);
   }

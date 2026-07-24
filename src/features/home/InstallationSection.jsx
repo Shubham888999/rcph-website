@@ -228,7 +228,7 @@ export default function InstallationSection({ autoRevealActive = false }) {
 
         </div>
 
-        <div className="home-installation__visual">
+        <div className="home-installation__visual" id="vox-theme-reveal">
 <section
   className="home-installation__countdown home-installation__countdown--stereo"
   aria-label="Countdown to VOX 2026 on 9th August 2026 at 7:00 PM IST"

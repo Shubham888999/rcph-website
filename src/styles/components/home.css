@@ -1171,6 +1171,7 @@
   width: min(100%, clamp(21rem, 31vw, 30rem));
   justify-self: end;
   overflow: visible;
+  scroll-margin-top: calc(var(--header-height, 5rem) + var(--vox-announcement-height, 0rem) + 1rem);
 }
 
 
