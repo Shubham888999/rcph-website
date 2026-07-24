@@ -485,9 +485,6 @@
   --installation-spotlight-scale: 0.92;
   --installation-left-spotlight-x: -8vw;
   --installation-right-spotlight-x: 8vw;
-  --installation-fixture-opacity: 0;
-  --installation-fixture-drop: -90px;
-  --installation-fixture-rotate: -8deg;
   position: relative;
   width: min(var(--content-wide-max-width), calc(100% - (2 * var(--page-gutter))));
   padding-block: clamp(4.5rem, 8vw, 7.5rem);
@@ -496,13 +493,12 @@
 
 .home-installation--auto-revealed .home-installation__atmosphere::before,
 .home-installation--auto-revealed .home-installation__atmosphere::after,
-.home-installation--auto-revealed .home-installation__spotlight,
-.home-installation--auto-revealed .installation-spotlight-fixture {
+.home-installation--auto-revealed .home-installation__spotlight {
   transition:
     opacity 720ms ease,
-    transform 860ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 720ms ease;
+    transform 860ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+
 
 .home-installation--auto-revealed .home-installation__copy,
 .home-installation--auto-revealed .home-installation h2,
@@ -555,75 +551,13 @@
 
 .home-installation__atmosphere::after {
   z-index: 1;
-  opacity: var(--installation-glow-opacity);
+  opacity: calc(var(--installation-glow-opacity) * 0.74);
   background:
-    radial-gradient(circle at 42% 40%, rgba(255, 188, 89, 0.14), transparent 24rem),
-    radial-gradient(circle at 64% 38%, rgba(226, 55, 126, 0.12), transparent 22rem);
-  filter: blur(0.35rem);
+    radial-gradient(circle at 42% 38%, rgba(255, 188, 89, 0.12), transparent 22rem),
+    radial-gradient(circle at 64% 42%, rgba(226, 55, 126, 0.1), transparent 21rem);
 }
 
-.installation-spotlight-fixtures {
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 100vw;
-  overflow: visible;
-  pointer-events: none;
-  transform: translateX(-50%);
-}
 
-.installation-spotlight-fixtures::before {
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: clamp(0.28rem, 0.7vw, 0.5rem);
-  content: "";
-  background:
-    linear-gradient(90deg, transparent, rgba(5, 2, 4, 0.86) 14%, rgba(255, 188, 89, 0.22) 48%, rgba(5, 2, 4, 0.86) 86%, transparent),
-    linear-gradient(180deg, rgba(255, 248, 237, 0.08), rgba(3, 1, 2, 0.72));
-  box-shadow:
-    0 0.65rem 1.3rem rgba(0, 0, 0, 0.36),
-    0 0 1.2rem rgba(255, 188, 89, 0.12);
-  opacity: var(--installation-fixture-opacity);
-  pointer-events: none;
-}
-
-.installation-spotlight-fixture {
-  position: absolute;
-  z-index: 1;
-  top: clamp(-0.85rem, -1.2vw, -0.35rem);
-  width: clamp(5.4rem, 7.4vw, 8.25rem);
-  height: auto;
-  display: block;
-  opacity: var(--installation-fixture-opacity);
-  filter:
-    drop-shadow(0 1.2rem 1.8rem rgba(0, 0, 0, 0.62))
-    drop-shadow(0 0 1rem rgba(255, 188, 89, 0.2));
-  pointer-events: none;
-  user-select: none;
-  will-change: opacity, transform;
-}
-
-.installation-spotlight-fixture--left {
-  left: clamp(0.35rem, 2.8vw, 3.4rem);
-  transform-origin: 48% 18%;
-  transform:
-    translate3d(var(--installation-left-spotlight-x), var(--installation-fixture-drop), 0)
-    rotate(calc(-18deg + var(--installation-fixture-rotate)));
-}
-
-.installation-spotlight-fixture--right {
-  right: clamp(0.35rem, 2.8vw, 3.4rem);
-  transform-origin: 52% 18%;
-  transform:
-    translate3d(var(--installation-right-spotlight-x), var(--installation-fixture-drop), 0)
-    scaleX(-1)
-    rotate(calc(-18deg + var(--installation-fixture-rotate)));
-}
 
 .home-installation__spotlight {
   position: absolute;
@@ -727,31 +661,65 @@
 
 .home-installation__details {
   margin: clamp(1.75rem, 4vw, 2.65rem) 0 0;
-  padding: clamp(0.35rem, 1vw, 0.55rem);
   display: grid;
-  grid-template-columns: minmax(9rem, 0.72fr) minmax(9rem, 0.72fr) minmax(15rem, 1.2fr);
-  border: 1px solid rgba(255, 188, 89, 0.26);
-  border-radius: 0.5rem;
-  background: rgba(4, 2, 4, 0.14);
-  box-shadow:
-    0 0 2.2rem rgba(255, 188, 89, var(--installation-visual-glow-opacity)),
-    0 0 3.4rem rgba(226, 55, 126, calc(var(--installation-visual-glow-opacity) * 0.7));
+  grid-template-columns: minmax(9rem, 0.74fr) minmax(9rem, 0.76fr) minmax(15rem, 1.2fr);
+  gap: clamp(0.6rem, 1.5vw, 0.85rem);
 }
 
-.home-installation__details div {
+.home-installation__detail-card {
+  position: relative;
   min-width: 0;
-  padding: 1rem clamp(1rem, 2vw, 1.45rem);
-  border-right: 1px solid rgba(255, 248, 237, 0.1);
+  min-height: 8.6rem;
+  padding: clamp(1rem, 2vw, 1.3rem);
+  overflow: hidden;
+  display: grid;
+  align-content: space-between;
+  gap: 0.55rem;
+  border: 1px solid rgba(255, 188, 89, 0.24);
+  border-radius: 0.48rem;
+  color: #fff8ed;
+  text-decoration: none;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.032), transparent),
-    rgba(4, 2, 4, 0.18);
+    linear-gradient(180deg, rgba(255, 248, 237, 0.055), transparent 48%),
+    radial-gradient(circle at 100% 0%, rgba(226, 55, 126, 0.14), transparent 8rem),
+    rgba(4, 2, 4, 0.34);
+  box-shadow:
+    0 0 1.4rem rgba(255, 188, 89, calc(var(--installation-visual-glow-opacity) * 0.6)),
+    inset 0 0 0 1px rgba(255, 248, 237, 0.035);
+  isolation: isolate;
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    background 220ms ease;
 }
 
-.home-installation__details div:last-child {
-  border-right: 0;
+.home-installation__detail-card::before,
+.home-installation__detail-card::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
 }
 
-.home-installation__details dt {
+.home-installation__detail-card::before {
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(255, 188, 89, 0.18), transparent 1px),
+    repeating-linear-gradient(90deg, rgba(255, 248, 237, 0.03) 0 1px, transparent 1px 0.86rem);
+  opacity: 0.45;
+}
+
+.home-installation__detail-card::after {
+  inset: auto 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 188, 89, 0.86), rgba(226, 55, 126, 0.62), transparent);
+  transform: scaleX(0.45);
+  transform-origin: left center;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.home-installation__detail-label {
   color: #ff6fb0;
   font-size: 0.72rem;
   font-weight: 850;
@@ -760,13 +728,36 @@
   text-transform: uppercase;
 }
 
-.home-installation__details dd {
-  margin: 0.35rem 0 0;
+.home-installation__detail-main {
   color: #fff8ed;
   font-size: clamp(0.94rem, 1.25vw, 1.08rem);
-  font-weight: 750;
+  font-weight: 850;
   line-height: 1.42;
   overflow-wrap: anywhere;
+}
+
+.home-installation__detail-note {
+  color: rgba(255, 248, 237, 0.66);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.home-installation__detail-map-cue {
+  color: #ffbc59;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.home-installation__detail-card--venue:focus-visible {
+  outline: none;
+  box-shadow:
+    var(--focus-ring),
+    0 0 2.2rem rgba(255, 188, 89, 0.2),
+    0 0 2.8rem rgba(226, 55, 126, 0.12);
 }
 
 .home-installation__closing {
@@ -778,10 +769,89 @@
 
 .home-installation__actions {
   margin-top: clamp(1.7rem, 3vw, 2.25rem);
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.9rem 1rem;
+}
+
+.home-installation__ticket {
+  position: relative;
+  min-width: min(100%, 17.5rem);
+  min-height: 4.75rem;
+  padding: 0.78rem 4.1rem 0.78rem 1rem;
+  overflow: hidden;
+  display: grid;
+  align-content: center;
+  gap: 0.2rem;
+  border: 1px solid rgba(255, 188, 89, 0.48);
+  border-radius: 0.48rem;
+  color: #fff8ed;
+  text-decoration: none;
+  background:
+    radial-gradient(circle at right 50%, transparent 0 0.58rem, rgba(255, 248, 237, 0.08) 0.6rem 0.63rem, transparent 0.65rem),
+    linear-gradient(135deg, rgba(255, 188, 89, 0.16), rgba(226, 55, 126, 0.16)),
+    linear-gradient(145deg, rgba(42, 7, 16, 0.92), rgba(6, 3, 5, 0.98));
+  box-shadow:
+    0 1rem 2.2rem rgba(0, 0, 0, 0.36),
+    0 0 1.8rem rgba(255, 188, 89, 0.12);
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    filter 220ms ease;
+}
+
+.home-installation__ticket::before,
+.home-installation__ticket::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.home-installation__ticket::before {
+  top: 0.65rem;
+  right: 3.25rem;
+  bottom: 0.65rem;
+  border-left: 1px dashed rgba(255, 248, 237, 0.28);
+}
+
+.home-installation__ticket::after {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3.25rem;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 248, 237, 0.12) 0 1px, transparent 1px 0.5rem),
+    linear-gradient(180deg, rgba(255, 188, 89, 0.18), rgba(226, 55, 126, 0.12));
+  opacity: 0.78;
+}
+
+.home-installation__ticket-kicker,
+.home-installation__ticket-meta {
+  color: rgba(255, 248, 237, 0.72);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.home-installation__ticket-main {
+  color: #ffbc59;
+  font-size: clamp(1.15rem, 2vw, 1.38rem);
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.home-installation__ticket:focus-visible {
+  outline: none;
+  box-shadow:
+    var(--focus-ring),
+    0 1rem 2.2rem rgba(0, 0, 0, 0.36),
+    0 0 2.2rem rgba(255, 188, 89, 0.18);
 }
 
 .home-installation__action-link {
@@ -824,19 +894,275 @@
   box-shadow: var(--focus-ring);
 }
 
-.home-installation__action-link--rsvp {
-  color: #ffbc59;
-}
-
 .home-installation__action-link--venue {
   color: #ff8cc1;
 }
 
-.home-installation__action-separator {
-  color: rgba(255, 248, 237, 0.34);
-  font-size: 0.95rem;
-  font-weight: 700;
-  line-height: 1;
+.home-installation__countdown {
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+}
+
+.home-installation__countdown--stereo {
+  width: 100%;
+  margin: 0 0 clamp(0.55rem, 1.15vw, 0.72rem);
+  transform: translateY(0.15rem);
+  filter:
+    drop-shadow(0 1.25rem 2rem rgba(0, 0, 0, 0.4))
+    drop-shadow(0 0 1.7rem rgba(255, 188, 89, calc(var(--installation-visual-glow-opacity) * 0.5)));
+}
+
+.home-installation__stereo-shell {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(0.7rem, 1.45vw, 0.95rem);
+  border: 1px solid rgba(255, 188, 89, 0.38);
+  border-radius: clamp(1rem, 2vw, 1.45rem);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 237, 0.1), transparent 16%),
+    radial-gradient(circle at 18% 25%, rgba(255, 188, 89, 0.22), transparent 5.8rem),
+    radial-gradient(circle at 82% 22%, rgba(226, 55, 126, 0.18), transparent 6.4rem),
+    linear-gradient(145deg, #1a0707 0%, #3a0b13 42%, #120507 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 237, 0.075),
+    inset 0 -0.85rem 1.5rem rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(7, 3, 4, 0.86),
+    0 1.2rem 2.7rem rgba(0, 0, 0, 0.38),
+    0 0 2.2rem rgba(255, 188, 89, 0.12);
+}
+
+.home-installation__stereo-shell::before,
+.home-installation__stereo-shell::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.home-installation__stereo-shell::before {
+  inset: 0.38rem;
+  border: 1px solid rgba(255, 188, 89, 0.22);
+  border-radius: calc(clamp(1rem, 2vw, 1.45rem) - 0.26rem);
+  box-shadow:
+    inset 0 0 1.2rem rgba(0, 0, 0, 0.42),
+    0 0 1.15rem rgba(255, 188, 89, 0.1);
+}
+
+.home-installation__stereo-shell::after {
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0 7%, rgba(255, 248, 237, 0.12) 7.3% 7.6%, transparent 7.9% 92%, rgba(255, 248, 237, 0.12) 92.4% 92.7%, transparent 93%),
+    repeating-linear-gradient(90deg, rgba(255, 248, 237, 0.025) 0 1px, transparent 1px 0.72rem);
+  mix-blend-mode: screen;
+  opacity: 0.45;
+}
+
+.home-installation__stereo-top {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto 0.58rem;
+  width: min(100%, 78%);
+  padding: 0.46rem 0.8rem;
+  border: 1px solid rgba(255, 188, 89, 0.36);
+  border-radius: 0.42rem;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 237, 0.055), transparent 60%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(31, 5, 10, 0.72), rgba(0, 0, 0, 0.55));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 237, 0.035),
+    0 0 1.1rem rgba(255, 188, 89, 0.12);
+  text-align: center;
+}
+
+.home-installation__experience-kicker {
+  position: relative;
+  z-index: 1;
+  display: block;
+  color: #ffbc59;
+  font-size: clamp(0.58rem, 1vw, 0.72rem);
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 0.85rem rgba(255, 188, 89, 0.44),
+    0 0 1.2rem rgba(226, 55, 126, 0.22);
+}
+
+.home-installation__stereo-body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: clamp(3.65rem, 7.4vw, 5.4rem) minmax(0, 1fr) clamp(3.65rem, 7.4vw, 5.4rem);
+  align-items: center;
+  gap: clamp(0.55rem, 1.35vw, 0.9rem);
+}
+
+.home-installation__stereo-speaker {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 188, 89, 0.46);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 248, 237, 0.16) 0 8%, rgba(0, 0, 0, 0.7) 9% 29%, rgba(255, 188, 89, 0.18) 30% 34%, rgba(0, 0, 0, 0.74) 35% 61%, rgba(255, 188, 89, 0.2) 62% 66%, rgba(0, 0, 0, 0.86) 67% 100%);
+  box-shadow:
+    inset 0 0 0 0.22rem rgba(255, 188, 89, 0.08),
+    inset 0 0 1.1rem rgba(0, 0, 0, 0.84),
+    0 0 1.25rem rgba(255, 188, 89, 0.16),
+    0 0 1.65rem rgba(226, 55, 126, 0.1);
+}
+
+.home-installation__stereo-speaker::before,
+.home-installation__stereo-speaker::after {
+  position: absolute;
+  content: "";
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.home-installation__stereo-speaker::before {
+  inset: -0.28rem;
+  border: 1px solid rgba(255, 188, 89, 0.24);
+}
+
+.home-installation__stereo-speaker::after {
+  inset: 20%;
+  border: 1px solid rgba(255, 248, 237, 0.12);
+  background: radial-gradient(circle, rgba(255, 188, 89, 0.12), rgba(0, 0, 0, 0.62));
+}
+
+.home-installation__stereo-speaker span:first-child {
+  width: 36%;
+  height: 36%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 40% 35%, rgba(255, 248, 237, 0.32), transparent 32%),
+    radial-gradient(circle, rgba(255, 188, 89, 0.22), rgba(0, 0, 0, 0.78));
+  box-shadow:
+    0 0 0 1px rgba(255, 248, 237, 0.1),
+    0 0 0.8rem rgba(255, 188, 89, 0.14);
+}
+
+.home-installation__stereo-speaker span:last-child {
+  position: absolute;
+  inset: 8%;
+  border: 1px solid rgba(255, 188, 89, 0.13);
+  border-radius: 50%;
+}
+
+.home-installation__stereo-center {
+  position: relative;
+  min-width: 0;
+  min-height: clamp(4.15rem, 8vw, 5.85rem);
+  padding: clamp(0.62rem, 1.3vw, 0.9rem);
+  display: grid;
+  align-items: center;
+  border: 1px solid rgba(255, 188, 89, 0.42);
+  border-radius: 0.62rem;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 237, 0.065), transparent 64%),
+    radial-gradient(circle at 48% 20%, rgba(255, 188, 89, 0.12), transparent 8rem),
+    rgba(0, 0, 0, 0.66);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 237, 0.035),
+    inset 0 0 1.7rem rgba(0, 0, 0, 0.55),
+    0 0 1.2rem rgba(255, 188, 89, 0.12);
+}
+
+.home-installation__stereo-center::before,
+.home-installation__stereo-center::after {
+  position: absolute;
+  top: 0.58rem;
+  bottom: 0.58rem;
+  width: 1px;
+  content: "";
+  background: linear-gradient(transparent, rgba(255, 188, 89, 0.56), transparent);
+  pointer-events: none;
+}
+
+.home-installation__stereo-center::before {
+  left: 25%;
+}
+
+.home-installation__stereo-center::after {
+  right: 25%;
+}
+
+.home-installation__countdown-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+}
+
+.home-installation__countdown-unit {
+  min-width: 0;
+  min-height: 3.7rem;
+  padding: 0.18rem 0.24rem;
+  display: grid;
+  place-items: center;
+  gap: 0.3rem;
+  text-align: center;
+}
+
+.home-installation__countdown-unit strong {
+  color: #fff8ed;
+  font-size: clamp(1.45rem, 3.2vw, 2.25rem);
+  font-weight: 950;
+  letter-spacing: 0.035em;
+  line-height: 0.92;
+  text-shadow:
+    0 0 0.65rem rgba(255, 188, 89, 0.62),
+    0 0 1.35rem rgba(255, 188, 89, 0.3),
+    0 0 1.7rem rgba(226, 55, 126, 0.2);
+}
+
+.home-installation__countdown-unit span {
+  color: #ffe0a1;
+  font-size: clamp(0.42rem, 0.85vw, 0.56rem);
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  text-shadow: 0 0 0.8rem rgba(255, 188, 89, 0.22);
+}
+
+.home-installation__countdown-live {
+  position: relative;
+  z-index: 1;
+  min-height: 3.7rem;
+  display: grid;
+  place-items: center;
+  color: #fff8ed;
+  font-size: clamp(1.2rem, 2.25vw, 1.65rem);
+  line-height: 1.15;
+  text-align: center;
+  text-shadow:
+    0 0 0.85rem rgba(255, 188, 89, 0.56),
+    0 0 1.6rem rgba(226, 55, 126, 0.22);
+}
+
+.home-installation__stereo-footer {
+  position: relative;
+  z-index: 1;
+  margin: 0.62rem auto 0;
+  width: min(78%, 17rem);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.42rem;
+}
+
+.home-installation__stereo-accent-bar {
+  height: 0.24rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 188, 89, 0.38), rgba(255, 111, 176, 0.64), rgba(255, 188, 89, 0.28));
+  box-shadow:
+    0 0 0.8rem rgba(255, 188, 89, 0.2),
+    0 0 1.1rem rgba(226, 55, 126, 0.13);
 }
 
 .home-installation__visual {
@@ -847,40 +1173,29 @@
   overflow: visible;
 }
 
-.home-installation__visual::before {
-  position: absolute;
-  inset: 8% 3% auto;
-  height: 46%;
-  content: "";
-  pointer-events: none;
-  background:
-    linear-gradient(112deg, transparent 0 17%, rgba(255, 188, 89, 0.22) 18% 20%, transparent 21% 100%),
-    linear-gradient(68deg, transparent 0 20%, rgba(226, 55, 126, 0.18) 21% 23%, transparent 24% 100%);
-  filter: blur(0.4rem);
-  opacity: 0.78;
-}
 
 .home-installation__reveal-card {
   position: relative;
   width: 100%;
   min-height: clamp(28rem, 44vw, 36rem);
-  padding: clamp(1.35rem, 3vw, 2rem);
+  padding: clamp(1.1rem, 2.4vw, 1.45rem);
   appearance: none;
   overflow: hidden;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 188, 89, 0.24);
-  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 188, 89, 0.38);
+  border-radius: clamp(1rem, 2vw, 1.35rem);
   color: #fff8ed;
   background:
-    linear-gradient(180deg, rgba(255, 248, 237, 0.05), transparent 28%),
-    radial-gradient(circle at 50% 36%, rgba(226, 55, 126, 0.15), transparent 18rem),
-    linear-gradient(145deg, #080506, #21030d 62%, #0b0507);
+    linear-gradient(180deg, rgba(255, 248, 237, 0.08), transparent 18%),
+    radial-gradient(circle at 50% 38%, rgba(255, 188, 89, 0.12), transparent 14rem),
+    radial-gradient(circle at 74% 22%, rgba(226, 55, 126, 0.13), transparent 15rem),
+    linear-gradient(145deg, #170607 0%, #3a0913 46%, #0b0405 100%);
   box-shadow:
-    0 1.6rem 4rem rgba(0, 0, 0, 0.42),
-    0 0 3.4rem rgba(255, 188, 89, var(--installation-visual-glow-opacity)),
-    0 0 4.8rem rgba(226, 55, 126, calc(var(--installation-visual-glow-opacity) * 0.72)),
-    inset 0 0 0 1px rgba(255, 248, 237, 0.035);
+    inset 0 0 0 1px rgba(255, 248, 237, 0.06),
+    inset 0 -0.9rem 1.7rem rgba(0, 0, 0, 0.32),
+    0 1.35rem 3rem rgba(0, 0, 0, 0.42),
+    0 0 2.2rem rgba(255, 188, 89, calc(var(--installation-visual-glow-opacity) * 0.64));
   text-decoration: none;
   text-align: inherit;
   font: inherit;
@@ -900,29 +1215,106 @@
 }
 
 .home-installation__reveal-card::before {
-  inset: 0;
+  inset: 0.55rem;
   z-index: -1;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 248, 237, 0.045) 0 1px,
-      transparent 1px 1.15rem
-    );
-  opacity: 0.28;
+  border: 1px solid rgba(255, 188, 89, 0.18);
+  border-radius: calc(clamp(1rem, 2vw, 1.35rem) - 0.32rem);
+  box-shadow: inset 0 0 1.4rem rgba(0, 0, 0, 0.38);
 }
 
 .home-installation__reveal-card::after {
   right: clamp(1rem, 3vw, 1.8rem);
   bottom: clamp(1rem, 3vw, 1.8rem);
   left: clamp(1rem, 3vw, 1.8rem);
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 188, 89, 0.78), rgba(226, 55, 126, 0.52), transparent);
-  box-shadow: 0 0 1.3rem rgba(255, 188, 89, 0.2);
+  height: 0.16rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 188, 89, 0.18), rgba(255, 111, 176, 0.54), rgba(255, 188, 89, 0.18));
+  box-shadow: 0 0 0.9rem rgba(255, 188, 89, 0.16);
+}
+
+.home-installation__turntable-panel {
+  position: absolute;
+  inset: clamp(0.85rem, 2vw, 1.2rem);
+  z-index: -1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 188, 89, 0.18);
+  border-radius: 0.85rem;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 237, 0.055), transparent 34%),
+    radial-gradient(circle at 50% 40%, rgba(255, 188, 89, 0.08), transparent 13rem),
+    rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.home-installation__turntable-screw {
+  position: absolute;
+  width: 0.46rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 248, 237, 0.38), rgba(255, 188, 89, 0.24) 38%, rgba(0, 0, 0, 0.58) 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 188, 89, 0.16),
+    0 0 0.5rem rgba(255, 188, 89, 0.12);
+}
+
+.home-installation__turntable-screw--top-left {
+  top: 0.72rem;
+  left: 0.72rem;
+}
+
+.home-installation__turntable-screw--top-right {
+  top: 0.72rem;
+  right: 0.72rem;
+}
+
+.home-installation__turntable-screw--bottom-left {
+  bottom: 0.72rem;
+  left: 0.72rem;
+}
+
+.home-installation__turntable-screw--bottom-right {
+  right: 0.72rem;
+  bottom: 0.72rem;
+}
+
+.home-installation__turntable-knob {
+  position: absolute;
+  top: clamp(1.2rem, 2.8vw, 1.7rem);
+  right: clamp(1.1rem, 2.8vw, 1.65rem);
+  width: clamp(1.6rem, 4vw, 2.25rem);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 188, 89, 0.26);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 42% 38%, rgba(255, 248, 237, 0.38), transparent 22%),
+    radial-gradient(circle, rgba(255, 188, 89, 0.2), rgba(0, 0, 0, 0.64) 64%);
+  box-shadow:
+    inset 0 0 0 0.3rem rgba(0, 0, 0, 0.22),
+    0 0 1rem rgba(255, 188, 89, 0.12);
+}
+
+.home-installation__platter {
+  position: relative;
+  width: min(19.5rem, 74%);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 188, 89, 0.22);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 188, 89, 0.12), transparent 48%),
+    radial-gradient(circle, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.58) 70%);
+  box-shadow:
+    inset 0 0 0 0.55rem rgba(0, 0, 0, 0.28),
+    inset 0 0 2.3rem rgba(0, 0, 0, 0.78),
+    0 1.15rem 2.5rem rgba(0, 0, 0, 0.48),
+    0 0 2.2rem rgba(255, 188, 89, 0.1);
 }
 
 .home-installation__record {
   position: relative;
-  width: min(18rem, 70%);
+  width: 88%;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -930,13 +1322,13 @@
   background:
     radial-gradient(circle at 50% 50%, #ffbc59 0 7%, #2a0710 7.5% 12%, transparent 12.5%),
     repeating-radial-gradient(circle, #070506 0 0.55rem, #13090d 0.58rem 0.68rem),
-    radial-gradient(circle at 40% 35%, rgba(255, 248, 237, 0.18), transparent 18%),
+    radial-gradient(circle at 40% 35%, rgba(255, 248, 237, 0.16), transparent 18%),
     #050304;
   box-shadow:
-    0 1.2rem 2.8rem rgba(0, 0, 0, 0.62),
+    0 1rem 2.3rem rgba(0, 0, 0, 0.58),
     0 0 0 1px rgba(255, 248, 237, 0.08),
-    0 0 2.8rem rgba(226, 55, 126, 0.16);
-  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    0 0 2.2rem rgba(226, 55, 126, 0.13);
+  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .home-installation__record::before,
@@ -950,7 +1342,7 @@
 
 .home-installation__record::before {
   inset: 9%;
-  border: 1px solid rgba(255, 248, 237, 0.08);
+  border: 1px solid rgba(255, 248, 237, 0.07);
 }
 
 .home-installation__record::after {
@@ -958,21 +1350,102 @@
   background:
     radial-gradient(circle, #0b0507 0 28%, transparent 29%),
     linear-gradient(135deg, #ffbc59, #ffedf5 52%, #e2377e);
-  box-shadow: 0 0 1.6rem rgba(255, 188, 89, 0.28);
+  box-shadow: 0 0 1.35rem rgba(255, 188, 89, 0.22);
 }
 
 .home-installation__record span {
   inset: 18%;
-  border: 1px solid rgba(255, 188, 89, 0.12);
+  border: 1px solid rgba(255, 188, 89, 0.1);
 }
 
 .home-installation__reveal-card--spinning .home-installation__record {
   animation: home-installation-record-spin 2000ms cubic-bezier(0.3, 0.02, 0.16, 1) forwards;
   box-shadow:
-    0 1.2rem 2.8rem rgba(0, 0, 0, 0.62),
-    0 0 0 1px rgba(255, 248, 237, 0.12),
-    0 0 3.4rem rgba(255, 188, 89, 0.28),
-    0 0 4.8rem rgba(226, 55, 126, 0.16);
+    0 1rem 2.3rem rgba(0, 0, 0, 0.58),
+    0 0 0 1px rgba(255, 248, 237, 0.1),
+    0 0 2.4rem rgba(255, 188, 89, 0.22),
+    0 0 3.4rem rgba(226, 55, 126, 0.13);
+}
+
+.home-installation__tonearm {
+  position: absolute;
+  top: clamp(4.9rem, 9.2vw, 6.25rem);
+  right: clamp(2.25rem, 5vw, 3.35rem);
+  z-index: 3;
+  width: clamp(6.6rem, 29%, 9.15rem);
+  height: 1.75rem;
+  pointer-events: none;
+  transform: rotate(-31deg);
+  transform-origin: calc(100% - 0.72rem) 0.88rem;
+  transition:
+    transform 720ms cubic-bezier(0.2, 0.84, 0.2, 1),
+    filter 720ms ease;
+}
+
+.home-installation__tonearm::before,
+.home-installation__tonearm::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.home-installation__tonearm::before {
+  right: 0;
+  top: 0.18rem;
+  width: 1.45rem;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 248, 237, 0.18);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 188, 89, 0.72) 0 22%, rgba(42, 7, 16, 0.96) 24% 100%);
+  box-shadow:
+    0 0 0 0.35rem rgba(255, 248, 237, 0.04),
+    0 0 1rem rgba(255, 188, 89, 0.13);
+}
+
+.home-installation__tonearm::after {
+  right: 1.05rem;
+  top: 0.72rem;
+  left: 0.7rem;
+  height: 0.18rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fff8ed, #ffbc59 46%, #ff6fb0);
+  box-shadow: 0 0.35rem 0.85rem rgba(0, 0, 0, 0.34);
+  opacity: 0.82;
+}
+
+.home-installation__tonearm-head {
+  position: absolute;
+  top: 0.34rem;
+  left: 0;
+  width: 1.08rem;
+  height: 0.72rem;
+  border: 1px solid rgba(255, 188, 89, 0.34);
+  border-radius: 0.18rem;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 237, 0.86), rgba(255, 188, 89, 0.62)),
+    #18070c;
+  box-shadow: 0 0 0.8rem rgba(226, 55, 126, 0.13);
+}
+
+.home-installation__tonearm-head::after {
+  position: absolute;
+  right: 0.08rem;
+  bottom: -0.46rem;
+  width: 0.12rem;
+  height: 0.5rem;
+  content: "";
+  border-radius: 999px;
+  background: #ffbc59;
+  transform: rotate(-14deg);
+  transform-origin: top center;
+}
+
+.home-installation__reveal-card--spinning .home-installation__tonearm {
+  transform: rotate(-17deg) translate(-0.52rem, 0.7rem);
+  filter:
+    drop-shadow(0 0 0.7rem rgba(255, 188, 89, 0.16))
+    drop-shadow(0 0 0.9rem rgba(226, 55, 126, 0.1));
 }
 
 @keyframes home-installation-record-spin {
@@ -981,29 +1454,32 @@
   }
 
   72% {
-    transform: rotate(900deg) scale(1.045);
+    transform: rotate(900deg) scale(1.035);
   }
 
   100% {
-    transform: rotate(1080deg) scale(1.02);
+    transform: rotate(1080deg) scale(1.01);
   }
 }
 
 .home-installation__stage-pass {
   position: absolute;
   right: clamp(1.1rem, 4vw, 2.15rem);
-  bottom: clamp(1.35rem, 4vw, 2.4rem);
+  bottom: clamp(1.35rem, 4vw, 2.25rem);
   left: clamp(1.1rem, 4vw, 2.15rem);
   min-width: 0;
-  padding: 0.95rem 1rem;
+  padding: 0.92rem 1rem;
   display: grid;
   gap: 0.2rem;
-  border: 1px solid rgba(255, 188, 89, 0.32);
-  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 188, 89, 0.34);
+  border-radius: 0.62rem;
   background:
-    linear-gradient(90deg, rgba(255, 188, 89, 0.13), transparent 48%, rgba(226, 55, 126, 0.13)),
-    rgba(5, 2, 4, 0.74);
-  backdrop-filter: blur(0.75rem);
+    linear-gradient(180deg, rgba(255, 248, 237, 0.055), transparent 58%),
+    linear-gradient(90deg, rgba(255, 188, 89, 0.14), transparent 48%, rgba(226, 55, 126, 0.13)),
+    rgba(5, 2, 4, 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 237, 0.035),
+    0 0 1rem rgba(255, 188, 89, 0.1);
 }
 
 .home-installation__stage-pass span {
@@ -1043,6 +1519,19 @@
     0 1.6rem 4rem rgba(0, 0, 0, 0.45),
     0 0 3rem rgba(255, 188, 89, var(--installation-visual-glow-opacity)),
     inset 0 0 0 1px rgba(255, 248, 237, 0.04);
+  animation: home-installation-inline-reveal-in 520ms ease-out both;
+}
+
+@keyframes home-installation-inline-reveal-in {
+  0% {
+    opacity: 0;
+    transform: translateY(0.55rem) scale(0.985);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .home-installation__inline-reveal::before {
@@ -2051,6 +2540,35 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     background-position: 100% 50%;
   }
 
+  .home-installation__detail-card:hover,
+  .home-installation__detail-card--venue:focus-visible {
+    transform: translateY(-3px);
+    border-color: rgba(255, 188, 89, 0.52);
+    background:
+      linear-gradient(180deg, rgba(255, 248, 237, 0.075), transparent 48%),
+      radial-gradient(circle at 100% 0%, rgba(226, 55, 126, 0.2), transparent 8rem),
+      rgba(10, 3, 7, 0.48);
+    box-shadow:
+      0 1rem 2.6rem rgba(0, 0, 0, 0.32),
+      0 0 2.1rem rgba(255, 188, 89, 0.2),
+      0 0 2.6rem rgba(226, 55, 126, 0.12);
+  }
+
+  .home-installation__detail-card:hover::after,
+  .home-installation__detail-card--venue:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  .home-installation__ticket:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 188, 89, 0.72);
+    filter: brightness(1.04);
+    box-shadow:
+      0 1.2rem 2.7rem rgba(0, 0, 0, 0.38),
+      0 0 2.2rem rgba(255, 188, 89, 0.2),
+      0 0 2.8rem rgba(226, 55, 126, 0.12);
+  }
+
   .home-installation__action-link:hover {
     color: #fff8ed;
     text-shadow:
@@ -2061,6 +2579,17 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   .home-installation__action-link:hover::after {
     opacity: 1;
     transform: scaleX(1);
+  }
+
+.home-installation__countdown-unit:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 188, 89, 0.34);
+    background:
+      linear-gradient(180deg, rgba(255, 248, 237, 0.075), transparent 60%),
+      rgba(0, 0, 0, 0.18);
+    box-shadow:
+      0 0.8rem 1.8rem rgba(0, 0, 0, 0.25),
+      0 0 1.5rem rgba(226, 55, 126, 0.11);
   }
 
   .home-highlight-awards__media:hover img {
@@ -2329,10 +2858,6 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   transform: translateX(-50%);
 }
 
-.installation-spotlight-fixtures {
-  display: none;
-}
-
 .home-installation__spotlight {
   display: none;
 }
@@ -2348,6 +2873,7 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     radial-gradient(circle at 50% 48%, rgba(226, 55, 126, 0.12), transparent 19rem);
   filter: blur(0.8rem);
 }
+
 
 .home-installation__event-name {
   font-size: 0.76rem;
@@ -2379,20 +2905,26 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   grid-template-columns: 1fr;
 }
 
-.home-installation__details div,
-.home-installation__details div:first-child,
-.home-installation__details div:last-child {
-  padding: 0.85rem 1rem;
-  border-right: 0;
-  border-bottom: 1px solid rgba(255, 248, 237, 0.09);
+.home-installation__detail-card {
+  min-height: 7.9rem;
+  padding: 0.9rem 1rem;
 }
 
-.home-installation__details div:last-child {
-  border-bottom: 0;
+.home-installation__detail-main {
+  font-size: 0.98rem;
 }
 
 .home-installation__actions {
-  gap: 0.55rem 0.65rem;
+  width: 100%;
+  display: grid;
+  justify-items: start;
+  gap: 0.85rem;
+}
+
+.home-installation__ticket {
+  width: min(100%, 24rem);
+  min-width: 0;
+  padding-right: 3.8rem;
 }
 
 .home-installation__action-link {
@@ -2401,18 +2933,100 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   line-height: 1.2;
 }
 
+.home-installation__countdown--stereo {
+  margin-bottom: 0.65rem;
+  transform: none;
+}
+
+.home-installation__stereo-shell {
+  padding: 0.64rem;
+  border-radius: 1rem;
+}
+
+.home-installation__stereo-top {
+  width: 86%;
+  margin-bottom: 0.48rem;
+  padding: 0.38rem 0.52rem;
+}
+
+.home-installation__experience-kicker {
+  font-size: 0.52rem;
+  letter-spacing: 0.105em;
+}
+
+.home-installation__stereo-body {
+  grid-template-columns: 3rem minmax(0, 1fr) 3rem;
+  gap: 0.42rem;
+}
+
+.home-installation__stereo-center {
+  min-height: 3.7rem;
+  padding: 0.46rem 0.4rem;
+}
+
+.home-installation__countdown-unit {
+  min-height: 2.95rem;
+  padding: 0.12rem 0.14rem;
+}
+
+.home-installation__countdown-unit strong {
+  font-size: clamp(1rem, 5.2vw, 1.34rem);
+}
+
+.home-installation__countdown-unit span {
+  font-size: 0.38rem;
+  letter-spacing: 0.06em;
+}
+
+.home-installation__stereo-footer {
+  width: 82%;
+  margin-top: 0.48rem;
+  gap: 0.28rem;
+}
+
+.home-installation__stereo-accent-bar {
+  height: 0.18rem;
+}
+
 .home-installation__reveal-card,
 .home-installation__inline-reveal {
-  min-height: 32rem;
+  min-height: 29rem;
+  padding: 1rem;
 }
 
-.home-installation__inline-frame-shell {
-  width: min(100%, 17.5rem);
+.home-installation__turntable-panel {
+  inset: 0.7rem;
 }
 
-.home-installation__record {
-  width: min(15rem, 72%);
+.home-installation__platter {
+  width: min(17.5rem, 82%);
 }
+
+.home-installation__tonearm {
+  top: 4.55rem;
+  right: 2.15rem;
+  width: 7.2rem;
+  transform: rotate(-31deg);
+}
+
+.home-installation__reveal-card--spinning .home-installation__tonearm {
+  transform: rotate(-18deg) translate(-0.42rem, 0.62rem);
+}
+
+.home-installation__stage-pass {
+  right: 1rem;
+  bottom: 1.05rem;
+  left: 1rem;
+  padding: 0.78rem 0.85rem;
+}
+
+.home-installation__stage-pass strong {
+  font-size: clamp(1.2rem, 7vw, 1.7rem);
+}
+.home-installation__reveal-card--spinning .home-installation__tonearm {
+  transform: rotate(-16deg) translate(-0.34rem, 0.56rem) scale(0.9);
+}
+
 
   .home-highlight-awards__media {
     min-height: 30rem;
@@ -2574,6 +3188,17 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     opacity: 0.42;
   }
 
+  .home-installation__stereo-shell {
+  grid-template-columns: 3.15rem minmax(0, 1fr) 3.15rem;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.home-installation__stereo-center {
+  min-height: 2.6rem;
+  padding: 0.5rem 0.6rem;
+}
+
 }
 @media (max-width: 38.75rem) {
   .home-hero h1 {
@@ -2698,6 +3323,24 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   font-size: 0.76rem;
 }
 
+  .home-installation__ticket {
+    min-height: 4.35rem;
+    padding: 0.72rem 3.35rem 0.72rem 0.85rem;
+  }
+
+  .home-installation__ticket::before {
+    right: 2.85rem;
+  }
+
+  .home-installation__ticket::after {
+    width: 2.85rem;
+  }
+
+  .home-installation__ticket-kicker,
+  .home-installation__ticket-meta {
+    font-size: 0.6rem;
+  }
+
 }
 
 @media (max-width: 22.5rem) {
@@ -2721,9 +3364,7 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     --installation-visual-glow-opacity: 0.32;
     --installation-spotlight-shift: 0rem;
     --installation-spotlight-scale: 1;
-    --installation-fixture-opacity: 0.16;
-    --installation-fixture-drop: 0rem;
-    --installation-fixture-rotate: 0deg;
+
   }
 
   .home-hero-shell,
@@ -2759,18 +3400,35 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   .home-gallery__item:hover img,
   .home-gallery__item:hover .home-gallery__item-title,
   .home-installation__reveal-card:hover,
-  .home-installation__reveal-card:hover .home-installation__record {
-    transform: none;
+  .home-installation__reveal-card:hover .home-installation__record,
+  .home-installation__detail-card:hover,
+  .home-installation__ticket:hover,
+  .home-installation__countdown-unit:hover,
+
+  .home-installation__reveal-card--spinning .home-installation__record,
+  .home-installation__inline-reveal {
+    animation: none;
   }
 
-  .home-installation__reveal-card--spinning .home-installation__record {
-    animation: none;
+  .home-installation__reveal-card--spinning .home-installation__tonearm {
+    filter: none;
+    transform: rotate(-30deg);
   }
 
   .home-installation__reveal-card,
   .home-installation__inline-reveal,
   .home-installation__inline-frame-shell,
   .home-installation__inline-fallback,
+  .home-installation__detail-card,
+  .home-installation__detail-card::after,
+  .home-installation__countdown-unit,
+  .home-installation__tonearm,
+  .home-installation__tonearm::before,
+  .home-installation__tonearm::after,
+  .home-installation__tonearm-head,
+  .home-installation__tonearm-head::after,
+  .home-installation__ticket,
+  .home-installation__ticket::after,
   .home-installation__action-link,
   .home-installation__action-link::after,
   .home-installation--auto-revealed .home-installation__atmosphere::before,
@@ -2778,8 +3436,6 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   .home-installation--auto-revealed .home-installation__copy,
   .home-installation--auto-revealed .home-installation h2,
   .home-installation--auto-revealed .home-installation__details,
-  .installation-spotlight-fixtures::before,
-  .installation-spotlight-fixture,
   .home-installation__spotlight,
   .home-installation__atmosphere,
   .home-installation__record {

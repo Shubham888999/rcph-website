@@ -5,6 +5,46 @@ const RSVP_URL = "https://forms.gle/gQ8JcgWHDHWvGakP7";
 const VENUE_URL = "https://maps.app.goo.gl/iNXahK8kMDFVURij8?g_st=ac";
 const THEME_REVEAL_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/?igsh=d2VrMHh0dWZ6eGtx";
 const THEME_REVEAL_EMBED_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/embed";
+const VOX_EVENT_START_ISO = "2026-08-09T19:00:00+05:30";
+const COUNTDOWN_UPDATE_INTERVAL_MS = 1000;
+const SECONDS_PER_DAY = 86400;
+const SECONDS_PER_HOUR = 3600;
+const SECONDS_PER_MINUTE = 60;
+
+export function getVoxCountdownParts(now = new Date()) {
+  const eventStart = new Date(VOX_EVENT_START_ISO);
+  const remainingMilliseconds = eventStart.getTime() - now.getTime();
+
+  if (remainingMilliseconds <= 0) {
+    return {
+      days: 0,
+      hours: 0,
+      isLive: true,
+      minutes: 0,
+      seconds: 0,
+    };
+  }
+
+  const totalSeconds = Math.ceil(remainingMilliseconds / 1000);
+  const days = Math.floor(totalSeconds / SECONDS_PER_DAY);
+  const remainingDaySeconds = totalSeconds % SECONDS_PER_DAY;
+  const hours = Math.floor(remainingDaySeconds / SECONDS_PER_HOUR);
+  const remainingHourSeconds = remainingDaySeconds % SECONDS_PER_HOUR;
+  const minutes = Math.floor(remainingHourSeconds / SECONDS_PER_MINUTE);
+  const seconds = remainingHourSeconds % SECONDS_PER_MINUTE;
+
+  return {
+    days,
+    hours,
+    isLive: false,
+    minutes,
+    seconds,
+  };
+}
+
+function formatCountdownPart(value) {
+  return String(value).padStart(2, "0");
+}
 
 const AUTO_REVEAL_STYLE = {
   "--installation-darkness-opacity": 0.62,
@@ -16,9 +56,6 @@ const AUTO_REVEAL_STYLE = {
   "--installation-spotlight-scale": 1.02,
   "--installation-left-spotlight-x": "0vw",
   "--installation-right-spotlight-x": "0vw",
-  "--installation-fixture-opacity": 1,
-  "--installation-fixture-drop": "0px",
-  "--installation-fixture-rotate": "0deg",
 };
 
 const INACTIVE_REVEAL_STYLE = {
@@ -31,14 +68,12 @@ const INACTIVE_REVEAL_STYLE = {
   "--installation-spotlight-scale": 0.92,
   "--installation-left-spotlight-x": "-8vw",
   "--installation-right-spotlight-x": "8vw",
-  "--installation-fixture-opacity": 0,
-  "--installation-fixture-drop": "-90px",
-  "--installation-fixture-rotate": "-8deg",
 };
 
 export default function InstallationSection({ autoRevealActive = false }) {
   const sectionRef = useRef(null);
   const revealTimerRef = useRef(null);
+  const [countdownParts, setCountdownParts] = useState(() => getVoxCountdownParts());
   const [themeRevealState, setThemeRevealState] = useState("idle");
   const [hasScrollRevealStarted, setHasScrollRevealStarted] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -58,9 +93,6 @@ export default function InstallationSection({ autoRevealActive = false }) {
   const spotlightScale = useTransform(scrollYProgress, [0, 0.54, 1], [0.82, 1.05, 0.94]);
   const leftSpotlightX = useTransform(scrollYProgress, [0, 0.52, 1], ["-8vw", "0vw", "3vw"]);
   const rightSpotlightX = useTransform(scrollYProgress, [0, 0.52, 1], ["8vw", "0vw", "-3vw"]);
-  const fixtureOpacity = useTransform(scrollYProgress, [0, 0.15, 0.58, 0.85, 1], [1, 1, 1, 0.55, 0]);
-  const fixtureDrop = useTransform(scrollYProgress, [0, 0.35, 0.72, 1], ["0px", "0px", "-24px", "-64px"]);
-  const fixtureRotate = useTransform(scrollYProgress, [0, 0.35, 0.72, 1], ["0deg", "0deg", "1.5deg", "4deg"]);
   const scrollRevealStyle = {
     "--installation-darkness-opacity": darknessOpacity,
     "--installation-left-spotlight-opacity": leftSpotlightOpacity,
@@ -71,9 +103,6 @@ export default function InstallationSection({ autoRevealActive = false }) {
     "--installation-spotlight-scale": spotlightScale,
     "--installation-left-spotlight-x": leftSpotlightX,
     "--installation-right-spotlight-x": rightSpotlightX,
-    "--installation-fixture-opacity": fixtureOpacity,
-    "--installation-fixture-drop": fixtureDrop,
-    "--installation-fixture-rotate": fixtureRotate,
   };
   const useAutoRevealLighting = autoRevealActive && !hasScrollRevealStarted;
   const revealStyle = reduceMotion
@@ -100,6 +129,16 @@ export default function InstallationSection({ autoRevealActive = false }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const updateCountdown = () => setCountdownParts(getVoxCountdownParts());
+    updateCountdown();
+
+    const countdownTimer = window.setInterval(updateCountdown, COUNTDOWN_UPDATE_INTERVAL_MS);
+    return () => window.clearInterval(countdownTimer);
+  }, []);
+
+  useEffect(() => {
     if (!autoRevealActive || hasScrollRevealStarted) return undefined;
 
     return scrollYProgress.on("change", (latestProgress) => {
@@ -120,20 +159,6 @@ export default function InstallationSection({ autoRevealActive = false }) {
         <span className="home-installation__spotlight home-installation__spotlight--left" />
         <span className="home-installation__spotlight home-installation__spotlight--right" />
       </div>
-      <div className="installation-spotlight-fixtures" aria-hidden="true">
-        <img
-          className="installation-spotlight-fixture installation-spotlight-fixture--left"
-          src="/images/vox-spotlight.png"
-          alt=""
-          aria-hidden="true"
-        />
-        <img
-          className="installation-spotlight-fixture installation-spotlight-fixture--right"
-          src="/images/vox-spotlight.png"
-          alt=""
-          aria-hidden="true"
-        />
-      </div>
 
       <div className="home-installation__layout">
         <div className="home-installation__copy">
@@ -147,34 +172,48 @@ export default function InstallationSection({ autoRevealActive = false }) {
             leaders and Board who will set the rhythm for the year.
           </p>
 
-          <dl className="home-installation__details" aria-label="VOX 2026 event details">
-            <div>
-              <dt>Date</dt>
-              <dd>9th August 2026</dd>
+          <div className="home-installation__details" role="group" aria-label="VOX 2026 event details">
+            <div className="home-installation__detail-card home-installation__detail-card--date">
+              <span className="home-installation__detail-label">Date</span>
+              <strong className="home-installation__detail-main">9th August 2026</strong>
+              <span className="home-installation__detail-note">Keep the date locked</span>
             </div>
-            <div>
-              <dt>Time</dt>
-              <dd>7:00 PM onwards</dd>
+
+            <div className="home-installation__detail-card home-installation__detail-card--time">
+              <span className="home-installation__detail-label">Time</span>
+              <strong className="home-installation__detail-main">7:00 PM onwards</strong>
+              <span className="home-installation__detail-note">Doors open. The show begins.</span>
+
             </div>
-            <div>
-              <dt>Venue</dt>
-              <dd>Cyrus Poonawalla Auditorium, BMCC Campus, Shivajinagar, Pune</dd>
-            </div>
-          </dl>
+
+            <a
+              className="home-installation__detail-card home-installation__detail-card--venue"
+              href={VENUE_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View Cyrus Poonawalla Auditorium on Google Maps"
+            >
+              <span className="home-installation__detail-label">Venue</span>
+              <strong className="home-installation__detail-main">Cyrus Poonawalla Auditorium</strong>
+              <span className="home-installation__detail-note">BMCC Campus, Shivajinagar, Pune</span>
+              <span className="home-installation__detail-map-cue" aria-hidden="true">View map</span>
+            </a>
+          </div>
 
           <p className="home-installation__closing">See you at VOX // '26.</p>
 
           <nav className="home-installation__actions" aria-label="VOX event actions">
             <a
-              className="home-installation__action-link home-installation__action-link--rsvp"
+              className="home-installation__ticket"
               href={RSVP_URL}
               target="_blank"
               rel="noreferrer"
               aria-label="RSVP for RCPH's 12th Installation Ceremony"
             >
-              RSVP Now
+              <span className="home-installation__ticket-kicker">VOX // '26 Admit One</span>
+              <strong className="home-installation__ticket-main">RSVP Now</strong>
+              <span className="home-installation__ticket-meta">09.08.26</span>
             </a>
-            <span className="home-installation__action-separator" aria-hidden="true">/</span>
             <a
               className="home-installation__action-link home-installation__action-link--venue"
               href={VENUE_URL}
@@ -185,9 +224,64 @@ export default function InstallationSection({ autoRevealActive = false }) {
               View Venue
             </a>
           </nav>
+
+
         </div>
 
         <div className="home-installation__visual">
+<section
+  className="home-installation__countdown home-installation__countdown--stereo"
+  aria-label="Countdown to VOX 2026 on 9th August 2026 at 7:00 PM IST"
+>
+  <div className="home-installation__stereo-shell">
+    <div className="home-installation__stereo-top">
+      <span className="home-installation__experience-kicker">COUNTDOWN TO VOX // '26</span>
+    </div>
+
+    <div className="home-installation__stereo-body">
+      <div className="home-installation__stereo-speaker home-installation__stereo-speaker--left" aria-hidden="true">
+        <span />
+        <span />
+      </div>
+
+      <div className="home-installation__stereo-center">
+        {countdownParts.isLive ? (
+          <strong className="home-installation__countdown-live">VOX // '26 is live</strong>
+        ) : (
+          <div className="home-installation__countdown-grid">
+            <span className="home-installation__countdown-unit">
+              <strong>{formatCountdownPart(countdownParts.days)}</strong>
+              <span>Days</span>
+            </span>
+            <span className="home-installation__countdown-unit">
+              <strong>{formatCountdownPart(countdownParts.hours)}</strong>
+              <span>Hours</span>
+            </span>
+            <span className="home-installation__countdown-unit">
+              <strong>{formatCountdownPart(countdownParts.minutes)}</strong>
+              <span>Minutes</span>
+            </span>
+            <span className="home-installation__countdown-unit">
+              <strong>{formatCountdownPart(countdownParts.seconds)}</strong>
+              <span>Seconds</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="home-installation__stereo-speaker home-installation__stereo-speaker--right" aria-hidden="true">
+        <span />
+        <span />
+      </div>
+    </div>
+
+    <div className="home-installation__stereo-footer" aria-hidden="true">
+      <span className="home-installation__stereo-accent-bar" />
+      <span className="home-installation__stereo-accent-bar" />
+      <span className="home-installation__stereo-accent-bar" />
+    </div>
+  </div>
+</section>
           {isThemeRevealRevealed ? (
             <div className="home-installation__inline-reveal" aria-live="polite">
               <div className="home-installation__inline-header">
@@ -216,24 +310,41 @@ export default function InstallationSection({ autoRevealActive = false }) {
               </a>
             </div>
           ) : (
-            <button
-              type="button"
-              className={`home-installation__reveal-card${isThemeRevealSpinning ? " home-installation__reveal-card--spinning" : ""}`}
-              onClick={handleInlineThemeRevealClick}
-              aria-label="Watch the VOX 2026 theme reveal inside this section"
-              aria-busy={isThemeRevealSpinning ? "true" : undefined}
-              disabled={isThemeRevealSpinning}
-            >
-              <span className="home-installation__record" aria-hidden="true">
-                <span />
-              </span>
-              <span className="home-installation__stage-pass">
-                <span className="home-installation__reveal-status" role={isThemeRevealSpinning ? "status" : undefined}>
-                  {isThemeRevealSpinning ? "Spinning the record..." : "Spin the record"}
-                </span>
-                <strong>{isThemeRevealSpinning ? "Cueing the theme reveal" : "Watch the theme reveal"}</strong>
-              </span>
-            </button>
+<button
+  type="button"
+  className={`home-installation__reveal-card home-installation__turntable${isThemeRevealSpinning ? " home-installation__reveal-card--spinning" : ""}`}
+  onClick={handleInlineThemeRevealClick}
+  aria-label="Watch the VOX 2026 theme reveal inside this section"
+  aria-busy={isThemeRevealSpinning ? "true" : undefined}
+  disabled={isThemeRevealSpinning}
+>
+  <span className="home-installation__turntable-panel" aria-hidden="true">
+    <span className="home-installation__turntable-screw home-installation__turntable-screw--top-left" />
+    <span className="home-installation__turntable-screw home-installation__turntable-screw--top-right" />
+    <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-left" />
+    <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-right" />
+    <span className="home-installation__turntable-knob" />
+  </span>
+
+  <span className="home-installation__platter" aria-hidden="true">
+    <span className="home-installation__record">
+      <span />
+    </span>
+  </span>
+
+  <span className="home-installation__tonearm" aria-hidden="true">
+    <span className="home-installation__tonearm-head" />
+  </span>
+
+
+
+  <span className="home-installation__stage-pass">
+    <span className="home-installation__reveal-status" role={isThemeRevealSpinning ? "status" : undefined}>
+      {isThemeRevealSpinning ? "Spinning the record..." : "Spin the record"}
+    </span>
+    <strong>{isThemeRevealSpinning ? "Cueing the theme reveal" : "Watch the theme reveal"}</strong>
+  </span>
+</button>
           )}
         </div>
       </div>
