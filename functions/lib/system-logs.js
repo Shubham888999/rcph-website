@@ -727,6 +727,40 @@ function safeVisibleUser(uid, userData = {}, fallback = {}) {
   };
 }
 
+async function activeBodPositionAssignmentDocs(db) {
+  try {
+    const snap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
+    return snap.docs || [];
+  } catch {
+    return [];
+  }
+}
+
+function assignmentsForAvenue(assignmentDocs = [], allowed = new Set()) {
+  const byUid = new Map();
+  assignmentDocs
+    .map(doc => docData(doc))
+    .forEach((assignment) => {
+      const uid = cleanText(assignment.uid, 160);
+      const positionKey = cleanLower(assignment.positionKey, 80);
+      if (!uid || assignment.active !== true || !allowed.has(positionKey)) return;
+      if (!byUid.has(uid)) byUid.set(uid, { ...assignment, uid, positionKey });
+    });
+  return Array.from(byUid.values());
+}
+
+async function visibleUsersForAssignments(db, assignments = []) {
+  const usersByUid = await getDocsByIds(db, 'users', assignments.map(assignment => assignment.uid));
+  return assignments.map((assignment) => {
+    const userSnap = usersByUid.get(assignment.uid);
+    const userData = userSnap?.exists ? (userSnap.data() || {}) : {};
+    return safeVisibleUser(assignment.uid, userData, {
+      role: assignment.positionKey,
+      status: 'active',
+    });
+  });
+}
+
 async function persistedActiveAnnouncementNotices(db, nowMillis = Date.now()) {
   const announcementDocs = await recentDocs(db, 'announcements', 'publishedAt', ACTIVE_NOTICE_LIMIT);
   const activeDocs = announcementDocs.filter(doc => isAnnouncementActive(docData(doc), nowMillis));
@@ -795,21 +829,13 @@ async function derivedAvenueLockNotices(db, avenueReportingLocks) {
   const locks = avenueReportingLocks.normalizeActiveAvenueReportingLocks({ lockDocs, reminderDocs });
   if (!locks.length) return [];
 
-  let assignmentDocs = [];
-  try {
-    const snap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
-    assignmentDocs = snap.docs || [];
-  } catch {
-    assignmentDocs = [];
-  }
+  const assignmentDocs = await activeBodPositionAssignmentDocs(db);
 
   const allTargetUids = new Set();
   const targetsByLock = new Map();
   locks.forEach((lock) => {
     const allowed = new Set(avenueReportingLocks.recipientPositionKeysForAvenue(lock.avenue));
-    const assignments = assignmentDocs
-      .map(doc => docData(doc))
-      .filter(assignment => assignment.active === true && allowed.has(cleanLower(assignment.positionKey, 80)));
+    const assignments = assignmentsForAvenue(assignmentDocs, allowed);
     targetsByLock.set(lock.lockId, { allowed: Array.from(allowed), assignments });
     assignments.forEach(assignment => {
       const uid = cleanText(assignment.uid, 160);
@@ -861,12 +887,61 @@ async function derivedAvenueLockNotices(db, avenueReportingLocks) {
   });
 }
 
+async function derivedAvenueReportingWindowNotices(db, avenueReportingLocks) {
+  if (!avenueReportingLocks?.normalizeOpenAvenueReportingWindows) return [];
+  const [reminderDocs, assignmentDocs] = await Promise.all([
+    recentDocs(db, 'reminders', 'updatedAt', 500),
+    activeBodPositionAssignmentDocs(db),
+  ]);
+  const windows = avenueReportingLocks.normalizeOpenAvenueReportingWindows({
+    reminderDocs,
+    now: new Date(),
+  });
+  if (!windows.length) return [];
+
+  return Promise.all(windows.map(async (window) => {
+    const allowed = new Set(avenueReportingLocks.recipientPositionKeysForAvenue(window.avenue));
+    const assignments = assignmentsForAvenue(assignmentDocs, allowed);
+    const visibleFor = await visibleUsersForAssignments(db, assignments);
+    const targetAudience = visibleFor.length
+      ? visibleFor.map(item => item.name).filter(Boolean).join(', ')
+      : `Positions: ${Array.from(allowed).join(', ') || window.avenue}`;
+    const dueAt = window.reportingDueAt || window.reportDueAt;
+    return {
+      id: `derived:reportingWindowOpen:${window.id}`,
+      persisted: false,
+      derived: true,
+      source: 'reportingWindowOpen',
+      category: 'dashboard_notice',
+      title: `${window.avenue} reporting window open`,
+      body: avenueReportingLocks.reportingWindowOpenDashboardMessage(window.avenue, dueAt),
+      priority: 'important',
+      status: 'active',
+      active: true,
+      createdAt: timestampToIso(window.createdAt),
+      publishedAt: timestampToIso(window.reportingOpensAt) || timestampToIso(window.updatedAt) || new Date().toISOString(),
+      expiresAt: timestampToIso(window.lockAt || dueAt),
+      targetAudience,
+      visibleFor,
+      deliverySummary: null,
+      openAvenue: window.avenue,
+      avenueLabel: window.avenueLabel,
+      reportingWindowId: window.id,
+      targetLabel: window.targetName,
+      conductedDate: window.conductedDate,
+      dueAt: timestampToIso(dueAt),
+      relatedDocPath: `reminders/${window.id}`,
+    };
+  }));
+}
+
 async function buildActiveDashboardNotices(db, avenueReportingLocks, nowMillis = Date.now()) {
-  const [announcements, locks] = await Promise.all([
+  const [announcements, locks, reportingWindows] = await Promise.all([
     persistedActiveAnnouncementNotices(db, nowMillis),
     derivedAvenueLockNotices(db, avenueReportingLocks),
+    derivedAvenueReportingWindowNotices(db, avenueReportingLocks),
   ]);
-  return [...locks, ...announcements]
+  return [...locks, ...reportingWindows, ...announcements]
     .sort((a, b) => Date.parse(b.publishedAt || b.createdAt || 0) - Date.parse(a.publishedAt || a.createdAt || 0)
       || String(a.title).localeCompare(String(b.title)));
 }

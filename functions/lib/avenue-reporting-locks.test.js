@@ -7,10 +7,13 @@ const test = require('node:test');
 const {
   assertBodEventAvenuesUnlocked,
   buildReportingWindowLockDashboardNotice,
+  buildReportingWindowOpenDashboardNotices,
   lockedAvenueMessage,
   lockedBodAvenuesForPayload,
   normalizeActiveAvenueReportingLocks,
+  normalizeOpenAvenueReportingWindows,
   reportingWindowLockDashboardMessage,
+  reportingWindowOpenDashboardMessage,
   recipientPositionKeysForAvenue,
 } = require('./avenue-reporting-locks');
 
@@ -32,6 +35,25 @@ function lockDoc(id, overrides = {}) {
       reason: 'reporting_window_expired',
       avenue: 'PDD',
       reportingWindowId: 'window-pdd',
+      ...overrides,
+    },
+  };
+}
+
+function reminderDoc(id, overrides = {}) {
+  return {
+    id,
+    data: {
+      recordType: 'avenue_reporting_window',
+      avenue: 'PDD',
+      targetName: 'Career Lab',
+      conductedDate: '2026-07-15',
+      reportingOpensAt: '2026-07-24T18:30:00.000Z',
+      reportingDueAt: '2026-07-26T18:29:00.000Z',
+      lockAt: '2026-07-26T18:30:00.000Z',
+      remindersEnabled: true,
+      lockEnabled: true,
+      status: 'open',
       ...overrides,
     },
   };
@@ -132,6 +154,71 @@ test('dashboard reporting-window lock notice targets only assigned director and 
   assert.equal(unrelatedNotice, null);
 });
 
+test('open reporting-window dashboard notices target assigned director and co-director positions', () => {
+  const reminderDocs = [
+    reminderDoc('window-pdd'),
+    reminderDoc('window-cmd', { avenue: 'CMD', targetName: 'Drive', status: 'active' }),
+  ];
+
+  const windows = normalizeOpenAvenueReportingWindows({
+    reminderDocs,
+    now: new Date('2026-07-25T00:00:00.000Z'),
+  });
+  assert.deepEqual(windows.map(window => window.avenue), ['CMD', 'PDD']);
+  assert.equal(
+    reportingWindowOpenDashboardMessage('PDD', '2026-07-26T18:29:00.000Z'),
+    'PDD reporting window is open. Please submit the event report before the deadline. Due by 26 July 2026, 11:59 PM.'
+  );
+
+  const directorNotice = buildReportingWindowOpenDashboardNotices({
+    windows,
+    positionKeys: ['pdd'],
+    now: new Date('2026-07-25T00:00:00.000Z'),
+  });
+  assert.equal(directorNotice.length, 1);
+  assert.equal(directorNotice[0].body, 'PDD reporting window is open. Please submit the event report before the deadline. Due by 26 July 2026, 11:59 PM.');
+  assert.equal(directorNotice[0].dismissible, false);
+  assert.deepEqual(directorNotice[0].reportingWindowIds, ['window-pdd']);
+
+  const coDirectorNotices = buildReportingWindowOpenDashboardNotices({
+    windows,
+    positionKeys: ['co-pdd', 'co-cmd'],
+    now: new Date('2026-07-25T00:00:00.000Z'),
+  });
+  assert.deepEqual(coDirectorNotices.map(notice => notice.openAvenue), ['CMD', 'PDD']);
+
+  const unrelatedNotice = buildReportingWindowOpenDashboardNotices({
+    windows,
+    positionKeys: ['pro'],
+    now: new Date('2026-07-25T00:00:00.000Z'),
+  });
+  assert.deepEqual(unrelatedNotice, []);
+});
+
+test('reporting-window dashboard notices disappear after completion, unlock, or expiry', () => {
+  const openWindows = normalizeOpenAvenueReportingWindows({
+    reminderDocs: [
+      reminderDoc('completed', { status: 'completed' }),
+      reminderDoc('unlocked', { status: 'unlocked' }),
+      reminderDoc('expired', { lockAt: '2026-07-24T18:30:00.000Z' }),
+    ],
+    now: new Date('2026-07-25T00:00:00.000Z'),
+  });
+  assert.deepEqual(openWindows, []);
+
+  const locks = normalizeActiveAvenueReportingLocks({
+    lockDocs: [
+      lockDoc('unlocked-lock', { locked: false, status: 'unlocked' }),
+      lockDoc('inactive-lock', { locked: true, status: 'unlocked' }),
+    ],
+  });
+  assert.deepEqual(locks, []);
+  assert.equal(buildReportingWindowLockDashboardNotice({
+    locks,
+    positionKeys: ['pdd', 'co-pdd'],
+  }), null);
+});
+
 test('GBM reporting locks target secretary assignments consistently with reminder routing', () => {
   assert.deepEqual(recipientPositionKeysForAvenue('GBM'), ['secretary', 'joint-secretary', 'co-secretary']);
   const locks = normalizeActiveAvenueReportingLocks({
@@ -153,6 +240,9 @@ test('submitBodEvent and updateBodEvent call avenue lock enforcement after paylo
   assert.match(indexSource, /const avenueReportingLocks = require\('\.\/lib\/avenue-reporting-locks'\);/);
   assert.match(indexSource, /async function loadActiveAvenueReportingLocks\(\)/);
   assert.match(indexSource, /async function assertBodEventAvenuesUnlocked\(avenues\)/);
+  assert.match(indexSource, /async function getActiveBodPositionKeysForUser\(uid\)/);
+  assert.match(indexSource, /const dashboardPositionKeys = mergePositionKeysForDashboard\(/);
+  assert.match(indexSource, /getReportingWindowDashboardNotices\(dashboardPositionKeys\)/);
   assert.match(indexSource, /exports\.submitBodEvent[\s\S]*const payload = normalizeBodEventPayload\(data\);\s*await assertBodEventAvenuesUnlocked\(payload\.avenues\);/);
   assert.match(indexSource, /exports\.updateBodEvent[\s\S]*const payload = normalizeBodEventPayload\(request\.data \|\| \{\}\);\s*await assertBodEventAvenuesUnlocked\(payload\.avenues\);/);
 });

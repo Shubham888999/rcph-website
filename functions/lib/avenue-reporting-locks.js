@@ -6,6 +6,8 @@ const {
   normalizeAvenueKey,
   avenueDisplayLabel,
   avenueRecipientPositionKeys,
+  normalizeReportingWindowConfig,
+  reportingWindowRuntimeState,
 } = require('./reminderCore');
 const { SECRETARY_POSITION_KEYS } = require('./momCore');
 const bodEventSchema = require('./bod-event-schema');
@@ -136,6 +138,27 @@ function normalizeActiveAvenueReportingLocks({ lockDocs = [], reminderDocs = [] 
       || String(a.reportingWindowId || a.lockId).localeCompare(String(b.reportingWindowId || b.lockId)));
 }
 
+function normalizeOpenAvenueReportingWindows({ reminderDocs = [], now = new Date() } = {}) {
+  const nowMillis = timestampToMillis(now) || Date.now();
+  const byId = new Map();
+  for (const doc of reminderDocs) {
+    const id = docId(doc);
+    const window = normalizeReportingWindowConfig(id, docData(doc));
+    if (!window) continue;
+    const state = reportingWindowRuntimeState(window, nowMillis);
+    if (state !== 'open' && state !== 'active') continue;
+    byId.set(window.id, {
+      ...window,
+      runtimeState: state,
+    });
+  }
+
+  return Array.from(byId.values())
+    .sort((a, b) => String(a.avenue).localeCompare(String(b.avenue))
+      || (timestampToMillis(a.reportingDueAt) - timestampToMillis(b.reportingDueAt))
+      || String(a.id).localeCompare(String(b.id)));
+}
+
 function formatAvenueList(codes = []) {
   const values = Array.from(new Set(codes.map(code => cleanText(code, 40)).filter(Boolean)));
   if (values.length <= 1) return values[0] || 'Selected avenue';
@@ -153,6 +176,29 @@ function reportingWindowLockDashboardMessage(codes = []) {
   const values = Array.from(new Set(codes.map(code => cleanText(code, 40)).filter(Boolean)));
   const subject = formatAvenueList(values);
   return `${subject} reporting is locked because the reporting deadline was missed. Please ask the President or Admin to unlock this avenue.`;
+}
+
+function formatDashboardDueDate(value) {
+  const millis = timestampToMillis(value);
+  if (!millis) return '';
+  const date = new Date(millis);
+  return `${date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  })}, ${date.toLocaleTimeString('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  }).toUpperCase()}`;
+}
+
+function reportingWindowOpenDashboardMessage(avenue, dueAt) {
+  const code = normalizeAvenueKey(avenue) || cleanText(avenue, 40) || 'Avenue';
+  const dueText = formatDashboardDueDate(dueAt);
+  return `${code} reporting window is open. Please submit the event report before the deadline.${dueText ? ` Due by ${dueText}.` : ''}`;
 }
 
 function lockedBodAvenuesForPayload(avenues, locks = []) {
@@ -231,13 +277,49 @@ function buildReportingWindowLockDashboardNotice({ locks = [], positionKeys = []
   };
 }
 
+function buildReportingWindowOpenDashboardNotices({ windows = [], reminderDocs = [], positionKeys = [], positionHelpers = defaultPositionHelpers, now = new Date() } = {}) {
+  const userKeys = normalizedPositionKeys(positionKeys, positionHelpers);
+  if (!userKeys.length) return [];
+  const candidates = Array.isArray(windows) && windows.length
+    ? windows
+    : normalizeOpenAvenueReportingWindows({ reminderDocs, now });
+
+  return candidates
+    .filter(window => recipientPositionKeysForAvenue(window?.avenue).some(key => userKeys.includes(key)))
+    .map((window) => {
+      const avenue = normalizeAvenueKey(window.avenue) || cleanText(window.avenue, 40);
+      const dueAt = window.reportingDueAt || window.reportDueAt;
+      const lockAt = window.lockAt || dueAt;
+      return {
+        id: `reportingWindowOpen_${safeAnnouncementIdSegment(window.id || `${avenue}_${window.targetName}`)}`,
+        source: 'reportingWindowOpen',
+        title: `${avenue} reporting window open`,
+        body: reportingWindowOpenDashboardMessage(avenue, dueAt),
+        priority: 'important',
+        publishedAt: timestampToIso(window.reportingOpensAt || now) || new Date().toISOString(),
+        expiresAt: timestampToIso(lockAt),
+        read: true,
+        dismissible: false,
+        openAvenue: avenue,
+        reportingWindowId: window.id,
+        reportingWindowIds: window.id ? [window.id] : [],
+        dueAt: timestampToIso(dueAt),
+        targetLabel: window.targetName || '',
+        conductedDate: window.conductedDate || '',
+      };
+    });
+}
+
 module.exports = {
   normalizeActiveAvenueReportingLockDoc,
   normalizeActiveAvenueReportingLocks,
+  normalizeOpenAvenueReportingWindows,
   lockedBodAvenuesForPayload,
   lockedAvenueMessage,
   reportingWindowLockDashboardMessage,
+  reportingWindowOpenDashboardMessage,
   assertBodEventAvenuesUnlocked,
   recipientPositionKeysForAvenue,
   buildReportingWindowLockDashboardNotice,
+  buildReportingWindowOpenDashboardNotices,
 };

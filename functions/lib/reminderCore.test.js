@@ -121,12 +121,21 @@ test('avenue reporting windows normalize aliases and runtime states', () => {
 });
 
 test('avenue recipient mapping covers director, secretary, sports, and finance targets', () => {
+  assert.deepEqual(avenueRecipientPositionKeys('PDD'), ['pdd', 'co-pdd']);
+  assert.deepEqual(avenueRecipientPositionKeys('CSD'), ['csd', 'co-csd']);
+  assert.deepEqual(avenueRecipientPositionKeys('CMD'), ['cmd', 'co-cmd']);
+  assert.deepEqual(avenueRecipientPositionKeys('ISD'), ['isd', 'co-isd']);
+  assert.deepEqual(avenueRecipientPositionKeys('RRRO'), ['rrro', 'co-rrro']);
+  assert.deepEqual(avenueRecipientPositionKeys('PRO'), ['pro', 'co-pro']);
+  assert.deepEqual(avenueRecipientPositionKeys('DEI'), ['dei', 'co-dei']);
   assert.deepEqual(avenueRecipientPositionKeys('CWD'), ['cwd', 'co-cwd']);
-  assert.deepEqual(avenueRecipientPositionKeys('Club Service'), ['csd', 'co-csd']);
   assert.deepEqual(avenueRecipientPositionKeys('Sports'), ['sports-representative', 'co-sports-representative']);
   assert.deepEqual(avenueRecipientPositionKeys('Finance'), ['treasurer', 'co-treasurer']);
+  assert.deepEqual(avenueRecipientPositionKeys('Club Service'), ['csd', 'co-csd']);
   assert.equal(avenueRecipientRole('GBM'), 'secretary');
   assert.equal(avenueRecipientRole('BOD Meeting'), 'secretary');
+  assert.deepEqual(avenueRecipientPositionKeys('GBM'), []);
+  assert.deepEqual(avenueRecipientPositionKeys('BOD Meeting'), []);
 });
 
 test('avenue reporting email uses formal deadline wording', () => {

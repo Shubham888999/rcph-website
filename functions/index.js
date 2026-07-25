@@ -3309,6 +3309,57 @@ async function getReportingWindowLockDashboardNotice(positionKeys) {
   });
 }
 
+async function loadAvenueReportingReminderDocs() {
+  const snap = await db.collection('reminders').get();
+  return snap.docs || [];
+}
+
+async function getActiveBodPositionKeysForUser(uid) {
+  const snap = await db
+    .collection('bodPositionAssignments')
+    .where('uid', '==', uid)
+    .get()
+    .catch(() => null);
+  if (!snap) return [];
+  const keys = [];
+  snap.forEach(doc => {
+    const assignment = doc.data() || {};
+    if (assignment.active !== true) return;
+    const key = positionHelpers.normalizePositionKey(assignment.positionKey);
+    if (key) keys.push(key);
+  });
+  return positionHelpers.normalizePositionKeys(keys).positionKeys || [];
+}
+
+function mergePositionKeysForDashboard(...sources) {
+  const values = sources.flatMap(source => Array.isArray(source) ? source : []);
+  return positionHelpers.normalizePositionKeys(values).positionKeys || [];
+}
+
+async function getReportingWindowDashboardNotices(positionKeys) {
+  const now = new Date();
+  const [locks, reminderDocs] = await Promise.all([
+    loadActiveAvenueReportingLocks(),
+    loadAvenueReportingReminderDocs(),
+  ]);
+  const lockNotice = avenueReportingLocks.buildReportingWindowLockDashboardNotice({
+    locks,
+    positionKeys,
+    positionHelpers,
+    now,
+  });
+  const openNotices = avenueReportingLocks.buildReportingWindowOpenDashboardNotices({
+    reminderDocs,
+    positionKeys,
+    positionHelpers,
+    now,
+  });
+  return [
+    ...(lockNotice ? [lockNotice] : []),
+    ...openNotices,
+  ];
+}
+
 async function assertBodEventRecordIsClubEvent(eventId) {
   const snap = await db.collection('bodEvents').doc(eventId).get();
   if (!snap.exists) return;
@@ -7367,9 +7418,14 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     userSnap,
     cwdAssignmentSnap,
   });
-  const reportingWindowLockNotice = await getReportingWindowLockDashboardNotice(authorityContext.positionKeys);
-  const memberAnnouncements = reportingWindowLockNotice
-    ? [reportingWindowLockNotice, ...announcements]
+  const activeAssignmentPositionKeys = await getActiveBodPositionKeysForUser(uid);
+  const dashboardPositionKeys = mergePositionKeysForDashboard(
+    authorityContext.positionKeys,
+    activeAssignmentPositionKeys
+  );
+  const reportingWindowNotices = await getReportingWindowDashboardNotices(dashboardPositionKeys);
+  const memberAnnouncements = reportingWindowNotices.length
+    ? [...reportingWindowNotices, ...announcements]
     : announcements;
   const myAttendanceData = myAttendanceSnap.exists ? (myAttendanceSnap.data() || {}) : {};
   const districtAttendanceData = districtAttendanceSnap.exists ? (districtAttendanceSnap.data() || {}) : {};

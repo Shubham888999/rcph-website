@@ -108,6 +108,15 @@ test('avenue recipient resolution uses position assignments and secretary specia
   assert.match(functionsSource, /normalizePositionKeys\(recipient\.positionKeys\)\.some\(key => allowed\.has\(key\)\)/);
 });
 
+test('avenue recipient resolution preserves primary and co-director coverage with dedupe', () => {
+  assert.match(functionsSource, /const allowed = new Set\(avenueRecipientPositionKeys\(avenue\)\)/);
+  assert.match(functionsSource, /allowed\.has\(positionKey\)/);
+  assert.match(functionsSource, /positionKeysByUid\.forEach\(\(_, uid\) => candidateUids\.add\(uid\)\)/);
+  assert.match(functionsSource, /positionKeysByUid\.set\(doc\.id, Array\.from\(new Set\(existing\.concat\(keys\)\)\)\)/);
+  assert.match(functionsSource, /return dedupeReminderRecipients\(candidateUids/);
+  assert.match(functionsSource, /byUid\.has\(uid\) \|\| emails\.has\(email\.email\)/);
+});
+
 test('avenue reporting lock workflow creates deterministic locks and supports admin unlock', () => {
   assert.match(functionsSource, /createOrActivateAvenueReportingLock/);
   assert.match(functionsSource, /db\.collection\('locks'\)\.doc\(lockId\)/);

@@ -86,6 +86,7 @@ test('summary counts failed logs and active notices', () => {
 
 test('index exports and logs through the System Logs service', () => {
   const indexSource = readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
+  const systemLogsSource = readFileSync(path.join(__dirname, 'system-logs.js'), 'utf8');
   assert.match(indexSource, /const systemLogs = require\('\.\/lib\/system-logs'\);/);
   assert.match(indexSource, /exports\.getSystemLogs = onCall/);
   assert.match(indexSource, /canAccessSystemLogs/);
@@ -93,4 +94,8 @@ test('index exports and logs through the System Logs service', () => {
   assert.match(indexSource, /writeSystemMutationLog/);
   assert.match(indexSource, /source: 'publishAnnouncement'/);
   assert.match(indexSource, /source: 'submitBodEvent'/);
+  assert.match(systemLogsSource, /derivedAvenueReportingWindowNotices/);
+  assert.match(systemLogsSource, /normalizeOpenAvenueReportingWindows/);
+  assert.match(systemLogsSource, /reportingWindowOpenDashboardMessage/);
+  assert.match(systemLogsSource, /\.\.\.reportingWindows/);
 });
