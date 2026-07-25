@@ -38,6 +38,7 @@ const { createBodPhotoUploadService } = require('./lib/bod-photo-upload');
 const momFunctions = require('./lib/momFunctions');
 const reminderFunctions = require('./lib/reminderFunctions');
 const avenueReportingLocks = require('./lib/avenue-reporting-locks');
+const systemLogs = require('./lib/system-logs');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 const {
   MemberProfileValidationError,
@@ -174,6 +175,15 @@ const bodPhotoUploads = createBodPhotoUploadService({
   allowedOrigins: CALLABLE_OPTIONS.cors,
   logger: console,
 });
+const systemLogsService = systemLogs.createSystemLogsService({
+  db,
+  admin,
+  HttpsError,
+  getAuthorityContext,
+  assertApprovedActiveCallableAccount,
+  avenueReportingLocks,
+  logger: console,
+});
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -301,6 +311,7 @@ const ANNOUNCEMENT_EMAIL_MAX_RECIPIENTS = 500;
 const RESOLUTIONS_COLLECTION = 'resolutions';
 const RESOLUTION_NUMBER_INDEX_COLLECTION = 'resolutionNumberIndex';
 const ADMIN_MAINTENANCE_AUDIT_COLLECTION = 'adminMaintenanceAudit';
+const ADMIN_LOCK_KEYS = new Set(['attendance', 'bodAttendance', 'bodEvents', 'fines', 'treasury']);
 const FINE_EVENT_SOURCES = new Set([
   'events',
   'bodMeetings',
@@ -3331,6 +3342,41 @@ async function getCallableUserProfile(uid, request) {
   };
 }
 
+async function writeSystemMutationLog({
+  uid,
+  request,
+  authority = {},
+  category,
+  action,
+  status = 'success',
+  targetType,
+  targetId,
+  targetLabel,
+  targetAudience = '',
+  details = '',
+  source,
+  relatedDocPath,
+  metadata = {},
+}) {
+  const userProfile = await getCallableUserProfile(uid, request);
+  await systemLogsService.writeLog({
+    category,
+    action,
+    status,
+    actorUid: uid,
+    actorName: userProfile.name,
+    actorRole: authority.role || '',
+    targetType,
+    targetId,
+    targetLabel,
+    targetAudience,
+    details,
+    source,
+    relatedDocPath,
+    metadata,
+  });
+}
+
 async function initializeAttendanceForEvent(eventId, now) {
   const participantIds = await loadGeneralAttendanceParticipantIds();
 
@@ -4757,6 +4803,10 @@ const authorityContext = await getAuthorityContext(uid, {
     userData,
     resolutionManager,
   });
+  const canAccessSystemLogs = systemLogs.canAccessSystemLogs({
+    authority: authorityContext,
+    userData,
+  });
   const visitDashboardAccess = isApprovedActiveUserRecord(userData) && role
     ? await visitDashboards.getAccessForRole({ role, roleData })
     : visitDashboards.emptyAccess();
@@ -4772,6 +4822,7 @@ const authorityContext = await getAuthorityContext(uid, {
     resolutionManager,
     canAccessLockTools,
     canAccessResolutionTools,
+    canAccessSystemLogs,
     ...visitDashboardAccess,
   };
 });
@@ -4890,6 +4941,81 @@ exports.getProspectManagementData = onCall(CALLABLE_OPTIONS, async (request) => 
       duesNotYetDue: prospects.filter(item => item.status !== 'promoted' && !item.duesDue && !item.duesPaid).length,
     },
   };
+});
+
+exports.getSystemLogs = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await systemLogsService.getSystemLogs(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'System logs request failed.');
+  }
+});
+
+function validateAdminLockKey(value) {
+  const key = normalizeText(value, 80);
+  if (!ADMIN_LOCK_KEYS.has(key)) {
+    throw new HttpsError('invalid-argument', 'Valid lock key required.');
+  }
+  return key;
+}
+
+function adminLockLabel(key) {
+  return {
+    attendance: 'Club & District Attendance',
+    bodAttendance: 'BOD Attendance',
+    bodEvents: 'BOD Event Submissions',
+    fines: 'Fines',
+    treasury: 'Treasury',
+  }[key] || key;
+}
+
+exports.setAdminLock = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const { userData } = await assertApprovedActiveCallableAccount(uid);
+  const authority = await getAuthorityContext(uid);
+  if (!hasLockToolsAuthority(authority, userData)) {
+    throw new HttpsError('permission-denied', 'Lock tools access required.');
+  }
+
+  const key = validateAdminLockKey(request.data?.key);
+  if (typeof request.data?.locked !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'locked must be a boolean.');
+  }
+  const locked = request.data.locked === true;
+  const userProfile = await getCallableUserProfile(uid, request);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const actorFields = locked
+    ? { lockedAt: now, lockedBy: uid, lockedByName: userProfile.name }
+    : { unlockedAt: now, unlockedBy: uid, unlockedByName: userProfile.name };
+
+  await db.collection('locks').doc(key).set({
+    type: 'admin_panel',
+    locked,
+    status: locked ? 'active' : 'unlocked',
+    ...actorFields,
+    updatedBy: uid,
+    updatedByName: userProfile.name,
+    updatedAt: now,
+  }, { merge: true });
+
+  await systemLogsService.writeLog({
+    category: 'lock',
+    action: locked ? 'locked' : 'unlocked',
+    status: locked ? 'active' : 'inactive',
+    actorUid: uid,
+    actorName: userProfile.name,
+    actorRole: authority.role || '',
+    targetType: 'admin_lock',
+    targetId: key,
+    targetLabel: adminLockLabel(key),
+    details: `${adminLockLabel(key)} ${locked ? 'locked' : 'unlocked'}.`,
+    source: 'setAdminLock',
+    relatedDocPath: `locks/${key}`,
+    metadata: { lockKey: key, locked },
+  });
+
+  return { ok: true, key, locked };
 });
 
 exports.recalculateAllProspectProgress = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -5771,7 +5897,7 @@ exports.removeAnnouncementAttachmentUpload = onCall(ANNOUNCEMENT_ATTACHMENT_CALL
 
 exports.publishAnnouncement = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, async (request) => {
   const actorUid = requireAuth(request);
-  await assertAdminOrPresidentAuthority(actorUid);
+  const actorAuthority = await assertAdminOrPresidentAuthority(actorUid);
   await assertApprovedActiveCallableAccount(actorUid);
 
   const announcement = normalizeAnnouncementPayload(request.data || {});
@@ -5877,6 +6003,56 @@ exports.publishAnnouncement = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, a
       });
     }
 
+    const targetAudience = announcement.targetRoles.includes('all')
+      ? 'All dashboard users'
+      : [
+        announcement.targetRoles.length ? `Roles: ${announcement.targetRoles.join(', ')}` : '',
+        announcement.targetUserIds.length ? `${announcement.targetUserIds.length} explicit users` : '',
+      ].filter(Boolean).join('; ');
+    await writeSystemMutationLog({
+      uid: actorUid,
+      request,
+      authority: actorAuthority,
+      category: 'announcement',
+      action: 'created',
+      status: 'active',
+      targetType: 'announcement',
+      targetId: announcementId,
+      targetLabel: announcement.title,
+      targetAudience,
+      details: `${recipients.length} dashboard recipients`,
+      source: 'publishAnnouncement',
+      relatedDocPath: `${ANNOUNCEMENTS_COLLECTION}/${announcementId}`,
+      metadata: {
+        priority: announcement.priority,
+        emailRequested: announcement.emailRequested,
+        recipientCount: recipients.length,
+      },
+    });
+
+    if (announcement.emailRequested) {
+      await writeSystemMutationLog({
+        uid: actorUid,
+        request,
+        authority: actorAuthority,
+        category: 'email',
+        action: emailSummary.sent > 0 ? 'sent' : 'failed',
+        status: emailSummary.sent > 0 ? 'success' : 'failed',
+        targetType: 'announcement',
+        targetId: announcementId,
+        targetLabel: announcement.title,
+        targetAudience,
+        details: `${emailSummary.sent}/${emailSummary.attempted} announcement emails sent; ${emailSummary.failed} failed`,
+        source: 'publishAnnouncement.sendAnnouncementEmails',
+        relatedDocPath: `${ANNOUNCEMENTS_COLLECTION}/${announcementId}`,
+        metadata: {
+          attempted: emailSummary.attempted,
+          sent: emailSummary.sent,
+          failed: emailSummary.failed,
+        },
+      });
+    }
+
     return {
       success: true,
       announcementId,
@@ -5917,6 +6093,7 @@ exports.archiveAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
   const announcementRef = db.collection(ANNOUNCEMENTS_COLLECTION).doc(announcementId);
   const auditRef = db.collection(ADMIN_MAINTENANCE_AUDIT_COLLECTION).doc();
   const now = admin.firestore.FieldValue.serverTimestamp();
+  let archivedAnnouncement = null;
 
   await db.runTransaction(async tx => {
     const snap = await tx.get(announcementRef);
@@ -5943,7 +6120,33 @@ exports.archiveAnnouncement = onCall(CALLABLE_OPTIONS, async (request) => {
       recipientCount: normalizeNonNegativeInteger(data.recipientCount, 0),
       createdAt: now,
     });
+    archivedAnnouncement = {
+      title: normalizeText(data.title, 160),
+      recipientCount: normalizeNonNegativeInteger(data.recipientCount, 0),
+      previousStatus: data.status,
+    };
   });
+
+  if (archivedAnnouncement) {
+    await writeSystemMutationLog({
+      uid: actorUid,
+      request,
+      authority: actorAuthority,
+      category: 'announcement',
+      action: 'archived',
+      status: 'inactive',
+      targetType: 'announcement',
+      targetId: announcementId,
+      targetLabel: archivedAnnouncement.title,
+      details: `${archivedAnnouncement.recipientCount} dashboard recipients preserved`,
+      source: 'archiveAnnouncement',
+      relatedDocPath: `${ANNOUNCEMENTS_COLLECTION}/${announcementId}`,
+      metadata: {
+        previousStatus: archivedAnnouncement.previousStatus,
+        recipientCount: archivedAnnouncement.recipientCount,
+      },
+    });
+  }
 
   return { ok: true, announcementId, status: 'archived' };
 });
@@ -5995,6 +6198,26 @@ exports.deleteAnnouncement = onCall(ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS, as
       console.warn('Announcement attachment cleanup after delete failed.', { announcementId, code: err?.code || 'drive-delete-failed' });
     }
   }
+
+  await writeSystemMutationLog({
+    uid: actorUid,
+    request,
+    authority: actorAuthority,
+    category: 'announcement',
+    action: 'deleted',
+    status: 'inactive',
+    targetType: 'announcement',
+    targetId: announcementId,
+    targetLabel: normalizeText(data.title, 160),
+    details: `${deliveriesSnap.size} delivery records deleted`,
+    source: 'deleteAnnouncement',
+    relatedDocPath: `${ANNOUNCEMENTS_COLLECTION}/${announcementId}`,
+    metadata: {
+      previousStatus: data.status || '',
+      deliveryCount: deliveriesSnap.size,
+      attachmentRemoved,
+    },
+  });
 
   return { ok: true, announcementId, deletedPaths, attachmentRemoved };
 });
@@ -7739,6 +7962,28 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
   const prospectProgressSummary = await recalcAllActiveProspects();
 
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: eventCreated ? 'created' : 'updated',
+    status: 'success',
+    targetType: 'bod_event',
+    targetId: eventId,
+    targetLabel: payload.name,
+    targetAudience: payload.avenues.join(', '),
+    details: `${attendanceRowsUpdated} attendance rows initialized`,
+    source: 'submitBodEvent',
+    relatedDocPath: `bodEvents/${eventId}`,
+    metadata: {
+      eventCreated,
+      attendanceRowsUpdated,
+      type: payload.type || 'clubEvent',
+      visibility: payload.visibility,
+    },
+  });
+
   return {
     ok: true,
     eventId,
@@ -7803,7 +8048,7 @@ exports.getBodSecretarialReportMetrics = onCall(CALLABLE_OPTIONS, async (request
 
 exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
-  await assertAdminOrPresident(uid);
+  const authority = await assertAdminOrPresidentAuthority(uid);
 
   const bodEventId = validateEventDocId(request.data?.bodEventId);
   if (!bodEventId) throw new HttpsError('invalid-argument', 'BOD event ID is required.');
@@ -7845,6 +8090,27 @@ exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
   const attendanceRowsUpdated = await initializeAttendanceForEvent(bodEventId, now);
   const prospectProgressSummary = await recalcAllActiveProspects();
 
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: 'synced',
+    status: 'success',
+    targetType: 'bod_event',
+    targetId: bodEventId,
+    targetLabel: payload.name,
+    targetAudience: payload.avenues.join(', '),
+    details: `${attendanceRowsUpdated} attendance rows initialized`,
+    source: 'syncBodEventToAttendance',
+    relatedDocPath: `bodEvents/${bodEventId}`,
+    metadata: {
+      eventCreated,
+      attendanceRowsUpdated,
+      syncedEventId: bodEventId,
+    },
+  });
+
   return {
     ok: true,
     eventId: bodEventId,
@@ -7874,6 +8140,27 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
   const prospectProgressSummary = await recalcAllActiveProspects();
+
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: 'updated',
+    status: 'success',
+    targetType: 'bod_event',
+    targetId: eventId,
+    targetLabel: payload.name,
+    targetAudience: payload.avenues.join(', '),
+    details: `${attendanceRowsUpdated} attendance rows refreshed`,
+    source: 'updateBodEvent',
+    relatedDocPath: `bodEvents/${eventId}`,
+    metadata: {
+      attendanceRowsUpdated,
+      type: payload.type || 'clubEvent',
+      visibility: payload.visibility,
+    },
+  });
 
   return {
     ok: true,
@@ -7913,6 +8200,22 @@ exports.archiveBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   await batch.commit();
   const prospectProgressSummary = await recalcAllActiveProspects();
 
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: 'archived',
+    status: 'inactive',
+    targetType: 'bod_event',
+    targetId: eventId,
+    targetLabel: eventId,
+    details: 'BOD event archived from BOD manager and attendance.',
+    source: 'archiveBodEvent',
+    relatedDocPath: `bodEvents/${eventId}`,
+    metadata: { eventId },
+  });
+
   return { ok: true, eventId, prospectProgressSummary };
 });
 
@@ -7936,6 +8239,27 @@ exports.createAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
   const prospectProgressSummary = await recalcAllActiveProspects();
 
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: eventCreated ? 'created' : 'updated',
+    status: 'success',
+    targetType: 'club_event',
+    targetId: eventId,
+    targetLabel: payload.name,
+    targetAudience: payload.avenues.join(', '),
+    details: `${attendanceRowsUpdated} attendance rows initialized`,
+    source: 'createAdminClubEvent',
+    relatedDocPath: `events/${eventId}`,
+    metadata: {
+      eventCreated,
+      attendanceRowsUpdated,
+      visibility: payload.visibility,
+    },
+  });
+
   return { ok: true, eventId, eventCreated, attendanceRowsUpdated, prospectProgressSummary };
 });
 
@@ -7954,6 +8278,25 @@ exports.updateAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
   const prospectProgressSummary = await recalcAllActiveProspects();
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: 'updated',
+    status: 'success',
+    targetType: 'club_event',
+    targetId: eventId,
+    targetLabel: payload.name,
+    targetAudience: payload.avenues.join(', '),
+    details: `${attendanceRowsUpdated} attendance rows refreshed`,
+    source: 'updateAdminClubEvent',
+    relatedDocPath: `events/${eventId}`,
+    metadata: {
+      attendanceRowsUpdated,
+      visibility: payload.visibility,
+    },
+  });
   return { ok: true, eventId, attendanceRowsUpdated, prospectProgressSummary };
 });
 
@@ -7982,6 +8325,21 @@ exports.archiveAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   }, { merge: true });
   await batch.commit();
   const prospectProgressSummary = await recalcAllActiveProspects();
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: 'archived',
+    status: 'inactive',
+    targetType: 'club_event',
+    targetId: eventId,
+    targetLabel: eventId,
+    details: 'Club event archived from attendance manager.',
+    source: 'archiveAdminClubEvent',
+    relatedDocPath: `events/${eventId}`,
+    metadata: { eventId },
+  });
   return { ok: true, eventId, prospectProgressSummary };
 });
 
@@ -7997,6 +8355,22 @@ exports.createBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const { meetingCreated } = await writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('bodMembers', 'bodAttendance', meetingId, now);
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: meetingCreated ? 'created' : 'updated',
+    status: 'success',
+    targetType: 'bod_meeting',
+    targetId: meetingId,
+    targetLabel: payload.name,
+    targetAudience: 'BOD',
+    details: `${attendanceRowsUpdated} BOD attendance rows initialized`,
+    source: 'createBodMeetingSynced',
+    relatedDocPath: `bodMeetings/${meetingId}`,
+    metadata: { meetingCreated, attendanceRowsUpdated },
+  });
   return { ok: true, meetingId, meetingCreated, attendanceRowsUpdated };
 });
 
@@ -8014,6 +8388,22 @@ exports.updateBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
 
   await writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('bodMembers', 'bodAttendance', meetingId, now);
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: 'updated',
+    status: 'success',
+    targetType: 'bod_meeting',
+    targetId: meetingId,
+    targetLabel: payload.name,
+    targetAudience: 'BOD',
+    details: `${attendanceRowsUpdated} BOD attendance rows refreshed`,
+    source: 'updateBodMeetingSynced',
+    relatedDocPath: `bodMeetings/${meetingId}`,
+    metadata: { attendanceRowsUpdated },
+  });
   return { ok: true, meetingId, attendanceRowsUpdated };
 });
 
@@ -8041,6 +8431,22 @@ exports.archiveBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
     updatedAt: now,
   }, { merge: true });
   await batch.commit();
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: 'archived',
+    status: 'inactive',
+    targetType: 'bod_meeting',
+    targetId: meetingId,
+    targetLabel: meetingId,
+    targetAudience: 'BOD',
+    details: 'BOD meeting archived from attendance manager.',
+    source: 'archiveBodMeetingSynced',
+    relatedDocPath: `bodMeetings/${meetingId}`,
+    metadata: { meetingId },
+  });
   return { ok: true, meetingId };
 });
 
@@ -8056,6 +8462,26 @@ exports.createDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => 
 
   const result = await writeDistrictEventSynced({ districtEventId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('members', 'districtAttendance', districtEventId, now, { includeGeneralAttendanceUsers: true });
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: result.districtEventCreated ? 'created' : 'updated',
+    status: 'success',
+    targetType: 'district_event',
+    targetId: districtEventId,
+    targetLabel: payload.name,
+    targetAudience: payload.visibility,
+    details: `${attendanceRowsUpdated} district attendance rows initialized`,
+    source: 'createDistrictEventSynced',
+    relatedDocPath: `districtEvents/${districtEventId}`,
+    metadata: {
+      attendanceRowsUpdated,
+      visibility: payload.visibility,
+      result,
+    },
+  });
   return { ok: true, districtEventId, attendanceRowsUpdated, ...result };
 });
 
@@ -8073,6 +8499,26 @@ exports.updateDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) => 
 
   const result = await writeDistrictEventSynced({ districtEventId, payload, uid, userProfile, now });
   const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('members', 'districtAttendance', districtEventId, now, { includeGeneralAttendanceUsers: true });
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: 'updated',
+    status: 'success',
+    targetType: 'district_event',
+    targetId: districtEventId,
+    targetLabel: payload.name,
+    targetAudience: payload.visibility,
+    details: `${attendanceRowsUpdated} district attendance rows refreshed`,
+    source: 'updateDistrictEventSynced',
+    relatedDocPath: `districtEvents/${districtEventId}`,
+    metadata: {
+      attendanceRowsUpdated,
+      visibility: payload.visibility,
+      result,
+    },
+  });
   return { ok: true, districtEventId, attendanceRowsUpdated, ...result };
 });
 
@@ -8106,6 +8552,22 @@ exports.archiveDistrictEventSynced = onCall(CALLABLE_OPTIONS, async (request) =>
     updatedAt: now,
   }, { merge: true });
   await batch.commit();
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'event',
+    action: 'archived',
+    status: 'inactive',
+    targetType: 'district_event',
+    targetId: districtEventId,
+    targetLabel: districtEventId,
+    targetAudience: 'district',
+    details: 'District event archived from attendance manager.',
+    source: 'archiveDistrictEventSynced',
+    relatedDocPath: `districtEvents/${districtEventId}`,
+    metadata: { districtEventId },
+  });
   return { ok: true, districtEventId };
 });
 
@@ -8199,6 +8661,12 @@ exports.uploadMomPdf = momFunctions.uploadMomPdf;
 exports.finalizeMomUpload = momFunctions.finalizeMomUpload;
 exports.downloadMomPdf = momFunctions.downloadMomPdf;
 exports.sendMomEmail = momFunctions.sendMomEmail;
+exports.createReportingWindowReminder = reminderFunctions.createReportingWindowReminder;
+exports.upsertEventReminderConfig = reminderFunctions.upsertEventReminderConfig;
+exports.stopEventReminderConfig = reminderFunctions.stopEventReminderConfig;
+exports.markReportingWindowSubmitted = reminderFunctions.markReportingWindowSubmitted;
+exports.stopReportingWindowReminders = reminderFunctions.stopReportingWindowReminders;
+exports.updateReportingWindowAdminNote = reminderFunctions.updateReportingWindowAdminNote;
 exports.sendScheduledReminderEmails = reminderFunctions.sendScheduledReminderEmails;
 exports.runReminderEmailSweep = reminderFunctions.runReminderEmailSweep;
 exports.sendReminderTemplateTestEmail = reminderFunctions.sendReminderTemplateTestEmail;

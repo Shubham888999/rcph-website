@@ -13,6 +13,8 @@ test('scheduled and manual reminder email functions are exported additively', ()
   assert.match(indexSource, /exports\.sendScheduledReminderEmails = reminderFunctions\.sendScheduledReminderEmails;/);
   assert.match(indexSource, /exports\.runReminderEmailSweep = reminderFunctions\.runReminderEmailSweep;/);
   assert.match(indexSource, /exports\.unlockAvenueReportingWindow = reminderFunctions\.unlockAvenueReportingWindow;/);
+  assert.match(indexSource, /exports\.createReportingWindowReminder = reminderFunctions\.createReportingWindowReminder;/);
+  assert.match(indexSource, /exports\.upsertEventReminderConfig = reminderFunctions\.upsertEventReminderConfig;/);
   assert.match(indexSource, /exports\.sendMomEmail = momFunctions\.sendMomEmail;/);
 });
 
@@ -28,6 +30,20 @@ test('manual reminder sweep callable requires admin panel authority', () => {
   assert.match(functionsSource, /requireAdminPanelReminderAccess\(request, 'run reminder emails'\)/);
   assert.match(functionsSource, /hasAdminPanelAuthority/);
   assert.match(functionsSource, /ADMIN_PANEL_POSITION_KEYS = new Set\(\['cwd', 'co-cwd', 'saa', 'co-saa', 'sergeant', 'sergeant-at-arms'\]\)/);
+  assert.match(functionsSource, /writeReminderSystemLog/);
+});
+
+test('reminder create and update mutations are callable-backed and system logged', () => {
+  assert.match(functionsSource, /const createReportingWindowReminder = onCall/);
+  assert.match(functionsSource, /const upsertEventReminderConfig = onCall/);
+  assert.match(functionsSource, /const stopEventReminderConfig = onCall/);
+  assert.match(functionsSource, /const markReportingWindowSubmitted = onCall/);
+  assert.match(functionsSource, /const stopReportingWindowReminders = onCall/);
+  assert.match(functionsSource, /const updateReportingWindowAdminNote = onCall/);
+  assert.match(functionsSource, /source: 'createReportingWindowReminder'/);
+  assert.match(functionsSource, /source: 'upsertEventReminderConfig'/);
+  assert.match(functionsSource, /source: 'stopReportingWindowReminders'/);
+  assert.match(functionsSource, /writeSystemLog/);
 });
 
 test('reminder recipients use active BOD position assignments for Secretary and SAA', () => {

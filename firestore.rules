@@ -211,6 +211,14 @@ function isFineLinkedTreasury(data) {
       allow read, write: if false;
     }
 
+    match /systemLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow read, write: if false;
+    }
+
     match /bodSettings/{document} {
       allow read, write: if false;
     }

@@ -10,6 +10,7 @@ const {
   REMINDERS_COLLECTION,
   REMINDER_EMAIL_HISTORY_COLLECTION,
   REMINDER_TEMPLATE_TEST_HISTORY_COLLECTION,
+  EVENT_REMINDER_RECORD_TYPE,
   REPORTING_WINDOW_RECORD_TYPE,
   AVENUE_REPORTING_LOCK_REASON,
   cleanLower,
@@ -34,6 +35,10 @@ const {
   avenueReportingLockId,
   avenueReportingLockPayload,
 } = require('./reminderCore');
+const {
+  writeSystemLog,
+  writeSystemLogSafely,
+} = require('./system-logs');
 const {
   normalizeMomAccess,
   normalizeMomEmailAddress,
@@ -217,6 +222,32 @@ function dedupeReminderRecipients(recipients = []) {
     emails.add(email.email);
   }
   return Array.from(byUid.values()).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')) || a.uid.localeCompare(b.uid));
+}
+
+function reminderLogActor(access = {}) {
+  return {
+    actorUid: cleanText(access.uid || 'system', 160) || 'system',
+    actorName: cleanText(access.displayName || access.name || (access.uid ? 'Unknown user' : 'System'), 180),
+    actorRole: cleanText(access.storedRole || access.role || (access.uid ? '' : 'system'), 80),
+  };
+}
+
+async function writeReminderSystemLog(input = {}, { safe = false } = {}) {
+  const writer = safe ? writeSystemLogSafely : writeSystemLog;
+  return writer({ db, admin }, {
+    ...reminderLogActor(input.access || {}),
+    category: input.category || 'reminder',
+    action: input.action || 'updated',
+    status: input.status || 'success',
+    targetType: input.targetType || 'reminder',
+    targetId: input.targetId || '',
+    targetLabel: input.targetLabel || '',
+    targetAudience: input.targetAudience || '',
+    details: input.details || '',
+    source: input.source || 'reminderFunctions',
+    relatedDocPath: input.relatedDocPath || '',
+    metadata: input.metadata || {},
+  }, console);
 }
 
 async function activePositionKeysByUidForReminderRole(recipientRole) {
@@ -594,6 +625,24 @@ async function createOrActivateAvenueReportingLock(doc, reminder, now) {
       maxReminders: reminder.maxReminders,
       sentAt: now,
     })]);
+    await writeReminderSystemLog({
+      access: { uid: 'system', displayName: 'System', storedRole: 'system' },
+      category: 'lock',
+      action: 'locked',
+      status: 'active',
+      targetType: 'avenue_reporting_window',
+      targetId: reminder.id,
+      targetLabel: reminder.targetName || reminder.eventName || reminder.avenue,
+      targetAudience: reminder.avenue,
+      details: 'Avenue reporting window locked after deadline.',
+      source: 'createOrActivateAvenueReportingLock',
+      relatedDocPath: `locks/${lockId}`,
+      metadata: {
+        avenue: reminder.avenue,
+        reportingWindowId: reminder.id,
+        lockReason: AVENUE_REPORTING_LOCK_REASON,
+      },
+    }, { safe: true });
   }
 
   return { created: !alreadyActive, lockId };
@@ -703,7 +752,7 @@ async function processReminderDoc(doc) {
   return processEventReminderDoc(doc);
 }
 
-async function runReminderSweep({ trigger = 'manual' } = {}) {
+async function runReminderSweep({ trigger = 'manual', actor = null } = {}) {
   const summary = {
     ok: true,
     trigger,
@@ -740,6 +789,19 @@ async function runReminderSweep({ trigger = 'manual' } = {}) {
   }
 
   logger.info('Reminder email sweep complete.', summary);
+  await writeReminderSystemLog({
+    access: actor || { uid: trigger === 'scheduled' ? 'system' : '', displayName: trigger === 'scheduled' ? 'System' : 'Unknown user', storedRole: trigger === 'scheduled' ? 'system' : '' },
+    category: 'reminder',
+    action: 'swept',
+    status: summary.failed > 0 ? 'failed' : 'success',
+    targetType: 'reminder_sweep',
+    targetId: trigger,
+    targetLabel: `${trigger} reminder sweep`,
+    details: `${summary.processed} processed; ${summary.sent} sent; ${summary.failed} failed; ${summary.locked} locked`,
+    source: 'runReminderSweep',
+    relatedDocPath: '',
+    metadata: summary,
+  }, { safe: true });
   return summary;
 }
 
@@ -756,6 +818,250 @@ async function writeReminderTemplateTestAudit({ access, templateType, recipientE
   });
   return sentAt;
 }
+
+function reminderPayloadSource(raw = {}) {
+  return raw && typeof raw.payload === 'object' && !Array.isArray(raw.payload)
+    ? raw.payload
+    : raw;
+}
+
+function assertReminderPayloadRecordType(payload = {}, expectedRecordType) {
+  const recordType = cleanText(payload.recordType || payload.type, 80);
+  if (recordType !== expectedRecordType) {
+    throw new HttpsError('invalid-argument', 'Reminder payload type is invalid.');
+  }
+}
+
+async function requireReminderDocument(reminderId, expectedRecordType) {
+  const safeId = safeDocumentId(reminderId);
+  if (!safeId) throw new HttpsError('invalid-argument', 'Choose a valid reminder record.');
+  const ref = db.collection(REMINDERS_COLLECTION).doc(safeId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Reminder record not found.');
+  const data = snap.data() || {};
+  assertReminderPayloadRecordType(data, expectedRecordType);
+  return { id: safeId, ref, snap, data };
+}
+
+const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) => {
+  const access = await requireAdminPanelReminderAccess(request, 'create reporting windows');
+  const payload = reminderPayloadSource(request.data || {});
+  assertReminderPayloadRecordType(payload, REPORTING_WINDOW_RECORD_TYPE);
+  const target = db.collection(REMINDERS_COLLECTION).doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await target.set({
+    ...payload,
+    createdBy: access.uid,
+    createdByName: access.displayName || 'Unknown user',
+    updatedBy: access.uid,
+    updatedByName: access.displayName || 'Unknown user',
+    createdAt: now,
+    updatedAt: now,
+  });
+  await writeReminderSystemLog({
+    access,
+    action: 'created',
+    status: 'active',
+    targetType: 'avenue_reporting_window',
+    targetId: target.id,
+    targetLabel: payload.targetName || payload.eventName || payload.name || payload.avenue,
+    targetAudience: payload.recipientRole || payload.avenue,
+    details: 'Reporting window reminder created.',
+    source: 'createReportingWindowReminder',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${target.id}`,
+    metadata: {
+      avenue: payload.avenue,
+      conductedDate: payload.conductedDate,
+      remindersEnabled: payload.remindersEnabled === true,
+      lockEnabled: payload.lockEnabled === true,
+    },
+  });
+  return { ok: true, reminderId: target.id };
+});
+
+const upsertEventReminderConfig = onCall(CALLABLE_OPTIONS, async (request) => {
+  const access = await requireAdminPanelReminderAccess(request, 'configure event reminders');
+  const payload = reminderPayloadSource(request.data || {});
+  assertReminderPayloadRecordType(payload, EVENT_REMINDER_RECORD_TYPE);
+  const configId = safeDocumentId(payload.configId || payload.id);
+  if (!configId) throw new HttpsError('invalid-argument', 'Reminder config ID is invalid.');
+  const target = db.collection(REMINDERS_COLLECTION).doc(configId);
+  const snap = await target.get();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await target.set({
+    ...payload,
+    updatedBy: access.uid,
+    updatedByName: access.displayName || 'Unknown user',
+    updatedAt: now,
+    ...(snap.exists ? {} : {
+      createdBy: access.uid,
+      createdByName: access.displayName || 'Unknown user',
+      createdAt: now,
+    }),
+  }, { merge: true });
+  await writeReminderSystemLog({
+    access,
+    action: snap.exists ? 'updated' : 'created',
+    status: 'active',
+    targetType: payload.targetType || payload.reminderType || 'event_reminder',
+    targetId: payload.targetId || configId,
+    targetLabel: payload.targetName || payload.name || payload.reminderType,
+    targetAudience: payload.recipientRole,
+    details: `${payload.reminderType || 'Reminder'} configured.`,
+    source: 'upsertEventReminderConfig',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${configId}`,
+    metadata: {
+      reminderType: payload.reminderType,
+      source: payload.source,
+      targetType: payload.targetType,
+      targetId: payload.targetId,
+    },
+  });
+  return { ok: true, reminderId: configId };
+});
+
+const stopEventReminderConfig = onCall(CALLABLE_OPTIONS, async (request) => {
+  const access = await requireAdminPanelReminderAccess(request, 'stop event reminders');
+  const reminder = await requireReminderDocument(request.data?.reminderId || request.data?.configId, EVENT_REMINDER_RECORD_TYPE);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await reminder.ref.set({
+    enabled: false,
+    disabled: true,
+    status: 'stopped',
+    stoppedAt: now,
+    stoppedBy: access.uid,
+    stoppedByName: access.displayName || 'Unknown user',
+    stoppedReason: 'admin_removed',
+    updatedBy: access.uid,
+    updatedByName: access.displayName || 'Unknown user',
+    updatedAt: now,
+  }, { merge: true });
+  await writeReminderSystemLog({
+    access,
+    action: 'updated',
+    status: 'inactive',
+    targetType: reminder.data.targetType || reminder.data.reminderType || 'event_reminder',
+    targetId: reminder.data.targetId || reminder.id,
+    targetLabel: reminder.data.targetName || reminder.data.name || reminder.data.reminderType,
+    targetAudience: reminder.data.recipientRole,
+    details: 'Event reminder stopped by admin.',
+    source: 'stopEventReminderConfig',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
+    metadata: {
+      reminderType: reminder.data.reminderType,
+      stoppedReason: 'admin_removed',
+    },
+  });
+  return { ok: true, reminderId: reminder.id };
+});
+
+const markReportingWindowSubmitted = onCall(CALLABLE_OPTIONS, async (request) => {
+  const access = await requireAdminPanelReminderAccess(request, 'mark reporting windows completed');
+  const reminder = await requireReminderDocument(request.data?.reportingWindowId || request.data?.reminderId, REPORTING_WINDOW_RECORD_TYPE);
+  const adminNote = cleanText(request.data?.adminNote, 500);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await reminder.ref.set({
+    remindersEnabled: false,
+    status: 'completed',
+    completedAt: now,
+    completedBy: access.uid,
+    completedByName: access.displayName || 'Unknown user',
+    completionReason: 'report_submitted',
+    failureReason: '',
+    adminNote,
+    updatedBy: access.uid,
+    updatedByName: access.displayName || 'Unknown user',
+    updatedAt: now,
+  }, { merge: true });
+  await writeReminderSystemLog({
+    access,
+    action: 'completed',
+    status: 'inactive',
+    targetType: 'avenue_reporting_window',
+    targetId: reminder.id,
+    targetLabel: reminder.data.targetName || reminder.data.eventName || reminder.data.avenue,
+    targetAudience: reminder.data.avenue,
+    details: 'Reporting window marked completed.',
+    source: 'markReportingWindowSubmitted',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
+    metadata: {
+      avenue: reminder.data.avenue,
+      completionReason: 'report_submitted',
+      hasAdminNote: Boolean(adminNote),
+    },
+  });
+  return { ok: true, reminderId: reminder.id };
+});
+
+const stopReportingWindowReminders = onCall(CALLABLE_OPTIONS, async (request) => {
+  const access = await requireAdminPanelReminderAccess(request, 'stop reporting window reminders');
+  const reminder = await requireReminderDocument(request.data?.reportingWindowId || request.data?.reminderId, REPORTING_WINDOW_RECORD_TYPE);
+  const adminNote = cleanText(request.data?.adminNote, 500);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await reminder.ref.set({
+    remindersEnabled: false,
+    completionReason: 'reminders_disabled',
+    stoppedAt: now,
+    stoppedBy: access.uid,
+    stoppedByName: access.displayName || 'Unknown user',
+    stoppedReason: 'reminders_disabled',
+    adminNote,
+    updatedBy: access.uid,
+    updatedByName: access.displayName || 'Unknown user',
+    updatedAt: now,
+  }, { merge: true });
+  await writeReminderSystemLog({
+    access,
+    action: 'updated',
+    status: 'inactive',
+    targetType: 'avenue_reporting_window',
+    targetId: reminder.id,
+    targetLabel: reminder.data.targetName || reminder.data.eventName || reminder.data.avenue,
+    targetAudience: reminder.data.avenue,
+    details: 'Reporting window reminder emails stopped.',
+    source: 'stopReportingWindowReminders',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
+    metadata: {
+      avenue: reminder.data.avenue,
+      stoppedReason: 'reminders_disabled',
+      hasAdminNote: Boolean(adminNote),
+    },
+  });
+  return { ok: true, reminderId: reminder.id };
+});
+
+const updateReportingWindowAdminNote = onCall(CALLABLE_OPTIONS, async (request) => {
+  const access = await requireAdminPanelReminderAccess(request, 'update reporting window notes');
+  const reminder = await requireReminderDocument(request.data?.reportingWindowId || request.data?.reminderId, REPORTING_WINDOW_RECORD_TYPE);
+  const adminNote = cleanText(request.data?.adminNote, 500);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await reminder.ref.set({
+    adminNote,
+    noteUpdatedAt: now,
+    noteUpdatedBy: access.uid,
+    noteUpdatedByName: access.displayName || 'Unknown user',
+    updatedBy: access.uid,
+    updatedByName: access.displayName || 'Unknown user',
+    updatedAt: now,
+  }, { merge: true });
+  await writeReminderSystemLog({
+    access,
+    action: 'updated',
+    status: 'info',
+    targetType: 'avenue_reporting_window',
+    targetId: reminder.id,
+    targetLabel: reminder.data.targetName || reminder.data.eventName || reminder.data.avenue,
+    targetAudience: reminder.data.avenue,
+    details: 'Reporting window admin note updated.',
+    source: 'updateReportingWindowAdminNote',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
+    metadata: {
+      avenue: reminder.data.avenue,
+      hasAdminNote: Boolean(adminNote),
+    },
+  });
+  return { ok: true, reminderId: reminder.id };
+});
 
 const sendReminderTemplateTestEmail = onCall(CALLABLE_OPTIONS, async (request) => {
   const access = await requireAdminPanelReminderAccess(request, 'send reminder template tests');
@@ -782,6 +1088,23 @@ const sendReminderTemplateTestEmail = onCall(CALLABLE_OPTIONS, async (request) =
       status: 'failed',
       errorCode: 'email_not_configured',
     });
+    await writeReminderSystemLog({
+      access,
+      category: 'email',
+      action: 'failed',
+      status: 'failed',
+      targetType: 'reminder_template_test',
+      targetId: templateType,
+      targetLabel: templateType,
+      targetAudience: email.email,
+      details: 'Reminder template test email failed: email not configured.',
+      source: 'sendReminderTemplateTestEmail',
+      metadata: {
+        templateType,
+        recipientEmail: email.email,
+        errorCode: 'email_not_configured',
+      },
+    }, { safe: true });
     throw new HttpsError('failed-precondition', 'Reminder email SMTP is not configured.');
   }
 
@@ -799,6 +1122,22 @@ const sendReminderTemplateTestEmail = onCall(CALLABLE_OPTIONS, async (request) =
       recipientEmail: email.email,
       status: 'sent',
     });
+    await writeReminderSystemLog({
+      access,
+      category: 'email',
+      action: 'sent',
+      status: 'success',
+      targetType: 'reminder_template_test',
+      targetId: templateType,
+      targetLabel: templateType,
+      targetAudience: email.email,
+      details: 'Reminder template test email sent.',
+      source: 'sendReminderTemplateTestEmail',
+      metadata: {
+        templateType,
+        recipientEmail: email.email,
+      },
+    }, { safe: true });
     return {
       ok: true,
       templateType,
@@ -814,6 +1153,23 @@ const sendReminderTemplateTestEmail = onCall(CALLABLE_OPTIONS, async (request) =
       status: 'failed',
       errorCode,
     });
+    await writeReminderSystemLog({
+      access,
+      category: 'email',
+      action: 'failed',
+      status: 'failed',
+      targetType: 'reminder_template_test',
+      targetId: templateType,
+      targetLabel: templateType,
+      targetAudience: email.email,
+      details: 'Reminder template test email failed.',
+      source: 'sendReminderTemplateTestEmail',
+      metadata: {
+        templateType,
+        recipientEmail: email.email,
+        errorCode,
+      },
+    }, { safe: true });
     logger.warn('Reminder template test email failed.', { templateType, recipientEmail: email.email, code: errorCode, message: error?.message || '' });
     throw new HttpsError('internal', 'The reminder template test email could not be sent.');
   }
@@ -853,6 +1209,24 @@ const unlockAvenueReportingWindow = onCall(CALLABLE_OPTIONS, async (request) => 
     updatedAt: now,
   }, { merge: true });
   await batch.commit();
+  await writeReminderSystemLog({
+    access,
+    category: 'lock',
+    action: 'unlocked',
+    status: 'inactive',
+    targetType: 'avenue_reporting_window',
+    targetId: reminder.id,
+    targetLabel: reminder.targetName || reminder.eventName || reminder.avenue,
+    targetAudience: reminder.avenue,
+    details: unlockReason,
+    source: 'unlockAvenueReportingWindow',
+    relatedDocPath: `locks/${lockId}`,
+    metadata: {
+      avenue: reminder.avenue,
+      reportingWindowId: reminder.id,
+      unlockReason,
+    },
+  });
   return { ok: true, reportingWindowId: reminder.id, lockId, status: 'unlocked' };
 });
 
@@ -867,11 +1241,17 @@ const sendScheduledReminderEmails = onSchedule({
 });
 
 const runReminderEmailSweep = onCall(CALLABLE_OPTIONS, async (request) => {
-  await requireAdminPanelReminderAccess(request, 'run reminder emails');
-  return runReminderSweep({ trigger: 'manual' });
+  const access = await requireAdminPanelReminderAccess(request, 'run reminder emails');
+  return runReminderSweep({ trigger: 'manual', actor: access });
 });
 
 module.exports = {
+  createReportingWindowReminder,
+  upsertEventReminderConfig,
+  stopEventReminderConfig,
+  markReportingWindowSubmitted,
+  stopReportingWindowReminders,
+  updateReportingWindowAdminNote,
   sendScheduledReminderEmails,
   runReminderEmailSweep,
   sendReminderTemplateTestEmail,

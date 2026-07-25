@@ -37,6 +37,7 @@ const {
   validateMomFileDescriptor,
   validateMomTarget,
 } = require('./momCore');
+const { writeSystemLogSafely } = require('./system-logs');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -1123,6 +1124,30 @@ const sendMomEmail = onCall(MOM_DRIVE_OPTIONS, async (request) => {
     status,
     failureReason: status === 'failed' ? failureReason : failureReason || '',
   });
+  await writeSystemLogSafely({ db, admin }, {
+    category: 'mom',
+    action: status === 'failed' ? 'failed' : 'sent',
+    status: status === 'failed' ? 'failed' : 'success',
+    actorUid: access.uid,
+    actorName: access.displayName || 'Unknown user',
+    actorRole: access.storedRole || '',
+    targetType: target.targetType,
+    targetId: target.targetId,
+    targetLabel: targetName,
+    targetAudience: momRecipientRequestLabel(emailRequest),
+    details: `${summary.sent}/${summary.attempted} MOM emails sent; ${summary.failed} failed`,
+    source: 'sendMomEmail',
+    relatedDocPath: target.ref?.path || '',
+    metadata: {
+      historyId: history.id,
+      momFileName: fileName,
+      recipientCount: recipients.length,
+      attempted: summary.attempted,
+      sent: summary.sent,
+      failed: summary.failed,
+      failureReason: status === 'failed' ? failureReason : '',
+    },
+  }, logger);
   logger.info('MOM email summary.', {
     targetType: target.targetType,
     targetId: target.targetId,
