@@ -37,6 +37,7 @@ const { createBodManagementService } = require('./lib/bod-management');
 const { createBodPhotoUploadService } = require('./lib/bod-photo-upload');
 const momFunctions = require('./lib/momFunctions');
 const reminderFunctions = require('./lib/reminderFunctions');
+const avenueReportingLocks = require('./lib/avenue-reporting-locks');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 const {
   MemberProfileValidationError,
@@ -3265,6 +3266,36 @@ async function assertBodEventsUnlockedForRole(roleOrAuthority) {
   if (locked && !hasPresidentAuthorityValue(roleOrAuthority)) {
     throw new HttpsError('failed-precondition', 'BOD event submissions are locked.');
   }
+}
+
+async function loadActiveAvenueReportingLocks() {
+  const [locksSnap, remindersSnap] = await Promise.all([
+    db.collection('locks').get(),
+    db.collection('reminders').get(),
+  ]);
+  return avenueReportingLocks.normalizeActiveAvenueReportingLocks({
+    lockDocs: locksSnap.docs,
+    reminderDocs: remindersSnap.docs,
+  });
+}
+
+async function assertBodEventAvenuesUnlocked(avenues) {
+  const locks = await loadActiveAvenueReportingLocks();
+  avenueReportingLocks.assertBodEventAvenuesUnlocked({
+    avenues,
+    locks,
+    HttpsError,
+  });
+}
+
+async function getReportingWindowLockDashboardNotice(positionKeys) {
+  const locks = await loadActiveAvenueReportingLocks();
+  return avenueReportingLocks.buildReportingWindowLockDashboardNotice({
+    locks,
+    positionKeys,
+    positionHelpers,
+    now: new Date(),
+  });
 }
 
 async function assertBodEventRecordIsClubEvent(eventId) {
@@ -7113,6 +7144,10 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     userSnap,
     cwdAssignmentSnap,
   });
+  const reportingWindowLockNotice = await getReportingWindowLockDashboardNotice(authorityContext.positionKeys);
+  const memberAnnouncements = reportingWindowLockNotice
+    ? [reportingWindowLockNotice, ...announcements]
+    : announcements;
   const myAttendanceData = myAttendanceSnap.exists ? (myAttendanceSnap.data() || {}) : {};
   const districtAttendanceData = districtAttendanceSnap.exists ? (districtAttendanceSnap.data() || {}) : {};
 
@@ -7198,7 +7233,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
   return {
     ok: true,
     clubRanking,
-    announcements,
+    announcements: memberAnnouncements,
     openResolutions,
     profile: {
       ...profileUpdates.safeProfileFromUserData({
@@ -7690,6 +7725,7 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const data = request.data || {};
   const eventId = validateEventDocId(data.eventId) || db.collection('events').doc().id;
   const payload = normalizeBodEventPayload(data);
+  await assertBodEventAvenuesUnlocked(payload.avenues);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
@@ -7831,6 +7867,7 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   await assertBodEventRecordIsClubEvent(eventId);
 
   const payload = normalizeBodEventPayload(request.data || {});
+  await assertBodEventAvenuesUnlocked(payload.avenues);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
