@@ -30,6 +30,7 @@ assert.match(bodSource, /activeParticipants: activeBodMembers/);
 assert.match(bodSource, /removedParticipants: removedBodMembers/);
 assert.match(bodSource, /AttendanceGrid members=\{activeBodMembers\} removedMembers=\{removedBodMembers\}/);
 assert.match(bodSource, /MailDraftTool members=\{activeBodMembers\}/);
+assert.doesNotMatch(bodSource, /includeProspectsInSummary/);
   assert.doesNotMatch(bodModule, /buildAttendanceParticipants/);
 });
 
@@ -41,6 +42,24 @@ test("prospect progress recalculation stays scoped to Club Attendance", () => {
 test("attendance rows show Prospect and GBM badges", () => {
   assert.match(source, /role === "prospect" \? "Prospect" : role === "gbm" \? "GBM" : ""/);
   assert.match(source, /attendance-member-role/);
+});
+
+test("Club Attendance defaults to excluding prospects from percentage summaries", () => {
+  const clubSource = clubAttendanceModule();
+
+  assert.match(clubSource, /const \[includeProspectsInClubAttendance, setIncludeProspectsInClubAttendance\] = useState\(false\)/);
+  assert.match(clubSource, /filterProspectsFromAttendanceParticipants\(attendanceParticipants\)/);
+  assert.match(clubSource, /clubAttendanceParticipantsForStats\.length/);
+  assert.match(clubSource, /<strong>\{clubAttendanceParticipantsForStats\.length\}<\/strong>/);
+  assert.match(clubSource, /members=\{attendanceParticipants\}/);
+  assert.match(clubSource, /includeProspectsInSummary=\{includeProspectsInClubAttendance\}/);
+  assert.match(clubSource, /onIncludeProspectsInSummaryChange=\{setIncludeProspectsInClubAttendance\}/);
+});
+
+test("Club Attendance exposes the prospect percentage opt-in checkbox", () => {
+  assert.match(source, /Include prospects in club attendance percentage/);
+  assert.match(source, /collectionName === "attendance"/);
+  assert.match(source, /includeProspects: includeProspectsInSummary/);
 });
 
 test(

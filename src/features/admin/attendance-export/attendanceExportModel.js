@@ -1,4 +1,8 @@
-import { normalizeAttendance, validDate } from "../shared/adminModel.js";
+import {
+  isProspectAttendanceParticipant,
+  normalizeAttendance,
+  validDate,
+} from "../shared/adminModel.js";
 import { formatRotaractorName } from "../../../utils/memberName.js";
 
 export const ATTENDANCE_EXPORT_PANELS = Object.freeze({
@@ -40,9 +44,28 @@ export function parseAttendanceDate(value) {
   return new Date(year, month - 1, day, 12, 0, 0, 0);
 }
 
-export function createAttendanceExportReport(panelKey, { members, events, attendance, selectedEventIds }) {
+function attendanceValueForMember(attendance, member, eventId) {
+  const rowIds = [
+    member?.id,
+    ...(Array.isArray(member?.attendanceIds) ? member.attendanceIds : []),
+  ]
+    .map((value) => cleanText(value, 128))
+    .filter(Boolean);
+
+  for (const rowId of [...new Set(rowIds)]) {
+    const row = attendance?.[rowId];
+    if (row && Object.prototype.hasOwnProperty.call(row, eventId)) {
+      return row[eventId];
+    }
+  }
+
+  return "NA";
+}
+
+export function createAttendanceExportReport(panelKey, { members, events, attendance, selectedEventIds, includeProspectsInClubAttendance = false }) {
   const panel = ATTENDANCE_EXPORT_PANELS[panelKey];
   if (!panel) throw new TypeError("Unknown attendance export panel.");
+  const countProspects = panelKey !== "club" || includeProspectsInClubAttendance === true;
   const selectedIds = new Set(Array.isArray(selectedEventIds) ? selectedEventIds : []);
   const safeEvents = (Array.isArray(events) ? events : [])
     .filter((event) => event && selectedIds.has(event.id) && validDate(event.date) && event.archived !== true)
@@ -57,8 +80,15 @@ export function createAttendanceExportReport(panelKey, { members, events, attend
     .filter((member) => member?.id)
     .map((member) => ({
       id: cleanText(member.id, 128),
+      attendanceIds: [
+        member.id,
+        ...(Array.isArray(member.attendanceIds) ? member.attendanceIds : []),
+      ]
+        .map((value) => cleanText(value, 128))
+        .filter(Boolean),
       name: formatRotaractorName(cleanText(member.name, 160), member.role ? member : true) || "Unnamed member",
       roleOrPosition: cleanText(member.position || member.role, 180),
+      countsTowardClubAttendance: countProspects || !isProspectAttendanceParticipant(member),
     }));
   const safeAttendance = attendance && typeof attendance === "object" ? attendance : {};
 
@@ -74,16 +104,21 @@ export function createAttendanceExportReport(panelKey, { members, events, attend
         memberId: member.id,
         memberName: member.name,
         roleOrPosition: member.roleOrPosition,
-        status: attendanceExportStatus(safeAttendance[member.id]?.[event.id]),
+        status: attendanceExportStatus(attendanceValueForMember(safeAttendance, member, event.id)),
+        countsTowardClubAttendance: member.countsTowardClubAttendance,
       });
     }
   }
+  const aggregateMembers = safeMembers.filter((member) => member.countsTowardClubAttendance);
+  const aggregateRows = rows.filter((row) => row.countsTowardClubAttendance);
 
   return {
     panel: { key: panel.key, title: panel.title, eventLabel: panel.eventLabel, categoryLabel: panel.categoryLabel },
     events: safeEvents,
     members: safeMembers,
     rows,
+    aggregateMembers,
+    aggregateRows,
   };
 }
 

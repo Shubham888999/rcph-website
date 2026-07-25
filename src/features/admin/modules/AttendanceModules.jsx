@@ -11,6 +11,7 @@ import {
   buildAttendanceParticipantGroups,
   buildEventAttendanceSummary,
   buildEventPayload,
+  filterProspectsFromAttendanceParticipants,
   normalizeAttendance,
 } from "../shared/adminModel";
 import { adminCalls, addRosterMember, deleteRosterMember, setAttendanceBulk, setAttendanceCell, setAttendanceRow, updateRosterMember } from "../shared/adminService";
@@ -208,6 +209,8 @@ function AttendanceGrid({
   locked,
   uid,
   onNotice,
+  includeProspectsInSummary = true,
+  onIncludeProspectsInSummaryChange,
 }) {
   const { busy, run } = useAdminMutation({
     uid,
@@ -223,10 +226,11 @@ function AttendanceGrid({
           participants: members,
           attendance,
           eventId: event.id,
+          includeProspects: includeProspectsInSummary,
         }),
       ]),
     ),
-  [attendance, events, members],
+  [attendance, events, includeProspectsInSummary, members],
 );
 
   if (!events.length) {
@@ -328,6 +332,19 @@ function AttendanceGrid({
             Absent, and Not applicable.
           </p>
         </div>
+
+        {collectionName === "attendance" ? (
+          <label className="attendance-workspace__option">
+            <input
+              type="checkbox"
+              checked={includeProspectsInSummary}
+              onChange={(event) =>
+                onIncludeProspectsInSummaryChange?.(event.target.checked)
+              }
+            />
+            Include prospects in club attendance percentage
+          </label>
+        ) : null}
 
         <div className="attendance-workspace__legend">
           <span>
@@ -627,6 +644,7 @@ export function ClubAttendanceModule({ data, lock, uid, access, onNotice }) {
   const [editing, setEditing] = useState(null);
   const [archive, setArchive] = useState(null);
   const [eventsExpanded, setEventsExpanded] = useState(false);
+  const [includeProspectsInClubAttendance, setIncludeProspectsInClubAttendance] = useState(false);
   const { busy, run } = useAdminMutation({ uid, module: "club-attendance", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const events = data.events.filter((event) => !event.archived);
@@ -639,12 +657,13 @@ export function ClubAttendanceModule({ data, lock, uid, access, onNotice }) {
     users: data.users,
     attendance: data.attendance,
   });
-  const overallValues = attendanceParticipants.flatMap((member) =>
+  const clubAttendanceParticipantsForStats = includeProspectsInClubAttendance
+    ? attendanceParticipants
+    : filterProspectsFromAttendanceParticipants(attendanceParticipants);
+  const overallValues = clubAttendanceParticipantsForStats.flatMap((member) =>
   events
     .map((event) =>
-      normalizeAttendance(
-        data.attendance[member.id]?.[event.id]
-      )
+      attendanceValueForMember(data.attendance, member, event.id)
     )
     .filter((value) => value === true || value === false)
 );
@@ -660,7 +679,7 @@ const overallAttendance = overallValues.length
 const completedRecords = overallValues.length;
 
 const pendingRecords =
-  attendanceParticipants.length * events.length -
+  clubAttendanceParticipantsForStats.length * events.length -
   completedRecords;
   return <>
     <AdminModuleHeader title="Club Events & Attendance" />
@@ -782,7 +801,7 @@ const pendingRecords =
 
   <article>
     <span>Participants</span>
-    <strong>{attendanceParticipants.length}</strong>
+    <strong>{clubAttendanceParticipantsForStats.length}</strong>
     <small>Current attendance roster</small>
   </article>
 
@@ -810,7 +829,7 @@ const pendingRecords =
 </section>
     
     <AttendanceExportPanel panelKey="club" members={attendanceParticipants} events={events} attendance={data.attendance} onNotice={onNotice} />
-<AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} />    <MailDraftTool members={attendanceParticipants} title="GBM" />
+<AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} includeProspectsInSummary={includeProspectsInClubAttendance} onIncludeProspectsInSummaryChange={setIncludeProspectsInClubAttendance} />    <MailDraftTool members={attendanceParticipants} title="GBM" />
     {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><ClubEventForm initial={editing} busy={busy} submitLabel="Save event" onSave={(payload) => run("update-event", () => adminCalls.updateClubEvent({ ...payload, eventId: editing.id }), "Club event updated.").then((result) => { if (result) setEditing(null); })} /></AdminDialog> : null}
     {archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This soft-archives club event records and preserves attendance history.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-event", () => adminCalls.archiveClubEvent(archive.id), "Club event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;

@@ -6,9 +6,11 @@ const panel = readFileSync(new URL("./AttendanceExportPanel.jsx", import.meta.ur
 const attendanceModules = readFileSync(new URL("../modules/AttendanceModules.jsx", import.meta.url), "utf8");
 
 test("export UI provides required filters, persistent selection controls, and confirmation", () => {
-  for (const copy of ["Search event", "Date from", "Date to", "Select all filtered", "Clear selection", "Download Excel"]) assert.match(panel, new RegExp(copy));
+  for (const copy of ["Search event", "Date from", "Date to", "Select all filtered", "Clear selection", "Download Excel", "Include prospects attendance in club attendance"]) assert.match(panel, new RegExp(copy));
   assert.match(panel, /selectedIds/);
   assert.match(panel, /disabled=\{!selectedEvents\.length \|\| exporting\}/);
+  assert.match(panel, /panelKey === "club"/);
+  assert.match(panel, /includeProspectsInClubAttendance/);
 });
 
 test("all canonical attendance panels use the shared exporter", () => {

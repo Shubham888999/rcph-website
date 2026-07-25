@@ -71,7 +71,13 @@ export function buildAttendanceWorkbook(ExcelJS, report, generatedAt = new Date(
   workbook.modified = generatedAt;
   workbook.calcProperties.fullCalcOnLoad = true;
 
-  const totals = report.rows.reduce((result, row) => {
+  const aggregateRows = Array.isArray(report.aggregateRows)
+    ? report.aggregateRows
+    : report.rows;
+  const aggregateMembers = Array.isArray(report.aggregateMembers)
+    ? report.aggregateMembers
+    : report.members;
+  const totals = aggregateRows.reduce((result, row) => {
     result[row.status] = (result[row.status] || 0) + 1;
     return result;
   }, {});
@@ -88,7 +94,7 @@ export function buildAttendanceWorkbook(ExcelJS, report, generatedAt = new Date(
   ];
   styleTitle(overview, report.panel.title, "Exported from the authorized Admin attendance view. N/A includes the panel’s existing Not applicable / unrecorded state.", 7);
   const summary = [
-    ["Events selected", report.events.length, "Roster rows", report.members.length],
+    ["Events selected", report.events.length, "Counted roster rows", aggregateMembers.length],
     ["Present", present, "Absent", absent],
     ["Not applicable", na, "Attendance rate", counted ? present / counted : 0],
   ];
@@ -102,7 +108,7 @@ export function buildAttendanceWorkbook(ExcelJS, report, generatedAt = new Date(
   const overviewHeader = overview.addRow(["Date", "Event", report.panel.categoryLabel, "Present", "Absent", "N/A", "Attendance rate"]);
   styleHeader(overviewHeader);
   for (const event of report.events) {
-    const eventRows = report.rows.filter((row) => row.eventId === event.id);
+    const eventRows = aggregateRows.filter((row) => row.eventId === event.id);
     const eventPresent = eventRows.filter((row) => row.status === "Present").length;
     const eventAbsent = eventRows.filter((row) => row.status === "Absent").length;
     const eventNa = eventRows.length - eventPresent - eventAbsent;

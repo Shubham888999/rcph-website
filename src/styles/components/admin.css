@@ -3759,6 +3759,27 @@
   font-size: 0.78rem;
 }
 
+.attendance-workspace__option,
+.attendance-export__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.attendance-workspace__option input,
+.attendance-export__option input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  accent-color: var(--color-gold);
+}
+
 .attendance-workspace__legend {
   display: flex;
   flex-wrap: wrap;
@@ -4053,6 +4074,10 @@
   border-radius: var(--radius-sm);
   color: var(--color-text);
   background: var(--color-bg);
+}
+
+.attendance-export__option {
+  margin-top: 0.85rem;
 }
 
 .attendance-export__selection-actions {

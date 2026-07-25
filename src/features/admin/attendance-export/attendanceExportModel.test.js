@@ -53,6 +53,72 @@ test("shared panel adapter exports only selected safe fields", () => {
   assert.equal(Object.hasOwn(report.members[0], "secret"), false);
 });
 
+test("club export keeps prospect rows but excludes them from aggregate rows by default", () => {
+  const report = createAttendanceExportReport("club", {
+    members: [
+      { id: "m-1", name: "Member One", role: "gbm", active: true },
+      { id: "p-1", name: "Prospect One", role: "prospect", active: true },
+    ],
+    events: [events[0]],
+    attendance: {
+      "m-1": { "e-1": true },
+      "p-1": { "e-1": false },
+    },
+    selectedEventIds: ["e-1"],
+  });
+
+  assert.equal(report.rows.length, 2);
+  assert.equal(report.aggregateRows.length, 1);
+  assert.deepEqual(report.aggregateRows.map((row) => row.memberName), ["Rtr. Member One"]);
+
+  const included = createAttendanceExportReport("club", {
+    members: [
+      { id: "m-1", name: "Member One", role: "gbm", active: true },
+      { id: "p-1", name: "Prospect One", role: "prospect", active: true },
+    ],
+    events: [events[0]],
+    attendance: {
+      "m-1": { "e-1": true },
+      "p-1": { "e-1": false },
+    },
+    selectedEventIds: ["e-1"],
+    includeProspectsInClubAttendance: true,
+  });
+
+  assert.equal(included.rows.length, 2);
+  assert.equal(included.aggregateRows.length, 2);
+});
+
+test("non-club exports continue to count all rows", () => {
+  const report = createAttendanceExportReport("district", {
+    members: [
+      { id: "m-1", name: "Member One", role: "gbm", active: true },
+      { id: "p-1", name: "Prospect One", role: "prospect", active: true },
+    ],
+    events: [{ id: "x", name: "District Event", date: "2026-04-01", visibility: "internal" }],
+    attendance: {},
+    selectedEventIds: ["x"],
+  });
+
+  assert.equal(report.rows.length, 2);
+  assert.equal(report.aggregateRows.length, 2);
+});
+
+test("export status checks participant attendance aliases", () => {
+  const report = createAttendanceExportReport("club", {
+    members: [
+      { id: "uid-1", name: "Alias Member", role: "gbm", attendanceIds: ["member-doc-1", "uid-1"] },
+    ],
+    events: [events[0]],
+    attendance: {
+      "member-doc-1": { "e-1": true },
+    },
+    selectedEventIds: ["e-1"],
+  });
+
+  assert.equal(report.rows[0].status, "Present");
+});
+
 test("all real attendance panel adapters produce the same safe report shape", () => {
   for (const panelKey of ["club", "bod", "district"]) {
     const sourceEvent = panelKey === "bod"

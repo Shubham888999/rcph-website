@@ -12,10 +12,12 @@ import {
   buildFineEventGroups,
   canUseAdmin,
   canUsePresidentControls,
+  filterProspectsFromAttendanceParticipants,
   findFineEventOption,
   formatAttachmentSize,
   formatAdminRole,
   formatInr,
+  isProspectAttendanceParticipant,
   normalizeAdminRole,
   normalizeAdminUser,
   normalizeAttendance,
@@ -233,6 +235,19 @@ test("announcement attachment validation accepts supported image and PDF types",
 test("announcement attachment validation rejects unsupported and oversized files before upload",()=>{assert.match(validateAnnouncementAttachmentFile({name:"notes.txt",type:"text/plain",size:20}),/PDF, JPEG, PNG, or WebP/);assert.match(validateAnnouncementAttachmentFile({name:"empty.pdf",type:"application/pdf",size:0}),/empty/);assert.match(validateAnnouncementAttachmentFile({name:"large.pdf",type:"application/pdf",size:ANNOUNCEMENT_ATTACHMENT_MAX_BYTES+1}),/10 MB or smaller/);assert.equal(formatAttachmentSize(ANNOUNCEMENT_ATTACHMENT_MAX_BYTES),"10 MB")});
 test("external links allow HTTP(S) only",()=>{assert.equal(safeUrl("javascript:alert(1)"),"");assert.equal(safeUrl("https://example.com"),"https://example.com/")});
 test("combined attendance participants add approved prospects and preserve manual rows",()=>{const participants=buildAttendanceParticipants({members:[{id:"member-1",name:"Member One",email:"one@example.com",active:true},{id:"member-2",userId:"uid-gbm",name:"Member Two",email:"two@example.com",role:"gbm",active:true}],users:[{id:"uid-prospect",name:"Prospect One",email:"prospect@example.com",role:"prospect",status:"approved",active:true},{id:"uid-gbm",name:"Duplicate GBM",email:"two@example.com",role:"gbm",status:"approved",active:true},{id:"uid-pending",name:"Pending Prospect",email:"pending@example.com",role:"prospect",status:"pending",active:true}],attendance:{"legacy-row":{"event-1":true}}});assert.deepEqual(new Set(participants.map((item)=>item.id)),new Set(["member-1","uid-gbm","uid-prospect","legacy-row"]));assert.equal(participants.find((item)=>item.id==="member-1").role,"gbm");assert.equal(participants.find((item)=>item.id==="uid-gbm").name,"Member Two");assert.equal(participants.find((item)=>item.id==="uid-prospect").role,"prospect");assert.equal(participants.find((item)=>item.id==="legacy-row").manualAttendanceOnly,true)});
+test("prospect attendance participant helpers identify and filter prospect rows", () => {
+  const participants = [
+    { id: "member", role: "gbm" },
+    { id: "prospect", role: "prospect" },
+    { id: "typed-prospect", memberType: "prospect" },
+  ];
+
+  assert.equal(isProspectAttendanceParticipant(participants[1]), true);
+  assert.deepEqual(
+    filterProspectsFromAttendanceParticipants(participants).map((participant) => participant.id),
+    ["member"],
+  );
+});
 test("attendance participants move removed profiles into a preserved archive section", () => {
   const groups = buildAttendanceParticipantGroups({
     members: [
@@ -403,4 +418,34 @@ test("event attendance summary checks participant attendance aliases", () => {
   assert.equal(summary.presentCount, 1);
   assert.equal(summary.eligibleCount, 1);
   assert.equal(summary.percentage, 100);
+});
+
+test("event attendance summary can exclude prospects without changing the default", () => {
+  const participants = [
+    { id: "member", role: "gbm" },
+    { id: "prospect", role: "prospect" },
+  ];
+  const attendance = {
+    member: { event1: true },
+    prospect: { event1: false },
+  };
+
+  const defaultSummary = buildEventAttendanceSummary({
+    participants,
+    attendance,
+    eventId: "event1",
+  });
+  assert.equal(defaultSummary.eligibleCount, 2);
+  assert.equal(defaultSummary.percentage, 50);
+
+  const clubSummary = buildEventAttendanceSummary({
+    participants,
+    attendance,
+    eventId: "event1",
+    includeProspects: false,
+  });
+  assert.equal(clubSummary.presentCount, 1);
+  assert.equal(clubSummary.eligibleCount, 1);
+  assert.equal(clubSummary.rosterCount, 1);
+  assert.equal(clubSummary.percentage, 100);
 });

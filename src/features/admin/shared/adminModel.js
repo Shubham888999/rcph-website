@@ -67,9 +67,12 @@ export function buildEventAttendanceSummary({
   participants = [],
   attendance = {},
   eventId = "",
+  includeProspects = true,
 } = {}) {
   const roster = Array.isArray(participants)
-    ? participants
+    ? includeProspects
+      ? participants
+      : filterProspectsFromAttendanceParticipants(participants)
     : [];
 
   const safeAttendance =
@@ -291,6 +294,15 @@ export function attendanceParticipantRole(value, fallback = "") {
   if (role === "gbm" || memberType === "member") return "gbm";
   if (["bod", "admin", "president"].includes(role)) return role;
   return fallback;
+}
+
+export function isProspectAttendanceParticipant(participant) {
+  return attendanceParticipantRole(participant, participant?.role || "").toLowerCase() === "prospect";
+}
+
+export function filterProspectsFromAttendanceParticipants(participants = []) {
+  return (Array.isArray(participants) ? participants : [])
+    .filter((participant) => !isProspectAttendanceParticipant(participant));
 }
 
 export function buildAttendanceParticipantGroups({

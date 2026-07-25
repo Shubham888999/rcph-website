@@ -47,6 +47,34 @@ test("workbook round-trips as valid XLSX without hidden identifiers or email", a
   assert.match(visible, /Asha Member/);
 });
 
+test("club workbook overview uses aggregate rows while detail keeps prospects", () => {
+  const report = createAttendanceExportReport("club", {
+    members: [
+      { id: "member-1", name: "Asha Member", role: "gbm" },
+      { id: "prospect-1", name: "Prospect One", role: "prospect" },
+    ],
+    events: [
+      { id: "event-1", name: "Club Assembly", date: "2026-01-10", avenue: ["GBM"] },
+    ],
+    attendance: {
+      "member-1": { "event-1": true },
+      "prospect-1": { "event-1": false },
+    },
+    selectedEventIds: ["event-1"],
+  });
+
+  const workbook = buildAttendanceWorkbook(ExcelJS, report, new Date("2026-03-01T12:00:00Z"));
+  const overview = workbook.getWorksheet("Overview");
+  const detail = workbook.getWorksheet("Attendance");
+
+  assert.equal(report.rows.length, 2);
+  assert.equal(report.aggregateRows.length, 1);
+  assert.equal(overview.getCell("D3").value, 1);
+  assert.equal(overview.getCell("D5").value, 1);
+  assert.equal(overview.getCell("G8").value, 1);
+  assert.equal(detail.getCell("D6").value, "Prospect One");
+});
+
 test("filename is deterministic and scoped to panel and selected dates", () => {
   assert.equal(attendanceExportFileName(fixture()), "RCPH_club_attendance_2026-01-10_to_2026-02-20.xlsx");
 });

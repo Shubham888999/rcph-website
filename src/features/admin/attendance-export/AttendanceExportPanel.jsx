@@ -26,6 +26,7 @@ export default function AttendanceExportPanel({ panelKey, members, events, atten
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  const [includeProspectsInClubAttendance, setIncludeProspectsInClubAttendance] = useState(false);
   const categories = useMemo(() => [...new Set(events.map((event) => panel.getCategory(event)).filter(Boolean))].sort(), [events, panel]);
   const filteredEvents = useMemo(() => filterAttendanceEvents(events, filters).filter((event) => (
     !filters.category || panel.getCategory(event) === filters.category
@@ -43,6 +44,7 @@ export default function AttendanceExportPanel({ panelKey, members, events, atten
         events,
         attendance,
         selectedEventIds: [...selectedIds],
+        includeProspectsInClubAttendance,
       });
       await downloadAttendanceWorkbook(report);
       onNotice?.({ type: "success", message: `${report.events.length} attendance event${report.events.length === 1 ? "" : "s"} exported to Excel.` });
@@ -71,6 +73,18 @@ export default function AttendanceExportPanel({ panelKey, members, events, atten
           <label>Date to<input type="date" min={filters.dateFrom} value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} /></label>
           {categories.length > 1 ? <label>{panel.categoryLabel}<select value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option value="">All</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label> : null}
         </div>
+        {panelKey === "club" ? (
+          <label className="attendance-export__option">
+            <input
+              type="checkbox"
+              checked={includeProspectsInClubAttendance}
+              onChange={(event) =>
+                setIncludeProspectsInClubAttendance(event.target.checked)
+              }
+            />
+            Include prospects attendance in club attendance
+          </label>
+        ) : null}
         <div className="attendance-export__selection-actions">
           <button type="button" onClick={() => setSelectedIds(selectFilteredAttendanceEvents(selectedIds, filteredEvents))} disabled={!filteredEvents.length}>Select all filtered</button>
           <button type="button" onClick={() => setSelectedIds(new Set())} disabled={!selectedIds.size}>Clear selection</button>
