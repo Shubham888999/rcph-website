@@ -58,6 +58,10 @@ export const router = createBrowserRouter([{
             children: [{ path: "/admin/locks", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
           },
           {
+            element: <RoleRoute capability="systemLogs" />,
+            children: [{ path: "/admin/logs", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
+          },
+          {
             element: <RoleRoute capability="visitSubmissions" />,
             children: [{ path: "/admin/visit-submissions", element: lazyRoute(lazy(() => import("../pages/admin/AdminPage"))) }],
           },

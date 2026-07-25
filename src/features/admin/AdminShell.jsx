@@ -7,10 +7,11 @@ export default function AdminShell({ access, displayName, onSignOut, children })
   const canAccessLockTools = access.canAccessLockTools === true || access.canAccessPresidentControls === true;
   const canAccessBodManagement = canManageBodManagement(access);
   const navigation = access.canAccessAdminTools
-    ? ADMIN_NAV.filter(([path]) => (path !== "resolutions" || access.canAccessResolutionTools) && (path !== "locks" || canAccessLockTools) && (path !== "bod-management" || canAccessBodManagement))
+    ? ADMIN_NAV.filter(([path]) => (path !== "resolutions" || access.canAccessResolutionTools) && (path !== "locks" || canAccessLockTools) && (path !== "logs" || access.canAccessSystemLogs) && (path !== "bod-management" || canAccessBodManagement))
     : ADMIN_NAV.filter(([path]) => (
       (path === "resolutions" && access.canAccessResolutionTools)
       || (path === "locks" && canAccessLockTools)
+      || (path === "logs" && access.canAccessSystemLogs)
       || (path === "visit-submissions" && access.canAccessVisitSubmissions)
       || (path === "bod-management" && canAccessBodManagement)
     ));

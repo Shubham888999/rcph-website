@@ -1,17 +1,7 @@
-import {
-  addDoc,
-  collection,
-  doc,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../../app/firebase";
-import { db } from "../../../app/firestore";
 import {
   EVENT_REMINDER_RECORD_TYPE,
-  REMINDERS_COLLECTION,
   REPORTING_WINDOW_RECORD_TYPE,
 } from "./reminderModel";
 
@@ -38,135 +28,77 @@ function reportingWindowRef(item) {
     throw new Error("Choose a valid reporting window.");
   }
 
-  return doc(db, REMINDERS_COLLECTION, item.id);
+  return item.id;
 }
 
 function cleanAdminNote(value) {
   return typeof value === "string" ? value.trim().slice(0, 500) : "";
 }
 
+async function callable(name, payload = {}) {
+  requireUser();
+  const result = await httpsCallable(functions, name)(payload);
+  return result?.data && typeof result.data === "object" ? result.data : {};
+}
+
 export async function createReportingWindowReminder(payload, actor) {
-  const { uid, name } = actorFields(actor);
-  const target = await addDoc(collection(db, REMINDERS_COLLECTION), {
-    ...payload,
-    createdBy: uid,
-    createdByName: name,
-    updatedBy: uid,
-    updatedByName: name,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return target.id;
+  actorFields(actor);
+  const result = await callable("createReportingWindowReminder", { payload });
+  return result.reminderId || "";
 }
 
 export async function upsertEventReminderConfig(payload, actor) {
-  const { uid, name } = actorFields(actor);
-  const target = doc(db, REMINDERS_COLLECTION, payload.configId);
-
-  const updatePayload = {
-    ...payload,
-    updatedBy: uid,
-    updatedByName: name,
-    updatedAt: serverTimestamp(),
-  };
-
-  try {
-    await updateDoc(target, updatePayload);
-  } catch (error) {
-    if (!String(error?.code || error?.message || "").toLowerCase().includes("not-found")) {
-      throw error;
-    }
-
-    await setDoc(target, {
-      ...updatePayload,
-      createdBy: uid,
-      createdByName: name,
-      createdAt: serverTimestamp(),
-    }, { merge: true });
-  }
-
-  return target.id;
+  actorFields(actor);
+  const result = await callable("upsertEventReminderConfig", { payload });
+  return result.reminderId || payload.configId || "";
 }
 
 export async function stopEventReminderConfig(config, actor) {
-  const { uid, name } = actorFields(actor);
+  actorFields(actor);
   if (!config?.id || config.recordType !== EVENT_REMINDER_RECORD_TYPE) {
     throw new Error("Choose a valid reminder configuration.");
   }
 
-  const target = doc(db, REMINDERS_COLLECTION, config.id);
-  await updateDoc(target, {
-    enabled: false,
-    disabled: true,
-    status: "stopped",
-    stoppedAt: serverTimestamp(),
-    stoppedReason: "admin_removed",
-    updatedBy: uid,
-    updatedByName: name,
-    updatedAt: serverTimestamp(),
-  });
-
-  return config.id;
+  const result = await callable("stopEventReminderConfig", { reminderId: config.id });
+  return result.reminderId || config.id;
 }
 
 export async function markReportingWindowSubmitted(item, adminNote, actor) {
-  const { uid, name } = actorFields(actor);
-  const target = reportingWindowRef(item);
+  actorFields(actor);
+  reportingWindowRef(item);
   const note = cleanAdminNote(adminNote);
 
-  await updateDoc(target, {
-    remindersEnabled: false,
-    status: "completed",
-    completedAt: serverTimestamp(),
-    completedBy: uid,
-    completedByName: name,
-    completionReason: "report_submitted",
-    failureReason: "",
+  const result = await callable("markReportingWindowSubmitted", {
+    reportingWindowId: item.id,
     adminNote: note,
-    updatedBy: uid,
-    updatedByName: name,
-    updatedAt: serverTimestamp(),
   });
 
-  return item.id;
+  return result.reminderId || item.id;
 }
 
 export async function stopReportingWindowReminders(item, adminNote, actor) {
-  const { uid, name } = actorFields(actor);
-  const target = reportingWindowRef(item);
+  actorFields(actor);
+  reportingWindowRef(item);
   const note = cleanAdminNote(adminNote);
 
-  await updateDoc(target, {
-    remindersEnabled: false,
-    completionReason: "reminders_disabled",
-    stoppedAt: serverTimestamp(),
-    stoppedBy: uid,
-    stoppedByName: name,
-    stoppedReason: "reminders_disabled",
+  const result = await callable("stopReportingWindowReminders", {
+    reportingWindowId: item.id,
     adminNote: note,
-    updatedBy: uid,
-    updatedByName: name,
-    updatedAt: serverTimestamp(),
   });
 
-  return item.id;
+  return result.reminderId || item.id;
 }
 
 export async function updateReportingWindowAdminNote(item, adminNote, actor) {
-  const { uid, name } = actorFields(actor);
-  const target = reportingWindowRef(item);
+  actorFields(actor);
+  reportingWindowRef(item);
 
-  await updateDoc(target, {
+  const result = await callable("updateReportingWindowAdminNote", {
+    reportingWindowId: item.id,
     adminNote: cleanAdminNote(adminNote),
-    noteUpdatedAt: serverTimestamp(),
-    noteUpdatedBy: uid,
-    noteUpdatedByName: name,
-    updatedBy: uid,
-    updatedByName: name,
-    updatedAt: serverTimestamp(),
   });
 
-  return item.id;
+  return result.reminderId || item.id;
 }
 
 function count(value) {
@@ -197,28 +129,22 @@ export function normalizeReminderTemplateTestResult(raw = {}) {
 }
 
 export async function runReminderEmailSweep() {
-  requireUser();
-  const callable = httpsCallable(functions, "runReminderEmailSweep");
-  const result = await callable({});
-  return normalizeReminderSweepSummary(result?.data || {});
+  const result = await callable("runReminderEmailSweep");
+  return normalizeReminderSweepSummary(result || {});
 }
 
 export async function sendReminderTemplateTestEmail(payload) {
-  requireUser();
-  const callable = httpsCallable(functions, "sendReminderTemplateTestEmail");
-  const result = await callable({
+  const result = await callable("sendReminderTemplateTestEmail", {
     templateType: payload?.templateType,
     recipientEmail: payload?.recipientEmail,
   });
-  return normalizeReminderTemplateTestResult(result?.data || {});
+  return normalizeReminderTemplateTestResult(result || {});
 }
 
 export async function unlockAvenueReportingWindow(reportingWindowId, unlockReason = "") {
-  requireUser();
-  const callable = httpsCallable(functions, "unlockAvenueReportingWindow");
-  const result = await callable({
+  const result = await callable("unlockAvenueReportingWindow", {
     reportingWindowId,
     unlockReason,
   });
-  return result?.data || {};
+  return result || {};
 }

@@ -11,6 +11,7 @@ import RemindersModule from "../../features/admin/reminders/RemindersModule";
 import ResolutionsModule from "../../features/admin/resolutions/ResolutionsModule";
 import { AdminError, AdminLoading, AdminNotice } from "../../features/admin/shared/AdminStates";
 import { clearAdminCaches } from "../../features/admin/shared/adminService";
+import SystemLogsModule from "../../features/admin/system-logs/SystemLogsModule";
 import useAdminData from "../../features/admin/shared/useAdminData";
 import { canManageBodManagement } from "../../features/auth/accessModel";
 import ClubVisitManagementModule from "../../features/admin/visit-management/ClubVisitManagementModule";
@@ -27,8 +28,9 @@ export default function AdminPage() {
   const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "users", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "users", "districtEvents", "districtAttendance"], reminders: ["events", "bodMeetings", "districtEvents", "reminders"], fines: ["members", "fines", "events", "bodMeetings", "districtEvents"], treasury: ["members", "treasury"], reports: ["events"] };
   const canAccessLockTools = access?.canAccessLockTools === true || access?.canAccessPresidentControls === true;
   const canAccessResolutionTools = access?.canAccessResolutionTools === true;
+  const canAccessSystemLogs = access?.canAccessSystemLogs === true;
   const canAccessBodManagement = canManageBodManagement(access);
-  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools) || (segment === "bod-management" && !canAccessBodManagement);
+  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools) || (segment === "logs" && !canAccessSystemLogs) || (segment === "bod-management" && !canAccessBodManagement);
   const state = moduleState(...(requirements[segment] || []));
   async function handleSignOut() { clearAdminCaches(uid); clearBodEventCache(uid); clearDashboardDataCache(uid); await signOut(); }
   let content;
@@ -57,6 +59,7 @@ export default function AdminPage() {
 />
   else if (segment === "treasury") content = <TreasuryModule transactions={data.treasury} members={data.members} lock={locks.treasury} uid={uid} onNotice={setNotice} />;
   else if (segment === "locks") content = <LocksModule locks={locks} access={access} uid={uid} onNotice={setNotice} />;
+  else if (segment === "logs") content = <SystemLogsModule uid={uid} access={access} />;
   else if (segment === "reports") content = <ReportsModule events={data.events} />;
   else if (segment === "visit-submissions") content = <VisitSubmissionsModule onNotice={setNotice} />;
   else if (segment === "visit-management") content = <ClubVisitManagementModule onNotice={setNotice} />;

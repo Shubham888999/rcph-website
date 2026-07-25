@@ -62,7 +62,7 @@ test("manual reminder sweep calls the backend callable with confirmation and sum
   assert.match(moduleSource, /no recipient \$\{summary\.noRecipient\}/);
   assert.match(moduleSource, /locked \$\{summary\.locked\}/);
   assert.match(moduleSource, /already submitted \$\{summary\.alreadySubmitted\}/);
-  assert.match(serviceSource, /httpsCallable\(functions, "runReminderEmailSweep"\)/);
+  assert.match(serviceSource, /callable\("runReminderEmailSweep"\)/);
   assert.match(serviceSource, /normalizeReminderSweepSummary/);
 });
 
@@ -75,7 +75,7 @@ test("reminder template test tool validates locally and calls the isolated backe
   assert.match(moduleSource, /buildReminderTemplateTestPayload\(templateTestDraft\)/);
   assert.match(moduleSource, /sendReminderTemplateTestEmail\(result\.payload\)/);
   assert.match(moduleSource, /Test only\. Does not create reminder configs, update counts, or change locks\./);
-  assert.match(serviceSource, /httpsCallable\(functions, "sendReminderTemplateTestEmail"\)/);
+  assert.match(serviceSource, /callable\("sendReminderTemplateTestEmail"/);
   assert.match(serviceSource, /normalizeReminderTemplateTestResult/);
 });
 
@@ -98,11 +98,8 @@ test("event reminder configs can be stopped from the action menu without deletin
   assert.match(moduleSource, /window\.confirm\(confirmMessage\)/);
   assert.match(moduleSource, /stopEventReminderConfig\(config/);
   assert.match(serviceSource, /export async function stopEventReminderConfig/);
-  assert.match(serviceSource, /enabled: false/);
-  assert.match(serviceSource, /disabled: true/);
-  assert.match(serviceSource, /status: "stopped"/);
-  assert.match(serviceSource, /stoppedAt: serverTimestamp\(\)/);
-  assert.match(serviceSource, /stoppedReason: "admin_removed"/);
+  assert.match(serviceSource, /callable\("stopEventReminderConfig"/);
+  assert.match(serviceSource, /reminderId: config\.id/);
   assert.doesNotMatch(serviceSource, /deleteDoc|firebase\/storage/);
 });
 
@@ -136,7 +133,7 @@ test("Reminders UI renders Phase 5 avenue window statuses and unlock action", ()
   assert.match(moduleSource, /Unlock/);
   assert.match(moduleSource, /window\.prompt\("Unlock reason"/);
   assert.match(moduleSource, /unlockAvenueReportingWindow\(item\.id, unlockReason\)/);
-  assert.match(serviceSource, /httpsCallable\(functions, "unlockAvenueReportingWindow"\)/);
+  assert.match(serviceSource, /callable\("unlockAvenueReportingWindow"/);
 });
 test("reporting window rows support manual completion, stopped reminders, and admin notes", () => {
   assert.match(moduleSource, /markReportingWindowSubmitted/);
@@ -153,12 +150,11 @@ test("reporting window rows support manual completion, stopped reminders, and ad
   assert.match(moduleSource, /Reporting window note saved\./);
 
   assert.match(serviceSource, /export async function markReportingWindowSubmitted/);
-  assert.match(serviceSource, /status: "completed"/);
-  assert.match(serviceSource, /completionReason: "report_submitted"/);
+  assert.match(serviceSource, /callable\("markReportingWindowSubmitted"/);
   assert.match(serviceSource, /export async function stopReportingWindowReminders/);
-  assert.match(serviceSource, /remindersEnabled: false/);
-  assert.match(serviceSource, /stoppedReason: "reminders_disabled"/);
+  assert.match(serviceSource, /callable\("stopReportingWindowReminders"/);
   assert.match(serviceSource, /export async function updateReportingWindowAdminNote/);
+  assert.match(serviceSource, /callable\("updateReportingWindowAdminNote"/);
   assert.doesNotMatch(serviceSource, /deleteDoc|firebase\/storage/);
 });
 test("Reminders UI does not call browser date formatters directly during render", () => {
@@ -173,6 +169,6 @@ test("Reminder frontend does not send direct email, lock, upload, or use Storage
   assert.doesNotMatch(combined, /firebase\/storage/);
   assert.doesNotMatch(combined, /\bupload[A-Z_]/);
   assert.doesNotMatch(serviceSource, /getDoc/);
-  assert.match(serviceSource, /collection\(db, REMINDERS_COLLECTION\)/);
-  assert.match(serviceSource, /setDoc\(target/);
+  assert.doesNotMatch(serviceSource, /collection\(db|setDoc|updateDoc|addDoc/);
+  assert.match(serviceSource, /httpsCallable\(functions, name\)/);
 });

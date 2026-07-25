@@ -89,6 +89,7 @@ hasPresidentAuthority: false,
     canManageBodManagement: false,
     canAccessLockTools: false,
     canAccessResolutionTools: false,
+    canAccessSystemLogs: false,
     canAccessVisitSubmissions: false,
     canAccessVisitDashboards: false,
     visitDashboardAccess: createEmptyVisitDashboardAccessMap(),
@@ -137,6 +138,7 @@ const hasPresidentAuthority =
   const trustedResolutionTools = payload.canAccessResolutionTools === true
     || authority.canAccessResolutionTools === true
     || resolutionManager;
+  const trustedSystemLogs = payload.canAccessSystemLogs === true;
   const hasDashboardRole = DASHBOARD_ROLES.has(storedRole);
   const visitDashboardAccess = normalizeVisitDashboardAccess(payload.visitDashboardAccess);
   const visitDashboardEntries = normalizeVisitDashboardEntries(payload.visitDashboardEntries, visitDashboardAccess);
@@ -178,6 +180,7 @@ canAccessAdminTools: isApproved
     canAccessLockTools: isApproved
       && (trustedLockTools || hasPresidentAuthority),
     canAccessResolutionTools: isApproved && trustedResolutionTools,
+    canAccessSystemLogs: isApproved && trustedSystemLogs,
     canAccessVisitSubmissions: isApproved
       && (["admin", "president"].includes(storedRole)
         || (storedRole === "bod" && cleanPositionKeys(payload.positionKeys).length > 0)),
@@ -210,6 +213,7 @@ export function hasCapability(access, capability) {
     visitSubmissions: "canAccessVisitSubmissions",
     visitDashboards: "canAccessVisitDashboards",
     presidentControls: "canAccessPresidentControls",
+    systemLogs: "canAccessSystemLogs",
   };
   const field = capabilityFields[capability];
   return Boolean(field && access?.isApproved && access[field] === true);

@@ -7448,3 +7448,245 @@ min-width: 250px;
     padding: 0.75rem;
   }
 }
+
+/* System Logs */
+
+.system-logs-summary {
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+}
+
+.system-log-metric {
+  border-top: 2px solid rgba(96, 195, 196, 0.48);
+}
+
+.system-logs-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.system-logs-filters label {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.system-logs-filters label span {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.system-logs-filters__search {
+  grid-column: span 2;
+}
+
+.system-logs-filters__actions {
+  justify-content: flex-end;
+}
+
+.system-logs-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.system-logs-section-heading h3 {
+  margin: 0;
+}
+
+.system-logs-section-heading span {
+  color: var(--color-gold-soft);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.system-logs-table-wrap table {
+  min-width: 1120px;
+}
+
+.system-logs-table-wrap td {
+  vertical-align: top;
+}
+
+.system-logs-table-wrap td span,
+.system-logs-table-wrap td small {
+  display: block;
+}
+
+.system-logs-table-wrap td small {
+  margin-top: 0.16rem;
+  color: var(--color-muted);
+  font-size: 0.76rem;
+}
+
+.system-log-badge,
+.system-log-reconstructed {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  min-height: 1.55rem;
+  padding: 0.2rem 0.48rem;
+  border: 1px solid rgba(229, 194, 104, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.system-log-badge--success {
+  color: var(--color-teal);
+  background: rgba(96, 195, 196, 0.1);
+}
+
+.system-log-badge--failed {
+  color: var(--color-danger);
+  background: rgba(153, 40, 87, 0.12);
+}
+
+.system-log-badge--active {
+  color: var(--color-gold-soft);
+  background: rgba(244, 180, 58, 0.09);
+}
+
+.system-log-badge--inactive,
+.system-log-badge--info {
+  color: var(--color-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.system-log-reconstructed {
+  margin-left: 0.35rem;
+  color: var(--color-gold-soft);
+  background: rgba(244, 180, 58, 0.08);
+}
+
+.system-logs-notice-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.system-log-notice {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid rgba(96, 195, 196, 0.58);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.system-log-notice header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.system-log-notice h4,
+.system-log-notice p {
+  margin: 0.12rem 0;
+}
+
+.system-log-notice header p,
+.system-logs-muted {
+  color: var(--color-muted);
+  font-size: 0.84rem;
+}
+
+.system-log-notice__body {
+  max-width: 70rem;
+  color: var(--color-text);
+  line-height: 1.48;
+  overflow-wrap: anywhere;
+}
+
+.system-log-notice dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.system-log-notice dl div {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.system-log-notice dt {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.system-log-notice dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.system-logs-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.system-logs-people li {
+  display: grid;
+  gap: 0.08rem;
+  max-width: 16rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid rgba(96, 195, 196, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(96, 195, 196, 0.055);
+}
+
+.system-logs-people strong,
+.system-logs-people span {
+  overflow-wrap: anywhere;
+}
+
+.system-logs-people span {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+}
+
+@media (max-width: 1100px) {
+  .system-logs-summary,
+  .system-logs-filters,
+  .system-log-notice dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .system-logs-filters__search {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .system-logs-summary,
+  .system-logs-filters,
+  .system-log-notice dl,
+  .system-logs-filters__search {
+    grid-template-columns: 1fr;
+    grid-column: auto;
+  }
+
+  .system-logs-filters__actions,
+  .system-logs-filters__actions button {
+    width: 100%;
+  }
+}

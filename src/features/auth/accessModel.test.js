@@ -213,6 +213,21 @@ test("BOD with trusted Website Director authority gets delegated Admin access", 
   assert.equal(access.canAccessAdminTools, true);
   assert.equal(access.canManageBodManagement, false);
   assert.equal(access.canAccessPresidentControls, true);
+  assert.equal(access.canAccessSystemLogs, false);
+});
+
+test("System Logs capability is trusted separately from Website Director presentation", () => {
+  const access = approvedWithCapabilities("bod", {
+    canAccessSystemLogs: true,
+  }, {
+    hasWebsiteDirectorPosition: true,
+    hasPresidentAuthority: true,
+  });
+
+  assert.equal(access.canAccessSystemLogs, true);
+  assert.equal(hasCapability(access, "systemLogs"), true);
+  assert.equal(approved("admin").canAccessSystemLogs, false);
+  assert.equal(approved("president", { isPresidentRole: true, hasPresidentAuthority: true }).canAccessSystemLogs, false);
 });
 
 test("pending BOD request grants no protected capability", () => {

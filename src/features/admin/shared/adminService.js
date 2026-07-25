@@ -65,6 +65,7 @@ export const adminCalls = {
   createBodMeeting: (payload) => callable("createBodMeetingSynced", payload), updateBodMeeting: (payload) => callable("updateBodMeetingSynced", payload), archiveBodMeeting: (meetingId) => callable("archiveBodMeetingSynced", { meetingId }),
   createDistrictEvent: (payload) => callable("createDistrictEventSynced", payload), updateDistrictEvent: (payload) => callable("updateDistrictEventSynced", payload), archiveDistrictEvent: (districtEventId) => callable("archiveDistrictEventSynced", { districtEventId }),
   treasuryTicket: (payload) => callable("createTreasuryUploadTicket", payload),
+  setAdminLock: (payload) => callable("setAdminLock", payload),
 };
 
 export async function setAttendanceCell(collectionName, recordId, eventId, value) { requireUser(); await setDoc(doc(db, collectionName, recordId), attendancePatch(eventId, value), { merge: true }); }
@@ -97,7 +98,7 @@ export function newTreasuryId() { requireUser(); return doc(collection(db, "trea
 export async function setTreasuryById(id, payload) { requireUser(); await setDoc(doc(db, "treasury", id), { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); return id; }
 export async function updateTreasury(id, payload) { requireUser(); return updateDoc(doc(db, "treasury", id), { ...payload, updatedAt: serverTimestamp() }); }
 export async function deleteTreasury(id) { requireUser(); return deleteDoc(doc(db, "treasury", id)); }
-export async function setAdminLock(key, locked) { requireUser(); return setDoc(doc(db, "locks", key), { locked }, { merge: true }); }
+export async function setAdminLock(key, locked) { requireUser(); return adminCalls.setAdminLock({ key, locked }); }
 
 export const visitCalls = {
   initialize: () => callable("initializeVisitSubmissionStructure", {}), dashboard: () => callable("getVisitSubmissionDashboard", {}), folders: (visitType) => callable("getVisitSubmissionFolders", { visitType }), folder: (visitType, positionKey) => callable("getVisitSubmissionFolder", { visitType, positionKey }),
