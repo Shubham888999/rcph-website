@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  AVENUE_REPORTING_LOCK_HELP_TEXT,
   BOD_EVENT_SOURCE,
   BOD_REPORT_FINANCE_MAX_ROWS,
   buildAvenueDescriptionDraft,
@@ -8,10 +9,13 @@ import {
   getEventDescriptionForAvenue,
   getBodEventAttachments,
   getBodEventPermissions,
+  getLockedBodAvenues,
   getDriveFileId,
   getDriveThumbnailUrl,
   isValidDateOnly,
+  lockedAvenueMessage,
   normalizeAvenueDescriptions,
+  normalizeAvenueReportingLock,
   normalizeBodEvent,
   normalizeBodReportFinance,
   safeExternalUrl,
@@ -189,6 +193,63 @@ test("payload builder whitelists fields and forces production classification", (
   assert.deepEqual(payload.collaborators, [{ name: "Partner" }]);
   assert.deepEqual(payload.reportFinance, { hasFinance: false, entries: [] });
   assert.equal(Object.hasOwn(payload, "uiOnly"), false);
+});
+
+test("active avenue reporting locks normalize and block selected BOD event avenues", () => {
+  const lock = normalizeAvenueReportingLock("avenueReporting_window-pdd", {
+    type: "avenue_reporting",
+    locked: true,
+    status: "active",
+    reason: "reporting_window_expired",
+    avenue: "PDD",
+    reportingWindowId: "window-pdd",
+  });
+
+  assert.equal(lock.avenue, "PDD");
+  assert.equal(AVENUE_REPORTING_LOCK_HELP_TEXT, "Locked due to missed reporting window. Ask President/Admin to unlock.");
+  assert.deepEqual(getLockedBodAvenues(["CMD", "PDD"], [lock]), ["PDD"]);
+  assert.equal(lockedAvenueMessage(["PDD"]), "PDD is locked due to missed reporting window. Ask President or Admin to unlock.");
+
+  const result = buildBodEventPayload({
+    name: "Test",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["PDD"],
+    description: "Desc",
+    avenueDescriptions: { PDD: "Professional report" },
+  }, "", { lockedAvenueReportingLocks: [lock] });
+
+  assert.equal(result.payload, null);
+  assert.equal(result.errors.avenues, "PDD is locked due to missed reporting window. Ask President or Admin to unlock.");
+});
+
+test("unlocked or unrelated avenue reporting locks do not block BOD event payloads", () => {
+  const inactiveLock = normalizeAvenueReportingLock("avenueReporting_window-pdd", {
+    type: "avenue_reporting",
+    locked: false,
+    status: "unlocked",
+    avenue: "PDD",
+  });
+  const cmdLock = normalizeAvenueReportingLock("avenueReporting_window-cmd", {
+    type: "avenue_reporting",
+    locked: true,
+    status: "active",
+    reason: "reporting_window_expired",
+    avenue: "CMD",
+  });
+
+  assert.equal(inactiveLock, null);
+  const result = buildBodEventPayload({
+    name: "Test",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["PDD"],
+    description: "Desc",
+    avenueDescriptions: { PDD: "Professional report" },
+  }, "", { lockedAvenueReportingLocks: [cmdLock] });
+
+  assert.deepEqual(result.errors, {});
+  assert.equal(result.payload.avenues[0], "PDD");
 });
 
 test("payload builder persists valid report-only finance entries", () => {

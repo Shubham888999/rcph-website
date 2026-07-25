@@ -21,6 +21,18 @@ test("BOD event form keeps public and per-avenue descriptions separate", () => {
   assert.match(form, /window\.confirm\(`Remove the \$\{avenue\} report description\?`\)/);
 });
 
+test("BOD event form keeps locked reporting-window avenues visible but unavailable", () => {
+  assert.match(form, /lockedAvenueReportingLocks = \[\]/);
+  assert.match(form, /getLockedBodAvenues\(BOD_AVENUES, lockedAvenueReportingLocks\)/);
+  assert.match(form, /disabled=\{locked && !selected\}/);
+  assert.match(form, /AVENUE_REPORTING_LOCK_HELP_TEXT/);
+  assert.match(form, /buildBodEventPayload\(draft, savedEventId, \{ lockedAvenueReportingLocks \}\)/);
+  assert.match(page, /avenueReportingLocks\.items/);
+  assert.match(service, /subscribeAvenueReportingLocks/);
+  assert.match(service, /collection\(db, "locks"\)/);
+  assert.match(service, /normalizeAvenueReportingLock/);
+});
+
 test("BOD event form exposes report-only finance rows without Treasury wiring", () => {
   assert.match(form, /Any income\/expense incurred for this event\?/);
   assert.match(form, /Report finance/);

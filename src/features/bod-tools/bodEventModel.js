@@ -9,6 +9,9 @@ export const BOD_EVENT_DESCRIPTION_LIMIT = 2500;
 export const BOD_REPORT_FINANCE_DESCRIPTION_LIMIT = 240;
 export const BOD_REPORT_FINANCE_MAX_AMOUNT = 1000000;
 export const BOD_REPORT_FINANCE_MAX_ROWS = 20;
+export const AVENUE_REPORTING_LOCK_TYPE = "avenue_reporting";
+export const AVENUE_REPORTING_LOCK_REASON = "reporting_window_expired";
+export const AVENUE_REPORTING_LOCK_HELP_TEXT = "Locked due to missed reporting window. Ask President/Admin to unlock.";
 const BOD_AVENUE_SET = new Set(BOD_AVENUES);
 const RESERVED_DESCRIPTION_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -20,6 +23,63 @@ function cleanStrings(value, { upper = false } = {}) {
   const source = Array.isArray(value) ? value : (typeof value === "string" ? [value] : []);
   return [...new Set(source.map((item) => cleanString(item)).filter(Boolean)
     .map((item) => upper ? item.toUpperCase() : item))];
+}
+
+function cleanLower(value, max = 120) {
+  return cleanString(value).toLowerCase().slice(0, max);
+}
+
+function safeLockIdSegment(value) {
+  return cleanString(value, "window")
+    .replace(/[^A-Za-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 120) || "window";
+}
+
+export function normalizeAvenueReportingLock(id, raw) {
+  if (!raw || typeof raw !== "object" || raw.locked !== true) return null;
+  if (cleanString(raw.type) !== AVENUE_REPORTING_LOCK_TYPE) return null;
+  if (cleanLower(raw.status, 40) !== "active") return null;
+  const reason = cleanString(raw.reason, AVENUE_REPORTING_LOCK_REASON);
+  if (reason && reason !== AVENUE_REPORTING_LOCK_REASON) return null;
+  const [avenue] = normalizeBodAvenues([raw.avenue]);
+  if (!avenue) return null;
+  const lockId = cleanString(id || raw.lockId || raw.id);
+  const reportingWindowId = cleanString(raw.reportingWindowId || raw.reminderId);
+  return {
+    id: lockId || `avenueReporting_${safeLockIdSegment(reportingWindowId || avenue)}`,
+    lockId,
+    avenue,
+    avenueLabel: cleanString(raw.avenueLabel, avenue),
+    reportingWindowId,
+    reminderId: cleanString(raw.reminderId || raw.reportingWindowId),
+    reason,
+    targetName: cleanString(raw.targetName || raw.eventName || raw.name, ""),
+    conductedDate: cleanString(raw.conductedDate || raw.eventConductedDate || raw.targetDate, ""),
+    lockedAt: timestampToIso(raw.lockedAt || raw.createdAt || raw.updatedAt),
+    updatedAt: timestampToIso(raw.updatedAt),
+  };
+}
+
+export function getLockedBodAvenues(avenues, locks = []) {
+  const selected = normalizeBodAvenues(avenues);
+  const locked = new Set((Array.isArray(locks) ? locks : [])
+    .map((lock) => cleanString(lock?.avenue).toUpperCase())
+    .filter((code) => BOD_AVENUE_SET.has(code)));
+  return selected.filter((code) => locked.has(code));
+}
+
+function formatAvenueList(codes) {
+  const values = [...new Set((Array.isArray(codes) ? codes : []).map((code) => cleanString(code)).filter(Boolean))];
+  if (values.length <= 1) return values[0] || "Selected avenue";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
+}
+
+export function lockedAvenueMessage(codes) {
+  const values = [...new Set((Array.isArray(codes) ? codes : []).map((code) => cleanString(code)).filter(Boolean))];
+  const subject = formatAvenueList(values);
+  return `${subject} ${values.length === 1 ? "is" : "are"} locked due to missed reporting window. Ask President or Admin to unlock.`;
 }
 
 function isPlainObject(value) {
@@ -289,7 +349,7 @@ export function getBodEventPermissions(event, access, lockState = "unlocked") {
   };
 }
 
-export function validateBodEventDraft(draft) {
+export function validateBodEventDraft(draft, options = {}) {
   const errors = {};
   if (!cleanString(draft?.name)) errors.name = "Event name is required.";
   const startDate = cleanString(draft?.startDate);
@@ -300,6 +360,8 @@ export function validateBodEventDraft(draft) {
   if (!isValidEventTime(cleanString(draft?.time))) errors.time = "Enter a valid time in HH:MM format.";
   const avenues = normalizeBodAvenues(draft?.avenues);
   if (!avenues.length) errors.avenues = "Select at least one avenue.";
+  const lockedAvenues = getLockedBodAvenues(avenues, options.lockedAvenueReportingLocks);
+  if (avenues.length && lockedAvenues.length) errors.avenues = lockedAvenueMessage(lockedAvenues);
   const coverage = validateAvenueDescriptionCoverage(
     avenues,
     draft?.avenueDescriptions == null
@@ -312,8 +374,8 @@ export function validateBodEventDraft(draft) {
   return errors;
 }
 
-export function buildBodEventPayload(draft, eventId = "") {
-  const errors = validateBodEventDraft(draft);
+export function buildBodEventPayload(draft, eventId = "", options = {}) {
+  const errors = validateBodEventDraft(draft, options);
   if (Object.keys(errors).length) return { payload: null, errors };
   const avenues = normalizeBodAvenues(draft.avenues).slice(0, 12);
   const avenueDescriptionDraft = draft.avenueDescriptions == null

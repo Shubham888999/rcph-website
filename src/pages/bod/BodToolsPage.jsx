@@ -30,7 +30,7 @@ const DEFAULT_FILTERS = { status: "active", type: "", avenue: "", month: "", min
 export default function BodToolsPage() {
   const { access, user, signOut } = useAuth();
   const uid = user?.uid || "";
-  const { status, events, lock, reload } = useBodEvents({ uid, enabled: Boolean(uid && access?.canAccessBodTools) });
+  const { status, events, lock, avenueReportingLocks, reload } = useBodEvents({ uid, enabled: Boolean(uid && access?.canAccessBodTools) });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [details, setDetails] = useState(null);
   const [form, setForm] = useState(null);
@@ -256,7 +256,7 @@ export default function BodToolsPage() {
         }}
         onClose={() => setDetails(null)}
       />
-      {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
+      {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} lockedAvenueReportingLocks={avenueReportingLocks.items} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
       <BodEventArchiveDialog event={confirmation?.event || null} mode={confirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmMutation} />
     
     

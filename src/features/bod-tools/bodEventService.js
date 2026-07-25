@@ -4,7 +4,7 @@ import { auth, functions } from "../../app/firebase";
 import { db } from "../../app/firestore";
 import { createBodEventCache } from "./bodEventCache";
 import { registerBodCacheClear } from "./bodCacheRegistry";
-import { normalizeBodEvent } from "./bodEventModel";
+import { normalizeAvenueReportingLock, normalizeBodEvent } from "./bodEventModel";
 
 function requireCurrentUser(uid = "") {
   if (!auth.currentUser || (uid && auth.currentUser.uid !== uid)) {
@@ -57,6 +57,17 @@ export function subscribeBodEventLock(callback, onError) {
       updatedByName: typeof value?.updatedByName === "string" ? value.updatedByName.trim().slice(0, 140) : "",
       updatedAt: updatedDate && !Number.isNaN(updatedDate.getTime()) ? updatedDate.toISOString() : "",
     });
+  }, onError);
+}
+
+export function subscribeAvenueReportingLocks(callback, onError) {
+  requireCurrentUser();
+  return onSnapshot(collection(db, "locks"), (snapshot) => {
+    const locks = snapshot.docs
+      .map((document) => normalizeAvenueReportingLock(document.id, document.data()))
+      .filter(Boolean)
+      .sort((a, b) => a.avenue.localeCompare(b.avenue) || a.id.localeCompare(b.id));
+    callback(locks);
   }, onError);
 }
 

@@ -84,6 +84,25 @@ test("only supplied targeted announcements render", () => {
   const items = normalizeDashboardAnnouncements([{ id: "a", title: "Hello", body: "Member update", priority: "normal", publishedAt: "2026-06-01T00:00:00Z" }], Date.parse("2026-06-02"));
   assert.equal(items.length, 1);
 });
+test("derived reporting-window lock notices stay visible and non-dismissible", () => {
+  const [item] = normalizeDashboardAnnouncements([{
+    id: "reportingWindowLock_PDD",
+    source: "reportingWindowLock",
+    title: "PDD reporting window locked",
+    body: "PDD is locked due to missed reporting window. Ask President or Admin to unlock.",
+    priority: "urgent",
+    publishedAt: "2026-07-25T00:00:00.000Z",
+    dismissible: false,
+    read: true,
+    lockedAvenues: ["PDD"],
+    reportingWindowIds: ["private-window-id"],
+  }], Date.parse("2026-07-25T00:01:00.000Z"));
+
+  assert.equal(item.source, "reportingWindowLock");
+  assert.equal(item.dismissible, false);
+  assert.deepEqual(item.lockedAvenues, ["PDD"]);
+  assert.equal("reportingWindowIds" in item, false);
+});
 test("expired and malformed announcements are excluded", () => {
   const items = normalizeDashboardAnnouncements([
     { id: "expired", title: "Old", body: "Old", expiresAt: "2026-01-01T00:00:00Z" },

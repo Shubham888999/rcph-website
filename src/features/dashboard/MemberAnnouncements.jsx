@@ -99,17 +99,18 @@ export default function MemberAnnouncements({ uid = "", announcements, busyId = 
         {announcements.map((announcement) => {
           const menuOpen = openId === announcement.id;
           const busy = busyId === announcement.id;
+          const canManage = announcement.dismissible !== false;
           return (
             <article key={announcement.id} className={`announcement-card announcement-card--${announcement.priority} ${announcement.read ? "is-read" : "is-unread"}`} aria-busy={busy}>
               <div className="announcement-card__topline">
                 <div className="announcement-card__labels"><span>{announcement.priority}</span><span className="announcement-card__read-state">{announcement.read ? "Read" : "Unread"}</span></div>
-                <div className="announcement-card__menu" ref={menuOpen ? menuRootRef : null}>
+                {canManage ? <div className="announcement-card__menu" ref={menuOpen ? menuRootRef : null}>
                   <button type="button" className="announcement-card__menu-trigger" aria-label="Announcement options" aria-haspopup="menu" aria-expanded={menuOpen} aria-controls={`announcement-menu-${announcement.id}`} disabled={busy} onClick={() => setOpenId(menuOpen ? "" : announcement.id)}>•••</button>
                   {menuOpen ? <div className="announcement-card__menu-panel" id={`announcement-menu-${announcement.id}`} role="menu">
                     <button type="button" role="menuitem" onClick={() => { setOpenId(""); onToggleRead?.(announcement); }}>{announcement.read ? "Mark as unread" : "Mark as read"}</button>
                     <button type="button" role="menuitem" onClick={() => { setOpenId(""); onDismiss?.(announcement); }}>Remove from dashboard</button>
                   </div> : null}
-                </div>
+                </div> : null}
               </div>
               <h3>{announcement.title}</h3>
               <p>{announcement.body}</p>

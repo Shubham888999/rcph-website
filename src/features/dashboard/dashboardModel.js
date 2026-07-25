@@ -115,6 +115,8 @@ export function normalizeDashboardAnnouncements(raw, now = Date.now()) {
     const expiresAt = normalizeIsoDate(item.expiresAt);
     if (expiresAt && Date.parse(expiresAt) <= now) return null;
     const publishedAt = normalizeIsoDate(item.publishedAt);
+    const source = text(item.source, 80);
+    const systemNotice = source === "reportingWindowLock";
     let actionText = text(item.actionText, 80);
     let actionUrl = text(item.actionUrl, 1000);
     try {
@@ -138,6 +140,9 @@ export function normalizeDashboardAnnouncements(raw, now = Date.now()) {
       publishedAt,
       expiresAt,
       read: item.read === true,
+      source: systemNotice ? source : "",
+      dismissible: systemNotice ? false : item.dismissible !== false,
+      lockedAvenues: systemNotice ? normalizeAvenues(item.lockedAvenues) : [],
       attachment: normalizeAnnouncementAttachment(item.attachment),
     };
   }).filter(Boolean)

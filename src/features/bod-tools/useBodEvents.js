@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBodEventDiagnostic } from "./bodEventErrors";
-import { fetchBodEvents, refreshBodEvents, subscribeBodEventLock } from "./bodEventService";
+import { fetchBodEvents, refreshBodEvents, subscribeAvenueReportingLocks, subscribeBodEventLock } from "./bodEventService";
 
 export default function useBodEvents({ uid, enabled }) {
   const [state, setState] = useState({ status: "loading", events: [], error: null });
   const [lock, setLock] = useState({ uid: "", status: "loading", locked: true, reason: "", updatedByName: "", updatedAt: "" });
+  const [avenueReportingLocks, setAvenueReportingLocks] = useState({ uid: "", status: "loading", items: [] });
   const versionRef = useRef(0);
   const mountedRef = useRef(false);
 
@@ -38,6 +39,18 @@ export default function useBodEvents({ uid, enabled }) {
     return unsubscribe;
   }, [enabled, uid]);
 
+  useEffect(() => {
+    if (!enabled || !uid) return undefined;
+    const unsubscribe = subscribeAvenueReportingLocks((items) => {
+      if (!mountedRef.current) return;
+      setAvenueReportingLocks({ uid, status: "success", items });
+    }, (error) => {
+      if (import.meta.env.DEV) console.error("Avenue reporting lock subscription failed.", getBodEventDiagnostic(error, "avenue-lock-read", uid));
+      if (mountedRef.current) setAvenueReportingLocks({ uid, status: "error", items: [] });
+    });
+    return unsubscribe;
+  }, [enabled, uid]);
+
   const reload = useCallback(() => {
     if (!enabled || !uid) return;
     setState({ status: "loading", events: [], error: null });
@@ -45,5 +58,8 @@ export default function useBodEvents({ uid, enabled }) {
   }, [enabled, resolve, uid]);
 
   const currentLock = lock.uid === uid ? lock : { uid, status: "loading", locked: true, reason: "", updatedByName: "", updatedAt: "" };
-  return { ...state, lock: currentLock, reload };
+  const currentAvenueReportingLocks = avenueReportingLocks.uid === uid
+    ? avenueReportingLocks
+    : { uid, status: "loading", items: [] };
+  return { ...state, lock: currentLock, avenueReportingLocks: currentAvenueReportingLocks, reload };
 }

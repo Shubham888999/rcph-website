@@ -11,6 +11,8 @@ test("announcement cards expose one state-appropriate action and per-user remova
   assert.match(source, /aria-label="Announcement options"/);
   assert.match(source, /aria-haspopup="menu"/);
   assert.match(source, /role="menuitem"/);
+  assert.match(source, /const canManage = announcement\.dismissible !== false/);
+  assert.match(source, /\{canManage \? <div className="announcement-card__menu"/);
 });
 
 test("read state is visible in text and dismiss uses the approved notice", () => {

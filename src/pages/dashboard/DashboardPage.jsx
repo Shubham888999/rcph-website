@@ -59,6 +59,7 @@ export default function DashboardPage() {
   }
 
   async function updateReadState(announcement) {
+    if (announcement?.dismissible === false) return;
     if (!user?.uid || announcementBusyId) return;
     const previous = data.announcements;
     const nextRead = !announcement.read;
@@ -77,6 +78,7 @@ export default function DashboardPage() {
   }
 
   async function dismissAnnouncement(announcement) {
+    if (announcement?.dismissible === false) return;
     if (!user?.uid || announcementBusyId) return;
     const previous = data.announcements;
     setAnnouncementBusyId(announcement.id);

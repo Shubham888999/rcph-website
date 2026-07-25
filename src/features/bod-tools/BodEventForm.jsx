@@ -4,6 +4,7 @@ import { updateBodEvent } from "./bodEventService";
 import { uploadBodEventFile } from "./bodUploadService";
 import { getSafeBodUploadError } from "./bodUploadModel";
 import {
+  AVENUE_REPORTING_LOCK_HELP_TEXT,
   BOD_AVENUES,
   BOD_EVENT_DESCRIPTION_LIMIT,
   BOD_REPORT_FINANCE_DESCRIPTION_LIMIT,
@@ -11,6 +12,7 @@ import {
   BOD_REPORT_FINANCE_MAX_ROWS,
   buildAvenueDescriptionDraft,
   buildBodEventPayload,
+  getLockedBodAvenues,
   normalizeBodReportFinance,
 } from "./bodEventModel";
 import useAccessibleDialog from "./useAccessibleDialog";
@@ -54,7 +56,7 @@ function initialDraft(event, displayName) {
   };
 }
 
-export default function BodEventForm({ event, displayName, busy, mutationError, onClose, onSubmit, onComplete }) {
+export default function BodEventForm({ event, displayName, busy, mutationError, lockedAvenueReportingLocks = [], onClose, onSubmit, onComplete }) {
   const seed = useMemo(() => initialDraft(event, displayName), [displayName, event]);
   const [draft, setDraft] = useState(seed);
   const [errors, setErrors] = useState({});
@@ -64,6 +66,10 @@ export default function BodEventForm({ event, displayName, busy, mutationError, 
   const [savedEventId, setSavedEventId] = useState(event?.id || "");
   const formBusy = Boolean(busy || working);
   const dialogRef = useAccessibleDialog({ open: true, onClose: () => { if (!formBusy) onClose(); } });
+  const lockedAvenues = useMemo(
+    () => new Set(getLockedBodAvenues(BOD_AVENUES, lockedAvenueReportingLocks)),
+    [lockedAvenueReportingLocks],
+  );
 
   function update(key, value) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -73,6 +79,7 @@ export default function BodEventForm({ event, displayName, busy, mutationError, 
   function toggleAvenue(avenue) {
     setDraft((current) => {
       const selected = current.avenues.includes(avenue);
+      if (lockedAvenues.has(avenue) && !selected) return current;
       const currentText = current.avenueDescriptions?.[avenue] || "";
       if (selected && currentText.trim() && !window.confirm(`Remove the ${avenue} report description?`)) return current;
       const avenueDescriptions = { ...(current.avenueDescriptions || {}) };
@@ -137,7 +144,7 @@ export default function BodEventForm({ event, displayName, busy, mutationError, 
   async function handleSubmit(submitEvent) {
     submitEvent.preventDefault();
     if (formBusy) return;
-    const result = buildBodEventPayload(draft, savedEventId);
+    const result = buildBodEventPayload(draft, savedEventId, { lockedAvenueReportingLocks });
     if (!result.payload) {
       setErrors(result.errors);
       const first = Object.keys(result.errors)[0];
@@ -273,7 +280,17 @@ if (completed.length) {
             <label>RCPH role<select value={draft.rcphRole} onChange={(e) => update("rcphRole", e.target.value)}><option value="host">Host</option><option value="cohost">Co-host</option><option value="collaborator">Collaborator</option><option value="participant">Participant</option></select></label>
           </div>
           <label>Public / General Event Description<textarea value={draft.description} onChange={(e) => update("description", e.target.value)} maxLength={BOD_EVENT_DESCRIPTION_LIMIT} rows="4" /></label>
-          <fieldset name="avenues" aria-describedby={described("avenues")}><legend>Avenues *</legend><div className="bod-avenue-grid">{BOD_AVENUES.map((avenue) => <label key={avenue}><input type="checkbox" checked={draft.avenues.includes(avenue)} onChange={() => toggleAvenue(avenue)} /> {avenue}</label>)}</div>{errors.avenues ? <span id="bod-avenues-error" className="bod-field-error">{errors.avenues}</span> : null}</fieldset>
+          <fieldset name="avenues" aria-describedby={described("avenues")}><legend>Avenues *</legend><div className="bod-avenue-grid">{BOD_AVENUES.map((avenue) => {
+            const locked = lockedAvenues.has(avenue);
+            const selected = draft.avenues.includes(avenue);
+            const lockHelpId = `bod-avenue-${avenue}-lock`;
+            return (
+              <label key={avenue} className={`bod-avenue-option ${locked ? "is-locked" : ""}`}>
+                <span><input type="checkbox" checked={selected} disabled={locked && !selected} aria-describedby={locked ? lockHelpId : undefined} onChange={() => toggleAvenue(avenue)} /> {avenue}</span>
+                {locked ? <small id={lockHelpId}>{AVENUE_REPORTING_LOCK_HELP_TEXT}</small> : null}
+              </label>
+            );
+          })}</div>{errors.avenues ? <span id="bod-avenues-error" className="bod-field-error">{errors.avenues}</span> : null}</fieldset>
           {draft.avenues.length ? (
             <fieldset className="bod-avenue-descriptions" aria-describedby={described("avenueDescriptions")}>
               <legend>Avenue report descriptions *</legend>
