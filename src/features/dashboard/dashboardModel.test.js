@@ -89,7 +89,7 @@ test("derived reporting-window lock notices stay visible and non-dismissible", (
     id: "reportingWindowLock_PDD",
     source: "reportingWindowLock",
     title: "PDD reporting window locked",
-    body: "PDD is locked due to missed reporting window. Ask President or Admin to unlock.",
+    body: "PDD reporting is locked because the reporting deadline was missed. Please ask the President or Admin to unlock this avenue.",
     priority: "urgent",
     publishedAt: "2026-07-25T00:00:00.000Z",
     dismissible: false,
