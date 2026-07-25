@@ -149,6 +149,12 @@ function lockedAvenueMessage(codes = []) {
   return `${subject} ${values.length === 1 ? 'is' : 'are'} locked due to missed reporting window. Ask President or Admin to unlock.`;
 }
 
+function reportingWindowLockDashboardMessage(codes = []) {
+  const values = Array.from(new Set(codes.map(code => cleanText(code, 40)).filter(Boolean)));
+  const subject = formatAvenueList(values);
+  return `${subject} reporting is locked because the reporting deadline was missed. Please ask the President or Admin to unlock this avenue.`;
+}
+
 function lockedBodAvenuesForPayload(avenues, locks = []) {
   const selected = bodEventSchema.normalizeBodAvenues(avenues);
   const lockedCodes = new Set((Array.isArray(locks) ? locks : [])
@@ -214,7 +220,7 @@ function buildReportingWindowLockDashboardNotice({ locks = [], positionKeys = []
     title: lockedAvenues.length === 1
       ? `${lockedAvenues[0]} reporting window locked`
       : `${formatAvenueList(lockedAvenues)} reporting windows locked`,
-    body: lockedAvenueMessage(lockedAvenues),
+    body: reportingWindowLockDashboardMessage(lockedAvenues),
     priority: 'urgent',
     publishedAt: timestampToIso(now) || new Date().toISOString(),
     expiresAt: '',
@@ -230,6 +236,7 @@ module.exports = {
   normalizeActiveAvenueReportingLocks,
   lockedBodAvenuesForPayload,
   lockedAvenueMessage,
+  reportingWindowLockDashboardMessage,
   assertBodEventAvenuesUnlocked,
   recipientPositionKeysForAvenue,
   buildReportingWindowLockDashboardNotice,

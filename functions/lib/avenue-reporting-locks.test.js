@@ -10,6 +10,7 @@ const {
   lockedAvenueMessage,
   lockedBodAvenuesForPayload,
   normalizeActiveAvenueReportingLocks,
+  reportingWindowLockDashboardMessage,
   recipientPositionKeysForAvenue,
 } = require('./avenue-reporting-locks');
 
@@ -74,6 +75,7 @@ test('BOD event avenue enforcement rejects locked selected avenues for every cal
   assert.deepEqual(lockedBodAvenuesForPayload(['PDD', 'GBM'], locks), ['PDD']);
   assert.equal(lockedAvenueMessage(['PDD']), 'PDD is locked due to missed reporting window. Ask President or Admin to unlock.');
   assert.equal(lockedAvenueMessage(['CMD', 'PDD']), 'CMD and PDD are locked due to missed reporting window. Ask President or Admin to unlock.');
+  assert.equal(reportingWindowLockDashboardMessage(['PDD']), 'PDD reporting is locked because the reporting deadline was missed. Please ask the President or Admin to unlock this avenue.');
 
   assert.throws(
     () => assertBodEventAvenuesUnlocked({
@@ -111,7 +113,7 @@ test('dashboard reporting-window lock notice targets only assigned director and 
     positionKeys: ['pdd'],
     now: new Date('2026-07-25T00:00:00.000Z'),
   });
-  assert.equal(directorNotice.body, 'PDD is locked due to missed reporting window. Ask President or Admin to unlock.');
+  assert.equal(directorNotice.body, 'PDD reporting is locked because the reporting deadline was missed. Please ask the President or Admin to unlock this avenue.');
   assert.deepEqual(directorNotice.lockedAvenues, ['PDD']);
   assert.equal(directorNotice.dismissible, false);
 
@@ -120,7 +122,7 @@ test('dashboard reporting-window lock notice targets only assigned director and 
     positionKeys: ['co-pdd', 'co-cmd'],
     now: new Date('2026-07-25T00:00:00.000Z'),
   });
-  assert.equal(coDirectorNotice.body, 'CMD and PDD are locked due to missed reporting window. Ask President or Admin to unlock.');
+  assert.equal(coDirectorNotice.body, 'CMD and PDD reporting is locked because the reporting deadline was missed. Please ask the President or Admin to unlock this avenue.');
 
   const unrelatedNotice = buildReportingWindowLockDashboardNotice({
     locks,
@@ -143,7 +145,7 @@ test('GBM reporting locks target secretary assignments consistently with reminde
     positionKeys: ['co-secretary'],
     now: new Date('2026-07-25T00:00:00.000Z'),
   });
-  assert.equal(notice.body, 'GBM is locked due to missed reporting window. Ask President or Admin to unlock.');
+  assert.equal(notice.body, 'GBM reporting is locked because the reporting deadline was missed. Please ask the President or Admin to unlock this avenue.');
 });
 
 test('submitBodEvent and updateBodEvent call avenue lock enforcement after payload normalization', () => {
