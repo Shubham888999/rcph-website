@@ -3,8 +3,33 @@ import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion
 
 const RSVP_URL = "https://forms.gle/gQ8JcgWHDHWvGakP7";
 const VENUE_URL = "https://maps.app.goo.gl/iNXahK8kMDFVURij8?g_st=ac";
-const THEME_REVEAL_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/?igsh=d2VrMHh0dWZ6eGtx";
-const THEME_REVEAL_EMBED_URL = "https://www.instagram.com/reel/DbJIe5ltc5l/embed";
+const VOX_INSTALLATION_POSTS = [
+  {
+    id: "save-the-date",
+    title: "Save the Date",
+    shortTitle: "Save Date",
+    label: "09.08.26",
+    instagramUrl: "https://www.instagram.com/reel/DbBZLu5pdP4/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA==",
+    embedUrl: "https://www.instagram.com/reel/DbBZLu5pdP4/embed",
+    accent: "amber",
+  },
+  {
+    id: "theme-reveal",
+    title: "Theme Reveal",
+    shortTitle: "Theme",
+    label: "Retro Rock",
+    instagramUrl: "https://www.instagram.com/reel/DbJIe5ltc5l/?igsh=d2VrMHh0dWZ6eGtx",
+    embedUrl: "https://www.instagram.com/reel/DbJIe5ltc5l/embed",
+    accent: "pink",
+    isLatest: true,
+  },
+];
+const VOX_RECORD_SHELF_SLOT_COUNT = 4;
+const DEFAULT_VOX_POST_ID =
+  VOX_INSTALLATION_POSTS.find((post) => post.isLatest)?.id ??
+  VOX_INSTALLATION_POSTS[0].id;
+
+const RECORD_LOAD_DURATION_MS = 2000;
 const VOX_EVENT_START_ISO = "2026-08-09T19:00:00+05:30";
 const COUNTDOWN_UPDATE_INTERVAL_MS = 1000;
 const SECONDS_PER_DAY = 86400;
@@ -72,13 +97,23 @@ const INACTIVE_REVEAL_STYLE = {
 
 export default function InstallationSection({ autoRevealActive = false }) {
   const sectionRef = useRef(null);
-  const revealTimerRef = useRef(null);
-  const [countdownParts, setCountdownParts] = useState(() => getVoxCountdownParts());
-  const [themeRevealState, setThemeRevealState] = useState("idle");
-  const [hasScrollRevealStarted, setHasScrollRevealStarted] = useState(false);
-  const reduceMotion = useReducedMotion();
-  const isThemeRevealSpinning = themeRevealState === "spinning";
-  const isThemeRevealRevealed = themeRevealState === "revealed";
+const revealTimerRef = useRef(null);
+const [countdownParts, setCountdownParts] = useState(() => getVoxCountdownParts());
+const [selectedPostId, setSelectedPostId] = useState(DEFAULT_VOX_POST_ID);
+const [pendingPostId, setPendingPostId] = useState(null);
+const [playerState, setPlayerState] = useState("idle");
+const [hasScrollRevealStarted, setHasScrollRevealStarted] = useState(false);
+const reduceMotion = useReducedMotion();
+
+const selectedPost =
+  VOX_INSTALLATION_POSTS.find((post) => post.id === selectedPostId) ??
+  VOX_INSTALLATION_POSTS[0];
+
+const pendingPost =
+  VOX_INSTALLATION_POSTS.find((post) => post.id === pendingPostId) ?? null;
+
+const isRecordLoading = playerState === "loading";
+const isPostRevealed = playerState === "revealed";
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start 78%", "end 16%"],
@@ -109,20 +144,34 @@ export default function InstallationSection({ autoRevealActive = false }) {
     ? autoRevealActive ? AUTO_REVEAL_STYLE : INACTIVE_REVEAL_STYLE
     : useAutoRevealLighting ? AUTO_REVEAL_STYLE : scrollRevealStyle;
 
-  function handleInlineThemeRevealClick() {
-    if (isThemeRevealSpinning || isThemeRevealRevealed) return;
+function loadVoxPost(postId) {
+  if (isRecordLoading) return;
 
-    if (reduceMotion) {
-      setThemeRevealState("revealed");
-      return;
-    }
+  const nextPost = VOX_INSTALLATION_POSTS.find((post) => post.id === postId);
+  if (!nextPost) return;
 
-    window.clearTimeout(revealTimerRef.current);
-    setThemeRevealState("spinning");
-    revealTimerRef.current = window.setTimeout(() => {
-      setThemeRevealState("revealed");
-    }, 2000);
+  window.clearTimeout(revealTimerRef.current);
+  setPendingPostId(postId);
+
+  if (reduceMotion) {
+    setSelectedPostId(postId);
+    setPendingPostId(null);
+    setPlayerState("revealed");
+    return;
   }
+
+  setPlayerState("loading");
+
+  revealTimerRef.current = window.setTimeout(() => {
+    setSelectedPostId(postId);
+    setPendingPostId(null);
+    setPlayerState("revealed");
+  }, RECORD_LOAD_DURATION_MS);
+}
+
+function handleActiveRecordClick() {
+  loadVoxPost(selectedPostId);
+}
 
   useEffect(() => {
     return () => window.clearTimeout(revealTimerRef.current);
@@ -228,126 +277,246 @@ export default function InstallationSection({ autoRevealActive = false }) {
 
         </div>
 
-        <div className="home-installation__visual" id="vox-theme-reveal">
-<section
-  className="home-installation__countdown home-installation__countdown--stereo"
-  aria-label="Countdown to VOX 2026 on 9th August 2026 at 7:00 PM IST"
->
-  <div className="home-installation__stereo-shell">
-    <div className="home-installation__stereo-top">
-      <span className="home-installation__experience-kicker">COUNTDOWN TO VOX // '26</span>
-    </div>
-
-    <div className="home-installation__stereo-body">
-      <div className="home-installation__stereo-speaker home-installation__stereo-speaker--left" aria-hidden="true">
-        <span />
-        <span />
+<div className="home-installation__visual" id="vox-theme-reveal">
+  <section
+    className="home-installation__countdown home-installation__countdown--stereo"
+    aria-label="Countdown to VOX 2026 on 9th August 2026 at 7:00 PM IST"
+  >
+    <div className="home-installation__stereo-shell">
+      <div className="home-installation__stereo-top">
+        <span className="home-installation__experience-kicker">
+          COUNTDOWN TO VOX // '26
+        </span>
       </div>
 
-      <div className="home-installation__stereo-center">
-        {countdownParts.isLive ? (
-          <strong className="home-installation__countdown-live">VOX // '26 is live</strong>
-        ) : (
-          <div className="home-installation__countdown-grid">
-            <span className="home-installation__countdown-unit">
-              <strong>{formatCountdownPart(countdownParts.days)}</strong>
-              <span>Days</span>
-            </span>
-            <span className="home-installation__countdown-unit">
-              <strong>{formatCountdownPart(countdownParts.hours)}</strong>
-              <span>Hours</span>
-            </span>
-            <span className="home-installation__countdown-unit">
-              <strong>{formatCountdownPart(countdownParts.minutes)}</strong>
-              <span>Minutes</span>
-            </span>
-            <span className="home-installation__countdown-unit">
-              <strong>{formatCountdownPart(countdownParts.seconds)}</strong>
-              <span>Seconds</span>
-            </span>
-          </div>
-        )}
-      </div>
+      <div className="home-installation__stereo-body">
+        <div
+          className="home-installation__stereo-speaker home-installation__stereo-speaker--left"
+          aria-hidden="true"
+        >
+          <span />
+          <span />
+        </div>
 
-      <div className="home-installation__stereo-speaker home-installation__stereo-speaker--right" aria-hidden="true">
-        <span />
-        <span />
-      </div>
-    </div>
-
-    <div className="home-installation__stereo-footer" aria-hidden="true">
-      <span className="home-installation__stereo-accent-bar" />
-      <span className="home-installation__stereo-accent-bar" />
-      <span className="home-installation__stereo-accent-bar" />
-    </div>
-  </div>
-</section>
-          {isThemeRevealRevealed ? (
-            <div className="home-installation__inline-reveal" aria-live="polite">
-              <div className="home-installation__inline-header">
-                <span>VOX // '26 Theme Reveal</span>
-                <strong>Watch the reveal</strong>
-              </div>
-              <div className="home-installation__inline-frame-shell">
-                <iframe
-                  className="home-installation__inline-frame"
-                  src={THEME_REVEAL_EMBED_URL}
-                  title="VOX 2026 theme reveal Instagram Reel"
-                  loading="lazy"
-                  allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                />
-              </div>
-              <a
-                className="home-installation__inline-fallback"
-                href={THEME_REVEAL_URL}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open the VOX 2026 theme reveal on Instagram"
-              >
-                Open on Instagram
-              </a>
-            </div>
+        <div className="home-installation__stereo-center">
+          {countdownParts.isLive ? (
+            <strong className="home-installation__countdown-live">
+              VOX // '26 is live
+            </strong>
           ) : (
-<button
-  type="button"
-  className={`home-installation__reveal-card home-installation__turntable${isThemeRevealSpinning ? " home-installation__reveal-card--spinning" : ""}`}
-  onClick={handleInlineThemeRevealClick}
-  aria-label="Watch the VOX 2026 theme reveal inside this section"
-  aria-busy={isThemeRevealSpinning ? "true" : undefined}
-  disabled={isThemeRevealSpinning}
->
-  <span className="home-installation__turntable-panel" aria-hidden="true">
-    <span className="home-installation__turntable-screw home-installation__turntable-screw--top-left" />
-    <span className="home-installation__turntable-screw home-installation__turntable-screw--top-right" />
-    <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-left" />
-    <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-right" />
-    <span className="home-installation__turntable-knob" />
-  </span>
+            <div className="home-installation__countdown-grid">
+              <span className="home-installation__countdown-unit">
+                <strong>{formatCountdownPart(countdownParts.days)}</strong>
+                <span>Days</span>
+              </span>
 
-  <span className="home-installation__platter" aria-hidden="true">
-    <span className="home-installation__record">
-      <span />
-    </span>
-  </span>
+              <span className="home-installation__countdown-unit">
+                <strong>{formatCountdownPart(countdownParts.hours)}</strong>
+                <span>Hours</span>
+              </span>
 
-  <span className="home-installation__tonearm" aria-hidden="true">
-    <span className="home-installation__tonearm-head" />
-  </span>
+              <span className="home-installation__countdown-unit">
+                <strong>{formatCountdownPart(countdownParts.minutes)}</strong>
+                <span>Minutes</span>
+              </span>
 
-
-
-  <span className="home-installation__stage-pass">
-    <span className="home-installation__reveal-status" role={isThemeRevealSpinning ? "status" : undefined}>
-      {isThemeRevealSpinning ? "Spinning the record..." : "Spin the record"}
-    </span>
-    <strong>{isThemeRevealSpinning ? "Cueing the theme reveal" : "Watch the theme reveal"}</strong>
-  </span>
-</button>
+              <span className="home-installation__countdown-unit">
+                <strong>{formatCountdownPart(countdownParts.seconds)}</strong>
+                <span>Seconds</span>
+              </span>
+            </div>
           )}
         </div>
+
+        <div
+          className="home-installation__stereo-speaker home-installation__stereo-speaker--right"
+          aria-hidden="true"
+        >
+          <span />
+          <span />
+        </div>
       </div>
+
+      <div className="home-installation__stereo-footer" aria-hidden="true">
+        <span className="home-installation__stereo-accent-bar" />
+        <span className="home-installation__stereo-accent-bar" />
+        <span className="home-installation__stereo-accent-bar" />
+      </div>
+    </div>
+  </section>
+
+  <div className="home-installation__record-station">
+    <div className="home-installation__player-column">
+      {isPostRevealed ? (
+        <div className="home-installation__inline-reveal" aria-live="polite">
+          <div className="home-installation__inline-header">
+            <span>VOX // '26 Installation Record</span>
+            <strong>{selectedPost.title}</strong>
+          </div>
+
+          <div className="home-installation__inline-frame-shell">
+            <iframe
+              key={selectedPost.id}
+              className="home-installation__inline-frame"
+              src={selectedPost.embedUrl}
+              title={`VOX 2026 ${selectedPost.title} Instagram post`}
+              loading="lazy"
+              allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          </div>
+
+          <a
+            className="home-installation__inline-fallback"
+            href={selectedPost.instagramUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open the VOX 2026 ${selectedPost.title} post on Instagram`}
+          >
+            Open on Instagram
+          </a>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={`home-installation__reveal-card home-installation__turntable${
+            isRecordLoading
+              ? " home-installation__reveal-card--spinning"
+              : ""
+          }`}
+          onClick={handleActiveRecordClick}
+          aria-label={`Play the VOX 2026 ${selectedPost.title} installation record`}
+          aria-busy={isRecordLoading ? "true" : undefined}
+          disabled={isRecordLoading}
+        >
+          <span
+            className="home-installation__turntable-panel"
+            aria-hidden="true"
+          >
+            <span className="home-installation__turntable-screw home-installation__turntable-screw--top-left" />
+            <span className="home-installation__turntable-screw home-installation__turntable-screw--top-right" />
+            <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-left" />
+            <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-right" />
+            <span className="home-installation__turntable-knob" />
+          </span>
+
+          <span className="home-installation__platter" aria-hidden="true">
+            <span
+              className={`home-installation__record home-installation__record--${selectedPost.accent}`}
+            >
+              <span />
+            </span>
+          </span>
+
+          <span className="home-installation__tonearm" aria-hidden="true">
+            <span className="home-installation__tonearm-head" />
+          </span>
+
+          <span className="home-installation__stage-pass">
+            <span
+              className="home-installation__reveal-status"
+              role={isRecordLoading ? "status" : undefined}
+            >
+              {isRecordLoading
+                ? "Loading the record..."
+                : selectedPost.title}
+            </span>
+
+            <strong>
+              {isRecordLoading
+                ? `Cueing ${pendingPost?.title ?? selectedPost.title}`
+                : "Spin the record"}
+            </strong>
+          </span>
+        </button>
+      )}
+
+      {pendingPost ? (
+        <span
+          className={`home-installation__travelling-disc home-installation__travelling-disc--${pendingPost.accent}`}
+          aria-hidden="true"
+        >
+          <span />
+        </span>
+      ) : null}
+    </div>
+
+    <aside
+      className="home-installation__record-library"
+      aria-labelledby="vox-record-library-title"
+    >
+      <div className="home-installation__record-library-header">
+        <span>VOX // '26</span>
+        <strong id="vox-record-library-title">
+          Installation Records
+        </strong>
+      </div>
+
+<div className="home-installation__record-shelf">
+  {Array.from({ length: VOX_RECORD_SHELF_SLOT_COUNT }, (_, slotIndex) => {
+    const post = VOX_INSTALLATION_POSTS[slotIndex];
+
+    if (!post) {
+      return (
+        <div
+          key={`empty-record-slot-${slotIndex}`}
+          className="home-installation__record-compartment home-installation__record-compartment--empty"
+          aria-hidden="true"
+        >
+          <span className="home-installation__empty-record-slot" />
+        </div>
+      );
+    }
+
+    const isSelected = post.id === selectedPostId;
+    const isPending = post.id === pendingPostId;
+
+    return (
+      <div
+        key={post.id}
+        className="home-installation__record-compartment"
+      >
+        <button
+          type="button"
+          className={`home-installation__record-choice home-installation__record-choice--${post.accent}${
+            isSelected
+              ? " home-installation__record-choice--selected"
+              : ""
+          }${
+            isPending
+              ? " home-installation__record-choice--loading"
+              : ""
+          }`}
+          onClick={() => loadVoxPost(post.id)}
+          aria-label={`Load the ${post.title} installation record`}
+          aria-pressed={isSelected}
+          disabled={isRecordLoading}
+        >
+          <span
+            className="home-installation__record-sleeve"
+            aria-hidden="true"
+          >
+            <span className="home-installation__record-mini">
+              <span className="home-installation__record-mini-label">
+                <strong>{post.shortTitle}</strong>
+                <small>{post.label}</small>
+              </span>
+            </span>
+          </span>
+
+          <span className="home-installation__record-choice-caption">
+            {post.title}
+          </span>
+        </button>
+      </div>
+    );
+  })}
+</div>
+    </aside>
+  </div>
+</div>
+        </div>
     </motion.section>
   );
 }

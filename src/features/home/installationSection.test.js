@@ -81,7 +81,7 @@ test("InstallationSection contains emoji-free VOX event content and external act
 /className="home-installation__stereo-accent-bar"/,
 /className="home-installation__stereo-speaker home-installation__stereo-speaker--right"/,
 /className="home-installation__visual" id="vox-theme-reveal"/,
-/className=\{`home-installation__reveal-card home-installation__turntable\$\{isThemeRevealSpinning \? " home-installation__reveal-card--spinning" : ""\}`\}/,
+/className=\{`home-installation__reveal-card home-installation__turntable\$\{[\s\S]*isRecordLoading[\s\S]*home-installation__reveal-card--spinning/,
 /className="home-installation__turntable-panel" aria-hidden="true"/,
 /className="home-installation__turntable-screw home-installation__turntable-screw--top-left"/,
 /className="home-installation__turntable-screw home-installation__turntable-screw--top-right"/,
@@ -109,7 +109,6 @@ test("InstallationSection contains emoji-free VOX event content and external act
   assert.doesNotMatch(source, /handleThemeRevealClick|openVoxThemeReveal|onClick=\{handleThemeRevealClick\}/);
   assert.doesNotMatch(source, /home-installation__action-link--rsvp/);
   assert.doesNotMatch(source, /button button-primary home-installation__button|button button-secondary home-installation__button/);
-  assert.equal((source.match(/onClick=\{handleInlineThemeRevealClick\}/g) ?? []).length, 1);
   assert.doesNotMatch(source, /role="dialog"|aria-modal="true"/);
 assert.doesNotMatch(source, /VOX \/\/ '26 SETLIST/);
 assert.doesNotMatch(source, /home-installation__setlist/);
@@ -119,51 +118,75 @@ assert.doesNotMatch(source, /home-installation__detail-card--time[\s\S]{0,360}ho
 assert.doesNotMatch(source, /home-installation__poster-texture/);
 assert.doesNotMatch(source, /home-installation__guitar-line/);
 assert.doesNotMatch(source, /home-installation__lightning-mark/);
+assert.doesNotMatch(source, /isThemeRevealSpinning/);
+assert.doesNotMatch(source, /isThemeRevealRevealed/);
+assert.doesNotMatch(source, /handleInlineThemeRevealClick/);
+assert.doesNotMatch(source, /themeRevealState/);
+assert.doesNotMatch(
+  source,
+  /aria-label="Watch the VOX 2026 theme reveal inside this section"/,
+);
 });
 
-test("InstallationSection vinyl card spins before revealing the Instagram Reel inline", async () => {
+test("InstallationSection loads one selected VOX installation record at a time", async () => {
   const source = await readFile(new URL("./InstallationSection.jsx", import.meta.url), "utf8");
 
   for (const expected of [
-    /import \{ useEffect, useRef, useState \} from "react";/,
-    /const THEME_REVEAL_URL = "https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx";/,
-    /const THEME_REVEAL_EMBED_URL = "https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/embed";/,
-    /const revealTimerRef = useRef\(null\);/,
-    /const \[themeRevealState, setThemeRevealState\] = useState\("idle"\);/,
-    /themeRevealState === "spinning"/,
-    /themeRevealState === "revealed"/,
-    /function handleInlineThemeRevealClick\(\)/,
-    /if \(isThemeRevealSpinning \|\| isThemeRevealRevealed\) return;/,
-    /if \(reduceMotion\) \{[\s\S]*setThemeRevealState\("revealed"\);/,
-    /setThemeRevealState\("spinning"\);/,
-    /window\.setTimeout\(\(\) => \{[\s\S]*setThemeRevealState\("revealed"\);[\s\S]*\}, 2000\);/,
-    /window\.clearTimeout\(revealTimerRef\.current\);/,
-    /useEffect\(\(\) => \{[\s\S]*return \(\) => window\.clearTimeout\(revealTimerRef\.current\);/,
-    /onClick=\{handleInlineThemeRevealClick\}/,
-    /aria-label="Watch the VOX 2026 theme reveal inside this section"/,
-    /aria-busy=\{isThemeRevealSpinning \? "true" : undefined\}/,
-    /disabled=\{isThemeRevealSpinning\}/,
-    /home-installation__reveal-card--spinning/,
-    /className="home-installation__tonearm" aria-hidden="true"/,
-    /className="home-installation__tonearm-head"/,
-    /Spinning the record\.\.\./,
-    /<iframe[\s\S]*className="home-installation__inline-frame"[\s\S]*src=\{THEME_REVEAL_EMBED_URL\}/,
-    /title="VOX 2026 theme reveal Instagram Reel"/,
+    /const VOX_INSTALLATION_POSTS = \[/,
+    /id: "save-the-date"/,
+    /title: "Save the Date"/,
+    /id: "theme-reveal"/,
+    /title: "Theme Reveal"/,
+    /isLatest: true/,
+    /const DEFAULT_VOX_POST_ID =/,
+    /const RECORD_LOAD_DURATION_MS = 2000;/,
+    /const \[selectedPostId, setSelectedPostId\] = useState\(DEFAULT_VOX_POST_ID\);/,
+    /const \[pendingPostId, setPendingPostId\] = useState\(null\);/,
+    /const \[playerState, setPlayerState\] = useState\("idle"\);/,
+    /const selectedPost =/,
+    /const pendingPost =/,
+    /const isRecordLoading = playerState === "loading";/,
+    /const isPostRevealed = playerState === "revealed";/,
+    /function loadVoxPost\(postId\)/,
+    /function handleActiveRecordClick\(\)/,
+    /setPendingPostId\(postId\);/,
+    /setPlayerState\("loading"\);/,
+    /setSelectedPostId\(postId\);/,
+    /setPlayerState\("revealed"\);/,
+    /RECORD_LOAD_DURATION_MS/,
+    /className="home-installation__record-station"/,
+    /className="home-installation__player-column"/,
+    /className="home-installation__record-library"/,
+    /className="home-installation__record-mini-label"/,
+/\{post\.shortTitle\}/,
+/\{post\.label\}/,
+/className="home-installation__record-choice-caption"/,
+    /id="vox-record-library-title"/,
+    /Installation Records/,
+    /VOX_INSTALLATION_POSTS\.map\(\(post\) =>/,
+    /onClick=\{\(\) => loadVoxPost\(post\.id\)\}/,
+    /aria-pressed=\{isSelected\}/,
+    /className="home-installation__record-sleeve"/,
+    /className="home-installation__record-mini"/,
+    /className=\{`home-installation__travelling-disc/,
+    /key=\{selectedPost\.id\}/,
+    /src=\{selectedPost\.embedUrl\}/,
+    /href=\{selectedPost\.instagramUrl\}/,
+    /Open on Instagram/,
     /loading="lazy"/,
     /allow="clipboard-write; encrypted-media; picture-in-picture; web-share"/,
-    /href=\{THEME_REVEAL_URL\}/,
-    /Open on Instagram/,
   ]) {
     assert.match(source, expected);
   }
 
   assert.doesNotMatch(source, /allow="autoplay;/);
-  assert.doesNotMatch(source, /function useIsNarrowViewport\(\)/);
-  assert.doesNotMatch(source, /window\.matchMedia\("\(max-width: 48rem\)"\)/);
-  assert.doesNotMatch(source, /isNarrowViewport \? \(/);
-  assert.doesNotMatch(source, /home-installation__equalizer/);
-assert.doesNotMatch(source, /home-installation__equalizer-bar/);
-assert.doesNotMatch(source, /home-installation__turntable-slider/);
+  assert.doesNotMatch(source, /multiple.*iframe/i);
+  assert.equal(
+    (source.match(/<iframe/g) ?? []).length,
+    1,
+    "Only one Instagram iframe should exist in the component source",
+  );
+  
 });
 
 test("InstallationSection provides a second-based VOX countdown above the record card", async () => {
@@ -348,6 +371,28 @@ test("home CSS defines VOX fixture stage, mobile simplification, and reduced-mot
 /\.home-installation__stereo-center::before/,
 /\.home-installation__stereo-footer \{/,
 /\.home-installation__stereo-accent-bar \{/,
+/\.home-installation__record-station \{/,
+/\.home-installation__player-column \{/,
+/\.home-installation__record-library \{/,
+/\.home-installation__record-library-header \{/,
+/\.home-installation__record-shelf \{/,
+/\.home-installation__record-choice \{/,
+/\.home-installation__record-choice--selected \{/,
+/\.home-installation__record-sleeve \{/,
+/\.home-installation__record-mini \{/,
+/\.home-installation__travelling-disc \{/,
+/@keyframes home-installation-disc-load/,
+/\.home-installation__record-library::before/,
+/\.home-installation__record-library::after/,
+/\.home-installation__record-choice:not\(:last-child\)::after/,
+/\.home-installation__record-mini-label \{/,
+/\.home-installation__record-mini-label::after/,
+/\.home-installation__record-mini-label strong \{/,
+/\.home-installation__record-mini-label small \{/,
+/\.home-installation__record-choice-caption \{/,
+/@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__record-station \{[\s\S]*grid-template-columns: 1fr;/,
+/@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__record-shelf \{[\s\S]*grid-auto-flow: column;[\s\S]*overflow-x: auto;/,
+/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.home-installation__travelling-disc/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__spotlight \{[\s\S]*display: none;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__details \{[\s\S]*grid-template-columns: 1fr;/,
     /@media \(max-width: 48rem\) \{[\s\S]*\.home-installation__detail-card \{[\s\S]*min-height: 7\.9rem;/,
@@ -390,6 +435,9 @@ assert.doesNotMatch(css, /home-installation__detail-stamp/);
 assert.doesNotMatch(css, /home-installation__turntable-slider/);
 assert.doesNotMatch(css, /home-installation__equalizer/);
 assert.doesNotMatch(css, /home-installation-equalizer-pulse/);
+assert.doesNotMatch(css, /iframe.*record-choice/);
+assert.doesNotMatch(source, /home-installation__record-choice-title/);
+assert.doesNotMatch(source, /home-installation__record-choice-label/);
 });
 
 test("VOX fixture polish does not introduce package dependencies", async () => {

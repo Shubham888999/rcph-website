@@ -515,9 +515,9 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(19rem, clamp(21rem, 31vw, 30rem));
+  grid-template-columns: minmax(0, 1fr) minmax(28rem, clamp(31rem, 40vw, 40rem));
   align-items: center;
-  gap: clamp(2rem, 4.2vw, 4.5rem);
+  gap: clamp(2rem, 3.5vw, 3.75rem);
 }
 
 .home-installation__atmosphere {
@@ -1167,14 +1167,501 @@
 
 .home-installation__visual {
   position: relative;
+  width: min(100%, 40rem);
   min-width: 0;
-  width: min(100%, clamp(21rem, 31vw, 30rem));
-  justify-self: end;
   overflow: visible;
-  scroll-margin-top: calc(var(--header-height, 5rem) + var(--vox-announcement-height, 0rem) + 1rem);
+  scroll-margin-top: calc(
+    var(--header-height, 5rem) +
+    var(--vox-announcement-height, 0rem) +
+    1rem
+  );
+}
+.home-installation__record-station {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(9.5rem, 12vw, 11.5rem);
+  align-items: stretch;
+  gap: 0;
+  filter: drop-shadow(0 1.2rem 2.4rem rgba(0, 0, 0, 0.38));
 }
 
+.home-installation__player-column {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  height: 100%;
+  display: grid;
+}
 
+.home-installation__player-column > .home-installation__reveal-card,
+.home-installation__player-column > .home-installation__inline-reveal {
+  height: 100%;
+}
+
+.home-installation__player-column .home-installation__reveal-card,
+.home-installation__player-column .home-installation__inline-reveal {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.home-installation__record-library {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  height: 100%;
+  margin-left: -1px;
+  padding: 0.68rem;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 0.34rem solid #6c381c;
+  border-left-width: 0.28rem;
+  border-radius: 0 0.9rem 0.9rem 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 232, 196, 0.035) 0 1px,
+      transparent 1px 0.82rem
+    ),
+    linear-gradient(
+      90deg,
+      #7b4323 0%,
+      #9a5a31 22%,
+      #75401f 48%,
+      #92542c 74%,
+      #663318 100%
+    );
+  box-shadow:
+    inset 0.22rem 0 0.35rem rgba(255, 226, 181, 0.11),
+    inset -0.28rem 0 0.5rem rgba(43, 14, 5, 0.42),
+    0 0 0 1px rgba(30, 8, 2, 0.8);
+}
+
+.home-installation__record-library::before {
+  position: absolute;
+  inset: 0.28rem;
+  z-index: 0;
+  content: "";
+  pointer-events: none;
+  border: 1px solid rgba(255, 225, 181, 0.08);
+  border-radius: 0 0.56rem 0.56rem 0;
+  box-shadow:
+    inset 0.45rem 0 0.65rem rgba(0, 0, 0, 0.18),
+    inset -0.45rem 0 0.65rem rgba(0, 0, 0, 0.2);
+}
+
+.home-installation__record-library::after {
+  display: none;
+}
+
+.home-installation__record-library-header {
+  position: relative;
+  z-index: 3;
+  margin: 0 0 0.55rem;
+  padding: 0.52rem 0.48rem 0.58rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.18rem;
+  border: 1px solid rgba(55, 20, 8, 0.9);
+  border-radius: 0.32rem;
+  background:
+    linear-gradient(
+      180deg,
+      #75401f 0%,
+      #5e3017 42%,
+      #4d2612 100%
+    );
+  box-shadow:
+    inset 0 1px rgba(255, 229, 188, 0.1),
+    inset 0 -0.22rem 0.36rem rgba(34, 10, 4, 0.34),
+    0 0.28rem 0.45rem rgba(23, 7, 3, 0.3);
+}
+
+.home-installation__record-library-header span {
+  color: #ff8fc2;
+  font-size: 0.46rem;
+  font-weight: 950;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.home-installation__record-library-header strong {
+  min-width: 0;
+  color: #fff0d3;
+  font-size: clamp(0.64rem, 0.8vw, 0.78rem);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  text-shadow: 0 1px rgba(0, 0, 0, 0.72);
+  white-space: nowrap;
+}
+.home-installation__record-shelf {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0.3rem solid #643217;
+  border-radius: 0.2rem;
+  background: #4b230f;
+  box-shadow:
+    inset 0.45rem 0 0.7rem rgba(37, 12, 4, 0.34),
+    inset -0.45rem 0 0.7rem rgba(37, 12, 4, 0.34),
+    inset 0 0.4rem 0.65rem rgba(30, 9, 3, 0.24);
+}
+
+.home-installation__record-compartment {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  display: block;
+  border: 0;
+background:
+  linear-gradient(
+    90deg,
+    #92562f 0%,
+    #b8794b 48%,
+    #8f522d 100%
+  );
+  box-shadow:
+    inset 0.8rem 0 1rem rgba(45, 17, 6, 0.24),
+    inset -0.8rem 0 1rem rgba(45, 17, 6, 0.24),
+    inset 0 0.8rem 0.85rem rgba(41, 14, 4, 0.3);
+}
+
+.home-installation__record-compartment::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(39, 12, 3, 0.2),
+      transparent 15% 85%,
+      rgba(39, 12, 3, 0.2)
+    ),
+    linear-gradient(
+      180deg,
+      rgba(38, 11, 3, 0.28),
+      transparent 28%
+    );
+}
+
+/* Thick physical wooden shelf board */
+.home-installation__record-compartment::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 5;
+  height: 1.55rem;
+  content: "";
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      #a96a3c 0%,
+      #8a4d27 18%,
+      #6b3519 62%,
+      #44200e 100%
+    );
+  border-top: 1px solid rgba(255, 226, 181, 0.2);
+  border-bottom: 1px solid rgba(38, 11, 3, 0.8);
+  box-shadow:
+    0 0.35rem 0.52rem rgba(37, 10, 2, 0.62),
+    inset 0 0.14rem 0.18rem rgba(255, 231, 193, 0.11),
+    inset 0 -0.22rem 0.28rem rgba(37, 11, 3, 0.34);
+}
+
+/* Keep a visible bottom plinth in the fourth cubby */
+.home-installation__record-compartment:last-child::after {
+  height: 1.55rem;
+}
+.home-installation__record-choice {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  appearance: none;
+  overflow: visible;
+  display: block;
+  border: 0;
+  color: #fff8ed;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  cursor: pointer;
+  perspective: 20rem;
+  transition:
+    transform 220ms ease,
+    filter 220ms ease,
+    opacity 220ms ease;
+}
+
+.home-installation__record-sleeve {
+  position: absolute;
+  right: 50%;
+  bottom: 1.28rem;
+  z-index: 7;
+  width: min(96%, 6.35rem);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  transform:
+    translateX(50%)
+    perspective(18rem)
+    rotateX(-2deg)
+    rotateY(-4deg)
+    rotateZ(-1deg);
+  transform-origin: center bottom;
+}
+.home-installation__record-sleeve::before {
+  position: absolute;
+  right: 8%;
+  bottom: -0.2rem;
+  left: 8%;
+  z-index: -1;
+  height: 0.44rem;
+  content: "";
+  border-radius: 50%;
+  background: rgba(36, 10, 3, 0.58);
+  box-shadow:
+    0 0.18rem 0.3rem rgba(22, 5, 1, 0.62),
+    0 -0.06rem 0.18rem rgba(94, 42, 18, 0.22);
+  filter: blur(0.07rem);
+}
+.home-installation__record-sleeve::after {
+  display: none;
+}
+
+.home-installation__record-mini {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 188, 89, 0.16);
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle,
+      transparent 0 17%,
+      rgba(255, 188, 89, 0.07) 17.5% 18.2%,
+      transparent 18.7%
+    ),
+    repeating-radial-gradient(
+      circle,
+      #070506 0 0.25rem,
+      #160a0e 0.27rem 0.32rem
+    ),
+    #050304;
+  box-shadow:
+    0.15rem 0.9rem 0.9rem rgba(43, 13, 4, 0.55),
+    -0.1rem 0.25rem 0.35rem rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 248, 237, 0.035);
+  transition:
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 220ms ease;
+}
+
+.home-installation__record-mini-label {
+  position: relative;
+  z-index: 2;
+  width: 46%;
+  aspect-ratio: 1;
+  padding: 0.18rem;
+  display: grid;
+  place-content: center;
+  gap: 0.08rem;
+  border: 1px solid rgba(255, 248, 237, 0.14);
+  border-radius: 50%;
+  color: #fff8ed;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 248, 237, 0.3), transparent 28%),
+    linear-gradient(145deg, #ffbc59, #b33f64 58%, #39101c);
+  box-shadow:
+    0 0 0.75rem rgba(255, 188, 89, 0.18),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  transform: rotate(-5deg);
+}
+
+.home-installation__record-mini-label::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.28rem;
+  aspect-ratio: 1;
+  content: "";
+  border-radius: 50%;
+  background: #090506;
+  transform: translate(-50%, -50%);
+}
+
+.home-installation__record-mini-label strong {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(0.32rem, 0.55vw, 0.46rem);
+  font-weight: 950;
+  letter-spacing: 0.025em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.home-installation__record-mini-label small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(255, 248, 237, 0.76);
+  font-size: clamp(0.22rem, 0.4vw, 0.32rem);
+  font-weight: 850;
+  letter-spacing: 0.035em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.home-installation__record-compartment--empty {
+  min-height: 0;
+}
+.home-installation__empty-record-slot {
+  position: absolute;
+  inset: 0 0 1.55rem;
+  z-index: 1;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(48, 15, 4, 0.18),
+      transparent 32%,
+      rgba(255, 220, 169, 0.018) 72%,
+      rgba(55, 20, 7, 0.1)
+    );
+  pointer-events: none;
+}
+.home-installation__record-choice-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+  height: 1.55rem;
+  padding: 0 0.22rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff6e8;
+  font-size: clamp(0.4rem, 0.52vw, 0.5rem);
+  font-weight: 950;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 1px 1px rgba(38, 10, 2, 0.95),
+    0 0 0.3rem rgba(0, 0, 0, 0.34);
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.home-installation__record-compartment:has(
+  .home-installation__record-choice--selected
+)::before {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  z-index: 9;
+  width: 0.34rem;
+  aspect-ratio: 1;
+  content: "";
+  border-radius: 50%;
+  background: #ffbc59;
+  box-shadow: 0 0 0.65rem rgba(255, 188, 89, 0.72);
+}
+.home-installation__record-choice--loading .home-installation__record-mini {
+  transform: translateX(-0.35rem) translateY(-0.16rem) rotate(-18deg) scale(1.04);
+}
+
+.home-installation__record-choice--amber .home-installation__record-mini-label,
+.home-installation__record--amber::after,
+.home-installation__travelling-disc--amber span {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 248, 237, 0.34), transparent 28%),
+    linear-gradient(145deg, #ffd783, #bd6b28 62%, #35180c);
+}
+
+.home-installation__record-choice--pink .home-installation__record-mini-label,
+.home-installation__record--pink::after,
+.home-installation__travelling-disc--pink span {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 248, 237, 0.34), transparent 28%),
+    linear-gradient(145deg, #ffbc59, #f56bac 52%, #501128);
+}
+.home-installation__travelling-disc {
+  position: absolute;
+  z-index: 8;
+  top: 24%;
+  right: -7.25rem;
+  width: clamp(3.1rem, 6vw, 4.4rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, #ffbc59 0 7%, #19070c 8% 17%, transparent 18%),
+    repeating-radial-gradient(circle, #070506 0 0.28rem, #14090d 0.3rem 0.37rem),
+    #050304;
+  box-shadow:
+    0 0.8rem 1.4rem rgba(0, 0, 0, 0.55),
+    0 0 1.3rem rgba(255, 188, 89, 0.2);
+  animation: home-installation-disc-load 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.home-installation__travelling-disc span {
+  position: absolute;
+  inset: 34%;
+  border-radius: 50%;
+}
+
+@keyframes home-installation-disc-load {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg) scale(0.82);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(-0.8rem, -0.8rem) rotate(-24deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-1 * clamp(10rem, 18vw, 14rem)),
+        clamp(6.5rem, 11vw, 9.5rem)
+      )
+      rotate(390deg)
+      scale(1.45);
+  }
+}
 .home-installation__reveal-card {
   position: relative;
   width: 100%;
@@ -2642,9 +3129,33 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
       0 1.8rem 4.4rem rgba(0, 0, 0, 0.46),
       0 0 2.4rem rgba(226, 55, 126, 0.13),
       inset 0 0 0 1px rgba(255, 248, 237, 0.045);
-  }
+ 
+    }
+
+    .home-installation__record-choice:hover {
+  border-color: rgba(255, 188, 89, 0.48);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 237, 0.04),
+    0 0.85rem 1.5rem rgba(0, 0, 0, 0.28),
+    0 0 1rem rgba(226, 55, 126, 0.1);
+  transform: translateY(-0.16rem);
+}
+.home-installation__record-choice:hover .home-installation__record-sleeve {
+  transform:
+    translateX(50%)
+    perspective(18rem)
+    rotateX(-1deg)
+    rotateY(-1deg)
+    rotateZ(0deg)
+    translateY(-0.12rem)
+    scale(1.025);
 }
 
+}
+.home-installation__record-choice:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 @media (max-width: 64rem) {
 .home-highlight-awards__composition {
   grid-template-columns: 1fr;
@@ -3199,7 +3710,149 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
   min-height: 2.6rem;
   padding: 0.5rem 0.6rem;
 }
+.home-installation__record-station {
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 0.75rem;
+  filter: none;
+}
 
+.home-installation__player-column .home-installation__reveal-card,
+.home-installation__player-column .home-installation__inline-reveal {
+  border-radius: clamp(1rem, 2vw, 1.35rem);
+}
+
+.home-installation__record-library {
+  width: 100%;
+  height: auto;
+  margin-left: 0;
+  padding: 0.58rem;
+  border: 0.28rem solid #6c381c;
+  border-radius: 0.75rem;
+}
+
+.home-installation__record-library-header {
+  margin-bottom: 0.5rem;
+  grid-template-columns: 1fr;
+  gap: 0.18rem;
+}
+
+.home-installation__record-library-header strong {
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.home-installation__record-shelf {
+  width: 100%;
+  height: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 10rem);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.home-installation__record-compartment {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  display: block;
+  border: 0;
+  border-right: 0.22rem solid #643217;
+  border-bottom: 0.22rem solid #643217;
+  background:
+    linear-gradient(
+      90deg,
+      #92562f 0%,
+      #b8794b 48%,
+      #8f522d 100%
+    );
+  box-shadow:
+    inset 0.72rem 0 0.85rem rgba(57, 24, 9, 0.2),
+    inset -0.72rem 0 0.85rem rgba(57, 24, 9, 0.2),
+    inset 0 0.62rem 0.7rem rgba(48, 17, 6, 0.28);
+}
+
+.home-installation__record-compartment:nth-child(2n) {
+  border-right: 0;
+}
+
+.home-installation__record-compartment:nth-child(n + 3) {
+  border-bottom: 0;
+}
+
+.home-installation__record-compartment::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(39, 13, 4, 0.16),
+      transparent 14% 86%,
+      rgba(39, 13, 4, 0.18)
+    ),
+    linear-gradient(
+      180deg,
+      rgba(43, 14, 4, 0.24),
+      transparent 25%
+    );
+}
+
+/*
+  Do not redefine record-compartment::after here.
+  The desktop 1.55rem slab applies to all four mobile cells.
+*/
+
+.home-installation__record-choice {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.home-installation__record-sleeve {
+  right: 50%;
+  bottom: 1.28rem;
+  width: min(82%, 7rem);
+  transform:
+    translateX(50%)
+    perspective(18rem)
+    rotateX(-2deg)
+    rotateY(-4deg)
+    rotateZ(-1deg);
+}
+
+.home-installation__record-choice-caption {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1.55rem;
+  padding-inline: 0.14rem;
+  font-size: clamp(0.42rem, 2.3vw, 0.54rem);
+}
+
+.home-installation__record-mini-label strong {
+  font-size: 0.42rem;
+}
+
+.home-installation__record-mini-label small {
+  font-size: 0.29rem;
+}
+
+.home-installation__travelling-disc {
+  display: none;
+}
 }
 @media (max-width: 38.75rem) {
   .home-hero h1 {
@@ -3443,6 +4096,18 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
     transition: none;
     will-change: auto;
   }
+
+  .home-installation__record-choice,
+.home-installation__record-mini,
+.home-installation__record-sleeve::after,
+.home-installation__travelling-disc {
+  animation: none;
+  transition: none;
+}
+
+.home-installation__travelling-disc {
+  display: none;
+}
 }
 
 @media (max-width: 48rem) {
