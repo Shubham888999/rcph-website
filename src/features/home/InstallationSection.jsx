@@ -346,9 +346,45 @@ function handleActiveRecordClick() {
   </section>
 
   <div className="home-installation__record-station">
-    <div className="home-installation__player-column">
+ <div className="home-installation__player-column">
+  <div
+    className={`home-installation__reveal-card home-installation__turntable${
+      isRecordLoading
+        ? " home-installation__reveal-card--spinning"
+        : ""
+    }${
+      isPostRevealed
+        ? " home-installation__turntable--revealed"
+        : ""
+    }`}
+    aria-live="polite"
+    aria-busy={isRecordLoading ? "true" : undefined}
+  >
+    <span
+      className="home-installation__turntable-panel"
+      aria-hidden="true"
+    >
+      <span className="home-installation__turntable-screw home-installation__turntable-screw--top-left" />
+      <span className="home-installation__turntable-screw home-installation__turntable-screw--top-right" />
+      <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-left" />
+      <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-right" />
+
+      <span className="home-installation__turntable-controls">
+        <span className="home-installation__turntable-control home-installation__turntable-control--power" />
+        <span className="home-installation__turntable-control" />
+        <span className="home-installation__turntable-control" />
+      </span>
+    </span>
+
+    <div
+      className={`home-installation__turntable-media${
+        isPostRevealed
+          ? " home-installation__turntable-media--revealed"
+          : ""
+      }`}
+    >
       {isPostRevealed ? (
-        <div className="home-installation__inline-reveal" aria-live="polite">
+        <div className="home-installation__turntable-embed">
           <div className="home-installation__inline-header">
             <span>VOX // '26 Installation Record</span>
             <strong>{selectedPost.title}</strong>
@@ -366,41 +402,16 @@ function handleActiveRecordClick() {
               allowFullScreen
             />
           </div>
-
-          <a
-            className="home-installation__inline-fallback"
-            href={selectedPost.instagramUrl}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`Open the VOX 2026 ${selectedPost.title} post on Instagram`}
-          >
-            Open on Instagram
-          </a>
         </div>
       ) : (
         <button
           type="button"
-          className={`home-installation__reveal-card home-installation__turntable${
-            isRecordLoading
-              ? " home-installation__reveal-card--spinning"
-              : ""
-          }`}
+          className="home-installation__turntable-play"
           onClick={handleActiveRecordClick}
           aria-label={`Play the VOX 2026 ${selectedPost.title} installation record`}
           aria-busy={isRecordLoading ? "true" : undefined}
           disabled={isRecordLoading}
         >
-          <span
-            className="home-installation__turntable-panel"
-            aria-hidden="true"
-          >
-            <span className="home-installation__turntable-screw home-installation__turntable-screw--top-left" />
-            <span className="home-installation__turntable-screw home-installation__turntable-screw--top-right" />
-            <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-left" />
-            <span className="home-installation__turntable-screw home-installation__turntable-screw--bottom-right" />
-            <span className="home-installation__turntable-knob" />
-          </span>
-
           <span className="home-installation__platter" aria-hidden="true">
             <span
               className={`home-installation__record home-installation__record--${selectedPost.accent}`}
@@ -408,39 +419,55 @@ function handleActiveRecordClick() {
               <span />
             </span>
           </span>
-
-          <span className="home-installation__tonearm" aria-hidden="true">
-            <span className="home-installation__tonearm-head" />
-          </span>
-
-          <span className="home-installation__stage-pass">
-            <span
-              className="home-installation__reveal-status"
-              role={isRecordLoading ? "status" : undefined}
-            >
-              {isRecordLoading
-                ? "Loading the record..."
-                : selectedPost.title}
-            </span>
-
-            <strong>
-              {isRecordLoading
-                ? `Cueing ${pendingPost?.title ?? selectedPost.title}`
-                : "Spin the record"}
-            </strong>
-          </span>
         </button>
       )}
+    </div>
 
-      {pendingPost ? (
-        <span
-          className={`home-installation__travelling-disc home-installation__travelling-disc--${pendingPost.accent}`}
-          aria-hidden="true"
+    <span className="home-installation__tonearm" aria-hidden="true">
+      <span className="home-installation__tonearm-head" />
+    </span>
+
+    <div className="home-installation__stage-pass">
+      <span
+        className="home-installation__reveal-status"
+        role={isRecordLoading ? "status" : undefined}
+      >
+        {isRecordLoading
+          ? "Loading the record..."
+          : selectedPost.title}
+      </span>
+
+      <strong>
+        {isRecordLoading
+          ? `Cueing ${pendingPost?.title ?? selectedPost.title}`
+          : isPostRevealed
+            ? selectedPost.title
+            : "Spin the record"}
+      </strong>
+
+      {isPostRevealed ? (
+        <a
+          className="home-installation__inline-fallback"
+          href={selectedPost.instagramUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open the VOX 2026 ${selectedPost.title} post on Instagram`}
         >
-          <span />
-        </span>
+          Open on Instagram
+        </a>
       ) : null}
     </div>
+  </div>
+
+  {pendingPost ? (
+    <span
+      className={`home-installation__travelling-disc home-installation__travelling-disc--${pendingPost.accent}`}
+      aria-hidden="true"
+    >
+      <span />
+    </span>
+  ) : null}
+</div>
 
     <aside
       className="home-installation__record-library"

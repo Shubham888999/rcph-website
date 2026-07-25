@@ -1193,10 +1193,6 @@
   display: grid;
 }
 
-.home-installation__player-column > .home-installation__reveal-card,
-.home-installation__player-column > .home-installation__inline-reveal {
-  height: 100%;
-}
 
 .home-installation__player-column .home-installation__reveal-card,
 .home-installation__player-column .home-installation__inline-reveal {
@@ -1664,73 +1660,92 @@ background:
 }
 .home-installation__reveal-card {
   position: relative;
+  isolation: isolate;
   width: 100%;
   min-height: clamp(28rem, 44vw, 36rem);
-  padding: clamp(1.1rem, 2.4vw, 1.45rem);
-  appearance: none;
+  padding: clamp(1rem, 2.2vw, 1.35rem);
   overflow: hidden;
   display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 188, 89, 0.38);
-  border-radius: clamp(1rem, 2vw, 1.35rem);
+  grid-template-rows: minmax(0, 1fr) auto;
+  border: 0.32rem solid #633117;
+  border-radius: clamp(1rem, 2vw, 1.35rem) 0 0
+    clamp(1rem, 2vw, 1.35rem);
   color: #fff8ed;
   background:
-    linear-gradient(180deg, rgba(255, 248, 237, 0.08), transparent 18%),
-    radial-gradient(circle at 50% 38%, rgba(255, 188, 89, 0.12), transparent 14rem),
-    radial-gradient(circle at 74% 22%, rgba(226, 55, 126, 0.13), transparent 15rem),
-    linear-gradient(145deg, #170607 0%, #3a0913 46%, #0b0405 100%);
+    linear-gradient(
+      90deg,
+      rgba(255, 226, 181, 0.045),
+      transparent 18% 82%,
+      rgba(45, 14, 5, 0.12)
+    ),
+    linear-gradient(
+      105deg,
+      #6c381c 0%,
+      #8f542d 22%,
+      #70401f 46%,
+      #985d34 70%,
+      #5a2b14 100%
+    );
   box-shadow:
-    inset 0 0 0 1px rgba(255, 248, 237, 0.06),
-    inset 0 -0.9rem 1.7rem rgba(0, 0, 0, 0.32),
-    0 1.35rem 3rem rgba(0, 0, 0, 0.42),
-    0 0 2.2rem rgba(255, 188, 89, calc(var(--installation-visual-glow-opacity) * 0.64));
-  text-decoration: none;
-  text-align: inherit;
-  font: inherit;
-  cursor: pointer;
-  isolation: isolate;
+    inset 0.35rem 0 0.65rem rgba(255, 227, 184, 0.06),
+    inset -0.42rem 0 0.75rem rgba(43, 13, 4, 0.34),
+    inset 0 0.3rem 0.45rem rgba(255, 228, 185, 0.06),
+    inset 0 -0.4rem 0.7rem rgba(38, 10, 3, 0.38),
+    0 1.35rem 3rem rgba(0, 0, 0, 0.42);
 }
 
 .home-installation__reveal-card:disabled {
   cursor: progress;
 }
 
-.home-installation__reveal-card::before,
-.home-installation__reveal-card::after {
+.home-installation__reveal-card::before {
   position: absolute;
+  inset: 0.58rem;
+  z-index: -1;
   content: "";
+  border: 1px solid rgba(55, 19, 8, 0.78);
+  border-radius: calc(clamp(1rem, 2vw, 1.35rem) - 0.38rem) 0 0
+    calc(clamp(1rem, 2vw, 1.35rem) - 0.38rem);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 229, 191, 0.04),
+      transparent 22%
+    );
+  box-shadow:
+    inset 0.52rem 0 0.8rem rgba(45, 14, 5, 0.18),
+    inset -0.52rem 0 0.8rem rgba(45, 14, 5, 0.2),
+    inset 0 0.6rem 0.9rem rgba(37, 10, 3, 0.16);
   pointer-events: none;
 }
 
-.home-installation__reveal-card::before {
-  inset: 0.55rem;
-  z-index: -1;
-  border: 1px solid rgba(255, 188, 89, 0.18);
-  border-radius: calc(clamp(1rem, 2vw, 1.35rem) - 0.32rem);
-  box-shadow: inset 0 0 1.4rem rgba(0, 0, 0, 0.38);
-}
-
 .home-installation__reveal-card::after {
-  right: clamp(1rem, 3vw, 1.8rem);
-  bottom: clamp(1rem, 3vw, 1.8rem);
-  left: clamp(1rem, 3vw, 1.8rem);
-  height: 0.16rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 188, 89, 0.18), rgba(255, 111, 176, 0.54), rgba(255, 188, 89, 0.18));
-  box-shadow: 0 0 0.9rem rgba(255, 188, 89, 0.16);
+  display: none;
 }
 
 .home-installation__turntable-panel {
   position: absolute;
-  inset: clamp(0.85rem, 2vw, 1.2rem);
-  z-index: -1;
+  inset: clamp(0.82rem, 1.8vw, 1.08rem);
+  z-index: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 188, 89, 0.18);
-  border-radius: 0.85rem;
+  border: 1px solid rgba(57, 21, 9, 0.76);
+  border-radius: 0.72rem 0 0 0.72rem;
   background:
-    linear-gradient(180deg, rgba(255, 248, 237, 0.055), transparent 34%),
-    radial-gradient(circle at 50% 40%, rgba(255, 188, 89, 0.08), transparent 13rem),
-    rgba(0, 0, 0, 0.12);
+    linear-gradient(
+      90deg,
+      rgba(255, 229, 190, 0.035),
+      transparent 22% 78%,
+      rgba(41, 12, 4, 0.14)
+    ),
+    linear-gradient(
+      110deg,
+      rgba(121, 68, 35, 0.56),
+      rgba(79, 36, 16, 0.38)
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 226, 182, 0.035),
+    inset 0 0.7rem 1rem rgba(33, 9, 3, 0.18),
+    inset 0 -0.7rem 1rem rgba(33, 9, 3, 0.22);
   pointer-events: none;
 }
 
@@ -1766,40 +1781,124 @@ background:
   bottom: 0.72rem;
 }
 
-.home-installation__turntable-knob {
+.home-installation__turntable-controls {
   position: absolute;
-  top: clamp(1.2rem, 2.8vw, 1.7rem);
-  right: clamp(1.1rem, 2.8vw, 1.65rem);
-  width: clamp(1.6rem, 4vw, 2.25rem);
-  aspect-ratio: 1;
-  border: 1px solid rgba(255, 188, 89, 0.26);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 42% 38%, rgba(255, 248, 237, 0.38), transparent 22%),
-    radial-gradient(circle, rgba(255, 188, 89, 0.2), rgba(0, 0, 0, 0.64) 64%);
-  box-shadow:
-    inset 0 0 0 0.3rem rgba(0, 0, 0, 0.22),
-    0 0 1rem rgba(255, 188, 89, 0.12);
+  top: clamp(1rem, 2.3vw, 1.4rem);
+  right: clamp(1rem, 2.3vw, 1.45rem);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.38rem, 0.8vw, 0.58rem);
 }
 
+.home-installation__turntable-control {
+  width: clamp(1.05rem, 2.5vw, 1.45rem);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 232, 199, 0.26);
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 38% 34%,
+      rgba(255, 255, 255, 0.58),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle,
+      #d4d1ca 0%,
+      #8d8b87 58%,
+      #3d3c3a 100%
+    );
+  box-shadow:
+    inset 0 0 0 0.2rem rgba(0, 0, 0, 0.12),
+    0 0.18rem 0.34rem rgba(0, 0, 0, 0.38);
+}
+
+.home-installation__turntable-control--power {
+  width: clamp(0.82rem, 2vw, 1.08rem);
+}
+.home-installation__turntable-media {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  min-height: 0;
+  margin: clamp(2.8rem, 6vw, 4.2rem)
+    clamp(0.45rem, 1vw, 0.75rem)
+    clamp(5.5rem, 11vw, 7.1rem);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(48, 16, 7, 0.74);
+  border-radius: 0.42rem;
+  background:
+    radial-gradient(
+      circle at 50% 48%,
+      rgba(37, 12, 5, 0.14),
+      transparent 62%
+    ),
+    rgba(58, 27, 13, 0.22);
+  box-shadow:
+    inset 0.62rem 0 1rem rgba(35, 10, 3, 0.2),
+    inset -0.62rem 0 1rem rgba(35, 10, 3, 0.2),
+    inset 0 0.55rem 0.85rem rgba(32, 9, 3, 0.22);
+}
+
+.home-installation__turntable-media--revealed {
+  padding: clamp(0.7rem, 1.7vw, 1rem);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(25, 7, 4, 0.48),
+      rgba(11, 3, 3, 0.66)
+    );
+}
+
+.home-installation__turntable-play {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.home-installation__turntable-play:disabled {
+  cursor: progress;
+}
+
+.home-installation__turntable-play:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
 .home-installation__platter {
   position: relative;
-  width: min(19.5rem, 74%);
+  width: min(21rem, 88%);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 188, 89, 0.22);
+  border: 0.34rem solid #45423e;
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(255, 188, 89, 0.12), transparent 48%),
-    radial-gradient(circle, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.58) 70%);
+    radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.05),
+      transparent 48%
+    ),
+    radial-gradient(
+      circle,
+      #4e4b47 0%,
+      #262422 62%,
+      #12110f 100%
+    );
   box-shadow:
-    inset 0 0 0 0.55rem rgba(0, 0, 0, 0.28),
-    inset 0 0 2.3rem rgba(0, 0, 0, 0.78),
-    0 1.15rem 2.5rem rgba(0, 0, 0, 0.48),
-    0 0 2.2rem rgba(255, 188, 89, 0.1);
+    inset 0 0 0 0.42rem rgba(0, 0, 0, 0.32),
+    inset 0 0 1.7rem rgba(0, 0, 0, 0.68),
+    0 0.8rem 1.35rem rgba(29, 8, 2, 0.42);
 }
-
 .home-installation__record {
   position: relative;
   width: 88%;
@@ -1857,16 +1956,17 @@ background:
 
 .home-installation__tonearm {
   position: absolute;
-  top: clamp(4.9rem, 9.2vw, 6.25rem);
-  right: clamp(2.25rem, 5vw, 3.35rem);
-  z-index: 3;
-  width: clamp(6.6rem, 29%, 9.15rem);
-  height: 1.75rem;
+  top: clamp(3.1rem, 6vw, 4.15rem);
+  right: clamp(1.35rem, 3vw, 2rem);
+  z-index: 6;
+  width: clamp(8.5rem, 35%, 11.5rem);
+  height: 2.3rem;
   pointer-events: none;
-  transform: rotate(-31deg);
-  transform-origin: calc(100% - 0.72rem) 0.88rem;
+  transform: rotate(4deg);
+  transform-origin: calc(100% - 0.92rem) 1.15rem;
   transition:
-    transform 720ms cubic-bezier(0.2, 0.84, 0.2, 1),
+    transform 780ms cubic-bezier(0.2, 0.84, 0.2, 1),
+    opacity 420ms ease,
     filter 720ms ease;
 }
 
@@ -1880,40 +1980,54 @@ background:
 .home-installation__tonearm::before {
   right: 0;
   top: 0.18rem;
-  width: 1.45rem;
+  width: 1.8rem;
   aspect-ratio: 1;
-  border: 1px solid rgba(255, 248, 237, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(255, 188, 89, 0.72) 0 22%, rgba(42, 7, 16, 0.96) 24% 100%);
+    radial-gradient(
+      circle,
+      #d6d4cf 0 22%,
+      #777571 24% 58%,
+      #353330 60% 100%
+    );
   box-shadow:
-    0 0 0 0.35rem rgba(255, 248, 237, 0.04),
-    0 0 1rem rgba(255, 188, 89, 0.13);
+    0 0 0 0.28rem rgba(0, 0, 0, 0.18),
+    0 0.3rem 0.55rem rgba(0, 0, 0, 0.38);
 }
 
 .home-installation__tonearm::after {
-  right: 1.05rem;
-  top: 0.72rem;
-  left: 0.7rem;
-  height: 0.18rem;
+  right: 1.4rem;
+  top: 1.02rem;
+  left: 0.72rem;
+  height: 0.2rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, #fff8ed, #ffbc59 46%, #ff6fb0);
-  box-shadow: 0 0.35rem 0.85rem rgba(0, 0, 0, 0.34);
-  opacity: 0.82;
+  background:
+    linear-gradient(
+      90deg,
+      #b7b4ae,
+      #ebe9e3 48%,
+      #8f8d88
+    );
+  box-shadow:
+    0 0.22rem 0.38rem rgba(0, 0, 0, 0.36);
 }
 
 .home-installation__tonearm-head {
   position: absolute;
-  top: 0.34rem;
+  top: 0.64rem;
   left: 0;
-  width: 1.08rem;
-  height: 0.72rem;
-  border: 1px solid rgba(255, 188, 89, 0.34);
-  border-radius: 0.18rem;
+  width: 1.22rem;
+  height: 0.84rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 0.16rem;
   background:
-    linear-gradient(135deg, rgba(255, 248, 237, 0.86), rgba(255, 188, 89, 0.62)),
-    #18070c;
-  box-shadow: 0 0 0.8rem rgba(226, 55, 126, 0.13);
+    linear-gradient(
+      135deg,
+      #d9d6cf,
+      #888580
+    );
+  box-shadow: 0 0.22rem 0.38rem rgba(0, 0, 0, 0.38);
 }
 
 .home-installation__tonearm-head::after {
@@ -1924,18 +2038,51 @@ background:
   height: 0.5rem;
   content: "";
   border-radius: 999px;
-  background: #ffbc59;
+  background: #d4d1ca;
   transform: rotate(-14deg);
   transform-origin: top center;
 }
 
-.home-installation__reveal-card--spinning .home-installation__tonearm {
-  transform: rotate(-17deg) translate(-0.52rem, 0.7rem);
-  filter:
-    drop-shadow(0 0 0.7rem rgba(255, 188, 89, 0.16))
-    drop-shadow(0 0 0.9rem rgba(226, 55, 126, 0.1));
+.home-installation__reveal-card--spinning
+  .home-installation__tonearm {
+  transform:
+    rotate(-25deg)
+    translate(-0.65rem, 1.55rem);
+  filter: drop-shadow(
+    0 0.35rem 0.45rem rgba(0, 0, 0, 0.32)
+  );
+}
+.home-installation__turntable--revealed
+  .home-installation__tonearm {
+  opacity: 0.72;
+  transform:
+    rotate(8deg)
+    translate(0.1rem, -0.05rem);
+}
+.home-installation__turntable-embed {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  gap: 0.65rem;
+  animation: home-installation-inline-reveal-in 480ms ease-out both;
 }
 
+.home-installation__turntable-embed
+  .home-installation__inline-frame-shell {
+  width: min(100%, 18rem);
+  height: 100%;
+  min-height: 20rem;
+  max-height: min(30rem, 61svh);
+  aspect-ratio: 9 / 14;
+}
+
+.home-installation__turntable--revealed
+  .home-installation__stage-pass {
+  padding-block: 0.7rem;
+}
 @keyframes home-installation-record-spin {
   0% {
     transform: rotate(0deg) scale(1);
@@ -1983,57 +2130,6 @@ background:
   color: #fff8ed;
   font-size: clamp(1.2rem, 2.3vw, 1.65rem);
   line-height: 1.05;
-}
-
-.home-installation__inline-reveal {
-  position: relative;
-  width: 100%;
-  min-height: clamp(28rem, 44vw, 36rem);
-  padding: clamp(1rem, 2.5vw, 1.35rem);
-  overflow: hidden;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  align-items: center;
-  justify-items: center;
-  gap: clamp(0.85rem, 2vw, 1rem);
-  border: 1px solid rgba(255, 188, 89, 0.28);
-  border-radius: 0.5rem;
-  color: #fff8ed;
-  background:
-    linear-gradient(180deg, rgba(255, 248, 237, 0.055), transparent 28%),
-    radial-gradient(circle at 50% 16%, rgba(226, 55, 126, 0.16), transparent 18rem),
-    linear-gradient(145deg, #070405, #21030d 62%, #090506);
-  box-shadow:
-    0 1.6rem 4rem rgba(0, 0, 0, 0.45),
-    0 0 3rem rgba(255, 188, 89, var(--installation-visual-glow-opacity)),
-    inset 0 0 0 1px rgba(255, 248, 237, 0.04);
-  animation: home-installation-inline-reveal-in 520ms ease-out both;
-}
-
-@keyframes home-installation-inline-reveal-in {
-  0% {
-    opacity: 0;
-    transform: translateY(0.55rem) scale(0.985);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.home-installation__inline-reveal::before {
-  position: absolute;
-  inset: 0;
-  content: "";
-  pointer-events: none;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 248, 237, 0.04) 0 1px,
-      transparent 1px 1.1rem
-    );
-  opacity: 0.22;
 }
 
 .home-installation__inline-header,
@@ -3853,6 +3949,73 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
 .home-installation__travelling-disc {
   display: none;
 }
+.home-installation__reveal-card {
+  min-height: 31rem;
+  padding: 0.75rem;
+  border-radius: 1rem;
+}
+
+.home-installation__turntable-panel {
+  inset: 0.58rem;
+  border-radius: 0.68rem;
+}
+
+.home-installation__turntable-media {
+  margin:
+    3.35rem
+    0.25rem
+    5.45rem;
+}
+
+.home-installation__turntable-media--revealed {
+  padding: 0.62rem;
+}
+
+.home-installation__platter {
+  width: min(19rem, 94%);
+}
+
+.home-installation__tonearm {
+  top: 3.1rem;
+  right: 0.95rem;
+  width: 8.25rem;
+  transform: rotate(5deg) scale(0.9);
+}
+
+.home-installation__reveal-card--spinning
+  .home-installation__tonearm {
+  transform:
+    rotate(-23deg)
+    translate(-0.35rem, 1.28rem)
+    scale(0.9);
+}
+
+.home-installation__turntable--revealed
+  .home-installation__tonearm {
+  transform:
+    rotate(8deg)
+    translate(0, 0)
+    scale(0.9);
+}
+
+.home-installation__turntable-controls {
+  top: 0.9rem;
+  right: 0.85rem;
+}
+
+.home-installation__stage-pass {
+  right: 0.85rem;
+  bottom: 0.85rem;
+  left: 0.85rem;
+  padding: 0.7rem 0.75rem;
+}
+
+.home-installation__turntable-embed
+  .home-installation__inline-frame-shell {
+  width: min(100%, 16rem);
+  min-height: 19rem;
+  max-height: 25rem;
+}
 }
 @media (max-width: 38.75rem) {
   .home-hero h1 {
@@ -4107,6 +4270,22 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
 
 .home-installation__travelling-disc {
   display: none;
+}
+.home-installation__record,
+.home-installation__tonearm,
+.home-installation__turntable-embed {
+  animation: none;
+  transition: none;
+}
+
+.home-installation__reveal-card--spinning
+  .home-installation__tonearm {
+  transform: rotate(-20deg);
+}
+
+.home-installation__turntable--revealed
+  .home-installation__tonearm {
+  transform: rotate(8deg);
 }
 }
 
