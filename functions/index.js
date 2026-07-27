@@ -261,14 +261,7 @@ exports.resetPasswordWithOtp = functions.https.onCall(async (data) => {
 
 const DISTRICT_OFFICIAL_ROLE = 'districtOfficial';
 const DISTRICT_OFFICIAL_SIGNUP_TYPE = 'district-official';
-const DISTRICT_OFFICIAL_POSITIONS = new Set([
-  'DRR',
-  'DZR',
-  'District Secretary',
-  'District Council Member',
-  'District Official',
-  'Other',
-]);
+const DISTRICT_OFFICIAL_POSITION_MAX_LENGTH = 120;
 const ACTIVE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
 const REQUESTABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', DISTRICT_OFFICIAL_ROLE]);
 const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin', 'president', DISTRICT_OFFICIAL_ROLE]);
@@ -1353,9 +1346,12 @@ function normalizeSignupConsentData(data, requestedRole) {
 }
 
 function normalizeDistrictOfficialSignupData(data) {
-  const position = normalizeText(data.districtOfficialPosition || data.districtPosition || data.position, 120);
-  if (!DISTRICT_OFFICIAL_POSITIONS.has(position)) {
+  const position = String(data.districtOfficialPosition || data.districtPosition || data.position || '').trim();
+  if (!position) {
     throw new HttpsError('invalid-argument', 'District Official position is required.');
+  }
+  if (position.length > DISTRICT_OFFICIAL_POSITION_MAX_LENGTH) {
+    throw new HttpsError('invalid-argument', `District Official position must be ${DISTRICT_OFFICIAL_POSITION_MAX_LENGTH} characters or fewer.`);
   }
   return {
     role: DISTRICT_OFFICIAL_ROLE,

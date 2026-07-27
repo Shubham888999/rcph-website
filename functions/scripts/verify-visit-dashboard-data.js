@@ -115,6 +115,7 @@ function createService(initial = {}) {
           avenueCode: 'PRES',
           folderId: 'private-president-folder',
           driveFolderId: 'private-president-drive-folder',
+          folderUrl: 'https://drive.google.com/drive/folders/older-president-folder',
         },
         clubAssembly_secretary: {
           visitType: 'clubAssembly',
@@ -128,6 +129,7 @@ function createService(initial = {}) {
           positionKey: 'treasurer',
           positionTitle: 'Treasurer',
           avenueCode: 'TREAS',
+          driveFolderId: 'private-treasurer-drive-folder',
         },
       },
       visitSubmissions: initial.visitSubmissions || {
@@ -224,6 +226,7 @@ async function rejectsWithCode(fn, code, label) {
 
 function assertNoSensitivePayload(value) {
   const json = JSON.stringify(value);
+  assert.equal(json.includes('private-treasurer-drive-folder'), false, 'unselected treasurer folder link leaked');
   [
     'one@example.test',
     'two@example.test',
@@ -231,7 +234,6 @@ function assertNoSensitivePayload(value) {
     '+91-private',
     'billUrl',
     'billDriveFileId',
-    'drive.google',
     'creator-uid',
     'creator@example.test',
     'updater-uid',
@@ -249,6 +251,7 @@ function assertNoSensitivePayload(value) {
     'driveFileUrl',
     'driveFileId',
     'driveFolderId',
+    'folderUrl',
     'uploadedByEmail',
     'uploadSessionId',
     'moderationNotes',
@@ -260,6 +263,26 @@ function assertNoSensitivePayload(value) {
     'canMark',
     'canDelete',
   ].forEach((needle) => assert.equal(json.includes(needle), false, `${needle} leaked`));
+  assertOnlySafeDriveFolderUrls(value);
+}
+
+function assertOnlySafeDriveFolderUrls(value, pathLabel = 'root') {
+  if (value == null) return;
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertOnlySafeDriveFolderUrls(item, `${pathLabel}[${index}]`));
+    return;
+  }
+  if (typeof value === 'object') {
+    Object.entries(value).forEach(([key, item]) => assertOnlySafeDriveFolderUrls(item, `${pathLabel}.${key}`));
+    return;
+  }
+  if (typeof value === 'string' && value.includes('drive.google.com')) {
+    assert.match(
+      value,
+      /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/,
+      `Only canonical Drive folder URLs may be exposed at ${pathLabel}`
+    );
+  }
 }
 
 (async () => {
@@ -415,11 +438,27 @@ function assertNoSensitivePayload(value) {
       positionKey: panel.positionKey,
       positionTitle: panel.positionTitle,
       fileCount: panel.fileCount,
+      canOpen: panel.canOpen,
+      openUrl: panel.openUrl,
       fileNames: panel.files.map(file => file.fileName),
     })),
     [
-      { positionKey: 'president', positionTitle: 'President', fileCount: 1, fileNames: ['president-report.pdf'] },
-      { positionKey: 'secretary', positionTitle: 'Secretary', fileCount: 1, fileNames: ['secretary.docx'] },
+      {
+        positionKey: 'president',
+        positionTitle: 'President',
+        fileCount: 1,
+        canOpen: true,
+        openUrl: 'https://drive.google.com/drive/folders/private-president-drive-folder',
+        fileNames: ['president-report.pdf'],
+      },
+      {
+        positionKey: 'secretary',
+        positionTitle: 'Secretary',
+        fileCount: 1,
+        canOpen: true,
+        openUrl: 'https://drive.google.com/drive/folders/private-secretary',
+        fileNames: ['secretary.docx'],
+      },
     ]
   );
   assert.equal(districtByDefault.documentPanels.some(panel => panel.positionKey === 'treasurer'), false);
@@ -446,6 +485,26 @@ function assertNoSensitivePayload(value) {
   }).getDashboardData(approvedContext());
   assert.deepEqual(noVisibleFolders.documentPanels, []);
 
+  const noFolderLink = await createService({
+    visitDashboardConfig: { clubAssembly: visibleConfig('clubAssembly', { visiblePositionKeys: ['treasurer'] }) },
+    visitSubmissionPositions: {
+      clubAssembly_treasurer: {
+        visitType: 'clubAssembly',
+        positionKey: 'treasurer',
+        positionTitle: 'Treasurer',
+        avenueCode: 'TREAS',
+      },
+    },
+    visitSubmissions: {},
+  }).getDashboardData(approvedContext());
+  assert.deepEqual(noFolderLink.documentPanels.map(panel => ({
+    positionKey: panel.positionKey,
+    canOpen: panel.canOpen,
+    openUrl: panel.openUrl,
+    fileCount: panel.fileCount,
+  })), [{ positionKey: 'treasurer', canOpen: false, openUrl: '', fileCount: 0 }]);
+  assertNoSensitivePayload(noFolderLink);
+
   const empty = await createService({
     members: {},
     events: {},
@@ -471,9 +530,9 @@ function assertNoSensitivePayload(value) {
     treasuryExpense: 0,
     treasuryNet: 0,
   });
-  assert.deepEqual(empty.documentPanels.map(panel => ({ positionKey: panel.positionKey, fileCount: panel.fileCount })), [
-    { positionKey: 'president', fileCount: 0 },
-    { positionKey: 'secretary', fileCount: 0 },
+  assert.deepEqual(empty.documentPanels.map(panel => ({ positionKey: panel.positionKey, fileCount: panel.fileCount, canOpen: panel.canOpen })), [
+    { positionKey: 'president', fileCount: 0, canOpen: true },
+    { positionKey: 'secretary', fileCount: 0, canOpen: true },
   ]);
   assert.deepEqual(empty.attendance, {
     club: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0 }, columns: [], rows: [] },

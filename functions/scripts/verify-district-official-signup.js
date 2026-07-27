@@ -113,6 +113,8 @@ async function approveDistrictOfficial(seed, options = {}) {
   );
 
   assert.match(functionsIndex, /const DISTRICT_OFFICIAL_ROLE = 'districtOfficial'/, 'canonical District Official role is defined');
+  assert.match(functionsIndex, /const DISTRICT_OFFICIAL_POSITION_MAX_LENGTH = 120/, 'District Official free-text position limit is defined');
+  assert.doesNotMatch(functionsIndex, /DISTRICT_OFFICIAL_POSITIONS/, 'District Official signup no longer uses a fixed position allowlist');
   assert.match(functionsIndex, /REQUESTABLE_ROLES[\s\S]*DISTRICT_OFFICIAL_ROLE/, 'District Official is requestable');
   assert.match(functionsIndex, /APPROVABLE_ROLES[\s\S]*DISTRICT_OFFICIAL_ROLE/, 'District Official is approvable');
   assert.doesNotMatch(functionsIndex, /const ACTIVE_ROLES = new Set\(\[[^\]]*DISTRICT_OFFICIAL_ROLE/, 'District Official is not a member dashboard active role');
@@ -123,6 +125,8 @@ async function approveDistrictOfficial(seed, options = {}) {
     'visit signup availability is checked before District Official profile validation'
   );
   assert.match(signupBlock, /normalizeDistrictOfficialSignupData\(data\)/, 'signup callable normalizes District Official profile data');
+  assert.match(functionsIndex, /position\.length > DISTRICT_OFFICIAL_POSITION_MAX_LENGTH/, 'signup callable rejects overlong District Official position text');
+  assert.match(functionsIndex, /String\(data\.districtOfficialPosition \|\| data\.districtPosition \|\| data\.position \|\| ''\)\.trim\(\)/, 'signup callable trims free-text District Official position');
   assert.match(signupBlock, /normalizeSignupConsentData\(data, requestedRole\)/, 'signup callable stores signup consent data');
   assert.match(signupBlock, /baseProfileData = requestedRole === DISTRICT_OFFICIAL_ROLE \? \{\} : commonSignupData/, 'pending District Official profile write omits club-only common profile fields');
   assert.match(pendingWriteBlock, /\.\.\.\(districtOfficialSignup \|\| \{\}\)/, 'pending user write includes District Official fields');
@@ -163,8 +167,8 @@ async function approveDistrictOfficial(seed, options = {}) {
         role: 'districtOfficial',
         requestedRole: 'districtOfficial',
         signupType: 'district-official',
-        position: 'DZR',
-        districtOfficialPosition: 'DZR',
+        position: 'District Rotaract Representative',
+        districtOfficialPosition: 'District Rotaract Representative',
         active: true,
       },
     },
@@ -175,7 +179,7 @@ async function approveDistrictOfficial(seed, options = {}) {
   assert.equal(db.state.users.target.status, 'approved');
   assert.equal(db.state.users.target.role, 'districtOfficial');
   assert.equal(db.state.users.target.requestedRole, 'districtOfficial');
-  assert.equal(db.state.users.target.districtOfficialPosition, 'DZR');
+  assert.equal(db.state.users.target.districtOfficialPosition, 'District Rotaract Representative');
   assert.equal(db.state.roles.target.role, 'districtOfficial');
   assert.equal(db.state.roles.target.status, 'approved');
   assert.equal(db.state.members.target, undefined, 'approval does not create a member roster row');

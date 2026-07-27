@@ -47,6 +47,7 @@ const AVENUE_LABELS = Object.freeze({
 const ATTENDANCE_STATUSES = Object.freeze(['present', 'absent', 'late', 'excused', 'unknown']);
 const MAX_OFFICIAL_NAMES = 12;
 const MAX_OFFICIAL_NAME_LENGTH = 160;
+const DRIVE_FOLDER_URL_ORIGIN = 'https://drive.google.com';
 
 function clone(value) {
   if (value == null) return value;
@@ -70,6 +71,37 @@ function normalizeSafeId(value, max = 160) {
   const id = normalizeText(value, max);
   if (!id || /[\\/]/.test(id) || /[\u0000-\u001f\u007f]/.test(id)) return '';
   return id;
+}
+
+function normalizeDriveFolderId(value) {
+  const id = normalizeText(value, 220);
+  return /^[A-Za-z0-9_-]{5,220}$/.test(id) ? id : '';
+}
+
+function driveFolderIdFromUrl(value) {
+  const raw = normalizeText(value, 1000);
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' || url.hostname !== 'drive.google.com') return '';
+    const segments = url.pathname.split('/').filter(Boolean);
+    const folderSegmentIndex = segments.indexOf('folders');
+    if (folderSegmentIndex >= 0) {
+      return normalizeDriveFolderId(segments[folderSegmentIndex + 1]);
+    }
+    if (segments.length === 1 && segments[0] === 'open') {
+      return normalizeDriveFolderId(url.searchParams.get('id'));
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+function driveFolderOpenUrl(raw) {
+  const driveFolderId = normalizeDriveFolderId(raw?.driveFolderId)
+    || driveFolderIdFromUrl(raw?.folderUrl || raw?.driveFolderUrl);
+  return driveFolderId ? `${DRIVE_FOLDER_URL_ORIGIN}/drive/folders/${encodeURIComponent(driveFolderId)}` : '';
 }
 
 function validDate(value) {
@@ -541,7 +573,7 @@ function buildDocumentPanels({ config, positionDocs, submissionDocs, positionHel
   const positionMap = new Map();
   (Array.isArray(positionDocs) ? positionDocs : []).forEach((doc) => {
     try {
-      const option = shapeFolderOption({ folderId: doc.id, ...(doc.data || {}) }, doc.id);
+      const option = shapeFolderOption({ folderId: doc.id, ...(doc.data || {}) }, doc.id, { includeOpenUrl: true });
       if (option?.visitType === config.visitType && visiblePositionKeys.includes(option.positionKey)) {
         positionMap.set(option.positionKey, option);
       }
@@ -572,6 +604,8 @@ function buildDocumentPanels({ config, positionDocs, submissionDocs, positionHel
       avenueName: metadata.avenueName,
       folderLabel: metadata.positionTitle,
       fileCount: files.length,
+      canOpen: folder?.canOpen === true,
+      openUrl: folder?.openUrl || '',
       files,
     };
   });
@@ -758,12 +792,12 @@ function validateConfigUpdate(input, positionHelpers = defaultPositionHelpers) {
   return updates;
 }
 
-function shapeFolderOption(raw, fallbackId = '') {
+function shapeFolderOption(raw, fallbackId = '', options = {}) {
   if (!raw || typeof raw !== 'object') return null;
   const visitType = normalizeVisitType(raw.visitType);
   const positionKey = normalizeText(raw.positionKey, 80);
   if (!positionKey) return null;
-  return {
+  const option = {
     folderId: normalizeText(raw.folderId || fallbackId, 180),
     visitType,
     positionKey,
@@ -774,6 +808,12 @@ function shapeFolderOption(raw, fallbackId = '') {
     locked: raw.locked === true,
     activeFileCount: Math.max(0, Number(raw.activeFileCount) || 0),
   };
+  if (options.includeOpenUrl === true) {
+    const openUrl = driveFolderOpenUrl(raw);
+    option.canOpen = Boolean(openUrl);
+    option.openUrl = openUrl;
+  }
+  return option;
 }
 
 function safeDiff(oldData, updates) {
