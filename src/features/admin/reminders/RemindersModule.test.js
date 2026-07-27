@@ -25,12 +25,13 @@ test("Reminders section is registered in Admin for authorized users", () => {
 
 test("Reminders UI exposes the required subsections and actions", () => {
   assert.match(moduleSource, /title="Reminders"/);
-  assert.match(moduleSource, /Avenue Reporting Window/);
+  assert.match(moduleSource, /Reporting workflow setup/);
+  assert.match(moduleSource, /Reporting starts the BOD event, MOM, and attendance follow-up workflow\./);
   assert.match(moduleSource, /REPORTING_WINDOW_AVENUE_OPTIONS\.map/);
   assert.match(moduleSource, /Event\/meeting name/);
+  assert.match(moduleSource, /placeholder="Exact event or meeting name"/);
   assert.match(moduleSource, /Send reminder emails/);
   assert.match(moduleSource, /Lock after deadline/);
-  assert.match(moduleSource, /Reporting reminders are sent to the mapped Avenue Director/);
   assert.match(moduleSource, /Run reminder email sweep/);
   assert.match(moduleSource, /Conducted Events & Meetings/);
   assert.match(moduleSource, /Reminder Email Test/);
@@ -118,8 +119,22 @@ test("Reminders UI renders Phase 5 avenue window statuses and unlock action", ()
   assert.match(modelSource, /reportingWindowStatusTone/);
   assert.match(modelSource, /reportingWindowSentText/);
   assert.match(modelSource, /reportingWindowStatusNote/);
+  assert.match(modelSource, /reportingWindowEventReportText/);
+  assert.match(modelSource, /reportingWindowMomText/);
+  assert.match(modelSource, /reportingWindowAttendanceText/);
+  assert.match(modelSource, /reportingWindowLockText/);
   assert.match(moduleSource, /reportingWindowStatusText\(item\)/);
+  assert.match(moduleSource, /reportingWindowEventReportText\(item\)/);
+  assert.match(moduleSource, /reportingWindowMomText\(item\)/);
+  assert.match(moduleSource, /reportingWindowAttendanceText\(item\)/);
+  assert.match(moduleSource, /reportingWindowLockText\(item\)/);
   assert.match(moduleSource, /reportingWindowSentText\(item\)/);
+  assert.match(moduleSource, /Event report/);
+  assert.match(moduleSource, /<th>MOM<\/th>/);
+  assert.match(moduleSource, /<th>Attendance<\/th>/);
+  assert.match(moduleSource, /<th>Lock<\/th>/);
+  assert.match(moduleSource, /Lock rule/);
+  assert.match(moduleSource, /Reminder status/);
   assert.match(moduleSource, /Last sent/);
   assert.match(moduleSource, /safeFormatReminderDateTime\(item\.conductedDate \|\| item\.eventConductedDate\)/);
   assert.match(moduleSource, /safeFormatReminderDateTime\(item\.windowOpensAt \|\| item\.reportingOpensAt\)/);

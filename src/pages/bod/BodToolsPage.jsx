@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import BodEventArchiveDialog from "../../features/bod-tools/BodEventArchiveDialog";
 import BodAvenueReportPanel from "../../features/bod-tools/BodAvenueReportPanel";
 import BodEventDetailsDialog from "../../features/bod-tools/BodEventDetailsDialog";
@@ -11,6 +12,7 @@ import { filterBodEvents } from "../../features/bod-tools/bodEventModel";
 import {
   archiveBodEvent,
   clearBodEventCache,
+  fetchReportingWindowPrefill,
   submitBodEvent,
   syncBodEventToAttendance,
   updateBodEvent,
@@ -29,7 +31,9 @@ const DEFAULT_FILTERS = { status: "active", type: "", avenue: "", month: "", min
 
 export default function BodToolsPage() {
   const { access, user, signOut } = useAuth();
+  const [searchParams] = useSearchParams();
   const uid = user?.uid || "";
+  const reportingWindowId = (searchParams.get("reportingWindowId") || "").trim();
   const { status, events, lock, avenueReportingLocks, reload } = useBodEvents({ uid, enabled: Boolean(uid && access?.canAccessBodTools) });
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [details, setDetails] = useState(null);
@@ -41,7 +45,45 @@ export default function BodToolsPage() {
   const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
   const mutationLockRef = useRef(false);
   const sessionUidRef = useRef(uid);
+  const prefillAppliedRef = useRef("");
   useEffect(() => { sessionUidRef.current = uid; }, [uid]);
+
+  useEffect(() => {
+    if (!reportingWindowId) {
+      prefillAppliedRef.current = "";
+      return undefined;
+    }
+    if (!uid || access?.canAccessBodTools !== true || status !== "success") return undefined;
+    if (prefillAppliedRef.current === reportingWindowId) return undefined;
+
+    let active = true;
+    prefillAppliedRef.current = reportingWindowId;
+    setMutationError("");
+    fetchReportingWindowPrefill(reportingWindowId)
+      .then((prefill) => {
+        if (!active) return;
+        if (prefill.bodToolsCreateSupported === false) {
+          setNotice({
+            type: "error",
+            message: "BOD Meeting reporting windows still use the BOD Meeting scheduler. Use the exact event name from the reporting email.",
+          });
+          return;
+        }
+        setForm({ event: null, prefill });
+        setSubmissionsExpanded(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setNotice({
+          type: "error",
+          message: "Reporting window prefill could not be opened. Check that the window is still open and your account has BOD Tools access.",
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [access?.canAccessBodTools, reportingWindowId, status, uid]);
 
   const lockState = lock.status === "success" ? (lock.locked ? "locked" : "unlocked") : "unknown";
   const canMutate = lockState === "unlocked" || (lockState === "locked" && access.canAccessPresidentControls);
@@ -130,7 +172,7 @@ export default function BodToolsPage() {
   canBypassLock={access.canAccessPresidentControls}
   onCreateEvent={() => {
     setMutationError("");
-    setForm({ event: null });
+    setForm({ event: null, prefill: null });
   }}
 />
         <BodEventMutationNotice notice={notice} onDismiss={() => setNotice(null)} />
@@ -256,7 +298,7 @@ export default function BodToolsPage() {
         }}
         onClose={() => setDetails(null)}
       />
-      {form ? <BodEventForm key={form.event?.id || "create"} event={form.event || null} displayName={displayName} busy={busy} mutationError={mutationError} lockedAvenueReportingLocks={avenueReportingLocks.items} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
+      {form ? <BodEventForm key={form.event?.id || form.prefill?.reportingWindowId || "create"} event={form.event || null} prefill={form.prefill || null} displayName={displayName} busy={busy} mutationError={mutationError} lockedAvenueReportingLocks={avenueReportingLocks.items} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
       <BodEventArchiveDialog event={confirmation?.event || null} mode={confirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmMutation} />
     
     

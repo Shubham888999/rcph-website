@@ -29,7 +29,8 @@ function reportFinanceDraft(event) {
   };
 }
 
-function initialDraft(event, displayName) {
+function initialDraft(event, displayName, prefill = null) {
+  const prefillAvenue = !event && BOD_AVENUES.includes(prefill?.avenue) ? prefill.avenue : "";
   const avenues = event?.avenues || [];
 
   const conductedBy = event
@@ -39,25 +40,29 @@ function initialDraft(event, displayName) {
     : displayName || "";
 
   return {
-    name: event?.name || "",
+    name: event?.name || prefill?.name || prefill?.eventName || "",
     conductedBy,
-    startDate: event?.startDate || "",
-    endDate: event?.endDate || "",
-    time: event?.time || "",
+    startDate: event?.startDate || prefill?.date || prefill?.conductedDate || "",
+    endDate: event?.endDate || prefill?.date || prefill?.conductedDate || "",
+    time: event?.time || prefill?.time || "",
     description: event?.description || "",
-    avenues,
-    avenueDescriptions: buildAvenueDescriptionDraft(event || {}, avenues),
+    avenues: avenues.length ? avenues : (prefillAvenue ? [prefillAvenue] : []),
+    avenueDescriptions: avenues.length
+      ? buildAvenueDescriptionDraft(event || {}, avenues)
+      : (prefillAvenue ? { [prefillAvenue]: "" } : {}),
     rcphRole: event?.rcphRole || "host",
     hostClub: event?.hostClub || "Rotaract Club of Pune Heritage",
     collaborators: event?.collaborators?.length ? event.collaborators : [{ name: "" }],
     collaborationNotes: event?.collaborationNotes || "",
     reportFinance: reportFinanceDraft(event),
     driveFolder: event?.driveFolder || "",
+    reportingWindowId: event?.reportingWindowId || prefill?.reportingWindowId || "",
+    reportingWindowNote: prefill?.note || "",
   };
 }
 
-export default function BodEventForm({ event, displayName, busy, mutationError, lockedAvenueReportingLocks = [], onClose, onSubmit, onComplete }) {
-  const seed = useMemo(() => initialDraft(event, displayName), [displayName, event]);
+export default function BodEventForm({ event, displayName, prefill = null, busy, mutationError, lockedAvenueReportingLocks = [], onClose, onSubmit, onComplete }) {
+  const seed = useMemo(() => initialDraft(event, displayName, prefill), [displayName, event, prefill]);
   const [draft, setDraft] = useState(seed);
   const [errors, setErrors] = useState({});
   const [uploadState, setUploadState] = useState({ files: [], selectionErrors: [] });
@@ -256,6 +261,9 @@ if (completed.length) {
         <button type="button" className="bod-dialog__close" onClick={onClose} disabled={formBusy} aria-label="Close event form">×</button>
         <p className="bod-tools-kicker">Club event</p>
         <h2 id="bod-form-title">{event ? "Edit event" : "Create event"}</h2>
+        {draft.reportingWindowId && draft.reportingWindowNote ? (
+          <p className="bod-form-prefill-note">{draft.reportingWindowNote}</p>
+        ) : null}
         <form onSubmit={handleSubmit} noValidate>
           <div className="bod-form-grid">
             <label>Event name *<input name="name" value={draft.name} onChange={(e) => update("name", e.target.value)} maxLength="180" aria-invalid={Boolean(errors.name)} aria-describedby={described("name")} />{errors.name ? <span id="bod-name-error" className="bod-field-error">{errors.name}</span> : null}</label>

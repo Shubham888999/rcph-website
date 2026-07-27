@@ -248,6 +248,7 @@ export function buildReportingWindowPayload(draft = {}) {
   const errors = [];
 
   if (!REPORTING_WINDOW_AVENUE_OPTIONS.includes(avenue)) errors.push("Choose a valid avenue.");
+  if (!targetName) errors.push("Event/meeting name is required.");
   if (!validDate(eventConductedDate)) errors.push("Enter a valid conducted date.");
   if (!isValidReminderTime(eventTime)) errors.push("Enter a valid event time.");
 
@@ -278,6 +279,10 @@ export function buildReportingWindowPayload(draft = {}) {
       remindersEnabled: draft.remindersEnabled !== false,
       lockEnabled: draft.lockEnabled !== false,
       status: "configured",
+      eventReportStatus: "pending",
+      momStatus: "pending",
+      attendanceStatus: "pending",
+      workflowStatus: "created",
       remindersSent: 0,
       maxReminders: 3,
       reminderTime: "00:00",
@@ -381,6 +386,16 @@ export function normalizeReminder(id, raw) {
       remindersEnabled: raw.remindersEnabled === true,
       lockEnabled: raw.lockEnabled === true,
       status: text(raw.status, 40) || "configured",
+      eventReportStatus: text(raw.eventReportStatus || raw.reportStatus, 40),
+      momStatus: text(raw.momStatus, 40),
+      attendanceStatus: text(raw.attendanceStatus, 40),
+      workflowStatus: text(raw.workflowStatus, 40),
+      linkedTargetType: text(raw.linkedTargetType || raw.linkedEventTargetType, 80),
+      linkedTargetId: text(raw.linkedTargetId || raw.linkedEventId || raw.linkedBodEventId || raw.linkedMeetingId, 160),
+      linkedBodEventId: text(raw.linkedBodEventId || raw.linkedEventId, 160),
+      possibleMatchStatus: text(raw.possibleMatchStatus, 40),
+      possibleMatchId: text(raw.possibleMatchId, 160),
+      possibleMatchConfidence: Number.isFinite(Number(raw.possibleMatchConfidence)) ? Number(raw.possibleMatchConfidence) : 0,
       remindersSent: Math.max(0, Number(raw.remindersSent) || 0),
       maxReminders: Math.max(0, Number(raw.maxReminders) || 3),
       lastReminderSentAt: reminderTimestamp(raw.lastReminderSentAt),
@@ -650,6 +665,29 @@ export function reportingWindowStatusNote(config) {
     500,
   );
   return REPORTING_WINDOW_REASON_LABELS[reason] || reason;
+}
+
+export function reportingWindowEventReportText(config) {
+  const eventReportStatus = text(config?.eventReportStatus, 40);
+  const status = text(config?.status, 40);
+  if (status === "locked") return "Locked";
+  if (eventReportStatus === "recorded" || status === "completed") return "Recorded";
+  return "Pending";
+}
+
+export function reportingWindowMomText(config) {
+  return text(config?.momStatus, 40) === "uploaded" ? "Uploaded" : "Pending";
+}
+
+export function reportingWindowAttendanceText(config) {
+  return text(config?.attendanceStatus, 40) === "marked" ? "Marked" : "Pending";
+}
+
+export function reportingWindowLockText(config) {
+  const status = text(config?.status, 40);
+  if (status === "locked") return "Locked";
+  if (status === "unlocked") return "Unlocked";
+  return "Open";
 }
 
 export function buildReminderStatusSummaries(reminders = [], event = {}) {

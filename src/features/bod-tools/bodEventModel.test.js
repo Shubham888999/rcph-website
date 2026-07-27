@@ -75,6 +75,15 @@ test("BOD event normalizer preserves MOM metadata on canonical records", () => {
   assert.equal(Object.hasOwn(event.mom, "momPublicUrl"), false);
 });
 
+test("BOD event normalizer preserves linked reporting window IDs", () => {
+  const event = normalizeBodEvent("event-1", {
+    ...base,
+    reportingWindowId: "window-1",
+  });
+
+  assert.equal(event.reportingWindowId, "window-1");
+});
+
 test("BOD meetings and district events stay read-only", () => {
   for (const type of ["bodMeeting", "districtEvent"]) {
     const event = normalizeBodEvent(type, { ...base, type });
@@ -178,12 +187,13 @@ test("payload builder whitelists fields and forces production classification", (
     time: "18:30", avenues: ["CMD", "CMD"], description: "Desc", rcphRole: "host",
     hostClub: " RCPH ", collaborators: [{ name: " " }, { name: "Partner" }],
     collaborationNotes: "Notes", driveFolder: "https://drive.google.com/drive/folders/abc",
-    type: "districtEvent", visibility: "internal", uiOnly: true,
+    reportingWindowId: "window-1", type: "districtEvent", visibility: "internal", uiOnly: true,
   }, "event-1");
   assert.deepEqual(errors, {});
   assert.equal(payload.eventId, "event-1");
   assert.equal(payload.type, "clubEvent");
   assert.equal(payload.source, BOD_EVENT_SOURCE);
+  assert.equal(payload.reportingWindowId, "window-1");
   assert.equal(payload.visibility, "public");
   assert.equal(payload.description, "Desc");
   assert.equal(payload.desc, "Desc");

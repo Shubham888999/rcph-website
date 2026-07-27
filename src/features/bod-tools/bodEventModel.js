@@ -285,6 +285,7 @@ export function normalizeBodEvent(id, raw) {
   const syncedEventId = cleanString(raw.syncedEventId);
   const syncedMeetingId = cleanString(raw.syncedMeetingId);
   const syncedDistrictEventId = cleanString(raw.syncedDistrictEventId);
+  const reportingWindowId = cleanString(raw.reportingWindowId || raw.reminderId);
   const rcphRole = cleanString(raw.rcphRole).toLowerCase();
   const timeCandidate = cleanString(raw.eventTime || raw.time);
 
@@ -330,6 +331,7 @@ export function normalizeBodEvent(id, raw) {
     syncedEventId,
     syncedMeetingId,
     syncedDistrictEventId,
+    reportingWindowId,
     isSynced: Boolean(syncedEventId || syncedMeetingId || syncedDistrictEventId || status === "synced"),
     recordKind,
     isActive,
@@ -406,6 +408,7 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
     driveFolder: safeExternalUrl(draft.driveFolder),
   };
   if (eventId) payload.eventId = cleanString(eventId);
+  if (cleanString(draft.reportingWindowId)) payload.reportingWindowId = cleanString(draft.reportingWindowId).slice(0, 160);
   return { payload, errors: {} };
 }
 

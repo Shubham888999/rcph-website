@@ -33,9 +33,10 @@ export default function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { accountState, authLoading, isAuthenticated } = useAuth();
+  const nextDestination = useMemo(() => new URLSearchParams(location.search).get("next") || "", [location.search]);
   const destination = useMemo(
-    () => getSafeLoginDestination(location.state?.from),
-    [location.state?.from],
+    () => getSafeLoginDestination(location.state?.from || nextDestination),
+    [location.state?.from, nextDestination],
   );
   const [busyMethod, setBusyMethod] = useState("");
   const [redirectChecking, setRedirectChecking] = useState(true);

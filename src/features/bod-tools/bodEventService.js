@@ -99,6 +99,29 @@ export function syncBodEventToAttendance(bodEventId) {
   return call("syncBodEventToAttendance", { bodEventId });
 }
 
+export async function fetchReportingWindowPrefill(reportingWindowId) {
+  requireCurrentUser();
+  const safeId = typeof reportingWindowId === "string" ? reportingWindowId.trim().slice(0, 180) : "";
+  if (!safeId) throw new Error("Choose a valid reporting window.");
+  const result = await httpsCallable(functions, "getReportingWindowPrefill")({ reportingWindowId: safeId });
+  const data = result?.data && typeof result.data === "object" ? result.data : {};
+  return {
+    ok: data.ok === true,
+    reportingWindowId: typeof data.reportingWindowId === "string" ? data.reportingWindowId : "",
+    avenue: typeof data.avenue === "string" ? data.avenue : "",
+    avenueLabel: typeof data.avenueLabel === "string" ? data.avenueLabel : "",
+    name: typeof data.name === "string" ? data.name : "",
+    eventName: typeof data.eventName === "string" ? data.eventName : "",
+    date: typeof data.date === "string" ? data.date : "",
+    conductedDate: typeof data.conductedDate === "string" ? data.conductedDate : "",
+    time: typeof data.time === "string" ? data.time : "",
+    targetType: typeof data.targetType === "string" ? data.targetType : "",
+    bodToolsCreateSupported: data.bodToolsCreateSupported !== false,
+    warning: typeof data.warning === "string" ? data.warning : "",
+    note: typeof data.note === "string" ? data.note : "",
+  };
+}
+
 export async function fetchBodAvenueReportDirectors(avenueCode) {
   requireCurrentUser();
   const result = await httpsCallable(functions, "getBodAvenueReportDirectors")({ avenueCode });

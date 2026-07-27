@@ -33,6 +33,23 @@ test("BOD event form keeps locked reporting-window avenues visible but unavailab
   assert.match(service, /normalizeAvenueReportingLock/);
 });
 
+test("BOD Tools opens a prefilled create form from reportingWindowId query links", () => {
+  assert.match(page, /useSearchParams/);
+  assert.match(page, /reportingWindowId/);
+  assert.match(page, /fetchReportingWindowPrefill\(reportingWindowId\)/);
+  assert.match(page, /prefillAppliedRef/);
+  assert.match(page, /setForm\(\{ event: null, prefill \}\)/);
+  assert.match(page, /bodToolsCreateSupported === false/);
+  assert.match(page, /BOD Meeting reporting windows still use the BOD Meeting scheduler/);
+  assert.match(page, /setForm\(\{ event: null, prefill: null \}\)/);
+  assert.match(page, /prefill=\{form\.prefill \|\| null\}/);
+  assert.match(form, /function initialDraft\(event, displayName, prefill = null\)/);
+  assert.match(form, /prefill\?\.reportingWindowId/);
+  assert.match(form, /bod-form-prefill-note/);
+  assert.match(service, /export async function fetchReportingWindowPrefill/);
+  assert.match(service, /httpsCallable\(functions, "getReportingWindowPrefill"\)/);
+});
+
 test("BOD event form exposes report-only finance rows without Treasury wiring", () => {
   assert.match(form, /Any income\/expense incurred for this event\?/);
   assert.match(form, /Report finance/);

@@ -12,6 +12,10 @@ import {
   EVENT_REMINDER_RECORD_TYPE,
   eventReminderConfigId,
   normalizeReminder,
+  reportingWindowAttendanceText,
+  reportingWindowEventReportText,
+  reportingWindowLockText,
+  reportingWindowMomText,
   reportingWindowSentText,
   reportingWindowStatusNote,
   reportingWindowStatusText,
@@ -57,6 +61,10 @@ test("Avenue reporting window payload stores Phase 5 defaults", () => {
   assert.equal(result.payload.remindersEnabled, true);
   assert.equal(result.payload.lockEnabled, true);
   assert.equal(result.payload.status, "configured");
+  assert.equal(result.payload.eventReportStatus, "pending");
+  assert.equal(result.payload.momStatus, "pending");
+  assert.equal(result.payload.attendanceStatus, "pending");
+  assert.equal(result.payload.workflowStatus, "created");
   assert.equal(result.payload.remindersSent, 0);
   assert.equal(result.payload.maxReminders, 3);
   assertIso(result.payload.reportingOpensAt, "2026-07-14T18:30:00.000Z");
@@ -64,6 +72,17 @@ test("Avenue reporting window payload stores Phase 5 defaults", () => {
   assertIso(result.payload.lockAt, "2026-07-17T18:30:00.000Z");
   assertIso(result.payload.windowOpensAt, "2026-07-14T18:30:00.000Z");
   assertIso(result.payload.reportDueAt, "2026-07-17T18:29:00.000Z");
+});
+
+test("Avenue reporting window payload requires an exact event or meeting name", () => {
+  const result = buildReportingWindowPayload({
+    avenue: "CSD",
+    targetName: " ",
+    eventConductedDate: "2026-07-14",
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /Event\/meeting name is required/);
 });
 
 test("CWD and Phase 5 reporting avenues are available without removing existing avenues", () => {
@@ -90,6 +109,7 @@ test("CWD and Phase 5 reporting avenues are available without removing existing 
 test("CWD reporting window payload preserves calculated dates", () => {
   const result = buildReportingWindowPayload({
     avenue: "CWD",
+    targetName: "Website Launch",
     eventConductedDate: "2026-07-14",
   });
 
@@ -107,16 +127,19 @@ test("CWD reporting window payload preserves calculated dates", () => {
 test("Phase 5 reporting avenues can be created with the same calculated dates", () => {
   const sports = buildReportingWindowPayload({
     avenue: "Sports",
+    targetName: "Sports Meet",
     eventConductedDate: "2026-07-14",
     remindersEnabled: false,
     lockEnabled: false,
   });
   const finance = buildReportingWindowPayload({
     avenue: "Finance",
+    targetName: "Budget Review",
     eventConductedDate: "2026-07-14",
   });
   const bodMeeting = buildReportingWindowPayload({
     avenue: "BOD Meeting",
+    targetName: "BOD Meeting 1",
     eventConductedDate: "2026-07-14",
   });
 
@@ -174,6 +197,44 @@ test("reporting window normalization accepts timestamp aliases and canonical ave
   assert.equal(normalized.lockAt, "2026-07-17T18:30:00.000Z");
   assert.equal(reportingWindowStatusText(normalized), "Locked");
 });
+
+test("reporting window normalization preserves linked workflow status fields", () => {
+  const normalized = normalizeReminder("window-1", {
+    recordType: REPORTING_WINDOW_RECORD_TYPE,
+    avenue: "CSD",
+    targetName: "Pages of Hope",
+    eventConductedDate: "2026-07-14",
+    status: "completed",
+    eventReportStatus: "recorded",
+    momStatus: "uploaded",
+    attendanceStatus: "marked",
+    workflowStatus: "linked",
+    linkedTargetType: "club_event",
+    linkedTargetId: "event-1",
+    linkedBodEventId: "bod-event-1",
+    possibleMatchStatus: "possible_match_not_auto_submitted",
+    possibleMatchId: "event-2",
+    possibleMatchConfidence: 0.86,
+  });
+
+  assert.equal(normalized.eventReportStatus, "recorded");
+  assert.equal(normalized.momStatus, "uploaded");
+  assert.equal(normalized.attendanceStatus, "marked");
+  assert.equal(normalized.workflowStatus, "linked");
+  assert.equal(normalized.linkedTargetType, "club_event");
+  assert.equal(normalized.linkedTargetId, "event-1");
+  assert.equal(normalized.linkedBodEventId, "bod-event-1");
+  assert.equal(normalized.possibleMatchStatus, "possible_match_not_auto_submitted");
+  assert.equal(normalized.possibleMatchId, "event-2");
+  assert.equal(normalized.possibleMatchConfidence, 0.86);
+  assert.equal(reportingWindowEventReportText(normalized), "Recorded");
+  assert.equal(reportingWindowMomText(normalized), "Uploaded");
+  assert.equal(reportingWindowAttendanceText(normalized), "Marked");
+  assert.equal(reportingWindowLockText(normalized), "Open");
+  assert.equal(reportingWindowEventReportText({ status: "locked" }), "Locked");
+  assert.equal(reportingWindowLockText({ status: "unlocked" }), "Unlocked");
+});
+
 test("reporting window normalization preserves manual notes and stopped reminder metadata", () => {
   const reminder = normalizeReminder("window-1", {
     recordType: REPORTING_WINDOW_RECORD_TYPE,

@@ -18,6 +18,10 @@ import {
   EVENT_REMINDER_RECORD_TYPE,
   EVENT_REMINDER_TYPES,
   findEventReminderConfig,
+  reportingWindowAttendanceText,
+  reportingWindowEventReportText,
+  reportingWindowLockText,
+  reportingWindowMomText,
   reportingWindowSentText,
   reportingWindowStatusNote,
   reportingWindowStatusText,
@@ -597,10 +601,10 @@ export default function RemindersModule({
       <section className="admin-panel reminders-window-panel">
         <header className="reminders-section-header">
           <div>
-            <p className="admin-kicker">Avenue Reporting Window</p>
-            <h3>Reporting window setup</h3>
+            <p className="admin-kicker">Reporting workflow setup</p>
+            <h3>Reporting workflow setup</h3>
             <p className="reminders-section-note">
-              Reporting reminders are sent to the mapped Avenue Director. GBM/BOD Meeting reminders go to Secretary.
+              Reporting starts the BOD event, MOM, and attendance follow-up workflow.
             </p>
           </div>
         </header>
@@ -630,11 +634,12 @@ export default function RemindersModule({
               <input
                 type="text"
                 value={draft.targetName}
-                placeholder="Optional"
+                placeholder="Exact event or meeting name"
                 onChange={(event) => setDraft({
                   ...draft,
                   targetName: event.target.value,
                 })}
+                required
               />
             </label>
 
@@ -709,9 +714,13 @@ export default function RemindersModule({
                     <th>Opens</th>
                     <th>Due</th>
                     <th>Lock target</th>
-                    <th>Reminders</th>
+                    <th>Event report</th>
+                    <th>MOM</th>
+                    <th>Attendance</th>
                     <th>Lock</th>
-                    <th>Status</th>
+                    <th>Reminders</th>
+                    <th>Lock rule</th>
+                    <th>Reminder status</th>
                     <th>Sent</th>
                     <th>Last sent</th>
                     <th>Note</th>
@@ -730,6 +739,10 @@ export default function RemindersModule({
                       <td>{safeFormatReminderDateTime(item.windowOpensAt || item.reportingOpensAt)}</td>
                       <td>{safeFormatReminderDateTime(item.reportDueAt || item.reportingDueAt)}</td>
                       <td>{safeFormatReminderDateTime(item.lockAt)}</td>
+                      <td>{reportingWindowEventReportText(item)}</td>
+                      <td>{reportingWindowMomText(item)}</td>
+                      <td>{reportingWindowAttendanceText(item)}</td>
+                      <td>{reportingWindowLockText(item)}</td>
                       <td>
                         {item.remindersEnabled ? "On" : "Off"}
                       </td>
