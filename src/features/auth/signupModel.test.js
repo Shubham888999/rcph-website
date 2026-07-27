@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  DISTRICT_OFFICIAL_POSITION_MAX_LENGTH,
   DISTRICT_OFFICIAL_ROLE,
   DISTRICT_OFFICIAL_SIGNUP_TYPE,
   SIGNUP_PATHS,
@@ -65,7 +66,7 @@ function validDistrictOfficial() {
     email: "dzr@example.com",
     password: "secret",
     confirmPassword: "secret",
-    districtOfficialPosition: "DZR",
+    districtOfficialPosition: "District Rotaract Representative",
     legalAccepted: true,
     communicationsOptIn: true,
   };
@@ -85,6 +86,14 @@ test("signup page gates District Official choice on safe availability", async ()
   assert.match(pageSource, /districtOfficialAvailable=\{districtOfficialAvailable\}/);
   assert.match(choiceSource, /districtOfficialAvailable \? \(/);
   assert.match(choiceSource, /Continue as District Official/);
+});
+test("District Official signup renders a bounded free-text position input", async () => {
+  const formSource = await readFile(new URL("./DistrictOfficialSignupForm.jsx", import.meta.url), "utf8");
+  assert.match(formSource, /id="signup-districtOfficialPosition"[\s\S]*type="text"/);
+  assert.match(formSource, /maxLength=\{DISTRICT_OFFICIAL_POSITION_MAX_LENGTH\}/);
+  assert.match(formSource, /placeholder="District Secretary, District Rotaract Representative, Avenue Chair"/);
+  assert.doesNotMatch(formSource, /<select[\s\S]*signup-districtOfficialPosition/);
+  assert.doesNotMatch(formSource, /DISTRICT_OFFICIAL_POSITIONS\.map/);
 });
 test("selecting Prospect clears member credentials and forces role", () => {
   const next = selectSignupPath({ ...validMember("admin"), password: "x", inviteCode: "code" }, "prospect");
@@ -220,6 +229,24 @@ test("District Official signup requires position but not member profile fields",
   assert.ok(missing.errors.districtOfficialPosition);
   assert.equal(validateSignup(validDistrictOfficial()).valid, true);
 });
+test("District Official signup accepts custom free-text position and trims payload", () => {
+  const form = {
+    ...validDistrictOfficial(),
+    districtOfficialPosition: "  Avenue Chair  ",
+  };
+  const validation = validateSignup(form);
+  const payload = buildSignupPayload(form);
+  assert.equal(validation.valid, true);
+  assert.equal(payload.position, "Avenue Chair");
+  assert.equal(payload.districtOfficialPosition, "Avenue Chair");
+});
+test("District Official signup rejects overlong position text", () => {
+  const result = validateSignup({
+    ...validDistrictOfficial(),
+    districtOfficialPosition: "x".repeat(DISTRICT_OFFICIAL_POSITION_MAX_LENGTH + 1),
+  });
+  assert.match(result.errors.districtOfficialPosition, /120 characters or fewer/);
+});
 test("District Official payload includes pending role shape, position, provider, and consents", () => {
   const payload = buildSignupPayload(validDistrictOfficial(), {
     provider: "google",
@@ -242,8 +269,8 @@ test("District Official payload includes pending role shape, position, provider,
     requestedRole: DISTRICT_OFFICIAL_ROLE,
     signupType: DISTRICT_OFFICIAL_SIGNUP_TYPE,
     email: "official@example.com",
-    position: "DZR",
-    districtOfficialPosition: "DZR",
+    position: "District Rotaract Representative",
+    districtOfficialPosition: "District Rotaract Representative",
     provider: "google",
     termsAccepted: true,
     privacyAccepted: true,

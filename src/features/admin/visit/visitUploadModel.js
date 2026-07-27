@@ -1,4 +1,6 @@
-const PROD_UPLOAD_ENDPOINT = "https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile";
+export const VISIT_UPLOAD_FUNCTION_NAME = "uploadVisitSubmissionFile";
+export const VISIT_UPLOAD_REGION = "us-central1";
+const PROD_UPLOAD_ENDPOINT = `https://${VISIT_UPLOAD_REGION}-rcph-admin.cloudfunctions.net/${VISIT_UPLOAD_FUNCTION_NAME}`;
 
 export const VISIT_FILE_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.webp";
 
@@ -20,6 +22,18 @@ export const VISIT_MIME_BY_EXTENSION = Object.freeze({
 
 function clean(value, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function cleanFirebaseProjectId(value) {
+  const candidate = clean(value, 80).toLowerCase();
+  return /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(candidate) ? candidate : "";
+}
+
+export function buildVisitUploadEndpoint(projectId) {
+  const safeProjectId = cleanFirebaseProjectId(projectId);
+  return safeProjectId
+    ? `https://${VISIT_UPLOAD_REGION}-${safeProjectId}.cloudfunctions.net/${VISIT_UPLOAD_FUNCTION_NAME}`
+    : "";
 }
 
 export function getVisitFileExtension(fileName) {
@@ -81,19 +95,27 @@ export function addVisitFiles(queue, incoming, folder, makeId = () => crypto.ran
   return { queue: [...current, ...added], duplicateCount, overflowCount };
 }
 
-export function validateVisitUploadEndpoint(value) {
+export function validateVisitUploadEndpoint(value, projectId = "") {
   const candidate = clean(value, 1000);
   if (!candidate) return "";
   try {
     const url = new URL(candidate);
-    if (url.href === PROD_UPLOAD_ENDPOINT) return candidate;
+    const endpointPath = new RegExp(`/${VISIT_UPLOAD_FUNCTION_NAME}/?$`);
+    const currentProjectEndpoint = buildVisitUploadEndpoint(projectId);
+    if (url.href === PROD_UPLOAD_ENDPOINT || (currentProjectEndpoint && url.href === currentProjectEndpoint)) return candidate;
     const localHost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-    return url.protocol === "http:" && localHost && /uploadVisitSubmissionFile\/?$/.test(url.pathname)
+    return url.protocol === "http:" && localHost && endpointPath.test(url.pathname)
       ? candidate
       : "";
   } catch {
     return "";
   }
+}
+
+export function resolveVisitUploadEndpoint(env = {}) {
+  const projectId = env?.VITE_FIREBASE_PROJECT_ID;
+  return validateVisitUploadEndpoint(env?.VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT, projectId)
+    || buildVisitUploadEndpoint(projectId);
 }
 
 export function normalizeVisitUploadResponse(raw) {

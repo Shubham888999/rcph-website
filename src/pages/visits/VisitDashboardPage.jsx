@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import AttendanceMark from "../../components/status/AttendanceMark";
 import useAuth from "../../hooks/useAuth";
 import {
   VISIT_ATTENDANCE_TABS,
   attendanceStatusLabel,
+  formatVisitAttendanceName,
+  formatVisitAttendanceRoleCode,
   formatVisitDashboardDate,
   formatVisitDashboardDateTime,
   formatVisitDashboardFileSize,
   formatVisitDashboardMoney,
+  getVisitDocumentPanelActionLabel,
   getVisitDashboardErrorMessage,
   normalizeVisitDashboardData,
   validVisitAttendanceTab,
@@ -80,8 +84,6 @@ function StatRail({ stats }) {
 }
 
 function AvenueCounts({ rows }) {
-  const maxCount = Math.max(1, ...rows.map((row) => row.count));
-
   return (
     <section className="visit-dashboard-avenue-section" aria-labelledby="visit-dashboard-avenues-title">
       <header>
@@ -90,15 +92,12 @@ function AvenueCounts({ rows }) {
       </header>
       <ul className="visit-dashboard-avenue-list">
         {rows.map((row) => (
-          <li key={row.avenueCode}>
-            <div>
+          <li className={row.count === 0 ? "is-zero" : ""} key={row.avenueCode}>
+            <span className="visit-dashboard-avenue-chip__label">
               <strong>{row.avenueName}</strong>
-              <span>{row.avenueCode}</span>
-            </div>
-            <span className="visit-dashboard-avenue-meter" aria-hidden="true">
-              <span style={{ inlineSize: `${Math.round((row.count / maxCount) * 100)}%` }} />
+              <small>{row.avenueCode}</small>
             </span>
-            <b>{row.count}</b>
+            <b aria-label={`${row.count} ${row.count === 1 ? "event" : "events"}`}>{row.count}</b>
           </li>
         ))}
       </ul>
@@ -108,7 +107,10 @@ function AvenueCounts({ rows }) {
 
 function DocumentPanels({ panels }) {
   const hasPanels = panels.length > 0;
-  const hasFiles = panels.some((panel) => panel.files.length > 0);
+  const allPanelsCanOpen = hasPanels && panels.every((panel) => panel.canOpen && panel.openUrl);
+  const folderLinkNote = allPanelsCanOpen
+    ? "Open the selected Google Drive folders shared by the club admin."
+    : "Folder links appear when shared by the club admin.";
 
   return (
     <section className="visit-dashboard-documents" aria-labelledby="visit-dashboard-documents-title">
@@ -125,20 +127,35 @@ function DocumentPanels({ panels }) {
           <strong>No document folders have been selected for this visit yet.</strong>
         </div>
       ) : (
-        <div className="visit-dashboard-folder-stack">
-          {hasFiles ? (
-            <p className="visit-dashboard-documents-note">
-              Secure document opening will be enabled in a later phase.
-            </p>
-          ) : null}
-          {panels.map((panel, index) => (
-            <details className="visit-dashboard-folder-panel" key={panel.positionKey} open={index === 0}>
-              <summary>
-                <span>
+        <div className="visit-dashboard-folder-directory">
+          <p className="visit-dashboard-documents-note">
+            {folderLinkNote}
+          </p>
+          {panels.map((panel) => {
+            const folderCode = formatVisitAttendanceRoleCode(panel.positionTitle || panel.positionKey || panel.avenueCode);
+            const actionLabel = getVisitDocumentPanelActionLabel(panel);
+            const fileCountLabel = `${panel.fileCount} ${panel.fileCount === 1 ? "file" : "files"}`;
+            return (
+            <details className="visit-dashboard-folder-panel" key={panel.positionKey}>
+              <summary aria-label={`${panel.folderLabel}: ${fileCountLabel}${actionLabel ? `. ${actionLabel}` : ""}`} title={panel.folderLabel}>
+                <span className="visit-dashboard-folder-title">
                   <strong>{panel.folderLabel}</strong>
-                  {panel.avenueCode ? <small>{panel.avenueName || panel.avenueCode}</small> : null}
+                  <small>{folderCode}</small>
                 </span>
-                <span className="visit-dashboard-folder-count">{panel.fileCount} {panel.fileCount === 1 ? "file" : "files"}</span>
+                <span className="visit-dashboard-folder-actions">
+                  <span className="visit-dashboard-folder-count">{fileCountLabel}</span>
+                  {actionLabel ? (
+                    <a
+                      className="visit-dashboard-folder-action"
+                      href={panel.openUrl}
+                      onClick={(event) => event.stopPropagation()}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      {actionLabel}
+                    </a>
+                  ) : null}
+                </span>
               </summary>
               {panel.files.length ? (
                 <ul className="visit-dashboard-document-list">
@@ -183,11 +200,18 @@ function DocumentPanels({ panels }) {
                 </div>
               )}
             </details>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
   );
+}
+
+function attendanceStatusMarkValue(status) {
+  if (status === "present" || status === "late") return true;
+  if (status === "absent") return false;
+  return "NA";
 }
 
 function AttendanceTable({ view }) {
@@ -207,10 +231,19 @@ function AttendanceTable({ view }) {
     );
   }
 
+  const tableMinWidth = Math.max(980, 400 + view.columns.length * 96);
+
   return (
     <div className="visit-dashboard-attendance-table-wrap">
-      <table className="visit-dashboard-attendance-table">
+      <table className="visit-dashboard-attendance-table" style={{ minWidth: `${tableMinWidth}px` }}>
         <caption>Read-only attendance overview</caption>
+        <colgroup>
+          <col className="visit-dashboard-attendance-col-name" />
+          <col className="visit-dashboard-attendance-col-role" />
+          {view.columns.map((column) => (
+            <col className="visit-dashboard-attendance-col-status" key={column.eventId} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th scope="col">Name</th>
@@ -224,25 +257,40 @@ function AttendanceTable({ view }) {
           </tr>
         </thead>
         <tbody>
-          {view.rows.map((row) => (
+          {view.rows.map((row) => {
+            const displayName = formatVisitAttendanceName(row.name);
+            const fullRole = row.roleOrPosition || "Member";
+            const roleCode = formatVisitAttendanceRoleCode(fullRole);
+            return (
             <tr key={row.personId}>
-              <th scope="row">{row.name}</th>
-              <td>{row.roleOrPosition || "Member"}</td>
+              <th className="visit-dashboard-attendance-name" scope="row" title={displayName}>{displayName}</th>
+              <td className="visit-dashboard-attendance-role" title={fullRole} aria-label={`${displayName} role or position: ${fullRole}`}>{roleCode}</td>
               {view.columns.map((column) => {
                 const status = row.cells[column.eventId] || "unknown";
                 const statusClass = ["present", "absent", "late", "excused", "unknown"].includes(status)
                   ? status
                   : "unknown";
+                const statusLabel = attendanceStatusLabel(statusClass);
                 return (
-                  <td key={column.eventId}>
-                    <span className={`visit-dashboard-attendance-status is-${statusClass}`}>
-                      {attendanceStatusLabel(status)}
+                  <td className="visit-dashboard-attendance-mark-cell" key={column.eventId}>
+                    <span
+                      className={`visit-dashboard-attendance-status is-${statusClass}`}
+                      aria-label={`${displayName}, ${column.title}: ${statusLabel}`}
+                      title={statusLabel}
+                    >
+                      <AttendanceMark
+                        value={attendanceStatusMarkValue(statusClass)}
+                        size="small"
+                        ariaLabel={statusLabel}
+                        title={statusLabel}
+                      />
                     </span>
                   </td>
                 );
               })}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

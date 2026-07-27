@@ -47,9 +47,158 @@ export const VISIT_ATTENDANCE_TABS = Object.freeze([
 const VISIT_ATTENDANCE_TAB_KEYS = new Set(VISIT_ATTENDANCE_TABS.map((tab) => tab.key));
 const ATTENDANCE_STATUSES = new Set(["present", "absent", "late", "excused", "unknown"]);
 const TREASURY_TYPES = new Set(["income", "expense", "unknown"]);
+const ATTENDANCE_ROLE_CODES = Object.freeze({
+  admin: "Admin",
+  avenuechair: "Chair",
+  ceditor: "Co-Editor",
+  ccmd: "Co-CMD",
+  ccsd: "Co-CSD",
+  ccwd: "Co-CWD",
+  cdei: "Co-DEI",
+  cisd: "Co-ISD",
+  clubservice: "CSD",
+  clubservicedirector: "CSD",
+  clubwebdirector: "CWD",
+  clubwebsitedirector: "CWD",
+  cpres: "Co-President",
+  cpdd: "Co-PDD",
+  cpro: "Co-PRO",
+  crrro: "Co-RRRO",
+  csd: "CSD",
+  csec: "Co-Secretary",
+  csaa: "Co-SAA",
+  ctreas: "Co-Treasurer",
+  cvp: "Co-VP",
+  coclubservice: "Co-CSD",
+  coclubservicedirector: "Co-CSD",
+  cocsd: "Co-CSD",
+  cmd: "CMD",
+  communityservice: "CMD",
+  communityservicedirector: "CMD",
+  cocmd: "Co-CMD",
+  cocommunityservice: "Co-CMD",
+  cocommunityservicedirector: "Co-CMD",
+  codei: "Co-DEI",
+  codeidirector: "Co-DEI",
+  codiversityequityandinclusion: "Co-DEI",
+  codiversityequityandinclusiondirector: "Co-DEI",
+  coeditor: "Co-Editor",
+  cointernationalservice: "Co-ISD",
+  cointernationalservicedirector: "Co-ISD",
+  coisd: "Co-ISD",
+  copdd: "Co-PDD",
+  coprofessionaldevelopment: "Co-PDD",
+  coprofessionaldevelopmentdirector: "Co-PDD",
+  copresident: "Co-President",
+  copro: "Co-PRO",
+  copublicrelations: "Co-PRO",
+  copublicrelationsdirector: "Co-PRO",
+  copublicrelationsofficer: "Co-PRO",
+  corrro: "Co-RRRO",
+  corotaryrotaractrelations: "Co-RRRO",
+  corotaryrotaractrelationsdirector: "Co-RRRO",
+  corotaryrotaractrelationsofficer: "Co-RRRO",
+  cosaa: "Co-SAA",
+  cosecretary: "Co-Secretary",
+  cosergeantatarms: "Co-SAA",
+  cotreasurer: "Co-Treasurer",
+  cotreas: "Co-Treasurer",
+  covicepresident: "Co-VP",
+  cowebdirector: "Co-CWD",
+  cowebsitedirector: "Co-CWD",
+  coclubwebdirector: "Co-CWD",
+  coclubwebsitedirector: "Co-CWD",
+  cocwd: "Co-CWD",
+  cwd: "CWD",
+  dei: "DEI",
+  deidirector: "DEI",
+  diversityequityandinclusion: "DEI",
+  diversityequityandinclusiondirector: "DEI",
+  districtofficial: "District",
+  editor: "Editor",
+  generalbodymember: "Member",
+  gbm: "Member",
+  immedatepastpresident: "IPP",
+  immediatepastpresident: "IPP",
+  ipp: "IPP",
+  isd: "ISD",
+  internationalservice: "ISD",
+  internationalservicedirector: "ISD",
+  jsec: "Joint Secretary",
+  jointsecretary: "Joint Secretary",
+  member: "Member",
+  president: "President",
+  pres: "President",
+  pdd: "PDD",
+  professionaldevelopment: "PDD",
+  professionaldevelopmentdirector: "PDD",
+  prospect: "Prospect",
+  pro: "PRO",
+  publicrelations: "PRO",
+  publicrelationsofficer: "PRO",
+  publicrelationsdirector: "PRO",
+  rrro: "RRRO",
+  rotaryrotaractrelations: "RRRO",
+  rotaryrotaractrelationsofficer: "RRRO",
+  rotaryrotaractrelationsdirector: "RRRO",
+  saa: "SAA",
+  secretary: "Secretary",
+  sec: "Secretary",
+  sergeantatarms: "SAA",
+  treas: "Treasurer",
+  treasurer: "Treasurer",
+  vicepresident: "VP",
+  vp: "VP",
+  webdirector: "CWD",
+  websitedirector: "CWD",
+});
+
+const ATTENDANCE_ROLE_FAMILIES = Object.freeze([
+  { patterns: ["internationalservice"], code: "ISD" },
+  { patterns: ["communityservice"], code: "CMD" },
+  { patterns: ["clubservice"], code: "CSD" },
+  { patterns: ["professionaldevelopment"], code: "PDD" },
+  { patterns: ["rotaryrotaractrelations"], code: "RRRO" },
+  { patterns: ["publicrelations"], code: "PRO" },
+  { patterns: ["diversityequityandinclusion"], code: "DEI" },
+  { patterns: ["websitedirector", "webdirector"], code: "CWD" },
+  { patterns: ["sergeantatarms"], code: "SAA" },
+]);
 
 function text(value, max = 200) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function roleLookupKey(value) {
+  return text(value, 120)
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function hasCoRolePrefix(value) {
+  const raw = text(value, 120).trim();
+  if (/^co[-_\s]+/i.test(raw)) return true;
+  if (raw.slice(0, 2).toLowerCase() !== "co" || raw.length < 3) return false;
+  return /[A-Z0-9]/.test(raw[2]) && raw[2] === raw[2].toUpperCase();
+}
+
+function compactRolePart(value) {
+  const raw = text(value, 120).replace(/\s+/g, " ");
+  const key = roleLookupKey(raw);
+  if (!raw) return "";
+  if (ATTENDANCE_ROLE_CODES[key]) return ATTENDANCE_ROLE_CODES[key];
+  const coRole = hasCoRolePrefix(raw);
+  const family = ATTENDANCE_ROLE_FAMILIES.find((item) => item.patterns.some((pattern) => key.includes(pattern)));
+  if (family) return coRole ? `Co-${family.code}` : family.code;
+  if (/^[A-Z0-9]{2,6}$/.test(raw)) return raw;
+  if (raw.length <= 12) return raw;
+  return raw
+    .split(/\s+/)
+    .filter((part) => !["and", "of", "the"].includes(part.toLowerCase()))
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("")
+    .slice(0, 6) || raw;
 }
 
 function safeId(value, max = 160) {
@@ -188,6 +337,23 @@ function normalizeDocumentFile(raw) {
   };
 }
 
+function normalizeDriveFolderOpenUrl(value) {
+  const raw = text(value, 1000);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.hostname !== "drive.google.com") return "";
+    const segments = url.pathname.split("/").filter(Boolean);
+    const folderSegmentIndex = segments.indexOf("folders");
+    if (folderSegmentIndex < 0) return "";
+    const folderId = segments[folderSegmentIndex + 1] || "";
+    if (!/^[A-Za-z0-9_-]{5,220}$/.test(folderId)) return "";
+    return `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`;
+  } catch {
+    return "";
+  }
+}
+
 function normalizeDocumentPanels(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -200,6 +366,7 @@ function normalizeDocumentPanels(value) {
     const files = Array.isArray(panel.files)
       ? panel.files.map(normalizeDocumentFile).filter(Boolean)
       : [];
+    const openUrl = normalizeDriveFolderOpenUrl(panel.openUrl);
     return [{
       positionKey,
       positionTitle,
@@ -207,6 +374,8 @@ function normalizeDocumentPanels(value) {
       avenueName: text(panel.avenueName, 80),
       folderLabel: text(panel.folderLabel, 180) || positionTitle,
       fileCount: files.length,
+      canOpen: panel.canOpen === true && Boolean(openUrl),
+      openUrl,
       files,
     }];
   });
@@ -382,6 +551,30 @@ const INR_FORMATTER = new Intl.NumberFormat("en-IN", {
 
 export function formatVisitDashboardMoney(value) {
   return INR_FORMATTER.format(money(value));
+}
+
+export function formatVisitAttendanceName(value) {
+  const name = text(value, 160).replace(/\s+/g, " ");
+  if (!name) return "";
+  if (/^Rtr(?:\.|\b)/i.test(name)) return name.replace(/^Rtr(?:\.|\b)\s*/i, "Rtr. ");
+  return `Rtr. ${name}`;
+}
+
+export function formatVisitAttendanceRoleCode(value) {
+  const raw = text(value, 120).replace(/\s+/g, " ");
+  if (!raw) return "Member";
+  const wholeKey = roleLookupKey(raw);
+  if (ATTENDANCE_ROLE_CODES[wholeKey]) return ATTENDANCE_ROLE_CODES[wholeKey];
+  const parts = raw
+    .split(/\s*(?:,|;|\/)\s*/)
+    .map(compactRolePart)
+    .filter(Boolean);
+  if (parts.length > 1) return [...new Set(parts)].join(", ");
+  return compactRolePart(raw) || raw;
+}
+
+export function getVisitDocumentPanelActionLabel(panel) {
+  return panel?.canOpen === true && panel.openUrl ? "Open folder" : "";
 }
 
 export function formatVisitDashboardFileSize(value) {

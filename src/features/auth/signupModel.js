@@ -18,14 +18,7 @@ export const SIGNUP_PATHS = {
 export const DISTRICT_OFFICIAL_ROLE = "districtOfficial";
 export const DISTRICT_OFFICIAL_SIGNUP_TYPE = "district-official";
 export const SIGNUP_ROLES = ["gbm", "bod", "admin"];
-export const DISTRICT_OFFICIAL_POSITIONS = [
-  "DRR",
-  "DZR",
-  "District Secretary",
-  "District Council Member",
-  "District Official",
-  "Other",
-];
+export const DISTRICT_OFFICIAL_POSITION_MAX_LENGTH = 120;
 export const SIGNUP_GENDERS = [
   "woman",
   "man",
@@ -244,8 +237,11 @@ export function validateSignup(form, options = {}) {
       errors.inviteCode = "Enter the Admin invite code.";
     }
   } else if (districtOfficialSignup) {
-    if (!DISTRICT_OFFICIAL_POSITIONS.includes(normalizeSignupText(form.districtOfficialPosition))) {
-      errors.districtOfficialPosition = "Choose your District position.";
+    const position = normalizeSignupText(form.districtOfficialPosition);
+    if (!position) {
+      errors.districtOfficialPosition = "Enter your District position.";
+    } else if (position.length > DISTRICT_OFFICIAL_POSITION_MAX_LENGTH) {
+      errors.districtOfficialPosition = `Use ${DISTRICT_OFFICIAL_POSITION_MAX_LENGTH} characters or fewer.`;
     }
   } else {
     errors.path = "Choose an account type.";

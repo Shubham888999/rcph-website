@@ -4,7 +4,7 @@ import AuthNotice from "./AuthNotice";
 import GoogleSignupButton from "./GoogleSignupButton";
 import SignupCommonFields from "./SignupCommonFields";
 import SignupConsents from "./SignupConsents";
-import { DISTRICT_OFFICIAL_POSITIONS } from "./signupModel";
+import { DISTRICT_OFFICIAL_POSITION_MAX_LENGTH } from "./signupModel";
 
 function ErrorText({ id, children }) {
   return children ? <p id={id} className="signup-field-error" role="alert">{children}</p> : null;
@@ -40,19 +40,18 @@ export default function DistrictOfficialSignupForm(props) {
           <legend>District role</legend>
           <div className="signup-field">
             <label htmlFor="signup-districtOfficialPosition">Position</label>
-            <select
+            <input
               id="signup-districtOfficialPosition"
+              type="text"
               value={form.districtOfficialPosition}
               disabled={Boolean(busy)}
+              maxLength={DISTRICT_OFFICIAL_POSITION_MAX_LENGTH}
+              placeholder="District Secretary, District Rotaract Representative, Avenue Chair"
+              required
               aria-invalid={Boolean(errors.districtOfficialPosition)}
               aria-describedby={errors.districtOfficialPosition ? "signup-district-position-error" : undefined}
               onChange={(event) => onChange("districtOfficialPosition", event.target.value)}
-            >
-              <option value="">Select a position</option>
-              {DISTRICT_OFFICIAL_POSITIONS.map((position) => (
-                <option key={position} value={position}>{position}</option>
-              ))}
-            </select>
+            />
             <ErrorText id="signup-district-position-error">{errors.districtOfficialPosition}</ErrorText>
           </div>
         </fieldset>

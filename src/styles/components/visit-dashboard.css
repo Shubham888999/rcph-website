@@ -107,7 +107,7 @@
   margin: 0;
   padding: 1.15rem 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10.75rem, 1fr));
   border-block: 1px solid var(--internal-border);
 }
 
@@ -139,7 +139,10 @@
   font-size: clamp(1.35rem, 2.6vw, 2.15rem);
   font-weight: 900;
   line-height: 1.05;
-  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .visit-dashboard-stat-rail .is-income dd {
@@ -152,16 +155,16 @@
 
 .visit-dashboard-avenue-section {
   display: grid;
-  grid-template-columns: minmax(12rem, 0.36fr) minmax(0, 1fr);
-  gap: clamp(1.5rem, 5vw, 4.5rem);
+  grid-template-columns: minmax(12rem, 0.28fr) minmax(0, 1fr);
+  gap: clamp(1.25rem, 4vw, 3rem);
   align-items: start;
 }
 
 .visit-dashboard-avenue-section h2 {
-  max-width: 10ch;
+  max-width: 12ch;
   margin: 0;
-  font-size: clamp(2rem, 5vw, 4rem);
-  line-height: 0.98;
+  font-size: clamp(1.9rem, 4vw, 3.3rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -169,56 +172,64 @@
   margin: 0;
   padding: 0;
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: 0 1rem;
   list-style: none;
 }
 
 .visit-dashboard-avenue-list li {
   min-width: 0;
-  padding: 0.95rem 0;
-  display: grid;
-  grid-template-columns: minmax(10rem, 0.5fr) minmax(5rem, 1fr) auto;
-  gap: clamp(0.8rem, 3vw, 1.4rem);
+  min-height: 2.15rem;
+  padding: 0.32rem 0;
+  display: flex;
+  gap: 0.55rem;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
 }
 
 .visit-dashboard-avenue-list li:first-child {
-  padding-top: 0.2rem;
+  padding-top: 0.32rem;
 }
 
-.visit-dashboard-avenue-list div {
+.visit-dashboard-avenue-list li.is-zero {
+  opacity: 0.62;
+}
+
+.visit-dashboard-avenue-chip__label {
   min-width: 0;
-  display: grid;
-  gap: 0.18rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
 }
 
 .visit-dashboard-avenue-list strong {
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  color: var(--internal-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.visit-dashboard-avenue-list span:not(.visit-dashboard-avenue-meter) {
+.visit-dashboard-avenue-list small {
   color: var(--internal-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
+  white-space: nowrap;
+}
+
+.visit-dashboard-avenue-list small::before {
+  margin-right: 0.35rem;
+  color: rgba(255, 255, 255, 0.28);
+  content: "·";
 }
 
 .visit-dashboard-avenue-list b {
+  min-width: 1.6rem;
   color: var(--internal-accent-soft);
   font-size: 1.1rem;
-}
-
-.visit-dashboard-avenue-meter {
-  height: 3px;
-  display: block;
-  background: rgba(255, 255, 255, 0.09);
-}
-
-.visit-dashboard-avenue-meter span {
-  min-inline-size: 0.4rem;
-  max-inline-size: 100%;
-  height: 100%;
-  display: block;
-  background: linear-gradient(90deg, var(--internal-accent), var(--internal-accent-secondary));
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .visit-dashboard-freshness {
@@ -274,12 +285,14 @@
   margin-top: 0.75rem;
 }
 
-.visit-dashboard-folder-stack {
+.visit-dashboard-folder-directory {
   display: grid;
-  gap: 0.75rem;
+  grid-template-columns: 1fr;
+  gap: 0;
 }
 
 .visit-dashboard-documents-note {
+  grid-column: 1 / -1;
   max-width: 46rem;
   margin: 0 0 0.25rem;
   padding-left: 0.85rem;
@@ -289,14 +302,21 @@
 }
 
 .visit-dashboard-folder-panel {
-  border-block: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+.visit-dashboard-folder-panel[open] {
+  background: rgba(255, 255, 255, 0.018);
 }
 
 .visit-dashboard-folder-panel summary {
-  min-height: 4.2rem;
+  min-height: 2.7rem;
+  padding: 0.42rem 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1rem;
+  grid-template-columns: minmax(16rem, 1fr) max-content;
+  gap: 0.85rem;
   align-items: center;
   cursor: pointer;
 }
@@ -305,40 +325,84 @@
   color: var(--internal-accent-secondary);
 }
 
-.visit-dashboard-folder-panel summary > span:first-child {
+.visit-dashboard-folder-title {
   min-width: 0;
-  display: grid;
-  gap: 0.25rem;
+  max-width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .visit-dashboard-folder-panel summary strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--internal-text);
-  font-size: 1.04rem;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .visit-dashboard-folder-panel summary small,
-.visit-dashboard-folder-count {
+.visit-dashboard-folder-count,
+.visit-dashboard-folder-action {
   color: var(--internal-text-muted);
   font-size: 0.78rem;
   font-weight: 850;
   text-transform: uppercase;
 }
 
-.visit-dashboard-folder-count {
-  min-height: 1.8rem;
-  padding: 0.32rem 0.58rem;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid rgba(96, 195, 196, 0.32);
-  border-radius: var(--internal-radius-control);
-  color: var(--internal-accent-secondary);
-  background: rgba(96, 195, 196, 0.07);
+.visit-dashboard-folder-panel summary small {
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 
+.visit-dashboard-folder-panel summary small::before {
+  margin-right: 0.5rem;
+  color: rgba(255, 255, 255, 0.28);
+  content: "·";
+}
+
+.visit-dashboard-folder-actions {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: end;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.visit-dashboard-folder-count {
+  min-height: 1.55rem;
+  padding: 0.22rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(96, 195, 196, 0.26);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-accent-secondary);
+  background: rgba(96, 195, 196, 0.045);
+  white-space: nowrap;
+}
+
+.visit-dashboard-folder-action {
+  min-height: 1.55rem;
+  padding: 0.22rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(229, 194, 104, 0.26);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-accent-soft);
+  background: rgba(229, 194, 104, 0.045);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.visit-dashboard-folder-action:hover {
+  border-color: rgba(229, 194, 104, 0.52);
+  background: rgba(229, 194, 104, 0.085);
+}
+
 .visit-dashboard-document-list {
-  margin: 0 0 1rem;
+  margin: 0 0 0.65rem;
   padding: 0;
   display: grid;
   list-style: none;
@@ -500,8 +564,20 @@
 
 .visit-dashboard-attendance-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 980px;
   border-collapse: collapse;
+}
+
+.visit-dashboard-attendance-col-name {
+  width: 18rem;
+}
+
+.visit-dashboard-attendance-col-role {
+  width: 7rem;
+}
+
+.visit-dashboard-attendance-col-status {
+  width: 6rem;
 }
 
 .visit-dashboard-attendance-table caption {
@@ -517,10 +593,10 @@
 
 .visit-dashboard-attendance-table th,
 .visit-dashboard-attendance-table td {
-  padding: 0.75rem 0.8rem;
+  padding: 0.52rem 0.65rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .visit-dashboard-attendance-table thead th {
@@ -542,27 +618,45 @@
   text-transform: none;
 }
 
-.visit-dashboard-attendance-table tbody th {
-  min-width: 11rem;
+.visit-dashboard-attendance-name {
+  max-width: 18rem;
   color: var(--internal-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .visit-dashboard-attendance-table tbody td {
   color: var(--internal-text-muted);
 }
 
+.visit-dashboard-attendance-role {
+  color: var(--internal-accent-soft) !important;
+  font-size: 0.82rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.visit-dashboard-attendance-mark-cell {
+  text-align: center !important;
+}
+
 .visit-dashboard-attendance-status {
-  min-height: 1.65rem;
-  padding: 0.22rem 0.5rem;
+  min-width: 2.45rem;
+  min-height: 1.95rem;
+  padding: 0.16rem 0.35rem;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--internal-radius-control);
   color: var(--internal-text-muted);
   background: rgba(255, 255, 255, 0.035);
-  font-size: 0.78rem;
-  font-weight: 850;
   white-space: nowrap;
+}
+
+.visit-dashboard-attendance-status .attendance-mark {
+  pointer-events: none;
 }
 
 .visit-dashboard-attendance-status.is-present,
@@ -578,7 +672,8 @@
   background: rgba(153, 40, 87, 0.12);
 }
 
-.visit-dashboard-attendance-status.is-excused {
+.visit-dashboard-attendance-status.is-excused,
+.visit-dashboard-attendance-status.is-unknown {
   border-color: rgba(229, 194, 104, 0.34);
   color: var(--internal-accent-soft);
   background: rgba(229, 194, 104, 0.07);
@@ -624,7 +719,10 @@
   font-size: clamp(1.2rem, 2.4vw, 1.85rem);
   font-weight: 900;
   line-height: 1.05;
-  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .visit-dashboard-treasury-summary .is-income dd {
@@ -795,7 +893,8 @@
   min-height: 7rem;
 }
 
-.visit-dashboard-page button:focus-visible {
+.visit-dashboard-page button:focus-visible,
+.visit-dashboard-folder-action:focus-visible {
   outline: none;
   box-shadow: var(--internal-focus-ring);
 }
@@ -851,6 +950,10 @@
   .visit-dashboard-document-list dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .visit-dashboard-attendance-name {
+    max-width: 15rem;
+  }
 }
 
 @media (max-width: 40rem) {
@@ -880,15 +983,6 @@
     border-right: 0;
   }
 
-  .visit-dashboard-avenue-list li {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .visit-dashboard-avenue-meter {
-    grid-column: 1 / -1;
-    order: 3;
-  }
-
   .visit-dashboard-freshness {
     margin-top: -0.75rem;
     text-align: left;
@@ -899,9 +993,20 @@
     grid-template-columns: 1fr;
   }
 
-  .visit-dashboard-folder-count,
+  .visit-dashboard-folder-actions,
   .visit-dashboard-attendance > summary b {
     justify-self: start;
+  }
+
+  .visit-dashboard-attendance-name {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .visit-dashboard-attendance-role {
+    white-space: normal;
   }
 
   .visit-dashboard-document-list dl,

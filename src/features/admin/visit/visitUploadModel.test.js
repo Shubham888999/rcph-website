@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addVisitFiles,
+  buildVisitUploadEndpoint,
   formatVisitFileSize,
   getVisitThumbnailUrl,
   normalizeVisitUploadResponse,
+  resolveVisitUploadEndpoint,
   safeVisitUploadError,
   validateVisitUploadEndpoint,
   validateVisitUploadFile,
@@ -52,6 +54,17 @@ test("only the exact production endpoint and local emulator endpoints are accept
   assert.equal(validateVisitUploadEndpoint("https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile"), "https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile");
   assert.equal(validateVisitUploadEndpoint("http://localhost:5001/rcph-admin/us-central1/uploadVisitSubmissionFile"), "http://localhost:5001/rcph-admin/us-central1/uploadVisitSubmissionFile");
   for (const value of ["", "https://evil.example/uploadVisitSubmissionFile", "http://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile", "https://us-central1-rcph-admin.cloudfunctions.net/other"]) assert.equal(validateVisitUploadEndpoint(value), "");
+});
+
+test("Club Visit upload endpoint resolves from the configured Firebase project", () => {
+  assert.equal(buildVisitUploadEndpoint("rcph-admin"), "https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile");
+  assert.equal(resolveVisitUploadEndpoint({ VITE_FIREBASE_PROJECT_ID: "rcph-admin" }), "https://us-central1-rcph-admin.cloudfunctions.net/uploadVisitSubmissionFile");
+  assert.equal(resolveVisitUploadEndpoint({ VITE_FIREBASE_PROJECT_ID: "rcph-admin-staging-2" }), "https://us-central1-rcph-admin-staging-2.cloudfunctions.net/uploadVisitSubmissionFile");
+  assert.equal(resolveVisitUploadEndpoint({
+    VITE_FIREBASE_PROJECT_ID: "rcph-admin-staging-2",
+    VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT: "http://127.0.0.1:5001/rcph-admin-staging-2/us-central1/uploadVisitSubmissionFile",
+  }), "http://127.0.0.1:5001/rcph-admin-staging-2/us-central1/uploadVisitSubmissionFile");
+  assert.equal(resolveVisitUploadEndpoint({ VITE_FIREBASE_PROJECT_ID: "../bad" }), "");
 });
 
 test("trusted response normalization requires a completion proof", () => {

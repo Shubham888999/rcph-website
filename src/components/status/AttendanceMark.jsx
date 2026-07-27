@@ -2,9 +2,11 @@ import { resolveAttendanceMark } from "./attendanceMarkModel";
 
 const SIZES = new Set(["small", "medium", "large"]);
 
-export default function AttendanceMark({ value, size = "medium", showLabel = false, className = "" }) {
+export default function AttendanceMark({ value, size = "medium", showLabel = false, className = "", ariaLabel = "", title = "" }) {
   const mark = resolveAttendanceMark(value);
   const normalizedSize = SIZES.has(size) ? size : "medium";
+  const accessibleLabel = ariaLabel || mark.label;
+  const titleText = title || accessibleLabel;
   const classes = [
     "attendance-mark",
     `attendance-mark--${mark.kind}`,
@@ -13,7 +15,7 @@ export default function AttendanceMark({ value, size = "medium", showLabel = fal
   ].filter(Boolean).join(" ");
 
   return (
-    <span className={classes} role="img" aria-label={mark.label} title={mark.label}>
+    <span className={classes} role="img" aria-label={accessibleLabel} title={titleText}>
       {mark.imageSrc ? <img src={mark.imageSrc} alt="" aria-hidden="true" /> : (
         <span className="attendance-mark__fallback">{mark.label}</span>
       )}

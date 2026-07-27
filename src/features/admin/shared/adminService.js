@@ -14,7 +14,7 @@ import {
 } from "../treasury/treasuryUploadModel";
 import {
   normalizeVisitUploadResponse,
-  validateVisitUploadEndpoint,
+  resolveVisitUploadEndpoint,
 } from "../visit/visitUploadModel";
 
 const QUERY_CONFIG = {
@@ -116,7 +116,7 @@ export const visitDashboardCalls = {
 };
 
 export async function uploadVisitFile(file, session, approved, onStage) {
-  const endpoint = validateVisitUploadEndpoint(import.meta.env.VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT);
+  const endpoint = resolveVisitUploadEndpoint(import.meta.env);
   if (!endpoint) throw new Error("Club Visits upload is not configured.");
   const form = new FormData(); form.append("ticket", approved.ticket); form.append("sessionId", session.sessionId); form.append("clientFileId", approved.clientFileId); form.append("fileName", approved.fileName); form.append("mimeType", approved.mimeType); form.append("sizeBytes", String(approved.sizeBytes)); form.append("file", file, file.name);
   onStage?.("uploading");

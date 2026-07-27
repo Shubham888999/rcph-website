@@ -8,6 +8,9 @@ const routerSource = readFileSync(new URL("../../../app/router.jsx", import.meta
 
 test("Club Visits upload exposes labelled sequential queue, retry, cancellation, and live status", () => {
   for (const copy of ["Choose supporting files", "Start sequential upload", "Retry failed uploads", "Cancel remaining uploads", "aria-live=\"polite\""]) assert.match(moduleSource, new RegExp(copy));
+  assert.match(moduleSource, /resolveVisitUploadEndpoint\(import\.meta\.env\)/);
+  assert.match(moduleSource, /Club Visits upload endpoint could not be resolved/);
+  assert.doesNotMatch(moduleSource, /Club Visits upload is not configured for this build/);
   assert.match(moduleSource, /completionProof/);
   assert.match(moduleSource, /Processing in Drive/);
 });
