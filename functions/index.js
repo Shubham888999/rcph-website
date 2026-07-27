@@ -37,6 +37,11 @@ const { createBodManagementService } = require('./lib/bod-management');
 const { createBodPhotoUploadService } = require('./lib/bod-photo-upload');
 const momFunctions = require('./lib/momFunctions');
 const reminderFunctions = require('./lib/reminderFunctions');
+const {
+  normalizeAvenueKey: normalizeReportingAvenueKey,
+  normalizeReportingWindowConfig,
+  normalizedNameSimilarity: reportingNameSimilarity,
+} = require('./lib/reminderCore');
 const avenueReportingLocks = require('./lib/avenue-reporting-locks');
 const systemLogs = require('./lib/system-logs');
 const { stripRotaractorPrefix } = require('./lib/member-name');
@@ -3164,6 +3169,7 @@ function normalizeBodEventPayload(raw, options = {}) {
   const imageLinks = normalizeStringArray(raw.imageLinks || raw.driveLinks || raw.uploadedFileUrls, 30, 700);
   const driveLinks = normalizeStringArray(raw.driveLinks || imageLinks, 30, 700);
   const driveFolder = normalizeText(raw.driveFolder || raw.driveFolderId, 700);
+  const reportingWindowId = validateEventDocId(raw.reportingWindowId || raw.reminderId);
 
   if (!name) throw new HttpsError('invalid-argument', 'Event name is required.');
   if (!date) throw new HttpsError('invalid-argument', 'Start date is required.');
@@ -3200,6 +3206,7 @@ function normalizeBodEventPayload(raw, options = {}) {
     collaborators,
     collaborationNotes,
     reportFinance,
+    reportingWindowId,
     _hasCollaborationFields: hasCollaborationFields,
     _hasReportFinanceField: hasReportFinanceField,
   };
@@ -3228,6 +3235,7 @@ function normalizeBodMeetingPayload(raw) {
   const name = normalizeText(raw.name, 180);
   const date = normalizeText(raw.date, 20);
   const desc = normalizeText(raw.desc || raw.description, 1200);
+  const reportingWindowId = validateEventDocId(raw.reportingWindowId || raw.reminderId);
   if (!name) throw new HttpsError('invalid-argument', 'Meeting name is required.');
   if (!date) throw new HttpsError('invalid-argument', 'Meeting date is required.');
   return {
@@ -3239,6 +3247,7 @@ function normalizeBodMeetingPayload(raw) {
     type: 'bodMeeting',
     source: 'adminBodAttendance',
     visibility: 'internal',
+    reportingWindowId,
   };
 }
 
@@ -3358,6 +3367,63 @@ async function getReportingWindowDashboardNotices(positionKeys) {
     ...(lockNotice ? [lockNotice] : []),
     ...openNotices,
   ];
+}
+
+function bodPayloadIncludesReportingWindowAvenue(payload, reportingWindow) {
+  const expected = normalizeReportingAvenueKey(reportingWindow.avenue);
+  return Array.isArray(payload.avenues)
+    && payload.avenues.map(normalizeReportingAvenueKey).includes(expected);
+}
+
+async function requireReportingWindowForBodPayload(payload) {
+  const reportingWindowId = validateEventDocId(payload.reportingWindowId);
+  if (!reportingWindowId) return null;
+  const snap = await db.collection('reminders').doc(reportingWindowId).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Reporting window not found.');
+  const reportingWindow = normalizeReportingWindowConfig(snap.id, snap.data() || {});
+  if (!reportingWindow) {
+    throw new HttpsError('failed-precondition', 'This record is not a valid reporting window.');
+  }
+  if (reportingWindow.status === 'locked' || (reportingWindow.lockEnabled && Date.now() >= reportingWindow.lockAtMillis)) {
+    throw new HttpsError('failed-precondition', 'This reporting window is locked.');
+  }
+  if (normalizeReportingAvenueKey(reportingWindow.avenue) === 'BOD_MEETING') {
+    throw new HttpsError('failed-precondition', 'BOD Meeting reporting windows use the existing BOD Meeting scheduler until the Phase 2 BOD Tools meeting form is enabled.');
+  }
+  if (payload.date !== reportingWindow.conductedDate) {
+    throw new HttpsError('invalid-argument', 'Event date must match the reporting window conducted date.');
+  }
+  if (reportingNameSimilarity(payload.name, reportingWindow.targetName) < 1) {
+    throw new HttpsError('invalid-argument', 'Event name must match the reporting window event name.');
+  }
+  if (!bodPayloadIncludesReportingWindowAvenue(payload, reportingWindow)) {
+    throw new HttpsError('invalid-argument', 'Event avenue must match the reporting window avenue.');
+  }
+  return reportingWindow;
+}
+
+async function requireReportingWindowForBodMeetingPayload(payload) {
+  const reportingWindowId = validateEventDocId(payload.reportingWindowId);
+  if (!reportingWindowId) return null;
+  const snap = await db.collection('reminders').doc(reportingWindowId).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Reporting window not found.');
+  const reportingWindow = normalizeReportingWindowConfig(snap.id, snap.data() || {});
+  if (!reportingWindow) {
+    throw new HttpsError('failed-precondition', 'This record is not a valid reporting window.');
+  }
+  if (reportingWindow.status === 'locked' || (reportingWindow.lockEnabled && Date.now() >= reportingWindow.lockAtMillis)) {
+    throw new HttpsError('failed-precondition', 'This reporting window is locked.');
+  }
+  if (normalizeReportingAvenueKey(reportingWindow.avenue) !== 'BOD_MEETING') {
+    throw new HttpsError('invalid-argument', 'BOD Meeting records can only link BOD Meeting reporting windows.');
+  }
+  if (payload.date !== reportingWindow.conductedDate) {
+    throw new HttpsError('invalid-argument', 'Meeting date must match the reporting window conducted date.');
+  }
+  if (reportingNameSimilarity(payload.name, reportingWindow.targetName) < 1) {
+    throw new HttpsError('invalid-argument', 'Meeting name must match the reporting window event name.');
+  }
+  return reportingWindow;
 }
 
 async function assertBodEventRecordIsClubEvent(eventId) {
@@ -3579,6 +3645,7 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
   const reportFinance = payload._hasReportFinanceField || (!bodSnap.exists && !eventSnap.exists)
     ? (payload.reportFinance || bodEventSchema.normalizeBodReportFinance())
     : normalizeStoredBodReportFinance(existingBod.reportFinance, existingEvent.reportFinance);
+  const reportingWindowId = payload.reportingWindowId || existingBod.reportingWindowId || existingEvent.reportingWindowId || '';
 
   const bodEventDoc = {
     name: payload.name,
@@ -3609,6 +3676,7 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     collaborators,
     collaborationNotes,
     reportFinance,
+    reportingWindowId,
     archived: false,
     createdBy: existingBod.createdBy || uid,
     createdByEmail: existingBod.createdByEmail || userProfile.email,
@@ -3634,6 +3702,7 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     hostClub,
     collaborators,
     collaborationNotes,
+    reportingWindowId,
     conductedBy: payload.conductedBy,
     createdBy: existingEvent.createdBy || uid,
     createdAt: preserveCreatedAt ? timestampCreatedAt(existingEvent, now) : now,
@@ -3665,6 +3734,7 @@ async function writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now
     type: 'bodMeeting',
     source: 'adminBodAttendance',
     visibility: 'internal',
+    reportingWindowId: payload.reportingWindowId || existingMeeting.reportingWindowId || existingBodEvent.reportingWindowId || '',
     archived: false,
     createdBy: existingMeeting.createdBy || uid,
     createdAt: timestampCreatedAt(existingMeeting, now),
@@ -3685,6 +3755,7 @@ async function writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now
     visibility: 'internal',
     status: 'synced',
     syncedMeetingId: meetingId,
+    reportingWindowId: payload.reportingWindowId || existingBodEvent.reportingWindowId || existingMeeting.reportingWindowId || '',
     archived: false,
     createdBy: existingBodEvent.createdBy || uid,
     createdByEmail: existingBodEvent.createdByEmail || userProfile.email,
@@ -8005,6 +8076,7 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const eventId = validateEventDocId(data.eventId) || db.collection('events').doc().id;
   const payload = normalizeBodEventPayload(data);
   await assertBodEventAvenuesUnlocked(payload.avenues);
+  const reportingWindow = await requireReportingWindowForBodPayload(payload);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
@@ -8015,6 +8087,27 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     userProfile,
     now,
   });
+  let reportingWorkflow = null;
+  if (reportingWindow) {
+    reportingWorkflow = await reminderFunctions.linkReportingWindowToTarget({
+      reportingWindow,
+      targetType: 'club_event',
+      targetId: eventId,
+      bodEventId: eventId,
+      access: {
+        uid,
+        displayName: userProfile.name,
+        storedRole: authority.role,
+        role: authority.role,
+      },
+      now: admin.firestore.Timestamp.now(),
+      match: {
+        detection: 'reportingWindowId',
+        confidence: 1,
+        source: 'submitBodEvent',
+      },
+    });
+  }
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
   const prospectProgressSummary = await recalcAllActiveProspects();
 
@@ -8037,6 +8130,8 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
       attendanceRowsUpdated,
       type: payload.type || 'clubEvent',
       visibility: payload.visibility,
+      reportingWindowId: payload.reportingWindowId,
+      reportingWorkflowLinked: reportingWorkflow?.ok === true,
     },
   });
 
@@ -8046,6 +8141,7 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     attendanceRowsUpdated,
     eventCreated,
     prospectProgressSummary,
+    reportingWorkflow,
   };
 });
 
@@ -8190,10 +8286,32 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const payload = normalizeBodEventPayload(request.data || {});
   await assertBodEventAvenuesUnlocked(payload.avenues);
+  const reportingWindow = await requireReportingWindowForBodPayload(payload);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
+  let reportingWorkflow = null;
+  if (reportingWindow) {
+    reportingWorkflow = await reminderFunctions.linkReportingWindowToTarget({
+      reportingWindow,
+      targetType: 'club_event',
+      targetId: eventId,
+      bodEventId: eventId,
+      access: {
+        uid,
+        displayName: userProfile.name,
+        storedRole: authority.role,
+        role: authority.role,
+      },
+      now: admin.firestore.Timestamp.now(),
+      match: {
+        detection: 'reportingWindowId',
+        confidence: 1,
+        source: 'updateBodEvent',
+      },
+    });
+  }
   const attendanceRowsUpdated = await initializeAttendanceForEvent(eventId, now);
   const prospectProgressSummary = await recalcAllActiveProspects();
 
@@ -8215,6 +8333,8 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
       attendanceRowsUpdated,
       type: payload.type || 'clubEvent',
       visibility: payload.visibility,
+      reportingWindowId: payload.reportingWindowId,
+      reportingWorkflowLinked: reportingWorkflow?.ok === true,
     },
   });
 
@@ -8223,6 +8343,7 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     eventId,
     attendanceRowsUpdated,
     prospectProgressSummary,
+    reportingWorkflow,
   };
 });
 
@@ -8406,10 +8527,32 @@ exports.createBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const meetingId = validateEventDocId(request.data?.meetingId) || db.collection('bodMeetings').doc().id;
   const payload = normalizeBodMeetingPayload(request.data || {});
+  const reportingWindow = await requireReportingWindowForBodMeetingPayload(payload);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   const { meetingCreated } = await writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now });
+  let reportingWorkflow = null;
+  if (reportingWindow) {
+    reportingWorkflow = await reminderFunctions.linkReportingWindowToTarget({
+      reportingWindow,
+      targetType: 'bod_meeting',
+      targetId: meetingId,
+      bodEventId: meetingId,
+      access: {
+        uid,
+        displayName: userProfile.name,
+        storedRole: authority.role,
+        role: authority.role,
+      },
+      now: admin.firestore.Timestamp.now(),
+      match: {
+        detection: 'reportingWindowId',
+        confidence: 1,
+        source: 'createBodMeetingSynced',
+      },
+    });
+  }
   const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('bodMembers', 'bodAttendance', meetingId, now);
   await writeSystemMutationLog({
     uid,
@@ -8425,9 +8568,9 @@ exports.createBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
     details: `${attendanceRowsUpdated} BOD attendance rows initialized`,
     source: 'createBodMeetingSynced',
     relatedDocPath: `bodMeetings/${meetingId}`,
-    metadata: { meetingCreated, attendanceRowsUpdated },
+    metadata: { meetingCreated, attendanceRowsUpdated, reportingWindowId: payload.reportingWindowId, reportingWorkflowLinked: reportingWorkflow?.ok === true },
   });
-  return { ok: true, meetingId, meetingCreated, attendanceRowsUpdated };
+  return { ok: true, meetingId, meetingCreated, attendanceRowsUpdated, reportingWorkflow };
 });
 
 exports.updateBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -8439,10 +8582,32 @@ exports.updateBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
   if (!meetingId) throw new HttpsError('invalid-argument', 'Meeting ID is required.');
 
   const payload = normalizeBodMeetingPayload(request.data || {});
+  const reportingWindow = await requireReportingWindowForBodMeetingPayload(payload);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   await writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now });
+  let reportingWorkflow = null;
+  if (reportingWindow) {
+    reportingWorkflow = await reminderFunctions.linkReportingWindowToTarget({
+      reportingWindow,
+      targetType: 'bod_meeting',
+      targetId: meetingId,
+      bodEventId: meetingId,
+      access: {
+        uid,
+        displayName: userProfile.name,
+        storedRole: authority.role,
+        role: authority.role,
+      },
+      now: admin.firestore.Timestamp.now(),
+      match: {
+        detection: 'reportingWindowId',
+        confidence: 1,
+        source: 'updateBodMeetingSynced',
+      },
+    });
+  }
   const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('bodMembers', 'bodAttendance', meetingId, now);
   await writeSystemMutationLog({
     uid,
@@ -8458,9 +8623,9 @@ exports.updateBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
     details: `${attendanceRowsUpdated} BOD attendance rows refreshed`,
     source: 'updateBodMeetingSynced',
     relatedDocPath: `bodMeetings/${meetingId}`,
-    metadata: { attendanceRowsUpdated },
+    metadata: { attendanceRowsUpdated, reportingWindowId: payload.reportingWindowId, reportingWorkflowLinked: reportingWorkflow?.ok === true },
   });
-  return { ok: true, meetingId, attendanceRowsUpdated };
+  return { ok: true, meetingId, attendanceRowsUpdated, reportingWorkflow };
 });
 
 exports.archiveBodMeetingSynced = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -8718,6 +8883,7 @@ exports.finalizeMomUpload = momFunctions.finalizeMomUpload;
 exports.downloadMomPdf = momFunctions.downloadMomPdf;
 exports.sendMomEmail = momFunctions.sendMomEmail;
 exports.createReportingWindowReminder = reminderFunctions.createReportingWindowReminder;
+exports.getReportingWindowPrefill = reminderFunctions.getReportingWindowPrefill;
 exports.upsertEventReminderConfig = reminderFunctions.upsertEventReminderConfig;
 exports.stopEventReminderConfig = reminderFunctions.stopEventReminderConfig;
 exports.markReportingWindowSubmitted = reminderFunctions.markReportingWindowSubmitted;

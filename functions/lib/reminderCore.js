@@ -16,6 +16,7 @@ const AVENUE_REPORTING_LOCK_TYPE = 'avenue_reporting';
 const AVENUE_REPORTING_LOCK_REASON = 'reporting_window_expired';
 const REPORTING_WINDOW_TIMEZONE = 'Asia/Kolkata';
 const REMINDER_DEFAULT_MAX = 3;
+const GBM_BOD_TOOLS_RECORD_WARNING = 'Please first add this meeting/event in BOD Tools using the exact name below if not already present.';
 
 const SUPPORTED_REMINDER_TYPES = Object.freeze([
   'mom_submission',
@@ -55,6 +56,7 @@ const SOURCE_TARGET_TYPES = Object.freeze({
   bodMeetings: 'bod_meeting',
   districtEvents: 'district_event',
   bodEvents: 'bod_event',
+  reminders: 'avenue_reporting_window',
 });
 
 const TARGET_COLLECTIONS = Object.freeze({
@@ -62,6 +64,15 @@ const TARGET_COLLECTIONS = Object.freeze({
   bod_meeting: 'bodMeetings',
   district_event: 'districtEvents',
   bod_event: 'bodEvents',
+  avenue_reporting_window: 'reminders',
+});
+
+const TARGET_TYPE_SOURCES = Object.freeze({
+  club_event: 'events',
+  bod_meeting: 'bodMeetings',
+  district_event: 'districtEvents',
+  bod_event: 'bodEvents',
+  avenue_reporting_window: 'reminders',
 });
 
 const REMINDER_RECIPIENT_BY_TYPE = Object.freeze({
@@ -208,6 +219,10 @@ function collectionForTargetType(targetType) {
   return TARGET_COLLECTIONS[cleanLower(targetType, 80)] || '';
 }
 
+function sourceForTargetType(targetType) {
+  return TARGET_TYPE_SOURCES[cleanLower(targetType, 80)] || '';
+}
+
 function normalizeReminderConfig(id, raw = {}) {
   const reminderType = normalizeReminderType(raw.reminderType || raw.type);
   if (!id || !reminderType) return null;
@@ -237,6 +252,11 @@ function normalizeReminderConfig(id, raw = {}) {
     stoppedAt: reminderTimestampIso(raw.stoppedAt),
     completionReason: cleanText(raw.completionReason || raw.stoppedReason || raw.failureReason, 160),
     failureReason: cleanText(raw.failureReason, 160),
+    reportingWindowId: safeDocumentId(raw.reportingWindowId || raw.reminderId),
+    workflowType: cleanText(raw.workflowType, 80),
+    workflowStatus: cleanText(raw.workflowStatus, 80),
+    requiresBodToolsRecord: raw.requiresBodToolsRecord === true,
+    workflowWarning: cleanText(raw.workflowWarning, 500),
     createdBy: cleanText(raw.createdBy, 160),
     updatedAt: reminderTimestampIso(raw.updatedAt),
     createdAt: reminderTimestampIso(raw.createdAt),
@@ -261,7 +281,7 @@ function normalizeReportingWindowConfig(id, raw = {}) {
     type: REPORTING_WINDOW_RECORD_TYPE,
     reminderType: AVENUE_REPORTING_REMINDER_TYPE,
     source: 'reminders',
-    targetType: AVENUE_REPORTING_REMINDER_TYPE,
+    targetType: REPORTING_WINDOW_RECORD_TYPE,
     targetId: id,
     avenue: avenueKey,
     avenueLabel: avenueDisplayLabel(avenueKey),
@@ -288,6 +308,18 @@ function normalizeReportingWindowConfig(id, raw = {}) {
     maxReminders,
     recipientRole: avenueRecipientRole(avenueKey),
     recipientPositionKeys: avenueRecipientPositionKeys(avenueKey),
+    bodToolsUrl: cleanText(raw.bodToolsUrl || raw.prefillUrl, 1000),
+    linkedTargetType: cleanLower(raw.linkedTargetType || raw.linkedEventTargetType, 80),
+    linkedTargetId: safeDocumentId(raw.linkedTargetId || raw.linkedEventId || raw.linkedBodEventId || raw.linkedMeetingId),
+    linkedBodEventId: safeDocumentId(raw.linkedBodEventId || raw.linkedEventId),
+    linkedMeetingId: safeDocumentId(raw.linkedMeetingId),
+    eventReportStatus: cleanLower(raw.eventReportStatus || raw.reportStatus, 40),
+    momStatus: cleanLower(raw.momStatus, 40),
+    attendanceStatus: cleanLower(raw.attendanceStatus, 40),
+    workflowStatus: cleanLower(raw.workflowStatus, 40),
+    possibleMatchStatus: cleanLower(raw.possibleMatchStatus, 40),
+    possibleMatchId: safeDocumentId(raw.possibleMatchId),
+    possibleMatchConfidence: Number.isFinite(Number(raw.possibleMatchConfidence)) ? Number(raw.possibleMatchConfidence) : 0,
     lastReminderSentAt: reminderTimestampIso(raw.lastReminderSentAt),
     completedAt: reminderTimestampIso(raw.completedAt),
     lockedAt: reminderTimestampIso(raw.lockedAt),
@@ -351,6 +383,56 @@ function hasMomMetadata(data = {}) {
         || data.momUpdatedAt
       ),
   );
+}
+
+function normalizeWorkflowName(value) {
+  return cleanText(value, 240)
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function levenshteinDistance(left, right) {
+  const a = normalizeWorkflowName(left);
+  const b = normalizeWorkflowName(right);
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= a.length; row += 1) {
+    const current = [row];
+    for (let column = 1; column <= b.length; column += 1) {
+      const cost = a[row - 1] === b[column - 1] ? 0 : 1;
+      current[column] = Math.min(
+        previous[column] + 1,
+        current[column - 1] + 1,
+        previous[column - 1] + cost,
+      );
+    }
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+function normalizedNameSimilarity(left, right) {
+  const a = normalizeWorkflowName(left);
+  const b = normalizeWorkflowName(right);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const maxLength = Math.max(a.length, b.length);
+  return maxLength ? Math.max(0, 1 - (levenshteinDistance(a, b) / maxLength)) : 0;
+}
+
+function attendanceValueIsMarked(value) {
+  if (value === true || value === false) return true;
+  const normalized = cleanText(value, 40)
+    .toUpperCase()
+    .replace(/[^A-Z]+/g, ' ')
+    .trim();
+  return ['P', 'A', 'PRESENT', 'ABSENT'].includes(normalized);
 }
 
 function hasAnyPositionKey(positionKeys, allowedKeys) {
@@ -424,10 +506,27 @@ function escapeEmailHtml(value) {
 function buildReminderBody({ reminder, recipient }) {
   const targetName = cleanText(reminder.targetName, 180) || 'RCPH event/meeting';
   const recipientName = cleanText(recipient?.name, 180) || recipientRoleLabel(reminder.recipientRole);
+  const workflowWarning = reminder.requiresBodToolsRecord === true
+    ? GBM_BOD_TOOLS_RECORD_WARNING
+    : cleanText(reminder.workflowWarning, 500);
+  const workflowWarningLines = workflowWarning ? [workflowWarning, ''] : [];
 
   if (reminder.reminderType === AVENUE_REPORTING_REMINDER_TYPE) {
     const avenue = avenueDisplayLabel(reminder.avenue || reminder.avenueLabel);
-    const itemNoun = ['GBM', 'BOD_MEETING'].includes(normalizeAvenueKey(reminder.avenue)) ? 'record' : 'event';
+    const avenueKey = normalizeAvenueKey(reminder.avenue);
+    const specialMeeting = ['GBM', 'BOD_MEETING'].includes(avenueKey);
+    const itemNoun = specialMeeting ? 'record' : 'event';
+    const bodToolsUrl = cleanText(reminder.bodToolsUrl || reminder.prefillUrl, 1000);
+    const actionLines = specialMeeting
+      ? [
+          GBM_BOD_TOOLS_RECORD_WARNING,
+        ]
+      : [
+          'Click the button below to open the BOD Tools form. The event name, avenue, date, and time will be prefilled from the reporting window.',
+          '',
+          'Please do not change the prefilled event name unless an Admin/President has asked you to correct it.',
+          ...(bodToolsUrl ? ['', `Open prefilled BOD Tools form: ${bodToolsUrl}`] : []),
+        ];
     return {
       subject: `Avenue Reporting Window Open: ${avenue} - ${targetName}`,
       text: [
@@ -436,6 +535,8 @@ function buildReminderBody({ reminder, recipient }) {
         `The reporting window for ${avenue} ${itemNoun}, "${targetName}", is now open on the Club Website.`,
         '',
         `The event was conducted on ${formatReminderDate(reminder.conductedDate || reminder.targetDate)} and must be reported by ${formatReminderDueDate(reminder.reportingDueAt || reminder.reportDueAt)}.`,
+        '',
+        ...actionLines,
         '',
         'Upon expiry of the prescribed reporting period, the portal will automatically close and no further submissions shall be accepted without administrative approval. Consequently, the Secretary may not be able to consider or report the event to the District.',
         '',
@@ -453,6 +554,7 @@ function buildReminderBody({ reminder, recipient }) {
       text: [
         `Dear Rtr. ${recipientName},`,
         '',
+        ...workflowWarningLines,
         `This is a reminder to create and upload the Minutes of Meeting for "${targetName}" on the Club Website.`,
         '',
         'You are requested to complete the MOM submission at the earliest so that the event/meeting records remain updated and accessible to the Board.',
@@ -468,6 +570,7 @@ function buildReminderBody({ reminder, recipient }) {
     text: [
       `Dear Rtr. ${recipientName},`,
       '',
+      ...workflowWarningLines,
       `This is a reminder to complete attendance marking for "${targetName}" on the Club Website.`,
       '',
       'You are requested to update the attendance records at the earliest so that the club records remain accurate and complete.',
@@ -482,6 +585,12 @@ function buildReminderEmail({ reminder, recipient }) {
   const body = buildReminderBody({ reminder, recipient });
   const safeText = escapeEmailHtml(body.text).replace(/\r?\n/g, '<br>');
   const targetName = cleanText(reminder.targetName, 180) || 'RCPH event/meeting';
+  const bodToolsUrl = reminder.reminderType === AVENUE_REPORTING_REMINDER_TYPE
+    ? cleanText(reminder.bodToolsUrl || reminder.prefillUrl, 1000)
+    : '';
+  const bodToolsButton = bodToolsUrl
+    ? `<p style="margin:0 0 18px;"><a href="${escapeEmailHtml(bodToolsUrl)}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:700;border-radius:8px;padding:12px 16px;">Open prefilled BOD Tools form</a></p>`
+    : '';
   return {
     subject: body.subject,
     text: body.text,
@@ -493,6 +602,7 @@ function buildReminderEmail({ reminder, recipient }) {
           <p style="margin:0 0 8px;color:#243133;"><strong>Event/meeting:</strong> ${escapeEmailHtml(targetName)}</p>
           <p style="margin:0 0 8px;color:#243133;"><strong>Conducted date:</strong> ${escapeEmailHtml(formatReminderDate(reminder.conductedDate || reminder.targetDate))}</p>
           ${reminder.reminderType === AVENUE_REPORTING_REMINDER_TYPE ? `<p style="margin:0 0 18px;color:#243133;"><strong>Due:</strong> ${escapeEmailHtml(formatReminderDueDate(reminder.reportingDueAt || reminder.reportDueAt))}</p>` : ''}
+          ${bodToolsButton}
           <div style="font-size:16px;color:#243133;">${safeText}</div>
         </div>
       </div>
@@ -537,6 +647,10 @@ function buildReminderTemplateTestEmail({ templateType } = {}) {
         'The reporting window for Test Avenue event, "Test Event / Meeting", is now open on the Club Website.',
         '',
         'The event was conducted on 15 July 2026 and must be reported by 18 July 2026, 11:59 PM.',
+        '',
+        'Click the button below to open the BOD Tools form. The event name, avenue, date, and time will be prefilled from the reporting window.',
+        '',
+        'Please do not change the prefilled event name unless an Admin/President has asked you to correct it.',
         '',
         'Upon expiry of the prescribed reporting period, the portal will automatically close and no further submissions shall be accepted without administrative approval. Consequently, the Secretary may not be able to consider or report the event to the District.',
         '',
@@ -637,6 +751,7 @@ module.exports = {
   AVENUE_REPORTING_LOCK_REASON,
   REPORTING_WINDOW_TIMEZONE,
   REMINDER_DEFAULT_MAX,
+  GBM_BOD_TOOLS_RECORD_WARNING,
   SUPPORTED_REMINDER_TYPES,
   REMINDER_TEMPLATE_TEST_TYPES,
   REMINDER_RECIPIENT_BY_TYPE,
@@ -649,6 +764,7 @@ module.exports = {
   avenueDisplayLabel,
   avenueRecipientRole,
   avenueRecipientPositionKeys,
+  sourceForTargetType,
   normalizeReminderRecipientRole,
   normalizeReminderConfig,
   normalizeReportingWindowConfig,
@@ -659,6 +775,9 @@ module.exports = {
   targetNameFromData,
   targetDateFromData,
   hasMomMetadata,
+  normalizeWorkflowName,
+  normalizedNameSimilarity,
+  attendanceValueIsMarked,
   reminderRecipientMatchesRole,
   recipientRoleLabel,
   buildReminderEmail,

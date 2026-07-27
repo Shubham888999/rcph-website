@@ -8,6 +8,8 @@ const {
   reminderSkipReason,
   reportingWindowRuntimeState,
   hasMomMetadata,
+  normalizedNameSimilarity,
+  attendanceValueIsMarked,
   avenueRecipientPositionKeys,
   avenueRecipientRole,
   reminderRecipientMatchesRole,
@@ -108,6 +110,8 @@ test('avenue reporting windows normalize aliases and runtime states', () => {
   });
 
   assert.equal(config.reminderType, 'avenue_reporting');
+  assert.equal(config.targetType, 'avenue_reporting_window');
+  assert.equal(config.source, 'reminders');
   assert.equal(config.avenue, 'CWD');
   assert.equal(config.recipientRole, 'avenue_director');
   assert.deepEqual(config.recipientPositionKeys, ['cwd', 'co-cwd']);
@@ -147,6 +151,7 @@ test('avenue reporting email uses formal deadline wording', () => {
       targetName: 'Website Launch',
       conductedDate: '2026-07-14',
       reportingDueAt: '2026-07-17T18:29:00.000Z',
+      bodToolsUrl: 'https://www.rcph3131.org/bod-tools?reportingWindowId=window-1',
     },
     recipient: { name: 'Dev' },
   });
@@ -155,8 +160,49 @@ test('avenue reporting email uses formal deadline wording', () => {
   assert.match(email.text, /Dear Rtr\. Dev/);
   assert.match(email.text, /The reporting window for CWD event, "Website Launch"/);
   assert.match(email.text, /must be reported by 17 July 2026, 11:59 PM/);
+  assert.match(email.text, /Click the button below to open the BOD Tools form/);
+  assert.match(email.text, /Please do not change the prefilled event name/);
+  assert.match(email.html, /Open prefilled BOD Tools form/);
   assert.match(email.text, /portal will automatically close/);
   assert.match(email.html, /Rotaract Club of Pune Heritage/);
+});
+
+test('GBM and BOD Meeting workflow reminders include the exact BOD Tools warning', () => {
+  const warning = 'Please first add this meeting/event in BOD Tools using the exact name below if not already present.';
+  const mom = buildReminderEmail({
+    reminder: {
+      reminderType: 'mom_submission',
+      recipientRole: 'secretary',
+      targetName: 'BOD Meeting 2',
+      targetDate: '2026-07-14',
+      requiresBodToolsRecord: true,
+    },
+    recipient: { name: 'Secretary' },
+  });
+  const attendance = buildReminderEmail({
+    reminder: {
+      reminderType: 'attendance_marking',
+      recipientRole: 'sergeant',
+      targetName: 'GBM 1',
+      targetDate: '2026-07-14',
+      workflowWarning: warning,
+    },
+    recipient: { name: 'SAA' },
+  });
+
+  assert.match(mom.text, new RegExp(warning.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(attendance.text, new RegExp(warning.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('strict workflow matching helpers reject low confidence names and accept marked attendance values', () => {
+  assert.equal(normalizedNameSimilarity('Pages of Hope', 'Pages of Hope'), 1);
+  assert.ok(normalizedNameSimilarity('Pages of Hope', 'Pages of Hopee') >= 0.85);
+  assert.ok(normalizedNameSimilarity('Pages of Hope', 'Completely Different Event') < 0.5);
+  assert.equal(attendanceValueIsMarked(true), true);
+  assert.equal(attendanceValueIsMarked(false), true);
+  assert.equal(attendanceValueIsMarked('Present'), true);
+  assert.equal(attendanceValueIsMarked('Absent'), true);
+  assert.equal(attendanceValueIsMarked('NA'), false);
 });
 
 test('avenue reporting send state does not complete before lock workflow runs', () => {
@@ -202,6 +248,7 @@ test('reminder template test emails use test labels and placeholder content', ()
   assert.equal(avenue.subject, '[TEST] Avenue Reporting Window Open: Test Avenue Event');
   assert.match(avenue.text, /The event was conducted on 15 July 2026/);
   assert.match(avenue.text, /18 July 2026, 11:59 PM/);
+  assert.match(avenue.text, /Click the button below to open the BOD Tools form/);
   assert.match(avenue.text, /portal will automatically close/);
   assert.match(avenue.html, /Rotaract Club of Pune Heritage/);
 });

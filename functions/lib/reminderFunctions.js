@@ -12,17 +12,25 @@ const {
   REMINDER_TEMPLATE_TEST_HISTORY_COLLECTION,
   EVENT_REMINDER_RECORD_TYPE,
   REPORTING_WINDOW_RECORD_TYPE,
+  AVENUE_REPORTING_REMINDER_TYPE,
   AVENUE_REPORTING_LOCK_REASON,
+  REMINDER_DEFAULT_MAX,
+  GBM_BOD_TOOLS_RECORD_WARNING,
   cleanLower,
   cleanText,
   safeDocumentId,
+  normalizeAvenueKey,
+  avenueDisplayLabel,
   avenueRecipientPositionKeys,
+  sourceForTargetType,
   normalizeReminderConfig,
   normalizeReportingWindowConfig,
   normalizeReminderRecipientRole,
   reminderSkipReason,
   reportingWindowRuntimeState,
   targetCollectionForReminder,
+  normalizedNameSimilarity,
+  attendanceValueIsMarked,
   targetNameFromData,
   targetDateFromData,
   hasMomMetadata,
@@ -60,6 +68,13 @@ const reminderTransporter = nodemailer.createTransport({
   greetingTimeout: 10000,
   socketTimeout: 15000,
 });
+const RCPH_APP_BASE_URL = cleanText(
+  process.env.RCPH_APP_BASE_URL
+    || process.env.RCPH_WEBSITE_URL
+    || process.env.SITE_URL
+    || 'https://www.rcph3131.org',
+  500,
+).replace(/\/+$/, '');
 
 const CALLABLE_OPTIONS = {
   region: 'us-central1',
@@ -250,6 +265,292 @@ async function writeReminderSystemLog(input = {}, { safe = false } = {}) {
   }, console);
 }
 
+function bodToolsPrefillUrl(reportingWindowId) {
+  const safeId = encodeURIComponent(safeDocumentId(reportingWindowId));
+  return safeId ? `${RCPH_APP_BASE_URL}/bod-tools?reportingWindowId=${safeId}` : '';
+}
+
+function isSpecialReportingWindow(reminder = {}) {
+  return ['GBM', 'BOD_MEETING'].includes(normalizeAvenueKey(reminder.avenue));
+}
+
+function workflowReminderConfigId(reportingWindowId, reminderType) {
+  return ['reportingWorkflow', safeDocumentId(reportingWindowId), cleanLower(reminderType, 80)]
+    .filter(Boolean)
+    .join('_');
+}
+
+function reminderTypeDefinition(reminderType) {
+  const type = cleanLower(reminderType, 80);
+  if (type === 'mom_submission') {
+    return { reminderType: 'mom_submission', recipientRole: 'secretary' };
+  }
+  if (type === 'attendance_marking') {
+    return { reminderType: 'attendance_marking', recipientRole: 'sergeant' };
+  }
+  return null;
+}
+
+function workflowReminderPayload({ reportingWindow, reminderType, targetType, targetId, enabled = true, requiresBodToolsRecord = false }) {
+  const definition = reminderTypeDefinition(reminderType);
+  if (!definition) return null;
+  const source = sourceForTargetType(targetType);
+  const safeTargetId = safeDocumentId(targetId);
+  if (!source || !safeTargetId) return null;
+  const configId = workflowReminderConfigId(reportingWindow.id, definition.reminderType);
+  return {
+    configId,
+    recordType: EVENT_REMINDER_RECORD_TYPE,
+    source,
+    targetType,
+    targetId: safeTargetId,
+    eventId: safeTargetId,
+    eventName: reportingWindow.targetName,
+    targetName: reportingWindow.targetName,
+    eventType: targetType,
+    eventTypeLabel: targetType === 'bod_meeting' ? 'BOD meeting' : targetType === 'avenue_reporting_window' ? 'Reporting workflow' : 'Club event',
+    avenue: [reportingWindow.avenue].filter(Boolean),
+    conductedDate: reportingWindow.conductedDate,
+    targetDate: reportingWindow.conductedDate,
+    reminderType: definition.reminderType,
+    recipientRole: definition.recipientRole,
+    enabled: enabled === true,
+    disabled: enabled !== true,
+    status: enabled === true ? 'configured' : 'stopped',
+    remindersSent: 0,
+    maxReminders: 3,
+    reminderTime: '00:00',
+    reportingWindowId: reportingWindow.id,
+    workflowType: 'reporting_window',
+    workflowStatus: requiresBodToolsRecord ? 'awaiting_bod_tools_record' : 'linked',
+    requiresBodToolsRecord: requiresBodToolsRecord === true,
+    workflowWarning: requiresBodToolsRecord ? GBM_BOD_TOOLS_RECORD_WARNING : '',
+    completionReason: '',
+    failureReason: '',
+    stoppedReason: enabled === true ? '' : 'workflow_reminders_disabled',
+  };
+}
+
+function existingWorkflowLifecyclePatch(snap) {
+  if (!snap?.exists) return {};
+  const data = snap.data() || {};
+  const existing = normalizeReminderConfig(snap.id, data);
+  if (!existing) return {};
+
+  const patch = {
+    remindersSent: existing.remindersSent,
+    maxReminders: existing.maxReminders || REMINDER_DEFAULT_MAX,
+  };
+  if (data.lastReminderSentAt !== undefined) patch.lastReminderSentAt = data.lastReminderSentAt;
+
+  if (existing.status === 'active') {
+    patch.status = 'active';
+  } else if (existing.status === 'completed') {
+    patch.status = 'completed';
+    patch.enabled = data.enabled !== false;
+    patch.disabled = data.disabled === true;
+    if (data.completedAt !== undefined) patch.completedAt = data.completedAt;
+    patch.completionReason = existing.completionReason;
+    patch.failureReason = '';
+  } else if (existing.status === 'stopped') {
+    patch.status = 'stopped';
+    patch.enabled = false;
+    patch.disabled = true;
+    if (data.stoppedAt !== undefined) patch.stoppedAt = data.stoppedAt;
+    patch.stoppedReason = existing.stoppedReason || 'admin_removed';
+  }
+
+  return patch;
+}
+
+async function upsertWorkflowReminderConfigs({ reportingWindow, targetType, targetId, enabled = true, requiresBodToolsRecord = false, access = null, now = admin.firestore.Timestamp.now() }) {
+  const createdOrUpdated = [];
+  for (const reminderType of ['mom_submission', 'attendance_marking']) {
+    const payload = workflowReminderPayload({
+      reportingWindow,
+      reminderType,
+      targetType,
+      targetId,
+      enabled,
+      requiresBodToolsRecord,
+    });
+    if (!payload) continue;
+    const ref = db.collection(REMINDERS_COLLECTION).doc(payload.configId);
+    const snap = await ref.get();
+    const lifecyclePatch = existingWorkflowLifecyclePatch(snap);
+    await ref.set({
+      ...payload,
+      ...lifecyclePatch,
+      updatedAt: now,
+      updatedBy: access?.uid || 'system',
+      updatedByName: access?.displayName || access?.name || 'System',
+      ...(snap.exists ? {} : {
+        createdAt: now,
+        createdBy: access?.uid || 'system',
+        createdByName: access?.displayName || access?.name || 'System',
+      }),
+    }, { merge: true });
+    createdOrUpdated.push(payload.configId);
+  }
+
+  if (createdOrUpdated.length) {
+    await writeReminderSystemLog({
+      access: access || { uid: 'system', displayName: 'System', storedRole: 'system' },
+      action: 'started',
+      status: enabled === true ? 'active' : 'inactive',
+      targetType: 'reporting_workflow_reminders',
+      targetId: reportingWindow.id,
+      targetLabel: reportingWindow.targetName,
+      targetAudience: reportingWindow.avenue,
+      details: `${createdOrUpdated.length} linked MOM/attendance reminder configs started.`,
+      source: 'upsertWorkflowReminderConfigs',
+      relatedDocPath: `${REMINDERS_COLLECTION}/${reportingWindow.id}`,
+      metadata: {
+        reportingWindowId: reportingWindow.id,
+        targetType,
+        targetId,
+        enabled: enabled === true,
+        requiresBodToolsRecord: requiresBodToolsRecord === true,
+        reminderIds: createdOrUpdated,
+      },
+    }, { safe: true });
+  }
+
+  return createdOrUpdated;
+}
+
+async function updateReportingWindowWorkflowFields(reportingWindowId, fields, now = admin.firestore.Timestamp.now()) {
+  const safeId = safeDocumentId(reportingWindowId);
+  if (!safeId) return false;
+  await db.collection(REMINDERS_COLLECTION).doc(safeId).set({
+    ...fields,
+    updatedAt: now,
+  }, { merge: true });
+  return true;
+}
+
+async function completeLinkedWorkflowRemindersForTarget({ targetType, targetId, reminderType, reason, now = admin.firestore.Timestamp.now(), metadata = {} }) {
+  const safeTargetId = safeDocumentId(targetId);
+  const normalizedReminderType = cleanLower(reminderType, 80);
+  const normalizedTargetType = cleanLower(targetType, 80);
+  if (!safeTargetId || !normalizedReminderType || !normalizedTargetType) return { completed: 0, reportingWindowIds: [] };
+
+  const snap = await db.collection(REMINDERS_COLLECTION)
+    .where('recordType', '==', EVENT_REMINDER_RECORD_TYPE)
+    .where('targetType', '==', normalizedTargetType)
+    .where('targetId', '==', safeTargetId)
+    .get()
+    .catch(() => null);
+  if (!snap?.docs?.length) return { completed: 0, reportingWindowIds: [] };
+
+  const reportingWindowIds = new Set();
+  let completed = 0;
+  const batch = db.batch();
+  snap.docs.forEach((doc) => {
+    const reminder = normalizeReminderConfig(doc.id, doc.data() || {});
+    if (!reminder || reminder.reminderType !== normalizedReminderType) return;
+    if (reminder.status === 'completed') return;
+    batch.set(doc.ref, {
+      status: 'completed',
+      completedAt: now,
+      completionReason: reason,
+      failureReason: '',
+      updatedAt: now,
+    }, { merge: true });
+    if (reminder.reportingWindowId) reportingWindowIds.add(reminder.reportingWindowId);
+    completed += 1;
+  });
+  if (!completed) return { completed: 0, reportingWindowIds: [] };
+  await batch.commit();
+
+  for (const reportingWindowId of reportingWindowIds) {
+    const statusFields = normalizedReminderType === 'mom_submission'
+      ? { momStatus: 'uploaded', momUploadedAt: now, momCompletionReason: reason }
+      : { attendanceStatus: 'marked', attendanceMarkedAt: now, attendanceCompletionReason: reason };
+    await updateReportingWindowWorkflowFields(reportingWindowId, {
+      ...statusFields,
+      workflowStatus: 'in_progress',
+      ...metadata,
+    }, now);
+    await writeReminderSystemLog({
+      access: { uid: 'system', displayName: 'System', storedRole: 'system' },
+      action: 'stopped',
+      status: 'success',
+      targetType: normalizedReminderType,
+      targetId: reportingWindowId,
+      targetLabel: reportingWindowId,
+      details: `${normalizedReminderType} reminder stopped after ${reason}.`,
+      source: 'completeLinkedWorkflowRemindersForTarget',
+      relatedDocPath: `${REMINDERS_COLLECTION}/${reportingWindowId}`,
+      metadata: {
+        reportingWindowId,
+        targetType: normalizedTargetType,
+        targetId: safeTargetId,
+        reason,
+      },
+    }, { safe: true });
+  }
+
+  return { completed, reportingWindowIds: Array.from(reportingWindowIds) };
+}
+
+async function linkReportingWindowToTarget({ reportingWindow, targetType, targetId, bodEventId = '', access = null, now = admin.firestore.Timestamp.now(), match = null }) {
+  const safeTargetId = safeDocumentId(targetId);
+  const normalizedTargetType = cleanLower(targetType, 80);
+  if (!reportingWindow?.id || !safeTargetId || !sourceForTargetType(normalizedTargetType)) {
+    return { ok: false, reminderIds: [] };
+  }
+
+  const fields = {
+    status: 'completed',
+    completedAt: now,
+    completionReason: 'report_submitted',
+    eventReportStatus: 'recorded',
+    workflowStatus: 'in_progress',
+    linkedTargetType: normalizedTargetType,
+    linkedTargetId: safeTargetId,
+    linkedEventId: safeTargetId,
+    linkedBodEventId: safeDocumentId(bodEventId) || safeTargetId,
+    failureReason: '',
+    possibleMatchStatus: '',
+  };
+  if (normalizedTargetType === 'bod_meeting') fields.linkedMeetingId = safeTargetId;
+  await updateReportingWindowWorkflowFields(reportingWindow.id, fields, now);
+
+  const reminderIds = await upsertWorkflowReminderConfigs({
+    reportingWindow,
+    targetType: normalizedTargetType,
+    targetId: safeTargetId,
+    enabled: true,
+    requiresBodToolsRecord: false,
+    access,
+    now,
+  });
+
+  await writeReminderSystemLog({
+    access: access || { uid: 'system', displayName: 'System', storedRole: 'system' },
+    action: 'linked',
+    status: 'success',
+    targetType: 'avenue_reporting_window',
+    targetId: reportingWindow.id,
+    targetLabel: reportingWindow.targetName,
+    targetAudience: reportingWindow.avenue,
+    details: 'BOD event linked to reporting window; MOM and attendance reminders started.',
+    source: 'linkReportingWindowToTarget',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${reportingWindow.id}`,
+    metadata: {
+      reportingWindowId: reportingWindow.id,
+      targetType: normalizedTargetType,
+      targetId: safeTargetId,
+      bodEventId: safeDocumentId(bodEventId) || safeTargetId,
+      match,
+      reminderIds,
+    },
+  }, { safe: true });
+
+  return { ok: true, reminderIds };
+}
+
 async function activePositionKeysByUidForReminderRole(recipientRole) {
   const result = new Map();
   const normalizedRole = normalizeReminderRecipientRole(recipientRole);
@@ -399,7 +700,13 @@ async function loadReminderTarget(config) {
   const ref = db.collection(collectionName).doc(config.targetId);
   const snapshot = await ref.get();
   if (!snapshot.exists) return { ref, snapshot, data: null };
-  return { ref, snapshot, data: snapshot.data() || {} };
+  return {
+    ref,
+    snapshot,
+    data: snapshot.data() || {},
+    targetType: config.targetType,
+    targetId: config.targetId,
+  };
 }
 
 function reminderHistoryPayload({ reminder, recipient = {}, status, errorCode = '', attemptNumber, maxReminders, sentAt }) {
@@ -514,10 +821,157 @@ async function failReminder(doc, reminder, status, reason, now, recipient = {}) 
   })]);
 }
 
-async function hasAvenueReportSubmission() {
+function eventDateFromBodEvent(data = {}) {
+  return cleanText(data.date || data.eventStart || data.startDate, 40);
+}
+
+function eventNameFromBodEvent(data = {}) {
+  return cleanText(data.name || data.title, 180);
+}
+
+function eventAvenueKeys(data = {}) {
+  const source = Array.isArray(data.avenues)
+    ? data.avenues
+    : (Array.isArray(data.avenue) ? data.avenue : [data.avenue]);
+  return source.map(normalizeAvenueKey).filter(Boolean);
+}
+
+function reportingWindowExpectedTargetType(reminder = {}) {
+  return normalizeAvenueKey(reminder.avenue) === 'BOD_MEETING' ? 'bod_meeting' : 'club_event';
+}
+
+function bodEventTargetForWorkflow(doc) {
+  const data = doc.data() || {};
+  const type = cleanText(data.type, 80);
+  if (type === 'bodMeeting' || data.syncedMeetingId) {
+    return {
+      targetType: 'bod_meeting',
+      targetId: safeDocumentId(data.syncedMeetingId || doc.id),
+      bodEventId: doc.id,
+      data,
+    };
+  }
+  if (type === 'clubEvent' || data.syncedEventId || !type) {
+    return {
+      targetType: 'club_event',
+      targetId: safeDocumentId(data.syncedEventId || doc.id),
+      bodEventId: doc.id,
+      data,
+    };
+  }
   return {
-    submitted: false,
-    detection: 'deferred_no_persisted_report_submission_source',
+    targetType: '',
+    targetId: '',
+    bodEventId: doc.id,
+    data,
+  };
+}
+
+function bodEventMatchesReportingWindowShape(reminder, data, targetType) {
+  if (eventDateFromBodEvent(data) !== reminder.conductedDate) return false;
+  const expectedTargetType = reportingWindowExpectedTargetType(reminder);
+  if (targetType !== expectedTargetType) return false;
+  const avenueKey = normalizeAvenueKey(reminder.avenue);
+  if (avenueKey === 'BOD_MEETING') return true;
+  return eventAvenueKeys(data).includes(avenueKey);
+}
+
+async function findReportingWindowBodEventMatch(reminder) {
+  const expectedTargetType = reportingWindowExpectedTargetType(reminder);
+  const snap = await db.collection('bodEvents').get().catch(() => null);
+  if (!snap) {
+    return { submitted: false, detection: 'bod_events_unavailable' };
+  }
+
+  const exact = [];
+  const scored = [];
+  snap.docs.forEach((doc) => {
+    const target = bodEventTargetForWorkflow(doc);
+    const data = target.data || {};
+    if (!target.targetType || !target.targetId) return;
+    if (data.archived === true || cleanLower(data.status, 40) === 'deleted') return;
+    if (cleanText(data.reportingWindowId || data.reminderId, 180) === reminder.id) {
+      exact.push({ ...target, confidence: 1, matchType: 'reportingWindowId' });
+      return;
+    }
+    if (!bodEventMatchesReportingWindowShape(reminder, data, target.targetType)) return;
+    const confidence = normalizedNameSimilarity(reminder.targetName, eventNameFromBodEvent(data));
+    scored.push({ ...target, confidence, matchType: 'strict_fallback' });
+  });
+
+  if (exact.length === 1) {
+    return { submitted: true, detection: 'reportingWindowId', match: exact[0] };
+  }
+  if (exact.length > 1) {
+    return {
+      submitted: false,
+      detection: 'ambiguous_reportingWindowId',
+      possibleMatchCount: exact.length,
+    };
+  }
+
+  const strong = scored
+    .filter(match => match.confidence >= 0.88)
+    .sort((a, b) => b.confidence - a.confidence);
+  if (strong.length === 1 || (strong.length > 1 && strong[0].confidence - strong[1].confidence >= 0.02)) {
+    return { submitted: true, detection: 'strict_fallback', match: strong[0] };
+  }
+
+  const possible = scored
+    .filter(match => match.confidence >= 0.7)
+    .sort((a, b) => b.confidence - a.confidence)[0];
+  if (possible) {
+    return {
+      submitted: false,
+      detection: 'possible_match_not_auto_submitted',
+      possibleMatchId: possible.bodEventId,
+      possibleMatchConfidence: possible.confidence,
+      expectedTargetType,
+    };
+  }
+
+  return { submitted: false, detection: 'none' };
+}
+
+async function hasAvenueReportSubmission(reminder) {
+  return findReportingWindowBodEventMatch(reminder);
+}
+
+function attendanceCollectionAndFieldForReminder(reminder, target) {
+  const targetType = cleanLower(reminder?.targetType || target?.targetType, 80);
+  const data = target?.data || {};
+  if (targetType === 'bod_meeting' || cleanText(data.type, 80) === 'bodMeeting' || data.syncedMeetingId) {
+    return {
+      collectionName: 'bodAttendance',
+      fieldId: safeDocumentId(data.syncedMeetingId || reminder?.targetId || target?.targetId),
+      detection: 'at_least_one_present_absent_bod_attendance',
+    };
+  }
+  return {
+    collectionName: 'attendance',
+    fieldId: safeDocumentId(data.syncedEventId || reminder?.targetId || target?.targetId),
+    detection: 'at_least_one_present_absent',
+  };
+}
+
+async function hasAttendanceSubmission(reminder, target) {
+  const context = attendanceCollectionAndFieldForReminder(reminder, target);
+  if (!context.collectionName || !context.fieldId) {
+    return { submitted: false, detection: 'invalid_attendance_target', markedCount: 0 };
+  }
+  const snap = await db.collection(context.collectionName).get().catch(() => null);
+  if (!snap) return { submitted: false, detection: 'attendance_collection_unavailable', markedCount: 0 };
+  let markedCount = 0;
+  snap.forEach((doc) => {
+    const value = (doc.data() || {})[context.fieldId];
+    if (attendanceValueIsMarked(value)) markedCount += 1;
+  });
+  return {
+    submitted: markedCount > 0,
+    detection: context.detection,
+    markedCount,
+    collectionName: context.collectionName,
+    fieldId: context.fieldId,
   };
 }
 
@@ -541,10 +995,68 @@ async function processEventReminderDoc(doc) {
 
   if (reminder.reminderType === 'mom_submission' && hasMomMetadata(target.data)) {
     await completeReminder(doc, reminder, 'mom_uploaded', now, 'skipped');
+    if (reminder.reportingWindowId) {
+      await updateReportingWindowWorkflowFields(reminder.reportingWindowId, {
+        momStatus: 'uploaded',
+        momUploadedAt: now,
+        momCompletionReason: 'mom_uploaded',
+      }, now);
+      await writeReminderSystemLog({
+        access: { uid: 'system', displayName: 'System', storedRole: 'system' },
+        action: 'stopped',
+        status: 'success',
+        targetType: 'mom_submission',
+        targetId: reminder.reportingWindowId,
+        targetLabel: reminder.targetName,
+        details: 'MOM reminder stopped after MOM upload metadata was found.',
+        source: 'processEventReminderDoc',
+        relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.reportingWindowId}`,
+        metadata: {
+          reportingWindowId: reminder.reportingWindowId,
+          targetType: reminder.targetType,
+          targetId: reminder.targetId,
+          completionRule: 'hasMomMetadata',
+        },
+      }, { safe: true });
+    }
     return { outcome: 'completed', reason: 'mom_uploaded' };
   }
 
-  // Attendance completion is intentionally deferred until a reliable persisted completion flag exists.
+  if (reminder.reminderType === 'attendance_marking') {
+    const attendance = await hasAttendanceSubmission(reminder, target);
+    if (attendance.submitted) {
+      await completeReminder(doc, reminder, 'attendance_marked', now, 'skipped');
+      if (reminder.reportingWindowId) {
+        await updateReportingWindowWorkflowFields(reminder.reportingWindowId, {
+          attendanceStatus: 'marked',
+          attendanceMarkedAt: now,
+          attendanceCompletionReason: 'attendance_marked',
+          attendanceCompletionRule: attendance.detection,
+          attendanceMarkedCount: attendance.markedCount,
+        }, now);
+        await writeReminderSystemLog({
+          access: { uid: 'system', displayName: 'System', storedRole: 'system' },
+          action: 'stopped',
+          status: 'success',
+          targetType: 'attendance_marking',
+          targetId: reminder.reportingWindowId,
+          targetLabel: reminder.targetName,
+          details: 'Attendance reminder stopped after marked attendance values were found.',
+          source: 'processEventReminderDoc',
+          relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.reportingWindowId}`,
+          metadata: {
+            reportingWindowId: reminder.reportingWindowId,
+            targetType: reminder.targetType,
+            targetId: reminder.targetId,
+            completionRule: attendance.detection,
+            markedCount: attendance.markedCount,
+          },
+        }, { safe: true });
+      }
+      return { outcome: 'completed', reason: 'attendance_marked' };
+    }
+  }
+
   const recipients = await resolveReminderRecipients(reminder.recipientRole);
   if (!recipients.length) {
     await failReminder(doc, reminder, 'no_recipient', 'no_eligible_recipient', now);
@@ -648,23 +1160,37 @@ async function createOrActivateAvenueReportingLock(doc, reminder, now) {
   return { created: !alreadyActive, lockId };
 }
 
-async function processAvenueReportingWindowDoc(doc) {
-  const reminder = normalizeReportingWindowConfig(doc.id, doc.data() || {});
+async function processAvenueReportingWindowDoc(doc, options = {}) {
+  const normalized = normalizeReportingWindowConfig(doc.id, doc.data() || {});
+  const reminder = normalized ? {
+    ...normalized,
+    bodToolsUrl: normalized.bodToolsUrl || bodToolsPrefillUrl(normalized.id),
+  } : null;
   if (!reminder) return { outcome: 'skipped', reason: 'invalid_reporting_window' };
 
   const now = admin.firestore.Timestamp.now();
   const nowMillis = now.toMillis();
-  const runtimeState = reportingWindowRuntimeState(reminder, nowMillis);
+  const runtimeState = options.forceSend === true
+    ? (nowMillis >= reminder.lockAtMillis ? 'lock_due' : (reminder.remindersSent > 0 ? 'active' : 'open'))
+    : reportingWindowRuntimeState(reminder, nowMillis);
   if (runtimeState === 'completed' || runtimeState === 'locked' || runtimeState === 'unlocked' || runtimeState === 'no_recipient') {
     return { outcome: 'skipped', reason: runtimeState };
   }
 
   const submitted = await hasAvenueReportSubmission(reminder);
   if (submitted.submitted) {
-    await setReportingWindowStatus(doc, 'completed', now, {
-      completedAt: now,
-      completionReason: 'report_submitted',
-      failureReason: '',
+    await linkReportingWindowToTarget({
+      reportingWindow: reminder,
+      targetType: submitted.match.targetType,
+      targetId: submitted.match.targetId,
+      bodEventId: submitted.match.bodEventId,
+      access: { uid: 'system', displayName: 'System', storedRole: 'system' },
+      now,
+      match: {
+        detection: submitted.detection,
+        confidence: submitted.match.confidence,
+        matchType: submitted.match.matchType,
+      },
     });
     await writeReminderHistory([reminderHistoryPayload({
       reminder,
@@ -675,6 +1201,15 @@ async function processAvenueReportingWindowDoc(doc) {
       sentAt: now,
     })]);
     return { outcome: 'alreadySubmitted', reason: 'report_submitted' };
+  }
+  if (submitted.possibleMatchId) {
+    await doc.ref.set({
+      possibleMatchStatus: 'possible_match',
+      possibleMatchId: submitted.possibleMatchId,
+      possibleMatchConfidence: submitted.possibleMatchConfidence,
+      possibleMatchDetection: submitted.detection,
+      updatedAt: now,
+    }, { merge: true });
   }
 
   if (runtimeState === 'not_open') {
@@ -740,6 +1275,24 @@ async function processAvenueReportingWindowDoc(doc) {
     completionReason: '',
     updatedAt: now,
   }, { merge: true });
+  await writeReminderSystemLog({
+    access: { uid: 'system', displayName: 'System', storedRole: 'system' },
+    action: 'sent',
+    status: 'success',
+    targetType: 'avenue_reporting_window',
+    targetId: reminder.id,
+    targetLabel: reminder.targetName,
+    targetAudience: reminder.avenue,
+    details: `${summary.sent}/${summary.attempted} reporting workflow email recipients sent.`,
+    source: 'processAvenueReportingWindowDoc',
+    relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
+    metadata: {
+      reportingWindowId: reminder.id,
+      sent: summary.sent,
+      failed: summary.failed,
+      bodToolsUrl: reminder.bodToolsUrl,
+    },
+  }, { safe: true });
 
   return { outcome: 'sent', sent: summary.sent, failed: summary.failed };
 }
@@ -764,8 +1317,8 @@ async function runReminderSweep({ trigger = 'manual', actor = null } = {}) {
     noRecipient: 0,
     locked: 0,
     alreadySubmitted: 0,
-    attendanceCompletionDetection: 'deferred',
-    avenueReportSubmissionDetection: 'deferred_no_persisted_report_submission_source',
+    attendanceCompletionDetection: 'at_least_one_present_absent',
+    avenueReportSubmissionDetection: 'reportingWindowId_or_strict_fallback',
   };
 
   const snap = await db.collection(REMINDERS_COLLECTION).get();
@@ -848,23 +1401,36 @@ const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) =
   const payload = reminderPayloadSource(request.data || {});
   assertReminderPayloadRecordType(payload, REPORTING_WINDOW_RECORD_TYPE);
   const target = db.collection(REMINDERS_COLLECTION).doc();
-  const now = admin.firestore.FieldValue.serverTimestamp();
-  await target.set({
+  const targetName = cleanText(payload.targetName || payload.eventName || payload.name, 180);
+  if (!targetName) throw new HttpsError('invalid-argument', 'Event/meeting name is required.');
+  const now = admin.firestore.Timestamp.now();
+  const persistedPayload = {
     ...payload,
+    targetName,
+    eventName: targetName,
+    bodToolsUrl: bodToolsPrefillUrl(target.id),
+    eventReportStatus: 'pending',
+    momStatus: 'pending',
+    attendanceStatus: 'pending',
+    workflowStatus: 'created',
+    possibleMatchStatus: '',
     createdBy: access.uid,
     createdByName: access.displayName || 'Unknown user',
     updatedBy: access.uid,
     updatedByName: access.displayName || 'Unknown user',
     createdAt: now,
     updatedAt: now,
-  });
+  };
+  const normalized = normalizeReportingWindowConfig(target.id, persistedPayload);
+  if (!normalized) throw new HttpsError('invalid-argument', 'Reporting window payload is invalid.');
+  await target.set(persistedPayload);
   await writeReminderSystemLog({
     access,
     action: 'created',
     status: 'active',
     targetType: 'avenue_reporting_window',
     targetId: target.id,
-    targetLabel: payload.targetName || payload.eventName || payload.name || payload.avenue,
+    targetLabel: targetName || payload.avenue,
     targetAudience: payload.recipientRole || payload.avenue,
     details: 'Reporting window reminder created.',
     source: 'createReportingWindowReminder',
@@ -876,7 +1442,64 @@ const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) =
       lockEnabled: payload.lockEnabled === true,
     },
   });
-  return { ok: true, reminderId: target.id };
+
+  if (isSpecialReportingWindow(normalized)) {
+    await upsertWorkflowReminderConfigs({
+      reportingWindow: normalized,
+      targetType: 'avenue_reporting_window',
+      targetId: normalized.id,
+      enabled: persistedPayload.remindersEnabled === true,
+      requiresBodToolsRecord: true,
+      access,
+      now,
+    });
+  }
+
+  let initialEmail = { outcome: 'skipped', reason: 'reminders_disabled' };
+  if (persistedPayload.remindersEnabled === true) {
+    const snap = await target.get();
+    initialEmail = await processAvenueReportingWindowDoc(snap, { forceSend: true });
+  }
+
+  return { ok: true, reminderId: target.id, initialEmail };
+});
+
+const getReportingWindowPrefill = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = request.auth?.uid || '';
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in before opening BOD Tools.');
+  const access = await resolveReminderAccess(uid, request.auth?.token || {});
+  const canAccessBodTools = access.isApproved === true
+    && (['bod', 'admin', 'president'].includes(access.storedRole) || access.hasPresidentAuthority === true);
+  if (!canAccessBodTools) {
+    throw new HttpsError('permission-denied', 'Approved BOD Tools access is required.');
+  }
+
+  const reportingWindowId = safeDocumentId(request.data?.reportingWindowId || request.data?.reminderId);
+  if (!reportingWindowId) throw new HttpsError('invalid-argument', 'Choose a valid reporting window.');
+  const snap = await db.collection(REMINDERS_COLLECTION).doc(reportingWindowId).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Reporting window not found.');
+  const reminder = normalizeReportingWindowConfig(snap.id, snap.data() || {});
+  if (!reminder) throw new HttpsError('failed-precondition', 'This record is not a reporting window.');
+  const runtimeState = reportingWindowRuntimeState(reminder, Date.now());
+  if (reminder.status === 'locked' || runtimeState === 'lock_due') {
+    throw new HttpsError('failed-precondition', 'This reporting window is locked.');
+  }
+
+  return {
+    ok: true,
+    reportingWindowId: reminder.id,
+    avenue: reminder.avenue,
+    avenueLabel: avenueDisplayLabel(reminder.avenue),
+    eventName: reminder.targetName,
+    name: reminder.targetName,
+    conductedDate: reminder.conductedDate,
+    date: reminder.conductedDate,
+    time: reminder.eventTime,
+    targetType: reportingWindowExpectedTargetType(reminder),
+    bodToolsCreateSupported: normalizeAvenueKey(reminder.avenue) !== 'BOD_MEETING',
+    warning: isSpecialReportingWindow(reminder) ? GBM_BOD_TOOLS_RECORD_WARNING : '',
+    note: 'Please do not change the prefilled event name unless an Admin/President has asked you to correct it.',
+  };
 });
 
 const upsertEventReminderConfig = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -1247,6 +1870,7 @@ const runReminderEmailSweep = onCall(CALLABLE_OPTIONS, async (request) => {
 
 module.exports = {
   createReportingWindowReminder,
+  getReportingWindowPrefill,
   upsertEventReminderConfig,
   stopEventReminderConfig,
   markReportingWindowSubmitted,
@@ -1257,9 +1881,14 @@ module.exports = {
   sendReminderTemplateTestEmail,
   unlockAvenueReportingWindow,
   runReminderSweep,
+  linkReportingWindowToTarget,
+  completeLinkedWorkflowRemindersForTarget,
   resolveReminderRecipients,
   resolveAvenueReportingRecipients,
   processReminderDoc,
   processAvenueReportingWindowDoc,
   hasAvenueReportSubmission,
+  hasAttendanceSubmission,
+  findReportingWindowBodEventMatch,
+  bodToolsPrefillUrl,
 };

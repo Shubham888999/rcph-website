@@ -38,6 +38,7 @@ const {
   validateMomTarget,
 } = require('./momCore');
 const { writeSystemLogSafely } = require('./system-logs');
+const reminderFunctions = require('./reminderFunctions');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -1001,6 +1002,17 @@ const finalizeMomUpload = onCall(MOM_BASE_OPTIONS, async (request) => {
   const metadata = buildMomMetadata({ target, previous: target.data, upload: session.uploaded, access, now });
   await target.ref.set(metadata, { merge: true });
   await mirrorMomMetadataToSyncedBodEvents(target, metadata);
+  await reminderFunctions.completeLinkedWorkflowRemindersForTarget({
+    targetType: target.targetType,
+    targetId: target.targetId,
+    reminderType: 'mom_submission',
+    reason: 'mom_uploaded',
+    now,
+    metadata: {
+      momDriveFileId: metadata.momDriveFileId || '',
+      momFileName: metadata.momFileName || '',
+    },
+  });
   await sessionRef.update({ status: 'finalized', finalizedAt: now, updatedAt: now, metadata: serializeMomMetadata(metadata) });
   return { ok: true, mom: serializeMomMetadata(metadata) };
 });

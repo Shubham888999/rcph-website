@@ -50,6 +50,8 @@ test('MOM upload and email history mirror to synced BOD event copies', () => {
   assert.match(functionsSource, /async function mirrorMomMetadataToSyncedBodEvents/);
   assert.match(functionsSource, /async function mirrorMomEmailHistoryToSyncedBodEvents/);
   assert.match(functionsSource, /await mirrorMomMetadataToSyncedBodEvents\(target, metadata\)/);
+  assert.match(functionsSource, /completeLinkedWorkflowRemindersForTarget/);
+  assert.match(functionsSource, /reason: 'mom_uploaded'/);
   assert.match(functionsSource, /await mirrorMomEmailHistoryToSyncedBodEvents\(target, latest\)/);
   assert.match(functionsSource, /momMirrorSourceType/);
   assert.match(functionsSource, /momEmailMirrorSourceType/);

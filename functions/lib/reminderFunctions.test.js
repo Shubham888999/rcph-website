@@ -14,6 +14,7 @@ test('scheduled and manual reminder email functions are exported additively', ()
   assert.match(indexSource, /exports\.runReminderEmailSweep = reminderFunctions\.runReminderEmailSweep;/);
   assert.match(indexSource, /exports\.unlockAvenueReportingWindow = reminderFunctions\.unlockAvenueReportingWindow;/);
   assert.match(indexSource, /exports\.createReportingWindowReminder = reminderFunctions\.createReportingWindowReminder;/);
+  assert.match(indexSource, /exports\.getReportingWindowPrefill = reminderFunctions\.getReportingWindowPrefill;/);
   assert.match(indexSource, /exports\.upsertEventReminderConfig = reminderFunctions\.upsertEventReminderConfig;/);
   assert.match(indexSource, /exports\.sendMomEmail = momFunctions\.sendMomEmail;/);
 });
@@ -61,11 +62,13 @@ test('reminder sweep handles sends, no recipients, max sends, and SMTP-not-confi
   assert.match(functionsSource, /completionReason: next\.completionReason/);
 });
 
-test('MOM reminder completes when MOM metadata already exists and attendance completion remains deferred', () => {
+test('MOM and attendance reminders complete from persisted workflow signals', () => {
   assert.match(functionsSource, /hasMomMetadata\(target\.data\)/);
   assert.match(functionsSource, /mom_uploaded/);
+  assert.match(functionsSource, /hasAttendanceSubmission\(reminder, target\)/);
+  assert.match(functionsSource, /attendance_marked/);
+  assert.match(functionsSource, /at_least_one_present_absent/);
   assert.doesNotMatch(functionsSource, /public Drive|drive\.files\.get|downloadMomPdf/);
-  assert.match(functionsSource, /Attendance completion is intentionally deferred/);
 });
 
 
@@ -98,6 +101,29 @@ test('avenue reporting windows are processed by scheduled and manual sweeps', ()
   assert.match(functionsSource, /nextAvenueReportingSentState\(reminder\)/);
   assert.match(functionsSource, /remindersSent: next\.remindersSent/);
   assert.match(functionsSource, /max_reminders_reached/);
+  assert.match(functionsSource, /bodToolsPrefillUrl\(normalized\.id\)/);
+  assert.match(functionsSource, /forceSend/);
+});
+
+test('reporting workflow prefill and linked reminders are backend enforced', () => {
+  assert.match(functionsSource, /const getReportingWindowPrefill = onCall/);
+  assert.match(functionsSource, /Approved BOD Tools access is required/);
+  assert.match(functionsSource, /linkReportingWindowToTarget/);
+  assert.match(functionsSource, /upsertWorkflowReminderConfigs/);
+  assert.match(functionsSource, /existingWorkflowLifecyclePatch/);
+  assert.match(functionsSource, /existing\.status === 'completed'/);
+  assert.match(functionsSource, /existing\.status === 'stopped'/);
+  assert.match(functionsSource, /reportingWindowId/);
+  assert.match(indexSource, /requireReportingWindowForBodPayload/);
+  assert.match(indexSource, /Event name must match the reporting window event name/);
+  assert.match(indexSource, /BOD Meeting reporting windows use the existing BOD Meeting scheduler/);
+});
+
+test('manual fallback matching is strict and low confidence remains pending', () => {
+  assert.match(functionsSource, /normalizedNameSimilarity\(reminder\.targetName, eventNameFromBodEvent\(data\)\)/);
+  assert.match(functionsSource, /confidence >= 0\.88/);
+  assert.match(functionsSource, /possible_match_not_auto_submitted/);
+  assert.doesNotMatch(functionsSource, /confidence >= 0\.5/);
 });
 
 test('avenue recipient resolution uses position assignments and secretary special cases', () => {
@@ -128,9 +154,11 @@ test('avenue reporting lock workflow creates deterministic locks and supports ad
   assert.match(functionsSource, /status: 'unlocked'/);
 });
 
-test('avenue report submission detection is safe and explicitly deferred', () => {
+test('avenue report submission detection uses reportingWindowId and strict fallback', () => {
   assert.match(functionsSource, /async function hasAvenueReportSubmission/);
-  assert.match(functionsSource, /deferred_no_persisted_report_submission_source/);
+  assert.match(functionsSource, /findReportingWindowBodEventMatch/);
+  assert.match(functionsSource, /reportingWindowId/);
+  assert.match(functionsSource, /strict_fallback/);
   assert.match(functionsSource, /alreadySubmitted/);
   assert.match(functionsSource, /locked: 0/);
   assert.match(functionsSource, /avenueReportSubmissionDetection/);
