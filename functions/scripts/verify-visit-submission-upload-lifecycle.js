@@ -285,6 +285,27 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   await rejectsWithCode(() => finalize(folderIdEnv, 'bod-secretary', folderIdSessionThree, mismatchedCompletion), 'failed-precondition', 'mismatched folder rejected');
   assert.strictEqual(folderDoc(folderIdEnv).driveFolderId, 'driveFolderABC12345', 'repeated folder lookup is idempotent');
 
+  const pptxEnv = await initializedEnv();
+  const pptxMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  const pptxSession = await createSession(pptxEnv, 'bod-secretary', {
+    file: {
+      clientFileId: 'pptx-live',
+      fileName: 'RCPH_Club_Assembly_CWD.pptx',
+      mimeType: pptxMime,
+      sizeBytes: 1900000,
+    },
+  });
+  const pptxProof = await consumeTicket(pptxEnv, pptxSession);
+  const pptxCompletion = await completeDrive(pptxEnv, pptxSession, pptxProof, 0, {
+    drive: {
+      driveFileId: 'driveFilePPTX12345',
+      driveFolderId: 'driveFolderABC12345',
+      driveFileUrl: 'https://docs.google.com/presentation/d/driveFilePPTX12345/edit?usp=drivesdk',
+    },
+  });
+  const pptxFinalized = await finalize(pptxEnv, 'bod-secretary', pptxSession, pptxCompletion);
+  assert.strictEqual(pptxEnv.adapter.store.visitSubmissions[pptxFinalized.submissionId].mimeType, pptxMime, 'PPTX can finalize from Google Slides webViewLink');
+
   const normalFolder = await env.service.getFolder('bod-secretary', 'clubAssembly', 'secretary');
   assertNoInternalFields(normalFolder.submissions[0]);
 

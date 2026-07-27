@@ -225,7 +225,10 @@ function normalizeDriveId(value, label) {
 
 function normalizeDriveUrl(value) {
   const cleaned = normalizeText(value, 1000);
-  if (!cleaned || !/^https:\/\/drive\.google\.com\//.test(cleaned)) {
+  if (
+    !cleaned
+    || !/^https:\/\/(?:drive\.google\.com\/|docs\.google\.com\/(?:document|spreadsheets|presentation)\/)/.test(cleaned)
+  ) {
     throw makeVisitSubmissionError('invalid-argument', 'Drive file URL is invalid.');
   }
   return cleaned;

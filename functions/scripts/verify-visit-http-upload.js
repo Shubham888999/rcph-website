@@ -200,9 +200,10 @@ return {
     this.order.push('upload');
     if (this.options.uploadFailure) throw this.options.uploadFailure;
     this.uploads.push(payload);
+    const driveFileId = `drive-file-${this.uploads.length}`;
     return {
-      driveFileId: `drive-file-${this.uploads.length}`,
-      driveFileUrl: `https://drive.google.com/file/d/drive-file-${this.uploads.length}/view`,
+      driveFileId,
+      driveFileUrl: this.options.driveFileUrl || `https://drive.google.com/file/d/${driveFileId}/view`,
       fileName: payload.fileName,
     };
   }
@@ -573,6 +574,14 @@ assert.deepStrictEqual(
     file: makeFile({ buffer: office, mimeType: officeMime }),
   });
   assert.deepStrictEqual(result.drive.uploads[0].buffer, office, 'Office-file-like binary bytes survive unchanged');
+  const pptxMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  result = await runHandler({
+    driveService: new FakeDriveService({ driveFileUrl: 'https://docs.google.com/presentation/d/drive-file-pptx/edit?usp=drivesdk' }),
+    fields: baseFields({ ticket: '6'.repeat(64), clientFileId: 'pptx-bytes', fileName: 'slides.pptx', mimeType: pptxMime, sizeBytes: office.length }),
+    file: makeFile({ buffer: office, fileName: 'slides.pptx', mimeType: pptxMime }),
+  });
+  assert.strictEqual(result.res.statusCode, 200, 'PPTX Drive webViewLink from Google Slides is accepted');
+  assert.strictEqual(result.json.ok, true, 'PPTX upload returns a completion proof');
 
   const failingCompletionDrive = new FakeDriveService();
   const capturedWarnings = [];
