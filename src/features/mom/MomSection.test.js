@@ -4,6 +4,8 @@ import test from "node:test";
 
 const section = readFileSync(new URL("./MomSection.jsx", import.meta.url), "utf8");
 const service = readFileSync(new URL("./momService.js", import.meta.url), "utf8");
+const bodDetails = readFileSync(new URL("../bod-tools/BodEventDetailsDialog.jsx", import.meta.url), "utf8");
+const adminAttendance = readFileSync(new URL("../admin/modules/AttendanceModules.jsx", import.meta.url), "utf8");
 
 test("MOM section renders empty and uploaded states with permission-scoped actions", () => {
   assert.match(section, /Minutes of Meeting \/ MOM/);
@@ -25,6 +27,11 @@ test("MOM email panel pre-fills recipient, subject, body, and attachment preview
   assert.match(section, /buildMomEmailDefaults\(target\)/);
   assert.match(section, /Recipient group/);
   assert.match(section, /MOM_RECIPIENT_GROUP_OPTIONS\.map/);
+  assert.match(section, /allGroupSelected \? \(/);
+  assert.match(section, /Include prospects/);
+  assert.match(section, /By default, All excludes prospects\./);
+  assert.match(section, /checked=\{sendDraft\.includeProspects === true\}/);
+  assert.match(section, /includeProspects: false/);
   assert.match(section, /Estimated recipient preview/);
   assert.match(section, /buildMomRecipientPreview\(recipientOptions, sendDraft\)/);
   assert.match(section, /Add specific members manually/);
@@ -47,6 +54,7 @@ test("MOM service uses backend-controlled Drive upload and view flow", () => {
   assert.match(service, /sendMomEmail/);
   assert.match(service, /getMomEmailRecipientOptions/);
   assert.match(service, /targetUserIds: draft\.targetUserIds/);
+  assert.match(service, /includeProspects: draft\.includeProspects === true/);
   assert.match(service, /httpsCallable\(functions, name\)/);
   assert.match(service, /Authorization: `Bearer \$\{token\}`/);
   assert.match(service, /FormData/);
@@ -56,4 +64,13 @@ test("MOM service uses backend-controlled Drive upload and view flow", () => {
   assert.doesNotMatch(service, /setAdminLock/);
   assert.doesNotMatch(service, /remindersSent|lockAt/);
   assert.doesNotMatch(service, /drive\.google\.com/);
+});
+
+test("BOD Tools and Admin Panel both render the shared MOM email form", () => {
+  assert.match(bodDetails, /import MomSection/);
+  assert.match(bodDetails, /<MomSection[\s\S]*target=\{momTarget\}[\s\S]*access=\{access\}/);
+  assert.match(adminAttendance, /import MomSection/);
+  assert.match(adminAttendance, /target=\{momTarget\(event, MOM_TARGET_TYPES\.CLUB_EVENT\)\}/);
+  assert.match(adminAttendance, /target=\{momTarget\(item, MOM_TARGET_TYPES\.BOD_MEETING\)\}/);
+  assert.match(adminAttendance, /target=\{momTarget\(event, MOM_TARGET_TYPES\.DISTRICT_EVENT\)\}/);
 });

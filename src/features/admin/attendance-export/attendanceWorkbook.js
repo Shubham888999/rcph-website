@@ -92,7 +92,7 @@ export function buildAttendanceWorkbook(ExcelJS, report, generatedAt = new Date(
   overview.columns = [
     { width: 14 }, { width: 34 }, { width: 24 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 16 },
   ];
-  styleTitle(overview, report.panel.title, "Exported from the authorized Admin attendance view. N/A includes the panel’s existing Not applicable / unrecorded state.", 7);
+  styleTitle(overview, report.panel.title, "Generated from the official RCPH Website", 7);
   const summary = [
     ["Events selected", report.events.length, "Counted roster rows", aggregateMembers.length],
     ["Present", present, "Absent", absent],

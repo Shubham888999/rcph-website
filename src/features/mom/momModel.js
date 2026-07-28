@@ -207,15 +207,18 @@ export function normalizeMomRecipientOptions(items = []) {
     .sort((a, b) => a.name.localeCompare(b.name) || a.uid.localeCompare(b.uid));
 }
 
-export function momRecipientMatchesGroups(recipient = {}, groups = []) {
+export function momRecipientMatchesGroups(recipient = {}, groups = [], options = {}) {
   const selectedGroups = Array.isArray(groups)
     ? groups.map((group) => lower(group, 40)).filter(Boolean)
     : [];
 
   if (!selectedGroups.length) return false;
-  if (selectedGroups.includes("all")) return true;
 
   const role = lower(recipient.role || recipient.storedRole, 40);
+  if (selectedGroups.includes("all")) {
+    return role !== "prospect" || options.includeProspects === true || selectedGroups.includes("prospect");
+  }
+
   const positionKeys = recipient.positionKeys || [];
   const hasPresident = recipient.hasPresidentAuthority === true
     || hasAnyPositionKey(positionKeys, PRESIDENT_POSITION_KEYS);
@@ -235,6 +238,7 @@ export function momRecipientMatchesGroups(recipient = {}, groups = []) {
 
 export function buildMomRecipientPreview(options = [], draft = {}) {
   const recipientGroups = Array.isArray(draft.recipientGroups) ? draft.recipientGroups : [];
+  const includeProspects = draft.includeProspects === true;
   const targetUserIds = Array.isArray(draft.targetUserIds)
     ? draft.targetUserIds.map((uid) => text(uid, 160)).filter(Boolean)
     : [];
@@ -243,7 +247,7 @@ export function buildMomRecipientPreview(options = [], draft = {}) {
   const byUid = new Map();
 
   normalizeMomRecipientOptions(options).forEach((recipient) => {
-    if (momRecipientMatchesGroups(recipient, recipientGroups) || selectedUidSet.has(recipient.uid)) {
+    if (momRecipientMatchesGroups(recipient, recipientGroups, { includeProspects }) || selectedUidSet.has(recipient.uid)) {
       byUid.set(recipient.uid, recipient);
     }
   });
@@ -334,6 +338,7 @@ export function buildMomEmailDefaults(target = {}) {
   const date = text(target.date || target.startDate, 40) || "the conducted date";
   return {
     recipientGroups: ["bod"],
+    includeProspects: false,
     targetUserIds: [],
     subject: `MOM for ${title}`,
     body: [

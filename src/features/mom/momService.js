@@ -115,6 +115,7 @@ export async function sendMomEmail(target, draft) {
   return call("sendMomEmail", {
     ...targetPayload(target),
     recipientGroups: draft.recipientGroups,
+    includeProspects: draft.includeProspects === true,
     targetUserIds: draft.targetUserIds,
     subject: draft.subject,
     body: draft.body,

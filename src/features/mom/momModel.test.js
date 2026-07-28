@@ -80,6 +80,7 @@ test("MOM email defaults and validation stay attachment-first", () => {
   assert.equal(defaults.subject, "MOM for BOD Meeting 2");
   assert.match(defaults.body, /Please find attached the Minutes of Meeting for "BOD Meeting 2", conducted on 2026-07-12\./);
   assert.deepEqual(defaults.recipientGroups, ["bod"]);
+  assert.equal(defaults.includeProspects, false);
   assert.equal(validateMomEmailDraft(defaults), "");
   assert.deepEqual(MOM_RECIPIENT_GROUP_OPTIONS.map((item) => item.value), ["all", "bod", "gbm", "prospect", "president", "secretary", "saa", "admin"]);
   assert.equal(validateMomEmailDraft({ ...defaults, recipientGroups: [], targetUserIds: ["uid-one"] }), "");
@@ -107,6 +108,7 @@ test("MOM recipient preview matches groups, specific members, and active BOD pos
     { uid: "uid-cmd", name: "Beta CMD", email: "cmd@example.com", role: "gbm", positionKeys: ["cmd"] },
     { uid: "uid-gbm", name: "Gamma GBM", email: "gbm@example.com", role: "gbm" },
     { uid: "uid-admin", name: "Delta Admin", email: "admin@example.com", role: "admin" },
+    { uid: "uid-prospect", name: "Echo Prospect", email: "prospect@example.com", role: "prospect" },
   ]);
 
   assert.equal(momRecipientMatchesGroups(options[0], ["bod"]), true);
@@ -121,6 +123,23 @@ test("MOM recipient preview matches groups, specific members, and active BOD pos
   assert.deepEqual(
     buildMomRecipientPreview(options, { recipientGroups: ["bod"], targetUserIds: ["uid-admin"] }).map((recipient) => recipient.uid),
     ["uid-bod", "uid-cmd", "uid-admin"],
+  );
+
+  assert.deepEqual(
+    buildMomRecipientPreview(options, { recipientGroups: ["all"], includeProspects: false, targetUserIds: [] }).map((recipient) => recipient.uid),
+    ["uid-bod", "uid-cmd", "uid-admin", "uid-gbm"],
+  );
+  assert.deepEqual(
+    buildMomRecipientPreview(options, { recipientGroups: ["all"], includeProspects: true, targetUserIds: [] }).map((recipient) => recipient.uid),
+    ["uid-bod", "uid-cmd", "uid-admin", "uid-prospect", "uid-gbm"],
+  );
+  assert.deepEqual(
+    buildMomRecipientPreview(options, { recipientGroups: ["prospect"], includeProspects: false, targetUserIds: [] }).map((recipient) => recipient.uid),
+    ["uid-prospect"],
+  );
+  assert.deepEqual(
+    buildMomRecipientPreview(options, { recipientGroups: ["all", "prospect"], includeProspects: false, targetUserIds: [] }).map((recipient) => recipient.uid),
+    ["uid-bod", "uid-cmd", "uid-admin", "uid-prospect", "uid-gbm"],
   );
 });
 

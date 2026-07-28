@@ -128,7 +128,11 @@ export default function MomSection({
       const recipientGroups = checked
         ? [...new Set([...existing, group])]
         : existing.filter((item) => item !== group);
-      return { ...current, recipientGroups };
+      return {
+        ...current,
+        recipientGroups,
+        ...(group === "all" && !checked ? { includeProspects: false } : {}),
+      };
     });
   }
 
@@ -192,6 +196,7 @@ export default function MomSection({
     : "";
   const groupLabelByValue = new Map(MOM_RECIPIENT_GROUP_OPTIONS.map((item) => [item.value, item.label]));
   const selectedGroups = Array.isArray(sendDraft.recipientGroups) ? sendDraft.recipientGroups : [];
+  const allGroupSelected = selectedGroups.includes("all");
   const selectedUserIds = Array.isArray(sendDraft.targetUserIds) ? sendDraft.targetUserIds : [];
   const selectedRecipients = selectedUserIds.map((userId) => recipientOptions.find((recipient) => recipient.uid === userId)).filter(Boolean);
   const previewRecipients = buildMomRecipientPreview(recipientOptions, sendDraft);
@@ -318,6 +323,21 @@ export default function MomSection({
               ))}
             </div>
           </fieldset>
+          {allGroupSelected ? (
+            <>
+              <div className="mom-email-panel__groups">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={sendDraft.includeProspects === true}
+                    onChange={(event) => setSendDraft({ ...sendDraft, includeProspects: event.target.checked })}
+                  />
+                  Include prospects
+                </label>
+              </div>
+              <p className="mom-email-panel__hint">By default, All excludes prospects.</p>
+            </>
+          ) : null}
           <div className="mom-email-panel__recipient-preview" aria-live="polite">
             <strong>Estimated recipient preview</strong>
 
