@@ -47,7 +47,7 @@ const AVENUE_LABELS = Object.freeze({
 const ATTENDANCE_STATUSES = Object.freeze(['present', 'absent', 'late', 'excused', 'unknown']);
 const MAX_OFFICIAL_NAMES = 12;
 const MAX_OFFICIAL_NAME_LENGTH = 160;
-const DRIVE_FOLDER_URL_ORIGIN = 'https://drive.google.com';
+const DRIVE_URL_ORIGIN = 'https://drive.google.com';
 
 function clone(value) {
   if (value == null) return value;
@@ -78,6 +78,11 @@ function normalizeDriveFolderId(value) {
   return /^[A-Za-z0-9_-]{5,220}$/.test(id) ? id : '';
 }
 
+function normalizeDriveFileId(value) {
+  const id = normalizeText(value, 220);
+  return /^[A-Za-z0-9_-]{5,220}$/.test(id) ? id : '';
+}
+
 function driveFolderIdFromUrl(value) {
   const raw = normalizeText(value, 1000);
   if (!raw) return '';
@@ -101,7 +106,42 @@ function driveFolderIdFromUrl(value) {
 function driveFolderOpenUrl(raw) {
   const driveFolderId = normalizeDriveFolderId(raw?.driveFolderId)
     || driveFolderIdFromUrl(raw?.folderUrl || raw?.driveFolderUrl);
-  return driveFolderId ? `${DRIVE_FOLDER_URL_ORIGIN}/drive/folders/${encodeURIComponent(driveFolderId)}` : '';
+  return driveFolderId ? `${DRIVE_URL_ORIGIN}/drive/folders/${encodeURIComponent(driveFolderId)}` : '';
+}
+
+function driveFileIdFromUrl(value) {
+  const raw = normalizeText(value, 1000);
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return '';
+    const segments = url.pathname.split('/').filter(Boolean);
+    if (url.hostname === 'drive.google.com') {
+      const fileSegmentIndex = segments.indexOf('file');
+      if (fileSegmentIndex >= 0 && segments[fileSegmentIndex + 1] === 'd') {
+        return normalizeDriveFileId(segments[fileSegmentIndex + 2]);
+      }
+      if (segments.length === 1 && segments[0] === 'open') {
+        return normalizeDriveFileId(url.searchParams.get('id'));
+      }
+    }
+    if (
+      url.hostname === 'docs.google.com'
+      && ['document', 'spreadsheets', 'presentation'].includes(segments[0])
+      && segments[1] === 'd'
+    ) {
+      return normalizeDriveFileId(segments[2]);
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+function driveFileOpenUrl(raw) {
+  const driveFileId = normalizeDriveFileId(raw?.billDriveFileId || raw?.billFileId || raw?.driveFileId)
+    || driveFileIdFromUrl(raw?.billUrl || raw?.billDriveFileUrl || raw?.driveFileUrl || raw?.fileUrl);
+  return driveFileId ? `${DRIVE_URL_ORIGIN}/file/d/${encodeURIComponent(driveFileId)}/view` : '';
 }
 
 function validDate(value) {
@@ -458,6 +498,7 @@ function shapeTreasuryRow(doc, index = 0) {
   const title = normalizeText(source.title || source.name || source.purpose || source.linkedEventName || 'Untitled transaction', 180);
   if (!transactionId || amount === null || !date || !title) return null;
   const avenueCode = firstAvenueCode(source.avenue || source.avenues, 'OTHER');
+  const billOpenUrl = driveFileOpenUrl(source);
   return {
     transactionId,
     date,
@@ -469,6 +510,8 @@ function shapeTreasuryRow(doc, index = 0) {
     avenueCode,
     avenueName: avenueNameForCode(avenueCode),
     notes: normalizeText(source.notes || source.note || source.remarks, 500),
+    billCanOpen: Boolean(billOpenUrl),
+    billOpenUrl,
   };
 }
 

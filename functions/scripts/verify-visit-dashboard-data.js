@@ -240,7 +240,6 @@ function assertNoSensitivePayload(value) {
     'updater@example.test',
     'archiver-uid',
     'deleter-uid',
-    'private-file',
     'internal-file',
     'private treasury audit',
     'Archived treasury',
@@ -263,27 +262,61 @@ function assertNoSensitivePayload(value) {
     'canMark',
     'canDelete',
   ].forEach((needle) => assert.equal(json.includes(needle), false, `${needle} leaked`));
-  assertOnlySafeDriveFolderUrls(value);
+  assertOnlySafeDriveUrls(value);
 }
 
-function assertOnlySafeDriveFolderUrls(value, pathLabel = 'root') {
+function assertOnlySafeDriveUrls(value, pathLabel = 'root') {
   if (value == null) return;
   if (Array.isArray(value)) {
-    value.forEach((item, index) => assertOnlySafeDriveFolderUrls(item, `${pathLabel}[${index}]`));
+    value.forEach((item, index) => assertOnlySafeDriveUrls(item, `${pathLabel}[${index}]`));
     return;
   }
   if (typeof value === 'object') {
-    Object.entries(value).forEach(([key, item]) => assertOnlySafeDriveFolderUrls(item, `${pathLabel}.${key}`));
+    Object.entries(value).forEach(([key, item]) => assertOnlySafeDriveUrls(item, `${pathLabel}.${key}`));
     return;
   }
   if (typeof value === 'string' && value.includes('drive.google.com')) {
-    assert.match(
-      value,
-      /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/,
-      `Only canonical Drive folder URLs may be exposed at ${pathLabel}`
+    const isFolderOpenUrl = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(value);
+    const isBillOpenUrl = pathLabel.endsWith('.billOpenUrl')
+      && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(value);
+    assert.ok(
+      isFolderOpenUrl || isBillOpenUrl,
+      `Only canonical Drive folder URLs and billOpenUrl Drive file URLs may be exposed at ${pathLabel}`
     );
   }
 }
+
+const districtDuesTreasury = dashboards.buildVisitDashboardTreasury([{
+  id: 'district-dues-transaction',
+  data: {
+    title: 'District Dues + Multimedia Charges',
+    type: 'expense',
+    amount: 6750,
+    date: '2026-07-02',
+    purpose: 'District Dues',
+    avenue: 'Other',
+    billUploadedAt: '2026-07-10T16:35:38.799Z',
+    billFolderUrl: 'https://drive.google.com/drive/folders/district-dues-folder-id',
+    billFolderName: '2026-07-02_District Dues_expense_6750_district-dues-transaction',
+    billFileName: 'District Dues.jpeg',
+    billSizeBytes: 95768,
+    billDriveFileId: 'district-dues-file-id',
+    billFolderId: 'district-dues-folder-id',
+    billUrl: 'https://drive.google.com/file/d/older-url-id/view?usp=drivesdk',
+    billMimeType: 'image/jpeg',
+    createdByEmail: 'private-bill-uploader@example.test',
+  },
+}]);
+assert.equal(districtDuesTreasury.rows[0].billCanOpen, true, 'District Dues bill can open');
+assert.equal(
+  districtDuesTreasury.rows[0].billOpenUrl,
+  'https://drive.google.com/file/d/district-dues-file-id/view',
+  'District Dues bill uses canonical Drive file URL from stored file ID'
+);
+assert.equal('billDriveFileId' in districtDuesTreasury.rows[0], false, 'raw bill Drive ID hidden');
+assert.equal('billUrl' in districtDuesTreasury.rows[0], false, 'raw bill URL hidden');
+assert.equal('billFolderUrl' in districtDuesTreasury.rows[0], false, 'bill folder URL hidden from treasury rows');
+assertNoSensitivePayload(districtDuesTreasury);
 
 (async () => {
   const source = fs.readFileSync(path.join(repoRoot, 'functions', 'index.js'), 'utf8');
@@ -392,6 +425,8 @@ function assertOnlySafeDriveFolderUrls(value, pathLabel = 'root') {
       avenueCode: row.avenueCode,
       avenueName: row.avenueName,
       notes: row.notes,
+      billCanOpen: row.billCanOpen,
+      billOpenUrl: row.billOpenUrl,
     })),
     [
       {
@@ -404,6 +439,8 @@ function assertOnlySafeDriveFolderUrls(value, pathLabel = 'root') {
         avenueCode: 'CLUB',
         avenueName: 'Club',
         notes: '',
+        billCanOpen: false,
+        billOpenUrl: '',
       },
       {
         transactionId: 't2',
@@ -415,6 +452,8 @@ function assertOnlySafeDriveFolderUrls(value, pathLabel = 'root') {
         avenueCode: 'CSD',
         avenueName: 'Club Service',
         notes: '',
+        billCanOpen: true,
+        billOpenUrl: 'https://drive.google.com/file/d/private-file/view',
       },
       {
         transactionId: 't1',
@@ -426,12 +465,27 @@ function assertOnlySafeDriveFolderUrls(value, pathLabel = 'root') {
         avenueCode: 'GBM',
         avenueName: 'General Body Meeting',
         notes: 'Collected during meeting',
+        billCanOpen: true,
+        billOpenUrl: 'https://drive.google.com/file/d/private/view',
       },
     ]
   );
   assert.deepEqual(
     Object.keys(districtByDefault.treasury.rows[0]).sort(),
-    ['amount', 'avenueCode', 'avenueName', 'category', 'date', 'description', 'notes', 'title', 'transactionId', 'type'].sort()
+    [
+      'amount',
+      'avenueCode',
+      'avenueName',
+      'billCanOpen',
+      'billOpenUrl',
+      'category',
+      'date',
+      'description',
+      'notes',
+      'title',
+      'transactionId',
+      'type',
+    ].sort()
   );
   assert.deepEqual(
     districtByDefault.documentPanels.map(panel => ({
