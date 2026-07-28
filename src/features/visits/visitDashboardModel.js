@@ -354,6 +354,45 @@ function normalizeDriveFolderOpenUrl(value) {
   }
 }
 
+function normalizeDriveFileId(value) {
+  const id = text(value, 220);
+  return /^[A-Za-z0-9_-]{5,220}$/.test(id) ? id : "";
+}
+
+function driveFileIdFromUrl(value) {
+  const raw = text(value, 1000);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return "";
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (url.hostname === "drive.google.com") {
+      const fileSegmentIndex = segments.indexOf("file");
+      if (fileSegmentIndex >= 0 && segments[fileSegmentIndex + 1] === "d") {
+        return normalizeDriveFileId(segments[fileSegmentIndex + 2]);
+      }
+      if (segments.length === 1 && segments[0] === "open") {
+        return normalizeDriveFileId(url.searchParams.get("id"));
+      }
+    }
+    if (
+      url.hostname === "docs.google.com"
+      && ["document", "spreadsheets", "presentation"].includes(segments[0])
+      && segments[1] === "d"
+    ) {
+      return normalizeDriveFileId(segments[2]);
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function normalizeDriveFileOpenUrl(value) {
+  const driveFileId = normalizeDriveFileId(value) || driveFileIdFromUrl(value);
+  return driveFileId ? `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/view` : "";
+}
+
 function normalizeDocumentPanels(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -459,6 +498,8 @@ function normalizeTreasuryRow(raw) {
   const date = dateOnly(raw.date);
   const amount = rowAmount(raw.amount);
   if (!transactionId || !title || !date || amount === null) return null;
+  const billOpenUrl = normalizeDriveFileOpenUrl(raw.billDriveFileId || raw.billFileId)
+    || normalizeDriveFileOpenUrl(raw.billOpenUrl || raw.billUrl || raw.driveFileUrl || raw.fileUrl);
   return {
     transactionId,
     date,
@@ -470,6 +511,8 @@ function normalizeTreasuryRow(raw) {
     avenueCode: text(raw.avenueCode, 40).toUpperCase(),
     avenueName: text(raw.avenueName, 80),
     notes: text(raw.notes, 500),
+    billCanOpen: Boolean(billOpenUrl) && raw.billCanOpen !== false,
+    billOpenUrl,
   };
 }
 

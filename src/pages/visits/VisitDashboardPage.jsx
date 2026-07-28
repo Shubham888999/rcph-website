@@ -82,24 +82,82 @@ function StatRail({ stats }) {
     </dl>
   );
 }
+function avenueTokens(value) {
+  return String(value || "")
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean);
+}
 
-function AvenueCounts({ rows }) {
+function visitEventsForAvenue(attendance, row) {
+  const columns = attendance?.club?.columns || [];
+  const avenueCode = String(row.avenueCode || "").toUpperCase();
+  const avenueName = String(row.avenueName || "").trim().toLowerCase();
+  const seen = new Set();
+
+  return columns.filter((column) => {
+    const columnCodes = avenueTokens(column.avenueCode);
+    const columnName = String(column.avenueName || "").trim().toLowerCase();
+
+    return columnCodes.includes(avenueCode) || Boolean(avenueName && columnName === avenueName);
+  }).flatMap((column) => {
+    if (seen.has(column.eventId)) return [];
+    seen.add(column.eventId);
+
+    return [{
+      eventId: column.eventId,
+      title: column.title,
+      date: formatVisitDashboardDate(column.date) || column.date || "Date unavailable",
+    }];
+  });
+}
+function AvenueCounts({ rows, attendance }) {
   return (
     <section className="visit-dashboard-avenue-section" aria-labelledby="visit-dashboard-avenues-title">
       <header>
         <p className="visit-dashboard-eyebrow">Club activity</p>
         <h2 id="visit-dashboard-avenues-title">Avenue-wise events</h2>
       </header>
+
       <ul className="visit-dashboard-avenue-list">
-        {rows.map((row) => (
-          <li className={row.count === 0 ? "is-zero" : ""} key={row.avenueCode}>
-            <span className="visit-dashboard-avenue-chip__label">
-              <strong>{row.avenueName}</strong>
-              <small>{row.avenueCode}</small>
-            </span>
-            <b aria-label={`${row.count} ${row.count === 1 ? "event" : "events"}`}>{row.count}</b>
-          </li>
-        ))}
+        {rows.map((row) => {
+          const events = visitEventsForAvenue(attendance, row);
+
+          return (
+            <li className={row.count === 0 ? "is-zero" : ""} key={row.avenueCode}>
+              <details className="visit-dashboard-avenue-disclosure">
+                <summary>
+                  <span className="visit-dashboard-avenue-chip__label">
+                    <strong>{row.avenueName}</strong>
+                    <small>{row.avenueCode}</small>
+                  </span>
+
+                  <span className="visit-dashboard-avenue-count-wrap">
+                    <b aria-label={`${row.count} ${row.count === 1 ? "event" : "events"}`}>
+                      {row.count}
+                    </b>
+                    <i aria-hidden="true">›</i>
+                  </span>
+                </summary>
+
+                {events.length ? (
+                  <ul className="visit-dashboard-avenue-event-list">
+                    {events.map((event) => (
+                      <li key={event.eventId}>
+                        <strong>{event.title}</strong>
+                        <span>{event.date}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="visit-dashboard-avenue-empty">
+                    No events recorded for this avenue yet.
+                  </p>
+                )}
+              </details>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -160,38 +218,15 @@ function DocumentPanels({ panels }) {
               {panel.files.length ? (
                 <ul className="visit-dashboard-document-list">
                   {panel.files.map((file) => {
-                    const fileMeta = [
-                      file.mimeType || "",
-                      formatVisitDashboardFileSize(file.fileSize),
-                    ].filter(Boolean).join(" / ");
-                    return (
-                      <li key={file.submissionId}>
-                        <div>
-                          <strong>{file.title}</strong>
-                          <span>{file.fileName || "Document"}</span>
-                        </div>
-                        <dl>
-                          {fileMeta ? (
-                            <div>
-                              <dt>Type/Size</dt>
-                              <dd>{fileMeta}</dd>
-                            </div>
-                          ) : null}
-                          {file.uploadedAt ? (
-                            <div>
-                              <dt>Uploaded</dt>
-                              <dd>{formatVisitDashboardDateTime(file.uploadedAt)}</dd>
-                            </div>
-                          ) : null}
-                          {file.uploadedByName ? (
-                            <div>
-                              <dt>By</dt>
-                              <dd>{file.uploadedByName}</dd>
-                            </div>
-                          ) : null}
-                        </dl>
-                      </li>
-                    );
+
+return (
+  <li key={file.submissionId}>
+    <div>
+      <strong>{file.title}</strong>
+      <span>{file.fileName || "Document"}</span>
+    </div>
+  </li>
+);
                   })}
                 </ul>
               ) : (
@@ -391,14 +426,20 @@ function TreasuryRecords({ treasury }) {
         <div className="visit-dashboard-treasury-table-wrap">
           <table className="visit-dashboard-treasury-table">
             <caption>Read-only treasury transaction register</caption>
+            <colgroup>
+              <col className="visit-dashboard-treasury-col-date" />
+              <col className="visit-dashboard-treasury-col-title" />
+              <col className="visit-dashboard-treasury-col-type" />
+              <col className="visit-dashboard-treasury-col-amount" />
+              <col className="visit-dashboard-treasury-col-bill" />
+            </colgroup>
             <thead>
               <tr>
                 <th scope="col">Date</th>
                 <th scope="col">Title / Description</th>
                 <th scope="col">Type</th>
-                <th scope="col">Category / Avenue</th>
                 <th scope="col">Amount</th>
-                <th scope="col">Notes</th>
+                <th scope="col">Bill</th>
               </tr>
             </thead>
             <tbody>
@@ -416,14 +457,23 @@ function TreasuryRecords({ treasury }) {
                         {typeClass === "income" ? "Income" : typeClass === "expense" ? "Expense" : "Unknown"}
                       </span>
                     </td>
-                    <td>
-                      <strong>{row.category || "Uncategorized"}</strong>
-                      <small>{row.avenueName || row.avenueCode || "No avenue"}</small>
-                    </td>
                     <td className={`visit-dashboard-treasury-amount is-${typeClass}`}>
                       {formatVisitDashboardMoney(row.amount)}
                     </td>
-                    <td>{row.notes}</td>
+                    <td className="visit-dashboard-bill-cell">
+                      {row.billCanOpen && row.billOpenUrl ? (
+                        <a
+                          className="visit-dashboard-bill-link"
+                          href={row.billOpenUrl}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          View bill
+                        </a>
+                      ) : (
+                        <span className="visit-dashboard-bill-empty" aria-label="No bill available">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -505,12 +555,17 @@ export default function VisitDashboardPage() {
               ))}
             </ul>
           </div>
-          <span className="visit-dashboard-readonly">Read-only</span>
+          <div className="visit-dashboard-masthead__actions">
+  <a className="visit-dashboard-action-link" href="/access">
+    Access page
+  </a>
+  <span className="visit-dashboard-readonly">Read-only</span>
+</div>
         </header>
 
         <StatRail stats={stats} />
 
-        <AvenueCounts rows={stats.avenueEventCounts} />
+        <AvenueCounts rows={stats.avenueEventCounts} attendance={attendance} />
 
         <DocumentPanels panels={documentPanels} />
 

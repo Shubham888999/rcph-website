@@ -102,7 +102,32 @@
   background: rgba(96, 195, 196, 0.08);
   text-transform: uppercase;
 }
+.visit-dashboard-masthead__actions {
+  justify-self: end;
+  display: grid;
+  gap: 0.5rem;
+}
 
+.visit-dashboard-action-link {
+  min-height: 1.9rem;
+  padding: 0.35rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(229, 194, 104, 0.34);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-accent-soft);
+  background: rgba(229, 194, 104, 0.06);
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-action-link:hover {
+  border-color: rgba(229, 194, 104, 0.56);
+  background: rgba(229, 194, 104, 0.1);
+}
 .visit-dashboard-stat-rail {
   margin: 0;
   padding: 1.15rem 0;
@@ -231,7 +256,82 @@
   text-align: right;
   white-space: nowrap;
 }
+.visit-dashboard-avenue-list li {
+  display: block;
+  min-height: 0;
+  padding: 0;
+}
 
+.visit-dashboard-avenue-disclosure {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.visit-dashboard-avenue-disclosure summary {
+  min-height: 2.15rem;
+  padding: 0.32rem 0;
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+}
+
+.visit-dashboard-avenue-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.visit-dashboard-avenue-count-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.visit-dashboard-avenue-count-wrap i {
+  color: var(--internal-accent-soft);
+  font-style: normal;
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.visit-dashboard-avenue-disclosure[open] .visit-dashboard-avenue-count-wrap i {
+  transform: rotate(90deg);
+}
+
+.visit-dashboard-avenue-event-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.2rem 0 0.65rem;
+  padding: 0;
+  list-style: none;
+}
+
+.visit-dashboard-avenue-event-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: var(--internal-radius-control);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.visit-dashboard-avenue-event-list strong {
+  min-width: 0;
+  white-space: normal;
+}
+
+.visit-dashboard-avenue-event-list span,
+.visit-dashboard-avenue-empty {
+  color: var(--internal-text-muted);
+  font-size: 0.78rem;
+}
+
+.visit-dashboard-avenue-empty {
+  margin: 0.25rem 0 0.65rem;
+}
 .visit-dashboard-freshness {
   margin: -1.4rem 0 0;
   color: var(--internal-text-muted);
@@ -410,10 +510,10 @@ a.visit-dashboard-folder-action:hover {
 
 .visit-dashboard-document-list li {
   min-width: 0;
-  padding: 0.85rem 0 0.85rem 0.85rem;
+  padding: 0.72rem 0 0.72rem 0.85rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.78fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.25rem;
   border-left: 2px solid rgba(229, 194, 104, 0.38);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -434,24 +534,6 @@ a.visit-dashboard-folder-action:hover {
 .visit-dashboard-document-list dt {
   color: var(--internal-text-muted);
 }
-
-.visit-dashboard-document-list dl {
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.7rem;
-}
-
-.visit-dashboard-document-list dt {
-  font-size: 0.72rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.visit-dashboard-document-list dd {
-  margin: 0.22rem 0 0;
-}
-
 .visit-dashboard-attendance {
   display: grid;
 }
@@ -740,8 +822,29 @@ a.visit-dashboard-folder-action:hover {
 
 .visit-dashboard-treasury-table {
   width: 100%;
-  min-width: 860px;
+  min-width: 740px;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.visit-dashboard-treasury-col-date {
+  width: 8.5rem;
+}
+
+.visit-dashboard-treasury-col-title {
+  width: auto;
+}
+
+.visit-dashboard-treasury-col-type {
+  width: 7.5rem;
+}
+
+.visit-dashboard-treasury-col-amount {
+  width: 9rem;
+}
+
+.visit-dashboard-treasury-col-bill {
+  width: 8rem;
 }
 
 .visit-dashboard-treasury-table caption {
@@ -829,6 +932,36 @@ a.visit-dashboard-folder-action:hover {
   color: var(--internal-status-danger);
 }
 
+.visit-dashboard-bill-cell {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.visit-dashboard-bill-link {
+  min-height: 1.85rem;
+  padding: 0.26rem 0.58rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(229, 194, 104, 0.35);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-accent-soft);
+  background: rgba(229, 194, 104, 0.08);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.visit-dashboard-bill-empty {
+  min-width: 2rem;
+  display: inline-flex;
+  justify-content: center;
+  color: var(--internal-text-muted);
+  font-weight: 850;
+}
+
 .visit-dashboard-state {
   width: min(860px, 100%);
   margin: min(12vh, 6rem) auto 0;
@@ -894,7 +1027,8 @@ a.visit-dashboard-folder-action:hover {
 }
 
 .visit-dashboard-page button:focus-visible,
-.visit-dashboard-folder-action:focus-visible {
+.visit-dashboard-folder-action:focus-visible,
+.visit-dashboard-bill-link:focus-visible {
   outline: none;
   box-shadow: var(--internal-focus-ring);
 }
@@ -907,6 +1041,12 @@ a.visit-dashboard-folder-action:hover {
   .visit-dashboard-state button:hover {
     border-color: var(--internal-accent);
     transform: translateY(-1px);
+  }
+
+  .visit-dashboard-bill-link:hover {
+    border-color: var(--internal-accent);
+    color: var(--internal-bg);
+    background: var(--internal-accent);
   }
 }
 
@@ -1030,7 +1170,27 @@ a.visit-dashboard-folder-action:hover {
     padding: 0.8rem;
   }
 }
+@media (max-width: 720px) {
+  .visit-dashboard-masthead__actions {
+    justify-self: start;
+    display: flex;
+    flex-wrap: wrap;
+  }
 
+  .visit-dashboard-avenue-section {
+    grid-template-columns: 1fr;
+  }
+
+  .visit-dashboard-avenue-list {
+    grid-template-columns: 1fr;
+  }
+
+  .visit-dashboard-avenue-event-list li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .visit-dashboard-page *,
   .visit-dashboard-page *::before,

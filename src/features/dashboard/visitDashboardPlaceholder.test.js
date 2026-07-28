@@ -148,6 +148,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
         avenueCode: "CSD",
         avenueName: "Club Service",
         notes: "",
+        billUrl: "https://unsafe.example.test/bill",
       }, {
         transactionId: "bad/id",
         date: "not-a-date",
@@ -214,6 +215,8 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       avenueCode: "GBM",
       avenueName: "General Body Meeting",
       notes: "Cash deposited",
+      billCanOpen: true,
+      billOpenUrl: "https://drive.google.com/file/d/private-drive-file/view",
     }, {
       transactionId: "treasury-2",
       date: "2026-07-17",
@@ -225,8 +228,41 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       avenueCode: "CSD",
       avenueName: "Club Service",
       notes: "",
+      billCanOpen: false,
+      billOpenUrl: "",
     }],
   });
+  assert.equal("billDriveFileId" in normalized.treasury.rows[0], false);
+  assert.equal("billUrl" in normalized.treasury.rows[0], false);
+
+  const districtDuesTreasury = normalizeVisitDashboardData({
+    visit: { visitType: "clubAssembly" },
+    treasury: {
+      rows: [{
+        transactionId: "district-dues-transaction",
+        title: "District Dues + Multimedia Charges",
+        description: "District Dues",
+        type: "expense",
+        amount: 6750,
+        date: "2026-07-02",
+        avenueCode: "OTHER",
+        avenueName: "Other",
+        billUploadedAt: "2026-07-10T16:35:38.799Z",
+        billDriveFileId: "district-dues-file-id",
+        billUrl: "https://drive.google.com/file/d/older-url-id/view?usp=drivesdk",
+        billFileName: "District Dues.jpeg",
+        billMimeType: "image/jpeg",
+        billSizeBytes: 95768,
+        billFolderId: "district-dues-folder-id",
+        billFolderUrl: "https://drive.google.com/drive/folders/district-dues-folder-id",
+      }],
+    },
+  }, "clubAssembly").treasury.rows[0];
+  assert.equal(districtDuesTreasury.billCanOpen, true);
+  assert.equal(districtDuesTreasury.billOpenUrl, "https://drive.google.com/file/d/district-dues-file-id/view");
+  assert.equal("billDriveFileId" in districtDuesTreasury, false);
+  assert.equal("billUrl" in districtDuesTreasury, false);
+  assert.equal("billFolderUrl" in districtDuesTreasury, false);
 
   const emptyFolder = normalizeVisitDashboardData({
     visit: { visitType: "clubAssembly" },
@@ -341,8 +377,12 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /Welcome District Officials/);
   assert.match(pageSource, /officialDisplayNames/);
   assert.match(pageSource, /Avenue-wise events/);
-  assert.match(pageSource, /visit-dashboard-avenue-chip__label/);
-  assert.match(pageSource, /row\.count === 0 \? "is-zero" : ""/);
+assert.match(pageSource, /visit-dashboard-avenue-chip__label/);
+assert.match(pageSource, /visit-dashboard-avenue-disclosure/);
+assert.match(pageSource, /visitEventsForAvenue\(attendance, row\)/);
+assert.match(pageSource, /visit-dashboard-avenue-event-list/);
+assert.match(pageSource, /No events recorded for this avenue yet\./);
+assert.match(pageSource, /row\.count === 0 \? "is-zero" : ""/);
   assert.doesNotMatch(pageSource, /visit-dashboard-avenue-meter/);
   assert.match(pageSource, /BOD Documents/);
   assert.match(pageSource, /visit-dashboard-folder-directory/);
@@ -379,10 +419,19 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.doesNotMatch(pageSource, /<details className="visit-dashboard-attendance"[^>]* open/);
   assert.match(pageSource, /Treasury Records/);
   assert.match(pageSource, /Read-only financial summary and transaction register for the selected visit\./);
+  assert.match(pageSource, /href="\/access"/);
+assert.match(pageSource, /Access page/);
+assert.match(pageSource, /visit-dashboard-masthead__actions/);
   assert.match(pageSource, /visit-dashboard-treasury-summary/);
   assert.match(pageSource, /visit-dashboard-treasury-table/);
   assert.match(pageSource, /Title \/ Description/);
-  assert.match(pageSource, /Category \/ Avenue/);
+  assert.match(pageSource, /<th scope="col">Bill<\/th>/);
+  assert.match(pageSource, /View bill/);
+  assert.match(pageSource, /className="visit-dashboard-bill-link"/);
+  assert.match(pageSource, /href=\{row\.billOpenUrl\}/);
+  assert.match(pageSource, /visit-dashboard-bill-empty/);
+  assert.doesNotMatch(pageSource, /Category \/ Avenue/);
+  assert.doesNotMatch(pageSource, /<th scope="col">Notes<\/th>/);
   assert.match(pageSource, /No treasury records are available yet\./);
   assert.match(pageSource, /totalMembers|Total members/);
   assert.match(pageSource, /treasuryIncome|Income/);
@@ -392,6 +441,9 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   );
   assert.doesNotMatch(pageSource, /<button[\s\S]{0,120}>Open<\/button>/i);
   assert.doesNotMatch(pageSource, /href=\{panel\.(?:folderUrl|fileUrl)/);
+assert.doesNotMatch(pageSource, /<dt>Type\/Size<\/dt>/);
+assert.doesNotMatch(pageSource, /<dt>Uploaded<\/dt>/);
+assert.doesNotMatch(pageSource, /<dt>By<\/dt>/);
 });
 
 test("visit dashboard CSS keeps metrics readable and compact sections gridded", () => {
@@ -402,15 +454,25 @@ test("visit dashboard CSS keeps metrics readable and compact sections gridded", 
   assert.match(visitCssSource, /\.visit-dashboard-avenue-list li \{[\s\S]*border-bottom:/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-avenue-list li \{[^}]*border-radius/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-directory \{[\s\S]*grid-template-columns: 1fr/);
-  assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary \{[\s\S]*grid-template-columns: minmax\(16rem, 1fr\) max-content/);
+assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary \{[\s\S]*grid-template-columns: minmax\(16rem, 1fr\) max-content/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary strong \{[\s\S]*white-space: nowrap/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary strong \{[\s\S]*text-overflow: ellipsis/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-folder-panel summary strong \{[^}]*overflow-wrap: anywhere/);
-  assert.match(visitCssSource, /\.visit-dashboard-folder-actions \{[\s\S]*inline-flex/);
+assert.match(visitCssSource, /\.visit-dashboard-folder-actions \{[\s\S]*inline-flex/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-action \{[\s\S]*var\(--internal-accent-soft\)/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-folder-action\.is-disabled/);
+  assert.match(visitCssSource, /\.visit-dashboard-treasury-col-bill \{[\s\S]*width: 8rem/);
+  assert.match(visitCssSource, /\.visit-dashboard-bill-link \{/);
+  assert.match(visitCssSource, /\.visit-dashboard-bill-empty \{/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-name \{[\s\S]*white-space: nowrap/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-col-name \{[\s\S]*width: 18rem/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-role \{[\s\S]*white-space: nowrap/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-status \{[\s\S]*justify-content: center/);
+assert.match(visitCssSource, /\.visit-dashboard-masthead__actions \{/);
+assert.match(visitCssSource, /\.visit-dashboard-action-link \{/);
+assert.match(visitCssSource, /\.visit-dashboard-avenue-disclosure summary \{[\s\S]*cursor: pointer/);
+assert.match(visitCssSource, /\.visit-dashboard-avenue-disclosure\[open\] \.visit-dashboard-avenue-count-wrap i \{[\s\S]*transform: rotate\(90deg\)/);
+assert.match(visitCssSource, /\.visit-dashboard-avenue-event-list \{/);
+assert.match(visitCssSource, /\.visit-dashboard-document-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+
 });
