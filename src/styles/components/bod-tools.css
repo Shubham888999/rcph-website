@@ -668,6 +668,7 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
 .bod-upload__files button { min-height: 2.5rem; padding: .5rem .65rem; border: 1px solid var(--internal-border); border-radius: var(--radius-sm); color: var(--internal-text); background: transparent; font: inherit; font-weight: 750; cursor: pointer; }
 .bod-field-error, .bod-form-error { color: #ffabb6; font-size: .86rem; }
 .bod-form-error { padding: .7rem; border-left: 3px solid var(--internal-status-danger); background: rgba(153,40,87,.16); }
+.bod-form-prefill-note { margin: .35rem 0 1rem; padding: .7rem; border-left: 3px solid var(--internal-accent); color: var(--internal-muted); background: rgba(15,118,110,.12); }
 .bod-dialog__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .7rem; margin-top: 1rem; }
 .bod-tools-page :focus-visible { outline: 3px solid var(--internal-accent-secondary); outline-offset: 3px; }
 .bod-tools-page .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }

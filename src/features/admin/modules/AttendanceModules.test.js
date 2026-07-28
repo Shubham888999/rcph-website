@@ -21,7 +21,22 @@ assert.match(source, /removedParticipants: removedAttendanceParticipants/);
 assert.match(source, /removedMembers=\{removedAttendanceParticipants\}/);
 assert.match(source, /<RemovedAttendanceSection/);
 });
-
+test("Attendance grid provides collapsed mobile member cards while keeping desktop table", () => {
+  assert.match(source, /className="attendance-mobile-list"/);
+  assert.match(source, /<details className="attendance-mobile-card"/);
+  assert.match(source, /<summary className="attendance-mobile-card__summary">/);
+  assert.match(source, /className="attendance-mobile-card__quick-stats"/);
+  assert.match(source, /className="attendance-mobile-card__body"/);
+  assert.match(source, /className="attendance-mobile-events"/);
+  assert.match(source, /className=\{`attendance-mobile-event attendance-mobile-event--\$\{statusClass\}`\}/);
+  assert.match(source, /attendanceValueLabel\(value\)/);
+  assert.match(source, /setAttendanceCell\(\s*collectionName,\s*member\.id,\s*event\.id,\s*nextAttendance\(value\)/);
+  assert.match(adminCss, /\.attendance-mobile-list \{[\s\S]*display: none/);
+  assert.match(adminCss, /\.attendance-mobile-card__summary \{[\s\S]*cursor: pointer/);
+  assert.match(adminCss, /\.attendance-mobile-card\[open\] \.attendance-mobile-card__chevron \{[\s\S]*transform: rotate\(90deg\)/);
+  assert.match(adminCss, /@media \(max-width: 768px\) \{[\s\S]*\.attendance-workspace \.attendance-manager-grid \{[\s\S]*display: none/);
+  assert.match(adminCss, /@media \(max-width: 768px\) \{[\s\S]*\.attendance-mobile-list \{[\s\S]*display: grid/);
+});
 test("BOD attendance remains limited to the director roster", () => {
     const bodSource = source.slice(source.indexOf("export function BodOperationsModule"));
   const bodModule = source.slice(source.indexOf("export function BodOperationsModule"), source.indexOf("export function DistrictModule"));

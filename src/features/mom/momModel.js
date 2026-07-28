@@ -337,7 +337,7 @@ export function buildMomEmailDefaults(target = {}) {
     targetUserIds: [],
     subject: `MOM for ${title}`,
     body: [
-      "Dear Rtr./Member,",
+      "Dear Member,",
       "",
       `Please find attached the Minutes of Meeting for "${title}", conducted on ${date}.`,
       "",

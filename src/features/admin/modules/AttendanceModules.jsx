@@ -363,7 +363,125 @@ function AttendanceGrid({
           </span>
         </div>
       </header>
+      <div className="attendance-mobile-list" aria-label="Mobile attendance register">
+        {members.map((member) => {
+          const stats = getAttendanceStats(member, events, attendance);
+          const role = member.role?.toLowerCase();
+          const roleLabel = role === "prospect" ? "Prospect" : role === "gbm" ? "GBM" : "";
+          const memberDisplayName = formatRotaractorName(member.name, member.role ? member : true);
 
+          return (
+            <details className="attendance-mobile-card" key={`mobile-${member.id}`}>
+              <summary className="attendance-mobile-card__summary">
+                <span className="attendance-mobile-card__identity">
+                  <strong>{memberDisplayName}</strong>
+
+                  {roleLabel ? (
+                    <span className="attendance-member-role">
+                      {roleLabel}
+                    </span>
+                  ) : null}
+                </span>
+
+                <span
+                  className="attendance-mobile-card__quick-stats"
+                  aria-label={`${memberDisplayName} attendance summary`}
+                >
+                  <span>
+                    <b>All</b>
+                    <strong>{stats.all.attended}/{stats.all.counted}</strong>
+                    <em>{stats.all.percentage}%</em>
+                  </span>
+
+                  <span>
+                    <b>GBM</b>
+                    <strong>{stats.gbm.attended}/{stats.gbm.counted}</strong>
+                    <em>{stats.gbm.percentage}%</em>
+                  </span>
+                </span>
+
+                <span className="attendance-mobile-card__chevron" aria-hidden="true">
+                  ›
+                </span>
+              </summary>
+
+              <div className="attendance-mobile-card__body">
+                <label className="attendance-mobile-card__bulk-row">
+                  <span>Bulk update</span>
+
+                  <select
+                    className="attendance-mobile-card__bulk"
+                    aria-label={`Bulk attendance for ${memberDisplayName}`}
+                    disabled={locked || busy}
+                    defaultValue=""
+                    onChange={(change) => {
+                      bulkMember(member.id, change.target.value);
+                      change.target.value = "";
+                    }}
+                  >
+                    {options.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="attendance-mobile-events">
+                  {events.map((event) => {
+                    const value = attendanceValueForMember(
+                      attendance,
+                      member,
+                      event.id
+                    );
+                    const label = attendanceValueLabel(value);
+                    const statusClass =
+                      value === true ? "present" : value === false ? "absent" : "na";
+
+                    return (
+                      <button
+                        className={`attendance-mobile-event attendance-mobile-event--${statusClass}`}
+                        type="button"
+                        key={event.id}
+                        disabled={locked || busy}
+                        aria-label={`${memberDisplayName}, ${event.name}: ${label}`}
+                        onClick={() =>
+                          run(
+                            "set-attendance",
+                            () =>
+                              setAttendanceCell(
+                                collectionName,
+                                member.id,
+                                event.id,
+                                nextAttendance(value)
+                              ),
+                            "Attendance updated."
+                          ).then((result) => {
+                            if (result !== null) {
+                              syncProspects([member.id]);
+                            }
+                          })
+                        }
+                      >
+                        <span className="attendance-mobile-event__meta">
+                          <small>{event.avenue.join(" · ") || "Club event"}</small>
+                          <strong>{event.name}</strong>
+                          <em>{event.date}</em>
+                        </span>
+
+                        <span className="attendance-mobile-event__mark">
+                          <AttendanceMark value={value} size="small" />
+                          <span>{label}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </details>
+          );
+        })}
+      </div>
       <div className="admin-table-wrap admin-attendance-grid attendance-manager-grid">
         <table>
           <thead>
