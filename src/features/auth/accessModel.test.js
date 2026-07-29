@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canAccessDashboardPreview,
   canManageBodManagement,
   createDeniedAccess,
   getAccountState,
@@ -228,6 +229,32 @@ test("System Logs capability is trusted separately from Website Director present
   assert.equal(hasCapability(access, "systemLogs"), true);
   assert.equal(approved("admin").canAccessSystemLogs, false);
   assert.equal(approved("president", { isPresidentRole: true, hasPresidentAuthority: true }).canAccessSystemLogs, false);
+});
+
+test("Dashboard Preview is available only to trusted Website Director authority", () => {
+  const cwd = approved("bod", {
+    hasWebsiteDirectorPosition: true,
+    hasPresidentAuthority: true,
+  });
+
+  assert.equal(canAccessDashboardPreview(cwd), true);
+  assert.equal(cwd.canAccessDashboardPreview, true);
+  assert.equal(hasCapability(cwd, "dashboardPreview"), true);
+
+  assert.equal(canAccessDashboardPreview(approved("admin")), false);
+  assert.equal(approved("admin").canAccessDashboardPreview, false);
+  assert.equal(
+    canAccessDashboardPreview(approved("president", { isPresidentRole: true, hasPresidentAuthority: true })),
+    false,
+  );
+  assert.equal(
+    canAccessDashboardPreview(approved("bod", { hasWebsiteDirectorPosition: true })),
+    false,
+  );
+  assert.equal(
+    canAccessDashboardPreview(approved("bod", { hasPresidentAuthority: true })),
+    false,
+  );
 });
 
 test("pending BOD request grants no protected capability", () => {

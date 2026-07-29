@@ -1,17 +1,19 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { canManageBodManagement } from "../auth/accessModel";
+import { canAccessDashboardPreview, canManageBodManagement } from "../auth/accessModel";
 import { ADMIN_NAV } from "./shared/adminNavigation";
 
 export default function AdminShell({ access, displayName, onSignOut, children }) {
   const location = useLocation(); const navigate = useNavigate(); const segment = location.pathname.replace(/^\/admin\/?/, "");
   const canAccessLockTools = access.canAccessLockTools === true || access.canAccessPresidentControls === true;
   const canAccessBodManagement = canManageBodManagement(access);
+  const canPreviewDashboards = canAccessDashboardPreview(access);
   const navigation = access.canAccessAdminTools
-    ? ADMIN_NAV.filter(([path]) => (path !== "resolutions" || access.canAccessResolutionTools) && (path !== "locks" || canAccessLockTools) && (path !== "logs" || access.canAccessSystemLogs) && (path !== "bod-management" || canAccessBodManagement))
+    ? ADMIN_NAV.filter(([path]) => (path !== "resolutions" || access.canAccessResolutionTools) && (path !== "locks" || canAccessLockTools) && (path !== "logs" || access.canAccessSystemLogs) && (path !== "dashboard-preview" || canPreviewDashboards) && (path !== "bod-management" || canAccessBodManagement))
     : ADMIN_NAV.filter(([path]) => (
       (path === "resolutions" && access.canAccessResolutionTools)
       || (path === "locks" && canAccessLockTools)
       || (path === "logs" && access.canAccessSystemLogs)
+      || (path === "dashboard-preview" && canPreviewDashboards)
       || (path === "visit-submissions" && access.canAccessVisitSubmissions)
       || (path === "bod-management" && canAccessBodManagement)
     ));

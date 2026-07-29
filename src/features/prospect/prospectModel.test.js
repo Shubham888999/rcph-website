@@ -31,7 +31,6 @@ test("dues state maps exactly", () => {
   assert.equal(normalizeProspectProgress(progress({ attendanceRequirementMet: true, duesDue: true })).status, "Dues Pending");
   assert.equal(normalizeProspectProgress(progress({ attendanceRequirementMet: true, duesPaid: true, ready: true })).status, "Ready for Induction");
 });
-test("missing WhatsApp link never produces a button URL", () => assert.equal(normalizeProspectProgress(progress()).hasWhatsAppLink, false));
 test("next-step guidance follows incomplete criteria", () => assert.match(normalizeProspectProgress(progress()).nextStep, /Attend 3 eligible/i));
 test("malformed qualifying events are ignored", () => {
   const model = normalizeProspectProgress(progress({ qualifyingEvents: [{ id: "a", name: "Valid", date: "2026-07-01" }, { id: "b", name: "", date: "bad" }] }));

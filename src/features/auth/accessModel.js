@@ -92,6 +92,7 @@ hasPresidentAuthority: false,
     canAccessSystemLogs: false,
     canAccessVisitSubmissions: false,
     canAccessVisitDashboards: false,
+    canAccessDashboardPreview: false,
     visitDashboardAccess: createEmptyVisitDashboardAccessMap(),
     visitDashboardEntries: [],
     canAccessPresidentControls: false,
@@ -185,6 +186,14 @@ canAccessAdminTools: isApproved
       && (["admin", "president"].includes(storedRole)
         || (storedRole === "bod" && cleanPositionKeys(payload.positionKeys).length > 0)),
     canAccessVisitDashboards: isApproved && trustedVisitDashboards,
+    canAccessDashboardPreview: isApproved
+      && (
+        ["admin", "president"].includes(storedRole)
+        || hasPresidentAuthority
+        || hasSergeantAtArmsPosition
+      )
+      && hasWebsiteDirectorPosition
+      && hasPresidentAuthority,
     visitDashboardAccess: allowedVisitDashboardAccess,
     visitDashboardEntries: isApproved && trustedVisitDashboards ? visitDashboardEntries : [],
     canAccessPresidentControls: isApproved
@@ -212,6 +221,7 @@ export function hasCapability(access, capability) {
     lockTools: "canAccessLockTools",
     visitSubmissions: "canAccessVisitSubmissions",
     visitDashboards: "canAccessVisitDashboards",
+    dashboardPreview: "canAccessDashboardPreview",
     presidentControls: "canAccessPresidentControls",
     systemLogs: "canAccessSystemLogs",
   };
@@ -242,4 +252,13 @@ export function getVisitDashboardEntry(access, visitTypeOrPath) {
 
 export function canManageBodManagement(access) {
   return Boolean(access?.isApproved === true && ["admin", "president"].includes(access.storedRole));
+}
+
+export function canAccessDashboardPreview(access) {
+  return Boolean(
+    access?.isApproved === true
+      && access.canAccessAdminTools === true
+      && access.hasWebsiteDirectorPosition === true
+      && access.hasPresidentAuthority === true
+  );
 }

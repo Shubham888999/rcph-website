@@ -4,6 +4,7 @@ import AdminShell from "../../features/admin/AdminShell";
 import BodManagementModule from "../../features/admin/bod-management/BodManagementModule";
 import { BodOperationsModule, ClubAttendanceModule, DistrictModule } from "../../features/admin/modules/AttendanceModules";
 import { AccountsModule, CommandCenter, MembersModule, ReportsModule } from "../../features/admin/modules/CoreModules";
+import DashboardPreviewModule from "../../features/admin/modules/DashboardPreviewModule";
 import { AnnouncementsModule, ProspectsModule } from "../../features/admin/modules/EngagementModules";
 import { FinesModule, TreasuryModule } from "../../features/admin/modules/FinanceModules";
 import LocksModule from "../../features/admin/modules/LocksModule";
@@ -13,7 +14,7 @@ import { AdminError, AdminLoading, AdminNotice } from "../../features/admin/shar
 import { clearAdminCaches } from "../../features/admin/shared/adminService";
 import SystemLogsModule from "../../features/admin/system-logs/SystemLogsModule";
 import useAdminData from "../../features/admin/shared/useAdminData";
-import { canManageBodManagement } from "../../features/auth/accessModel";
+import { canAccessDashboardPreview, canManageBodManagement } from "../../features/auth/accessModel";
 import ClubVisitManagementModule from "../../features/admin/visit-management/ClubVisitManagementModule";
 import VisitSubmissionsModule from "../../features/admin/visit/VisitSubmissionsModule";
 import { clearBodEventCache } from "../../features/bod-tools/bodEventService";
@@ -23,14 +24,15 @@ import { formatRotaractorName } from "../../utils/memberName";
 import "../../styles/components/admin.css";
 
 export default function AdminPage() {
-  const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, ""); const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools) });
+  const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, ""); const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools && segment !== "dashboard-preview") });
   const displayName = formatRotaractorName(access?.user?.name || user?.displayName || "RCPH Admin", access?.user || access?.storedRole);
   const requirements = { "": ["members", "events", "attendance", "fines", "treasury", "users"], requests: ["users"], members: ["members", "users", "events", "attendance", "fines"], attendance: ["members", "users", "events", "attendance"], bod: ["bodMembers", "bodMeetings", "bodAttendance"], district: ["members", "users", "districtEvents", "districtAttendance"], reminders: ["events", "bodMeetings", "districtEvents", "reminders"], fines: ["members", "fines", "events", "bodMeetings", "districtEvents"], treasury: ["members", "treasury"], reports: ["events"] };
   const canAccessLockTools = access?.canAccessLockTools === true || access?.canAccessPresidentControls === true;
   const canAccessResolutionTools = access?.canAccessResolutionTools === true;
   const canAccessSystemLogs = access?.canAccessSystemLogs === true;
   const canAccessBodManagement = canManageBodManagement(access);
-  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools) || (segment === "logs" && !canAccessSystemLogs) || (segment === "bod-management" && !canAccessBodManagement);
+  const canPreviewDashboards = canAccessDashboardPreview(access);
+  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools) || (segment === "logs" && !canAccessSystemLogs) || (segment === "dashboard-preview" && !canPreviewDashboards) || (segment === "bod-management" && !canAccessBodManagement);
   const state = moduleState(...(requirements[segment] || []));
   async function handleSignOut() { clearAdminCaches(uid); clearBodEventCache(uid); clearDashboardDataCache(uid); await signOut(); }
   let content;
@@ -45,6 +47,7 @@ export default function AdminPage() {
   else if (segment === "district") content = <DistrictModule data={data} lock={locks.attendance} uid={uid} access={access} onNotice={setNotice} />;
   else if (segment === "prospects") content = <ProspectsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "announcements") content = <AnnouncementsModule uid={uid} onNotice={setNotice} />;
+  else if (segment === "dashboard-preview") content = <DashboardPreviewModule />;
   else if (segment === "reminders") content = <RemindersModule data={data} access={access} uid={uid} actorName={displayName} onNotice={setNotice} />;
   else if (segment === "resolutions") content = <ResolutionsModule uid={uid} onNotice={setNotice} />;
   else if (segment === "fines") content = <FinesModule

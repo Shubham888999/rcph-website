@@ -700,10 +700,14 @@ export default function RemindersModule({
           </button>
         </form>
 
-        <div className="reminders-saved-list">
-          <h4>Saved reporting windows</h4>
+<details className="reminders-saved-list">
+  <summary className="reminders-saved-list__summary">
+    <span>Saved reporting windows</span>
+    <small>{reportingWindows.length ? `${reportingWindows.length} saved` : "None saved"}</small>
+  </summary>
 
-          {reportingWindows.length ? (
+  <div className="reminders-saved-list__body">
+    {reportingWindows.length ? (
             <div className="admin-table-wrap reminders-table-wrap">
               <table>
                 <thead>
@@ -813,10 +817,11 @@ export default function RemindersModule({
                 </tbody>
               </table>
             </div>
-          ) : (
-            <AdminEmpty message="No reporting windows have been saved yet." />
-          )}
-        </div>
+    ) : (
+      <AdminEmpty message="No reporting windows have been saved yet." />
+    )}
+  </div>
+</details>
       </section>
 
       <section className="reminders-conducted-list">

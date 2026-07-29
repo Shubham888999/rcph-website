@@ -175,7 +175,11 @@ test("reporting window rows support manual completion, stopped reminders, and ad
 test("Reminders UI does not call browser date formatters directly during render", () => {
   assert.doesNotMatch(moduleSource, /toLocaleString|toLocaleDateString|toLocaleTimeString|Intl\.DateTimeFormat/);
 });
-
+test("Saved reporting windows section is collapsible and closed by default", () => {
+  assert.match(moduleSource, /<details className="reminders-saved-list">/);
+  assert.match(moduleSource, /<summary className="reminders-saved-list__summary">/);
+  assert.doesNotMatch(moduleSource, /<details className="reminders-saved-list" open/);
+});
 test("Reminder frontend does not send direct email, lock, upload, or use Storage directly", () => {
   const combined = `${moduleSource}\n${serviceSource}`;
 

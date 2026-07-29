@@ -69,6 +69,5 @@ export function normalizeProspectProgress(raw) {
     percent,
     status,
     nextStep,
-    hasWhatsAppLink: false,
   };
 }
