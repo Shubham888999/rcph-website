@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { createTreasuryUploadState, formatTreasuryUploadSize, selectTreasuryUploadFile } from "./treasuryUploadModel";
 
 const STATUS_LABELS = {
@@ -10,8 +10,9 @@ const STATUS_LABELS = {
   failed: "Failed",
 };
 
-export default function TreasuryFileField({ value, onChange, disabled = false, onRetry }) {
+export default function TreasuryFileField({ value, onChange, disabled = false, onRetry, heading = "Supporting document", helpText = "Upload one receipt, invoice, payment proof, or supporting document for this Treasury record." }) {
   const inputRef = useRef(null);
+  const titleId = useId();
   const [dragging, setDragging] = useState(false);
   const file = value?.file || null;
   const working = ["requesting", "uploading", "processing"].includes(value?.status);
@@ -40,7 +41,7 @@ export default function TreasuryFileField({ value, onChange, disabled = false, o
   return (
     <section
       className={`treasury-upload ${dragging ? "is-dragging" : ""}`}
-      aria-labelledby="treasury-upload-title"
+      aria-labelledby={titleId}
       onDragOver={(event) => event.preventDefault()}
       onDragEnter={() => setDragging(true)}
       onDragLeave={() => setDragging(false)}
@@ -48,8 +49,8 @@ export default function TreasuryFileField({ value, onChange, disabled = false, o
     >
       <div className="treasury-upload__heading">
         <div>
-          <h4 id="treasury-upload-title">Supporting document</h4>
-          <p>Upload one receipt, invoice, payment proof, or supporting document for this Treasury record.</p>
+          <h4 id={titleId}>{heading}</h4>
+          <p>{helpText}</p>
         </div>
         <span>PDF, JPG, PNG or WebP - 10 MB max</span>
       </div>

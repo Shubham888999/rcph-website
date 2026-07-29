@@ -2,12 +2,20 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  CLUB_DUES_AMOUNT,
+  CLUB_DUES_TRANSACTION_TITLE,
   DEFAULT_TREASURY_FILTERS,
   TREASURY_AVENUE_OPTIONS,
+  addClubDuesRow,
   applyTreasuryWorkflow,
+  buildClubDuesImportDescription,
+  buildClubDuesImportPayloads,
+  buildClubDuesDescription,
+  buildClubDuesPayloads,
   buildTreasuryPayload,
   buildTreasuryReview,
   buildTreasurySummary,
+  createClubDuesDraft,
   createEmptyTreasuryDraft,
   filterAndSortTreasury,
   getTreasuryAvenueOptions,
@@ -15,9 +23,19 @@ import {
   groupTreasuryByMonth,
   isReimbursementRecord,
   localToday,
+  normalizeGoogleFormHeader,
   normalizeTreasuryAvenue,
+  parseClubDuesGoogleFormCsv,
+  removeClubDuesRow,
+  resetClubDuesDraft,
   sanitizeAmountInput,
+  updateClubDuesImportRow,
+  updateClubDuesDraft,
+  validateClubDuesImportRows,
+  validateClubDuesRows,
   validateTreasuryDraft,
+  dateFromGoogleFormTimestamp,
+  getGoogleDriveFileId,
 } from "./treasuryModel.js";
 
 const records = [
@@ -111,6 +129,163 @@ test("Treasury avenue options add Club while preserving existing avenues and nor
   assert.equal(payload.avenue, "Club");
 });
 
+test("club dues default row uses the fixed income transaction shape", () => {
+  const row = createClubDuesDraft();
+  assert.equal(row.title, CLUB_DUES_TRANSACTION_TITLE);
+  assert.equal(row.amount, String(CLUB_DUES_AMOUNT));
+  assert.equal(row.avenue, "Club");
+  assert.equal(row.type, "income");
+  assert.equal(row.workflowType, "income");
+  assert.equal(row.date, "");
+  assert.equal(row.paidBy, "");
+  assert.equal(row.paymentMode, "");
+});
+
+test("club dues description auto-generates without duplicating the Rtr prefix", () => {
+  const row = createClubDuesDraft({ paidBy: "Sana", date: "2026-07-10", paymentMode: "UPI" });
+  assert.equal(row.purpose, "Club dues payment by Rtr. Sana on 2026-07-10 by UPI.");
+  assert.equal(buildClubDuesDescription(row), row.purpose);
+  assert.equal(
+    createClubDuesDraft({ paidBy: "Rtr. Sana", date: "2026-07-10", paymentMode: "Cash" }).purpose,
+    "Club dues payment by Rtr. Sana on 2026-07-10 by Cash.",
+  );
+  assert.equal(
+    createClubDuesDraft({ paidBy: "Rtr Sana", date: "2026-07-10", paymentMode: "Cash" }).purpose,
+    "Club dues payment by Rtr Sana on 2026-07-10 by Cash.",
+  );
+});
+
+test("club dues manual description edits are preserved until a row is reset", () => {
+  const row = createClubDuesDraft({ paidBy: "Aarav", date: "2026-07-10", paymentMode: "UPI" });
+  const edited = updateClubDuesDraft(row, { purpose: "Paid by prospect before induction." });
+  const changed = updateClubDuesDraft(edited, { paymentMode: "Cash", date: "2026-07-12" });
+  assert.equal(changed.descriptionTouched, true);
+  assert.equal(changed.purpose, "Paid by prospect before induction.");
+  const reset = resetClubDuesDraft({ ...changed, clientId: "row-1" });
+  assert.equal(reset.clientId, "row-1");
+  assert.equal(reset.descriptionTouched, false);
+  assert.equal(reset.purpose, "");
+  assert.equal(
+    updateClubDuesDraft(reset, { paidBy: "Aarav", date: "2026-07-12", paymentMode: "Cash" }).purpose,
+    "Club dues payment by Rtr. Aarav on 2026-07-12 by Cash.",
+  );
+});
+
+test("club dues rows can be added, removed, and kept to at least one row", () => {
+  const first = createClubDuesDraft({ clientId: "row-1" });
+  const second = createClubDuesDraft({ clientId: "row-2" });
+  const rows = addClubDuesRow([first], second);
+  assert.deepEqual(rows.map((row) => row.clientId), ["row-1", "row-2"]);
+  assert.deepEqual(removeClubDuesRow(rows, 0).map((row) => row.clientId), ["row-2"]);
+  assert.deepEqual(removeClubDuesRow([first], 0).map((row) => row.clientId), ["row-1"]);
+});
+
+test("club dues validation and payload builder create separate treasury transactions", () => {
+  const rows = [
+    createClubDuesDraft({ paidBy: "Sana", date: "2026-07-10", paymentMode: "UPI", referenceNumber: "UTR-1" }),
+    createClubDuesDraft({ paidBy: "Rtr. Aarav", date: "2026-07-11", paymentMode: "Bank Transfer", referenceNumber: "UTR-2" }),
+  ];
+  assert.equal(validateClubDuesRows(rows).valid, true);
+  const payloads = buildClubDuesPayloads(rows);
+  assert.equal(payloads.length, 2);
+  assert.notStrictEqual(payloads[0], payloads[1]);
+  assert.deepEqual(payloads.map((payload) => payload.title), [CLUB_DUES_TRANSACTION_TITLE, CLUB_DUES_TRANSACTION_TITLE]);
+  assert.deepEqual(payloads.map((payload) => payload.amount), [CLUB_DUES_AMOUNT, CLUB_DUES_AMOUNT]);
+  assert.deepEqual(payloads.map((payload) => payload.type), ["income", "income"]);
+  assert.deepEqual(payloads.map((payload) => payload.avenue), ["Club", "Club"]);
+  assert.deepEqual(payloads.map((payload) => payload.paidBy), ["Sana", "Rtr. Aarav"]);
+  assert.deepEqual(payloads.map((payload) => payload.referenceNumber), ["UTR-1", "UTR-2"]);
+  assert.match(payloads[0].purpose, /Rtr\. Sana/);
+  assert.match(payloads[1].purpose, /Rtr\. Aarav/);
+
+  const missingMode = validateClubDuesRows([createClubDuesDraft({ paidBy: "Sana", date: "2026-07-10" })]);
+  assert.equal(missingMode.valid, false);
+  assert.match(missingMode.errors[0].paymentMode, /required/);
+});
+
+test("Google Form headers normalize case and double spaces", () => {
+  assert.equal(normalizeGoogleFormHeader(" Member  Occupation "), "member occupation");
+  assert.equal(normalizeGoogleFormHeader("ATTACH Screenshot OF Your Club Dues Payment"), "attach screenshot of your club dues payment");
+});
+
+test("Google Form CSV import maps paid dues rows and skips non-Yes responses", () => {
+  const csv = [
+    "Timestamp,Email Address,Member Name,Member Whatsapp number,Member Email ID,Member RI ID,Member Designation,Gender,Member Date of Birth,Dues Paid,Member  Occupation,Member Blood Group,Attach Screenshot of your Club Dues Payment",
+    "7/17/2026 8:26:24,dshubham8788@gmail.com,Shubham Deshpande,14085950189,dshubham8788@gmail.com,11218198,Club Website Director,Male,7/21/2001,Yes,Student,O+ve,https://drive.google.com/open?id=1Bk1_K97nX7xqkDBa2rGXGKmvecj_Eq_G",
+    "7/18/2026 9:00:00,member@example.test,Asha Kulkarni,,,,,,,,No,,,https://drive.google.com/file/d/skipped/view",
+    "7/19/2026 9:00:00,member@example.test,Blank Dues,,,,,,,,,,,",
+  ].join("\n");
+  const result = parseClubDuesGoogleFormCsv(csv);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.totalRows, 3);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.skippedRows.length, 2);
+  const row = result.rows[0];
+  assert.equal(row.title, CLUB_DUES_TRANSACTION_TITLE);
+  assert.equal(row.amount, String(CLUB_DUES_AMOUNT));
+  assert.equal(row.avenue, "Club");
+  assert.equal(row.type, "income");
+  assert.equal(row.paymentMode, "");
+  assert.equal(row.referenceNumber, "");
+  assert.equal(row.date, "2026-07-17");
+  assert.equal(row.paidBy, "Shubham Deshpande");
+  assert.equal(row.billDriveFileId, "1Bk1_K97nX7xqkDBa2rGXGKmvecj_Eq_G");
+  assert.equal(row.billUrl, "https://drive.google.com/file/d/1Bk1_K97nX7xqkDBa2rGXGKmvecj_Eq_G/view");
+});
+
+test("Google Form timestamp and Drive helpers accept expected export formats", () => {
+  assert.equal(dateFromGoogleFormTimestamp("7/17/2026 8:26:24"), "2026-07-17");
+  assert.equal(dateFromGoogleFormTimestamp("2026-07-17T08:26:24.000Z"), "2026-07-17");
+  assert.equal(getGoogleDriveFileId("https://drive.google.com/open?id=abc_123"), "abc_123");
+  assert.equal(getGoogleDriveFileId("https://drive.google.com/file/d/file-456/view"), "file-456");
+});
+
+test("imported club dues descriptions auto-update until manually edited", () => {
+  const row = parseClubDuesGoogleFormCsv("Timestamp,Member Name,Dues Paid\n7/17/2026 8:26:24,Sana Patil,Yes").rows[0];
+  assert.equal(row.purpose, "Club dues payment by Rtr. Sana Patil on 2026-07-17.");
+  const withMode = updateClubDuesImportRow(row, { paymentMode: "UPI" });
+  assert.equal(withMode.purpose, "Club dues payment by Rtr. Sana Patil on 2026-07-17 by UPI.");
+  assert.equal(buildClubDuesImportDescription(withMode), withMode.purpose);
+  const alreadyPrefixed = updateClubDuesImportRow(withMode, { paidBy: "Rtr. Sana Patil" });
+  assert.equal(alreadyPrefixed.purpose, "Club dues payment by Rtr. Sana Patil on 2026-07-17 by UPI.");
+  const edited = updateClubDuesImportRow(alreadyPrefixed, { purpose: "Imported from Google Form." });
+  assert.equal(updateClubDuesImportRow(edited, { paymentMode: "Cash" }).purpose, "Imported from Google Form.");
+});
+
+test("imported club dues payloads remain separate transactions with Drive proof fields", () => {
+  const rows = [
+    updateClubDuesImportRow(parseClubDuesGoogleFormCsv("Timestamp,Member Name,Dues Paid,Attach Screenshot of your Club Dues Payment\n7/17/2026 8:26:24,Sana Patil,Yes,https://drive.google.com/open?id=proof-one").rows[0], { paymentMode: "UPI" }),
+    updateClubDuesImportRow(parseClubDuesGoogleFormCsv("Timestamp,Member Name,Dues Paid,Attach Screenshot of your Club Dues Payment\n7/18/2026 8:26:24,Aarav Joshi,Yes,https://drive.google.com/file/d/proof-two/view").rows[0], { referenceNumber: "UTR-2" }),
+  ];
+  assert.equal(validateClubDuesImportRows(rows).valid, true);
+  const payloads = buildClubDuesImportPayloads(rows);
+  assert.equal(payloads.length, 2);
+  assert.notStrictEqual(payloads[0], payloads[1]);
+  assert.deepEqual(payloads.map((payload) => payload.title), [CLUB_DUES_TRANSACTION_TITLE, CLUB_DUES_TRANSACTION_TITLE]);
+  assert.deepEqual(payloads.map((payload) => payload.amount), [CLUB_DUES_AMOUNT, CLUB_DUES_AMOUNT]);
+  assert.deepEqual(payloads.map((payload) => payload.type), ["income", "income"]);
+  assert.deepEqual(payloads.map((payload) => payload.avenue), ["Club", "Club"]);
+  assert.equal(payloads[0].billDriveFileId, "proof-one");
+  assert.equal(payloads[1].billDriveFileId, "proof-two");
+  assert.equal(payloads[1].referenceNumber, "UTR-2");
+});
+
+test("imported club dues duplicate and malformed proof warnings do not block valid rows", () => {
+  const rows = [
+    parseClubDuesGoogleFormCsv("Timestamp,Member Name,Dues Paid,Attach Screenshot of your Club Dues Payment\n7/17/2026 8:26:24,Sana Patil,Yes,not-a-drive-link").rows[0],
+    parseClubDuesGoogleFormCsv("Timestamp,Member Name,Dues Paid\n7/17/2026 8:26:24,Sana Patil,Yes").rows[0],
+  ];
+  const validation = validateClubDuesImportRows(rows, [
+    { title: CLUB_DUES_TRANSACTION_TITLE, type: "income", amount: CLUB_DUES_AMOUNT, date: "2026-07-17", paidBy: "Sana Patil" },
+  ]);
+  assert.equal(validation.valid, true);
+  assert.match(validation.warnings[0].join(" "), /supported Google Drive/);
+  assert.match(validation.warnings[0].join(" "), /duplicate/i);
+  assert.match(validation.warnings[0].join(" "), /existing Treasury/);
+  assert.match(validation.warnings[1].join(" "), /No proof link/);
+  assert.match(validation.warnings[1].join(" "), /duplicate/i);
+});
+
 test("filters cover search, type, month, avenue, file state, reimbursement, and sort order", () => {
   assert.equal(filterAndSortTreasury(records, { ...DEFAULT_TREASURY_FILTERS, search: "district" }).length, 1);
   assert.deepEqual(filterAndSortTreasury(records, { ...DEFAULT_TREASURY_FILTERS, type: "income" }).map((item) => item.id), ["income-1"]);
@@ -163,6 +338,22 @@ test("Treasury module source keeps the intended workflow safeguards", () => {
   assert.match(source, /Clear form/);
   assert.match(source, /Cancel edit/);
   assert.match(source, /External supporting link/);
+  assert.match(source, /Club dues/);
+  assert.match(source, /TreasuryClubDuesForm/);
+  assert.match(source, /TreasuryClubDuesImportPanel/);
+  assert.match(source, /Upload CSV\/Excel from Google Form responses/);
+  assert.match(source, /No Treasury records are created until Save transactions is clicked/);
+  assert.match(source, /parseClubDuesImportFile/);
+  assert.match(source, /await import\("exceljs"\)/);
+  assert.match(source, /\.xlsx/);
+  assert.match(source, /create-imported-dues-transactions/);
+  assert.match(source, /Add another dues payment/);
+  assert.match(source, /Reset row/);
+  assert.match(source, /Save dues transactions/);
+  assert.match(source, /Save transactions/);
+  assert.match(source, /setTreasuryById\(id, payload\)/);
+  assert.match(source, /uploadForRecord\(upload, setDuesUploadAt\(index\), payload, id/);
+  assert.match(source, /heading="Bill screenshot"/);
 });
 
 test("Treasury mobile history uses compact rows and an accessible action menu", () => {
@@ -192,12 +383,17 @@ test("Treasury mobile history uses compact rows and an accessible action menu", 
 test("Treasury CSS anchors review, wraps filters, and disables sticky on smaller screens", () => {
   const css = readFileSync(new URL("../../../styles/components/admin.css", import.meta.url), "utf8");
   assert.match(css, /\.treasury-entry-grid,[\s\S]*?align-items: start/);
+  assert.match(css, /\.treasury-dues-toggle \{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\)/);
+  assert.match(css, /\.treasury-dues-import \{[\s\S]*?display: grid/);
+  assert.match(css, /\.treasury-dues-import__table \{[\s\S]*?min-width: 1120px/);
+  assert.match(css, /\.treasury-club-dues-grid \{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.treasury-review-column[\s\S]*?align-self: start/);
   assert.match(css, /\.treasury-review \{[\s\S]*?position: sticky;[\s\S]*?top: 5\.5rem/);
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?\.treasury-review \{[\s\S]*?position: static/);
   assert.match(css, /\.treasury-filterbar \{[\s\S]*?grid-template-columns: minmax\(220px, 1\.5fr\) repeat\(4, minmax\(128px, 1fr\)\)/);
   assert.match(css, /\.treasury-filterbar__search \{[\s\S]*?grid-column: span 2/);
   assert.match(css, /\.treasury-filterbar__clear \{[\s\S]*?justify-self: end/);
+  assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.treasury-club-dues-grid,[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.treasury-filterbar__clear \{[\s\S]*?width: 100%/);
 });
 

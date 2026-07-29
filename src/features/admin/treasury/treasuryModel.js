@@ -10,6 +10,9 @@ export const TREASURY_PAYMENT_MODES = Object.freeze(["Cash", "UPI", "Bank Transf
 export const TREASURY_REIMBURSEMENT_STATUSES = Object.freeze(["Not Applicable", "Pending", "Done"]);
 export const TREASURY_SORT_OPTIONS = Object.freeze(["newest", "oldest", "amount-desc", "amount-asc"]);
 export const TREASURY_AVENUE_OPTIONS = Object.freeze(["Club", ...AVENUES, "Other"]);
+export const CLUB_DUES_TRANSACTION_TITLE = "Club Dues 26-27";
+export const CLUB_DUES_AMOUNT = 3131;
+export const CLUB_DUES_IMPORT_REQUIRED_HEADERS = Object.freeze(["timestamp", "memberName", "duesPaid"]);
 
 export const DEFAULT_TREASURY_FILTERS = Object.freeze({
   search: "",
@@ -52,6 +55,316 @@ export function createEmptyTreasuryDraft(defaults = {}) {
     reimbursementDate: "",
     billUrl: "",
   };
+}
+
+export function clubDuesPayerForDescription(value) {
+  const name = text(value, 180);
+  if (!name) return "";
+  return /^rtr\.?(\s|$)/i.test(name) ? name : `Rtr. ${name}`;
+}
+
+export function buildClubDuesDescription(row = {}) {
+  const payer = clubDuesPayerForDescription(row.paidBy);
+  const date = text(row.date, 20);
+  const paymentMode = text(row.paymentMode, 80);
+  if (!payer || !validDate(date) || !paymentMode) return "";
+  return `Club dues payment by ${payer} on ${date} by ${paymentMode}.`;
+}
+
+export function createClubDuesDraft(overrides = {}) {
+  const draft = {
+    ...createEmptyTreasuryDraft({ workflowType: "income" }),
+    ...overrides,
+    workflowType: "income",
+    type: "income",
+    title: CLUB_DUES_TRANSACTION_TITLE,
+    amount: String(CLUB_DUES_AMOUNT),
+    date: text(overrides.date, 20),
+    avenue: "Club",
+    paidBy: text(overrides.paidBy, 180),
+    paidByType: "other",
+    paidByMemberId: "",
+    paidTo: "",
+    paidToType: "other",
+    paidToMemberId: "",
+    paymentMode: text(overrides.paymentMode, 80),
+    referenceNumber: text(overrides.referenceNumber, 180),
+    reimbursementStatus: "Not Applicable",
+    reimbursedTo: "",
+    reimbursementDate: "",
+    billUrl: "",
+    purpose: text(overrides.purpose, 500),
+    descriptionTouched: overrides.descriptionTouched === true,
+  };
+
+  return draft.descriptionTouched ? draft : { ...draft, purpose: buildClubDuesDescription(draft) };
+}
+
+export function updateClubDuesDraft(row = {}, changes = {}) {
+  return createClubDuesDraft({
+    ...row,
+    ...changes,
+    descriptionTouched: Object.hasOwn(changes, "purpose") ? true : row.descriptionTouched === true,
+  });
+}
+
+export function resetClubDuesDraft(row = {}) {
+  return createClubDuesDraft({ clientId: row.clientId });
+}
+
+export function addClubDuesRow(rows = [], row = createClubDuesDraft()) {
+  const current = Array.isArray(rows) ? rows : [];
+  return [...current, row];
+}
+
+export function removeClubDuesRow(rows = [], index) {
+  const current = Array.isArray(rows) && rows.length ? rows : [createClubDuesDraft()];
+  if (current.length <= 1) return current;
+  return current.filter((_, rowIndex) => rowIndex !== index);
+}
+
+export function normalizeGoogleFormHeader(value) {
+  return text(value, 200).toLowerCase().replace(/\s+/g, " ");
+}
+
+function csvCellText(value) {
+  if (value === undefined || value === null) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "object") {
+    if (typeof value.text === "string") return value.text;
+    if (typeof value.hyperlink === "string") return value.hyperlink;
+    if (typeof value.result === "string" || typeof value.result === "number") return String(value.result);
+    if (Array.isArray(value.richText)) return value.richText.map((part) => part.text || "").join("");
+  }
+  return String(value);
+}
+
+export function parseGoogleFormCsv(textValue = "") {
+  const source = String(textValue || "").replace(/^\uFEFF/, "");
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (quoted) {
+      if (char === '"' && next === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+      continue;
+    }
+    if (char === '"') {
+      quoted = true;
+    } else if (char === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (char !== "\r") {
+      cell += char;
+    }
+  }
+
+  if (cell || row.length || source.endsWith(",")) {
+    row.push(cell);
+    rows.push(row);
+  }
+
+  return rows.filter((items) => items.some((item) => text(item, 500)));
+}
+
+function headerIndexes(headers = []) {
+  const normalized = headers.map(normalizeGoogleFormHeader);
+  const find = (...candidates) => normalized.findIndex((item) => candidates.includes(item));
+  return {
+    timestamp: find("timestamp"),
+    memberName: find("member name"),
+    duesPaid: find("dues paid"),
+    proofLink: find("attach screenshot of your club dues payment", "club dues payment screenshot", "payment screenshot"),
+  };
+}
+
+function missingGoogleFormHeaders(indexes) {
+  return CLUB_DUES_IMPORT_REQUIRED_HEADERS
+    .filter((key) => indexes[key] < 0)
+    .map((key) => ({
+      timestamp: "Timestamp",
+      memberName: "Member Name",
+      duesPaid: "Dues Paid",
+    })[key]);
+}
+
+export function normalizeGoogleFormDuesPaid(value) {
+  return text(value, 40).toLowerCase() === "yes";
+}
+
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+export function dateFromGoogleFormTimestamp(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getFullYear()}-${padDatePart(value.getMonth() + 1)}-${padDatePart(value.getDate())}`;
+  }
+
+  const raw = text(value, 80);
+  if (!raw) return "";
+  const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDate && validDate(isoDate[0])) return isoDate[0];
+
+  const datePart = raw.split(/[ T]/)[0];
+  const slashDate = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!slashDate) return "";
+
+  const first = Number(slashDate[1]);
+  const second = Number(slashDate[2]);
+  const year = Number(slashDate[3].length === 2 ? `20${slashDate[3]}` : slashDate[3]);
+  if (!Number.isInteger(first) || !Number.isInteger(second) || !Number.isInteger(year)) return "";
+
+  const month = first > 12 && second <= 12 ? second : first;
+  const day = first > 12 && second <= 12 ? first : second;
+  const candidate = `${year}-${padDatePart(month)}-${padDatePart(day)}`;
+  return validDate(candidate) ? candidate : "";
+}
+
+export function getGoogleDriveFileId(value) {
+  const raw = text(value, 1000);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.hostname !== "drive.google.com") return "";
+    const id = url.searchParams.get("id");
+    if (id && /^[a-zA-Z0-9_-]+$/.test(id)) return id;
+    const match = url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    return match?.[1] || "";
+  } catch {
+    const match = raw.match(/drive\.google\.com\/(?:open\?id=|file\/d\/)([a-zA-Z0-9_-]+)/);
+    return match?.[1] || "";
+  }
+}
+
+export function normalizeClubDuesProofLink(value) {
+  const raw = text(value, 1000);
+  if (!raw) return { billUrl: "", billDriveFileId: "", warning: "No proof link." };
+  const fileId = getGoogleDriveFileId(raw);
+  if (!fileId) return { billUrl: "", billDriveFileId: "", warning: "Proof link is not a supported Google Drive file link." };
+  return {
+    billUrl: `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`,
+    billDriveFileId: fileId,
+    warning: "",
+  };
+}
+
+export function buildClubDuesImportDescription(row = {}) {
+  const payer = clubDuesPayerForDescription(row.paidBy);
+  const date = text(row.date, 20);
+  if (!payer || !validDate(date)) return "";
+  const paymentMode = text(row.paymentMode, 80);
+  return paymentMode
+    ? `Club dues payment by ${payer} on ${date} by ${paymentMode}.`
+    : `Club dues payment by ${payer} on ${date}.`;
+}
+
+export function createClubDuesImportRow(overrides = {}) {
+  const proof = normalizeClubDuesProofLink(overrides.billUrl || overrides.proofLink || overrides.rawProofLink);
+  const row = {
+    clientId: text(overrides.clientId, 80),
+    sourceRowNumber: Number.isFinite(Number(overrides.sourceRowNumber)) ? Number(overrides.sourceRowNumber) : 0,
+    title: CLUB_DUES_TRANSACTION_TITLE,
+    workflowType: "income",
+    type: "income",
+    amount: String(CLUB_DUES_AMOUNT),
+    date: text(overrides.date, 20),
+    avenue: "Club",
+    paidBy: text(overrides.paidBy, 180),
+    paymentMode: text(overrides.paymentMode, 80),
+    referenceNumber: text(overrides.referenceNumber, 180),
+    purpose: text(overrides.purpose, 500),
+    billUrl: proof.billUrl,
+    billDriveFileId: proof.billDriveFileId,
+    rawProofLink: text(overrides.rawProofLink || overrides.billUrl || overrides.proofLink, 1000),
+    descriptionTouched: overrides.descriptionTouched === true,
+  };
+  return row.descriptionTouched ? row : { ...row, purpose: buildClubDuesImportDescription(row) };
+}
+
+export function updateClubDuesImportRow(row = {}, changes = {}) {
+  const proofFields = Object.hasOwn(changes, "billUrl") || Object.hasOwn(changes, "proofLink")
+    ? normalizeClubDuesProofLink(changes.billUrl || changes.proofLink)
+    : { billUrl: row.billUrl, billDriveFileId: row.billDriveFileId };
+  return createClubDuesImportRow({
+    ...row,
+    ...changes,
+    billUrl: proofFields.billUrl,
+    billDriveFileId: proofFields.billDriveFileId,
+    rawProofLink: Object.hasOwn(changes, "billUrl") || Object.hasOwn(changes, "proofLink")
+      ? (changes.billUrl || changes.proofLink)
+      : row.rawProofLink,
+    descriptionTouched: Object.hasOwn(changes, "purpose") ? true : row.descriptionTouched === true,
+  });
+}
+
+export function parseClubDuesGoogleFormRows(rows = []) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const [headers = [], ...bodyRows] = sourceRows;
+  const indexes = headerIndexes(headers.map(csvCellText));
+  const missing = missingGoogleFormHeaders(indexes);
+  if (missing.length) {
+    return {
+      rows: [],
+      skippedRows: [],
+      totalRows: Math.max(0, sourceRows.length - 1),
+      errors: [`Missing Google Form column${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}.`],
+    };
+  }
+
+  const importedRows = [];
+  const skippedRows = [];
+  bodyRows.forEach((rawRow, index) => {
+    const values = Array.isArray(rawRow) ? rawRow.map(csvCellText) : [];
+    if (!values.some((item) => text(item, 500))) return;
+    const sourceRowNumber = index + 2;
+    const memberName = values[indexes.memberName] || "";
+    const date = dateFromGoogleFormTimestamp(values[indexes.timestamp]);
+    const duesPaid = values[indexes.duesPaid] || "";
+    const proofLink = indexes.proofLink >= 0 ? values[indexes.proofLink] || "" : "";
+    if (!normalizeGoogleFormDuesPaid(duesPaid)) {
+      skippedRows.push({ sourceRowNumber, memberName: text(memberName, 180), reason: "Dues Paid is not Yes." });
+      return;
+    }
+    importedRows.push(createClubDuesImportRow({
+      sourceRowNumber,
+      date,
+      paidBy: memberName,
+      proofLink,
+      rawProofLink: proofLink,
+    }));
+  });
+
+  return {
+    rows: importedRows,
+    skippedRows,
+    totalRows: bodyRows.length,
+    errors: [],
+  };
+}
+
+export function parseClubDuesGoogleFormCsv(csvText = "") {
+  return parseClubDuesGoogleFormRows(parseGoogleFormCsv(csvText));
+}
+
+function normalizedClubDuesMemberKey(value) {
+  return text(value, 180).toLowerCase().replace(/^rtr\.?\s*/i, "").replace(/\s+/g, " ");
 }
 
 export function normalizeWorkflowType(value) {
@@ -245,6 +558,105 @@ export function buildTreasuryPayload(source = {}) {
     reimbursementDate,
     billUrl: source.billUrl ? safeUrl(source.billUrl) : "",
   };
+}
+
+export function validateClubDuesDraft(row = {}) {
+  const draft = createClubDuesDraft(row);
+  const validation = validateTreasuryDraft(draft);
+  const errors = { ...validation.errors };
+  if (!text(draft.paymentMode, 80)) errors.paymentMode = "Payment mode is required for club dues.";
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+
+export function validateClubDuesRows(rows = []) {
+  const current = Array.isArray(rows) && rows.length ? rows : [createClubDuesDraft()];
+  const errors = current.map((row) => validateClubDuesDraft(row).errors);
+  return {
+    valid: errors.every((rowErrors) => Object.keys(rowErrors).length === 0),
+    errors,
+  };
+}
+
+export function buildClubDuesPayload(row = {}) {
+  return buildTreasuryPayload(createClubDuesDraft(row));
+}
+
+export function buildClubDuesPayloads(rows = []) {
+  return (Array.isArray(rows) ? rows : []).map((row) => buildClubDuesPayload(row));
+}
+
+function clubDuesDuplicateKey(row = {}) {
+  return [
+    normalizedClubDuesMemberKey(row.paidBy),
+    text(row.date, 20),
+    String(parseTreasuryAmount(row.amount || CLUB_DUES_AMOUNT) || CLUB_DUES_AMOUNT),
+  ].join("|");
+}
+
+export function validateClubDuesImportRows(rows = [], existingTransactions = []) {
+  const current = Array.isArray(rows) ? rows : [];
+  const errors = current.map(() => ({}));
+  const warnings = current.map(() => []);
+  const importKeys = new Map();
+  const existingKeys = new Set(
+    (Array.isArray(existingTransactions) ? existingTransactions : [])
+      .filter((record) => text(record.title || record.name, 180).toLowerCase() === CLUB_DUES_TRANSACTION_TITLE.toLowerCase())
+      .filter((record) => Number(record.amount) === CLUB_DUES_AMOUNT)
+      .map((record) => clubDuesDuplicateKey({ paidBy: record.paidBy || record.memberName, date: record.date, amount: record.amount })),
+  );
+
+  current.forEach((row, index) => {
+    if (!validDate(text(row.date, 20))) errors[index].date = "Choose a valid imported date.";
+    if (!text(row.paidBy, 180)) errors[index].paidBy = "Received from is required.";
+
+    const proof = normalizeClubDuesProofLink(row.rawProofLink || row.billUrl);
+    if (proof.warning) warnings[index].push(proof.warning);
+
+    const key = clubDuesDuplicateKey(row);
+    const seenAt = importKeys.get(key);
+    if (seenAt !== undefined) {
+      warnings[index].push(`Possible duplicate of imported row ${seenAt + 1}.`);
+      warnings[seenAt].push(`Possible duplicate of imported row ${index + 1}.`);
+    } else {
+      importKeys.set(key, index);
+    }
+
+    if (existingKeys.has(key)) {
+      warnings[index].push("Possible duplicate of an existing Treasury transaction.");
+    }
+  });
+
+  return {
+    valid: errors.every((rowErrors) => Object.keys(rowErrors).length === 0),
+    errors,
+    warnings: warnings.map((items) => [...new Set(items)]),
+  };
+}
+
+export function buildClubDuesImportPayload(row = {}) {
+  const draft = createClubDuesImportRow(row);
+  const proof = normalizeClubDuesProofLink(draft.rawProofLink || draft.billUrl);
+  const payload = buildTreasuryPayload({
+    ...draft,
+    paidByType: "other",
+    paidByMemberId: "",
+    paidTo: "",
+    paidToType: "other",
+    paidToMemberId: "",
+    reimbursementStatus: "Not Applicable",
+    reimbursedTo: "",
+    reimbursementDate: "",
+    billUrl: proof.billUrl,
+  });
+  return {
+    ...payload,
+    billUrl: proof.billUrl,
+    billDriveFileId: proof.billDriveFileId,
+  };
+}
+
+export function buildClubDuesImportPayloads(rows = []) {
+  return (Array.isArray(rows) ? rows : []).map((row) => buildClubDuesImportPayload(row));
 }
 
 export function isTreasuryUploadWorking(upload = {}) {

@@ -17,14 +17,20 @@ import { downloadTreasuryWorkbook } from "../treasury/treasuryExcel";
 import { downloadTreasuryPdf } from "../treasury/treasuryPdf";
 import { createTreasuryUploadState, getSafeTreasuryUploadError, validateTreasuryUploadFile } from "../treasury/treasuryUploadModel";
 import {
+  CLUB_DUES_AMOUNT,
+  CLUB_DUES_TRANSACTION_TITLE,
   DEFAULT_TREASURY_FILTERS,
   TREASURY_PAYMENT_MODES,
   TREASURY_REIMBURSEMENT_STATUSES,
   TREASURY_WORKFLOW_TYPES,
+  addClubDuesRow,
   applyTreasuryWorkflow,
+  buildClubDuesImportPayloads,
+  buildClubDuesPayloads,
   buildTreasuryPayload,
   buildTreasuryReview,
   buildTreasurySummary,
+  createClubDuesDraft,
   createEmptyTreasuryDraft,
   filterAndSortTreasury,
   formatTreasuryDate,
@@ -36,10 +42,18 @@ import {
   isTreasuryUploadWorking,
   normalizeTreasuryAvenue,
   normalizeReimbursementStatus,
+  parseClubDuesGoogleFormCsv,
+  parseClubDuesGoogleFormRows,
   prepareTreasuryDraft,
+  removeClubDuesRow,
+  resetClubDuesDraft,
   sanitizeAmountInput,
   transactionPartyLabel,
   treasuryHasSupportingFile,
+  updateClubDuesImportRow,
+  updateClubDuesDraft,
+  validateClubDuesImportRows,
+  validateClubDuesRows,
   validateTreasuryDraft,
 } from "../treasury/treasuryModel";
 import { formatRotaractorName } from "../../../utils/memberName";
@@ -227,12 +241,57 @@ function formatTimestamp(value) {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+function excelCellText(value) {
+  if (value === undefined || value === null) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "object") {
+    if (typeof value.hyperlink === "string") return value.hyperlink;
+    if (typeof value.text === "string") return value.text;
+    if (typeof value.result === "string" || typeof value.result === "number") return String(value.result);
+    if (Array.isArray(value.richText)) return value.richText.map((part) => part.text || "").join("");
+  }
+  return String(value);
+}
+
+async function parseClubDuesImportFile(file) {
+  const name = file?.name || "";
+  const lowerName = name.toLowerCase();
+  if (lowerName.endsWith(".csv") || file?.type === "text/csv") {
+    return parseClubDuesGoogleFormCsv(await file.text());
+  }
+  if (lowerName.endsWith(".xlsx") || file?.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+    const imported = await import("exceljs");
+    const ExcelJS = imported.default || imported;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await file.arrayBuffer());
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) return { rows: [], skippedRows: [], totalRows: 0, errors: ["The Excel workbook has no worksheets."] };
+    const rows = [];
+    worksheet.eachRow((row) => {
+      rows.push(Array.from({ length: row.cellCount }, (_, index) => excelCellText(row.getCell(index + 1).value)));
+    });
+    return parseClubDuesGoogleFormRows(rows);
+  }
+  return { rows: [], skippedRows: [], totalRows: 0, errors: ["Upload a Google Form CSV or .xlsx export."] };
+}
+
 export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const [lastDefaults, setLastDefaults] = useState({ avenue: "", paymentMode: "" });
   const [draft, setDraft] = useState(() => createEmptyTreasuryDraft());
   const [draftErrors, setDraftErrors] = useState({});
   const [draftUpload, setDraftUpload] = useState(createTreasuryUploadState);
   const [draftRecordId, setDraftRecordId] = useState("");
+  const duesRowSequence = useRef(1);
+  const [clubDuesMode, setClubDuesMode] = useState(false);
+  const [duesRows, setDuesRows] = useState(() => [createClubDuesDraft({ clientId: "club-dues-1" })]);
+  const [duesErrors, setDuesErrors] = useState([{}]);
+  const [duesUploads, setDuesUploads] = useState(() => [createTreasuryUploadState()]);
+  const [duesSaving, setDuesSaving] = useState(false);
+  const duesImportSequence = useRef(0);
+  const [duesImportRows, setDuesImportRows] = useState([]);
+  const [duesImportMeta, setDuesImportMeta] = useState({ fileName: "", totalRows: 0, skippedCount: 0, error: "" });
+  const [duesImporting, setDuesImporting] = useState(false);
+  const [duesImportSaving, setDuesImportSaving] = useState(false);
   const [editing, setEditing] = useState(null);
   const [editErrors, setEditErrors] = useState({});
   const [editUpload, setEditUpload] = useState(createTreasuryUploadState);
@@ -245,10 +304,14 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const summary = useMemo(() => buildTreasurySummary(transactions), [transactions]);
   const filteredTransactions = useMemo(() => filterAndSortTreasury(transactions, filters), [transactions, filters]);
   const groupedTransactions = useMemo(() => groupTreasuryByMonth(filteredTransactions), [filteredTransactions]);
+  const duesImportValidation = useMemo(() => validateClubDuesImportRows(duesImportRows, transactions), [duesImportRows, transactions]);
   const monthOptions = useMemo(() => getTreasuryMonthOptions(transactions), [transactions]);
   const avenueOptions = useMemo(() => getTreasuryAvenueOptions(transactions), [transactions]);
   const incomeCount = transactions.filter((item) => item.type === "income").length;
   const expenseCount = transactions.filter((item) => item.type === "expense").length;
+  const duesUploadWorking = duesUploads.some(isTreasuryUploadWorking);
+  const duesBusy = busy || locked || duesSaving || duesUploadWorking || duesImportSaving;
+  const duesAmountLabel = formatInr(CLUB_DUES_AMOUNT).replace(".00", "");
 
   function reportValidation(message) {
     onNotice?.({ type: "error", message });
@@ -259,6 +322,27 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
     setDraftErrors({});
     setDraftUpload(createTreasuryUploadState());
     setDraftRecordId("");
+  }
+
+  function createDuesUiRow() {
+    duesRowSequence.current += 1;
+    return createClubDuesDraft({ clientId: `club-dues-${duesRowSequence.current}` });
+  }
+
+  function resetDuesBatch() {
+    const row = createDuesUiRow();
+    setDuesRows([row]);
+    setDuesErrors([{}]);
+    setDuesUploads([createTreasuryUploadState()]);
+  }
+
+  function importRowId() {
+    duesImportSequence.current += 1;
+    return `club-dues-import-${duesImportSequence.current}`;
+  }
+
+  function setImportedRows(rows) {
+    setDuesImportRows(rows.map((row) => ({ ...row, clientId: row.clientId || importRowId() })));
   }
 
   function rememberDefaults(value) {
@@ -303,6 +387,7 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
       setFileState((current) => ({ ...current, status: "uploaded", error: "" }));
       onComplete();
     }
+    return result;
   }
 
   async function saveDraft(event) {
@@ -334,6 +419,194 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
       return;
     }
     await uploadForRecord(draftUpload, setDraftUpload, value, id, () => resetDraft(defaults));
+  }
+
+  function updateDuesRow(index, changes) {
+    setDuesRows((current) => current.map((row, rowIndex) => (rowIndex === index ? updateClubDuesDraft(row, changes) : row)));
+    setDuesErrors((current) => current.map((rowErrors, rowIndex) => (rowIndex === index ? {} : rowErrors)));
+  }
+
+  function addDuesPaymentRow() {
+    setDuesRows((current) => addClubDuesRow(current, createDuesUiRow()));
+    setDuesErrors((current) => [...current, {}]);
+    setDuesUploads((current) => [...current, createTreasuryUploadState()]);
+  }
+
+  function removeDuesPaymentRow(index) {
+    setDuesRows((current) => removeClubDuesRow(current, index));
+    setDuesErrors((current) => (current.length <= 1 ? current : current.filter((_, rowIndex) => rowIndex !== index)));
+    setDuesUploads((current) => (current.length <= 1 ? current : current.filter((_, rowIndex) => rowIndex !== index)));
+  }
+
+  function resetDuesPaymentRow(index) {
+    setDuesRows((current) => current.map((row, rowIndex) => (rowIndex === index ? resetClubDuesDraft(row) : row)));
+    setDuesErrors((current) => current.map((rowErrors, rowIndex) => (rowIndex === index ? {} : rowErrors)));
+    setDuesUploads((current) => current.map((upload, rowIndex) => (rowIndex === index ? createTreasuryUploadState() : upload)));
+  }
+
+  function setDuesUploadAt(index) {
+    return (valueOrUpdater) => {
+      setDuesUploads((current) => current.map((upload, rowIndex) => {
+        if (rowIndex !== index) return upload;
+        return typeof valueOrUpdater === "function" ? valueOrUpdater(upload) : valueOrUpdater;
+      }));
+    };
+  }
+
+  function validateDuesForSave(rows, uploads) {
+    const validation = validateClubDuesRows(rows);
+    const rowErrors = validation.errors.map((item) => ({ ...item }));
+    rows.forEach((row, index) => {
+      const upload = uploads[index] || createTreasuryUploadState();
+      if (upload.error && !upload.file) rowErrors[index].bill = upload.error;
+      if (!upload.file) return;
+      const fileError = validateTreasuryUploadFile(upload.file);
+      if (fileError) rowErrors[index].bill = fileError;
+      if (!row.purpose) rowErrors[index].purpose = "Enter a description before uploading a bill screenshot.";
+    });
+
+    const firstErrorIndex = rowErrors.findIndex((rowError) => Object.keys(rowError).length > 0);
+    return {
+      valid: firstErrorIndex < 0,
+      errors: rowErrors,
+      firstErrorIndex,
+      firstError: firstErrorIndex < 0 ? "" : Object.values(rowErrors[firstErrorIndex])[0],
+    };
+  }
+
+  function markDuesRowRecordId(index, recordId) {
+    setDuesRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, recordId } : row)));
+  }
+
+  async function saveClubDues(event) {
+    event?.preventDefault();
+    if (duesSaving || busy || duesUploads.some(isTreasuryUploadWorking)) return;
+    const rows = duesRows.map((row) => createClubDuesDraft(row));
+    const validation = validateDuesForSave(rows, duesUploads);
+    setDuesRows(rows);
+    setDuesErrors(validation.errors);
+    if (!validation.valid) {
+      reportValidation(`Row ${validation.firstErrorIndex + 1}: ${validation.firstError}`);
+      return;
+    }
+
+    const payloads = buildClubDuesPayloads(rows);
+    setDuesSaving(true);
+    try {
+      for (let index = 0; index < payloads.length; index += 1) {
+        const payload = payloads[index];
+        const currentRow = rows[index];
+        const id = currentRow.recordId || newTreasuryId();
+        const saved = await run(
+          currentRow.recordId ? "update-dues-transaction-before-retry" : "create-dues-transaction",
+          async () => {
+            if (currentRow.recordId) await updateTreasury(id, payload);
+            else await setTreasuryById(id, payload);
+            return id;
+          },
+          currentRow.recordId ? `Dues transaction ${index + 1} updated.` : `Dues transaction ${index + 1} saved.`,
+        );
+        if (!saved) {
+          reportValidation(`Row ${index + 1}: The dues transaction could not be saved. No later rows were processed.`);
+          return;
+        }
+        markDuesRowRecordId(index, id);
+
+        const upload = duesUploads[index] || createTreasuryUploadState();
+        if (!upload.file) continue;
+        const uploaded = await uploadForRecord(upload, setDuesUploadAt(index), payload, id, () => {});
+        if (!uploaded) {
+          reportValidation(`Row ${index + 1}: The transaction is saved, but its bill screenshot needs retry.`);
+          return;
+        }
+      }
+
+      onNotice?.({
+        type: "success",
+        message: `${payloads.length} dues transaction${payloads.length === 1 ? "" : "s"} saved separately.`,
+      });
+      resetDuesBatch();
+    } finally {
+      setDuesSaving(false);
+    }
+  }
+
+  async function importClubDuesFile(file) {
+    if (!file || duesImporting) return;
+    setDuesImporting(true);
+    try {
+      const result = await parseClubDuesImportFile(file);
+      if (result.errors?.length) {
+        setDuesImportRows([]);
+        setDuesImportMeta({ fileName: file.name, totalRows: result.totalRows || 0, skippedCount: 0, error: result.errors[0] });
+        reportValidation(result.errors[0]);
+        return;
+      }
+      setImportedRows(result.rows || []);
+      setDuesImportMeta({
+        fileName: file.name,
+        totalRows: result.totalRows || 0,
+        skippedCount: result.skippedRows?.length || 0,
+        error: "",
+      });
+      onNotice?.({
+        type: "success",
+        message: `${result.rows?.length || 0} payable dues row${result.rows?.length === 1 ? "" : "s"} imported for review.`,
+      });
+    } catch {
+      const message = "The Google Form response file could not be parsed.";
+      setDuesImportRows([]);
+      setDuesImportMeta({ fileName: file.name, totalRows: 0, skippedCount: 0, error: message });
+      reportValidation(message);
+    } finally {
+      setDuesImporting(false);
+    }
+  }
+
+  function updateDuesImportRow(index, changes) {
+    setDuesImportRows((current) => current.map((row, rowIndex) => (rowIndex === index ? updateClubDuesImportRow(row, changes) : row)));
+  }
+
+  function removeDuesImportRow(index) {
+    setDuesImportRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
+  }
+
+  function clearDuesImportRows() {
+    setDuesImportRows([]);
+    setDuesImportMeta({ fileName: "", totalRows: 0, skippedCount: 0, error: "" });
+  }
+
+  async function saveImportedClubDues(event) {
+    event?.preventDefault();
+    if (duesImportSaving || duesSaving || duesUploadWorking || busy || locked) return;
+    if (!duesImportRows.length) {
+      reportValidation("Import payable dues rows before saving transactions.");
+      return;
+    }
+    const validation = validateClubDuesImportRows(duesImportRows, transactions);
+    if (!validation.valid) {
+      const firstErrorIndex = validation.errors.findIndex((rowErrors) => Object.keys(rowErrors).length > 0);
+      reportValidation(`Imported row ${firstErrorIndex + 1}: ${Object.values(validation.errors[firstErrorIndex])[0]}`);
+      return;
+    }
+    const payloads = buildClubDuesImportPayloads(duesImportRows);
+    setDuesImportSaving(true);
+    try {
+      const saved = await run(
+        "create-imported-dues-transactions",
+        async () => {
+          for (const payload of payloads) {
+            const id = newTreasuryId();
+            await setTreasuryById(id, payload);
+          }
+          return payloads.length;
+        },
+        `${payloads.length} imported dues transaction${payloads.length === 1 ? "" : "s"} saved.`,
+      );
+      if (saved !== null) clearDuesImportRows();
+    } finally {
+      setDuesImportSaving(false);
+    }
   }
 
   async function saveEdit(event) {
@@ -410,27 +683,70 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
           <div className="treasury-section-heading">
             <div>
               <span>Quick entry</span>
-              <h3>{draftRecordId ? "Resume saved transaction" : "Record transaction"}</h3>
+              <h3>{clubDuesMode ? CLUB_DUES_TRANSACTION_TITLE : draftRecordId ? "Resume saved transaction" : "Record transaction"}</h3>
             </div>
             {draftRecordId ? <strong>Record saved - upload can be retried</strong> : null}
           </div>
-          <TreasuryForm
-            formId="treasury-create"
-            value={draft}
-            setValue={setDraft}
-            members={members}
-            onSubmit={saveDraft}
-            busy={busy || locked}
-            upload={draftUpload}
-            setUpload={setDraftUpload}
-            onRetry={saveDraft}
-            errors={draftErrors}
-            mode="create"
-            onClear={() => resetDraft()}
-          />
+          <label className="treasury-dues-toggle">
+            <input
+              type="checkbox"
+              checked={clubDuesMode}
+              onChange={(event) => setClubDuesMode(event.target.checked)}
+              disabled={busy || locked || isTreasuryUploadWorking(draftUpload)}
+            />
+            <span>
+              <strong>Club dues</strong>
+              <small>Use this to enter multiple {duesAmountLabel} club dues payments quickly. Each row is saved as a separate income transaction.</small>
+            </span>
+          </label>
+          {clubDuesMode ? (
+            <TreasuryClubDuesForm
+              rows={duesRows}
+              uploads={duesUploads}
+              errors={duesErrors}
+              members={members}
+              onSubmit={saveClubDues}
+              onRowChange={updateDuesRow}
+              onUploadChange={(index, value) => setDuesUploadAt(index)(value)}
+              onAddRow={addDuesPaymentRow}
+              onRemoveRow={removeDuesPaymentRow}
+              onResetRow={resetDuesPaymentRow}
+              importRows={duesImportRows}
+              importMeta={duesImportMeta}
+              importValidation={duesImportValidation}
+              importBusy={duesImporting}
+              importSaving={duesImportSaving || busy}
+              onImportFile={importClubDuesFile}
+              onImportRowChange={updateDuesImportRow}
+              onImportRowRemove={removeDuesImportRow}
+              onImportClear={clearDuesImportRows}
+              onImportSave={saveImportedClubDues}
+              disabled={duesBusy}
+              saving={duesSaving || busy || duesUploadWorking}
+            />
+          ) : (
+            <TreasuryForm
+              formId="treasury-create"
+              value={draft}
+              setValue={setDraft}
+              members={members}
+              onSubmit={saveDraft}
+              busy={busy || locked}
+              upload={draftUpload}
+              setUpload={setDraftUpload}
+              onRetry={saveDraft}
+              errors={draftErrors}
+              mode="create"
+              onClear={() => resetDraft()}
+            />
+          )}
         </div>
         <div className="treasury-review-column">
-          <TreasuryReviewPanel value={draft} upload={draftUpload} errors={draftErrors} />
+          {clubDuesMode ? (
+            <TreasuryClubDuesReviewPanel rows={duesRows} uploads={duesUploads} errors={duesErrors} />
+          ) : (
+            <TreasuryReviewPanel value={draft} upload={draftUpload} errors={draftErrors} />
+          )}
         </div>
       </section>
       <TreasuryHistory
@@ -717,6 +1033,294 @@ function TreasuryForm({ formId, value, setValue, members, onSubmit, busy, upload
         {mode === "edit" ? <button type="button" onClick={onCancel} disabled={busy}>Cancel edit</button> : <button type="button" onClick={onClear} disabled={busy}>Clear form</button>}
       </div>
     </form>
+  );
+}
+
+function TreasuryClubDuesImportPanel({ rows, meta, validation, disabled, importing, saving, onImportFile, onRowChange, onRowRemove, onClear, onSave }) {
+  const inputRef = useRef(null);
+  const canSave = rows.length > 0 && !disabled && !saving && !importing;
+
+  function selectFile(event) {
+    const file = event.target.files?.[0];
+    if (file) onImportFile(file);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function rowStatus(rowErrors, rowWarnings) {
+    if (Object.keys(rowErrors).length) return { label: "Error", className: "is-error" };
+    if (rowWarnings.length) return { label: "Warning", className: "is-warning" };
+    return { label: "Ready", className: "is-ready" };
+  }
+
+  return (
+    <section className="treasury-dues-import" aria-labelledby="treasury-dues-import-title">
+      <div className="treasury-dues-import__heading">
+        <div>
+          <span>Google Form import</span>
+          <h4 id="treasury-dues-import-title">Upload CSV/Excel from Google Form responses</h4>
+          <p>CSV and .xlsx exports are parsed into a review table first. No Treasury records are created until Save transactions is clicked.</p>
+        </div>
+        <label className="treasury-dues-import__picker">
+          <span>{importing ? "Parsing..." : "Choose CSV or Excel"}</span>
+          <input ref={inputRef} type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={selectFile} disabled={disabled || importing || saving} />
+        </label>
+      </div>
+      {meta.fileName || meta.error ? (
+        <div className={`treasury-dues-import__meta ${meta.error ? "is-error" : ""}`}>
+          <strong>{meta.fileName || "Import"}</strong>
+          <span>{meta.error || `${rows.length} payable row${rows.length === 1 ? "" : "s"} ready for review from ${meta.totalRows} response row${meta.totalRows === 1 ? "" : "s"}. ${meta.skippedCount} row${meta.skippedCount === 1 ? "" : "s"} skipped because Dues Paid was not Yes.`}</span>
+        </div>
+      ) : null}
+      {rows.length ? (
+        <>
+          <div className="treasury-dues-import__table-wrap">
+            <table className="treasury-dues-import__table">
+              <caption>Imported Club dues transactions pending confirmation</caption>
+              <thead>
+                <tr>
+                  <th>Status / row</th>
+                  <th>Date</th>
+                  <th>Member name / Received from</th>
+                  <th>Amount</th>
+                  <th>Payment mode</th>
+                  <th>Payment reference</th>
+                  <th>Description</th>
+                  <th>Proof link</th>
+                  <th>Remove</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => {
+                  const rowErrors = validation.errors[index] || {};
+                  const rowWarnings = validation.warnings[index] || [];
+                  const status = rowStatus(rowErrors, rowWarnings);
+                  const rowMessages = [...Object.values(rowErrors), ...rowWarnings];
+                  return (
+                    <tr key={row.clientId || index}>
+                      <td>
+                        <span className={`treasury-dues-import-status ${status.className}`}>{status.label}</span>
+                        <small>Form row {row.sourceRowNumber || index + 2}</small>
+                        {rowMessages.map((message) => <small className="treasury-dues-import-message" key={message}>{message}</small>)}
+                      </td>
+                      <td>
+                        <input type="date" value={row.date} onChange={(event) => onRowChange(index, { date: event.target.value })} aria-invalid={Boolean(rowErrors.date)} disabled={disabled || saving} />
+                      </td>
+                      <td>
+                        <input value={row.paidBy} onChange={(event) => onRowChange(index, { paidBy: event.target.value })} aria-invalid={Boolean(rowErrors.paidBy)} disabled={disabled || saving} />
+                      </td>
+                      <td><span className="treasury-amount is-income">{formatInr(CLUB_DUES_AMOUNT)}</span></td>
+                      <td>
+                        <select value={row.paymentMode} onChange={(event) => onRowChange(index, { paymentMode: event.target.value })} disabled={disabled || saving}>
+                          <option value="">Choose mode</option>
+                          {TREASURY_PAYMENT_MODES.map((item) => <option key={item}>{item}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <input value={row.referenceNumber} onChange={(event) => onRowChange(index, { referenceNumber: event.target.value })} disabled={disabled || saving} />
+                      </td>
+                      <td>
+                        <textarea rows="3" value={row.purpose} onChange={(event) => onRowChange(index, { purpose: event.target.value })} disabled={disabled || saving} />
+                      </td>
+                      <td>
+                        <input type="url" value={row.rawProofLink || row.billUrl} onChange={(event) => onRowChange(index, { billUrl: event.target.value })} placeholder="https://drive.google.com/open?id=..." disabled={disabled || saving} />
+                      </td>
+                      <td>
+                        <button type="button" onClick={() => onRowRemove(index)} disabled={disabled || saving}>Remove</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="admin-actions treasury-dues-import__actions">
+            <button type="button" onClick={onSave} disabled={!canSave}>{saving ? "Saving transactions..." : "Save transactions"}</button>
+            <button type="button" onClick={onClear} disabled={disabled || saving}>Clear import</button>
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function TreasuryClubDuesForm({
+  rows,
+  uploads,
+  errors,
+  members,
+  onSubmit,
+  onRowChange,
+  onUploadChange,
+  onAddRow,
+  onRemoveRow,
+  onResetRow,
+  importRows,
+  importMeta,
+  importValidation,
+  importBusy,
+  importSaving,
+  onImportFile,
+  onImportRowChange,
+  onImportRowRemove,
+  onImportClear,
+  onImportSave,
+  disabled,
+  saving,
+}) {
+  const peopleListId = "treasury-club-dues-people";
+  const rowCount = rows.length;
+  const amountLabel = formatInr(CLUB_DUES_AMOUNT).replace(".00", "");
+
+  function rowFieldId(rowKey, key) {
+    return `treasury-dues-${rowKey}-${key}`;
+  }
+
+  function describedBy(rowKey, rowErrors, key) {
+    return rowErrors[key] ? rowFieldId(rowKey, `${key}-error`) : undefined;
+  }
+
+  return (
+    <>
+      <TreasuryClubDuesImportPanel
+        rows={importRows}
+        meta={importMeta}
+        validation={importValidation}
+        disabled={disabled}
+        importing={importBusy}
+        saving={importSaving}
+        onImportFile={onImportFile}
+        onRowChange={onImportRowChange}
+        onRowRemove={onImportRowRemove}
+        onClear={onImportClear}
+        onSave={onImportSave}
+      />
+      <form className="admin-form treasury-club-dues-form is-income" onSubmit={onSubmit} noValidate>
+        <datalist id={peopleListId}>
+          <option value="Rotaract Club of Pune Heritage" />
+          {members.map((member) => <option key={member.id} value={formatRotaractorName(member.name, true)} />)}
+        </datalist>
+        <div className="treasury-club-dues-manual-heading">
+          <span>Manual dues rows</span>
+          <strong>Enter payments by hand</strong>
+        </div>
+        <div className="treasury-club-dues-rows">
+          {rows.map((row, index) => {
+            const rowKey = row.clientId || `row-${index + 1}`;
+            const rowErrors = errors[index] || {};
+            const upload = uploads[index] || createTreasuryUploadState();
+            return (
+              <section className="treasury-club-dues-row" key={rowKey} aria-label={`Club dues payment ${index + 1}`}>
+                <header className="treasury-club-dues-row__header">
+                  <div>
+                    <span>Payment {index + 1}</span>
+                    <h4>{CLUB_DUES_TRANSACTION_TITLE}</h4>
+                    <small>{amountLabel} - Income - Club</small>
+                  </div>
+                  <div className="treasury-club-dues-row__actions">
+                    <button type="button" onClick={() => onResetRow(index)} disabled={disabled || Boolean(row.recordId)}>Reset row</button>
+                    {rowCount > 1 ? <button type="button" onClick={() => onRemoveRow(index)} disabled={disabled}>Remove</button> : null}
+                  </div>
+                </header>
+                <div className="treasury-club-dues-grid">
+                  <label>
+                    <FieldLabel label="Date" required />
+                    <input
+                      type="date"
+                      value={row.date}
+                      onChange={(event) => onRowChange(index, { date: event.target.value })}
+                      required
+                      aria-invalid={Boolean(rowErrors.date)}
+                      aria-describedby={describedBy(rowKey, rowErrors, "date")}
+                    />
+                    <FieldError id={rowFieldId(rowKey, "date-error")} message={rowErrors.date} />
+                  </label>
+                  <label>
+                    <FieldLabel label="Received from" required />
+                    <input
+                      list={peopleListId}
+                      value={row.paidBy}
+                      onChange={(event) => onRowChange(index, { paidBy: event.target.value })}
+                      required
+                      aria-invalid={Boolean(rowErrors.paidBy)}
+                      aria-describedby={describedBy(rowKey, rowErrors, "paidBy")}
+                    />
+                    <FieldError id={rowFieldId(rowKey, "paidBy-error")} message={rowErrors.paidBy} />
+                  </label>
+                  <label>
+                    <FieldLabel label="Payment mode" required />
+                    <select
+                      value={row.paymentMode}
+                      onChange={(event) => onRowChange(index, { paymentMode: event.target.value })}
+                      required
+                      aria-invalid={Boolean(rowErrors.paymentMode)}
+                      aria-describedby={describedBy(rowKey, rowErrors, "paymentMode")}
+                    >
+                      <option value="">Choose mode</option>
+                      {TREASURY_PAYMENT_MODES.map((item) => <option key={item}>{item}</option>)}
+                    </select>
+                    <FieldError id={rowFieldId(rowKey, "paymentMode-error")} message={rowErrors.paymentMode} />
+                  </label>
+                  <label>
+                    <FieldLabel label="Reference" optional />
+                    <input value={row.referenceNumber} onChange={(event) => onRowChange(index, { referenceNumber: event.target.value })} />
+                  </label>
+                  <label className="treasury-club-dues-grid__wide">
+                    <FieldLabel label="Description" optional />
+                    <textarea rows="3" value={row.purpose} onChange={(event) => onRowChange(index, { purpose: event.target.value })} aria-invalid={Boolean(rowErrors.purpose)} aria-describedby={describedBy(rowKey, rowErrors, "purpose")} />
+                    <FieldError id={rowFieldId(rowKey, "purpose-error")} message={rowErrors.purpose} />
+                  </label>
+                  <div className="treasury-club-dues-grid__wide treasury-club-dues-bill">
+                    <FieldLabel label="Bill screenshot" optional />
+                    <TreasuryFileField
+                      value={upload}
+                      onChange={(value) => onUploadChange(index, value)}
+                      disabled={disabled}
+                      onRetry={onSubmit}
+                      heading="Bill screenshot"
+                      helpText="Upload one payment screenshot or receipt for this dues transaction."
+                    />
+                    <FieldError id={rowFieldId(rowKey, "bill-error")} message={rowErrors.bill} />
+                  </div>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+        <button className="treasury-dues-add" type="button" onClick={onAddRow} disabled={disabled}>+ Add another dues payment</button>
+        <div className="admin-actions treasury-form-actions">
+          <button disabled={disabled}>{saving ? "Saving dues transactions..." : "Save dues transactions"}</button>
+        </div>
+      </form>
+    </>
+  );
+}
+
+function TreasuryClubDuesReviewPanel({ rows, uploads, errors }) {
+  const validation = validateClubDuesRows(rows);
+  const readyCount = validation.errors.filter((rowErrors) => Object.keys(rowErrors).length === 0).length;
+  const fileCount = uploads.filter((upload) => upload?.file || upload?.uploadedMetadata).length;
+  const currentErrors = errors.flatMap((rowErrors, index) => Object.values(rowErrors || {}).map((message) => `Row ${index + 1}: ${message}`));
+  return (
+    <aside className="treasury-review treasury-dues-review is-income" aria-live="polite">
+      <div className="treasury-section-heading">
+        <div>
+          <span>Batch review</span>
+          <h3>{CLUB_DUES_TRANSACTION_TITLE}</h3>
+        </div>
+        <strong>{formatInr(rows.length * CLUB_DUES_AMOUNT)}</strong>
+      </div>
+      <dl>
+        <div><dt>Rows</dt><dd>{rows.length} dues payment{rows.length === 1 ? "" : "s"}</dd></div>
+        <div><dt>Ready</dt><dd>{readyCount} of {rows.length}</dd></div>
+        <div><dt>Each amount</dt><dd>{formatInr(CLUB_DUES_AMOUNT)}</dd></div>
+        <div><dt>Evidence</dt><dd>{fileCount} separate file{fileCount === 1 ? "" : "s"} selected</dd></div>
+      </dl>
+      {currentErrors.length ? (
+        <div className="treasury-review__alerts">
+          {currentErrors.slice(0, 3).map((message) => <span key={message}>{message}</span>)}
+        </div>
+      ) : null}
+    </aside>
   );
 }
 
