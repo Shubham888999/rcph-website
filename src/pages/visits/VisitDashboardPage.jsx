@@ -58,28 +58,49 @@ function VisitDashboardError({ title, onRetry }) {
 }
 
 function StatRail({ stats }) {
-  const values = [
+  const memberValues = [
+    { label: "Total events", value: stats.totalEvents },
     { label: "Total members", value: stats.totalMembers },
     { label: "Male", value: stats.maleMembers },
     { label: "Female", value: stats.femaleMembers },
     { label: "Other", value: stats.otherGenderMembers },
     { label: "Not specified", value: stats.unknownGenderMembers },
     { label: "Male/Female ratio", value: stats.maleFemaleRatio },
-    { label: "Total events", value: stats.totalEvents },
+  ];
+
+  const financeValues = [
     { label: "Income", value: formatVisitDashboardMoney(stats.treasuryIncome), tone: "income" },
     { label: "Expense", value: formatVisitDashboardMoney(stats.treasuryExpense), tone: "expense" },
     { label: "Net", value: formatVisitDashboardMoney(stats.treasuryNet), tone: stats.treasuryNet < 0 ? "expense" : "income" },
   ];
 
   return (
-    <dl className="visit-dashboard-stat-rail">
-      {values.map((item) => (
-        <div key={item.label} className={item.tone ? `is-${item.tone}` : ""}>
-          <dt>{item.label}</dt>
-          <dd>{item.value}</dd>
+    <section className="visit-dashboard-summary" aria-label="Visit dashboard summary">
+      <dl className="visit-dashboard-stat-rail visit-dashboard-stat-rail--overview">
+        {memberValues.map((item) => (
+          <div key={item.label}>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <section className="visit-dashboard-finance-strip" aria-labelledby="visit-dashboard-financial-title">
+        <div className="visit-dashboard-finance-strip__heading">
+          <p className="visit-dashboard-eyebrow">Treasury</p>
+          <h2 id="visit-dashboard-financial-title">Financial summary</h2>
         </div>
-      ))}
-    </dl>
+
+        <dl className="visit-dashboard-finance-line">
+          {financeValues.map((item) => (
+            <div key={item.label} className={`is-${item.tone}`}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    </section>
   );
 }
 function avenueTokens(value) {
@@ -136,7 +157,7 @@ function AvenueCounts({ rows, attendance }) {
                     <b aria-label={`${row.count} ${row.count === 1 ? "event" : "events"}`}>
                       {row.count}
                     </b>
-                    <i aria-hidden="true">›</i>
+                    <i aria-hidden="true">&gt;</i>
                   </span>
                 </summary>
 
@@ -160,6 +181,64 @@ function AvenueCounts({ rows, attendance }) {
         })}
       </ul>
     </section>
+  );
+}
+
+function isPrimaryPreviewDocument(file) {
+  if (!file?.canPreview || !file.previewUrl) return false;
+  const fileName = String(file.fileName || "").toLowerCase();
+  const mimeType = String(file.mimeType || "").toLowerCase();
+  return mimeType === "application/pdf"
+    || mimeType.includes("powerpoint")
+    || /\.(?:pdf|pptx?)$/.test(fileName);
+}
+
+function getPanelDocumentGroups(panel) {
+  const files = Array.isArray(panel?.files) ? panel.files : [];
+  const previewable = files.filter((file) => file.canPreview && file.previewUrl);
+  const primary = previewable.find(isPrimaryPreviewDocument) || previewable[0] || null;
+  return {
+    primary,
+    otherDocuments: primary
+      ? files.filter((file) => file.submissionId !== primary.submissionId)
+      : files,
+  };
+}
+
+function DocumentFileList({ files }) {
+  if (!files.length) {
+    return (
+      <p className="visit-dashboard-document-empty">
+        No other documents in this folder.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="visit-dashboard-document-list">
+      {files.map((file) => {
+        const sizeLabel = formatVisitDashboardFileSize(file.fileSize);
+        const meta = [file.fileName || "Document", sizeLabel].filter(Boolean).join(" / ");
+        return (
+          <li key={file.submissionId}>
+            <div>
+              <strong>{file.title}</strong>
+              <span>{meta}</span>
+            </div>
+            {file.canOpen && file.openUrl ? (
+              <a
+                className="visit-dashboard-document-action"
+                href={file.openUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Open file
+              </a>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -193,48 +272,76 @@ function DocumentPanels({ panels }) {
             const folderCode = formatVisitAttendanceRoleCode(panel.positionTitle || panel.positionKey || panel.avenueCode);
             const actionLabel = getVisitDocumentPanelActionLabel(panel);
             const fileCountLabel = `${panel.fileCount} ${panel.fileCount === 1 ? "file" : "files"}`;
+            const { primary, otherDocuments } = getPanelDocumentGroups(panel);
             return (
-            <details className="visit-dashboard-folder-panel" key={panel.positionKey}>
-              <summary aria-label={`${panel.folderLabel}: ${fileCountLabel}${actionLabel ? `. ${actionLabel}` : ""}`} title={panel.folderLabel}>
-                <span className="visit-dashboard-folder-title">
-                  <strong>{panel.folderLabel}</strong>
-                  <small>{folderCode}</small>
-                </span>
-                <span className="visit-dashboard-folder-actions">
-                  <span className="visit-dashboard-folder-count">{fileCountLabel}</span>
-                  {actionLabel ? (
-                    <a
-                      className="visit-dashboard-folder-action"
-                      href={panel.openUrl}
-                      onClick={(event) => event.stopPropagation()}
-                      rel="noopener noreferrer"
-                      target="_blank"
-                    >
-                      {actionLabel}
-                    </a>
-                  ) : null}
-                </span>
-              </summary>
-              {panel.files.length ? (
-                <ul className="visit-dashboard-document-list">
-                  {panel.files.map((file) => {
+              <details className="visit-dashboard-folder-panel" key={panel.positionKey}>
+                <summary aria-label={`${panel.folderLabel}: ${fileCountLabel}${actionLabel ? `. ${actionLabel}` : ""}`} title={panel.folderLabel}>
+                  <span className="visit-dashboard-folder-title">
+                    <strong>{panel.folderLabel}</strong>
+                    <small>{folderCode}</small>
+                  </span>
+                  <span className="visit-dashboard-folder-actions">
+                    <span className="visit-dashboard-folder-count">{fileCountLabel}</span>
+                    {actionLabel ? (
+                      <a
+                        className="visit-dashboard-folder-action"
+                        href={panel.openUrl}
+                        onClick={(event) => event.stopPropagation()}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        {actionLabel}
+                      </a>
+                    ) : null}
+                  </span>
+                </summary>
 
-return (
-  <li key={file.submissionId}>
-    <div>
-      <strong>{file.title}</strong>
-      <span>{file.fileName || "Document"}</span>
-    </div>
-  </li>
-);
-                  })}
-                </ul>
-              ) : (
-                <div className="visit-dashboard-empty-state visit-dashboard-empty-state--compact">
-                  <strong>No visible documents uploaded for this folder yet.</strong>
-                </div>
-              )}
-            </details>
+                {panel.files.length ? (
+                  <div className="visit-dashboard-document-panel-body">
+                    {primary ? (
+                      <div className="visit-dashboard-document-preview">
+                        <div className="visit-dashboard-document-preview-heading">
+                          <div>
+                            <p className="visit-dashboard-document-kicker">Primary preview</p>
+                            <h3>{primary.title}</h3>
+                            <span>{primary.fileName || "Document"}</span>
+                          </div>
+                          {primary.canOpen && primary.openUrl ? (
+                            <a
+                              className="visit-dashboard-document-action"
+                              href={primary.openUrl}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                            >
+                              Open file
+                            </a>
+                          ) : null}
+                        </div>
+                        <iframe
+                          className="visit-dashboard-document-preview-frame"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          src={primary.previewUrl}
+                          title={`Preview of ${primary.title}`}
+                        />
+                      </div>
+                    ) : (
+                      <div className="visit-dashboard-empty-state visit-dashboard-empty-state--compact">
+                        <strong>No previewable presentation or PDF found. Open the folder to view files.</strong>
+                      </div>
+                    )}
+
+                    <div className="visit-dashboard-document-other">
+                      <h3>Other documents</h3>
+                      <DocumentFileList files={otherDocuments} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="visit-dashboard-empty-state visit-dashboard-empty-state--compact">
+                    <strong>No visible documents uploaded for this folder yet.</strong>
+                  </div>
+                )}
+              </details>
             );
           })}
         </div>
@@ -266,29 +373,34 @@ function AttendanceTable({ view }) {
     );
   }
 
-  const tableMinWidth = Math.max(980, 400 + view.columns.length * 96);
+  const tableMinWidth = Math.max(1280, 560 + view.columns.length * 118);
 
   return (
     <div className="visit-dashboard-attendance-table-wrap">
       <table className="visit-dashboard-attendance-table" style={{ minWidth: `${tableMinWidth}px` }}>
         <caption>Read-only attendance overview</caption>
-        <colgroup>
-          <col className="visit-dashboard-attendance-col-name" />
-          <col className="visit-dashboard-attendance-col-role" />
-          {view.columns.map((column) => (
-            <col className="visit-dashboard-attendance-col-status" key={column.eventId} />
-          ))}
-        </colgroup>
+<colgroup>
+  <col className="visit-dashboard-attendance-col-percent" />
+  <col className="visit-dashboard-attendance-col-name" />
+  <col className="visit-dashboard-attendance-col-role" />
+  {view.columns.map((column) => (
+    <col className="visit-dashboard-attendance-col-status" key={column.eventId} />
+  ))}
+</colgroup>
         <thead>
           <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Role/Position</th>
-            {view.columns.map((column) => (
-              <th scope="col" key={column.eventId}>
-                <span>{column.title}</span>
-                <small>{column.date || column.avenueName || column.avenueCode || "Event"}</small>
-              </th>
-            ))}
+<th scope="col">Member %</th>
+<th scope="col">Name</th>
+<th scope="col">Role</th>
+{view.columns.map((column) => (
+  <th scope="col" key={column.eventId}>
+    <span>{column.title}</span>
+    <small>{column.date || column.avenueName || column.avenueCode || "Event"}</small>
+    <small className="visit-dashboard-attendance-event-rate">
+      {column.attendanceLabel}
+    </small>
+  </th>
+))}
           </tr>
         </thead>
         <tbody>
@@ -298,31 +410,38 @@ function AttendanceTable({ view }) {
             const roleCode = formatVisitAttendanceRoleCode(fullRole);
             return (
             <tr key={row.personId}>
-              <th className="visit-dashboard-attendance-name" scope="row" title={displayName}>{displayName}</th>
-              <td className="visit-dashboard-attendance-role" title={fullRole} aria-label={`${displayName} role or position: ${fullRole}`}>{roleCode}</td>
-              {view.columns.map((column) => {
-                const status = row.cells[column.eventId] || "unknown";
-                const statusClass = ["present", "absent", "late", "excused", "unknown"].includes(status)
-                  ? status
-                  : "unknown";
-                const statusLabel = attendanceStatusLabel(statusClass);
-                return (
-                  <td className="visit-dashboard-attendance-mark-cell" key={column.eventId}>
-                    <span
-                      className={`visit-dashboard-attendance-status is-${statusClass}`}
-                      aria-label={`${displayName}, ${column.title}: ${statusLabel}`}
-                      title={statusLabel}
-                    >
-                      <AttendanceMark
-                        value={attendanceStatusMarkValue(statusClass)}
-                        size="small"
-                        ariaLabel={statusLabel}
-                        title={statusLabel}
-                      />
-                    </span>
-                  </td>
-                );
-              })}
+<td className="visit-dashboard-attendance-percent" title={`${displayName}: ${row.attendanceLabel}`}>
+  {row.attendanceLabel}
+</td>
+<th className="visit-dashboard-attendance-name" scope="row" title={displayName}>
+  {displayName}
+</th>
+<td className="visit-dashboard-attendance-role" title={fullRole} aria-label={`${displayName} role or position: ${fullRole}`}>
+  {roleCode}
+</td>
+{view.columns.map((column) => {
+  const status = row.cells[column.eventId] || "unknown";
+  const statusClass = ["present", "absent", "late", "excused", "unknown"].includes(status)
+    ? status
+    : "unknown";
+  const statusLabel = attendanceStatusLabel(statusClass);
+  return (
+    <td className="visit-dashboard-attendance-mark-cell" key={column.eventId}>
+      <span
+        className={`visit-dashboard-attendance-status is-${statusClass}`}
+        aria-label={`${displayName}, ${column.title}: ${statusLabel}`}
+        title={statusLabel}
+      >
+        <AttendanceMark
+          value={attendanceStatusMarkValue(statusClass)}
+          size="small"
+          ariaLabel={statusLabel}
+          title={statusLabel}
+        />
+      </span>
+    </td>
+  );
+})}
             </tr>
             );
           })}
@@ -384,7 +503,15 @@ function AttendanceRecords({ attendance }) {
               </div>
               <div>
                 <dt>Average</dt>
-                <dd>{view.summary.averageAttendanceRate}%</dd>
+                <dd>{view.summary.averageAttendanceLabel}</dd>
+              </div>
+              <div>
+                <dt>Event attendance %</dt>
+                <dd>{view.summary.averageEventAttendanceLabel}</dd>
+              </div>
+              <div>
+                <dt>Member attendance %</dt>
+                <dd>{view.summary.averageMemberAttendanceLabel}</dd>
               </div>
             </dl>
             <AttendanceTable view={view} />
@@ -397,9 +524,9 @@ function AttendanceRecords({ attendance }) {
 
 function TreasuryRecords({ treasury }) {
   const summaryValues = [
-    { label: "Income", value: formatVisitDashboardMoney(treasury.summary.income), tone: "income" },
-    { label: "Expense", value: formatVisitDashboardMoney(treasury.summary.expense), tone: "expense" },
-    { label: "Net", value: formatVisitDashboardMoney(treasury.summary.net), tone: treasury.summary.net < 0 ? "expense" : "income" },
+    { label: "Income", value: formatVisitDashboardMoney(treasury.summary.income), tone: "income", money: true },
+    { label: "Expense", value: formatVisitDashboardMoney(treasury.summary.expense), tone: "expense", money: true },
+    { label: "Net", value: formatVisitDashboardMoney(treasury.summary.net), tone: treasury.summary.net < 0 ? "expense" : "income", money: true },
     { label: "Transactions", value: treasury.summary.transactionCount },
   ];
 
@@ -414,12 +541,18 @@ function TreasuryRecords({ treasury }) {
       </header>
 
       <dl className="visit-dashboard-treasury-summary">
-        {summaryValues.map((item) => (
-          <div className={item.tone ? `is-${item.tone}` : ""} key={item.label}>
-            <dt>{item.label}</dt>
-            <dd>{item.value}</dd>
-          </div>
-        ))}
+        {summaryValues.map((item) => {
+          const className = [
+            item.tone ? `is-${item.tone}` : "",
+            item.money ? "is-money" : "",
+          ].filter(Boolean).join(" ");
+          return (
+            <div className={className} key={item.label}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          );
+        })}
       </dl>
 
       {treasury.rows.length ? (
@@ -471,7 +604,7 @@ function TreasuryRecords({ treasury }) {
                           View bill
                         </a>
                       ) : (
-                        <span className="visit-dashboard-bill-empty" aria-label="No bill available">—</span>
+                        <span className="visit-dashboard-bill-empty" aria-label="No bill available">&mdash;</span>
                       )}
                     </td>
                   </tr>

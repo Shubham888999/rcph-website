@@ -324,16 +324,31 @@ function normalizeDocumentFile(raw) {
   const submissionId = safeId(raw.submissionId);
   const title = text(raw.title || raw.fileName, 180);
   if (!submissionId || !title) return null;
+  const fileName = text(raw.fileName, 180);
+  const driveFileIds = [raw.driveFileId, raw.fileDriveId, raw.googleDriveFileId, raw.fileId];
+  const driveFileUrls = [raw.openUrl, raw.driveFileUrl, raw.fileUrl, raw.webViewLink, raw.previewUrl];
+  const safeFileSignal = raw.canOpen === true
+    || raw.canPreview === true
+    || Boolean(raw.openUrl || raw.previewUrl);
+  const openUrl = safeFileSignal
+    ? normalizeDriveFileOpenUrlFromCandidates([...driveFileIds, ...driveFileUrls])
+    : "";
+  const previewUrl = safeFileSignal && raw.canPreview !== false && isPreviewableDocument(raw, fileName)
+    ? normalizeDriveFilePreviewUrlFromCandidates([raw.previewUrl, ...driveFileIds, ...driveFileUrls])
+    : "";
   return {
     submissionId,
     title,
-    fileName: text(raw.fileName, 180),
+    fileName,
     mimeType: text(raw.mimeType, 120).toLowerCase(),
     fileSize: normalizeFileSize(raw.fileSize || raw.sizeBytes),
     uploadedAt: normalizeGeneratedAt(raw.uploadedAt),
     uploadedByName: text(raw.uploadedByName, 120),
     status: text(raw.status, 40).toLowerCase() || "active",
-    canOpen: raw.canOpen === true,
+    canOpen: Boolean(openUrl) && raw.canOpen !== false,
+    openUrl,
+    canPreview: Boolean(previewUrl),
+    previewUrl,
   };
 }
 
@@ -388,9 +403,42 @@ function driveFileIdFromUrl(value) {
   return "";
 }
 
-function normalizeDriveFileOpenUrl(value) {
-  const driveFileId = normalizeDriveFileId(value) || driveFileIdFromUrl(value);
+function driveFileIdFromCandidates(values) {
+  for (const value of Array.isArray(values) ? values : []) {
+    const driveFileId = normalizeDriveFileId(value) || driveFileIdFromUrl(value);
+    if (driveFileId) return driveFileId;
+  }
+  return "";
+}
+
+function normalizeDriveFileOpenUrlFromCandidates(values) {
+  const driveFileId = driveFileIdFromCandidates(values);
   return driveFileId ? `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/view` : "";
+}
+
+function normalizeDriveFilePreviewUrlFromCandidates(values) {
+  const driveFileId = driveFileIdFromCandidates(values);
+  return driveFileId ? `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/preview` : "";
+}
+
+const PREVIEWABLE_DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.google-apps.document",
+  "application/vnd.google-apps.presentation",
+]);
+const PREVIEWABLE_DOCUMENT_EXTENSIONS = new Set(["pdf", "ppt", "pptx"]);
+
+function fileExtension(value) {
+  const match = text(value, 220).toLowerCase().match(/\.([a-z0-9]{1,12})$/);
+  return match ? match[1] : "";
+}
+
+function isPreviewableDocument(raw, fileName = "") {
+  const mimeType = text(raw?.mimeType, 160).toLowerCase();
+  if (PREVIEWABLE_DOCUMENT_MIME_TYPES.has(mimeType)) return true;
+  return PREVIEWABLE_DOCUMENT_EXTENSIONS.has(fileExtension(fileName || raw?.fileName || raw?.originalFileName));
 }
 
 function normalizeDocumentPanels(value) {
@@ -425,6 +473,41 @@ function normalizeAttendanceStatus(value) {
   return ATTENDANCE_STATUSES.has(raw) ? raw : "unknown";
 }
 
+function nullablePercentage(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 && number <= 100 ? Math.round(number) : null;
+}
+
+function attendanceMetricsFromStatuses(statuses) {
+  let attendedCount = 0;
+  let eligibleCount = 0;
+  (Array.isArray(statuses) ? statuses : []).forEach((value) => {
+    const status = normalizeAttendanceStatus(value);
+    if (status === "present" || status === "late") {
+      attendedCount += 1;
+      eligibleCount += 1;
+    } else if (status === "absent") {
+      eligibleCount += 1;
+    }
+  });
+  const attendanceRate = eligibleCount ? Math.round((attendedCount / eligibleCount) * 100) : null;
+  return { attendedCount, eligibleCount, attendanceRate };
+}
+
+function averageNullablePercentage(items) {
+  const rates = (Array.isArray(items) ? items : [])
+    .map((item) => nullablePercentage(item?.attendanceRate))
+    .filter((rate) => rate !== null);
+  if (!rates.length) return null;
+  return Math.round(rates.reduce((sum, rate) => sum + rate, 0) / rates.length);
+}
+
+function attendanceRateLabel(value) {
+  const rate = nullablePercentage(value);
+  return rate === null ? "N/A" : `${rate}%`;
+}
+
 function normalizeAttendanceColumn(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const eventId = safeId(raw.eventId, 160);
@@ -436,6 +519,10 @@ function normalizeAttendanceColumn(raw) {
     date: text(raw.date, 20),
     avenueCode: text(raw.avenueCode, 40).toUpperCase(),
     avenueName: text(raw.avenueName, 80),
+    attendedCount: count(raw.attendedCount),
+    eligibleCount: count(raw.eligibleCount),
+    attendanceRate: nullablePercentage(raw.attendanceRate),
+    attendanceLabel: attendanceRateLabel(raw.attendanceRate),
   };
 }
 
@@ -447,14 +534,20 @@ function normalizeAttendanceRow(raw, columns) {
   const incomingCells = raw.cells && typeof raw.cells === "object" && !Array.isArray(raw.cells)
     ? raw.cells
     : {};
+  const cells = columns.reduce((result, column) => {
+    result[column.eventId] = normalizeAttendanceStatus(incomingCells[column.eventId]);
+    return result;
+  }, {});
+  const metrics = attendanceMetricsFromStatuses(Object.values(cells));
   return {
     personId,
     name,
     roleOrPosition: text(raw.roleOrPosition, 120),
-    cells: columns.reduce((cells, column) => {
-      cells[column.eventId] = normalizeAttendanceStatus(incomingCells[column.eventId]);
-      return cells;
-    }, {}),
+    attendedCount: metrics.attendedCount,
+    eligibleCount: metrics.eligibleCount,
+    attendanceRate: metrics.attendanceRate,
+    attendanceLabel: attendanceRateLabel(metrics.attendanceRate),
+    cells,
   };
 }
 
@@ -466,14 +559,38 @@ function normalizeAttendanceView(raw) {
   const rows = Array.isArray(source.rows)
     ? source.rows.map((row) => normalizeAttendanceRow(row, columns)).filter(Boolean)
     : [];
+  const columnsWithMetrics = columns.map((column) => {
+    const metrics = attendanceMetricsFromStatuses(rows.map((row) => row.cells[column.eventId]));
+    const attendanceRate = nullablePercentage(column.attendanceRate ?? metrics.attendanceRate);
+    return {
+      ...column,
+      attendedCount: column.eligibleCount ? column.attendedCount : metrics.attendedCount,
+      eligibleCount: column.eligibleCount || metrics.eligibleCount,
+      attendanceRate,
+      attendanceLabel: attendanceRateLabel(attendanceRate),
+    };
+  });
+  const overallMetrics = attendanceMetricsFromStatuses(
+    rows.flatMap((row) => columnsWithMetrics.map((column) => row.cells[column.eventId])),
+  );
   const summary = source.summary && typeof source.summary === "object" ? source.summary : {};
+  const averageAttendanceRate = nullablePercentage(summary.averageAttendanceRate ?? overallMetrics.attendanceRate) ?? 0;
+  const averageEventAttendanceRate = nullablePercentage(summary.averageEventAttendanceRate)
+    ?? averageNullablePercentage(columnsWithMetrics);
+  const averageMemberAttendanceRate = nullablePercentage(summary.averageMemberAttendanceRate)
+    ?? averageNullablePercentage(rows);
   return {
     summary: {
-      totalEvents: count(summary.totalEvents) || columns.length,
+      totalEvents: count(summary.totalEvents) || columnsWithMetrics.length,
       totalPeople: count(summary.totalPeople) || rows.length,
-      averageAttendanceRate: percentage(summary.averageAttendanceRate),
+      averageAttendanceRate,
+      averageAttendanceLabel: attendanceRateLabel(averageAttendanceRate),
+      averageEventAttendanceRate,
+      averageEventAttendanceLabel: attendanceRateLabel(averageEventAttendanceRate),
+      averageMemberAttendanceRate,
+      averageMemberAttendanceLabel: attendanceRateLabel(averageMemberAttendanceRate),
     },
-    columns,
+    columns: columnsWithMetrics,
     rows,
   };
 }
@@ -498,8 +615,14 @@ function normalizeTreasuryRow(raw) {
   const date = dateOnly(raw.date);
   const amount = rowAmount(raw.amount);
   if (!transactionId || !title || !date || amount === null) return null;
-  const billOpenUrl = normalizeDriveFileOpenUrl(raw.billDriveFileId || raw.billFileId)
-    || normalizeDriveFileOpenUrl(raw.billOpenUrl || raw.billUrl || raw.driveFileUrl || raw.fileUrl);
+  const billOpenUrl = normalizeDriveFileOpenUrlFromCandidates([
+    raw.billDriveFileId,
+    raw.billFileId,
+    raw.billOpenUrl,
+    raw.billUrl,
+    raw.driveFileUrl,
+    raw.fileUrl,
+  ]);
   return {
     transactionId,
     date,

@@ -87,7 +87,8 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
         uploadedByEmail: "private@example.test",
         driveFileId: "private-drive-file",
         fileUrl: "https://drive.google.com/file/d/private/view",
-        canOpen: false,
+        canOpen: true,
+        canPreview: true,
       }],
     }],
     attendance: {
@@ -166,7 +167,11 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
   assert.equal(normalized.stats.maleFemaleRatio, "10:11");
   assert.equal(normalized.stats.avenueEventCounts.find((row) => row.avenueCode === "CMD")?.count, 3);
   assert.equal(formatVisitDashboardMoney(30914), "\u20b930,914");
-  assert.equal(formatVisitDashboardMoney(normalized.stats.treasuryNet), "₹749.5");
+  assert.equal(formatVisitDashboardMoney(84191.05), "\u20b984,191.05");
+  assert.equal(formatVisitDashboardMoney(6750), "\u20b96,750");
+  assert.equal(formatVisitDashboardMoney(77441.05), "\u20b977,441.05");
+  assert.equal(formatVisitDashboardMoney(normalized.stats.treasuryNet), "\u20b9749.5");
+  assert.doesNotMatch(formatVisitDashboardMoney(6750), /\.00/);
   assert.deepEqual(normalized.documentPanels, [{
     positionKey: "secretary",
     positionTitle: "Secretary",
@@ -185,14 +190,21 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       uploadedAt: "2026-07-19T10:00:00.000Z",
       uploadedByName: "Rtr. Safe Name",
       status: "active",
-      canOpen: false,
+      canOpen: true,
+      openUrl: "https://drive.google.com/file/d/private-drive-file/view",
+      canPreview: true,
+      previewUrl: "https://drive.google.com/file/d/private-drive-file/preview",
     }],
   }]);
   assert.equal(getVisitDocumentPanelActionLabel(normalized.documentPanels[0]), "Open folder");
   assert.equal("folderId" in normalized.documentPanels[0], false);
   assert.equal("driveFolderId" in normalized.documentPanels[0], false);
   assert.equal("folderUrl" in normalized.documentPanels[0], false);
+  assert.equal("driveFileId" in normalized.documentPanels[0].files[0], false);
+  assert.equal("fileUrl" in normalized.documentPanels[0].files[0], false);
   assert.equal(normalized.attendance.club.rows[0].cells["event-1"], "present");
+  assert.equal(normalized.attendance.club.columns[0].attendanceLabel, "100%");
+  assert.equal(normalized.attendance.club.rows[0].attendanceLabel, "100%");
   assert.equal("unknown-event" in normalized.attendance.club.rows[0].cells, false);
   assert.equal(formatVisitDashboardFileSize(2048), "2 KB");
   assert.equal(formatVisitDashboardDate("2026-07-18"), "18 Jul 2026");
@@ -301,7 +313,16 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
   assert.equal(empty.stats.avenueEventCounts.every((row) => row.count === 0), true);
   assert.deepEqual(empty.documentPanels, []);
   assert.deepEqual(empty.attendance.club, {
-    summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0 },
+    summary: {
+      totalEvents: 0,
+      totalPeople: 0,
+      averageAttendanceRate: 0,
+      averageAttendanceLabel: "0%",
+      averageEventAttendanceRate: null,
+      averageEventAttendanceLabel: "N/A",
+      averageMemberAttendanceRate: null,
+      averageMemberAttendanceLabel: "N/A",
+    },
     columns: [],
     rows: [],
   });
@@ -389,11 +410,20 @@ assert.match(pageSource, /row\.count === 0 \? "is-zero" : ""/);
   assert.match(pageSource, /visit-dashboard-folder-title/);
   assert.match(pageSource, /formatVisitAttendanceRoleCode\(panel\.positionTitle \|\| panel\.positionKey \|\| panel\.avenueCode\)/);
   assert.match(pageSource, /getVisitDocumentPanelActionLabel\(panel\)/);
+  assert.match(pageSource, /getPanelDocumentGroups\(panel\)/);
+  assert.match(pageSource, /isPrimaryPreviewDocument/);
   assert.match(pageSource, /visit-dashboard-folder-actions/);
   assert.match(pageSource, /visit-dashboard-folder-action/);
   assert.match(pageSource, /href=\{panel\.openUrl\}/);
   assert.match(pageSource, /target="_blank"/);
   assert.match(pageSource, /rel="noopener noreferrer"/);
+  assert.match(pageSource, /visit-dashboard-document-preview-frame/);
+  assert.match(pageSource, /src=\{primary\.previewUrl\}/);
+  assert.match(pageSource, /Preview of/);
+  assert.match(pageSource, /Other documents/);
+  assert.match(pageSource, /Open file/);
+  assert.match(pageSource, /href=\{file\.openUrl\}/);
+  assert.match(pageSource, /No previewable presentation or PDF found\. Open the folder to view files\./);
   assert.doesNotMatch(pageSource, /No folder link available/);
   assert.match(pageSource, /Only folders selected by the club admin are visible here\./);
   assert.match(pageSource, /No document folders have been selected for this visit yet\./);
@@ -407,6 +437,12 @@ assert.match(pageSource, /row\.count === 0 \? "is-zero" : ""/);
   assert.match(pageSource, /formatVisitAttendanceRoleCode/);
   assert.match(pageSource, /visit-dashboard-attendance-col-name/);
   assert.match(pageSource, /visit-dashboard-attendance-role/);
+  assert.match(pageSource, /visit-dashboard-attendance-col-percent/);
+  assert.match(pageSource, /visit-dashboard-attendance-percent/);
+  assert.match(pageSource, /Event attendance %/);
+  assert.match(pageSource, /Member attendance %/);
+  assert.match(pageSource, /column\.attendanceLabel/);
+  assert.match(pageSource, /row\.attendanceLabel/);
   assert.match(pageSource, /attendanceStatusMarkValue/);
   assert.match(pageSource, /<AttendanceMark/);
   assert.match(pageSource, /VISIT_ATTENDANCE_TABS\.map\(\(tab\)/);
@@ -454,25 +490,33 @@ test("visit dashboard CSS keeps metrics readable and compact sections gridded", 
   assert.match(visitCssSource, /\.visit-dashboard-avenue-list li \{[\s\S]*border-bottom:/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-avenue-list li \{[^}]*border-radius/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-directory \{[\s\S]*grid-template-columns: 1fr/);
-assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary \{[\s\S]*grid-template-columns: minmax\(16rem, 1fr\) max-content/);
+assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary \{[\s\S]*grid-template-columns: minmax\(20rem, 1fr\) max-content/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary strong \{[\s\S]*white-space: nowrap/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-panel summary strong \{[\s\S]*text-overflow: ellipsis/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-folder-panel summary strong \{[^}]*overflow-wrap: anywhere/);
 assert.match(visitCssSource, /\.visit-dashboard-folder-actions \{[\s\S]*inline-flex/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-action \{[\s\S]*var\(--internal-accent-soft\)/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-folder-action\.is-disabled/);
+  assert.match(visitCssSource, /\.visit-dashboard-document-panel-body \{/);
+  assert.match(visitCssSource, /\.visit-dashboard-document-preview-frame \{[\s\S]*min-height: min\(62vh, 38rem\)/);
+  assert.match(visitCssSource, /\.visit-dashboard-document-action \{/);
+  assert.match(visitCssSource, /\.visit-dashboard-document-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto/);
   assert.match(visitCssSource, /\.visit-dashboard-treasury-col-bill \{[\s\S]*width: 8rem/);
   assert.match(visitCssSource, /\.visit-dashboard-bill-link \{/);
   assert.match(visitCssSource, /\.visit-dashboard-bill-empty \{/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-panel \{[\s\S]*margin-inline: auto/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-summary \{[\s\S]*repeat\(auto-fit, minmax\(7rem, 1fr\)\)/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-name \{[\s\S]*white-space: nowrap/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-col-name \{[\s\S]*width: 18rem/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-col-percent \{[\s\S]*width: 8rem/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-role \{[\s\S]*white-space: nowrap/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-status \{[\s\S]*justify-content: center/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-percent \{[\s\S]*text-align: center/);
 assert.match(visitCssSource, /\.visit-dashboard-masthead__actions \{/);
 assert.match(visitCssSource, /\.visit-dashboard-action-link \{/);
 assert.match(visitCssSource, /\.visit-dashboard-avenue-disclosure summary \{[\s\S]*cursor: pointer/);
 assert.match(visitCssSource, /\.visit-dashboard-avenue-disclosure\[open\] \.visit-dashboard-avenue-count-wrap i \{[\s\S]*transform: rotate\(90deg\)/);
 assert.match(visitCssSource, /\.visit-dashboard-avenue-event-list \{/);
-assert.match(visitCssSource, /\.visit-dashboard-document-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+assert.match(visitCssSource, /\.visit-dashboard-document-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto/);
 
 });
