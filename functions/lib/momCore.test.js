@@ -101,7 +101,10 @@ test("MOM metadata replaces file while preserving original uploader", () => {
 
 test("MOM email recipient groups and payload validation are strict", () => {
   assert.deepEqual(normalizeMomRecipientGroups(["bod", "bad", "BOD", "gbm"]), ["bod", "gbm"]);
+  assert.deepEqual(normalizeMomRecipientGroups(["all", "bod", "prospect"]), ["all", "prospect"]);
   assert.equal(validateMomEmailRequest({ recipientGroups: ["bod"], subject: "MOM", body: "Attached." }).ok, true);
+  assert.equal(validateMomEmailRequest({ recipientGroups: ["all"], subject: "MOM", body: "Attached." }).includeProspects, false);
+  assert.equal(validateMomEmailRequest({ recipientGroups: ["all"], includeProspects: true, subject: "MOM", body: "Attached." }).includeProspects, true);
   assert.equal(validateMomEmailRequest({ recipientGroups: ["bad"], subject: "MOM", body: "Attached." }).ok, false);
   assert.equal(validateMomEmailRequest({ recipientGroups: ["bod"], subject: "", body: "Attached." }).ok, false);
   assert.equal(validateMomEmailRequest({ recipientGroups: ["bod"], subject: "MOM", body: "" }).ok, false);
@@ -122,6 +125,9 @@ test("MOM email recipient groups include role and active position metadata", () 
   assert.equal(momRecipientMatchesGroups({ role: "gbm" }, ["gbm"]), true);
   assert.equal(momRecipientMatchesGroups({ role: "prospect" }, ["prospect"]), true);
   assert.equal(momRecipientMatchesGroups({ role: "bod" }, ["all"]), true);
+  assert.equal(momRecipientMatchesGroups({ role: "prospect" }, ["all"]), false);
+  assert.equal(momRecipientMatchesGroups({ role: "prospect" }, ["all"], { includeProspects: true }), true);
+  assert.equal(momRecipientMatchesGroups({ role: "prospect" }, ["all", "prospect"], { includeProspects: false }), true);
   assert.equal(momRecipientMatchesGroups({ role: "bod", positionKeys: ["cmd"] }, ["president"]), false);
   assert.equal(momRecipientMatchesGroups({ role: "gbm", positionKeys: ["cmd"] }, ["bod"]), true);
   assert.equal(momRecipientMatchesGroups({ role: "admin", positionKeys: ["treasurer"] }, ["bod"]), true);

@@ -244,7 +244,9 @@ function normalizeMomRecipientGroups(value) {
       groups.push(group);
     }
   });
-  return groups.includes("all") ? ["all"] : groups;
+  return groups.includes("all")
+    ? ["all", ...(groups.includes("prospect") ? ["prospect"] : [])]
+    : groups;
 }
 
 function normalizeMomTargetUserIds(value) {
@@ -268,6 +270,7 @@ function normalizeMomTargetUserIds(value) {
 function validateMomEmailRequest(input = {}) {
   const recipientGroups = normalizeMomRecipientGroups(input.recipientGroups || input.recipientRoles || input.targetRoles);
   const explicitUsers = normalizeMomTargetUserIds(input.targetUserIds || input.explicitUserIds);
+  const includeProspects = input.includeProspects === true;
   const subject = cleanText(input.subject, 180);
   const body = cleanText(input.body, 6000);
   if (!explicitUsers.ok) return explicitUsers;
@@ -280,18 +283,20 @@ function validateMomEmailRequest(input = {}) {
   if (!body) {
     return { ok: false, code: "invalid-argument", message: "MOM email body is required." };
   }
-  return { ok: true, recipientGroups, targetUserIds: explicitUsers.targetUserIds, subject, body };
+  return { ok: true, recipientGroups, includeProspects, targetUserIds: explicitUsers.targetUserIds, subject, body };
 }
 
 function hasAnyPositionKey(positionKeys, allowedKeys) {
   return normalizePositionKeys(positionKeys).some((key) => allowedKeys.has(key));
 }
 
-function momRecipientMatchesGroups(recipient = {}, groups = []) {
+function momRecipientMatchesGroups(recipient = {}, groups = [], options = {}) {
   const normalizedGroups = normalizeMomRecipientGroups(groups);
   if (!normalizedGroups.length) return false;
-  if (normalizedGroups.includes('all')) return true;
   const role = cleanLower(recipient.role || recipient.storedRole, 40);
+  if (normalizedGroups.includes('all')) {
+    return role !== 'prospect' || options.includeProspects === true || normalizedGroups.includes('prospect');
+  }
   const positionKeys = normalizePositionKeys(recipient.positionKeys);
   const hasPresident = recipient.hasPresidentAuthority === true || hasAnyPositionKey(positionKeys, PRESIDENT_POSITION_KEYS);
   const hasSecretary = hasAnyPositionKey(positionKeys, SECRETARY_POSITION_KEYS);

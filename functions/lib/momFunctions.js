@@ -672,6 +672,7 @@ async function getEligibleMomRecipientsForUids(candidateIds, positionKeysByUid =
 
 async function resolveMomEmailRecipients(emailRequest) {
   const recipientGroups = Array.isArray(emailRequest?.recipientGroups) ? emailRequest.recipientGroups : [];
+  const includeProspects = emailRequest?.includeProspects === true;
   const targetUserIds = Array.isArray(emailRequest?.targetUserIds) ? emailRequest.targetUserIds : [];
   const explicitUidSet = new Set(targetUserIds);
   const candidateUids = new Set(targetUserIds);
@@ -695,11 +696,11 @@ async function resolveMomEmailRecipients(emailRequest) {
 
   const recipients = await getEligibleMomRecipientsForUids(Array.from(candidateUids), positionKeysByUid);
   return dedupeMomRecipients(recipients)
-    .filter(recipient => explicitUidSet.has(recipient.uid) || momRecipientMatchesGroups(recipient, recipientGroups));
+    .filter(recipient => explicitUidSet.has(recipient.uid) || momRecipientMatchesGroups(recipient, recipientGroups, { includeProspects }));
 }
 
 async function getMomEmailRecipientDirectory() {
-  const recipients = await resolveMomEmailRecipients({ recipientGroups: ['all'], targetUserIds: [] });
+  const recipients = await resolveMomEmailRecipients({ recipientGroups: ['all'], includeProspects: true, targetUserIds: [] });
   return recipients
     .filter(recipient => normalizeMomEmailAddress(recipient.email).ok)
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')) || a.uid.localeCompare(b.uid));
@@ -825,6 +826,7 @@ function serializeMomEmailHistory(id, history = {}) {
     momFileName: cleanText(history.momFileName, 180),
     recipientGroups: Array.isArray(history.recipientGroups) ? history.recipientGroups.map(group => cleanLower(group, 40)).filter(Boolean) : [],
     recipientRoles: Array.isArray(history.recipientRoles) ? history.recipientRoles.map(group => cleanLower(group, 40)).filter(Boolean) : [],
+    includeProspects: history.includeProspects === true,
     targetUserIds: Array.isArray(history.targetUserIds) ? history.targetUserIds.map(uid => safeDocumentId(uid)).filter(Boolean) : [],
     explicitRecipientCount: Number.isInteger(history.explicitRecipientCount) ? history.explicitRecipientCount : 0,
     recipientCount: Number.isInteger(history.recipientCount) ? history.recipientCount : 0,
@@ -856,6 +858,7 @@ async function writeMomEmailHistory({ target, access, request, recipients, summa
     momFileName: safeMomFileName(target.data.momFileName || 'mom.pdf'),
     recipientGroups: request.recipientGroups,
     recipientRoles: request.recipientGroups,
+    includeProspects: request.includeProspects === true,
     targetUserIds: request.targetUserIds || [],
     explicitRecipientCount: Array.isArray(request.targetUserIds) ? request.targetUserIds.length : 0,
     recipientCount: recipients.length,

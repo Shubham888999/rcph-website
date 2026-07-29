@@ -42,6 +42,14 @@ test('MOM BOD recipient group scans active BOD position assignments', () => {
   assert.match(functionsSource, /momRecipientMatchesGroups\(\{ role: 'gbm', positionKeys: \[positionKey\] \}, groups\)/);
 });
 
+test('MOM email recipient resolver carries the prospect opt-in through backend filtering', () => {
+  assert.match(functionsSource, /const includeProspects = emailRequest\?\.includeProspects === true/);
+  assert.match(functionsSource, /momRecipientMatchesGroups\(recipient, recipientGroups, \{ includeProspects \}\)/);
+  assert.match(functionsSource, /resolveMomEmailRecipients\(\{ recipientGroups: \['all'\], includeProspects: true, targetUserIds: \[\] \}\)/);
+  assert.match(functionsSource, /includeProspects: request\.includeProspects === true/);
+  assert.match(functionsSource, /includeProspects: history\.includeProspects === true/);
+});
+
 test('MOM upload and email history mirror to synced BOD event copies', () => {
   assert.match(functionsSource, /MOM_BOD_SYNC_FIELD_BY_TARGET_TYPE/);
   assert.match(functionsSource, /syncedEventId/);

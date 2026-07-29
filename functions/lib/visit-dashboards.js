@@ -138,10 +138,43 @@ function driveFileIdFromUrl(value) {
   return '';
 }
 
+function driveFileIdFromCandidates(values) {
+  for (const value of Array.isArray(values) ? values : []) {
+    const driveFileId = normalizeDriveFileId(value) || driveFileIdFromUrl(value);
+    if (driveFileId) return driveFileId;
+  }
+  return '';
+}
+
 function driveFileOpenUrl(raw) {
-  const driveFileId = normalizeDriveFileId(raw?.billDriveFileId || raw?.billFileId || raw?.driveFileId)
-    || driveFileIdFromUrl(raw?.billUrl || raw?.billDriveFileUrl || raw?.driveFileUrl || raw?.fileUrl);
+  const driveFileId = driveFileIdFromCandidates([
+    raw?.billDriveFileId,
+    raw?.billFileId,
+    raw?.driveFileId,
+    raw?.billUrl,
+    raw?.billDriveFileUrl,
+    raw?.driveFileUrl,
+    raw?.fileUrl,
+    raw?.openUrl,
+    raw?.previewUrl,
+    raw?.webViewLink,
+  ]);
   return driveFileId ? `${DRIVE_URL_ORIGIN}/file/d/${encodeURIComponent(driveFileId)}/view` : '';
+}
+
+function driveFilePreviewUrl(raw) {
+  const driveFileId = driveFileIdFromCandidates([
+    raw?.driveFileId,
+    raw?.fileDriveId,
+    raw?.googleDriveFileId,
+    raw?.fileId,
+    raw?.driveFileUrl,
+    raw?.fileUrl,
+    raw?.openUrl,
+    raw?.previewUrl,
+    raw?.webViewLink,
+  ]);
+  return driveFileId ? `${DRIVE_URL_ORIGIN}/file/d/${encodeURIComponent(driveFileId)}/preview` : '';
 }
 
 function validDate(value) {
@@ -188,6 +221,26 @@ function money(value) {
 
 function roundMoney(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+const PREVIEWABLE_DOCUMENT_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.presentation',
+]);
+const PREVIEWABLE_DOCUMENT_EXTENSIONS = new Set(['pdf', 'ppt', 'pptx']);
+
+function fileExtension(value) {
+  const match = normalizeText(value, 220).toLowerCase().match(/\.([a-z0-9]{1,12})$/);
+  return match ? match[1] : '';
+}
+
+function isPreviewableDocument(source, fileName = '') {
+  const mimeType = normalizeText(source?.mimeType, 160).toLowerCase();
+  if (PREVIEWABLE_DOCUMENT_MIME_TYPES.has(mimeType)) return true;
+  return PREVIEWABLE_DOCUMENT_EXTENSIONS.has(fileExtension(fileName || source?.fileName || source?.originalFileName));
 }
 
 function normalizeVisitType(value) {
@@ -371,6 +424,96 @@ function normalizeGender(value) {
   return 'unknown';
 }
 
+function recordData(record) {
+  if (record?.data && typeof record.data === 'object') return record.data;
+  return record && typeof record === 'object' ? record : {};
+}
+
+function recordId(record) {
+  const source = recordData(record);
+  return normalizeSafeId(record?.id || source.id || source.uid || source.userId, 160);
+}
+
+function nestedObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function genderValueFromSource(source) {
+  const profile = nestedObject(source.profile);
+  const memberProfile = nestedObject(source.memberProfile);
+  const profileData = nestedObject(source.profileData);
+  return [
+    source.gender,
+    source.memberGender,
+    source.profileGender,
+    source.genderIdentity,
+    source.sex,
+    profile.gender,
+    profile.memberGender,
+    profile.profileGender,
+    profile.genderIdentity,
+    profile.sex,
+    memberProfile.gender,
+    memberProfile.memberGender,
+    memberProfile.profileGender,
+    memberProfile.genderIdentity,
+    memberProfile.sex,
+    profileData.gender,
+    profileData.memberGender,
+    profileData.profileGender,
+    profileData.genderIdentity,
+    profileData.sex,
+  ].find(value => normalizeText(value, 80)) || '';
+}
+
+function indexUserProfiles(rawUsers) {
+  const usersById = new Map();
+  (Array.isArray(rawUsers) ? rawUsers : []).forEach((record) => {
+    const source = recordData(record);
+    const ids = [
+      recordId(record),
+      source.uid,
+      source.userId,
+      source.linkedUserUid,
+      source.linkedProfileUid,
+    ].map(value => normalizeSafeId(value, 160)).filter(Boolean);
+    ids.forEach(id => usersById.set(id, source));
+  });
+  return usersById;
+}
+
+function userIdsForMember(record) {
+  const source = recordData(record);
+  const profile = nestedObject(source.profile);
+  const memberProfile = nestedObject(source.memberProfile);
+  return [
+    source.userId,
+    source.uid,
+    source.linkedUserUid,
+    source.linkedProfileUid,
+    source.profileUid,
+    source.profileUserId,
+    profile.userId,
+    profile.uid,
+    memberProfile.userId,
+    memberProfile.uid,
+    recordId(record),
+  ].map(value => normalizeSafeId(value, 160)).filter(Boolean);
+}
+
+function genderForMember(record, usersById) {
+  const source = recordData(record);
+  const direct = normalizeGender(genderValueFromSource(source));
+  if (direct !== 'unknown') return direct;
+  for (const userId of userIdsForMember(record)) {
+    const user = usersById.get(userId);
+    if (!user) continue;
+    const linked = normalizeGender(genderValueFromSource(user));
+    if (linked !== 'unknown') return linked;
+  }
+  return direct;
+}
+
 function greatestCommonDivisor(a, b) {
   let x = Math.abs(a);
   let y = Math.abs(b);
@@ -388,9 +531,13 @@ function maleFemaleRatio(male, female) {
   return `${male / divisor}:${female / divisor}`;
 }
 
-function summarizeMembers(rawMembers) {
+function summarizeMembers(rawMembers, rawUsers = []) {
   const members = Array.isArray(rawMembers) ? rawMembers : [];
-  const activeMembers = members.filter(member => member && member.active !== false);
+  const usersById = indexUserProfiles(rawUsers);
+  const activeMembers = members.filter(member => {
+    const source = recordData(member);
+    return source && source.active !== false;
+  });
   const counts = {
     totalMembers: activeMembers.length,
     maleMembers: 0,
@@ -399,7 +546,7 @@ function summarizeMembers(rawMembers) {
     unknownGenderMembers: 0,
   };
   activeMembers.forEach((member) => {
-    const gender = normalizeGender(member.gender || member.sex);
+    const gender = genderForMember(member, usersById);
     if (gender === 'male') counts.maleMembers += 1;
     else if (gender === 'female') counts.femaleMembers += 1;
     else if (gender === 'other') counts.otherGenderMembers += 1;
@@ -552,9 +699,9 @@ function summarizeTreasury(rawTreasury) {
   };
 }
 
-function buildVisitDashboardStats({ members, events, treasury }) {
+function buildVisitDashboardStats({ members, users, events, treasury }) {
   return {
-    ...summarizeMembers(members),
+    ...summarizeMembers(members, users),
     ...summarizeEvents(events),
     ...summarizeTreasury(treasury),
   };
@@ -596,6 +743,15 @@ function shapeDocumentFile(doc) {
   const title = normalizeText(source.title || fileName || 'Untitled document', 180);
   if (!submissionId || !title) return null;
   const size = Number(source.sizeBytes || source.fileSize || 0);
+  const fileLinkSource = {
+    ...source,
+    driveFileId: source.driveFileId || source.fileDriveId || source.googleDriveFileId || source.fileId,
+    driveFileUrl: source.driveFileUrl || source.fileUrl || source.openUrl || source.previewUrl || source.webViewLink,
+  };
+  const openUrl = driveFileOpenUrl(fileLinkSource);
+  const previewUrl = isPreviewableDocument(source, fileName)
+    ? driveFilePreviewUrl(fileLinkSource)
+    : '';
   return {
     submissionId,
     title,
@@ -605,7 +761,10 @@ function shapeDocumentFile(doc) {
     uploadedAt: timestampToIso(source.createdAt || source.uploadedAt || source.updatedAt),
     uploadedByName: normalizeText(source.uploadedByName, 160),
     status: 'active',
-    canOpen: false,
+    canOpen: Boolean(openUrl),
+    openUrl,
+    canPreview: Boolean(previewUrl),
+    previewUrl,
   };
 }
 
@@ -680,14 +839,51 @@ function attendanceColumnFromDoc(doc, fallbackAvenueCode = '') {
   };
 }
 
+function attendanceRateFromCounts(attendedCount, eligibleCount) {
+  return eligibleCount ? Math.round((attendedCount / eligibleCount) * 100) : null;
+}
+
+function attendanceMetricsFromStatuses(statuses) {
+  let attendedCount = 0;
+  let eligibleCount = 0;
+  (Array.isArray(statuses) ? statuses : []).forEach((value) => {
+    const status = ATTENDANCE_STATUSES.includes(value) ? value : 'unknown';
+    if (status === 'present' || status === 'late') {
+      attendedCount += 1;
+      eligibleCount += 1;
+    } else if (status === 'absent') {
+      eligibleCount += 1;
+    }
+  });
+  return {
+    attendedCount,
+    eligibleCount,
+    attendanceRate: attendanceRateFromCounts(attendedCount, eligibleCount),
+  };
+}
+
+function averageAttendanceRate(items) {
+  const rates = (Array.isArray(items) ? items : [])
+    .map(item => item?.attendanceRate)
+    .filter(rate => Number.isFinite(rate));
+  if (!rates.length) return null;
+  return Math.round(rates.reduce((sum, rate) => sum + rate, 0) / rates.length);
+}
+
 function activePersonDocs(docs) {
   return (Array.isArray(docs) ? docs : [])
     .filter(doc => doc?.data && doc.data.active !== false);
 }
 
-function attendanceLookupId(doc) {
+function attendanceLookupIds(doc) {
   const source = doc?.data && typeof doc.data === 'object' ? doc.data : {};
-  return normalizeSafeId(source.userId || source.uid || doc?.id, 160);
+  return [
+    source.userId,
+    source.uid,
+    source.linkedUserUid,
+    source.linkedProfileUid,
+    doc?.id,
+  ].map(value => normalizeSafeId(value, 160)).filter(Boolean);
 }
 
 function personName(source, fallback) {
@@ -702,19 +898,24 @@ function attendanceRowsFromPeople({ peopleDocs, attendanceDocs, columns, fallbac
   );
 
   return activePersonDocs(peopleDocs)
-    .map((doc, index) => {
+      .map((doc, index) => {
       const source = doc.data || {};
-      const lookupId = attendanceLookupId(doc);
-      const attendance = attendanceById.get(lookupId) || {};
+      const attendance = attendanceLookupIds(doc)
+        .map(id => attendanceById.get(id))
+        .find(Boolean) || {};
       const cells = columns.reduce((result, column) => {
         result[column.eventId] = normalizeAttendanceStatus(attendance[column.eventId]);
         return result;
       }, {});
+      const metrics = attendanceMetricsFromStatuses(Object.values(cells));
       return {
         personId: `${personPrefix}-${index + 1}`,
         name: personName(source, `Person ${index + 1}`),
         roleOrPosition: normalizeText(source.position || source.clubPosition || source.role || source.memberType, 120)
           || fallbackRoleOrPosition,
+        attendedCount: metrics.attendedCount,
+        eligibleCount: metrics.eligibleCount,
+        attendanceRate: metrics.attendanceRate,
         cells,
       };
     })
@@ -722,30 +923,20 @@ function attendanceRowsFromPeople({ peopleDocs, attendanceDocs, columns, fallbac
 }
 
 function summarizeAttendanceView(columns, rows) {
-  let attended = 0;
-  let counted = 0;
-  rows.forEach((row) => {
-    columns.forEach((column) => {
-      const status = ATTENDANCE_STATUSES.includes(row.cells?.[column.eventId])
-        ? row.cells[column.eventId]
-        : 'unknown';
-      if (status === 'present' || status === 'late') {
-        attended += 1;
-        counted += 1;
-      } else if (status === 'absent') {
-        counted += 1;
-      }
-    });
-  });
+  const overall = attendanceMetricsFromStatuses(
+    rows.flatMap(row => columns.map(column => row.cells?.[column.eventId] || 'unknown'))
+  );
   return {
     totalEvents: columns.length,
     totalPeople: rows.length,
-    averageAttendanceRate: counted ? Math.round((attended / counted) * 100) : 0,
+    averageAttendanceRate: overall.attendanceRate ?? 0,
+    averageEventAttendanceRate: averageAttendanceRate(columns),
+    averageMemberAttendanceRate: averageAttendanceRate(rows),
   };
 }
 
 function buildAttendanceView({ eventDocs, peopleDocs, attendanceDocs, fallbackAvenueCode, fallbackRoleOrPosition, personPrefix, eventFilter }) {
-  const columns = (Array.isArray(eventDocs) ? eventDocs : [])
+  const baseColumns = (Array.isArray(eventDocs) ? eventDocs : [])
     .filter(doc => doc?.data && doc.data.archived !== true && (!eventFilter || eventFilter(doc.data)))
     .map(doc => attendanceColumnFromDoc(doc, fallbackAvenueCode))
     .filter(Boolean)
@@ -753,9 +944,18 @@ function buildAttendanceView({ eventDocs, peopleDocs, attendanceDocs, fallbackAv
   const rows = attendanceRowsFromPeople({
     peopleDocs,
     attendanceDocs,
-    columns,
+    columns: baseColumns,
     fallbackRoleOrPosition,
     personPrefix,
+  });
+  const columns = baseColumns.map((column) => {
+    const metrics = attendanceMetricsFromStatuses(rows.map(row => row.cells?.[column.eventId] || 'unknown'));
+    return {
+      ...column,
+      attendedCount: metrics.attendedCount,
+      eligibleCount: metrics.eligibleCount,
+      attendanceRate: metrics.attendanceRate,
+    };
   });
   return {
     summary: summarizeAttendanceView(columns, rows),
@@ -1045,6 +1245,7 @@ function createVisitDashboardService(options = {}) {
     const visiblePositionKeys = config.visiblePositionKeys.slice();
     const [
       members,
+      users,
       events,
       treasury,
       visitPositionDocs,
@@ -1057,6 +1258,7 @@ function createVisitDashboardService(options = {}) {
       districtAttendance,
     ] = await Promise.all([
       adapter.listDocs('members'),
+      adapter.listDocs('users'),
       adapter.listDocs('events'),
       adapter.listDocs('treasury'),
       visiblePositionKeys.length ? adapter.listVisitPositionDocs(visitType) : Promise.resolve([]),
@@ -1078,7 +1280,8 @@ function createVisitDashboardService(options = {}) {
         dashboardVisible: true,
       },
       stats: buildVisitDashboardStats({
-        members: members.map(doc => doc.data || {}),
+        members,
+        users,
         events: events.map(doc => doc.data || {}),
         treasury: treasury.map(doc => doc.data || {}),
       }),

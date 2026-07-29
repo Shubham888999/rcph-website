@@ -33,10 +33,14 @@ function createService(initial = {}) {
       },
       members: initial.members || {
         m1: { name: 'Private One', email: 'one@example.test', active: true, gender: 'male' },
-        m2: { name: 'Private Two', email: 'two@example.test', active: true, gender: 'Female' },
+        m2: { name: 'Private Two', email: 'two@example.test', active: true, userId: 'u2' },
         m3: { name: 'Inactive', email: 'inactive@example.test', active: false, gender: 'female' },
-        m4: { name: 'Private Three', email: 'three@example.test', active: true, gender: 'non-binary' },
-        m5: { name: 'Private Four', email: 'four@example.test', active: true, gender: '' },
+        m4: { name: 'Private Three', email: 'three@example.test', active: true, profile: { gender: 'non-binary' } },
+        m5: { name: 'Private Four', email: 'four@example.test', active: true, linkedUserUid: 'u5' },
+      },
+      users: initial.users || {
+        u2: { name: 'Private Two Profile', email: 'two-profile@example.test', active: true, status: 'approved', gender: 'woman' },
+        u5: { name: 'Private Four Profile', email: 'four-profile@example.test', active: true, status: 'approved', gender: 'prefer-not-to-say' },
       },
       events: initial.events || {
         e1: { name: 'Community Work', date: '2026-07-01', avenue: ['CMD', 'CSD'], type: 'clubEvent' },
@@ -230,6 +234,8 @@ function assertNoSensitivePayload(value) {
   [
     'one@example.test',
     'two@example.test',
+    'two-profile@example.test',
+    'four-profile@example.test',
     'bod-one@example.test',
     '+91-private',
     'billUrl',
@@ -279,9 +285,13 @@ function assertOnlySafeDriveUrls(value, pathLabel = 'root') {
     const isFolderOpenUrl = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(value);
     const isBillOpenUrl = pathLabel.endsWith('.billOpenUrl')
       && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(value);
+    const isDocumentOpenUrl = /\.documentPanels\[\d+\]\.files\[\d+\]\.openUrl$/.test(pathLabel)
+      && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(value);
+    const isDocumentPreviewUrl = /\.documentPanels\[\d+\]\.files\[\d+\]\.previewUrl$/.test(pathLabel)
+      && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/preview$/.test(value);
     assert.ok(
-      isFolderOpenUrl || isBillOpenUrl,
-      `Only canonical Drive folder URLs and billOpenUrl Drive file URLs may be exposed at ${pathLabel}`
+      isFolderOpenUrl || isBillOpenUrl || isDocumentOpenUrl || isDocumentPreviewUrl,
+      `Only canonical Drive folder URLs and safe Drive file URLs may be exposed at ${pathLabel}`
     );
   }
 }
@@ -516,21 +526,48 @@ assertNoSensitivePayload(districtDuesTreasury);
     ]
   );
   assert.equal(districtByDefault.documentPanels.some(panel => panel.positionKey === 'treasurer'), false);
-  assert.equal(districtByDefault.documentPanels[0].files[0].canOpen, false);
+  assert.equal(districtByDefault.documentPanels[0].files[0].canOpen, true);
+  assert.equal(
+    districtByDefault.documentPanels[0].files[0].openUrl,
+    'https://drive.google.com/file/d/private-president-drive-file/view'
+  );
+  assert.equal(districtByDefault.documentPanels[0].files[0].canPreview, true);
+  assert.equal(
+    districtByDefault.documentPanels[0].files[0].previewUrl,
+    'https://drive.google.com/file/d/private-president-drive-file/preview'
+  );
   assert.deepEqual(
     Object.keys(districtByDefault.documentPanels[0].files[0]).sort(),
-    ['canOpen', 'fileName', 'fileSize', 'mimeType', 'status', 'submissionId', 'title', 'uploadedAt', 'uploadedByName'].sort()
+    ['canOpen', 'canPreview', 'fileName', 'fileSize', 'mimeType', 'openUrl', 'previewUrl', 'status', 'submissionId', 'title', 'uploadedAt', 'uploadedByName'].sort()
   );
   assert.equal(districtByDefault.attendance.club.summary.totalEvents, 2);
   assert.equal(districtByDefault.attendance.club.summary.totalPeople, 4);
   assert.equal(districtByDefault.attendance.club.summary.averageAttendanceRate, 50);
+  assert.equal(districtByDefault.attendance.club.summary.averageEventAttendanceRate, 34);
+  assert.equal(districtByDefault.attendance.club.summary.averageMemberAttendanceRate, 50);
   assert.equal(districtByDefault.attendance.club.columns.map(column => column.eventId).join(','), 'e1,e5');
+  assert.deepEqual(
+    districtByDefault.attendance.club.columns.map(column => ({
+      eventId: column.eventId,
+      attendedCount: column.attendedCount,
+      eligibleCount: column.eligibleCount,
+      attendanceRate: column.attendanceRate,
+    })),
+    [
+      { eventId: 'e1', attendedCount: 2, eligibleCount: 3, attendanceRate: 67 },
+      { eventId: 'e5', attendedCount: 0, eligibleCount: 1, attendanceRate: 0 },
+    ]
+  );
   assert.equal(districtByDefault.attendance.club.rows.find(row => row.name === 'Private One').cells.e1, 'present');
+  assert.equal(districtByDefault.attendance.club.rows.find(row => row.name === 'Private One').attendanceRate, 50);
   assert.equal(districtByDefault.attendance.club.rows.find(row => row.name === 'Private Three').cells.e1, 'late');
+  assert.equal(districtByDefault.attendance.club.rows.find(row => row.name === 'Private Four').attendanceRate, null);
   assert.equal(districtByDefault.attendance.bod.summary.totalEvents, 1);
   assert.equal(districtByDefault.attendance.bod.summary.totalPeople, 2);
+  assert.equal(districtByDefault.attendance.bod.summary.averageEventAttendanceRate, 100);
   assert.equal(districtByDefault.attendance.bod.rows.find(row => row.name === 'BOD Two').cells.bm1, 'excused');
   assert.equal(districtByDefault.attendance.district.summary.totalEvents, 1);
+  assert.equal(districtByDefault.attendance.district.columns[0].attendanceRate, 0);
   assert.equal(districtByDefault.attendance.district.rows.find(row => row.name === 'Private Two').cells.de1, 'absent');
   assertNoSensitivePayload(districtByDefault);
 
@@ -589,9 +626,9 @@ assertNoSensitivePayload(districtDuesTreasury);
     { positionKey: 'secretary', fileCount: 0, canOpen: true },
   ]);
   assert.deepEqual(empty.attendance, {
-    club: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0 }, columns: [], rows: [] },
-    bod: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0 }, columns: [], rows: [] },
-    district: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0 }, columns: [], rows: [] },
+    club: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0, averageEventAttendanceRate: null, averageMemberAttendanceRate: null }, columns: [], rows: [] },
+    bod: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0, averageEventAttendanceRate: null, averageMemberAttendanceRate: null }, columns: [], rows: [] },
+    district: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0, averageEventAttendanceRate: null, averageMemberAttendanceRate: null }, columns: [], rows: [] },
   });
   assert.deepEqual(empty.treasury, {
     summary: { income: 0, expense: 0, net: 0, transactionCount: 0 },
