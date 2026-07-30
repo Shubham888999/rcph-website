@@ -4,7 +4,7 @@ import AdminModuleHeader from "../AdminModuleHeader";
 import { AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
-import { normalizeFolder, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
+import { normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
 import VisitSubmissionFiles from "./VisitSubmissionFiles";
 import {
   addVisitFiles,
@@ -35,7 +35,7 @@ export default function VisitSubmissionsModule({ onNotice }) {
   }
   async function openVisit(visitType) {
     setState((current) => ({ ...current, status: "loading" }));
-    try { const data = await visitCalls.folders(visitType); setRoute({ visit: visitType, position: "" }); setState((current) => ({ ...current, status: "success", folders: { visit: normalizeVisit(data.visit), access: data.access || {}, folders: (data.folders || []).map(normalizeFolder).filter(Boolean) }, detail: null })); }
+    try { const data = await visitCalls.folders(visitType); setRoute({ visit: visitType, position: "" }); setState((current) => ({ ...current, status: "success", folders: { visit: normalizeVisit(data.visit), access: data.access || {}, folders: normalizeFolders(data.folders, visitType) }, detail: null })); }
     catch (error) { setState((current) => ({ ...current, status: "error", error: safeAdminError(error) })); }
   }
   async function openFolder(visitType, positionKey) {

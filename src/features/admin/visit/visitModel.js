@@ -59,6 +59,21 @@ export function normalizeFolder(value) {
     canManage: value.canManage === true,
   };
 }
+
+export function normalizeFolders(values, visitType = "") {
+  const expectedVisitType = VISIT_TYPES.includes(visitType) ? visitType : "";
+  const folders = [];
+  const seen = new Set();
+  for (const value of Array.isArray(values) ? values : []) {
+    const folder = normalizeFolder(value);
+    if (!folder || (expectedVisitType && folder.visitType !== expectedVisitType)) continue;
+    const key = `${folder.visitType}:${folder.positionKey}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    folders.push(folder);
+  }
+  return folders;
+}
 export function normalizeSubmission(value) {
   if (!value || !text(value.submissionId || value.id, 128)) return null;
   return {
