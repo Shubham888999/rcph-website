@@ -1,9 +1,9 @@
 .visit-dashboard-page {
-  --visit-dashboard-attendance-side-gap: clamp(1.5rem, 2vw, 2.25rem);
   min-height: 100vh;
-  overflow-x: clip;
-  overflow-y: visible;
-  padding: clamp(1rem, 3vw, 2.25rem) var(--visit-dashboard-attendance-side-gap) clamp(2.25rem, 5vw, 4rem);
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding: clamp(1rem, 3vw, 2.25rem) clamp(1rem, 4vw, 3.5rem) clamp(2.25rem, 5vw, 4rem);
   color: var(--internal-text);
   background:
     radial-gradient(ellipse at 8% 0%, rgba(229, 194, 104, 0.13), transparent 32%),
@@ -13,6 +13,7 @@
 
 .visit-dashboard-shell {
   width: min(1480px, 100%);
+  min-width: 0;
   margin: 0 auto;
   display: grid;
   gap: clamp(1.75rem, 4vw, 3.4rem);
@@ -72,63 +73,98 @@
 }
 
 .visit-dashboard-officials {
-  max-width: 44rem;
+  max-width: 52rem;
   margin: 1.05rem 0 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 0.28rem 0.5rem;
+  align-items: baseline;
+  color: var(--internal-text-muted);
   list-style: none;
 }
 
-.visit-dashboard-officials li,
-.visit-dashboard-readonly {
-  min-height: 1.9rem;
-  padding: 0.35rem 0.65rem;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid rgba(229, 194, 104, 0.24);
-  border-radius: var(--internal-radius-control);
-  color: var(--internal-text-muted);
-  background: rgba(255, 255, 255, 0.035);
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1.2;
+.visit-dashboard-officials::before {
+  content: "District officials";
+  color: var(--internal-accent-secondary);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-officials li {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--internal-accent-soft);
+  background: transparent;
+  font-size: clamp(0.9rem, 1.4vw, 1rem);
+  font-weight: 850;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.visit-dashboard-readonly {
-  justify-self: end;
-  border-color: rgba(96, 195, 196, 0.36);
-  color: var(--internal-accent-secondary);
-  background: rgba(96, 195, 196, 0.08);
-  text-transform: uppercase;
+.visit-dashboard-officials li + li::before {
+  margin-right: 0.5rem;
+  color: rgba(255, 255, 255, 0.32);
+  content: "/";
 }
+
 .visit-dashboard-masthead__actions {
   justify-self: end;
-  display: grid;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.38rem;
+  padding-top: 0.35rem;
+  text-align: right;
 }
 
 .visit-dashboard-action-link {
-  min-height: 1.9rem;
-  padding: 0.35rem 0.65rem;
+  min-height: 0;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(229, 194, 104, 0.34);
-  border-radius: var(--internal-radius-control);
+  border: 0;
+  border-bottom: 1px solid rgba(229, 194, 104, 0.55);
+  border-radius: 0;
   color: var(--internal-accent-soft);
-  background: rgba(229, 194, 104, 0.06);
+  background: transparent;
   font-size: 0.82rem;
-  font-weight: 850;
+  font-weight: 900;
+  letter-spacing: 0.08em;
   text-decoration: none;
   text-transform: uppercase;
 }
 
+.visit-dashboard-readonly {
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 0;
+  color: var(--internal-accent-secondary);
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-readonly::before {
+  color: rgba(96, 195, 196, 0.7);
+  content: "•";
+}
+
 .visit-dashboard-action-link:hover {
-  border-color: rgba(229, 194, 104, 0.56);
-  background: rgba(229, 194, 104, 0.1);
+  color: var(--internal-accent);
+  border-bottom-color: var(--internal-accent);
+  background: transparent;
 }
 .visit-dashboard-summary {
   display: grid;
@@ -341,10 +377,6 @@
 
 .visit-dashboard-avenue-list li:first-child {
   padding-top: 0.32rem;
-}
-
-.visit-dashboard-avenue-list li.is-zero {
-  opacity: 0.62;
 }
 
 .visit-dashboard-avenue-chip__label {
@@ -758,9 +790,10 @@ a.visit-dashboard-document-action:hover {
 .visit-dashboard-attendance {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   display: grid;
   justify-self: stretch;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -831,10 +864,11 @@ a.visit-dashboard-document-action:hover {
 
 .visit-dashboard-attendance-panel {
   min-width: 0;
-  width: 100%;
+  width: min(100%, 90rem);
+  max-width: 100%;
   margin-inline: 0;
   padding: clamp(0.8rem, 1.8vw, 1.1rem);
-  overflow: visible;
+  overflow: hidden;
   box-sizing: border-box;
   border: 1px solid var(--internal-border-strong);
   background:
@@ -843,14 +877,16 @@ a.visit-dashboard-document-action:hover {
 }
 
 .visit-dashboard-attendance-summary {
-  margin: 0 0 1rem;
-  padding: 0 0 0.9rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 0.75rem;
+  padding: 0 0 0.65rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(5, minmax(8rem, 1fr));
+  gap: 0.45rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
 }
-
 .visit-dashboard-attendance-summary div {
   min-width: 0;
 }
@@ -869,20 +905,32 @@ a.visit-dashboard-document-action:hover {
   font-weight: 900;
 }
 
-.visit-dashboard-attendance-table-wrap {
+.visit-dashboard-attendance-table-shell {
   width: 100%;
   max-width: 100%;
-  display: block;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0 2.75rem 0.75rem 0;
-  scroll-padding-inline: 0 2.75rem;
-  overscroll-behavior-inline: contain;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   box-sizing: border-box;
+}
+.visit-dashboard-attendance-table-wrap {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 54rem;
+  max-height: 78vh;
+  display: block;
+  overflow-x: scroll !important;
+  overflow-y: auto;
+  padding: 0 0 0.9rem;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
   scrollbar-width: auto;
 }
 
 .visit-dashboard-attendance-table-wrap::-webkit-scrollbar {
+  width: 14px;
   height: 14px;
 }
 
@@ -897,32 +945,24 @@ a.visit-dashboard-document-action:hover {
 }
 
 .visit-dashboard-attendance-table {
-  --visit-dashboard-attendance-percent-width: 6.5rem;
-  --visit-dashboard-attendance-name-width: 17rem;
-  --visit-dashboard-attendance-role-width: 7rem;
-  --visit-dashboard-attendance-status-width: 7.4rem;
-  --visit-dashboard-attendance-sticky-bg: var(--internal-surface);
-  width: max(100%, var(--visit-dashboard-attendance-table-width, 980px));
-  min-width: var(--visit-dashboard-attendance-table-width, 980px);
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
-
 .visit-dashboard-attendance-col-percent {
-  width: var(--visit-dashboard-attendance-percent-width);
+  width: 6rem;
 }
 
 .visit-dashboard-attendance-col-name {
-  width: var(--visit-dashboard-attendance-name-width);
+  width: 16rem;
 }
 
 .visit-dashboard-attendance-col-role {
-  width: var(--visit-dashboard-attendance-role-width);
+  width: 7rem;
 }
 
 .visit-dashboard-attendance-col-status {
-  width: var(--visit-dashboard-attendance-status-width);
+  width: 8rem;
 }
 
 .visit-dashboard-attendance-table caption {
@@ -978,41 +1018,59 @@ a.visit-dashboard-document-action:hover {
 .visit-dashboard-attendance-table thead th {
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: 80;
   background: var(--internal-surface);
+  background-clip: padding-box;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
 }
-
+.visit-dashboard-attendance-mark-cell {
+  position: relative;
+  z-index: 1;
+}
 .visit-dashboard-attendance-percent-heading,
 .visit-dashboard-attendance-percent {
   position: sticky;
   left: 0;
-  z-index: 5;
-  background: var(--visit-dashboard-attendance-sticky-bg);
+  background: var(--internal-surface);
+}
+
+.visit-dashboard-attendance-percent {
+  z-index: 30;
+}
+
+.visit-dashboard-attendance-percent-heading {
+  z-index: 120;
 }
 
 .visit-dashboard-attendance-name-heading,
 .visit-dashboard-attendance-name {
   position: sticky;
-  left: var(--visit-dashboard-attendance-percent-width);
-  z-index: 5;
-  background: var(--visit-dashboard-attendance-sticky-bg);
+  left: 6rem;
+  background: var(--internal-surface);
 }
 
+.visit-dashboard-attendance-name {
+  z-index: 30;
+}
+
+.visit-dashboard-attendance-name-heading {
+  z-index: 120;
+}
 .visit-dashboard-attendance-role-heading,
 .visit-dashboard-attendance-role {
   position: sticky;
-  left: calc(var(--visit-dashboard-attendance-percent-width) + var(--visit-dashboard-attendance-name-width));
-  z-index: 5;
-  background: var(--visit-dashboard-attendance-sticky-bg);
+  left: 22rem;
+  background: var(--internal-surface);
   box-shadow: 1px 0 0 rgba(255, 255, 255, 0.13);
 }
 
-.visit-dashboard-attendance-percent-heading,
-.visit-dashboard-attendance-name-heading,
-.visit-dashboard-attendance-role-heading {
-  z-index: 7;
+.visit-dashboard-attendance-role {
+  z-index: 30;
 }
 
+.visit-dashboard-attendance-role-heading {
+  z-index: 120;
+}
 .visit-dashboard-attendance-name {
   color: var(--internal-text);
   overflow: hidden;
@@ -1640,8 +1698,7 @@ a.visit-dashboard-document-action:hover {
 
 @media (max-width: 40rem) {
   .visit-dashboard-page {
-    --visit-dashboard-attendance-side-gap: clamp(0.9rem, 4vw, 1.25rem);
-    padding: 1rem var(--visit-dashboard-attendance-side-gap) 2rem;
+    padding: 1rem var(--page-gutter) 2rem;
   }
 
   .visit-dashboard-masthead h1,
@@ -1720,19 +1777,6 @@ a.visit-dashboard-document-action:hover {
   .visit-dashboard-attendance-panel {
     padding: 0.8rem;
   }
-
-  .visit-dashboard-attendance-table {
-    --visit-dashboard-attendance-percent-width: 6rem;
-    --visit-dashboard-attendance-name-width: 13.5rem;
-    --visit-dashboard-attendance-role-width: 6rem;
-    --visit-dashboard-attendance-status-width: 6.6rem;
-    min-width: 900px;
-  }
-
-.visit-dashboard-attendance-table-wrap {
-  padding-right: 1.5rem;
-  scroll-padding-inline: 0 1.5rem;
-}
 }
 @media (max-width: 720px) {
   .visit-dashboard-masthead__actions {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAuth from "../../hooks/useAuth";
@@ -133,6 +133,8 @@ function visitEventsForAvenue(attendance, row) {
   });
 }
 function AvenueCounts({ rows, attendance }) {
+  const activeAvenueRows = rows.filter((row) => Number(row.count) > 0);
+
   return (
     <section className="visit-dashboard-avenue-section" aria-labelledby="visit-dashboard-avenues-title">
       <header>
@@ -140,46 +142,52 @@ function AvenueCounts({ rows, attendance }) {
         <h2 id="visit-dashboard-avenues-title">Avenue-wise events</h2>
       </header>
 
-      <ul className="visit-dashboard-avenue-list">
-        {rows.map((row) => {
-          const events = visitEventsForAvenue(attendance, row);
+      {activeAvenueRows.length ? (
+        <ul className="visit-dashboard-avenue-list">
+          {activeAvenueRows.map((row) => {
+            const events = visitEventsForAvenue(attendance, row);
 
-          return (
-            <li className={row.count === 0 ? "is-zero" : ""} key={row.avenueCode}>
-              <details className="visit-dashboard-avenue-disclosure">
-                <summary>
-                  <span className="visit-dashboard-avenue-chip__label">
-                    <strong>{row.avenueName}</strong>
-                    <small>{row.avenueCode}</small>
-                  </span>
+            return (
+              <li key={row.avenueCode}>
+                <details className="visit-dashboard-avenue-disclosure">
+                  <summary>
+                    <span className="visit-dashboard-avenue-chip__label">
+                      <strong>{row.avenueName}</strong>
+                      <small>{row.avenueCode}</small>
+                    </span>
 
-                  <span className="visit-dashboard-avenue-count-wrap">
-                    <b aria-label={`${row.count} ${row.count === 1 ? "event" : "events"}`}>
-                      {row.count}
-                    </b>
-                    <i aria-hidden="true">&gt;</i>
-                  </span>
-                </summary>
+                    <span className="visit-dashboard-avenue-count-wrap">
+                      <b aria-label={`${row.count} ${row.count === 1 ? "event" : "events"}`}>
+                        {row.count}
+                      </b>
+                      <i aria-hidden="true">&gt;</i>
+                    </span>
+                  </summary>
 
-                {events.length ? (
-                  <ul className="visit-dashboard-avenue-event-list">
-                    {events.map((event) => (
-                      <li key={event.eventId}>
-                        <strong>{event.title}</strong>
-                        <span>{event.date}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="visit-dashboard-avenue-empty">
-                    No events recorded for this avenue yet.
-                  </p>
-                )}
-              </details>
-            </li>
-          );
-        })}
-      </ul>
+                  {events.length ? (
+                    <ul className="visit-dashboard-avenue-event-list">
+                      {events.map((event) => (
+                        <li key={event.eventId}>
+                          <strong>{event.title}</strong>
+                          <span>{event.date}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="visit-dashboard-avenue-empty">
+                      No linked attendance records found for this avenue yet.
+                    </p>
+                  )}
+                </details>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <div className="visit-dashboard-empty-state">
+          <strong>No avenue-wise events have been recorded yet.</strong>
+        </div>
+      )}
     </section>
   );
 }
@@ -247,7 +255,7 @@ function DocumentPanels({ panels }) {
   const allPanelsCanOpen = hasPanels && panels.every((panel) => panel.canOpen && panel.openUrl);
   const folderLinkNote = allPanelsCanOpen
     ? "Open the selected Google Drive folders shared by the club admin."
-    : "Folder links appear when shared by the club admin.";
+    : "Folder links appear when files are uploaded";
 
   return (
     <section className="visit-dashboard-documents" aria-labelledby="visit-dashboard-documents-title">
@@ -256,7 +264,6 @@ function DocumentPanels({ panels }) {
           <p className="visit-dashboard-eyebrow">Selected folders</p>
           <h2 id="visit-dashboard-documents-title">BOD Documents</h2>
         </div>
-        <p>Only folders selected by the club admin are visible here.</p>
       </header>
 
       {!hasPanels ? (
@@ -357,30 +364,6 @@ function attendanceStatusMarkValue(status) {
 }
 
 function AttendanceTable({ view }) {
-  const tableWrapRef = useRef(null);
-
-  const handleAttendanceWheel = useCallback((event) => {
-    const tableWrap = tableWrapRef.current;
-    if (!tableWrap) return;
-
-    const canScrollHorizontally = tableWrap.scrollWidth > tableWrap.clientWidth + 1;
-    if (!canScrollHorizontally) return;
-
-    const mostlyVerticalWheel = Math.abs(event.deltaY) > Math.abs(event.deltaX);
-    if (!mostlyVerticalWheel) return;
-
-    const maxScrollLeft = tableWrap.scrollWidth - tableWrap.clientWidth;
-    const nextScrollLeft = Math.max(
-      0,
-      Math.min(maxScrollLeft, tableWrap.scrollLeft + event.deltaY),
-    );
-
-    if (nextScrollLeft === tableWrap.scrollLeft) return;
-
-    event.preventDefault();
-    tableWrap.scrollLeft = nextScrollLeft;
-  }, []);
-
   if (!view.columns.length) {
     return (
       <div className="visit-dashboard-empty-state">
@@ -397,18 +380,20 @@ function AttendanceTable({ view }) {
     );
   }
 
-  const tableMinWidth = Math.max(1280, 560 + view.columns.length * 118);
+  const fixedColumnsWidth = 6 + 16 + 7;
+  const eventColumnWidth = 8;
+  const tableWidthRem = fixedColumnsWidth + (view.columns.length * eventColumnWidth);
 
   return (
+    <div className="visit-dashboard-attendance-table-shell">
 <div
   className="visit-dashboard-attendance-table-wrap"
-  onWheel={handleAttendanceWheel}
-  ref={tableWrapRef}
+  tabIndex={0}
 >
-  <table
-    className="visit-dashboard-attendance-table"
-    style={{ "--visit-dashboard-attendance-table-width": `${tableMinWidth}px` }}
-  >
+          <table
+          className="visit-dashboard-attendance-table"
+          style={{ width: `${tableWidthRem}rem`, minWidth: "69rem" }}
+        >
           <caption>Read-only attendance overview</caption>
           <colgroup>
             <col className="visit-dashboard-attendance-col-percent" />
@@ -482,8 +467,9 @@ function AttendanceTable({ view }) {
               );
             })}
           </tbody>
-  </table>
-</div>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -585,7 +571,6 @@ function FinesRecords({ fines }) {
           <p className="visit-dashboard-eyebrow">Read-only</p>
           <h2 id="visit-dashboard-fines-title">Fines Records</h2>
         </div>
-        <p>Read-only fine summary and member fine register for the selected visit.</p>
       </header>
 
       <dl className="visit-dashboard-fines-summary">
@@ -679,7 +664,6 @@ function TreasuryRecords({ treasury }) {
           <p className="visit-dashboard-eyebrow">Read-only</p>
           <h2 id="visit-dashboard-treasury-title">Treasury Records</h2>
         </div>
-        <p>Read-only financial summary and transaction register for the selected visit.</p>
       </header>
 
       <dl className="visit-dashboard-treasury-summary">
