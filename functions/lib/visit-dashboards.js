@@ -690,6 +690,125 @@ function buildVisitDashboardTreasury(rawTreasury) {
   };
 }
 
+function isActiveFineRecord(row) {
+  const status = normalizeText(row?.status, 40).toLowerCase();
+  const visibility = normalizeText(row?.visibility, 40).toLowerCase();
+  return Boolean(
+    row
+      && row.archived !== true
+      && row.deleted !== true
+      && row.isDeleted !== true
+      && row.active !== false
+      && row.isActive !== false
+      && row.internal !== true
+      && row.private !== true
+      && status !== 'archived'
+      && status !== 'deleted'
+      && status !== 'internal'
+      && status !== 'private'
+      && visibility !== 'internal'
+      && visibility !== 'private'
+  );
+}
+
+function fineReasonLabel(value) {
+  const reason = normalizeText(value, 180);
+  const key = reason.toLowerCase();
+  if (key === 'missing_badge') return 'Missing badge';
+  if (key === 'late') return 'Late to event/meeting';
+  return reason
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b[a-z]/g, letter => letter.toUpperCase());
+}
+
+function normalizeFineStatus(row) {
+  const source = row && typeof row === 'object' ? row : {};
+  const statusText = [
+    source.status,
+    source.paymentStatus,
+    source.fineStatus,
+    source.collectionStatus,
+    source.paidStatus,
+  ].map(value => normalizeText(value, 80).toLowerCase()).filter(Boolean).join(' ');
+
+  if (source.waived === true || /\b(waived|forgiven|cancelled|canceled)\b/.test(statusText)) return 'waived';
+  if (/\b(pending|unpaid|due|open|outstanding)\b/.test(statusText)) return 'pending';
+  if (/\b(paid|collected|settled|complete|completed|closed)\b/.test(statusText)) return 'paid';
+  if (source.paid === true || source.collected === true || source.settled === true || normalizeText(source.treasuryEntryId, 128)) return 'paid';
+  if (source.paid === false || source.collected === false || source.settled === false) return 'pending';
+  return 'unknown';
+}
+
+function shapeFineRow(doc) {
+  const source = doc?.data && typeof doc.data === 'object'
+    ? doc.data
+    : (doc && typeof doc === 'object' ? doc : {});
+  if (!isActiveFineRecord(source)) return null;
+  const amount = money(source.amount);
+  const date = dateOnly(source.date || source.fineDate || source.eventDate);
+  const memberName = normalizeText(source.memberName || source.member || source.name, 160);
+  const reason = fineReasonLabel(source.reason || source.title || source.description || source.eventName);
+  if (amount === null || !date || !memberName || !reason) return null;
+  return {
+    memberName,
+    reason,
+    title: normalizeText(source.title || source.eventName, 180),
+    amount,
+    status: normalizeFineStatus(source),
+    date,
+    notes: normalizeText(source.dashboardNotes || source.visitDashboardNotes || source.publicNotes, 500),
+  };
+}
+
+function buildVisitDashboardFines(rawFines) {
+  const sortedRows = (Array.isArray(rawFines) ? rawFines : [])
+    .map((doc, index) => {
+      const row = shapeFineRow(doc);
+      return row ? { ...row, _sortIndex: index } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => (
+      b.date.localeCompare(a.date)
+      || a.memberName.localeCompare(b.memberName)
+      || a.reason.localeCompare(b.reason)
+      || a._sortIndex - b._sortIndex
+    ));
+  const rows = sortedRows.map((row, index) => {
+    const { _sortIndex, ...clean } = row;
+    return {
+      fineKey: `fine-${index + 1}`,
+      ...clean,
+    };
+  });
+  let paidFines = 0;
+  let pendingFines = 0;
+  let totalAmount = 0;
+  let collectedAmount = 0;
+  let pendingAmount = 0;
+  rows.forEach((row) => {
+    totalAmount += row.amount;
+    if (row.status === 'paid') {
+      paidFines += 1;
+      collectedAmount += row.amount;
+    } else if (row.status !== 'waived') {
+      pendingFines += 1;
+      pendingAmount += row.amount;
+    }
+  });
+  return {
+    summary: {
+      totalFines: rows.length,
+      paidFines,
+      pendingFines,
+      totalAmount: roundMoney(totalAmount),
+      collectedAmount: roundMoney(collectedAmount),
+      pendingAmount: roundMoney(pendingAmount),
+    },
+    rows,
+  };
+}
+
 function summarizeTreasury(rawTreasury) {
   const summary = buildVisitDashboardTreasury(rawTreasury).summary;
   return {
@@ -1247,6 +1366,7 @@ function createVisitDashboardService(options = {}) {
       members,
       users,
       events,
+      fines,
       treasury,
       visitPositionDocs,
       submissionDocs,
@@ -1260,6 +1380,7 @@ function createVisitDashboardService(options = {}) {
       adapter.listDocs('members'),
       adapter.listDocs('users'),
       adapter.listDocs('events'),
+      adapter.listDocs('fines'),
       adapter.listDocs('treasury'),
       visiblePositionKeys.length ? adapter.listVisitPositionDocs(visitType) : Promise.resolve([]),
       visiblePositionKeys.length ? adapter.queryActiveSubmissionsForPositions(visitType, visiblePositionKeys) : Promise.resolve([]),
@@ -1301,6 +1422,7 @@ function createVisitDashboardService(options = {}) {
         districtEvents,
         districtAttendance,
       }),
+      fines: buildVisitDashboardFines(fines),
       treasury: buildVisitDashboardTreasury(treasury),
       generatedAt: new Date().toISOString(),
     };
@@ -1383,6 +1505,7 @@ module.exports = {
   buildVisitDashboardAccess,
   buildVisitDashboardAttendance,
   buildDocumentPanels,
+  buildVisitDashboardFines,
   buildVisitDashboardTreasury,
   buildVisitDashboardStats,
   buildVisitDashboardDefaultConfig,

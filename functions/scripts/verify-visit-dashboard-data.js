@@ -75,6 +75,45 @@ function createService(initial = {}) {
         m1: { de1: 'excused' },
         m2: { de1: false },
       },
+      fines: initial.fines || {
+        f1: {
+          memberId: 'm1',
+          memberName: 'Private One',
+          reason: 'late',
+          amount: 50,
+          date: '2026-07-03',
+          eventId: 'e1',
+          eventName: 'Community Work',
+          treasuryEntryId: 'fine_f1',
+          publicNotes: 'Arrived after roll call',
+          notes: 'private fine note',
+          createdBy: 'fine-creator-uid',
+          createdByEmail: 'fine-creator@example.test',
+          audit: { note: 'private fine audit' },
+        },
+        f2: {
+          memberId: 'm2',
+          memberName: 'Private Two',
+          reason: 'missing_badge',
+          amount: 25,
+          date: '2026-07-02',
+          eventId: 'bm1',
+          eventName: 'BOD Meeting 1',
+          status: 'pending',
+          updatedBy: 'fine-updater-uid',
+        },
+        f3: {
+          memberId: 'm4',
+          memberName: 'Private Three',
+          reason: 'late',
+          amount: 15,
+          date: '2026-07-01',
+          eventName: 'District Event 1',
+          status: 'waived',
+        },
+        f4: { memberName: 'Archived Fine', reason: 'late', amount: 20, date: '2026-07-05', archived: true },
+        f5: { memberName: 'Internal Fine', reason: 'late', amount: 20, date: '2026-07-06', visibility: 'internal' },
+      },
       treasury: initial.treasury || {
         t1: {
           title: 'Dues',
@@ -248,6 +287,15 @@ function assertNoSensitivePayload(value) {
     'deleter-uid',
     'internal-file',
     'private treasury audit',
+    'fine-creator-uid',
+    'fine-creator@example.test',
+    'fine-updater-uid',
+    'private fine audit',
+    'private fine note',
+    'Archived Fine',
+    'Internal Fine',
+    'fine_f1',
+    'memberId',
     'Archived treasury',
     'Deleted treasury',
     'Internal treasury',
@@ -327,6 +375,78 @@ assert.equal('billDriveFileId' in districtDuesTreasury.rows[0], false, 'raw bill
 assert.equal('billUrl' in districtDuesTreasury.rows[0], false, 'raw bill URL hidden');
 assert.equal('billFolderUrl' in districtDuesTreasury.rows[0], false, 'bill folder URL hidden from treasury rows');
 assertNoSensitivePayload(districtDuesTreasury);
+
+const finesSummary = dashboards.buildVisitDashboardFines([
+  {
+    id: 'raw-fine-one',
+    data: {
+      memberId: 'private-member-id',
+      memberName: 'Fine Member',
+      reason: 'late',
+      amount: 100,
+      date: '2026-07-12',
+      eventId: 'private-event-id',
+      eventName: 'BOD Meeting 2',
+      treasuryEntryId: 'fine_raw-fine-one',
+      createdBy: 'private-fine-creator',
+      createdByEmail: 'private-fine@example.test',
+      audit: { by: 'private fine audit' },
+    },
+  },
+  {
+    id: 'raw-fine-two',
+    data: {
+      memberName: 'Pending Member',
+      reason: 'missing_badge',
+      amount: 50,
+      date: '2026-07-11',
+      eventName: 'Club Work',
+      paymentStatus: 'unpaid',
+    },
+  },
+  {
+    id: 'raw-fine-three',
+    data: {
+      memberName: 'Waived Member',
+      reason: 'late',
+      amount: 25,
+      date: '2026-07-10',
+      status: 'waived',
+    },
+  },
+  { id: 'raw-fine-archived', data: { memberName: 'Archived Fine', reason: 'late', amount: 25, date: '2026-07-09', archived: true } },
+]);
+assert.deepEqual(finesSummary.summary, {
+  totalFines: 3,
+  paidFines: 1,
+  pendingFines: 1,
+  totalAmount: 175,
+  collectedAmount: 100,
+  pendingAmount: 50,
+});
+assert.deepEqual(
+  finesSummary.rows.map(row => ({
+    fineKey: row.fineKey,
+    memberName: row.memberName,
+    reason: row.reason,
+    title: row.title,
+    amount: row.amount,
+    status: row.status,
+    date: row.date,
+    notes: row.notes,
+  })),
+  [
+    { fineKey: 'fine-1', memberName: 'Fine Member', reason: 'Late to event/meeting', title: 'BOD Meeting 2', amount: 100, status: 'paid', date: '2026-07-12', notes: '' },
+    { fineKey: 'fine-2', memberName: 'Pending Member', reason: 'Missing badge', title: 'Club Work', amount: 50, status: 'pending', date: '2026-07-11', notes: '' },
+    { fineKey: 'fine-3', memberName: 'Waived Member', reason: 'Late to event/meeting', title: '', amount: 25, status: 'waived', date: '2026-07-10', notes: '' },
+  ]
+);
+assert.equal(JSON.stringify(finesSummary).includes('raw-fine-one'), false, 'raw fine document ID hidden');
+assert.equal(JSON.stringify(finesSummary).includes('private-member-id'), false, 'raw fine member ID hidden');
+assert.equal(JSON.stringify(finesSummary).includes('private-event-id'), false, 'raw fine event ID hidden');
+assert.equal(JSON.stringify(finesSummary).includes('private-fine@example.test'), false, 'private fine email hidden');
+assert.equal(JSON.stringify(finesSummary).includes('private fine audit'), false, 'private fine audit hidden');
+assertNoSensitivePayload(finesSummary);
 
 (async () => {
   const source = fs.readFileSync(path.join(repoRoot, 'functions', 'index.js'), 'utf8');
@@ -497,6 +617,62 @@ assertNoSensitivePayload(districtDuesTreasury);
       'type',
     ].sort()
   );
+  assert.deepEqual(districtByDefault.fines.summary, {
+    totalFines: 3,
+    paidFines: 1,
+    pendingFines: 1,
+    totalAmount: 90,
+    collectedAmount: 50,
+    pendingAmount: 25,
+  });
+  assert.deepEqual(
+    districtByDefault.fines.rows.map(row => ({
+      fineKey: row.fineKey,
+      memberName: row.memberName,
+      reason: row.reason,
+      title: row.title,
+      amount: row.amount,
+      status: row.status,
+      date: row.date,
+      notes: row.notes,
+    })),
+    [
+      {
+        fineKey: 'fine-1',
+        memberName: 'Private One',
+        reason: 'Late to event/meeting',
+        title: 'Community Work',
+        amount: 50,
+        status: 'paid',
+        date: '2026-07-03',
+        notes: 'Arrived after roll call',
+      },
+      {
+        fineKey: 'fine-2',
+        memberName: 'Private Two',
+        reason: 'Missing badge',
+        title: 'BOD Meeting 1',
+        amount: 25,
+        status: 'pending',
+        date: '2026-07-02',
+        notes: '',
+      },
+      {
+        fineKey: 'fine-3',
+        memberName: 'Private Three',
+        reason: 'Late to event/meeting',
+        title: 'District Event 1',
+        amount: 15,
+        status: 'waived',
+        date: '2026-07-01',
+        notes: '',
+      },
+    ]
+  );
+  assert.deepEqual(
+    Object.keys(districtByDefault.fines.rows[0]).sort(),
+    ['amount', 'date', 'fineKey', 'memberName', 'notes', 'reason', 'status', 'title'].sort()
+  );
   assert.deepEqual(
     districtByDefault.documentPanels.map(panel => ({
       positionKey: panel.positionKey,
@@ -599,6 +775,7 @@ assertNoSensitivePayload(districtDuesTreasury);
   const empty = await createService({
     members: {},
     events: {},
+    fines: {},
     treasury: {},
     attendance: {},
     bodMembers: {},
@@ -629,6 +806,17 @@ assertNoSensitivePayload(districtDuesTreasury);
     club: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0, averageEventAttendanceRate: null, averageMemberAttendanceRate: null }, columns: [], rows: [] },
     bod: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0, averageEventAttendanceRate: null, averageMemberAttendanceRate: null }, columns: [], rows: [] },
     district: { summary: { totalEvents: 0, totalPeople: 0, averageAttendanceRate: 0, averageEventAttendanceRate: null, averageMemberAttendanceRate: null }, columns: [], rows: [] },
+  });
+  assert.deepEqual(empty.fines, {
+    summary: {
+      totalFines: 0,
+      paidFines: 0,
+      pendingFines: 0,
+      totalAmount: 0,
+      collectedAmount: 0,
+      pendingAmount: 0,
+    },
+    rows: [],
   });
   assert.deepEqual(empty.treasury, {
     summary: { income: 0, expense: 0, net: 0, transactionCount: 0 },
