@@ -36,6 +36,7 @@ assert.deepEqual(normalizeProfileUpdatePayload({
   rotaryId: ' 11218198 ',
   dateOfBirth: '1997-05-01',
   gender: 'woman',
+  duesPaid: true,
   hobbies: 'Reading',
 }, 'gbm', { today: '2026-07-12' }), {
   name: 'Asha Rao',
@@ -45,8 +46,30 @@ assert.deepEqual(normalizeProfileUpdatePayload({
   gender: 'woman',
   genderSelfDescribe: '',
   hobbies: 'Reading',
+  duesPaid: true,
 });
+assert.deepEqual(
+  normalizeProfileUpdatePayload({
+    duesPaid: false,
+  }, 'gbm'),
+  {
+    duesPaid: false,
+  }
+);
 
+assert.throws(
+  () => normalizeProfileUpdatePayload({
+    duesPaid: 'yes',
+  }, 'gbm'),
+  /duesPaid must be a boolean/
+);
+
+assert.throws(
+  () => normalizeProfileUpdatePayload({
+    duesPaid: true,
+  }, 'prospect'),
+  /Unsupported profile field: duesPaid/
+);
 assert.deepEqual(normalizeProfileUpdatePayload({
   rotaryId: '',
 }, 'gbm', { today: '2026-07-12' }), {
@@ -108,17 +131,23 @@ assert.deepEqual(safeProspect, {
 });
 assert.equal(Object.hasOwn(safeProspect, 'rid'), false);
 assert.equal(Object.hasOwn(safeProspect, 'rotaryId'), false);
+assert.equal(
+  Object.hasOwn(safeProspect, 'duesPaid'),
+  false
+);
 
 const safeMember = safeProfileFromUserData({
   name: ' Rtr. Member One ',
   email: 'MEMBER@Example.COM',
   phone: '123',
+  duesPaid: true,
   rotaryId: ' 11218198 ',
   rid: 'must-not-leak',
 }, 'gbm', { uid: 'uid-2' });
 
 assert.equal(safeMember.rotaryId, '11218198');
 assert.equal(Object.hasOwn(safeMember, 'rid'), false);
+assert.equal(safeMember.duesPaid, true);
 
 const selfBlock = blockBetween(
   functionsIndex,
