@@ -105,6 +105,7 @@ export const visitCalls = {
   updateVisit: (payload) => callable("updateVisitSubmissionConfig", payload), updateFolder: (payload) => callable("updateVisitSubmissionFolder", payload),
   createSession: (payload) => callable("createVisitSubmissionUploadSession", payload), finalize: (payload) => callable("finalizeVisitSubmissionUpload", payload), cancelSession: (sessionId) => callable("cancelVisitSubmissionUploadSession", { sessionId }),
   withdraw: (submissionId) => callable("withdrawVisitSubmission", { submissionId }), remove: (submissionId, reason) => callable("removeVisitSubmission", { submissionId, reason }), replace: (submissionId, files) => callable("replaceVisitSubmission", { submissionId, files }),
+  setPrimaryPresentation: (visitType, positionKey, submissionId = "") => callable("updateVisitSubmissionFolder", { visitType, positionKey, primaryPresentationSubmissionId: submissionId || "" }),
   moderation: (payload) => callable("getVisitSubmissionModerationData", payload), reconcile: (visitType, positionKey) => callable("reconcileVisitSubmissionFolderCount", { visitType, positionKey }), cleanup: () => callable("cleanupExpiredVisitUploadSessions", { limit: 25 }),
 };
 

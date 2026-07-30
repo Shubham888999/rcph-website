@@ -28,8 +28,10 @@ test("BOD event form keeps locked reporting-window avenues visible but unavailab
   assert.match(form, /AVENUE_REPORTING_LOCK_HELP_TEXT/);
   assert.match(form, /buildBodEventPayload\(draft, savedEventId, \{ lockedAvenueReportingLocks \}\)/);
   assert.match(page, /avenueReportingLocks\.items/);
-  assert.match(service, /subscribeAvenueReportingLocks/);
-  assert.match(service, /collection\(db, "locks"\)/);
+  assert.match(service, /subscribeBodToolsLockState/);
+  assert.match(service, /getBodToolsLockState/);
+  assert.doesNotMatch(service, /collection\(db, "locks"\)/);
+  assert.doesNotMatch(service, /doc\(db, "locks"/);
   assert.match(service, /normalizeAvenueReportingLock/);
 });
 

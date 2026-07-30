@@ -19,6 +19,11 @@ test("details keep file links when thumbnails fail and preserve optional folder 
   assert.match(detailsSource, /onError=\{\(\) => setFailed\(true\)\}/);
   assert.match(detailsSource, />Open file</);
   assert.match(detailsSource, />Open Drive folder</);
+  assert.match(detailsSource, /Set as main presentation/);
+  assert.match(detailsSource, /Main presentation/);
+  assert.match(detailsSource, /"Clear"/);
+  assert.match(moduleSource, /visitCalls\.setPrimaryPresentation/);
+  assert.match(moduleSource, /primarySelectionBusy/);
   assert.match(detailsSource, /target="_blank" rel="noopener noreferrer"/);
 });
 

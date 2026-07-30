@@ -636,31 +636,52 @@
 }
 
 .visit-dashboard-folder-count {
-  min-height: 1.55rem;
-  padding: 0.22rem 0.5rem;
+  min-height: 0;
+  padding: 0;
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(96, 195, 196, 0.26);
-  border-radius: var(--internal-radius-control);
+  gap: 0.32rem;
+  border: 0;
+  border-radius: 0;
   color: var(--internal-accent-secondary);
-  background: rgba(96, 195, 196, 0.045);
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
   white-space: nowrap;
+}
+
+.visit-dashboard-folder-count::before {
+  color: rgba(96, 195, 196, 0.7);
+  content: "•";
 }
 
 .visit-dashboard-folder-action {
-  min-height: 1.55rem;
-  padding: 0.22rem 0.5rem;
+  min-height: 0;
+  padding: 0;
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(229, 194, 104, 0.26);
-  border-radius: var(--internal-radius-control);
+  border: 0;
+  border-bottom: 1px solid rgba(229, 194, 104, 0.58);
+  border-radius: 0;
   color: var(--internal-accent-soft);
-  background: rgba(229, 194, 104, 0.045);
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
   text-decoration: none;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
-a.visit-dashboard-folder-action:hover,
+a.visit-dashboard-folder-action:hover {
+  color: var(--internal-accent);
+  border-bottom-color: var(--internal-accent);
+  background: transparent;
+}
+
 a.visit-dashboard-document-action:hover {
   border-color: rgba(229, 194, 104, 0.52);
   background: rgba(229, 194, 104, 0.085);
@@ -717,7 +738,7 @@ a.visit-dashboard-document-action:hover {
 .visit-dashboard-document-preview-heading {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.85rem;
   align-items: center;
 }
@@ -764,6 +785,19 @@ a.visit-dashboard-document-action:hover {
   min-width: 0;
   display: grid;
   gap: 0.5rem;
+}
+
+.visit-dashboard-document-other-heading {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+}
+
+.visit-dashboard-document-other-heading h3 {
+  min-width: 0;
 }
 
 .visit-dashboard-document-action {

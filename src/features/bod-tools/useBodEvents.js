@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBodEventDiagnostic } from "./bodEventErrors";
-import { fetchBodEvents, refreshBodEvents, subscribeAvenueReportingLocks, subscribeBodEventLock } from "./bodEventService";
+import { fetchBodEvents, refreshBodEvents, subscribeBodToolsLockState } from "./bodEventService";
 
 export default function useBodEvents({ uid, enabled }) {
   const [state, setState] = useState({ status: "loading", events: [], error: null });
@@ -29,24 +29,16 @@ export default function useBodEvents({ uid, enabled }) {
 
   useEffect(() => {
     if (!enabled || !uid) return undefined;
-    const unsubscribe = subscribeBodEventLock((value) => {
+    const unsubscribe = subscribeBodToolsLockState((value) => {
       if (!mountedRef.current) return;
-      setLock({ uid, status: "success", ...value });
+      setLock({ uid, status: "success", ...value.lock });
+      setAvenueReportingLocks({ uid, status: "success", items: value.avenueReportingLocks });
     }, (error) => {
-      if (import.meta.env.DEV) console.error("BOD lock subscription failed.", getBodEventDiagnostic(error, "lock-read", uid));
-      if (mountedRef.current) setLock({ uid, status: "error", locked: true, reason: "", updatedByName: "", updatedAt: "" });
-    });
-    return unsubscribe;
-  }, [enabled, uid]);
-
-  useEffect(() => {
-    if (!enabled || !uid) return undefined;
-    const unsubscribe = subscribeAvenueReportingLocks((items) => {
-      if (!mountedRef.current) return;
-      setAvenueReportingLocks({ uid, status: "success", items });
-    }, (error) => {
-      if (import.meta.env.DEV) console.error("Avenue reporting lock subscription failed.", getBodEventDiagnostic(error, "avenue-lock-read", uid));
-      if (mountedRef.current) setAvenueReportingLocks({ uid, status: "error", items: [] });
+      if (import.meta.env.DEV) console.error("BOD lock-state load failed.", getBodEventDiagnostic(error, "lock-read", uid));
+      if (mountedRef.current) {
+        setLock({ uid, status: "error", locked: true, reason: "", updatedByName: "", updatedAt: "" });
+        setAvenueReportingLocks({ uid, status: "error", items: [] });
+      }
     });
     return unsubscribe;
   }, [enabled, uid]);

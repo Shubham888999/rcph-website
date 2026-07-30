@@ -67,6 +67,7 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
   const [queue, setQueue] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [primarySelectionBusy, setPrimarySelectionBusy] = useState("");
   const folder = data.folder;
   const uploadConfigured = Boolean(resolveVisitUploadEndpoint(import.meta.env));
 
@@ -224,9 +225,23 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
     setQueue((current) => current.map((item) => item.status === "Uploaded" ? item : { ...item, status: "Cancelled", message: "Upload cancelled." }));
     setAnnouncement("Remaining upload reservations were cancelled.");
   }
+  async function updatePrimaryPresentation(submissionId, busyKey, message) {
+    if (primarySelectionBusy) return;
+    setPrimarySelectionBusy(busyKey);
+    try {
+      await mutate(
+        "primary-presentation",
+        () => visitCalls.setPrimaryPresentation(folder.visitType, folder.positionKey, submissionId),
+        message,
+        reload,
+      );
+    } finally {
+      setPrimarySelectionBusy("");
+    }
+  }
   return <><section className="admin-panel"><h3>{data.visit?.displayTitle} · {folder.positionTitle}</h3><p>{folder.locked ? `Locked: ${folder.lockReason}` : `${folder.activeFileCount} of ${folder.maxActiveFiles} active files`}</p><p>Up to {folder.maxFilesPerSelection} files per selection, {Math.round(folder.maxFileSizeBytes / 1048576)} MB each.</p><div className="admin-actions">{data.access.canManage ? <button onClick={() => setDialog({ type: "folder-settings", folder })}>Folder settings</button> : null}{data.access.canManage ? <button onClick={() => mutate("reconcile", () => visitCalls.reconcile(folder.visitType, folder.positionKey), "Folder counts reconciled.", reload)}>Reconcile counts</button> : null}</div></section>
     {folder.canUpload ? <section className="admin-panel visit-upload" aria-labelledby="visit-upload-title"><h3 id="visit-upload-title">Supporting files</h3><p>Upload invitation letters, visit reports, photographs, attendance sheets, or other supporting documents for this Club Visit.</p>{!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload endpoint could not be resolved. Configure VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT or VITE_FIREBASE_PROJECT_ID for uploadVisitSubmissionFile.</p> : null}<label className="visit-upload__label" htmlFor="visit-supporting-files">Choose supporting files</label><input id="visit-supporting-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={uploading || !uploadConfigured} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} /><p>{queue.length} selected · maximum {folder.maxFilesPerSelection}</p><p className="sr-only" aria-live="polite">{announcement}</p>{queue.length ? <ul className="visit-upload__queue">{queue.map((item) => <li key={item.clientFileId}><div><strong>{item.file.name}</strong><span>{item.file.type || "Unknown type"} · {formatVisitFileSize(item.file.size)}</span><span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span></div>{!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}</li>)}</ul> : null}<div className="admin-actions"><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>{queue.some((item) => item.sessionId && item.status !== "Uploaded") ? <button type="button" disabled={uploading} onClick={cancelRemaining}>Cancel remaining uploads</button> : null}</div></section> : <p className="admin-lock-banner is-locked">Uploads are unavailable for this folder.</p>}
-    <section className="admin-panel" aria-labelledby="visit-active-files"><h3 id="visit-active-files">Supporting files</h3><VisitSubmissionFiles submissions={data.submissions} onReplace={(item) => setDialog({ type: "replace", item, folder })} onWithdraw={(item) => setDialog({ type: "withdraw", item })} onRemove={(item) => setDialog({ type: "remove", item })} /></section>
+    <section className="admin-panel" aria-labelledby="visit-active-files"><h3 id="visit-active-files">Supporting files</h3><VisitSubmissionFiles submissions={data.submissions} canManagePrimaryPresentation={data.access.canManage === true} primaryPresentationSubmissionId={folder.primaryPresentationSubmissionId} primarySelectionBusy={primarySelectionBusy} onSetPrimaryPresentation={(item) => updatePrimaryPresentation(item.submissionId, item.submissionId, "Main presentation selected.")} onClearPrimaryPresentation={() => updatePrimaryPresentation("", "__clear__", "Main presentation selection cleared.")} onReplace={(item) => setDialog({ type: "replace", item, folder })} onWithdraw={(item) => setDialog({ type: "withdraw", item })} onRemove={(item) => setDialog({ type: "remove", item })} /></section>
   </>;
 }
 

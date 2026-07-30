@@ -226,6 +226,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
     fileCount: 1,
     canOpen: true,
     openUrl: "https://drive.google.com/drive/folders/safe-secretary-folder",
+    primaryPresentation: null,
     files: [{
       submissionId: "sub-1",
       title: "Secretary Report",
@@ -247,6 +248,86 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
   assert.equal("folderUrl" in normalized.documentPanels[0], false);
   assert.equal("driveFileId" in normalized.documentPanels[0].files[0], false);
   assert.equal("fileUrl" in normalized.documentPanels[0].files[0], false);
+
+  const noPrimarySelection = normalizeVisitDashboardData({
+    visit: { visitType: "clubAssembly" },
+    documentPanels: [{
+      positionKey: "president",
+      positionTitle: "President",
+      avenueCode: "PRES",
+      folderLabel: "President",
+      canOpen: true,
+      openUrl: "https://drive.google.com/drive/folders/safe-president-folder",
+      files: [{
+        submissionId: "constitution",
+        title: "Constitution",
+        fileName: "constitution.pdf",
+        mimeType: "application/pdf",
+        canOpen: true,
+        canPreview: true,
+        driveFileId: "safeConstitutionFile",
+      }, {
+        submissionId: "letterhead",
+        title: "Letterhead",
+        fileName: "letterhead.pdf",
+        mimeType: "application/pdf",
+        canOpen: true,
+        canPreview: true,
+        driveFileId: "safeLetterheadFile",
+      }, {
+        submissionId: "deck",
+        title: "Club Assembly",
+        fileName: "club-assembly.pptx",
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        canOpen: true,
+        canPreview: true,
+        driveFileId: "safeDeckFile",
+      }],
+    }],
+  }, "clubAssembly").documentPanels[0];
+  assert.equal(noPrimarySelection.fileCount, 3);
+  assert.equal(noPrimarySelection.files.every((file) => file.canPreview), true);
+  assert.equal(noPrimarySelection.primaryPresentation, null, "previewable supporting files are not promoted without explicit selection");
+
+  const explicitPrimarySelection = normalizeVisitDashboardData({
+    visit: { visitType: "clubAssembly" },
+    documentPanels: [{
+      positionKey: "president",
+      positionTitle: "President",
+      avenueCode: "PRES",
+      folderLabel: "President",
+      canOpen: true,
+      openUrl: "https://drive.google.com/drive/folders/safe-president-folder",
+      primaryPresentation: {
+        submissionId: "deck",
+        title: "Club Assembly",
+        fileName: "club-assembly.pptx",
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        canOpen: true,
+        canPreview: true,
+        driveFileId: "safeDeckFile",
+      },
+      files: [{
+        submissionId: "constitution",
+        title: "Constitution",
+        fileName: "constitution.pdf",
+        mimeType: "application/pdf",
+        canOpen: true,
+        canPreview: true,
+        driveFileId: "safeConstitutionFile",
+      }, {
+        submissionId: "deck",
+        title: "Club Assembly",
+        fileName: "club-assembly.pptx",
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        canOpen: true,
+        canPreview: true,
+        driveFileId: "safeDeckFile",
+      }],
+    }],
+  }, "clubAssembly").documentPanels[0];
+  assert.equal(explicitPrimarySelection.primaryPresentation.fileName, "club-assembly.pptx");
+  assert.equal(explicitPrimarySelection.primaryPresentation.previewUrl, "https://drive.google.com/file/d/safeDeckFile/preview");
   assert.equal(normalized.attendance.club.rows[0].cells["event-1"], "present");
   assert.equal(normalized.attendance.club.columns[0].attendanceLabel, "100%");
   assert.equal(normalized.attendance.club.rows[0].attendanceLabel, "100%");
@@ -512,7 +593,9 @@ assert.doesNotMatch(pageSource, /keep existing summary\/body exactly same/i);
   assert.match(pageSource, /formatVisitAttendanceRoleCode\(panel\.positionTitle \|\| panel\.positionKey \|\| panel\.avenueCode\)/);
   assert.match(pageSource, /getVisitDocumentPanelActionLabel\(panel\)/);
   assert.match(pageSource, /getPanelDocumentGroups\(panel\)/);
-  assert.match(pageSource, /isPrimaryPreviewDocument/);
+  assert.match(pageSource, /panel\?\.primaryPresentation \|\| null/);
+  assert.doesNotMatch(pageSource, /isPrimaryPreviewDocument/);
+  assert.doesNotMatch(pageSource, /previewable\.find|previewable\[0\]/);
   assert.match(pageSource, /visit-dashboard-folder-actions/);
   assert.match(pageSource, /visit-dashboard-folder-action/);
   assert.match(pageSource, /href=\{panel\.openUrl\}/);
@@ -524,13 +607,14 @@ assert.doesNotMatch(pageSource, /keep existing summary\/body exactly same/i);
   assert.match(pageSource, /Other documents/);
   assert.match(pageSource, /Open file/);
   assert.match(pageSource, /href=\{file\.openUrl\}/);
-  assert.match(pageSource, /No previewable presentation or PDF found\. Open the folder to view files\./);
+  assert.match(pageSource, /No main presentation has been selected for this folder\./);
+  assert.doesNotMatch(pageSource, /No previewable presentation or PDF found\. Open the folder to view files\./);
   assert.doesNotMatch(pageSource, /No folder link available/);
   assert.match(pageSource, /Selected folders/);
   assert.match(pageSource, /No document folders have been selected for this visit yet\./);
   assert.match(pageSource, /No visible documents uploaded for this folder yet\./);
   assert.match(pageSource, /Open the selected Google Drive folders shared by the club admin\./);
-  assert.match(pageSource, /Folder links appear when files are uploaded/);
+  assert.match(pageSource, /Click on any tab to view the files for that Avenue\./);
   assert.doesNotMatch(pageSource, /open=\{index === 0\}/);
   assert.match(pageSource, /Attendance Records/);
   assert.match(pageSource, /import AttendanceMark/);
@@ -615,7 +699,7 @@ assert.match(pageSource, /visit-dashboard-masthead__actions/);
   assert.match(pageSource, /treasuryIncome|Income/);
   assert.doesNotMatch(
     pageSource,
-    /adminService|getVisitDashboardConfigs|getVisitDashboardFolderOptions|addTreasury|updateTreasury|deleteTreasury|setTreasuryById|newTreasuryId|treasuryTicket|uploadTreasuryBill|buildTreasuryPayload|addFine|updateFine|deleteFine|setFine|fineTicket|fineId|memberId|uploadBytes|getDownloadURL|firebase\/storage|drive\.google|driveFolderId|folderId|fileUrl|billDriveFileId|billUrl|createdBy|updatedBy|deletedBy|archivedBy|audit|canEdit|canDelete|>Upload<|>Edit<|>Delete<|>Finalize<|>Archive<|>Save<|>Mark<|>Bulk<|>Export<|"Upload"|"Edit"|"Delete"|"Finalize"|"Archive"|"Save"|"Mark"|"Bulk"|"Export"/i,
+    /adminService|getVisitDashboardConfigs|getVisitDashboardFolderOptions|addTreasury|updateTreasury|deleteTreasury|setTreasuryById|newTreasuryId|treasuryTicket|uploadTreasuryBill|buildTreasuryPayload|addFine|updateFine|deleteFine|setFine|fineTicket|fineId|memberId|uploadBytes|getDownloadURL|firebase\/storage|drive\.google|driveFolderId|folderId|fileUrl|billDriveFileId|billUrl|primaryPresentationSubmissionId|createdBy|updatedBy|deletedBy|archivedBy|audit|canEdit|canDelete|>Upload<|>Edit<|>Delete<|>Finalize<|>Archive<|>Save<|>Mark<|>Bulk<|>Export<|"Upload"|"Edit"|"Delete"|"Finalize"|"Archive"|"Save"|"Mark"|"Bulk"|"Export"/i,
   );
   assert.doesNotMatch(pageSource, /<button[\s\S]{0,120}>Open<\/button>/i);
   assert.doesNotMatch(pageSource, /href=\{panel\.(?:folderUrl|fileUrl)/);

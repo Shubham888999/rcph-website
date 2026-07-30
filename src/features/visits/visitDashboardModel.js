@@ -353,6 +353,13 @@ function normalizeDocumentFile(raw) {
   };
 }
 
+function normalizePrimaryPresentation(raw, files) {
+  const primary = normalizeDocumentFile(raw);
+  if (!primary || !primary.canPreview || !primary.previewUrl) return null;
+  if (Array.isArray(files) && files.length && !files.some((file) => file.submissionId === primary.submissionId)) return null;
+  return primary;
+}
+
 function normalizeDriveFolderOpenUrl(value) {
   const raw = text(value, 1000);
   if (!raw) return "";
@@ -455,6 +462,7 @@ function normalizeDocumentPanels(value) {
       ? panel.files.map(normalizeDocumentFile).filter(Boolean)
       : [];
     const openUrl = normalizeDriveFolderOpenUrl(panel.openUrl);
+    const primaryPresentation = normalizePrimaryPresentation(panel.primaryPresentation, files);
     return [{
       positionKey,
       positionTitle,
@@ -464,6 +472,7 @@ function normalizeDocumentPanels(value) {
       fileCount: files.length,
       canOpen: panel.canOpen === true && Boolean(openUrl),
       openUrl,
+      primaryPresentation,
       files,
     }];
   });

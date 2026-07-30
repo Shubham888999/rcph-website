@@ -63,6 +63,15 @@
   overflow-wrap: anywhere;
 }
 
+.visit-files__meta .visit-files__primary-status {
+  width: max-content;
+  color: var(--color-accent);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
 .visit-files img {
   width: 5.5rem;
   height: 4.25rem;

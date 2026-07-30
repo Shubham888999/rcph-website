@@ -192,23 +192,14 @@ function AvenueCounts({ rows, attendance }) {
   );
 }
 
-function isPrimaryPreviewDocument(file) {
-  if (!file?.canPreview || !file.previewUrl) return false;
-  const fileName = String(file.fileName || "").toLowerCase();
-  const mimeType = String(file.mimeType || "").toLowerCase();
-  return mimeType === "application/pdf"
-    || mimeType.includes("powerpoint")
-    || /\.(?:pdf|pptx?)$/.test(fileName);
-}
-
 function getPanelDocumentGroups(panel) {
   const files = Array.isArray(panel?.files) ? panel.files : [];
-  const previewable = files.filter((file) => file.canPreview && file.previewUrl);
-  const primary = previewable.find(isPrimaryPreviewDocument) || previewable[0] || null;
+  const primary = panel?.primaryPresentation || null;
+  const primarySubmissionId = primary?.submissionId || "";
   return {
     primary,
-    otherDocuments: primary
-      ? files.filter((file) => file.submissionId !== primary.submissionId)
+    otherDocuments: primarySubmissionId
+      ? files.filter((file) => file.submissionId !== primarySubmissionId)
       : files,
   };
 }
@@ -255,7 +246,7 @@ function DocumentPanels({ panels }) {
   const allPanelsCanOpen = hasPanels && panels.every((panel) => panel.canOpen && panel.openUrl);
   const folderLinkNote = allPanelsCanOpen
     ? "Open the selected Google Drive folders shared by the club admin."
-    : "Folder links appear when files are uploaded";
+    : "Click on any tab to view the files for that Avenue.";
 
   return (
     <section className="visit-dashboard-documents" aria-labelledby="visit-dashboard-documents-title">
@@ -282,24 +273,17 @@ function DocumentPanels({ panels }) {
             const { primary, otherDocuments } = getPanelDocumentGroups(panel);
             return (
               <details className="visit-dashboard-folder-panel" key={panel.positionKey}>
-                <summary aria-label={`${panel.folderLabel}: ${fileCountLabel}${actionLabel ? `. ${actionLabel}` : ""}`} title={panel.folderLabel}>
+                <summary
+                  aria-label={`${panel.folderLabel}: ${fileCountLabel}`}
+                  title={panel.folderLabel}
+                >
                   <span className="visit-dashboard-folder-title">
                     <strong>{panel.folderLabel}</strong>
                     <small>{folderCode}</small>
                   </span>
+
                   <span className="visit-dashboard-folder-actions">
                     <span className="visit-dashboard-folder-count">{fileCountLabel}</span>
-                    {actionLabel ? (
-                      <a
-                        className="visit-dashboard-folder-action"
-                        href={panel.openUrl}
-                        onClick={(event) => event.stopPropagation()}
-                        rel="noopener noreferrer"
-                        target="_blank"
-                      >
-                        {actionLabel}
-                      </a>
-                    ) : null}
                   </span>
                 </summary>
 
@@ -313,16 +297,6 @@ function DocumentPanels({ panels }) {
                             <h3>{primary.title}</h3>
                             <span>{primary.fileName || "Document"}</span>
                           </div>
-                          {primary.canOpen && primary.openUrl ? (
-                            <a
-                              className="visit-dashboard-document-action"
-                              href={primary.openUrl}
-                              rel="noopener noreferrer"
-                              target="_blank"
-                            >
-                              Open file
-                            </a>
-                          ) : null}
                         </div>
                         <iframe
                           className="visit-dashboard-document-preview-frame"
@@ -334,12 +308,26 @@ function DocumentPanels({ panels }) {
                       </div>
                     ) : (
                       <div className="visit-dashboard-empty-state visit-dashboard-empty-state--compact">
-                        <strong>No previewable presentation or PDF found. Open the folder to view files.</strong>
+                        <strong>No main presentation has been selected for this folder.</strong>
                       </div>
                     )}
 
                     <div className="visit-dashboard-document-other">
-                      <h3>Other documents</h3>
+                      <div className="visit-dashboard-document-other-heading">
+                        <h3>Other documents</h3>
+
+                        {actionLabel ? (
+                          <a
+                            className="visit-dashboard-folder-action"
+                            href={panel.openUrl}
+                            rel="noopener noreferrer"
+                            target="_blank"
+                          >
+                            {actionLabel}
+                          </a>
+                        ) : null}
+                      </div>
+
                       <DocumentFileList files={otherDocuments} />
                     </div>
                   </div>

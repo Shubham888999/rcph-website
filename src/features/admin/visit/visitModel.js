@@ -54,6 +54,7 @@ export function normalizeFolder(value) {
     maxFileSizeBytes: Math.max(1, Number(value.maxFileSizeBytes) || 25 * 1024 * 1024),
     activeFileCount: Math.max(0, Number(value.activeFileCount) || 0),
     reservedFileCount: Math.max(0, Number(value.reservedFileCount) || 0),
+    primaryPresentationSubmissionId: text(value.primaryPresentationSubmissionId, 128),
     canOpen: value.canOpen === true,
     canUpload: value.canUpload === true,
     canManage: value.canManage === true,
@@ -90,6 +91,8 @@ export function normalizeSubmission(value) {
     canReplace: value.canReplace === true,
     canWithdraw: value.canWithdraw === true,
     canRemove: value.canRemove === true,
+    isPrimaryPresentation: value.isPrimaryPresentation === true,
+    canSetPrimaryPresentation: value.canSetPrimaryPresentation === true,
   };
 }
 export function validateVisitFile(file, folder) {

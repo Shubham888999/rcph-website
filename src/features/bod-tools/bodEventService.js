@@ -1,10 +1,12 @@
-import { collection, doc, getDocs, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../app/firebase";
 import { db } from "../../app/firestore";
 import { createBodEventCache } from "./bodEventCache";
 import { registerBodCacheClear } from "./bodCacheRegistry";
 import { normalizeAvenueReportingLock, normalizeBodEvent } from "./bodEventModel";
+
+const BOD_LOCK_STATE_POLL_MS = 30000;
 
 function requireCurrentUser(uid = "") {
   if (!auth.currentUser || (uid && auth.currentUser.uid !== uid)) {
@@ -46,29 +48,55 @@ export function clearBodEventCache(uid) {
 }
 registerBodCacheClear(clearBodEventCache);
 
-export function subscribeBodEventLock(callback, onError) {
-  requireCurrentUser();
-  return onSnapshot(doc(db, "locks", "bodEvents"), (snapshot) => {
-    const value = snapshot.exists() ? snapshot.data() : {};
-    const updatedDate = typeof value?.updatedAt?.toDate === "function" ? value.updatedAt.toDate() : null;
-    callback({
-      locked: value?.locked === true,
-      reason: typeof value?.reason === "string" ? value.reason.trim().slice(0, 240) : "",
-      updatedByName: typeof value?.updatedByName === "string" ? value.updatedByName.trim().slice(0, 140) : "",
-      updatedAt: updatedDate && !Number.isNaN(updatedDate.getTime()) ? updatedDate.toISOString() : "",
-    });
-  }, onError);
+function normalizeBodLockState(data) {
+  const lock = data?.lock && typeof data.lock === "object" ? data.lock : {};
+  const avenueReportingLocks = Array.isArray(data?.avenueReportingLocks)
+    ? data.avenueReportingLocks
+      .map((item) => normalizeAvenueReportingLock(item?.id || item?.lockId, item))
+      .filter(Boolean)
+      .sort((a, b) => a.avenue.localeCompare(b.avenue) || a.id.localeCompare(b.id))
+    : [];
+  return {
+    lock: {
+      locked: lock.locked === true,
+      reason: typeof lock.reason === "string" ? lock.reason.trim().slice(0, 240) : "",
+      updatedByName: typeof lock.updatedByName === "string" ? lock.updatedByName.trim().slice(0, 140) : "",
+      updatedAt: typeof lock.updatedAt === "string" ? lock.updatedAt : "",
+    },
+    avenueReportingLocks,
+  };
 }
 
-export function subscribeAvenueReportingLocks(callback, onError) {
+async function fetchBodToolsLockState() {
   requireCurrentUser();
-  return onSnapshot(collection(db, "locks"), (snapshot) => {
-    const locks = snapshot.docs
-      .map((document) => normalizeAvenueReportingLock(document.id, document.data()))
-      .filter(Boolean)
-      .sort((a, b) => a.avenue.localeCompare(b.avenue) || a.id.localeCompare(b.id));
-    callback(locks);
-  }, onError);
+  return normalizeBodLockState(await call("getBodToolsLockState", {}));
+}
+
+export function subscribeBodToolsLockState(callback, onError) {
+  requireCurrentUser();
+  let active = true;
+  let busy = false;
+  let timer = null;
+
+  const load = async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const state = await fetchBodToolsLockState();
+      if (active) callback(state);
+    } catch (error) {
+      if (active) onError?.(error);
+    } finally {
+      busy = false;
+    }
+  };
+
+  load();
+  timer = globalThis.setInterval(load, BOD_LOCK_STATE_POLL_MS);
+  return () => {
+    active = false;
+    if (timer) globalThis.clearInterval(timer);
+  };
 }
 
 async function call(name, payload) {
