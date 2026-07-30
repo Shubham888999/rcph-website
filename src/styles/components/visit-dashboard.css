@@ -683,10 +683,10 @@ a.visit-dashboard-folder-action:hover {
 }
 
 a.visit-dashboard-document-action:hover {
-  border-color: rgba(229, 194, 104, 0.52);
-  background: rgba(229, 194, 104, 0.085);
+  color: var(--internal-accent);
+  border-bottom-color: var(--internal-accent);
+  background: transparent;
 }
-
 .visit-dashboard-document-list {
   margin: 0 0 0.65rem;
   padding: 0;
@@ -744,10 +744,11 @@ a.visit-dashboard-document-action:hover {
 }
 
 .visit-dashboard-document-preview-heading h3,
-.visit-dashboard-document-other h3 {
+.visit-dashboard-document-files-title {
   margin: 0;
   color: var(--internal-text);
   font-size: 1rem;
+  font-weight: 900;
   line-height: 1.25;
 }
 
@@ -781,37 +782,66 @@ a.visit-dashboard-document-action:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.visit-dashboard-document-other {
+.visit-dashboard-document-files {
   min-width: 0;
-  display: grid;
-  gap: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.visit-dashboard-document-other-heading {
-  min-width: 0;
+.visit-dashboard-document-files > summary {
+  min-height: 2.75rem;
+  padding: 0.45rem 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem 1rem;
+  gap: 0.75rem 1rem;
+  cursor: pointer;
+  list-style: none;
 }
 
-.visit-dashboard-document-other-heading h3 {
+.visit-dashboard-document-files > summary::-webkit-details-marker {
+  display: none;
+}
+
+.visit-dashboard-document-files-title {
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.visit-dashboard-document-files-title::before {
+  display: inline-block;
+  color: var(--internal-accent-secondary);
+  content: ">";
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.visit-dashboard-document-files[open]
+  .visit-dashboard-document-files-title::before {
+  transform: rotate(90deg);
+}
+
+.visit-dashboard-document-files .visit-dashboard-document-list {
+  margin-top: 0.2rem;
 }
 
 .visit-dashboard-document-action {
-  min-height: 1.75rem;
-  padding: 0.26rem 0.58rem;
+  min-height: 0;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(229, 194, 104, 0.32);
-  border-radius: var(--internal-radius-control);
+  border: 0;
+  border-bottom: 1px solid rgba(229, 194, 104, 0.58);
+  border-radius: 0;
   color: var(--internal-accent-soft);
-  background: rgba(229, 194, 104, 0.06);
+  background: transparent;
   font-size: 0.76rem;
-  font-weight: 850;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
   text-decoration: none;
   text-transform: uppercase;
   white-space: nowrap;

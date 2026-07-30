@@ -193,14 +193,8 @@ function AvenueCounts({ rows, attendance }) {
 }
 
 function getPanelDocumentGroups(panel) {
-  const files = Array.isArray(panel?.files) ? panel.files : [];
-  const primary = panel?.primaryPresentation || null;
-  const primarySubmissionId = primary?.submissionId || "";
   return {
-    primary,
-    otherDocuments: primarySubmissionId
-      ? files.filter((file) => file.submissionId !== primarySubmissionId)
-      : files,
+    primary: panel?.primaryPresentation || null,
   };
 }
 
@@ -270,7 +264,7 @@ function DocumentPanels({ panels }) {
             const folderCode = formatVisitAttendanceRoleCode(panel.positionTitle || panel.positionKey || panel.avenueCode);
             const actionLabel = getVisitDocumentPanelActionLabel(panel);
             const fileCountLabel = `${panel.fileCount} ${panel.fileCount === 1 ? "file" : "files"}`;
-            const { primary, otherDocuments } = getPanelDocumentGroups(panel);
+            const { primary } = getPanelDocumentGroups(panel);
             return (
               <details className="visit-dashboard-folder-panel" key={panel.positionKey}>
                 <summary
@@ -289,47 +283,47 @@ function DocumentPanels({ panels }) {
 
                 {panel.files.length ? (
                   <div className="visit-dashboard-document-panel-body">
-                    {primary ? (
-                      <div className="visit-dashboard-document-preview">
-                        <div className="visit-dashboard-document-preview-heading">
-                          <div>
-                            <p className="visit-dashboard-document-kicker">Primary preview</p>
-                            <h3>{primary.title}</h3>
-                            <span>{primary.fileName || "Document"}</span>
-                          </div>
-                        </div>
-                        <iframe
-                          className="visit-dashboard-document-preview-frame"
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          src={primary.previewUrl}
-                          title={`Preview of ${primary.title}`}
-                        />
-                      </div>
-                    ) : (
-                      <div className="visit-dashboard-empty-state visit-dashboard-empty-state--compact">
-                        <strong>No main presentation has been selected for this folder.</strong>
-                      </div>
-                    )}
+{primary ? (
+  <div className="visit-dashboard-document-preview">
+    <div className="visit-dashboard-document-preview-heading">
+      <div>
+        <p className="visit-dashboard-document-kicker">Primary preview</p>
+        <h3>{primary.title}</h3>
+        <span>{primary.fileName || "Document"}</span>
+      </div>
+    </div>
 
-                    <div className="visit-dashboard-document-other">
-                      <div className="visit-dashboard-document-other-heading">
-                        <h3>Other documents</h3>
+    <iframe
+      className="visit-dashboard-document-preview-frame"
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      src={primary.previewUrl}
+      title={`Preview of ${primary.title}`}
+    />
+  </div>
+) : null}
 
-                        {actionLabel ? (
-                          <a
-                            className="visit-dashboard-folder-action"
-                            href={panel.openUrl}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                          >
-                            {actionLabel}
-                          </a>
-                        ) : null}
-                      </div>
+<details className="visit-dashboard-document-files">
+  <summary>
+    <span className="visit-dashboard-document-files-title">
+      All Files
+    </span>
 
-                      <DocumentFileList files={otherDocuments} />
-                    </div>
+    {actionLabel ? (
+      <a
+        className="visit-dashboard-folder-action"
+        href={panel.openUrl}
+        onClick={(event) => event.stopPropagation()}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        {actionLabel}
+      </a>
+    ) : null}
+  </summary>
+
+  <DocumentFileList files={panel.files} />
+</details>
                   </div>
                 ) : (
                   <div className="visit-dashboard-empty-state visit-dashboard-empty-state--compact">
