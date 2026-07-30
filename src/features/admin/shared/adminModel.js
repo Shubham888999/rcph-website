@@ -169,6 +169,7 @@ export function normalizeAdminUser(id, raw) {
     gender: text(raw.gender, 40).toLowerCase(),
     genderSelfDescribe: text(raw.genderSelfDescribe, 160),
     hobbies: text(raw.hobbies, 600),
+    duesPaid: raw.duesPaid === true,
     previousRotaract: raw.previousRotaract === true,
     previousRotaractDetails: text(raw.previousRotaractDetails === "N/A" ? "" : raw.previousRotaractDetails, 1200),
     joinReason: text(raw.joinReason, 1200),

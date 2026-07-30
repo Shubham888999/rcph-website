@@ -30,6 +30,7 @@ function completeMember(overrides = {}) {
     role: "",
     position: "Secretary",
     active: true,
+    duesPaid: true,
     ...overrides,
   };
 }
@@ -44,6 +45,7 @@ function completeLinkedAccount(overrides = {}) {
     gender: "woman",
     genderSelfDescribe: "",
     hobbies: "Reading, trekking",
+    duesPaid: true,
     role: "gbm",
     status: "approved",
     active: true,
@@ -176,19 +178,39 @@ test("legacy profile rid can satisfy completeness when rotaryId is absent", () =
   assert.deepEqual(completeness.missing, []);
 });
 
-test("hobbies remain missing even when canonical profile RID is present", () => {
-  const completeness = calculateMemberCompleteness(
-    completeMember({ rid: "" }),
+test("hobbies do not affect member completeness", () => {
+  const withHobbies = calculateMemberCompleteness(
+    completeMember(),
     completeLinkedAccount({
-      rotaryId: "11218198",
+      hobbies: "Reading",
+    }),
+  );
+
+  const withoutHobbies = calculateMemberCompleteness(
+    completeMember(),
+    completeLinkedAccount({
       hobbies: "",
     }),
   );
 
-  assert.deepEqual(completeness.missing, ["hobbies and interests"]);
+  assert.equal(withHobbies.score, 100);
+  assert.equal(withoutHobbies.score, 100);
+  assert.deepEqual(withoutHobbies.missing, []);
 });
+test("unpaid dues prevent a profile from being complete", () => {
+  const completeness = calculateMemberCompleteness(
+    completeMember(),
+    completeLinkedAccount({
+      duesPaid: false,
+    }),
+  );
 
-test("completeness gives 44% for the linked account example with five missing profile fields and RID", () => {
+  assert.equal(completeness.score, 89);
+  assert.equal(completeness.completed, 8);
+  assert.equal(completeness.total, 9);
+  assert.deepEqual(completeness.missing, ["dues paid"]);
+});
+test("completeness gives 56% when four required profile checks are missing", () => {
   const completeness = calculateMemberCompleteness(
     completeMember({ rid: "" }),
     completeLinkedAccount({
@@ -199,14 +221,13 @@ test("completeness gives 44% for the linked account example with five missing pr
     }),
   );
 
-  assert.equal(completeness.score, 44);
-  assert.equal(completeness.completed, 4);
+  assert.equal(completeness.score, 56);
+  assert.equal(completeness.completed, 5);
   assert.equal(completeness.total, 9);
   assert.deepEqual(completeness.missing, [
     "phone number",
     "date of birth",
     "gender",
-    "hobbies and interests",
     "RID",
   ]);
 });
@@ -306,14 +327,14 @@ test("legacy member name and email fall back without a linked account", () => {
   );
 
   assert.equal(completeness.score, 33);
-  assert.deepEqual(completeness.missing, [
-    "phone number",
-    "date of birth",
-    "gender",
-    "hobbies and interests",
-    "RID",
-    "approved linked account",
-  ]);
+assert.deepEqual(completeness.missing, [
+  "phone number",
+  "date of birth",
+  "gender",
+  "RID",
+  "approved linked account",
+  "dues paid",
+]);
 });
 
 test("attendance and fine summaries use loaded data", () => {

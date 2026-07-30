@@ -24,19 +24,21 @@ test("member profile payload uses only editable fields", () => {
     dateOfBirth: "1998-02-28",
     gender: "woman",
     hobbies: "Reading",
+    duesPaid: true,
     role: "admin",
     rid: "RID",
     active: false,
   }, { role: "gbm", today: "2026-07-12" });
-  assert.deepEqual(payload, {
-    name: "Asha",
-    phone: "123",
-    rotaryId: "RI-3131A",
-    dateOfBirth: "1998-02-28",
-    gender: "woman",
-    genderSelfDescribe: "",
-    hobbies: "Reading",
-  });
+assert.deepEqual(payload, {
+  name: "Asha",
+  phone: "123",
+  rotaryId: "RI-3131A",
+  dateOfBirth: "1998-02-28",
+  gender: "woman",
+  genderSelfDescribe: "",
+  hobbies: "Reading",
+  duesPaid: true,
+});
   assert.equal(Object.hasOwn(payload, "email"), false);
   assert.equal(Object.hasOwn(payload, "rid"), false);
   assert.equal(Object.hasOwn(payload, "active"), false);
@@ -54,7 +56,52 @@ test("member profile optional Rotary ID can be empty", () => {
   assert.equal(validation.errors.rotaryId, undefined);
   assert.equal(payload.rotaryId, "");
 });
+test("member dues-paid state loads and saves as a boolean", () => {
+  const paidDraft = createProfileDraft({
+    role: "gbm",
+    name: "Paid Member",
+    duesPaid: true,
+  });
 
+  const unpaidDraft = createProfileDraft({
+    role: "gbm",
+    name: "Unpaid Member",
+    duesPaid: false,
+  });
+
+  assert.equal(paidDraft.duesPaid, true);
+  assert.equal(unpaidDraft.duesPaid, false);
+
+  assert.equal(
+    buildProfileUpdatePayload(paidDraft, {
+      role: "gbm",
+      today: "2026-07-12",
+    }).duesPaid,
+    true,
+  );
+
+  assert.equal(
+    buildProfileUpdatePayload(unpaidDraft, {
+      role: "gbm",
+      today: "2026-07-12",
+    }).duesPaid,
+    false,
+  );
+});
+test("prospect profile payload does not expose member dues-paid editing", () => {
+  const draft = createProfileDraft({
+    role: "prospect",
+    name: "Prospect",
+    duesPaid: true,
+  });
+
+  const payload = buildProfileUpdatePayload(draft, {
+    role: "prospect",
+    today: "2026-07-12",
+  });
+
+  assert.equal(Object.hasOwn(payload, "duesPaid"), false);
+});
 test("member profile payload sends canonical rotaryId accepted by backend", () => {
   const draft = {
     ...createProfileDraft({ role: "gbm", name: "Member" }),

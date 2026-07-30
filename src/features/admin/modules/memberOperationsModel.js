@@ -93,33 +93,80 @@ function memberCompletenessFields(member, linkedAccount) {
 
   return {
     name: text(linked?.name, 160) || text(member?.name, 160),
-    email: normalizeMemberEmail(linked?.email) || normalizeMemberEmail(member?.email),
+    email:
+      normalizeMemberEmail(linked?.email)
+      || normalizeMemberEmail(member?.email),
     phone: linked ? text(linked.phone, 40) : "",
     dateOfBirth: linked ? text(linked.dateOfBirth, 20) : "",
     gender: linked ? text(linked.gender, 40).toLowerCase() : "",
-    genderSelfDescribe: linked ? text(linked.genderSelfDescribe, 160) : "",
-    hobbies: linked ? text(linked.hobbies, 600) : "",
+    genderSelfDescribe: linked
+      ? text(linked.genderSelfDescribe, 160)
+      : "",
     rid: memberProfileRid(member, linked),
-    roleOrPosition: text(linked?.role, 80) || text(member?.role, 80) || text(member?.position, 180),
+    roleOrPosition:
+      text(linked?.role, 80)
+      || text(member?.role, 80)
+      || text(member?.position, 180),
+    duesPaid: linked?.duesPaid === true,
   };
 }
 
 export function calculateMemberCompleteness(member, linkedAccount) {
   const fields = memberCompletenessFields(member, linkedAccount);
-  const checks = [
-    { key: "name", label: "full name", complete: Boolean(fields.name) },
-    { key: "email", label: "email", complete: Boolean(fields.email) },
-    { key: "phone", label: "phone number", complete: Boolean(fields.phone) },
-    { key: "dateOfBirth", label: "date of birth", complete: Boolean(fields.dateOfBirth) },
-    { key: "gender", label: "gender", complete: Boolean(fields.gender) },
-    ...(fields.gender === "self-describe"
-      ? [{ key: "genderSelfDescribe", label: "gender description", complete: Boolean(fields.genderSelfDescribe) }]
-      : []),
-    { key: "hobbies", label: "hobbies and interests", complete: Boolean(fields.hobbies) },
-    { key: "rid", label: "RID", complete: Boolean(fields.rid) },
-    { key: "position", label: "role or position", complete: Boolean(fields.roleOrPosition) },
-    { key: "account", label: "approved linked account", complete: Boolean(linkedAccount) },
-  ];
+const checks = [
+  {
+    key: "name",
+    label: "full name",
+    complete: Boolean(fields.name),
+  },
+  {
+    key: "email",
+    label: "email",
+    complete: Boolean(fields.email),
+  },
+  {
+    key: "phone",
+    label: "phone number",
+    complete: Boolean(fields.phone),
+  },
+  {
+    key: "dateOfBirth",
+    label: "date of birth",
+    complete: Boolean(fields.dateOfBirth),
+  },
+  {
+    key: "gender",
+    label: "gender",
+    complete: Boolean(fields.gender),
+  },
+  ...(fields.gender === "self-describe"
+    ? [{
+        key: "genderSelfDescribe",
+        label: "gender description",
+        complete: Boolean(fields.genderSelfDescribe),
+      }]
+    : []),
+  {
+    key: "rid",
+    label: "RID",
+    complete: Boolean(fields.rid),
+  },
+  {
+    key: "position",
+    label: "role or position",
+    complete: Boolean(fields.roleOrPosition),
+  },
+  {
+    key: "account",
+    label: "approved linked account",
+    complete: Boolean(linkedAccount),
+  },
+  {
+    key: "duesPaid",
+    label: "dues paid",
+    complete: fields.duesPaid,
+  },
+];
   const total = checks.length;
   const completed = checks.filter((check) => check.complete).length;
 

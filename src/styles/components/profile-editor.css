@@ -81,7 +81,49 @@
   font-size: 0.82rem;
   font-weight: 850;
 }
+.profile-editor-form .profile-editor-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-text);
+  background: rgba(255, 255, 255, 0.018);
+  cursor: pointer;
+}
 
+.profile-editor-form .profile-editor-checkbox input[type="checkbox"] {
+  width: 1.15rem;
+  min-height: 1.15rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  flex: 0 0 auto;
+  accent-color: var(--internal-accent-secondary);
+  cursor: pointer;
+}
+
+.profile-editor-form .profile-editor-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.profile-editor-checkbox__copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.profile-editor-checkbox__copy strong {
+  color: var(--internal-accent-soft);
+  font-size: 0.9rem;
+}
+
+.profile-editor-checkbox__copy small {
+  color: var(--internal-text-muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
 .profile-editor-form input,
 .profile-editor-form select,
 .profile-editor-form textarea {

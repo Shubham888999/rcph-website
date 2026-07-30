@@ -16,6 +16,7 @@ export const PROFILE_FIELD_LABELS = {
   gender: "Gender",
   genderSelfDescribe: "Gender description",
   hobbies: "Hobbies",
+  duesPaid: "Dues paid",
   previousRotaract: "Previous Rotaract",
   previousRotaractDetails: "Rotaract experience",
   joinReason: "Reason for joining",
@@ -90,6 +91,7 @@ export function createProfileDraft(profile = {}) {
       : "",
     genderSelfDescribe: text(profile.genderSelfDescribe, 160),
     hobbies: text(profile.hobbies, 600),
+    duesPaid: profile.duesPaid === true,
     previousRotaract: profile.previousRotaract === true ? "yes" : "no",
     previousRotaractDetails: text(profile.previousRotaractDetails === "N/A" ? "" : profile.previousRotaractDetails, 1200),
     joinReason: text(profile.joinReason, 1200),
@@ -164,7 +166,13 @@ export function buildProfileUpdatePayload(draft, options = {}) {
     genderSelfDescribe: draft.gender === "self-describe" ? text(draft.genderSelfDescribe, 160) : "",
     hobbies: text(draft.hobbies, 600),
   };
-  if (!prospect) return { ...payload, rotaryId: text(draft.rotaryId, 40) };
+  if (!prospect) {
+  return {
+    ...payload,
+    rotaryId: text(draft.rotaryId, 40),
+    duesPaid: draft.duesPaid === true,
+  };
+}
   return {
     ...payload,
     previousRotaract: draft.previousRotaract === "yes",

@@ -165,6 +165,7 @@ export function normalizeDashboardProfile(raw) {
     gender: text(raw.gender, 40).toLowerCase(),
     genderSelfDescribe: text(raw.genderSelfDescribe, 160),
     hobbies: text(raw.hobbies, 600),
+    duesPaid: raw.duesPaid === true,
     clubPosition: text(raw.clubPosition, 120),
     memberName: text(raw.memberName, 160),
     memberPosition: text(raw.memberPosition, 120),

@@ -44,6 +44,7 @@ export default function ProfileEditorDialog({
   const role = profile?.role || draft.role;
   const prospect = isProspectProfile(role);
   const canEditRotaryId = !prospect;
+  const canEditDuesPaid = !prospect;
   const validation = useMemo(
     () => validateProfileDraft(draft, { role, today }),
     [draft, role, today],
@@ -188,7 +189,25 @@ export default function ProfileEditorDialog({
           />
           <FieldError id={fieldId(prefix, "hobbies-error")} message={validation.errors.hobbies} />
         </label>
+{canEditDuesPaid ? (
+  <label className="profile-editor-checkbox">
+    <input
+      type="checkbox"
+      checked={draft.duesPaid === true}
+      disabled={disabled}
+      onChange={(event) =>
+        change("duesPaid", event.target.checked)
+      }
+    />
 
+    <span className="profile-editor-checkbox__copy">
+      <strong>Dues paid</strong>
+      <small>
+        Check this when the club dues have been paid.
+      </small>
+    </span>
+  </label>
+) : null}
         {prospect ? (
           <fieldset className="profile-editor-fieldset">
             <legend>Prospect details</legend>

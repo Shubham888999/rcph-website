@@ -19,3 +19,19 @@ test("Edit Profile helper text is styled separately from validation errors", () 
   assert.match(css, /\.profile-field-help\s*\{/);
   assert.match(css, /color: var\(--color-muted\)/);
 });
+test("Edit Profile renders dues-paid checkbox for members", () => {
+  assert.match(source, /const canEditDuesPaid = !prospect/);
+  assert.match(source, /className="profile-editor-checkbox"/);
+  assert.match(source, /type="checkbox"/);
+  assert.match(source, /checked=\{draft\.duesPaid === true\}/);
+  assert.match(
+    source,
+    /change\("duesPaid", event\.target\.checked\)/,
+  );
+  assert.match(source, />Dues paid</);
+  assert.match(css, /\.profile-editor-checkbox/);
+  assert.match(
+    css,
+    /input\[type="checkbox"\]/,
+  );
+});
