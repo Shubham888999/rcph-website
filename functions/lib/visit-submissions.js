@@ -91,6 +91,16 @@ const VISIT_DANGEROUS_EXTENSIONS = new Set([
   'rar',
   '7z',
 ]);
+const FORBIDDEN_VISIT_UPLOAD_AUTHORITY_FIELDS = Object.freeze([
+  'driveFolderId',
+  'rootFolderId',
+  'driveFileId',
+  'driveFileUrl',
+  'fileUrl',
+  'folderId',
+  'uploadDestination',
+  'authorization',
+]);
 const PRIMARY_PRESENTATION_MIME_TYPES = new Set([
   'application/pdf',
   'application/vnd.ms-powerpoint',
@@ -159,6 +169,22 @@ function normalizeUploadText(value, max = 200) {
     .replace(/[.\s]+$/, '')
     .slice(0, max)
     .trim();
+}
+
+function rejectBrowserSuppliedVisitAuthorityFields(input) {
+  const sources = [input, ...(Array.isArray(input?.files) ? input.files : [])];
+  const present = [];
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    for (const field of FORBIDDEN_VISIT_UPLOAD_AUTHORITY_FIELDS) {
+      if (normalizeText(source[field], 1000)) present.push(field);
+    }
+  }
+  if (present.length) {
+    throw makeVisitSubmissionError('invalid-argument', 'Upload destination and Drive result must be selected by the trusted server.', {
+      fields: Array.from(new Set(present)),
+    });
+  }
 }
 
 function fileExtension(fileName) {
@@ -234,6 +260,14 @@ function normalizeSessionId(value) {
     throw makeVisitSubmissionError('invalid-argument', 'Valid upload session ID is required.');
   }
   return sessionId;
+}
+
+function normalizeBulkUploadId(value) {
+  const bulkUploadId = normalizeText(value, 160);
+  if (!bulkUploadId || /[\\/]/.test(bulkUploadId)) {
+    throw makeVisitSubmissionError('invalid-argument', 'Valid bulk upload ID is required.');
+  }
+  return bulkUploadId;
 }
 
 function normalizeRawVisitTicket(value) {
@@ -865,7 +899,7 @@ function shapeSubmission(submission, access, options = {}) {
     positionTitle: submission.positionTitle || '',
     uploadedByName: submission.uploadedByName || '',
     uploadedByRole: submission.uploadedByRole || '',
-    fileName: submission.fileName || '',
+    fileName: submission.originalFileName || submission.fileName || '',
     originalFileName: submission.originalFileName || submission.fileName || '',
     mimeType: submission.mimeType || '',
     sizeBytes: Number(submission.sizeBytes || 0),
@@ -1026,6 +1060,12 @@ function createFirestoreVisitSubmissionAdapter(db, admin) {
         .get();
       return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
     },
+    async queryUploadSessionsForBulk(bulkUploadId) {
+      const snap = await db.collection('visitSubmissionUploadSessions')
+        .where('bulkUploadId', '==', bulkUploadId)
+        .get();
+      return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    },
   };
 }
 
@@ -1183,6 +1223,12 @@ function createMemoryVisitSubmissionAdapter(initialData) {
             && doc.positionKey === positionKey
             && VISIT_UPLOAD_SESSION_ACTIVE_STATUSES.includes(doc.status);
         })
+        .map(id => ({ id, data: clone(docs[id]) }));
+    },
+    async queryUploadSessionsForBulk(bulkUploadId) {
+      const docs = store.visitSubmissionUploadSessions || {};
+      return Object.keys(docs)
+        .filter(id => docs[id]?.bulkUploadId === bulkUploadId)
         .map(id => ({ id, data: clone(docs[id]) }));
     },
   };
@@ -1538,11 +1584,13 @@ function createVisitSubmissionService(options) {
       seenClientIds.add(clientFileId);
       const { safeName, extension, mimeType } = validateVisitFileType(file.fileName, file.mimeType);
       const sizeBytes = validateVisitFileSize(file.sizeBytes, Number(folder.maxFileSizeBytes || DEFAULT_MAX_FILE_SIZE_BYTES));
-      const storageFileName = buildStorageFileName({ safeName, extension, visitType, positionKey, clientFileId }, tokenGenerator);
+      const internalTrackingName = buildStorageFileName({ safeName, extension, visitType, positionKey, clientFileId }, tokenGenerator);
       return {
         clientFileId,
         originalFileName: safeName,
-        fileName: storageFileName,
+        sanitizedOriginalFileName: safeName,
+        fileName: safeName,
+        internalTrackingName,
         mimeType,
         sizeBytes,
         status: 'reserved',
@@ -1558,7 +1606,7 @@ function createVisitSubmissionService(options) {
     if (folder.locked === true) throw makeVisitSubmissionError('failed-precondition', 'This position folder is locked.');
   }
 
-  async function updateVisitUploadRateLimit(tx, uid, nowValue) {
+  async function updateVisitUploadRateLimit(tx, uid, nowValue, increment = 1) {
     const rateLimitId = `${uid}_${VISIT_UPLOAD_TYPE}`;
     const snap = await tx.getDoc('driveUploadRateLimits', rateLimitId);
     const existing = snap.exists ? (snap.data || {}) : {};
@@ -1566,10 +1614,11 @@ function createVisitSubmissionService(options) {
     const recent = Array.isArray(existing.createdAtMillis)
       ? existing.createdAtMillis.filter(value => Number.isSafeInteger(value) && value > windowStart)
       : [];
-    if (recent.length >= VISIT_UPLOAD_RATE_LIMIT) {
+    const safeIncrement = Math.max(1, Math.min(VISIT_UPLOAD_RATE_LIMIT, Number(increment) || 1));
+    if (recent.length + safeIncrement > VISIT_UPLOAD_RATE_LIMIT) {
       throw makeVisitSubmissionError('resource-exhausted', 'Too many upload sessions requested. Try again later.');
     }
-    recent.push(nowValue);
+    for (let index = 0; index < safeIncrement; index += 1) recent.push(nowValue);
     tx.setDoc('driveUploadRateLimits', rateLimitId, {
       uid,
       uploadType: VISIT_UPLOAD_TYPE,
@@ -1582,6 +1631,7 @@ function createVisitSubmissionService(options) {
   }
 
   async function createUploadSession(uid, input, replacementOptions = {}) {
+    rejectBrowserSuppliedVisitAuthorityFields(input || {});
     const access = await resolveAccessContext(uid);
     const visitType = normalizeVisitType(input?.visitType);
     const positionKey = normalizeCanonicalPositionKey(input?.positionKey, positionHelpers);
@@ -1658,6 +1708,8 @@ function createVisitSubmissionService(options) {
           clientFileId: file.clientFileId,
           fileName: file.fileName,
           originalFileName: file.originalFileName,
+          sanitizedOriginalFileName: file.sanitizedOriginalFileName,
+          internalTrackingName: file.internalTrackingName,
           mimeType: file.mimeType,
           sizeBytes: file.sizeBytes,
           ticketHash: file.ticketHash,
@@ -1681,6 +1733,8 @@ function createVisitSubmissionService(options) {
           positionKey,
           fileName: file.fileName,
           originalFileName: file.originalFileName,
+          sanitizedOriginalFileName: file.sanitizedOriginalFileName,
+          internalTrackingName: file.internalTrackingName,
           mimeType: file.mimeType,
           sizeBytes: file.sizeBytes,
           uploadProofHash: file.uploadProofHash,
@@ -1716,10 +1770,316 @@ function createVisitSubmissionService(options) {
         ticket: file.ticket,
         fileName: file.fileName,
         originalFileName: file.originalFileName,
+        sanitizedOriginalFileName: file.sanitizedOriginalFileName,
         mimeType: file.mimeType,
         sizeBytes: file.sizeBytes,
         expiresAt: file.expiresAtMillis,
       })),
+    };
+  }
+
+  function normalizeBulkPositionKeys(values) {
+    const normalized = normalizeCanonicalPositionKeys(Array.isArray(values) ? values : [], positionHelpers);
+    const unique = [];
+    const seen = new Set();
+    for (const key of normalized) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(key);
+    }
+    if (!unique.length) {
+      throw makeVisitSubmissionError('invalid-argument', 'Select at least one destination folder.');
+    }
+    return unique;
+  }
+
+  async function createBulkUploadSessions(uid, input) {
+    rejectBrowserSuppliedVisitAuthorityFields(input || {});
+    const access = await resolveAccessContext(uid);
+    assertManageAccess(access);
+    const visitType = normalizeVisitType(input?.visitType);
+    const positionKeys = normalizeBulkPositionKeys(input?.positionKeys);
+    const existingBulkUploadId = input?.bulkUploadId ? normalizeBulkUploadId(input.bulkUploadId) : '';
+    const bulkUploadId = existingBulkUploadId || adapter.newDocId('visitSubmissionBulkUploads');
+    const config = await loadVisitConfig(visitType);
+    if (config.enabled === false) throw makeVisitSubmissionError('failed-precondition', 'Visit submissions are disabled.');
+    if (config.submissionOpen === false) throw makeVisitSubmissionError('failed-precondition', 'Visit submissions are closed.');
+
+    const folders = await Promise.all(positionKeys.map(positionKey => loadFolder(visitType, positionKey)));
+    const nowValue = nowMillis(clock);
+    const expiresAtMillis = nowValue + VISIT_UPLOAD_SESSION_TTL_MS;
+    const plans = folders.map((folder) => {
+      assertVisitFolderAllowsUpload(config, folder);
+      const files = normalizeUploadFileDescriptors(input?.files, folder, visitType, folder.positionKey);
+      const sessionId = adapter.newDocId('visitSubmissionUploadSessions');
+      const tickets = files.map((file) => {
+        const ticket = generateRandomHex(32, tokenGenerator);
+        const ticketHash = hashSecret(ticket);
+        const uploadProof = generateRandomHex(32, tokenGenerator);
+        const uploadProofHash = hashSecret(uploadProof);
+        return {
+          ...file,
+          ticket,
+          ticketHash,
+          uploadProof,
+          uploadProofHash,
+          expiresAtMillis: nowValue + VISIT_UPLOAD_TICKET_TTL_MS,
+          deleteAtMillis: nowValue + VISIT_UPLOAD_TICKET_TTL_MS + VISIT_UPLOAD_TICKET_DELETE_GRACE_MS,
+        };
+      });
+      return {
+        folder,
+        folderId: visitPositionDocId(visitType, folder.positionKey, positionHelpers),
+        sessionId,
+        files,
+        tickets,
+      };
+    });
+    const selectedFileCount = plans[0]?.files.length || 0;
+    const attemptedUploadCount = plans.reduce((sum, plan) => sum + plan.files.length, 0);
+
+    await adapter.runTransaction(async (tx) => {
+      if (existingBulkUploadId) {
+        const bulkSnap = await tx.getDoc('visitSubmissionBulkUploads', bulkUploadId);
+        if (!bulkSnap.exists) {
+          throw makeVisitSubmissionError('not-found', 'Bulk upload session not found.');
+        }
+      }
+
+      const latestFolders = new Map();
+      for (const plan of plans) {
+        const folderSnap = await tx.getDoc('visitSubmissionPositions', plan.folderId);
+        if (!folderSnap.exists) {
+          throw makeVisitSubmissionError('not-found', 'Visit Submission structure is incomplete.');
+        }
+        const latestFolder = shapePosition(folderSnap.data, visitType, plan.folder.positionKey, null, null, positionHelpers);
+        latestFolders.set(plan.folder.positionKey, latestFolder);
+        assertVisitFolderAllowsUpload(config, latestFolder);
+        const activeFileCount = Number(latestFolder.activeFileCount || 0);
+        const reservedFileCount = Number(latestFolder.reservedFileCount || 0);
+        const maxActiveFiles = Number(latestFolder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES);
+        if (activeFileCount + reservedFileCount + plan.files.length > maxActiveFiles) {
+          const remaining = Math.max(0, maxActiveFiles - activeFileCount - reservedFileCount);
+          throw makeVisitSubmissionError('resource-exhausted', 'This position folder has reached its active file limit.', {
+            visitType,
+            positionKey: plan.folder.positionKey,
+            remainingCapacity: remaining,
+          });
+        }
+      }
+
+      await updateVisitUploadRateLimit(tx, uid, nowValue, plans.length);
+
+      if (existingBulkUploadId) {
+        tx.setDoc('visitSubmissionBulkUploads', bulkUploadId, {
+          lastRetryAt: adapter.serverTimestamp(),
+          lastRetryPositionKeys: positionKeys,
+          lastRetryFileCount: selectedFileCount,
+          lastRetryAttemptedUploadCount: attemptedUploadCount,
+          updatedAt: adapter.serverTimestamp(),
+        }, { merge: true });
+      } else {
+        tx.createDoc('visitSubmissionBulkUploads', bulkUploadId, {
+          bulkUploadId,
+          actorUid: uid,
+          actorRole: access.role,
+          visitType,
+          positionKeys,
+          selectedFileCount,
+          attemptedUploadCount,
+          status: 'sessions-created',
+          createdAt: adapter.serverTimestamp(),
+          updatedAt: adapter.serverTimestamp(),
+        });
+      }
+
+      for (const plan of plans) {
+        const latestFolder = latestFolders.get(plan.folder.positionKey) || plan.folder;
+        const reservedFileCount = Math.max(0, Number(latestFolder.reservedFileCount || 0));
+        tx.updateDoc('visitSubmissionPositions', plan.folderId, {
+          reservedFileCount: reservedFileCount + plan.files.length,
+          updatedAt: adapter.serverTimestamp(),
+          updatedBy: uid,
+        });
+        tx.createDoc('visitSubmissionUploadSessions', plan.sessionId, {
+          sessionId: plan.sessionId,
+          bulkUploadId,
+          actorUid: uid,
+          actorRole: access.role,
+          actorName: access.name || '',
+          visitType,
+          positionKey: latestFolder.positionKey,
+          positionTitle: latestFolder.positionTitle,
+          avenueCode: latestFolder.avenueCode,
+          folderId: plan.folderId,
+          status: 'pending',
+          fileCount: plan.files.length,
+          reservedFileCount: plan.files.length,
+          finalizedFileCount: 0,
+          cancelledFileCount: 0,
+          replacesSubmissionId: null,
+          expectedFiles: plan.tickets.map(file => ({
+            clientFileId: file.clientFileId,
+            fileName: file.fileName,
+            originalFileName: file.originalFileName,
+            sanitizedOriginalFileName: file.sanitizedOriginalFileName,
+            internalTrackingName: file.internalTrackingName,
+            mimeType: file.mimeType,
+            sizeBytes: file.sizeBytes,
+            ticketHash: file.ticketHash,
+            status: 'reserved',
+          })),
+          expiresAt: timestampFromMillis(adapter, expiresAtMillis),
+          expiresAtMillis,
+          createdAt: adapter.serverTimestamp(),
+          updatedAt: adapter.serverTimestamp(),
+        });
+        for (const file of plan.tickets) {
+          tx.createDoc('driveUploadTickets', file.ticketHash, {
+            uid,
+            role: access.role,
+            uploadType: VISIT_UPLOAD_TYPE,
+            uploadPurpose: VISIT_UPLOAD_PURPOSE,
+            sessionId: plan.sessionId,
+            bulkUploadId,
+            clientFileId: file.clientFileId,
+            visitType,
+            positionKey: latestFolder.positionKey,
+            fileName: file.fileName,
+            originalFileName: file.originalFileName,
+            sanitizedOriginalFileName: file.sanitizedOriginalFileName,
+            internalTrackingName: file.internalTrackingName,
+            mimeType: file.mimeType,
+            sizeBytes: file.sizeBytes,
+            uploadProofHash: file.uploadProofHash,
+            expiresAt: timestampFromMillis(adapter, file.expiresAtMillis),
+            expiresAtMillis: file.expiresAtMillis,
+            deleteAt: timestampFromMillis(adapter, file.deleteAtMillis),
+            used: false,
+            finalized: false,
+            createdAt: adapter.serverTimestamp(),
+          });
+        }
+      }
+    });
+
+    await adapter.addDoc('visitSubmissionAudit', buildAuditPayload('visitBulkUploadSessionsCreated', access, {
+      visitType,
+      details: {
+        bulkUploadId,
+        selectedPositionKeys: positionKeys,
+        selectedFileCount,
+        attemptedUploadCount,
+        sessionCount: plans.length,
+        retry: Boolean(existingBulkUploadId),
+      },
+    }, adapter.serverTimestamp()));
+
+    return {
+      ok: true,
+      bulkUploadId,
+      visitType,
+      selectedPositionKeys: positionKeys,
+      selectedFileCount,
+      attemptedUploadCount,
+      sessionCount: plans.length,
+      uploadType: 'visitSubmission',
+      sessions: plans.map(plan => ({
+        ok: true,
+        sessionId: plan.sessionId,
+        bulkUploadId,
+        visitType,
+        positionKey: plan.folder.positionKey,
+        expiresAt: expiresAtMillis,
+        uploadType: 'visitSubmission',
+        files: plan.tickets.map(file => ({
+          clientFileId: file.clientFileId,
+          ticket: file.ticket,
+          fileName: file.fileName,
+          originalFileName: file.originalFileName,
+          sanitizedOriginalFileName: file.sanitizedOriginalFileName,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          expiresAt: file.expiresAtMillis,
+        })),
+      })),
+    };
+  }
+
+  async function recordBulkUploadAudit(uid, input) {
+    const access = await resolveAccessContext(uid);
+    assertManageAccess(access);
+    const bulkUploadId = normalizeBulkUploadId(input?.bulkUploadId);
+    const sessions = await adapter.queryUploadSessionsForBulk(bulkUploadId);
+    if (!sessions.length) {
+      throw makeVisitSubmissionError('not-found', 'Bulk upload session not found.');
+    }
+    const visitTypes = [...new Set(sessions.map(item => item.data?.visitType).filter(Boolean))];
+    const visitType = normalizeVisitType(visitTypes[0]);
+    if (visitTypes.length !== 1) {
+      throw makeVisitSubmissionError('failed-precondition', 'Bulk upload session is inconsistent.');
+    }
+    const selectedPositionKeys = [];
+    const seenPositions = new Set();
+    const uploadPairs = new Map();
+    let selectedFileCount = 0;
+    for (const item of sessions) {
+      const session = item.data || {};
+      if (session.bulkUploadId !== bulkUploadId) continue;
+      const positionKey = normalizeCanonicalPositionKey(session.positionKey, positionHelpers);
+      if (!seenPositions.has(positionKey)) {
+        seenPositions.add(positionKey);
+        selectedPositionKeys.push(positionKey);
+      }
+      const expectedFiles = Array.isArray(session.expectedFiles) ? session.expectedFiles : [];
+      selectedFileCount = Math.max(selectedFileCount, Number(session.fileCount || expectedFiles.length || 0));
+      for (const file of expectedFiles) {
+        const pairKey = [
+          positionKey,
+          file.clientFileId,
+          file.originalFileName || file.fileName,
+          file.sizeBytes,
+        ].join('|');
+        const existing = uploadPairs.get(pairKey) || { finalized: false };
+        uploadPairs.set(pairKey, {
+          finalized: existing.finalized || file.status === 'finalized',
+        });
+      }
+    }
+    const attemptedUploadCount = uploadPairs.size;
+    const successCount = Array.from(uploadPairs.values()).filter(pair => pair.finalized).length;
+    const failureCount = Math.max(0, attemptedUploadCount - successCount);
+    const now = adapter.serverTimestamp();
+    await adapter.setDoc('visitSubmissionBulkUploads', bulkUploadId, {
+      status: failureCount ? 'partial' : 'completed',
+      selectedPositionKeys,
+      selectedFileCount,
+      attemptedUploadCount,
+      successCount,
+      failureCount,
+      completedAt: now,
+      updatedAt: now,
+    }, { merge: true });
+    await adapter.addDoc('visitSubmissionAudit', buildAuditPayload('visitBulkUploadCompleted', access, {
+      visitType,
+      details: {
+        bulkUploadId,
+        selectedPositionKeys,
+        selectedFileCount,
+        attemptedUploadCount,
+        successCount,
+        failureCount,
+      },
+    }, now));
+    return {
+      ok: true,
+      bulkUploadId,
+      visitType,
+      selectedPositionKeys,
+      selectedFileCount,
+      attemptedUploadCount,
+      successCount,
+      failureCount,
     };
   }
 
@@ -1785,11 +2145,13 @@ function createVisitSubmissionService(options) {
         status: 'partial',
         updatedAt: adapter.serverTimestamp(),
       });
+      const sanitizedOriginalFileName = ticketData.sanitizedOriginalFileName || ticketData.originalFileName || ticketData.fileName;
       response = {
         ok: true,
         uploadType: 'visitSubmission',
-        safeFileName: ticketData.fileName,
-        originalFileName: ticketData.originalFileName,
+        sanitizedOriginalFileName,
+        originalFileName: ticketData.originalFileName || sanitizedOriginalFileName,
+        internalTrackingName: ticketData.internalTrackingName || ticketData.fileName,
         visitType: ticketData.visitType,
         visitDisplayTitle: getVisitTypeDefinition(ticketData.visitType).displayTitle,
         positionKey: ticketData.positionKey,
@@ -1965,6 +2327,8 @@ function createVisitSubmissionService(options) {
         result = { ok: true, submissionId: existingId, alreadyFinalized: true };
         return;
       }
+      const visibleFileName = expectedFile.originalFileName || expectedFile.sanitizedOriginalFileName || expectedFile.fileName;
+      const internalTrackingName = expectedFile.internalTrackingName || expectedFile.fileName || visibleFileName;
 
       const activeFileCount = Math.max(0, Number(folder.activeFileCount || 0));
       const reservedFileCount = Math.max(0, Number(folder.reservedFileCount || 0));
@@ -1979,8 +2343,10 @@ function createVisitSubmissionService(options) {
         uploadedByUid: uid,
         uploadedByName: access.name || session.actorName || uid,
         uploadedByRole: access.role,
-        fileName: expectedFile.fileName,
-        originalFileName: expectedFile.originalFileName,
+        fileName: visibleFileName,
+        originalFileName: visibleFileName,
+        sanitizedOriginalFileName: visibleFileName,
+        internalTrackingName,
         mimeType: expectedFile.mimeType,
         sizeBytes: expectedFile.sizeBytes,
         driveFileId,
@@ -2317,6 +2683,8 @@ function createVisitSubmissionService(options) {
     updateConfig,
     updateFolder,
     createUploadSession,
+    createBulkUploadSessions,
+    recordBulkUploadAudit,
     validateVisitUploadTicketWithProof,
     completeDriveUpload,
     finalizeUpload,

@@ -84,7 +84,7 @@ function baseFields(overrides = {}) {
     ticket: has('ticket') ? overrides.ticket : 'a'.repeat(64),
     sessionId: has('sessionId') ? overrides.sessionId : 'session-one',
     clientFileId: has('clientFileId') ? overrides.clientFileId : 'file-one',
-    fileName: has('fileName') ? overrides.fileName : 'clubAssembly_secretary_file-one_report.pdf',
+    fileName: has('fileName') ? overrides.fileName : 'report.pdf',
     mimeType: has('mimeType') ? overrides.mimeType : 'application/pdf',
     sizeBytes: String(has('sizeBytes') ? overrides.sizeBytes : 11),
     ...overrides.extraFields,
@@ -122,8 +122,9 @@ class FakeVisitService {
     return {
       ok: true,
       uploadType: 'visitSubmission',
-      safeFileName: input.fileName,
+      sanitizedOriginalFileName: input.fileName,
       originalFileName: 'report.pdf',
+      internalTrackingName: `clubAssembly_secretary_${input.clientFileId}_internal_report.pdf`,
 visitType: this.options.visitType || 'clubAssembly',
 visitDisplayTitle:
   this.options.visitDisplayTitle ||
@@ -298,6 +299,9 @@ async function main() {
   assert.ok(result.json.fileUrl, 'file URL returned');
   assert.strictEqual(result.json.driveFileId, undefined, 'Drive file ID hidden from browser response');
   assert.strictEqual(result.json.driveFolderId, undefined, 'Drive folder ID hidden from browser response');
+  assert.strictEqual(result.drive.uploads[0].fileName, 'report.pdf', 'Drive visible filename is the sanitized original filename');
+  assert.strictEqual(result.service.completions[0].finalFileName, 'report.pdf', 'trusted completion records visible filename without internal prefix');
+  assert.ok(!/clubAssembly|secretary|react-|replace-|\d{10,}/.test(result.drive.uploads[0].fileName), 'Drive visible filename has no internal upload prefix');
 
   const optionsReq = multipartRequest({ fields: {}, file: null, method: 'OPTIONS' });
   const optionsRes = makeResponse();

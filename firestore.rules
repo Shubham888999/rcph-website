@@ -282,6 +282,10 @@ function isFineLinkedTreasury(data) {
       allow read, write: if false;
     }
 
+    match /visitSubmissionBulkUploads/{bulkUploadId} {
+      allow read, write: if false;
+    }
+
     match /visitSubmissionFolderLocks/{folderLockId} {
       allow read, write: if false;
     }

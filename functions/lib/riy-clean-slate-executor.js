@@ -34,6 +34,7 @@ const RESET_COLLECTIONS = Object.freeze([
   'visitSubmissionAudit',
   'visitSubmissionFolderLocks',
   'visitSubmissionUploadSessions',
+  'visitSubmissionBulkUploads',
 ]);
 
 const KEEP_ONE_COLLECTIONS = Object.freeze(['users', 'roles']);

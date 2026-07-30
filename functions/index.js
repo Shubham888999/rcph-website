@@ -4828,6 +4828,24 @@ exports.createVisitSubmissionUploadSession = onCall(CALLABLE_OPTIONS, async (req
   }
 });
 
+exports.createVisitSubmissionBulkUploadSessions = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.createBulkUploadSessions(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission bulk upload session creation failed.');
+  }
+});
+
+exports.recordVisitSubmissionBulkUploadAudit = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.recordBulkUploadAudit(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission bulk upload audit failed.');
+  }
+});
+
 exports.finalizeVisitSubmissionUpload = onCall(CALLABLE_OPTIONS, async (request) => {
   try {
     const uid = requireAuth(request);

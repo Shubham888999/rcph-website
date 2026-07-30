@@ -490,7 +490,7 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
 }
 
 function assertTrustedValidation(validation) {
-  const required = ['safeFileName', 'visitType', 'visitDisplayTitle', 'positionKey', 'positionTitle', 'avenueCode', 'uploadProof'];
+  const required = ['sanitizedOriginalFileName', 'visitType', 'visitDisplayTitle', 'positionKey', 'positionTitle', 'avenueCode', 'uploadProof'];
   const missing = required.filter(field => !safeText(validation?.[field], 1000));
   if (missing.length) {
     throw createHttpUploadError(500, 'Trusted upload validation response was incomplete.');
@@ -656,7 +656,7 @@ folderLock = await folderLockManager.acquireLock({
       const folder = await driveService.ensureVisitFolderHierarchy(validation, driveConfig);
       driveFile = await driveService.uploadFile({
         folderId: folder.positionFolderId,
-        fileName: validation.safeFileName,
+        fileName: validation.sanitizedOriginalFileName,
         mimeType: metadata.mimeType,
         buffer: parsedFile.buffer,
       });
@@ -670,7 +670,7 @@ folderLock = await folderLockManager.acquireLock({
         driveFolderId: folder.positionFolderId,
         driveFileUrl: driveFile.driveFileUrl,
         fileName: metadata.fileName,
-        finalFileName: validation.safeFileName,
+        finalFileName: validation.sanitizedOriginalFileName,
         mimeType: metadata.mimeType,
         sizeBytes: metadata.sizeBytes,
       });

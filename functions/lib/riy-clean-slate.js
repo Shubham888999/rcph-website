@@ -53,6 +53,7 @@ const RULES_COVERAGE = Object.freeze({
   driveUploadRateLimits: 'Explicit rules: read/write false.',
   driveUploadGroups: 'Explicit rules: read/write false.',
   visitSubmissionUploadSessions: 'Explicit rules: read/write false.',
+  visitSubmissionBulkUploads: 'Explicit rules: read/write false.',
   bodPositionOccupancy: 'Explicit rules: admin read, direct client writes denied.',
   bodPositionAssignments: 'Explicit rules: admin read, direct client writes denied.',
   rolePositionAudit: 'Explicit rules: admin read, direct client writes denied.',
@@ -198,6 +199,11 @@ const COLLECTION_POLICIES = Object.freeze({
   visitSubmissionUploadSessions: {
     classification: 'reset',
     reason: 'Visit upload sessions are temporary operational reservations and should reset.',
+    referencedBy: ['functions/lib/visit-submissions.js'],
+  },
+  visitSubmissionBulkUploads: {
+    classification: 'reset',
+    reason: 'Visit bulk upload audit summaries are operational attempt metadata and should reset.',
     referencedBy: ['functions/lib/visit-submissions.js'],
   },
 });

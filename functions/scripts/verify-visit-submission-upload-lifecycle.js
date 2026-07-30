@@ -206,7 +206,10 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   let session = await createSession(env, 'bod-secretary');
   assert.strictEqual(folderDoc(env).reservedFileCount, 1, 'reservation counter increments');
   assert.strictEqual(session.files.length, 1);
-  assert.match(session.files[0].fileName, /^clubAssembly_secretary_local-1_[a-f0-9]+_Secretary Report\.pdf$/);
+  assert.strictEqual(session.files[0].fileName, 'Secretary Report.pdf', 'ticket response keeps original visible filename');
+  const storedSession = env.adapter.store.visitSubmissionUploadSessions[session.sessionId];
+  assert.match(storedSession.expectedFiles[0].internalTrackingName, /^clubAssembly_secretary_local-1_[a-f0-9]+_Secretary Report\.pdf$/, 'internal tracking name remains unique');
+  assert.strictEqual(storedSession.expectedFiles[0].fileName, 'Secretary Report.pdf', 'session metadata keeps visible filename separate');
 
   const presidentSession = await createSession(env, 'president-uid', { positionKey: 'treasurer' });
   assert.strictEqual(presidentSession.positionKey, 'treasurer', 'President can upload to any position');
@@ -263,6 +266,115 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   await createSession(env, 'bod-secretary');
   await rejectsWithCode(() => createSession(env, 'bod-secretary', { file: { clientFileId: 'another' } }), 'resource-exhausted', 'concurrent reservation blocked');
 
+  const bulkEnv = await initializedEnv();
+  const bulk = await bulkEnv.service.createBulkUploadSessions('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKeys: ['secretary', 'treasurer'],
+    files: [
+      file({ clientFileId: 'bulk-agenda', fileName: 'Agenda.pdf' }),
+      file({ clientFileId: 'bulk-report', fileName: 'Report.pdf' }),
+    ],
+  });
+  assert.strictEqual(bulk.sessions.length, 2, 'manager bulk upload creates one session per destination folder');
+  assert.strictEqual(bulk.attemptedUploadCount, 4, 'bulk upload counts file-folder pairs');
+  assert.deepStrictEqual(bulk.selectedPositionKeys, ['secretary', 'treasurer']);
+  assert.strictEqual(bulk.sessions[0].files[0].fileName, 'Agenda.pdf', 'bulk session response preserves visible filename');
+  assert.strictEqual(folderDoc(bulkEnv, 'clubAssembly', 'secretary').reservedFileCount, 2, 'bulk session reserves secretary capacity');
+  assert.strictEqual(folderDoc(bulkEnv, 'clubAssembly', 'treasurer').reservedFileCount, 2, 'bulk session reserves treasurer capacity');
+  const bulkStoredSessions = Object.values(bulkEnv.adapter.store.visitSubmissionUploadSessions).filter(item => item.bulkUploadId === bulk.bulkUploadId);
+  const bulkTrackingNames = bulkStoredSessions.flatMap(item => item.expectedFiles.map(fileItem => fileItem.internalTrackingName));
+  assert.strictEqual(new Set(bulkTrackingNames).size, 4, 'bulk upload keeps distinct internal tracking names');
+  assert.ok(bulkTrackingNames.every(name => /^clubAssembly_(secretary|treasurer)_bulk-[a-z]+_[a-f0-9]+_/.test(name) || /^clubAssembly_(secretary|treasurer)_bulk-/.test(name)), 'bulk tracking names remain internal');
+  await rejectsWithCode(() => bulkEnv.service.createBulkUploadSessions('bod-secretary', {
+    visitType: 'clubAssembly',
+    positionKeys: ['secretary'],
+    files: [file({ clientFileId: 'bod-bulk' })],
+  }), 'permission-denied', 'ordinary BOD cannot create bulk sessions');
+  await rejectsWithCode(() => bulkEnv.service.createBulkUploadSessions('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKeys: ['secretary'],
+    driveFolderId: 'browser-drive-folder',
+    files: [file({ clientFileId: 'drive-tamper' })],
+  }), 'invalid-argument', 'browser supplied Drive folder ID rejected');
+
+  const bulkLockedEnv = await initializedEnv();
+  folderDoc(bulkLockedEnv).locked = true;
+  await rejectsWithCode(() => bulkLockedEnv.service.createBulkUploadSessions('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKeys: ['secretary'],
+    files: [file({ clientFileId: 'locked-bulk' })],
+  }), 'failed-precondition', 'bulk locked folder rejected');
+  const bulkCapacityEnv = await initializedEnv();
+  folderDoc(bulkCapacityEnv).maxActiveFiles = 1;
+  await rejectsWithCode(() => bulkCapacityEnv.service.createBulkUploadSessions('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKeys: ['secretary'],
+    files: [file({ clientFileId: 'bulk-one' }), file({ clientFileId: 'bulk-two' })],
+  }), 'resource-exhausted', 'bulk capacity overflow rejected');
+
+  const duplicateNameEnv = await initializedEnv();
+  const duplicateBulk = await duplicateNameEnv.service.createBulkUploadSessions('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKeys: ['secretary', 'treasurer'],
+    files: [file({ clientFileId: 'same-name', fileName: 'Report.pdf' })],
+  });
+  const secretarySession = duplicateBulk.sessions.find(item => item.positionKey === 'secretary');
+  const treasurerSession = duplicateBulk.sessions.find(item => item.positionKey === 'treasurer');
+  const secretaryProof = await consumeTicket(duplicateNameEnv, secretarySession);
+  const treasurerProof = await consumeTicket(duplicateNameEnv, treasurerSession);
+  const secretaryCompletion = await completeDrive(duplicateNameEnv, secretarySession, secretaryProof, 0, {
+    drive: {
+      driveFileId: 'driveFileSAMEONE',
+      driveFolderId: 'driveFolderABC12345',
+      driveFileUrl: 'https://drive.google.com/file/d/driveFileSAMEONE/view',
+    },
+  });
+  const treasurerCompletion = await completeDrive(duplicateNameEnv, treasurerSession, treasurerProof, 0, {
+    drive: {
+      driveFileId: 'driveFileSAMETWO',
+      driveFolderId: 'driveFolderTREASURER12345',
+      driveFileUrl: 'https://drive.google.com/file/d/driveFileSAMETWO/view',
+    },
+  });
+  const secretaryFinal = await finalize(duplicateNameEnv, 'admin-uid', secretarySession, secretaryCompletion);
+  const treasurerFinal = await finalize(duplicateNameEnv, 'admin-uid', treasurerSession, treasurerCompletion);
+  assert.notStrictEqual(secretaryFinal.submissionId, treasurerFinal.submissionId, 'same visible filename creates distinct submissions');
+  assert.notStrictEqual(duplicateNameEnv.adapter.store.visitSubmissions[secretaryFinal.submissionId].driveFileId, duplicateNameEnv.adapter.store.visitSubmissions[treasurerFinal.submissionId].driveFileId, 'same visible filename creates distinct Drive IDs');
+  assert.strictEqual(duplicateNameEnv.adapter.store.visitSubmissions[secretaryFinal.submissionId].fileName, 'Report.pdf', 'bulk finalized submission keeps original visible name');
+  const bulkAudit = await duplicateNameEnv.service.recordBulkUploadAudit('admin-uid', { bulkUploadId: duplicateBulk.bulkUploadId });
+  assert.strictEqual(bulkAudit.successCount, 2, 'bulk audit counts successful pairs from trusted sessions');
+  assert.strictEqual(bulkAudit.failureCount, 0, 'bulk audit counts failed pairs from trusted sessions');
+
+  const sameFolderNameEnv = await initializedEnv();
+  const sameFolderSession = await sameFolderNameEnv.service.createUploadSession('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    files: [
+      file({ clientFileId: 'same-folder-one', fileName: 'Report.pdf' }),
+      file({ clientFileId: 'same-folder-two', fileName: 'Report.pdf' }),
+    ],
+  });
+  const sameFolderProofOne = await consumeTicket(sameFolderNameEnv, sameFolderSession, 0);
+  const sameFolderProofTwo = await consumeTicket(sameFolderNameEnv, sameFolderSession, 1);
+  const sameFolderCompletionOne = await completeDrive(sameFolderNameEnv, sameFolderSession, sameFolderProofOne, 0, {
+    drive: {
+      driveFileId: 'driveFileDUPONE',
+      driveFolderId: 'driveFolderABC12345',
+      driveFileUrl: 'https://drive.google.com/file/d/driveFileDUPONE/view',
+    },
+  });
+  const sameFolderCompletionTwo = await completeDrive(sameFolderNameEnv, sameFolderSession, sameFolderProofTwo, 1, {
+    drive: {
+      driveFileId: 'driveFileDUPTWO',
+      driveFolderId: 'driveFolderABC12345',
+      driveFileUrl: 'https://drive.google.com/file/d/driveFileDUPTWO/view',
+    },
+  });
+  const sameFolderFinalOne = await finalize(sameFolderNameEnv, 'admin-uid', sameFolderSession, sameFolderCompletionOne, 0);
+  const sameFolderFinalTwo = await finalize(sameFolderNameEnv, 'admin-uid', sameFolderSession, sameFolderCompletionTwo, 1);
+  assert.notStrictEqual(sameFolderFinalOne.submissionId, sameFolderFinalTwo.submissionId, 'same visible filename in one folder creates distinct submissions');
+  assert.notStrictEqual(sameFolderNameEnv.adapter.store.visitSubmissions[sameFolderFinalOne.submissionId].driveFileId, sameFolderNameEnv.adapter.store.visitSubmissions[sameFolderFinalTwo.submissionId].driveFileId, 'same visible filename in one folder creates distinct Drive files');
+
   env = await initializedEnv();
   session = await createSession(env, 'bod-secretary');
   await rejectsWithCode(() => consumeTicket(env, session, 0, { sessionId: 'wrong-session' }), 'failed-precondition', 'ticket bound to session');
@@ -272,6 +384,8 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   await rejectsWithCode(() => consumeTicket(env, session, 0, { sizeBytes: 999 }), 'failed-precondition', 'mismatched size rejected');
 
   const proof = await consumeTicket(env, session);
+  assert.strictEqual(proof.sanitizedOriginalFileName, 'Secretary Report.pdf', 'trusted uploader receives sanitized original filename');
+  assert.match(proof.internalTrackingName, /^clubAssembly_secretary_local-1_[a-f0-9]+_Secretary Report\.pdf$/, 'trusted uploader receives private tracking name');
   assert.strictEqual(proof.visitDisplayTitle, 'Club Assembly', 'validator returns canonical visit display title');
   assert.strictEqual(proof.positionTitle, 'Secretary', 'validator returns canonical position title');
   assert.strictEqual(proof.avenueCode, 'SEC', 'validator returns canonical avenue code');
@@ -559,6 +673,7 @@ function assertNoSecretFields(value, pathLabel = 'root') {
 
   const rules = fs.readFileSync(path.join(repoRoot, 'firestore.rules'), 'utf8');
   assert.ok(/match \/visitSubmissionUploadSessions\/\{[^}]+\}\s*\{\s*allow read, write: if false;\s*\}/m.test(rules), 'session rules deny direct access');
+  assert.ok(/match \/visitSubmissionBulkUploads\/\{[^}]+\}\s*\{\s*allow read, write: if false;\s*\}/m.test(rules), 'bulk upload rules deny direct access');
   ['driveUploadTickets', 'driveUploadRateLimits', 'driveUploadGroups'].forEach((collection) => {
     assert.ok(new RegExp(`match\\s+/${collection}/\\{[^}]+\\}\\s*\\{\\s*allow\\s+read,\\s*write:\\s*if\\s+false;\\s*\\}`, 'm').test(rules));
   });
@@ -572,6 +687,7 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   assert.ok(/completeVisitSubmissionDriveUpload[\s\S]*timingSafeSharedSecretMatches[\s\S]*completeDriveUpload/.test(indexSource), 'completion endpoint checks shared secret before completion');
   assert.ok(/uploadType !== VISIT_UPLOAD_TYPE/.test(indexSource), 'other upload purposes cannot use Visit completion');
   assert.ok(cleanSlate.RESET_COLLECTIONS.includes('visitSubmissionUploadSessions'), 'clean slate resets visit upload sessions');
+  assert.ok(cleanSlate.RESET_COLLECTIONS.includes('visitSubmissionBulkUploads'), 'clean slate resets visit bulk metadata');
 
   console.log('Visit Submission upload lifecycle verification passed.');
 })().catch((err) => {

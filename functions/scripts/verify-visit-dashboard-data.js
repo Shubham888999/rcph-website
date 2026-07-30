@@ -1087,7 +1087,6 @@ districtByDefault.attendance.club.columns.map(column => ({
   attendanceRate: column.attendanceRate,
 })),
     [
-[
   {
     eventId: 'e1',
     avenueCode: 'CMD',
