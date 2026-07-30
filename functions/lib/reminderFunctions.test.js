@@ -116,7 +116,10 @@ test('reporting workflow prefill and linked reminders are backend enforced', () 
   assert.match(functionsSource, /reportingWindowId/);
   assert.match(indexSource, /requireReportingWindowForBodPayload/);
   assert.match(indexSource, /Event name must match the reporting window event name/);
-  assert.match(indexSource, /BOD Meeting reporting windows use the existing BOD Meeting scheduler/);
+  assert.match(indexSource, /BOD Meeting reporting windows must be submitted as Board of Directors meetings in BOD Tools/);
+  assert.match(functionsSource, /isBodMeetingWindow \? 'BOD' : reminder\.avenue/);
+  assert.match(functionsSource, /isBodMeetingWindow \? 'Board of Directors' : avenueDisplayLabel\(reminder\.avenue\)/);
+  assert.match(functionsSource, /bodToolsCreateSupported: true/);
 });
 
 test('manual fallback matching is strict and low confidence remains pending', () => {

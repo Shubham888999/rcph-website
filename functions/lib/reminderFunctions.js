@@ -1485,18 +1485,20 @@ const getReportingWindowPrefill = onCall(CALLABLE_OPTIONS, async (request) => {
     throw new HttpsError('failed-precondition', 'This reporting window is locked.');
   }
 
+  const normalizedAvenueKey = normalizeAvenueKey(reminder.avenue);
+  const isBodMeetingWindow = normalizedAvenueKey === 'BOD_MEETING';
   return {
     ok: true,
     reportingWindowId: reminder.id,
-    avenue: reminder.avenue,
-    avenueLabel: avenueDisplayLabel(reminder.avenue),
+    avenue: isBodMeetingWindow ? 'BOD' : reminder.avenue,
+    avenueLabel: isBodMeetingWindow ? 'Board of Directors' : avenueDisplayLabel(reminder.avenue),
     eventName: reminder.targetName,
     name: reminder.targetName,
     conductedDate: reminder.conductedDate,
     date: reminder.conductedDate,
     time: reminder.eventTime,
     targetType: reportingWindowExpectedTargetType(reminder),
-    bodToolsCreateSupported: normalizeAvenueKey(reminder.avenue) !== 'BOD_MEETING',
+    bodToolsCreateSupported: true,
     warning: isSpecialReportingWindow(reminder) ? GBM_BOD_TOOLS_RECORD_WARNING : '',
     note: 'Please do not change the prefilled event name unless an Admin/President has asked you to correct it.',
   };

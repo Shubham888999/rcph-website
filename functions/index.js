@@ -3230,6 +3230,7 @@ function normalizeClubEventPayload(raw, userProfile, source = 'adminAttendanceMa
 function normalizeBodMeetingPayload(raw) {
   const name = normalizeText(raw.name, 180);
   const date = normalizeText(raw.date, 20);
+  const time = normalizeText(raw.time || raw.eventTime, 20);
   const desc = normalizeText(raw.desc || raw.description, 1200);
   const reportingWindowId = validateEventDocId(raw.reportingWindowId || raw.reminderId);
   if (!name) throw new HttpsError('invalid-argument', 'Meeting name is required.');
@@ -3238,13 +3239,47 @@ function normalizeBodMeetingPayload(raw) {
     name,
     date,
     endDate: date,
+    time,
     desc,
     avenue: ['BOD'],
+    avenues: ['BOD'],
     type: 'bodMeeting',
-    source: 'adminBodAttendance',
+    source: normalizeText(raw.source, 80) || 'adminBodAttendance',
     visibility: 'internal',
     reportingWindowId,
+    _hasTimeField: Object.prototype.hasOwnProperty.call(raw || {}, 'time')
+      || Object.prototype.hasOwnProperty.call(raw || {}, 'eventTime'),
   };
+}
+
+function normalizeBodToolsMeetingPayload(raw = {}) {
+  const requestedType = normalizeText(raw.type, 40);
+  const rawAvenues = [...new Set(normalizeStringArray(
+    raw.avenues !== undefined ? raw.avenues : raw.avenue,
+    12,
+    40,
+  ).map((code) => code.toUpperCase()))];
+  const requestsBodMeeting = requestedType === 'bodMeeting' || rawAvenues.includes('BOD');
+  if (!requestsBodMeeting) return null;
+  if (rawAvenues.length && (rawAvenues.length !== 1 || rawAvenues[0] !== 'BOD')) {
+    throw new HttpsError('invalid-argument', 'Board of Directors meetings must use only the BOD avenue.');
+  }
+  return {
+    ...normalizeBodMeetingPayload({
+      ...raw,
+      avenue: ['BOD'],
+      avenues: ['BOD'],
+      type: 'bodMeeting',
+      visibility: 'internal',
+      source: 'bodEventManager',
+    }),
+    source: 'bodEventManager',
+  };
+}
+
+function bodEventRecordIsBodMeeting(data = {}) {
+  return normalizeEventType(data.type, 'clubEvent') === 'bodMeeting'
+    || Boolean(normalizeText(data.syncedMeetingId || data.bodMeetingId, 128));
 }
 
 function normalizeDistrictEventPayload(raw) {
@@ -3413,7 +3448,7 @@ async function requireReportingWindowForBodPayload(payload) {
     throw new HttpsError('failed-precondition', 'This reporting window is locked.');
   }
   if (normalizeReportingAvenueKey(reportingWindow.avenue) === 'BOD_MEETING') {
-    throw new HttpsError('failed-precondition', 'BOD Meeting reporting windows use the existing BOD Meeting scheduler until the Phase 2 BOD Tools meeting form is enabled.');
+    throw new HttpsError('invalid-argument', 'BOD Meeting reporting windows must be submitted as Board of Directors meetings in BOD Tools.');
   }
   if (payload.date !== reportingWindow.conductedDate) {
     throw new HttpsError('invalid-argument', 'Event date must match the reporting window conducted date.');
@@ -3743,27 +3778,70 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
   return { eventCreated: !eventSnap.exists };
 }
 
+const BOD_MEETING_MOM_FIELDS = [
+  'momDriveFileId',
+  'momFileName',
+  'momMimeType',
+  'momUploadedBy',
+  'momUploadedByName',
+  'momUploadedAt',
+  'momUpdatedAt',
+  'momReplacedBy',
+  'momReplacedByName',
+  'momPublicUrl',
+  'momUrl',
+  'momFileUrl',
+  'minutesUrl',
+];
+
+function preservedBodMeetingMomPatch(meetingId, ...sources) {
+  const patch = {};
+  BOD_MEETING_MOM_FIELDS.forEach((field) => {
+    for (const source of sources) {
+      const value = source?.[field];
+      if (value !== undefined && value !== null && value !== '') {
+        patch[field] = value;
+        break;
+      }
+    }
+  });
+  if (!patch.momDriveFileId && !patch.momFileName && !patch.momUrl && !patch.minutesUrl) return {};
+  return {
+    ...patch,
+    momTargetType: 'bod_meeting',
+    momTargetId: meetingId,
+  };
+}
+
 async function writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now }) {
   const meetingRef = db.collection('bodMeetings').doc(meetingId);
   const bodEventRef = db.collection('bodEvents').doc(meetingId);
   const [meetingSnap, bodEventSnap] = await Promise.all([meetingRef.get(), bodEventRef.get()]);
   const existingMeeting = meetingSnap.exists ? (meetingSnap.data() || {}) : {};
   const existingBodEvent = bodEventSnap.exists ? (bodEventSnap.data() || {}) : {};
+  const source = payload.source || existingMeeting.source || existingBodEvent.source || 'adminBodAttendance';
+  const reportingWindowId = payload.reportingWindowId || existingMeeting.reportingWindowId || existingBodEvent.reportingWindowId || '';
+  const momPatch = preservedBodMeetingMomPatch(meetingId, existingBodEvent, existingMeeting);
+  const time = payload._hasTimeField
+    ? (payload.time || '')
+    : (existingMeeting.time || existingMeeting.eventTime || existingBodEvent.time || existingBodEvent.eventTime || '');
 
   const batch = db.batch();
   batch.set(meetingRef, {
     name: payload.name,
     date: payload.date,
     endDate: payload.endDate,
+    time,
     desc: payload.desc,
     type: 'bodMeeting',
-    source: 'adminBodAttendance',
+    source,
     visibility: 'internal',
-    reportingWindowId: payload.reportingWindowId || existingMeeting.reportingWindowId || existingBodEvent.reportingWindowId || '',
+    reportingWindowId,
     archived: false,
     createdBy: existingMeeting.createdBy || uid,
     createdAt: timestampCreatedAt(existingMeeting, now),
     updatedAt: now,
+    ...momPatch,
   }, { merge: true });
 
   batch.set(bodEventRef, {
@@ -3772,25 +3850,168 @@ async function writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now
     endDate: payload.endDate,
     eventStart: payload.date,
     eventEnd: payload.endDate,
+    time,
+    eventTime: time,
     desc: payload.desc,
     description: payload.desc,
     avenue: payload.avenue,
+    avenues: payload.avenues || payload.avenue,
     type: 'bodMeeting',
-    source: 'adminBodAttendance',
+    source,
     visibility: 'internal',
     status: 'synced',
     syncedMeetingId: meetingId,
-    reportingWindowId: payload.reportingWindowId || existingBodEvent.reportingWindowId || existingMeeting.reportingWindowId || '',
+    bodMeetingId: meetingId,
+    reportingWindowId,
     archived: false,
     createdBy: existingBodEvent.createdBy || uid,
     createdByEmail: existingBodEvent.createdByEmail || userProfile.email,
     createdByName: existingBodEvent.createdByName || userProfile.name,
     createdAt: timestampCreatedAt(existingBodEvent, now),
     updatedAt: now,
+    ...momPatch,
   }, { merge: true });
 
   await batch.commit();
   return { meetingCreated: !meetingSnap.exists };
+}
+
+function stableBodToolsMeetingId(raw = {}, payload = {}) {
+  const explicitId = validateEventDocId(raw.eventId || raw.meetingId || raw.bodMeetingId);
+  if (explicitId) return explicitId;
+  if (payload.reportingWindowId) return payload.reportingWindowId;
+  const seed = [
+    normalizeText(payload.date, 20),
+    normalizeText(payload.time, 20),
+    normalizeText(payload.name, 180).replace(/\s+/g, ' ').toLowerCase(),
+  ].join('|');
+  const digest = crypto.createHash('sha256').update(seed).digest('hex').slice(0, 24);
+  return `bodMeeting_${digest}`;
+}
+
+async function saveBodToolsMeetingFromBodEventCallable({
+  request,
+  uid,
+  authority,
+  meetingId,
+  payload,
+  source,
+}) {
+  const reportingWindow = await requireReportingWindowForBodMeetingPayload(payload);
+  const userProfile = await getCallableUserProfile(uid, request);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const { meetingCreated } = await writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now });
+  let reportingWorkflow = null;
+  if (reportingWindow) {
+    reportingWorkflow = await reminderFunctions.linkReportingWindowToTarget({
+      reportingWindow,
+      targetType: 'bod_meeting',
+      targetId: meetingId,
+      bodEventId: meetingId,
+      access: {
+        uid,
+        displayName: userProfile.name,
+        storedRole: authority.role,
+        role: authority.role,
+      },
+      now: admin.firestore.Timestamp.now(),
+      match: {
+        detection: 'reportingWindowId',
+        confidence: 1,
+        source,
+      },
+    });
+  }
+  const attendanceRowsUpdated = await initializeAttendanceFieldForCollection('bodMembers', 'bodAttendance', meetingId, now);
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: meetingCreated ? 'created' : 'updated',
+    status: 'success',
+    targetType: 'bod_meeting',
+    targetId: meetingId,
+    targetLabel: payload.name,
+    targetAudience: 'BOD',
+    details: `${attendanceRowsUpdated} BOD attendance rows initialized`,
+    source,
+    relatedDocPath: `bodMeetings/${meetingId}`,
+    metadata: {
+      meetingCreated,
+      attendanceRowsUpdated,
+      reportingWindowId: payload.reportingWindowId,
+      reportingWorkflowLinked: reportingWorkflow?.ok === true,
+      bodMeetingId: meetingId,
+    },
+  });
+  return {
+    ok: true,
+    eventId: meetingId,
+    meetingId,
+    bodMeetingId: meetingId,
+    meetingCreated,
+    attendanceRowsUpdated,
+    reportingWorkflow,
+  };
+}
+
+async function archiveBodToolsMeetingFromBodEventCallable({
+  request,
+  uid,
+  authority,
+  eventId,
+  bodEventData = {},
+}) {
+  const meetingId = validateEventDocId(bodEventData.syncedMeetingId || bodEventData.bodMeetingId || eventId);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const batch = db.batch();
+  batch.set(db.collection('bodMeetings').doc(meetingId), {
+    archived: true,
+    archivedAt: now,
+    archivedBy: uid,
+    updatedAt: now,
+  }, { merge: true });
+  batch.set(db.collection('bodEvents').doc(eventId), {
+    archived: true,
+    status: 'deleted',
+    archivedAt: now,
+    archivedBy: uid,
+    deletedAt: now,
+    deletedBy: uid,
+    updatedAt: now,
+  }, { merge: true });
+  if (eventId !== meetingId) {
+    batch.set(db.collection('bodEvents').doc(meetingId), {
+      archived: true,
+      status: 'deleted',
+      archivedAt: now,
+      archivedBy: uid,
+      deletedAt: now,
+      deletedBy: uid,
+      updatedAt: now,
+      syncedMeetingId: meetingId,
+      bodMeetingId: meetingId,
+    }, { merge: true });
+  }
+  await batch.commit();
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: 'archived',
+    status: 'inactive',
+    targetType: 'bod_meeting',
+    targetId: meetingId,
+    targetLabel: meetingId,
+    targetAudience: 'BOD',
+    details: 'BOD meeting archived from BOD Tools; attendance history was preserved.',
+    source: 'archiveBodEvent',
+    relatedDocPath: `bodMeetings/${meetingId}`,
+    metadata: { eventId, meetingId, bodMeetingId: meetingId },
+  });
+  return { ok: true, eventId: meetingId, meetingId, bodMeetingId: meetingId };
 }
 
 async function writeDistrictEventSynced({ districtEventId, payload, uid, userProfile, now }) {
@@ -8136,6 +8357,19 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   await assertBodEventsUnlockedForRole(authority);
 
   const data = request.data || {};
+  const bodMeetingPayload = normalizeBodToolsMeetingPayload(data);
+  if (bodMeetingPayload) {
+    const meetingId = stableBodToolsMeetingId(data, bodMeetingPayload);
+    return saveBodToolsMeetingFromBodEventCallable({
+      request,
+      uid,
+      authority,
+      meetingId,
+      payload: bodMeetingPayload,
+      source: 'submitBodEvent',
+    });
+  }
+
   const eventId = validateEventDocId(data.eventId) || db.collection('events').doc().id;
   const payload = normalizeBodEventPayload(data);
   await assertBodEventAvenuesUnlocked(payload.avenues);
@@ -8345,6 +8579,30 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const eventId = validateEventDocId(request.data?.eventId);
   if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
+  const bodEventSnap = await db.collection('bodEvents').doc(eventId).get();
+  const bodEventData = bodEventSnap.exists ? (bodEventSnap.data() || {}) : {};
+  let bodMeetingPayload = normalizeBodToolsMeetingPayload(request.data || {});
+  if (!bodMeetingPayload && bodEventRecordIsBodMeeting(bodEventData)) {
+    bodMeetingPayload = normalizeBodToolsMeetingPayload({
+      ...(request.data || {}),
+      type: 'bodMeeting',
+      avenue: request.data?.avenue === undefined ? ['BOD'] : request.data.avenue,
+      avenues: request.data?.avenues === undefined ? ['BOD'] : request.data.avenues,
+      visibility: 'internal',
+      source: 'bodEventManager',
+    });
+  }
+  if (bodMeetingPayload) {
+    const meetingId = validateEventDocId(bodEventData.syncedMeetingId || bodEventData.bodMeetingId || eventId);
+    return saveBodToolsMeetingFromBodEventCallable({
+      request,
+      uid,
+      authority,
+      meetingId,
+      payload: bodMeetingPayload,
+      source: 'updateBodEvent',
+    });
+  }
   await assertBodEventRecordIsClubEvent(eventId);
 
   const payload = normalizeBodEventPayload(request.data || {});
@@ -8420,6 +8678,17 @@ exports.archiveBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const eventId = validateEventDocId(request.data?.eventId);
   if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
+  const bodEventSnap = await db.collection('bodEvents').doc(eventId).get();
+  const bodEventData = bodEventSnap.exists ? (bodEventSnap.data() || {}) : {};
+  if (bodEventRecordIsBodMeeting(bodEventData)) {
+    return archiveBodToolsMeetingFromBodEventCallable({
+      request,
+      uid,
+      authority,
+      eventId,
+      bodEventData,
+    });
+  }
   await assertBodEventRecordIsClubEvent(eventId);
 
   const now = admin.firestore.FieldValue.serverTimestamp();
