@@ -122,7 +122,6 @@ export default function AdminShell({ access, displayName, onSignOut, children })
             aria-controls={ADMIN_SIDEBAR_NAV_ID}
             onClick={collapseSidebar}
           >
-            <span>Collapse navigation</span>
             <span aria-hidden="true">{"<"}</span>
           </button>
         </div>

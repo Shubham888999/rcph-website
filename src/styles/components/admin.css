@@ -548,12 +548,17 @@
 }
 .admin-sidebar > * {
   min-width: 0;
+  flex: 0 0 auto;
 }
 
 .admin-sidebar header,
 .admin-sidebar__brand {
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
+}
+.admin-sidebar__brand {
+  display: grid;
+  gap: 0.15rem;
 }
 .admin-sidebar::after {
   position: absolute;
@@ -580,17 +585,22 @@
 .admin-sidebar a.active,.admin-sidebar a:hover,.admin-sidebar button:hover { border-color:var(--internal-border-strong); color:var(--internal-text); background:rgba(244,180,58,.08); }
 .admin-sidebar__links { margin-top:auto; padding-top:1rem; border-top:1px solid var(--internal-border); }
 .admin-sidebar__collapse {
-  width: 100%;
-  margin-top: 0.9rem;
-  display: flex;
+  width: max-content;
+  max-width: 100%;
+  min-height: 2rem !important;
+  margin-top: 0.65rem;
+  padding: 0.3rem 0.55rem !important;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.55rem;
+  justify-content: center;
+  gap: 0.4rem;
+  justify-self: start;
   border-color: rgba(229, 194, 104, 0.28) !important;
   color: var(--internal-accent-soft) !important;
   background: rgba(229, 194, 104, 0.055) !important;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 850;
+  line-height: 1;
 }
 .admin-sidebar__collapse span:first-child,
 .admin-sidebar-open-button span:last-child {
