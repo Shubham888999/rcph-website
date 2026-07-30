@@ -106,6 +106,8 @@ async function call(name, payload) {
   return {
     ok: data.ok === true,
     eventId: typeof data.eventId === "string" ? data.eventId : "",
+    meetingId: typeof data.meetingId === "string" ? data.meetingId : "",
+    bodMeetingId: typeof data.bodMeetingId === "string" ? data.bodMeetingId : "",
     attendanceRowsUpdated: Number.isInteger(data.attendanceRowsUpdated) && data.attendanceRowsUpdated >= 0
       ? data.attendanceRowsUpdated : null,
   };

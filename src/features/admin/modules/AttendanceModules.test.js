@@ -49,6 +49,46 @@ assert.doesNotMatch(bodSource, /includeProspectsInSummary/);
   assert.doesNotMatch(bodModule, /buildAttendanceParticipants/);
 });
 
+test("BOD Operations keeps attendance work while roster remains display-only", () => {
+  const bodModule = source.slice(source.indexOf("export function BodOperationsModule"), source.indexOf("export function DistrictModule"));
+
+  assert.match(bodModule, /View club leadership and record BOD meeting attendance/);
+  assert.match(bodModule, /Leadership directory/);
+  assert.match(bodModule, /Meeting register/);
+  assert.match(bodModule, /AttendanceGrid members=\{activeBodMembers\}/);
+  assert.doesNotMatch(bodModule, /Add director/);
+  assert.doesNotMatch(bodModule, /Edit details/);
+  assert.doesNotMatch(bodModule, />\s*Remove\s*<\/button>/);
+  assert.doesNotMatch(bodModule, /Save BOD member/);
+  assert.doesNotMatch(bodModule, /Schedule meeting/);
+  assert.doesNotMatch(bodModule, /createPanel/);
+  assert.doesNotMatch(bodModule, /bod-create-reveal/);
+  assert.doesNotMatch(bodModule, /setEditMember|setRemove|edit-bod-member|remove-bod-member/);
+  assert.doesNotMatch(bodModule, /adminCalls\.createBodMeeting/);
+  assert.doesNotMatch(source, /deleteRosterMember|updateRosterMember/);
+});
+
+test("BOD Operations meeting rows are attendance-only with optional read-only MOM viewing", () => {
+  const bodModule = source.slice(source.indexOf("export function BodOperationsModule"), source.indexOf("export function DistrictModule"));
+
+  assert.match(bodModule, /BOD Meetings/);
+  assert.match(bodModule, /events=\{meetings\}/);
+  assert.match(bodModule, /collectionName="bodAttendance"/);
+  assert.match(bodModule, /ReadOnlyMomLink/);
+  assert.match(source, /function ReadOnlyMomLink/);
+  assert.match(source, /View MOM/);
+  assert.match(source, /viewMomPdf\(target\)/);
+  assert.doesNotMatch(bodModule, /Edit meeting/);
+  assert.doesNotMatch(bodModule, /setEditMeeting/);
+  assert.doesNotMatch(bodModule, /saveMeeting/);
+  assert.doesNotMatch(bodModule, /Archive/);
+  assert.doesNotMatch(bodModule, /setArchiveMeeting/);
+  assert.doesNotMatch(bodModule, /adminCalls\.updateBodMeeting/);
+  assert.doesNotMatch(bodModule, /adminCalls\.archiveBodMeeting/);
+  assert.doesNotMatch(bodModule, /<MomSection/);
+  assert.doesNotMatch(bodModule, /uploadMom|finalizeMom|replace/i);
+});
+
 test("prospect progress recalculation stays scoped to Club Attendance", () => {
   assert.match(source, /if \(collectionName !== "attendance"\) return/);
   assert.match(source, /adminCalls\.recalcProspect\(id\)/);
@@ -145,15 +185,15 @@ test("Active club events renders a conditional compact list while preserving act
   assert.doesNotMatch(clubSource, /attendance-event-list__grid/);
 });
 
-test("event and meeting lists expose MOM sections without changing attendance calls", () => {
+test("club and district event lists expose MOM sections without changing attendance calls", () => {
   assert.match(source, /import MomSection/);
   assert.match(source, /MOM_TARGET_TYPES\.CLUB_EVENT/);
   assert.match(source, /MOM_TARGET_TYPES\.BOD_MEETING/);
   assert.match(source, /MOM_TARGET_TYPES\.DISTRICT_EVENT/);
   assert.match(source, /access=\{access\}/);
   assert.match(source, /target=\{momTarget\(event, MOM_TARGET_TYPES\.CLUB_EVENT\)\}/);
-  assert.match(source, /target=\{momTarget\(item, MOM_TARGET_TYPES\.BOD_MEETING\)\}/);
   assert.match(source, /target=\{momTarget\(event, MOM_TARGET_TYPES\.DISTRICT_EVENT\)\}/);
+  assert.match(source, /targetType=\{MOM_TARGET_TYPES\.BOD_MEETING\}/);
   assert.doesNotMatch(source, /send.*mom.*email/i);
 });
 

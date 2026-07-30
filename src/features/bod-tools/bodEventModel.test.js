@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AVENUE_REPORTING_LOCK_HELP_TEXT,
+  BOD_AVENUE_OPTIONS,
   BOD_EVENT_SOURCE,
+  BOD_MEETING_AVENUE,
   BOD_REPORT_FINANCE_MAX_ROWS,
   buildAvenueDescriptionDraft,
   buildBodEventPayload,
@@ -84,13 +86,24 @@ test("BOD event normalizer preserves linked reporting window IDs", () => {
   assert.equal(event.reportingWindowId, "window-1");
 });
 
-test("BOD meetings and district events stay read-only", () => {
-  for (const type of ["bodMeeting", "districtEvent"]) {
-    const event = normalizeBodEvent(type, { ...base, type });
-    assert.equal(event.recordKind, type);
-    assert.equal(event.canEdit, false);
-    assert.equal(event.canArchive, false);
-  }
+test("BOD meetings are editable while district events stay read-only", () => {
+  const bodMeeting = normalizeBodEvent("meeting-1", {
+    name: "BOD Meeting 1",
+    date: "2026-07-10",
+    type: "bodMeeting",
+    avenue: ["BOD"],
+    syncedMeetingId: "meeting-1",
+  });
+  const districtEvent = normalizeBodEvent("district-1", { ...base, type: "districtEvent" });
+
+  assert.equal(bodMeeting.recordKind, "bodMeeting");
+  assert.deepEqual(bodMeeting.avenues, ["BOD"]);
+  assert.equal(bodMeeting.bodMeetingId, "meeting-1");
+  assert.equal(bodMeeting.canEdit, true);
+  assert.equal(bodMeeting.canArchive, true);
+  assert.equal(districtEvent.recordKind, "districtEvent");
+  assert.equal(districtEvent.canEdit, false);
+  assert.equal(districtEvent.canArchive, false);
 });
 
 test("archived and deleted records are inactive", () => {
@@ -203,6 +216,52 @@ test("payload builder whitelists fields and forces production classification", (
   assert.deepEqual(payload.collaborators, [{ name: "Partner" }]);
   assert.deepEqual(payload.reportFinance, { hasFinance: false, entries: [] });
   assert.equal(Object.hasOwn(payload, "uiOnly"), false);
+});
+
+test("BOD meeting avenue builds an internal meeting payload without service report fields", () => {
+  const { payload, errors } = buildBodEventPayload({
+    name: "BOD Meeting 1",
+    startDate: "2026-07-15",
+    time: "",
+    avenues: [BOD_MEETING_AVENUE],
+    description: "Board planning",
+    reportFinance: {
+      hasFinance: true,
+      entries: [{ type: "expense", amount: "100", description: "Ignored for meetings" }],
+    },
+    reportingWindowId: "window-bod",
+  }, "meeting-1");
+
+  assert.deepEqual(errors, {});
+  assert.equal(BOD_AVENUE_OPTIONS.some((option) => option.code === "BOD" && option.label === "Board of Directors"), true);
+  assert.equal(payload.eventId, "meeting-1");
+  assert.equal(payload.type, "bodMeeting");
+  assert.equal(payload.visibility, "internal");
+  assert.equal(payload.source, BOD_EVENT_SOURCE);
+  assert.equal(payload.date, "2026-07-15");
+  assert.equal(payload.endDate, "2026-07-15");
+  assert.deepEqual(payload.avenue, ["BOD"]);
+  assert.deepEqual(payload.avenues, ["BOD"]);
+  assert.equal(Object.hasOwn(payload, "avenueDescriptions"), false);
+  assert.equal(Object.hasOwn(payload, "reportFinance"), false);
+});
+
+test("BOD meeting payload rejects mixed or unknown avenues", () => {
+  const mixed = buildBodEventPayload({
+    name: "BOD Meeting 1",
+    startDate: "2026-07-15",
+    avenues: ["BOD", "CMD"],
+  });
+  assert.equal(mixed.payload, null);
+  assert.match(mixed.errors.avenues, /cannot be combined/i);
+
+  const unknown = buildBodEventPayload({
+    name: "Unknown Avenue",
+    startDate: "2026-07-15",
+    avenues: ["XYZ"],
+  });
+  assert.equal(unknown.payload, null);
+  assert.match(unknown.errors.avenues, /Select at least one avenue/);
 });
 
 test("active avenue reporting locks normalize and block selected BOD event avenues", () => {

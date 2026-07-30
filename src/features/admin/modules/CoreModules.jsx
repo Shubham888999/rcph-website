@@ -128,7 +128,7 @@ export function CommandCenter({ data, access, uid, onNotice }) {
       path: "bod",
       label: "BOD operations",
       description:
-        "Manage directors, BOD meetings, and synchronized attendance.",
+        "View club leadership and record BOD meeting attendance.",
       value: data.bodMembers.length,
       accent: "gold",
     },

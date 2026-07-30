@@ -63,7 +63,6 @@ export function normalizeProspectProgress(raw) {
     duesDue,
     duesPaid,
     ready,
-    whatsappJoined: raw.whatsappJoined === true,
     completedCount: count(raw.completedCount),
     totalCount: count(raw.totalCount, 1),
     percent,

@@ -41,8 +41,8 @@ test("BOD Tools opens a prefilled create form from reportingWindowId query links
   assert.match(page, /fetchReportingWindowPrefill\(reportingWindowId\)/);
   assert.match(page, /prefillAppliedRef/);
   assert.match(page, /setForm\(\{ event: null, prefill \}\)/);
-  assert.match(page, /bodToolsCreateSupported === false/);
-  assert.match(page, /BOD Meeting reporting windows still use the BOD Meeting scheduler/);
+  assert.doesNotMatch(page, /bodToolsCreateSupported === false/);
+  assert.doesNotMatch(page, /BOD Meeting reporting windows still use the BOD Meeting scheduler/);
   assert.match(page, /setForm\(\{ event: null, prefill: null \}\)/);
   assert.match(page, /prefill=\{form\.prefill \|\| null\}/);
   assert.match(form, /function initialDraft\(event, displayName, prefill = null\)/);
@@ -50,6 +50,19 @@ test("BOD Tools opens a prefilled create form from reportingWindowId query links
   assert.match(form, /bod-form-prefill-note/);
   assert.match(service, /export async function fetchReportingWindowPrefill/);
   assert.match(service, /httpsCallable\(functions, "getReportingWindowPrefill"\)/);
+});
+
+test("BOD event form includes a Board of Directors meeting path", () => {
+  assert.match(form, /BOD_AVENUE_OPTIONS/);
+  assert.match(form, /Board of Directors meeting/);
+  assert.match(form, /Board of Directors/);
+  assert.match(form, /Meeting name \*/);
+  assert.match(form, /Meeting date \*/);
+  assert.match(form, /isBodMeetingAvenueSelection/);
+  assert.match(form, /selectedReportAvenues/);
+  assert.match(form, /result\.payload\.type === "bodMeeting"/);
+  assert.match(service, /meetingId: typeof data\.meetingId === "string"/);
+  assert.match(service, /bodMeetingId: typeof data\.bodMeetingId === "string"/);
 });
 
 test("BOD event form exposes report-only finance rows without Treasury wiring", () => {
@@ -106,7 +119,7 @@ test("BOD submissions render as a collapsible compact list without the card grid
   assert.doesNotMatch(styles, /bod-event-grid/);
 });
 
-test("BOD details render MOM for synced club events and BOD meetings", () => {
+test("BOD Tools details render MOM management for synced club events and BOD meetings", () => {
   assert.match(details, /import MomSection/);
   assert.match(details, /getBodMomTarget\(event\)/);
   assert.match(details, /momTarget \? \(/);
@@ -114,6 +127,15 @@ test("BOD details render MOM for synced club events and BOD meetings", () => {
   assert.doesNotMatch(details, /isCanonicalBodMomTarget/);
   assert.match(details, /onUploaded=\{onUploaded\}/);
   assert.match(details, /uid=\{uid\}/);
+});
+
+test("BOD Tools rows keep edit and archive ownership for BOD meetings", () => {
+  assert.match(card, /permissions\.canEdit/);
+  assert.match(card, /permissions\.canArchive/);
+  assert.match(card, />\s*Edit\s*<\/button>/);
+  assert.match(card, />\s*Archive\s*<\/button>/);
+  assert.match(page, /archiveBodEvent\(event\.id\)/);
+  assert.match(page, /event\.recordKind === "bodMeeting" \? "Meeting" : "Event"/);
 });
 
 test("callable sync remains canonical-event based and public events ignore avenue descriptions", () => {

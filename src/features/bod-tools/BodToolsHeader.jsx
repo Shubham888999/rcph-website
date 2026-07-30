@@ -58,7 +58,7 @@ export default function BodToolsHeader({
           </h1>
 
           <p className="bod-tools-header__intro">
-            Create club events, maintain avenue records, synchronize attendance,
+            Create club events, schedule BOD meetings, maintain avenue records,
             and generate official reports from one clean workspace.
           </p>
 
@@ -74,7 +74,7 @@ export default function BodToolsHeader({
           </div>
         </div>
 
-        <aside className="bod-tools-header__action-panel" aria-label="Event operations">
+        <aside className="bod-tools-header__action-panel" aria-label="Event and meeting operations">
           <span
             className={`bod-tools-header__status ${
               submissionsLocked ? "is-locked" : "is-open"
@@ -84,9 +84,9 @@ export default function BodToolsHeader({
           </span>
 
           <div>
-            <span className="bod-tools-header__action-label">Event operations</span>
-            <strong>Club events workspace</strong>
-            <p>Manage public calendar records, attendance sync, and avenue reporting.</p>
+            <span className="bod-tools-header__action-label">Event and meeting operations</span>
+            <strong>BOD Tools workspace</strong>
+            <p>Manage public calendar records, BOD meeting schedules, MOMs, and avenue reporting.</p>
           </div>
 
           <button
@@ -95,7 +95,7 @@ export default function BodToolsHeader({
             disabled={!canCreateEvent}
             onClick={onCreateEvent}
           >
-            Create club event
+            Create event or meeting
           </button>
         </aside>
       </div>

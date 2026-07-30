@@ -14,12 +14,13 @@ import {
   filterProspectsFromAttendanceParticipants,
   normalizeAttendance,
 } from "../shared/adminModel";
-import { adminCalls, addRosterMember, deleteRosterMember, setAttendanceBulk, setAttendanceCell, setAttendanceRow, updateRosterMember } from "../shared/adminService";
+import { adminCalls, setAttendanceBulk, setAttendanceCell, setAttendanceRow } from "../shared/adminService";
 import useAdminMutation from "../shared/useAdminMutation";
 import AttendanceExportPanel from "../attendance-export/AttendanceExportPanel";
-import { formatRotaractorName, stripRotaractorPrefix } from "../../../utils/memberName";
+import { formatRotaractorName } from "../../../utils/memberName";
 import MomSection from "../../mom/MomSection";
-import { MOM_TARGET_TYPES } from "../../mom/momModel";
+import { canViewMom, MOM_TARGET_TYPES, normalizeMomMetadata } from "../../mom/momModel";
+import { viewMomPdf } from "../../mom/momService";
 
 function nextAttendance(value) { return value === true ? false : value === false ? "NA" : true; }
 function getAttendanceStats(memberOrId, events, attendance) {
@@ -752,6 +753,36 @@ function momTarget(record, targetType) {
   };
 }
 
+function ReadOnlyMomLink({ record, targetType, access, uid, onNotice }) {
+  const target = momTarget(record, targetType);
+  const metadata = normalizeMomMetadata(record?.mom || record, {
+    momTargetType: target.targetType,
+    momTargetId: target.targetId,
+  });
+  if (!metadata || !uid || !canViewMom(access)) return null;
+
+  async function openMom() {
+    try {
+      await viewMomPdf(target);
+    } catch {
+      onNotice?.({
+        type: "error",
+        message: "MOM could not be opened.",
+      });
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="admin-text-action"
+      onClick={openMom}
+    >
+      View MOM
+    </button>
+  );
+}
+
 function ClubEventForm({ initial = emptyEvent, onSave, busy, submitLabel }) {
   const [draft, setDraft] = useState({ ...emptyEvent, ...initial });
   function submit(event) { event.preventDefault(); const payload = buildEventPayload(draft); if (!payload.name || !payload.date || (payload.endDate && payload.endDate < payload.date) || !payload.avenue.length) return; onSave(payload); }
@@ -954,14 +985,6 @@ const pendingRecords =
 }
 
 export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
-  const [member, setMember] = useState({ name: "", position: "" });
-  const [meeting, setMeeting] = useState({ name: "", date: "" });
-  const [editMember, setEditMember] = useState(null);
-  const [editMeeting, setEditMeeting] = useState(null);
-  const [archiveMeeting, setArchiveMeeting] = useState(null);
-  const [remove, setRemove] = useState(null);
-  const [createPanel, setCreatePanel] = useState(null);
-  const { busy, run } = useAdminMutation({ uid, module: "bod-operations", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const meetings = data.bodMeetings.filter((item) => !item.archived);
     const {
@@ -973,8 +996,6 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
     includeUsers: false,
     memberRoleFallback: "bod",
   });
-  function saveMember(event) { event.preventDefault(); run("edit-bod-member", () => updateRosterMember("bodMembers", editMember.id, { name: stripRotaractorPrefix(editMember.name), position: editMember.position.trim() }), "BOD member updated.").then((result) => { if (result !== null) setEditMember(null); }); }
-  function saveMeeting(event) { event.preventDefault(); run("edit-bod-meeting", () => adminCalls.updateBodMeeting({ meetingId: editMeeting.id, name: editMeeting.name.trim(), date: editMeeting.date }), "BOD meeting updated.").then((result) => { if (result) setEditMeeting(null); }); }
   return <>
     <AdminModuleHeader title="Club Directors, Meetings & Attendance" />
     <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{locked ? "BOD Attendance is locked or unavailable." : "BOD Attendance is open."}</div>
@@ -983,196 +1004,10 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
     <p className="admin-kicker">BOD operations</p>
 
     <p>
-      Maintain club leadership, schedule meetings, and record attendance.
+      View club leadership and record BOD meeting attendance.
     </p>
   </div>
-
-  <div className="bod-command-bar__actions">
-    <button
-      type="button"
-      className={`bod-highlight-action ${
-        createPanel === "director" ? "is-active" : ""
-      }`}
-      aria-expanded={createPanel === "director"}
-      onClick={() =>
-        setCreatePanel((current) =>
-          current === "director" ? null : "director"
-        )
-      }
-    >
-      <span className="bod-highlight-action__mark">+</span>
-      Add director
-    </button>
-
-    <button
-      type="button"
-      className={`bod-highlight-action ${
-        createPanel === "meeting" ? "is-active" : ""
-      }`}
-      aria-expanded={createPanel === "meeting"}
-      onClick={() =>
-        setCreatePanel((current) =>
-          current === "meeting" ? null : "meeting"
-        )
-      }
-    >
-      <span className="bod-highlight-action__mark">+</span>
-      Schedule meeting
-    </button>
-  </div>
 </section>
-
-<div
-  className={`bod-create-reveal ${
-    createPanel ? "is-open" : ""
-  }`}
->
-  {createPanel === "director" ? (
-    <form
-      className="admin-form bod-create-reveal__form"
-      onSubmit={(event) => {
-        event.preventDefault();
-
-        run(
-          "add-bod-member",
-          () => addRosterMember("bodMembers", { ...member, name: stripRotaractorPrefix(member.name) }),
-          "BOD member added."
-        ).then((result) => {
-          if (result) {
-            setMember({ name: "", position: "" });
-            setCreatePanel(null);
-          }
-        });
-      }}
-    >
-      <header>
-        <div>
-          <p className="admin-kicker">New leadership record</p>
-          <h3>Add club director</h3>
-        </div>
-
-        <button
-          type="button"
-          className="admin-text-action"
-          onClick={() => setCreatePanel(null)}
-        >
-          Close
-        </button>
-      </header>
-
-      <div className="bod-create-reveal__fields">
-        <label>
-          Name
-          <input
-            value={member.name}
-            onChange={(event) =>
-              setMember({
-                ...member,
-                name: event.target.value,
-              })
-            }
-            required
-          />
-        </label>
-
-        <label>
-          Position
-          <input
-            value={member.position}
-            onChange={(event) =>
-              setMember({
-                ...member,
-                position: event.target.value,
-              })
-            }
-          />
-        </label>
-      </div>
-
-      <button
-        type="submit"
-        className="bod-create-submit"
-        disabled={locked || busy}
-      >
-        Add to leadership directory
-      </button>
-    </form>
-  ) : null}
-
-  {createPanel === "meeting" ? (
-    <form
-      className="admin-form bod-create-reveal__form"
-      onSubmit={(event) => {
-        event.preventDefault();
-
-        run(
-          "add-bod-meeting",
-          () => adminCalls.createBodMeeting(meeting),
-          "BOD meeting created and attendance initialized."
-        ).then((result) => {
-          if (result) {
-            setMeeting({ name: "", date: "" });
-            setCreatePanel(null);
-          }
-        });
-      }}
-    >
-      <header>
-        <div>
-          <p className="admin-kicker">New attendance session</p>
-          <h3>Schedule BOD meeting</h3>
-        </div>
-
-        <button
-          type="button"
-          className="admin-text-action"
-          onClick={() => setCreatePanel(null)}
-        >
-          Close
-        </button>
-      </header>
-
-      <div className="bod-create-reveal__fields">
-        <label>
-          Meeting name
-          <input
-            value={meeting.name}
-            onChange={(event) =>
-              setMeeting({
-                ...meeting,
-                name: event.target.value,
-              })
-            }
-            required
-          />
-        </label>
-
-        <label>
-          Meeting date
-          <input
-            type="date"
-            value={meeting.date}
-            onChange={(event) =>
-              setMeeting({
-                ...meeting,
-                date: event.target.value,
-              })
-            }
-            required
-          />
-        </label>
-      </div>
-
-      <button
-        type="submit"
-        className="bod-create-submit"
-        disabled={locked || busy}
-      >
-        Create meeting and attendance
-      </button>
-    </form>
-  ) : null}
-</div>
     <section className="bod-directory">
 <header className="bod-section-header">
   <div>
@@ -1211,26 +1046,6 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
 
             <p>{item.position || "Position unavailable"}</p>
           </div>
-
-<div className="bod-director-row__actions">
-  <button
-    type="button"
-    className="admin-text-action"
-    disabled={locked}
-    onClick={() => setEditMember({ ...item })}
-  >
-    Edit details
-  </button>
-
-  <button
-    type="button"
-    className="admin-text-action admin-text-action--danger"
-    disabled={locked}
-    onClick={() => setRemove(item)}
-  >
-    Remove
-  </button>
-</div>
         </article>
       );
     })}
@@ -1281,32 +1096,14 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
           <p>{item.date}</p>
         </div>
 
-<MomSection
-  className="mom-section--bod-row"
-  target={momTarget(item, MOM_TARGET_TYPES.BOD_MEETING)}
-  access={access}
-  uid={uid}
-  onNotice={onNotice}
-/>
-
 <div className="bod-meeting-row__actions">
-  <button
-    type="button"
-    className="admin-text-action"
-    disabled={locked}
-    onClick={() => setEditMeeting({ ...item })}
-  >
-    Edit meeting
-  </button>
-
-  <button
-    type="button"
-    className="admin-text-action admin-text-action--danger"
-    disabled={locked}
-    onClick={() => setArchiveMeeting(item)}
-  >
-    Archive
-  </button>
+  <ReadOnlyMomLink
+    record={item}
+    targetType={MOM_TARGET_TYPES.BOD_MEETING}
+    access={access}
+    uid={uid}
+    onNotice={onNotice}
+  />
 </div>
       </article>
     ))}
@@ -1334,10 +1131,6 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
 <AttendanceExportPanel panelKey="bod" members={activeBodMembers} events={meetings} attendance={data.bodAttendance} onNotice={onNotice} />
 <AttendanceGrid members={activeBodMembers} removedMembers={removedBodMembers} events={meetings} attendance={data.bodAttendance} collectionName="bodAttendance" locked={locked} uid={uid} onNotice={onNotice} />
 <MailDraftTool members={activeBodMembers} title="BOD" />
-    {editMember ? <AdminDialog title={`Edit ${formatRotaractorName(editMember.name, true)}`} busy={busy} onClose={() => setEditMember(null)}><form className="admin-form" onSubmit={saveMember}><label>Name<input value={editMember.name} onChange={(event) => setEditMember({ ...editMember, name: event.target.value })} required /></label><label>Position<input value={editMember.position} onChange={(event) => setEditMember({ ...editMember, position: event.target.value })} /></label><button disabled={busy}>Save BOD member</button></form></AdminDialog> : null}
-    {editMeeting ? <AdminDialog title={`Edit ${editMeeting.name}`} busy={busy} onClose={() => setEditMeeting(null)}><form className="admin-form" onSubmit={saveMeeting}><label>Name<input value={editMeeting.name} onChange={(event) => setEditMeeting({ ...editMeeting, name: event.target.value })} required /></label><label>Date<input type="date" value={editMeeting.date} onChange={(event) => setEditMeeting({ ...editMeeting, date: event.target.value })} required /></label><button disabled={busy}>Save meeting</button></form></AdminDialog> : null}
-    {archiveMeeting ? <AdminDialog title={`Archive ${archiveMeeting.name}?`} busy={busy} onClose={() => setArchiveMeeting(null)}><p>This soft-archives the club meeting while preserving historical attendance.</p><div className="admin-actions"><button onClick={() => setArchiveMeeting(null)}>Cancel</button><button className="danger" onClick={() => run("archive-bod-meeting", () => adminCalls.archiveBodMeeting(archiveMeeting.id), "BOD meeting archived.").then((result) => { if (result) setArchiveMeeting(null); })}>Archive</button></div></AdminDialog> : null}
-    {remove ? <AdminDialog title={`Remove ${formatRotaractorName(remove.name, true)}?`} busy={busy} onClose={() => setRemove(null)}><p>This permanently removes the BOD roster and attendance documents, matching production.</p><div className="admin-actions"><button onClick={() => setRemove(null)}>Cancel</button><button className="danger" onClick={() => run("remove-bod-member", () => deleteRosterMember("bodMembers", "bodAttendance", remove.id), "BOD member removed.").then((result) => { if (result !== null) setRemove(null); })}>Remove</button></div></AdminDialog> : null}
   </>;
 }
 

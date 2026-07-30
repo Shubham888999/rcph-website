@@ -66,11 +66,14 @@ test("MOM service uses backend-controlled Drive upload and view flow", () => {
   assert.doesNotMatch(service, /drive\.google\.com/);
 });
 
-test("BOD Tools and Admin Panel both render the shared MOM email form", () => {
+test("BOD Tools renders MOM management while Admin BOD Operations keeps MOM read-only", () => {
   assert.match(bodDetails, /import MomSection/);
   assert.match(bodDetails, /<MomSection[\s\S]*target=\{momTarget\}[\s\S]*access=\{access\}/);
   assert.match(adminAttendance, /import MomSection/);
   assert.match(adminAttendance, /target=\{momTarget\(event, MOM_TARGET_TYPES\.CLUB_EVENT\)\}/);
-  assert.match(adminAttendance, /target=\{momTarget\(item, MOM_TARGET_TYPES\.BOD_MEETING\)\}/);
   assert.match(adminAttendance, /target=\{momTarget\(event, MOM_TARGET_TYPES\.DISTRICT_EVENT\)\}/);
+  assert.match(adminAttendance, /function ReadOnlyMomLink/);
+  assert.match(adminAttendance, /targetType=\{MOM_TARGET_TYPES\.BOD_MEETING\}/);
+  assert.match(adminAttendance, /viewMomPdf\(target\)/);
+  assert.doesNotMatch(adminAttendance, /target=\{momTarget\(item, MOM_TARGET_TYPES\.BOD_MEETING\)\}/);
 });

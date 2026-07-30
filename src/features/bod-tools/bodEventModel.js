@@ -3,7 +3,13 @@ import { MOM_TARGET_TYPES, normalizeMomEmailHistory, normalizeMomMetadata } from
 const EVENT_KINDS = new Set(["clubEvent", "bodMeeting", "districtEvent"]);
 const RCPH_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
 const REPORT_FINANCE_TYPES = new Set(["income", "expense"]);
-export const BOD_AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
+export const BOD_MEETING_AVENUE = "BOD";
+export const BOD_SERVICE_AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
+export const BOD_AVENUES = [...BOD_SERVICE_AVENUES, BOD_MEETING_AVENUE];
+export const BOD_AVENUE_OPTIONS = [
+  ...BOD_SERVICE_AVENUES.map((code) => ({ code, label: code })),
+  { code: BOD_MEETING_AVENUE, label: "Board of Directors" },
+];
 export const BOD_EVENT_SOURCE = "bodEventManager";
 export const BOD_EVENT_DESCRIPTION_LIMIT = 2500;
 export const BOD_REPORT_FINANCE_DESCRIPTION_LIMIT = 240;
@@ -93,8 +99,13 @@ export function normalizeBodAvenues(value) {
   return BOD_AVENUES.filter((code) => selected.has(code));
 }
 
+export function isBodMeetingAvenueSelection(value) {
+  const selected = normalizeBodAvenues(value);
+  return selected.length === 1 && selected[0] === BOD_MEETING_AVENUE;
+}
+
 export function normalizeAvenueDescriptions(value, avenues = []) {
-  const selected = normalizeBodAvenues(avenues);
+  const selected = normalizeBodAvenues(avenues).filter((code) => code !== BOD_MEETING_AVENUE);
   if (!isPlainObject(value)) return {};
   return Object.fromEntries(selected.map((code) => [
     code,
@@ -103,7 +114,7 @@ export function normalizeAvenueDescriptions(value, avenues = []) {
 }
 
 export function buildAvenueDescriptionDraft(event = {}, avenues = event?.avenues ?? event?.avenue) {
-  const selected = normalizeBodAvenues(avenues);
+  const selected = normalizeBodAvenues(avenues).filter((code) => code !== BOD_MEETING_AVENUE);
   const existing = normalizeAvenueDescriptions(event?.avenueDescriptions, selected);
   const fallback = cleanString(event?.description || event?.desc).slice(0, BOD_EVENT_DESCRIPTION_LIMIT);
   return Object.fromEntries(selected.map((code) => [code, existing[code] || fallback]));
@@ -121,19 +132,24 @@ export function validateAvenueDescriptionCoverage(avenues, avenueDescriptions) {
   const invalidKeys = [];
   const extraKeys = [];
   const missing = [];
+  if (isBodMeetingAvenueSelection(selected)) {
+    return { ok: true, errors, selected, invalidKeys, extraKeys, missing, descriptions: {} };
+  }
+  const reportableSelected = selected.filter((code) => code !== BOD_MEETING_AVENUE);
   if (!selected.length) errors.push("Select at least one avenue.");
+  if (selected.includes(BOD_MEETING_AVENUE)) errors.push("Board of Directors meetings cannot be combined with service avenues.");
   if (!isPlainObject(avenueDescriptions)) {
     errors.push("Avenue descriptions must be a plain object.");
     return { ok: false, errors, selected, invalidKeys, extraKeys, missing, descriptions: {} };
   }
-  const selectedSet = new Set(selected);
+  const selectedSet = new Set(reportableSelected);
   Object.keys(avenueDescriptions).forEach((key) => {
     const code = cleanString(key).toUpperCase();
     if (RESERVED_DESCRIPTION_KEYS.has(key) || !BOD_AVENUE_SET.has(code)) invalidKeys.push(key);
     else if (!selectedSet.has(code)) extraKeys.push(key);
   });
-  const descriptions = normalizeAvenueDescriptions(avenueDescriptions, selected);
-  selected.forEach((code) => {
+  const descriptions = normalizeAvenueDescriptions(avenueDescriptions, reportableSelected);
+  reportableSelected.forEach((code) => {
     if (!descriptions[code]) missing.push(code);
   });
   if (invalidKeys.length) errors.push("Avenue descriptions include invalid keys.");
@@ -284,6 +300,7 @@ export function normalizeBodEvent(id, raw) {
   const isActive = !archived && status !== "deleted";
   const syncedEventId = cleanString(raw.syncedEventId);
   const syncedMeetingId = cleanString(raw.syncedMeetingId);
+  const bodMeetingId = cleanString(raw.bodMeetingId || raw.syncedMeetingId);
   const syncedDistrictEventId = cleanString(raw.syncedDistrictEventId);
   const reportingWindowId = cleanString(raw.reportingWindowId || raw.reminderId);
   const rcphRole = cleanString(raw.rcphRole).toLowerCase();
@@ -330,13 +347,14 @@ export function normalizeBodEvent(id, raw) {
     momEmail: normalizeMomEmailHistory(raw.momEmail || raw),
     syncedEventId,
     syncedMeetingId,
+    bodMeetingId,
     syncedDistrictEventId,
     reportingWindowId,
     isSynced: Boolean(syncedEventId || syncedMeetingId || syncedDistrictEventId || status === "synced"),
     recordKind,
     isActive,
-    canEdit: isActive && recordKind === "clubEvent",
-    canArchive: isActive && recordKind === "clubEvent",
+    canEdit: isActive && (recordKind === "clubEvent" || recordKind === "bodMeeting"),
+    canArchive: isActive && (recordKind === "clubEvent" || recordKind === "bodMeeting"),
   };
 }
 
@@ -353,26 +371,32 @@ export function getBodEventPermissions(event, access, lockState = "unlocked") {
 
 export function validateBodEventDraft(draft, options = {}) {
   const errors = {};
-  if (!cleanString(draft?.name)) errors.name = "Event name is required.";
+  const avenues = normalizeBodAvenues(draft?.avenues);
+  const isBodMeeting = isBodMeetingAvenueSelection(avenues);
+  if (!cleanString(draft?.name)) errors.name = isBodMeeting ? "Meeting name is required." : "Event name is required.";
   const startDate = cleanString(draft?.startDate);
   const endDate = cleanString(draft?.endDate);
-  if (!isValidDateOnly(startDate)) errors.startDate = "Enter a valid start date.";
-  if (endDate && !isValidDateOnly(endDate)) errors.endDate = "Enter a valid end date.";
-  else if (startDate && endDate && endDate < startDate) errors.endDate = "End date cannot be before start date.";
+  if (!isValidDateOnly(startDate)) errors.startDate = isBodMeeting ? "Enter a valid meeting date." : "Enter a valid start date.";
+  if (!isBodMeeting && endDate && !isValidDateOnly(endDate)) errors.endDate = "Enter a valid end date.";
+  else if (!isBodMeeting && startDate && endDate && endDate < startDate) errors.endDate = "End date cannot be before start date.";
   if (!isValidEventTime(cleanString(draft?.time))) errors.time = "Enter a valid time in HH:MM format.";
-  const avenues = normalizeBodAvenues(draft?.avenues);
   if (!avenues.length) errors.avenues = "Select at least one avenue.";
-  const lockedAvenues = getLockedBodAvenues(avenues, options.lockedAvenueReportingLocks);
-  if (avenues.length && lockedAvenues.length) errors.avenues = lockedAvenueMessage(lockedAvenues);
-  const coverage = validateAvenueDescriptionCoverage(
-    avenues,
-    draft?.avenueDescriptions == null
-      ? buildAvenueDescriptionDraft(draft, avenues)
-      : draft.avenueDescriptions,
-  );
-  if (avenues.length && !coverage.ok) errors.avenueDescriptions = coverage.errors.at(-1);
-  const reportFinanceError = validateBodReportFinanceDraft(draft?.reportFinance);
-  if (reportFinanceError) errors.reportFinance = reportFinanceError;
+  else if (avenues.includes(BOD_MEETING_AVENUE) && !isBodMeeting) {
+    errors.avenues = "Board of Directors meetings cannot be combined with service avenues.";
+  }
+  if (!isBodMeeting) {
+    const lockedAvenues = getLockedBodAvenues(avenues, options.lockedAvenueReportingLocks);
+    if (avenues.length && lockedAvenues.length) errors.avenues = lockedAvenueMessage(lockedAvenues);
+    const coverage = validateAvenueDescriptionCoverage(
+      avenues,
+      draft?.avenueDescriptions == null
+        ? buildAvenueDescriptionDraft(draft, avenues)
+        : draft.avenueDescriptions,
+    );
+    if (avenues.length && !coverage.ok) errors.avenueDescriptions = coverage.errors.at(-1);
+    const reportFinanceError = validateBodReportFinanceDraft(draft?.reportFinance);
+    if (reportFinanceError) errors.reportFinance = reportFinanceError;
+  }
   return errors;
 }
 
@@ -380,12 +404,31 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
   const errors = validateBodEventDraft(draft, options);
   if (Object.keys(errors).length) return { payload: null, errors };
   const avenues = normalizeBodAvenues(draft.avenues).slice(0, 12);
+  const description = cleanString(draft.description).slice(0, BOD_EVENT_DESCRIPTION_LIMIT);
+  if (isBodMeetingAvenueSelection(avenues)) {
+    const meetingDate = cleanString(draft.startDate);
+    const payload = {
+      name: cleanString(draft.name).slice(0, 180),
+      date: meetingDate,
+      endDate: meetingDate,
+      time: cleanString(draft.time).slice(0, 20),
+      desc: description,
+      description,
+      avenue: [BOD_MEETING_AVENUE],
+      avenues: [BOD_MEETING_AVENUE],
+      source: BOD_EVENT_SOURCE,
+      type: "bodMeeting",
+      visibility: "internal",
+    };
+    if (eventId) payload.eventId = cleanString(eventId);
+    if (cleanString(draft.reportingWindowId)) payload.reportingWindowId = cleanString(draft.reportingWindowId).slice(0, 160);
+    return { payload, errors: {} };
+  }
   const avenueDescriptionDraft = draft.avenueDescriptions == null
     ? buildAvenueDescriptionDraft(draft, avenues)
     : draft.avenueDescriptions;
   const coverage = validateAvenueDescriptionCoverage(avenues, avenueDescriptionDraft);
   if (!coverage.ok) return { payload: null, errors: { ...errors, avenueDescriptions: coverage.errors.at(-1) } };
-  const description = cleanString(draft.description).slice(0, BOD_EVENT_DESCRIPTION_LIMIT);
   const payload = {
     name: cleanString(draft.name).slice(0, 180),
     conductedBy: cleanString(draft.conductedBy).slice(0, 140),

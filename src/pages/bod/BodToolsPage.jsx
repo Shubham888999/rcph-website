@@ -62,13 +62,6 @@ export default function BodToolsPage() {
     fetchReportingWindowPrefill(reportingWindowId)
       .then((prefill) => {
         if (!active) return;
-        if (prefill.bodToolsCreateSupported === false) {
-          setNotice({
-            type: "error",
-            message: "BOD Meeting reporting windows still use the BOD Meeting scheduler. Use the exact event name from the reporting email.",
-          });
-          return;
-        }
         setForm({ event: null, prefill });
         setSubmissionsExpanded(false);
       })
@@ -140,7 +133,8 @@ export default function BodToolsPage() {
     setForm(null);
     setMutationError("");
     const rows = result?.attendanceRowsUpdated;
-    setNotice({ type: "success", message: `Event saved and synchronized.${rows === null ? "" : ` Attendance initialized for ${rows} member rows.`}` });
+    const recordLabel = result?.meetingId || result?.bodMeetingId ? "Meeting" : "Event";
+    setNotice({ type: "success", message: `${recordLabel} saved and synchronized.${rows === null ? "" : ` Attendance initialized for ${rows} member rows.`}` });
     reload();
   }
 
@@ -148,7 +142,8 @@ export default function BodToolsPage() {
     if (!confirmation) return;
     const { event, mode } = confirmation;
     if (mode === "archive") {
-      runMutation("archive", () => archiveBodEvent(event.id), "Event archived; attendance history was preserved.", () => setConfirmation(null));
+      const recordLabel = event.recordKind === "bodMeeting" ? "Meeting" : "Event";
+      runMutation("archive", () => archiveBodEvent(event.id), `${recordLabel} archived; attendance history was preserved.`, () => setConfirmation(null));
     } else {
       runMutation("sync", () => syncBodEventToAttendance(event.id), "Synchronization complete.", () => setConfirmation(null));
     }
