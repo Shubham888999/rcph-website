@@ -305,6 +305,7 @@ function assertNoSensitivePayload(value) {
     'driveFileId',
     'driveFolderId',
     'folderUrl',
+    'primaryPresentationSubmissionId',
     'uploadedByEmail',
     'uploadSessionId',
     'moderationNotes',
@@ -333,10 +334,14 @@ function assertOnlySafeDriveUrls(value, pathLabel = 'root') {
     const isFolderOpenUrl = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(value);
     const isBillOpenUrl = pathLabel.endsWith('.billOpenUrl')
       && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(value);
-    const isDocumentOpenUrl = /\.documentPanels\[\d+\]\.files\[\d+\]\.openUrl$/.test(pathLabel)
-      && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(value);
-    const isDocumentPreviewUrl = /\.documentPanels\[\d+\]\.files\[\d+\]\.previewUrl$/.test(pathLabel)
-      && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/preview$/.test(value);
+    const isDocumentOpenUrl = (
+      /\.documentPanels\[\d+\]\.files\[\d+\]\.openUrl$/.test(pathLabel)
+      || /\.documentPanels\[\d+\]\.primaryPresentation\.openUrl$/.test(pathLabel)
+    ) && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(value);
+    const isDocumentPreviewUrl = (
+      /\.documentPanels\[\d+\]\.files\[\d+\]\.previewUrl$/.test(pathLabel)
+      || /\.documentPanels\[\d+\]\.primaryPresentation\.previewUrl$/.test(pathLabel)
+    ) && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/preview$/.test(value);
     assert.ok(
       isFolderOpenUrl || isBillOpenUrl || isDocumentOpenUrl || isDocumentPreviewUrl,
       `Only canonical Drive folder URLs and safe Drive file URLs may be exposed at ${pathLabel}`
@@ -716,6 +721,216 @@ assertNoSensitivePayload(finesSummary);
     Object.keys(districtByDefault.documentPanels[0].files[0]).sort(),
     ['canOpen', 'canPreview', 'fileName', 'fileSize', 'mimeType', 'openUrl', 'previewUrl', 'status', 'submissionId', 'title', 'uploadedAt', 'uploadedByName'].sort()
   );
+
+  const previewableNoSelection = await createService({
+    visitDashboardConfig: {
+      clubAssembly: visibleConfig('clubAssembly', { visiblePositionKeys: ['president'], allowDistrictOfficials: true }),
+    },
+    visitSubmissionPositions: {
+      clubAssembly_president: {
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        positionTitle: 'President',
+        avenueCode: 'PRES',
+        driveFolderId: 'safe-president-folder',
+      },
+    },
+    visitSubmissions: {
+      constitution: {
+        submissionId: 'constitution',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'constitution.pdf',
+        originalFileName: 'constitution.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1000,
+        driveFileId: 'safeConstitutionFile',
+        status: 'active',
+      },
+      letterhead: {
+        submissionId: 'letterhead',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'letterhead.pdf',
+        originalFileName: 'letterhead.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1000,
+        driveFileId: 'safeLetterheadFile',
+        status: 'active',
+      },
+      assemblyDeck: {
+        submissionId: 'assemblyDeck',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'club-assembly.pptx',
+        originalFileName: 'club-assembly.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        sizeBytes: 1000,
+        driveFileId: 'safeAssemblyDeckFile',
+        status: 'active',
+      },
+    },
+  }).getDashboardData(approvedContext());
+  assert.equal(previewableNoSelection.documentPanels[0].fileCount, 3, 'all supporting files remain counted without selection');
+  assert.equal(previewableNoSelection.documentPanels[0].files.every(file => file.canPreview), true, 'fixture files are previewable');
+  assert.equal(previewableNoSelection.documentPanels[0].primaryPresentation, null, 'previewable files do not auto-select a main presentation');
+  assertNoSensitivePayload(previewableNoSelection);
+
+  const explicitSelection = await createService({
+    visitDashboardConfig: {
+      clubAssembly: visibleConfig('clubAssembly', { visiblePositionKeys: ['president'], allowDistrictOfficials: true }),
+    },
+    visitSubmissionPositions: {
+      clubAssembly_president: {
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        positionTitle: 'President',
+        avenueCode: 'PRES',
+        driveFolderId: 'safe-president-folder',
+        primaryPresentationSubmissionId: 'assemblyDeck',
+      },
+    },
+    visitSubmissions: previewableNoSelection.documentPanels[0].files.reduce((docs, file) => {
+      docs[file.submissionId] = {
+        submissionId: file.submissionId,
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: file.fileName,
+        originalFileName: file.fileName,
+        mimeType: file.mimeType,
+        sizeBytes: file.fileSize,
+        driveFileId: file.previewUrl.match(/\/d\/([^/]+)\//)?.[1],
+        status: 'active',
+      };
+      return docs;
+    }, {}),
+  }).getDashboardData(approvedContext());
+  assert.equal(explicitSelection.documentPanels[0].primaryPresentation.fileName, 'club-assembly.pptx', 'explicit PPTX selection is exposed as primary');
+  assert.equal(explicitSelection.documentPanels[0].primaryPresentation.previewUrl, 'https://drive.google.com/file/d/safeAssemblyDeckFile/preview');
+  assert.equal(JSON.stringify(explicitSelection.documentPanels[0].primaryPresentation).includes('constitution.pdf'), false);
+  assert.equal(JSON.stringify(explicitSelection.documentPanels[0].primaryPresentation).includes('letterhead.pdf'), false);
+
+  const explicitPdfSelection = await createService({
+    visitDashboardConfig: {
+      clubAssembly: visibleConfig('clubAssembly', { visiblePositionKeys: ['president'], allowDistrictOfficials: true }),
+    },
+    visitSubmissionPositions: {
+      clubAssembly_president: {
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        positionTitle: 'President',
+        avenueCode: 'PRES',
+        driveFolderId: 'safe-president-folder',
+        primaryPresentationSubmissionId: 'constitution',
+      },
+    },
+    visitSubmissions: {
+      constitution: {
+        submissionId: 'constitution',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'constitution.pdf',
+        originalFileName: 'constitution.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1000,
+        driveFileId: 'safeConstitutionFile',
+        status: 'active',
+      },
+      assemblyDeck: {
+        submissionId: 'assemblyDeck',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'club-assembly.pptx',
+        originalFileName: 'club-assembly.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        sizeBytes: 1000,
+        driveFileId: 'safeAssemblyDeckFile',
+        status: 'active',
+      },
+    },
+  }).getDashboardData(approvedContext());
+  assert.equal(explicitPdfSelection.documentPanels[0].primaryPresentation.fileName, 'constitution.pdf', 'explicit PDF selection is allowed');
+
+  const invalidSelection = await createService({
+    visitDashboardConfig: {
+      clubAssembly: visibleConfig('clubAssembly', { visiblePositionKeys: ['president'], allowDistrictOfficials: true }),
+    },
+    visitSubmissionPositions: {
+      clubAssembly_president: {
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        positionTitle: 'President',
+        avenueCode: 'PRES',
+        driveFolderId: 'safe-president-folder',
+        primaryPresentationSubmissionId: 'withdrawnDeck',
+      },
+    },
+    visitSubmissions: {
+      withdrawnDeck: {
+        submissionId: 'withdrawnDeck',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'withdrawn.pptx',
+        originalFileName: 'withdrawn.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        driveFileId: 'safeWithdrawnDeckFile',
+        status: 'archived',
+      },
+      fallbackPdf: {
+        submissionId: 'fallbackPdf',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'fallback.pdf',
+        originalFileName: 'fallback.pdf',
+        mimeType: 'application/pdf',
+        driveFileId: 'safeFallbackFile',
+        status: 'active',
+      },
+    },
+  }).getDashboardData(approvedContext());
+  assert.equal(invalidSelection.documentPanels[0].fileCount, 1);
+  assert.equal(invalidSelection.documentPanels[0].primaryPresentation, null, 'invalid selected file does not fall back to another previewable file');
+
+  const inactiveFlagSelection = await createService({
+    visitDashboardConfig: {
+      clubAssembly: visibleConfig('clubAssembly', { visiblePositionKeys: ['president'], allowDistrictOfficials: true }),
+    },
+    visitSubmissionPositions: {
+      clubAssembly_president: {
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        positionTitle: 'President',
+        avenueCode: 'PRES',
+        driveFolderId: 'safe-president-folder',
+        primaryPresentationSubmissionId: 'inactiveDeck',
+      },
+    },
+    visitSubmissions: {
+      inactiveDeck: {
+        submissionId: 'inactiveDeck',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'inactive.pptx',
+        originalFileName: 'inactive.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        driveFileId: 'safeInactiveDeckFile',
+        status: 'active',
+        active: false,
+      },
+      fallbackPdf: {
+        submissionId: 'fallbackPdf',
+        visitType: 'clubAssembly',
+        positionKey: 'president',
+        fileName: 'fallback.pdf',
+        originalFileName: 'fallback.pdf',
+        mimeType: 'application/pdf',
+        driveFileId: 'safeFallbackFile',
+        status: 'active',
+      },
+    },
+  }).getDashboardData(approvedContext());
+  assert.equal(inactiveFlagSelection.documentPanels[0].fileCount, 1);
+  assert.equal(inactiveFlagSelection.documentPanels[0].primaryPresentation, null, 'active=false selection does not fall back to another previewable file');
   assert.equal(districtByDefault.attendance.club.summary.totalEvents, 2);
   assert.equal(districtByDefault.attendance.club.summary.totalPeople, 4);
   assert.equal(districtByDefault.attendance.club.summary.averageAttendanceRate, 50);

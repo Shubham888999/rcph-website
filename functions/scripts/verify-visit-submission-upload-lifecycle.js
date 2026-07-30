@@ -355,10 +355,17 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   const normalFolder = await env.service.getFolder('bod-secretary', 'clubAssembly', 'secretary');
   assertNoInternalFields(normalFolder.submissions[0]);
 
+  await env.service.updateFolder('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    primaryPresentationSubmissionId: finalized.submissionId,
+  });
+  assert.strictEqual(folderDoc(env).primaryPresentationSubmissionId, finalized.submissionId, 'manager can feature a finalized PDF');
   await rejectsWithCode(() => env.service.withdrawSubmission('bod-editor', { submissionId: finalized.submissionId }), 'permission-denied');
   const withdrawn = await env.service.withdrawSubmission('bod-secretary', { submissionId: finalized.submissionId });
   assert.strictEqual(withdrawn.status, 'archived', 'BOD withdraw archives');
   assert.strictEqual(folderDoc(env).activeFileCount, 0, 'withdraw decrements active');
+  assert.strictEqual(folderDoc(env).primaryPresentationSubmissionId, '', 'withdraw clears selected main presentation');
   await rejectsWithCode(() => env.service.withdrawSubmission('bod-secretary', { submissionId: finalized.submissionId }), 'failed-precondition');
 
   env = await initializedEnv();
@@ -366,9 +373,15 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   const proof2 = await consumeTicket(env, session);
   const completion2 = await completeDrive(env, session, proof2);
   const removeTarget = await finalize(env, 'bod-secretary', session, completion2);
+  await env.service.updateFolder('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    primaryPresentationSubmissionId: removeTarget.submissionId,
+  });
   const removed = await env.service.removeSubmission('admin-uid', { submissionId: removeTarget.submissionId, reason: 'Duplicate' });
   assert.strictEqual(removed.status, 'admin-removed');
   assert.strictEqual(folderDoc(env).activeFileCount, 0, 'manager remove decrements once');
+  assert.strictEqual(folderDoc(env).primaryPresentationSubmissionId, '', 'manager removal clears selected main presentation');
   await rejectsWithCode(() => env.service.removeSubmission('admin-uid', { submissionId: removeTarget.submissionId, reason: 'Again' }), 'failed-precondition');
 
   env = await initializedEnv();
@@ -416,6 +429,73 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   assert.strictEqual(env.adapter.store.visitSubmissions[oldSubmission.submissionId].status, 'replaced');
   assert.strictEqual(env.adapter.store.visitSubmissions[oldSubmission.submissionId].replacedBySubmissionId, replacement.submissionId);
   assert.strictEqual(folderDoc(env).activeFileCount, activeBeforeReplace, 'replacement keeps active count unchanged');
+
+  const managerPrimaryEnv = await initializedEnv();
+  const managerPrimarySession = await createSession(managerPrimaryEnv, 'bod-secretary', {
+    file: { clientFileId: 'manager-primary', fileName: 'Manager Primary.pdf' },
+  });
+  const managerPrimaryProof = await consumeTicket(managerPrimaryEnv, managerPrimarySession);
+  const managerPrimaryCompletion = await completeDrive(managerPrimaryEnv, managerPrimarySession, managerPrimaryProof);
+  const managerPrimaryOld = await finalize(managerPrimaryEnv, 'bod-secretary', managerPrimarySession, managerPrimaryCompletion);
+  await managerPrimaryEnv.service.updateFolder('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    primaryPresentationSubmissionId: managerPrimaryOld.submissionId,
+  });
+  const managerPrimaryReplacement = await managerPrimaryEnv.service.replaceSubmission('admin-uid', {
+    replacesSubmissionId: managerPrimaryOld.submissionId,
+    files: [file({
+      clientFileId: 'manager-primary-replacement',
+      fileName: 'Manager Replacement.pptx',
+      mimeType: pptxMime,
+      sizeBytes: 1900000,
+    })],
+  });
+  const managerReplacementProof = await consumeTicket(managerPrimaryEnv, managerPrimaryReplacement);
+  const managerReplacementCompletion = await completeDrive(managerPrimaryEnv, managerPrimaryReplacement, managerReplacementProof, 0, {
+    drive: {
+      driveFileId: 'driveFileMANAGERREPLACEMENT',
+      driveFolderId: 'driveFolderABC12345',
+      driveFileUrl: 'https://drive.google.com/file/d/driveFileMANAGERREPLACEMENT/view',
+    },
+  });
+  const managerPrimaryNew = await finalize(managerPrimaryEnv, 'admin-uid', managerPrimaryReplacement, managerReplacementCompletion);
+  assert.strictEqual(
+    folderDoc(managerPrimaryEnv).primaryPresentationSubmissionId,
+    managerPrimaryNew.submissionId,
+    'manager replacement transfers selected main presentation to eligible replacement'
+  );
+
+  const uploaderPrimaryEnv = await initializedEnv();
+  const uploaderPrimarySession = await createSession(uploaderPrimaryEnv, 'bod-secretary', {
+    file: { clientFileId: 'uploader-primary', fileName: 'Uploader Primary.pdf' },
+  });
+  const uploaderPrimaryProof = await consumeTicket(uploaderPrimaryEnv, uploaderPrimarySession);
+  const uploaderPrimaryCompletion = await completeDrive(uploaderPrimaryEnv, uploaderPrimarySession, uploaderPrimaryProof);
+  const uploaderPrimaryOld = await finalize(uploaderPrimaryEnv, 'bod-secretary', uploaderPrimarySession, uploaderPrimaryCompletion);
+  await uploaderPrimaryEnv.service.updateFolder('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    primaryPresentationSubmissionId: uploaderPrimaryOld.submissionId,
+  });
+  const uploaderPrimaryReplacement = await uploaderPrimaryEnv.service.replaceSubmission('bod-secretary', {
+    replacesSubmissionId: uploaderPrimaryOld.submissionId,
+    files: [file({ clientFileId: 'uploader-primary-replacement', fileName: 'Uploader Replacement.pdf' })],
+  });
+  const uploaderReplacementProof = await consumeTicket(uploaderPrimaryEnv, uploaderPrimaryReplacement);
+  const uploaderReplacementCompletion = await completeDrive(uploaderPrimaryEnv, uploaderPrimaryReplacement, uploaderReplacementProof, 0, {
+    drive: {
+      driveFileId: 'driveFileUPLOADERREPLACEMENT',
+      driveFolderId: 'driveFolderABC12345',
+      driveFileUrl: 'https://drive.google.com/file/d/driveFileUPLOADERREPLACEMENT/view',
+    },
+  });
+  await finalize(uploaderPrimaryEnv, 'bod-secretary', uploaderPrimaryReplacement, uploaderReplacementCompletion);
+  assert.strictEqual(
+    folderDoc(uploaderPrimaryEnv).primaryPresentationSubmissionId,
+    '',
+    'ordinary uploader replacement clears selected main presentation pending manager review'
+  );
 
   await createSession(env, 'bod-secretary', { file: { clientFileId: 'reserved-live' } });
   const consumedLive = await createSession(env, 'bod-secretary', { file: { clientFileId: 'consumed-live' } });

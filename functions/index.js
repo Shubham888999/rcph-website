@@ -3295,6 +3295,35 @@ async function loadActiveAvenueReportingLocks() {
   });
 }
 
+function shapeBodEventLockState(lockSnap) {
+  const data = lockSnap?.exists ? (lockSnap.data() || {}) : {};
+  return {
+    locked: data.locked === true,
+    reason: normalizeText(data.reason, 240),
+    updatedByName: normalizeText(data.updatedByName, 140),
+    updatedAt: timestampToIso(data.updatedAt) || '',
+  };
+}
+
+function shapeAvenueReportingLockState(lock) {
+  return {
+    id: normalizeText(lock.id || lock.lockId, 180),
+    lockId: normalizeText(lock.lockId || lock.id, 180),
+    locked: true,
+    type: 'avenue_reporting',
+    status: 'active',
+    reason: normalizeText(lock.reason, 160) || 'reporting_window_expired',
+    avenue: normalizeText(lock.avenue, 40),
+    avenueLabel: normalizeText(lock.avenueLabel, 120),
+    reportingWindowId: normalizeText(lock.reportingWindowId, 180),
+    reminderId: normalizeText(lock.reminderId || lock.reportingWindowId, 180),
+    targetName: normalizeText(lock.targetName, 180),
+    conductedDate: normalizeText(lock.conductedDate, 40),
+    lockedAt: timestampToIso(lock.lockedAt) || '',
+    updatedAt: timestampToIso(lock.updatedAt) || '',
+  };
+}
+
 async function assertBodEventAvenuesUnlocked(avenues) {
   const locks = await loadActiveAvenueReportingLocks();
   avenueReportingLocks.assertBodEventAvenuesUnlocked({
@@ -8058,6 +8087,26 @@ exports.completeVisitSubmissionDriveUpload = onRequest({
       message,
     });
   }
+});
+
+exports.getBodToolsLockState = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const [authority] = await Promise.all([
+    assertBodAdminOrPresident(uid),
+    assertApprovedActiveCallableAccount(uid),
+  ]);
+  if (!authority) {
+    throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
+  }
+  const [bodEventsLock, locks] = await Promise.all([
+    db.collection('locks').doc('bodEvents').get(),
+    loadActiveAvenueReportingLocks(),
+  ]);
+  return {
+    ok: true,
+    lock: shapeBodEventLockState(bodEventsLock),
+    avenueReportingLocks: locks.map(shapeAvenueReportingLockState),
+  };
 });
 
 exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {

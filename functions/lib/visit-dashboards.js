@@ -231,6 +231,13 @@ const PREVIEWABLE_DOCUMENT_MIME_TYPES = new Set([
   'application/vnd.google-apps.presentation',
 ]);
 const PREVIEWABLE_DOCUMENT_EXTENSIONS = new Set(['pdf', 'ppt', 'pptx']);
+const PRIMARY_PRESENTATION_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.google-apps.presentation',
+]);
+const PRIMARY_PRESENTATION_EXTENSIONS = new Set(['pdf', 'ppt', 'pptx']);
 
 function fileExtension(value) {
   const match = normalizeText(value, 220).toLowerCase().match(/\.([a-z0-9]{1,12})$/);
@@ -241,6 +248,12 @@ function isPreviewableDocument(source, fileName = '') {
   const mimeType = normalizeText(source?.mimeType, 160).toLowerCase();
   if (PREVIEWABLE_DOCUMENT_MIME_TYPES.has(mimeType)) return true;
   return PREVIEWABLE_DOCUMENT_EXTENSIONS.has(fileExtension(fileName || source?.fileName || source?.originalFileName));
+}
+
+function isPrimaryPresentationDocument(source, fileName = '') {
+  const mimeType = normalizeText(source?.mimeType, 160).toLowerCase();
+  if (PRIMARY_PRESENTATION_MIME_TYPES.has(mimeType)) return true;
+  return PRIMARY_PRESENTATION_EXTENSIONS.has(fileExtension(fileName || source?.fileName || source?.originalFileName));
 }
 
 function normalizeVisitType(value) {
@@ -849,8 +862,10 @@ function isVisibleDocumentSubmission(submission, visitType, visiblePositionKeys)
       && submission.visitType === visitType
       && visiblePositionKeys.has(submission.positionKey)
       && status === 'active'
+      && submission.active !== false
       && submission.archived !== true
       && submission.deleted !== true
+      && submission.removed !== true
       && submission.rejected !== true
   );
 }
@@ -916,8 +931,17 @@ function buildDocumentPanels({ config, positionDocs, submissionDocs, positionHel
   return visiblePositionKeys.map((positionKey) => {
     const folder = positionMap.get(positionKey) || null;
     const metadata = positionMetadataForKey(positionKey, folder, positionHelpers);
+    const primaryPresentationSubmissionId = normalizeSafeId(folder?.primaryPresentationSubmissionId, 160);
     const files = (filesByPosition.get(positionKey) || [])
       .sort((a, b) => String(b.uploadedAt).localeCompare(String(a.uploadedAt)) || a.title.localeCompare(b.title));
+    const selectedPrimary = primaryPresentationSubmissionId
+      ? files.find(file => (
+        file.submissionId === primaryPresentationSubmissionId
+        && file.canPreview === true
+        && Boolean(file.previewUrl)
+        && isPrimaryPresentationDocument(file, file.fileName)
+      )) || null
+      : null;
     return {
       positionKey,
       positionTitle: metadata.positionTitle,
@@ -927,6 +951,7 @@ function buildDocumentPanels({ config, positionDocs, submissionDocs, positionHel
       fileCount: files.length,
       canOpen: folder?.canOpen === true,
       openUrl: folder?.openUrl || '',
+      primaryPresentation: selectedPrimary || null,
       files,
     };
   });
@@ -1169,6 +1194,7 @@ function shapeFolderOption(raw, fallbackId = '', options = {}) {
     submissionOpen: raw.submissionOpen !== false,
     locked: raw.locked === true,
     activeFileCount: Math.max(0, Number(raw.activeFileCount) || 0),
+    primaryPresentationSubmissionId: normalizeSafeId(raw.primaryPresentationSubmissionId, 160),
   };
   if (options.includeOpenUrl === true) {
     const openUrl = driveFolderOpenUrl(raw);
@@ -1513,6 +1539,7 @@ module.exports = {
   createFirestoreVisitDashboardAdapter,
   createMemoryVisitDashboardAdapter,
   createVisitDashboardService,
+  isPrimaryPresentationDocument,
   makeVisitDashboardError,
   normalizeOfficialDisplayNames,
   normalizeVisiblePositionKeys,

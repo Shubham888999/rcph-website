@@ -45,6 +45,7 @@ const syncBodEventFn = functionsClient.httpsCallable('syncBodEventToAttendance')
 const updateBodEventFn = functionsClient.httpsCallable('updateBodEvent');
 const archiveBodEventFn = functionsClient.httpsCallable('archiveBodEvent');
 const createBodUploadTicketFn = functionsClient.httpsCallable('createBodUploadTicket');
+const getBodToolsLockStateFn = functionsClient.httpsCallable('getBodToolsLockState');
 
 const BOD_UPLOAD_WEB_APP_URL =
   'https://script.google.com/macros/s/AKfycby1iqbZHj2LJFz3FZzE7XkjGMZ1Tqi6Y-rCJmH1ZWs5bXBFRGrb--bkNfFh_D7dS0UfKw/exec';
@@ -101,8 +102,9 @@ let CURRENT_DISPLAY_NAME = '';
 
 // Lock UI helpers
 const lockBodEventsBtn   = document.getElementById('lockBodEventsBtn');
+const BOD_LOCK_STATE_POLL_MS = 30000;
 
-function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
+function watchRawLockDeprecated(panelKey, btnEl, badgeEl, onLockedChange) {
   return db.collection('locks').doc(panelKey).onSnapshot(snap => {
     const locked = snap.exists && !!snap.data().locked;
     if (badgeEl) badgeEl.textContent = locked ? 'Locked' : 'Unlocked';
@@ -114,6 +116,46 @@ function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
     }
     onLockedChange?.(locked);
   });
+}
+
+function watchLock(panelKey, btnEl, badgeEl, onLockedChange) {
+  let active = true;
+  let timer = null;
+  let busy = false;
+
+  async function loadLockState() {
+    if (busy) return;
+    busy = true;
+    try {
+      const result = await getBodToolsLockStateFn({});
+      const lock = result?.data?.lock || {};
+      const locked = lock.locked === true;
+      if (!active) return;
+      if (badgeEl) badgeEl.textContent = locked ? 'Locked' : 'Unlocked';
+      if (btnEl) {
+        btnEl.disabled = !IS_PRESIDENT;
+        btnEl.textContent = locked ? 'Locked' : 'Unlocked';
+        btnEl.setAttribute('aria-label', locked ? 'Unlock' : 'Lock');
+        btnEl.title = locked ? 'Unlock' : 'Lock';
+      }
+      onLockedChange?.(locked);
+    } catch (err) {
+      console.warn(`${panelKey} lock state failed:`, err?.message || err);
+      if (!active) return;
+      if (badgeEl) badgeEl.textContent = 'Unavailable';
+      if (btnEl) btnEl.disabled = !IS_PRESIDENT;
+      onLockedChange?.(true);
+    } finally {
+      busy = false;
+    }
+  }
+
+  loadLockState();
+  timer = setInterval(loadLockState, BOD_LOCK_STATE_POLL_MS);
+  return () => {
+    active = false;
+    if (timer) clearInterval(timer);
+  };
 }
 
 async function toggleLock(panelKey) {
@@ -1236,7 +1278,3 @@ document.addEventListener('click', (e) => {
     }
   }
 });
-
-
-
-

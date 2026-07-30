@@ -91,6 +91,13 @@ const VISIT_DANGEROUS_EXTENSIONS = new Set([
   'rar',
   '7z',
 ]);
+const PRIMARY_PRESENTATION_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.google-apps.presentation',
+]);
+const PRIMARY_PRESENTATION_EXTENSIONS = new Set(['pdf', 'ppt', 'pptx']);
 
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object || {}, key);
@@ -254,6 +261,82 @@ function normalizeDriveUrl(value) {
     throw makeVisitSubmissionError('invalid-argument', 'Drive file URL is invalid.');
   }
   return cleaned;
+}
+
+function safeDriveFileId(value) {
+  const cleaned = normalizeText(value, 256);
+  return /^[A-Za-z0-9_-]{8,256}$/.test(cleaned) ? cleaned : '';
+}
+
+function driveFileIdFromUrl(value) {
+  const raw = normalizeText(value, 1000);
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return '';
+    const segments = url.pathname.split('/').filter(Boolean);
+    if (url.hostname === 'drive.google.com') {
+      const fileSegmentIndex = segments.indexOf('file');
+      if (fileSegmentIndex >= 0 && segments[fileSegmentIndex + 1] === 'd') {
+        return safeDriveFileId(segments[fileSegmentIndex + 2]);
+      }
+      if (segments.length === 1 && segments[0] === 'open') {
+        return safeDriveFileId(url.searchParams.get('id'));
+      }
+    }
+    if (url.hostname === 'docs.google.com' && segments[0] === 'presentation' && segments[1] === 'd') {
+      return safeDriveFileId(segments[2]);
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+function primaryPresentationDriveFileId(submission) {
+  return safeDriveFileId(submission?.driveFileId)
+    || safeDriveFileId(submission?.fileDriveId)
+    || safeDriveFileId(submission?.googleDriveFileId)
+    || safeDriveFileId(submission?.fileId)
+    || driveFileIdFromUrl(submission?.driveFileUrl)
+    || driveFileIdFromUrl(submission?.fileUrl)
+    || driveFileIdFromUrl(submission?.openUrl)
+    || driveFileIdFromUrl(submission?.previewUrl)
+    || driveFileIdFromUrl(submission?.webViewLink);
+}
+
+function safePrimaryPresentationPreviewUrl(submission) {
+  const driveFileId = primaryPresentationDriveFileId(submission);
+  return driveFileId ? `https://drive.google.com/file/d/${encodeURIComponent(driveFileId)}/preview` : '';
+}
+
+function isPrimaryPresentationEligibleSubmission(submission) {
+  const mimeType = normalizeText(submission?.mimeType, 160).toLowerCase();
+  if (PRIMARY_PRESENTATION_MIME_TYPES.has(mimeType)) return true;
+  const extension = fileExtension(submission?.originalFileName || submission?.fileName);
+  return PRIMARY_PRESENTATION_EXTENSIONS.has(extension);
+}
+
+function canUseAsPrimaryPresentation(submission) {
+  return Boolean(isPrimaryPresentationEligibleSubmission(submission) && safePrimaryPresentationPreviewUrl(submission));
+}
+
+function isActivePrimaryPresentationSubmission(submission) {
+  const status = normalizeText(submission?.status || 'active', 40).toLowerCase();
+  return Boolean(
+    submission
+    && status === 'active'
+    && submission.active !== false
+    && submission.archived !== true
+    && submission.deleted !== true
+    && submission.removed !== true
+    && submission.rejected !== true
+  );
+}
+
+function safePrimaryPresentationSubmissionId(value) {
+  const submissionId = normalizeText(value, 160);
+  return submissionId && !/[\\/]/.test(submissionId) ? submissionId : '';
 }
 
 function normalizeSubmissionStatus(value) {
@@ -601,6 +684,7 @@ function buildVisitPositionDefaults(visitTypeValue, positionKeyValue, actorUid, 
     maxFilesPerSelection: DEFAULT_MAX_FILES_PER_SELECTION,
     maxFileSizeBytes: DEFAULT_MAX_FILE_SIZE_BYTES,
     activeFileCount: 0,
+    primaryPresentationSubmissionId: '',
     createdAt: now,
     createdBy: actorUid,
     updatedAt: now,
@@ -684,6 +768,12 @@ function validateFolderUpdate(input) {
       DEFAULT_MAX_FILE_SIZE_BYTES
     );
   }
+  if (hasOwn(input, 'primaryPresentationSubmissionId')) {
+    const value = input.primaryPresentationSubmissionId;
+    updates.primaryPresentationSubmissionId = value === null || value === ''
+      ? ''
+      : normalizeSubmissionId(value);
+  }
   return updates;
 }
 
@@ -725,6 +815,22 @@ function shapePosition(positionData, visitTypeValue, positionKeyValue, actorUid,
   };
 }
 
+function assertPrimaryPresentationSubmission(submission, submissionId, visitType, positionKey) {
+  if (!isActivePrimaryPresentationSubmission(submission)) {
+    throw makeVisitSubmissionError('invalid-argument', 'Main presentation must be an active file in this folder.');
+  }
+  if (submission.visitType !== visitType) {
+    throw makeVisitSubmissionError('invalid-argument', 'Main presentation must belong to this visit.');
+  }
+  if (submission.positionKey !== positionKey) {
+    throw makeVisitSubmissionError('invalid-argument', 'Main presentation must belong to this folder.');
+  }
+  if (!canUseAsPrimaryPresentation(submission)) {
+    throw makeVisitSubmissionError('invalid-argument', 'Main presentation must be a previewable PDF or presentation.');
+  }
+  return safePrimaryPresentationSubmissionId(submissionId);
+}
+
 function submissionActionPermissions(submission, access) {
   const isActive = (submission.status || 'active') === 'active';
   if (!isActive || !access) {
@@ -743,10 +849,17 @@ function submissionActionPermissions(submission, access) {
   };
 }
 
-function shapeSubmission(submission, access) {
+function shapeSubmission(submission, access, options = {}) {
   const permissions = submissionActionPermissions(submission, access);
+  const submissionId = submission.submissionId || submission.id || '';
+  const primaryPresentationSubmissionId = safePrimaryPresentationSubmissionId(options.primaryPresentationSubmissionId);
+  const canSetPrimaryPresentation = Boolean(
+    access?.canManageVisitSystem === true
+      && isActivePrimaryPresentationSubmission(submission)
+      && canUseAsPrimaryPresentation(submission)
+  );
   return {
-    submissionId: submission.submissionId || submission.id || '',
+    submissionId,
     visitType: submission.visitType,
     positionKey: submission.positionKey,
     positionTitle: submission.positionTitle || '',
@@ -763,6 +876,8 @@ function shapeSubmission(submission, access) {
     canWithdraw: permissions.canWithdraw,
     canReplace: permissions.canReplace,
     canRemove: permissions.canRemove,
+    isPrimaryPresentation: Boolean(primaryPresentationSubmissionId && submissionId === primaryPresentationSubmissionId),
+    canSetPrimaryPresentation,
   };
 }
 
@@ -787,6 +902,7 @@ function buildFolderResponse(config, folder, access) {
     locked: folder.locked === true,
     lockReason: folder.lockReason || '',
     activeFileCount: Number(folder.activeFileCount || 0),
+    primaryPresentationSubmissionId: safePrimaryPresentationSubmissionId(folder.primaryPresentationSubmissionId),
     maxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES),
     maxFilesPerSelection: Number(folder.maxFilesPerSelection || DEFAULT_MAX_FILES_PER_SELECTION),
     maxFileSizeBytes: Number(folder.maxFileSizeBytes || DEFAULT_MAX_FILE_SIZE_BYTES),
@@ -1310,7 +1426,11 @@ function createVisitSubmissionService(options) {
         instructions: config.instructions || '',
       },
       folder: buildFolderResponse(config, folder, access),
-      submissions: submissions.map(doc => shapeSubmission({ id: doc.id, ...doc.data }, access)),
+      submissions: submissions.map(doc => shapeSubmission(
+        { id: doc.id, ...doc.data },
+        access,
+        { primaryPresentationSubmissionId: folder.primaryPresentationSubmissionId }
+      )),
       limits: {
         maxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES),
         maxFilesPerSelection: Number(folder.maxFilesPerSelection || DEFAULT_MAX_FILES_PER_SELECTION),
@@ -1357,25 +1477,45 @@ function createVisitSubmissionService(options) {
       throw makeVisitSubmissionError('invalid-argument', 'At least one mutable folder field is required.');
     }
     const docId = visitPositionDocId(visitType, positionKey, positionHelpers);
-    const snap = await adapter.getDoc('visitSubmissionPositions', docId);
-    if (!snap.exists) {
-      throw makeVisitSubmissionError('not-found', 'Visit position folder has not been initialized.');
-    }
-    const diff = safeDiff(snap.data, updates);
     const now = adapter.serverTimestamp();
-    if (Object.keys(diff).length) {
-      await adapter.updateDoc('visitSubmissionPositions', docId, {
-        ...updates,
-        updatedAt: now,
-        updatedBy: uid,
-      });
+    let changedFields = [];
+    let changes = {};
+    await adapter.runTransaction(async (tx) => {
+      const snap = await tx.getDoc('visitSubmissionPositions', docId);
+      if (!snap.exists) {
+        throw makeVisitSubmissionError('not-found', 'Visit position folder has not been initialized.');
+      }
+      if (updates.primaryPresentationSubmissionId) {
+        const selectedSnap = await tx.getDoc('visitSubmissions', updates.primaryPresentationSubmissionId);
+        if (!selectedSnap.exists) {
+          throw makeVisitSubmissionError('invalid-argument', 'Main presentation submission not found.');
+        }
+        assertPrimaryPresentationSubmission(
+          { id: selectedSnap.id, ...(selectedSnap.data || {}) },
+          updates.primaryPresentationSubmissionId,
+          visitType,
+          positionKey
+        );
+      }
+      const diff = safeDiff(snap.data, updates);
+      changedFields = Object.keys(diff);
+      changes = diff;
+      if (changedFields.length) {
+        tx.updateDoc('visitSubmissionPositions', docId, {
+          ...updates,
+          updatedAt: now,
+          updatedBy: uid,
+        });
+      }
+    });
+    if (changedFields.length) {
       await adapter.addDoc('visitSubmissionAudit', buildAuditPayload('visitFolderUpdated', access, {
         visitType,
         positionKey,
-        details: { changedFields: Object.keys(diff), changes: diff },
+        details: { changedFields, changes },
       }, now));
     }
-    return { ok: true, visitType, positionKey, changedFields: Object.keys(diff) };
+    return { ok: true, visitType, positionKey, changedFields };
   }
 
   function normalizeUploadFileDescriptors(files, folder, visitType, positionKey) {
@@ -1829,6 +1969,8 @@ function createVisitSubmissionService(options) {
       const activeFileCount = Math.max(0, Number(folder.activeFileCount || 0));
       const reservedFileCount = Math.max(0, Number(folder.reservedFileCount || 0));
       const replacingSubmissionId = session.replacesSubmissionId || null;
+      const currentPrimaryPresentationSubmissionId = safePrimaryPresentationSubmissionId(folder.primaryPresentationSubmissionId);
+      let nextPrimaryPresentationSubmissionId = currentPrimaryPresentationSubmissionId;
       const submission = {
         submissionId,
         visitType: session.visitType,
@@ -1876,6 +2018,11 @@ function createVisitSubmissionService(options) {
           updatedAt: adapter.serverTimestamp(),
         });
         nextActiveFileCount = activeFileCount;
+        if (currentPrimaryPresentationSubmissionId === replacingSubmissionId) {
+          nextPrimaryPresentationSubmissionId = access.canManageVisitSystem === true && canUseAsPrimaryPresentation(submission)
+            ? submissionId
+            : '';
+        }
       }
 
       const nextFiles = expectedFiles.map(file => (
@@ -1897,14 +2044,18 @@ function createVisitSubmissionService(options) {
         completionProofUsed: true,
         submissionId,
       });
-      tx.updateDoc('visitSubmissionPositions', folderId, {
+      const folderUpdates = {
         activeFileCount: nextActiveFileCount,
         reservedFileCount: Math.max(0, reservedFileCount - 1),
         driveFolderId: folder.driveFolderId || driveFolderId,
         driveFolderStatus: 'ready',
         updatedAt: adapter.serverTimestamp(),
         updatedBy: uid,
-      });
+      };
+      if (nextPrimaryPresentationSubmissionId !== currentPrimaryPresentationSubmissionId) {
+        folderUpdates.primaryPresentationSubmissionId = nextPrimaryPresentationSubmissionId;
+      }
+      tx.updateDoc('visitSubmissionPositions', folderId, folderUpdates);
 
       result = { ok: true, submissionId, visitType: session.visitType, positionKey: session.positionKey };
     });
@@ -2006,11 +2157,15 @@ function createVisitSubmissionService(options) {
       const folderSnap = await tx.getDoc('visitSubmissionPositions', folderId);
       if (folderSnap.exists) {
         const folder = folderSnap.data || {};
-        tx.updateDoc('visitSubmissionPositions', folderId, {
+        const folderUpdates = {
           activeFileCount: Math.max(0, Number(folder.activeFileCount || 0) - 1),
           updatedAt: adapter.serverTimestamp(),
           updatedBy: uid,
-        });
+        };
+        if (safePrimaryPresentationSubmissionId(folder.primaryPresentationSubmissionId) === submissionId) {
+          folderUpdates.primaryPresentationSubmissionId = '';
+        }
+        tx.updateDoc('visitSubmissionPositions', folderId, folderUpdates);
       }
       const status = mode === 'withdraw' ? 'archived' : 'admin-removed';
       tx.updateDoc('visitSubmissions', submissionId, {
@@ -2086,17 +2241,27 @@ function createVisitSubmissionService(options) {
     if (!folderSnap.exists) throw makeVisitSubmissionError('not-found', 'Visit Submission structure is incomplete.');
     const previousActiveFileCount = Math.max(0, Number(folderSnap.data?.activeFileCount || 0));
     const previousReservedFileCount = Math.max(0, Number(folderSnap.data?.reservedFileCount || 0));
+    const currentPrimaryPresentationSubmissionId = safePrimaryPresentationSubmissionId(folderSnap.data?.primaryPresentationSubmissionId);
     const reservedStatuses = new Set(['reserved', 'ticket-consumed', 'drive-upload-completed']);
     const reservedFileCount = activeSessions.reduce((sum, session) => {
       const files = Array.isArray(session.data.expectedFiles) ? session.data.expectedFiles : [];
       return sum + files.filter(file => reservedStatuses.has(file.status)).length;
     }, 0);
-    await adapter.updateDoc('visitSubmissionPositions', folderId, {
+    const primaryStillValid = currentPrimaryPresentationSubmissionId
+      ? activeDocs.some(doc => (
+        doc.id === currentPrimaryPresentationSubmissionId
+        && isActivePrimaryPresentationSubmission(doc.data || {})
+        && canUseAsPrimaryPresentation(doc.data || {})
+      ))
+      : true;
+    const updates = {
       activeFileCount: activeDocs.length,
       reservedFileCount,
       updatedAt: adapter.serverTimestamp(),
       updatedBy: uid,
-    });
+    };
+    if (!primaryStillValid) updates.primaryPresentationSubmissionId = '';
+    await adapter.updateDoc('visitSubmissionPositions', folderId, updates);
     await adapter.addDoc('visitSubmissionAudit', buildAuditPayload('visitFolderCountReconciled', access, {
       visitType,
       positionKey,
@@ -2106,6 +2271,7 @@ function createVisitSubmissionService(options) {
         previousReservedFileCount,
         newReservedFileCount: reservedFileCount,
         activeSessionCount: activeSessions.length,
+        primaryPresentationCleared: !primaryStillValid,
       },
     }, adapter.serverTimestamp()));
     return { ok: true, visitType, positionKey, activeFileCount: activeDocs.length, reservedFileCount };
@@ -2180,6 +2346,8 @@ module.exports = {
   VISIT_ALLOWED_MIME_BY_EXTENSION,
   VISIT_DANGEROUS_EXTENSIONS,
   VISIT_SUBMISSION_STATUSES,
+  PRIMARY_PRESENTATION_MIME_TYPES,
+  PRIMARY_PRESENTATION_EXTENSIONS,
   makeVisitSubmissionError,
   hashSecret,
   sanitizeVisitFileName,
@@ -2201,6 +2369,10 @@ module.exports = {
   buildVisitConfigDefaults,
   buildVisitPositionDefaults,
   buildAuditPayload,
+  safePrimaryPresentationPreviewUrl,
+  isPrimaryPresentationEligibleSubmission,
+  canUseAsPrimaryPresentation,
+  isActivePrimaryPresentationSubmission,
   submissionActionPermissions,
   shapeSubmission,
   buildFolderResponse,

@@ -361,8 +361,10 @@ test('Firestore rules centralize President authority and block client assignment
   assert(rules.includes('function hasPresidentAuthority()'), 'rules define hasPresidentAuthority');
   assert(rules.includes('function hasActivePresidentAssignment()'), 'rules define canonical active President assignment authority');
   assert(rules.includes('function presidentAssignmentPath()'), 'rules centralize canonical President assignment path');
+  assert(rules.includes('function websiteDirectorAssignmentPath()'), 'rules centralize canonical Website Director assignment path');
   assert(rules.includes('"president_" + request.auth.uid'), 'rules use canonical President assignment');
-  assert(rules.includes('bodPositionOccupancy/cwd'), 'rules use server-maintained cwd occupancy');
+  assert(rules.includes('"cwd_" + request.auth.uid'), 'rules use canonical Website Director assignment');
+  assert(!rules.includes('bodPositionOccupancy/cwd'), 'rules no longer use stale cwd occupancy for authority');
   assert(/match \/bodPositionAssignments\/\{assignmentId\}[\s\S]*allow write: if false;/.test(rules), 'clients cannot write assignments');
   assert(/match \/bodPositionOccupancy\/\{positionKey\}[\s\S]*allow write: if false;/.test(rules), 'clients cannot write occupancy');
   assert(rules.includes('function hasLockTools()'), 'rules define focused lock tools authority');

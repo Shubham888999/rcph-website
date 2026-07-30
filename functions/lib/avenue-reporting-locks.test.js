@@ -239,6 +239,9 @@ test('submitBodEvent and updateBodEvent call avenue lock enforcement after paylo
   const indexSource = readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
   assert.match(indexSource, /const avenueReportingLocks = require\('\.\/lib\/avenue-reporting-locks'\);/);
   assert.match(indexSource, /async function loadActiveAvenueReportingLocks\(\)/);
+  assert.match(indexSource, /exports\.getBodToolsLockState = onCall/);
+  assert.match(indexSource, /shapeBodEventLockState\(bodEventsLock\)/);
+  assert.match(indexSource, /locks\.map\(shapeAvenueReportingLockState\)/);
   assert.match(indexSource, /async function assertBodEventAvenuesUnlocked\(avenues\)/);
   assert.match(indexSource, /async function getActiveBodPositionKeysForUser\(uid\)/);
   assert.match(indexSource, /const dashboardPositionKeys = mergePositionKeysForDashboard\(/);

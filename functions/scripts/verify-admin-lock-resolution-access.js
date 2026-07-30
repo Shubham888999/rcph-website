@@ -202,7 +202,8 @@ assert.equal(canManageResolutions({ role: 'bod', userActive: true, userApproved:
 assert.equal(canManageResolutions({ role: 'gbm', userActive: true, userApproved: true, secretaryAssignmentActive: false }), false);
 assert.equal(canManageResolutions({ role: 'prospect', userActive: true, userApproved: true, secretaryAssignmentActive: false }), false);
 
-assert.match(rules, /function hasApprovedActiveRole\(role\)[\s\S]*get\(userPath\(\)\)\.data\.get\('status', ''\) == 'approved'[\s\S]*get\(userPath\(\)\)\.data\.get\('active', true\) != false/, 'rules require approved active user for focused role checks');
+assert.match(rules, /function isApprovedActiveRecord\(data\)[\s\S]*data\.get\('status', ''\) == 'approved'[\s\S]*isActiveLifecycleRecord\(data\)/, 'rules centralize approved active lifecycle checks');
+assert.match(rules, /function hasApprovedActiveRole\(role\)[\s\S]*get\(userPath\(\)\)\.data\.role == role[\s\S]*isApprovedActiveRecord\(get\(rolePath\(\)\)\.data\)[\s\S]*isApprovedActiveRecord\(get\(userPath\(\)\)\.data\)/, 'rules require approved active user and role records for focused role checks');
 assert.match(rules, /function hasLockTools\(\)[\s\S]*hasApprovedActiveRole\('admin'\)[\s\S]*hasApprovedActiveRole\('president'\)[\s\S]*hasPresidentAuthority\(\)/, 'rules define lock tools without SAA');
 assert.doesNotMatch(bodyOfFunction(rules, 'hasLockTools'), /saa|Sergeant|hasSergeant/i, 'rules lock tools do not include SAA');
 assert.match(rules, /match \/locks\/\{panelId\}[\s\S]*allow create, update, delete: if hasLockTools\(\);/, 'direct lock writes use focused lock tools');

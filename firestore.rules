@@ -14,72 +14,97 @@ service cloud.firestore {
       return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
-    function websiteDirectorOccupancyPath() {
-      return /databases/$(database)/documents/bodPositionOccupancy/cwd;
-    }
-
     function presidentAssignmentPath() {
       return /databases/$(database)/documents/bodPositionAssignments/$(("president_" + request.auth.uid));
     }
+
+    function websiteDirectorAssignmentPath() {
+      return /databases/$(database)/documents/bodPositionAssignments/$(("cwd_" + request.auth.uid));
+    }
+
     function saaAssignmentPath() {
   return /databases/$(database)/documents/bodPositionAssignments/$(("saa_" + request.auth.uid));
 }
-    function hasRole(role) {
-      return signedIn()
-        && exists(rolePath())
-        && get(rolePath()).data.role == role
-        && get(rolePath()).data.get('status', 'approved') == 'approved';
+
+    function hasNoTerminalLifecycleFields(data) {
+      return !data.keys().hasAny([
+        'revokedAt',
+        'disabledAt',
+        'inactiveAt',
+        'deletedAt',
+        'archivedAt',
+        'removedAt',
+        'endedAt',
+        'historicalAt'
+      ]);
+    }
+
+    function hasNoExpiredLifecycle(data) {
+      return !data.keys().hasAny(['expiresAt'])
+        || (data.expiresAt is timestamp && request.time < data.expiresAt);
+    }
+
+    function isActiveLifecycleRecord(data) {
+      return data.get('active', true) != false
+        && data.get('disabled', false) != true
+        && data.get('deleted', false) != true
+        && data.get('archived', false) != true
+        && data.get('removed', false) != true
+        && data.get('accessRevoked', false) != true
+        && hasNoTerminalLifecycleFields(data)
+        && hasNoExpiredLifecycle(data);
+    }
+
+    function isApprovedActiveRecord(data) {
+      return data.get('status', '') == 'approved'
+        && isActiveLifecycleRecord(data);
     }
 
     function hasApprovedActiveRole(role) {
-      return hasRole(role)
+      return signedIn()
+        && exists(rolePath())
         && exists(userPath())
-        && get(userPath()).data.get('status', '') == 'approved'
-        && get(userPath()).data.get('active', true) != false;
+        && get(rolePath()).data.role == role
+        && get(userPath()).data.role == role
+        && isApprovedActiveRecord(get(rolePath()).data)
+        && isApprovedActiveRecord(get(userPath()).data);
     }
 
     function hasAnyRole(roles) {
       return signedIn()
         && exists(rolePath())
         && get(rolePath()).data.role in roles
-        && get(rolePath()).data.get('status', 'approved') == 'approved';
+        && exists(userPath())
+        && get(userPath()).data.role == get(rolePath()).data.role
+        && isApprovedActiveRecord(get(rolePath()).data)
+        && isApprovedActiveRecord(get(userPath()).data);
+    }
+
+    function hasActivePositionAssignment(assignmentPath, positionKey) {
+      return exists(assignmentPath)
+        && get(assignmentPath).data.positionKey == positionKey
+        && get(assignmentPath).data.uid == request.auth.uid
+        && get(assignmentPath).data.active == true
+        && get(assignmentPath).data.get('status', 'active') in ['active', 'approved']
+        && isActiveLifecycleRecord(get(assignmentPath).data);
     }
 
     function hasActivePresidentAssignment() {
       return hasAnyRole(['bod', 'admin', 'president'])
-        && exists(userPath())
-        && get(userPath()).data.get('status', '') == 'approved'
-        && get(userPath()).data.get('active', true) != false
         && get(userPath()).data.get('positionKeys', []).hasAny(['president'])
-        && exists(presidentAssignmentPath())
-        && get(presidentAssignmentPath()).data.positionKey == 'president'
-        && get(presidentAssignmentPath()).data.uid == request.auth.uid
-        && get(presidentAssignmentPath()).data.active == true;
+        && hasActivePositionAssignment(presidentAssignmentPath(), 'president');
     }
 
 function hasActiveSaaAssignment() {
   return hasAnyRole(['bod', 'admin', 'president'])
-    && exists(userPath())
-    && get(userPath()).data.get('status', '') == 'approved'
-    && get(userPath()).data.get('active', true) != false
     && get(userPath()).data.get('positionKeys', []).hasAny(['saa'])
-    && exists(saaAssignmentPath())
-    && get(saaAssignmentPath()).data.positionKey == 'saa'
-    && get(saaAssignmentPath()).data.uid == request.auth.uid
-    && get(saaAssignmentPath()).data.active == true;
+    && hasActivePositionAssignment(saaAssignmentPath(), 'saa');
 }
 
     function hasWebsiteDirectorPosition() {
-      return signedIn()
-        && hasAnyRole(['bod', 'admin', 'president'])
-        && exists(userPath())
-        && get(userPath()).data.get('status', '') == 'approved'
-        && get(userPath()).data.get('active', true) != false
+      return hasAnyRole(['bod', 'admin', 'president'])
         && get(userPath()).data.get('positionKeys', []).hasAny(['cwd'])
-        && exists(websiteDirectorOccupancyPath())
-        && get(websiteDirectorOccupancyPath()).data.positionKey == 'cwd'
-        && get(websiteDirectorOccupancyPath()).data.active == true
-        && get(websiteDirectorOccupancyPath()).data.get('holderUids', []).hasAny([request.auth.uid]);
+        && hasActivePositionAssignment(websiteDirectorAssignmentPath(), 'cwd');
     }
 
     function hasPresidentAuthority() {
@@ -87,7 +112,8 @@ function hasActiveSaaAssignment() {
     }
 
 function isAdmin() {
-  return hasRole('admin')
+  return hasApprovedActiveRole('admin')
+    || hasApprovedActiveRole('president')
     || hasPresidentAuthority()
     || hasActiveSaaAssignment();
 }
@@ -99,7 +125,7 @@ function hasAdminPanelAuthority() {
     || hasActiveSaaAssignment();
 }
     function isApprovedBod() {
-      return hasRole('bod') || isAdmin();
+      return hasApprovedActiveRole('bod') || isAdmin();
     }
 
     function hasLockTools() {
@@ -179,7 +205,8 @@ function isFineLinkedTreasury(data) {
     }
 
     match /roles/{uid} {
-      allow read: if signedIn();
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
       allow write: if false;
     }
 
@@ -364,7 +391,7 @@ match /treasury/{transactionId} {
       allow read, create, update, delete: if hasAdminPanelAuthority();
     }
     match /locks/{panelId} {
-      allow read: if signedIn();
+      allow read: if hasAdminPanelAuthority();
       allow create, update, delete: if hasLockTools();
     }
 
