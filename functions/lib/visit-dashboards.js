@@ -44,6 +44,48 @@ const AVENUE_LABELS = Object.freeze({
   CLUB: 'Club',
   OTHER: 'Other',
 });
+const EVENT_AVENUE_ORDER = Object.freeze([
+  'ISD',
+  'CMD',
+  'CSD',
+  'PDD',
+  'RRRO',
+  'PRO',
+  'DEI',
+]);
+
+const EVENT_AVENUE_CODE_SET = new Set(EVENT_AVENUE_ORDER);
+
+const EVENT_AVENUE_ALIASES = Object.freeze({
+  isd: 'ISD',
+  internationalservice: 'ISD',
+  internationalserviceavenue: 'ISD',
+
+  cmd: 'CMD',
+  communityservice: 'CMD',
+  communityserviceavenue: 'CMD',
+
+  csd: 'CSD',
+  clubservice: 'CSD',
+  clubserviceavenue: 'CSD',
+
+  pdd: 'PDD',
+  professionaldevelopment: 'PDD',
+  professionaldevelopmentavenue: 'PDD',
+
+  rrro: 'RRRO',
+  rotaryrotaractrelations: 'RRRO',
+  rotaryrotaractrelationsofficer: 'RRRO',
+  rotaryrotaractrelationsavenue: 'RRRO',
+
+  pro: 'PRO',
+  publicrelations: 'PRO',
+  publicrelationsavenue: 'PRO',
+
+  dei: 'DEI',
+  diversityequityandinclusion: 'DEI',
+  diversityequityandinclusionavenue: 'DEI',
+});
 const ATTENDANCE_STATUSES = Object.freeze(['present', 'absent', 'late', 'excused', 'unknown']);
 const MAX_OFFICIAL_NAMES = 12;
 const MAX_OFFICIAL_NAME_LENGTH = 160;
@@ -571,14 +613,85 @@ function summarizeMembers(rawMembers, rawUsers = []) {
   };
 }
 
+function normalizeAvenueLookupKey(value) {
+  return normalizeText(value, 120)
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function normalizeEventAvenueCode(value) {
+  const raw = normalizeText(value, 120);
+  if (!raw) return '';
+
+  const directCode = raw
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
+  if (EVENT_AVENUE_CODE_SET.has(directCode)) {
+    return directCode;
+  }
+
+  return EVENT_AVENUE_ALIASES[normalizeAvenueLookupKey(raw)] || '';
+}
+
 function normalizeAvenuesForSummary(value) {
-  const input = Array.isArray(value) ? value : (value ? [value] : []);
-  const cleaned = input.map(item => normalizeText(item, 60)).filter(Boolean);
-  if (!cleaned.length) return ['Other'];
-  return [...new Set(cleaned.map((item) => {
-    const upper = item.toUpperCase();
-    return /^[A-Z0-9 &-]{1,20}$/.test(upper) ? upper : item;
-  }))];
+  const selected = new Set();
+
+  const collect = (item) => {
+    if (Array.isArray(item)) {
+      item.forEach(collect);
+      return;
+    }
+
+    if (item && typeof item === 'object') {
+      collect([
+        item.avenueCode,
+        item.code,
+        item.avenue,
+        item.avenueName,
+        item.name,
+        item.label,
+        item.value,
+      ]);
+      return;
+    }
+
+    const raw = normalizeText(item, 240);
+    if (!raw) return;
+
+    const directCode = normalizeEventAvenueCode(raw);
+
+    if (directCode) {
+      selected.add(directCode);
+      return;
+    }
+
+    raw
+      .split(/\s*(?:,|;|\/|\||\+|\band\b)\s*/i)
+      .forEach((part) => {
+        const code = normalizeEventAvenueCode(part);
+        if (code) selected.add(code);
+      });
+  };
+
+  collect(value);
+
+  return EVENT_AVENUE_ORDER.filter(
+    avenueCode => selected.has(avenueCode)
+  );
+}
+
+function resolveEventAvenueCodes(event) {
+  return normalizeAvenuesForSummary([
+    event?.avenueCodes,
+    event?.associatedAvenueCodes,
+    event?.associatedAvenues,
+    event?.avenues,
+    event?.avenue,
+    event?.avenueCode,
+    event?.avenueName,
+  ]);
 }
 
 function avenueNameForCode(avenueCode) {
@@ -604,9 +717,12 @@ function summarizeEvents(rawEvents) {
   const events = (Array.isArray(rawEvents) ? rawEvents : []).filter(isDashboardClubEvent);
   const avenueCounts = new Map();
   events.forEach((event) => {
-    normalizeAvenuesForSummary(event.avenue || event.avenues).forEach((avenueCode) => {
-      avenueCounts.set(avenueCode, (avenueCounts.get(avenueCode) || 0) + 1);
-    });
+resolveEventAvenueCodes(event).forEach((avenueCode) => {
+  avenueCounts.set(
+    avenueCode,
+    (avenueCounts.get(avenueCode) || 0) + 1
+  );
+});
   });
   return {
     totalEvents: events.length,
@@ -969,16 +1085,36 @@ function normalizeAttendanceStatus(value) {
 }
 
 function attendanceColumnFromDoc(doc, fallbackAvenueCode = '') {
-  const source = doc?.data && typeof doc.data === 'object' ? doc.data : {};
-  const eventId = normalizeSafeId(source.id || doc?.id, 160);
+  const source = doc?.data && typeof doc.data === 'object'
+    ? doc.data
+    : {};
+
+  const eventId = normalizeSafeId(
+    source.id || doc?.id,
+    160
+  );
+
   if (!eventId) return null;
-  const title = normalizeText(source.name || source.title || source.meetingTitle, 180) || 'Untitled record';
-  const avenueCode = firstAvenueCode(source.avenue || source.avenues, fallbackAvenueCode);
+
+  const title = normalizeText(
+    source.name || source.title || source.meetingTitle,
+    180
+  ) || 'Untitled record';
+
+  const avenueCodes = resolveEventAvenueCodes(source);
+
+  const avenueCode = avenueCodes[0]
+    || firstAvenueCode(
+      source.avenue || source.avenues,
+      fallbackAvenueCode
+    );
+
   return {
     eventId,
     title,
     date: dateOnly(source.date || source.eventStart),
     avenueCode,
+    avenueCodes,
     avenueName: avenueNameForCode(avenueCode),
   };
 }
@@ -1541,9 +1677,10 @@ module.exports = {
   createVisitDashboardService,
   isPrimaryPresentationDocument,
   makeVisitDashboardError,
-  normalizeOfficialDisplayNames,
-  normalizeVisiblePositionKeys,
-  normalizeVisitType,
+normalizeOfficialDisplayNames,
+normalizeVisiblePositionKeys,
+normalizeVisitType,
+resolveEventAvenueCodes,
   shapeVisitDashboardConfig,
   summarizeEvents,
   summarizeMembers,

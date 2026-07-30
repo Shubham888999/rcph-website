@@ -454,6 +454,37 @@ assert.equal(JSON.stringify(finesSummary).includes('private fine audit'), false,
 assertNoSensitivePayload(finesSummary);
 
 (async () => {
+  assert.deepEqual(
+    dashboards.resolveEventAvenueCodes({
+      avenue: ['CSD', 'RRRO'],
+    }),
+    ['CSD', 'RRRO'],
+    'joint event resolves both CSD and RRRO'
+  );
+
+  assert.deepEqual(
+    dashboards.resolveEventAvenueCodes({
+      avenue: [
+        'Club Service',
+        'Rotary-Rotaract Relations',
+      ],
+    }),
+    ['CSD', 'RRRO'],
+    'avenue names normalize to canonical codes'
+  );
+
+  assert.deepEqual(
+    dashboards.resolveEventAvenueCodes({
+      avenue: ['CSD', 'RRRO', 'RRRO', 'GBM'],
+      associatedAvenues: [
+        { code: 'RRRO' },
+        { label: 'Club Service Avenue' },
+      ],
+    }),
+    ['CSD', 'RRRO'],
+    'duplicate avenues are deduplicated and GBM is excluded'
+  );
+
   const source = fs.readFileSync(path.join(repoRoot, 'functions', 'index.js'), 'utf8');
   const block = source.slice(
     source.indexOf('exports.getVisitDashboardData = onCall'),
@@ -535,11 +566,120 @@ assertNoSensitivePayload(finesSummary);
   assert.equal(districtByDefault.stats.unknownGenderMembers, 1);
   assert.equal(districtByDefault.stats.maleFemaleRatio, '1:1');
   assert.equal(districtByDefault.stats.totalEvents, 2);
-  assert.deepEqual(districtByDefault.stats.avenueEventCounts, [
-    { avenueCode: 'CMD', avenueName: 'Community Service', count: 1 },
-    { avenueCode: 'CSD', avenueName: 'Club Service', count: 1 },
-    { avenueCode: 'Other', avenueName: 'Other', count: 1 },
-  ]);
+assert.deepEqual(districtByDefault.stats.avenueEventCounts, [
+  { avenueCode: 'CMD', avenueName: 'Community Service', count: 1 },
+  { avenueCode: 'CSD', avenueName: 'Club Service', count: 1 },
+]);
+const jointEventDashboard = await createService({
+  events: {
+    jointEventOne: {
+      name: 'Joint Club Fellowship',
+      date: '2026-07-20',
+      avenue: ['CSD', 'RRRO'],
+      type: 'clubEvent',
+      visibility: 'public',
+    },
+
+    jointEventTwo: {
+      name: 'Rotary Connect',
+      date: '2026-07-21',
+      avenue: [
+        'Club Service',
+        'Rotary-Rotaract Relations',
+      ],
+      associatedAvenues: [
+        { code: 'RRRO' },
+        { label: 'Club Service Avenue' },
+      ],
+      type: 'clubEvent',
+      visibility: 'public',
+    },
+
+    gbmEvent: {
+      name: 'General Body Meeting',
+      date: '2026-07-22',
+      avenue: ['GBM'],
+      type: 'clubEvent',
+      visibility: 'public',
+    },
+  },
+
+  attendance: {},
+}).getDashboardData(approvedContext());
+
+assert.equal(
+  jointEventDashboard.stats.totalEvents,
+  3,
+  'all three club-event records remain part of total event statistics'
+);
+
+assert.deepEqual(
+  jointEventDashboard.stats.avenueEventCounts,
+  [
+    {
+      avenueCode: 'CSD',
+      avenueName: 'Club Service',
+      count: 2,
+    },
+    {
+      avenueCode: 'RRRO',
+      avenueName: 'Rotary-Rotaract Relations',
+      count: 2,
+    },
+  ],
+  'joint events count under every associated event avenue while GBM is excluded'
+);
+
+assert.equal(
+  jointEventDashboard.stats.avenueEventCounts.some(
+    row => row.avenueCode === 'GBM'
+  ),
+  false,
+  'GBM is not returned as an Avenue-wise Events row'
+);
+
+const jointEventOneColumn =
+  jointEventDashboard.attendance.club.columns.find(
+    column => column.eventId === 'jointEventOne'
+  );
+
+const jointEventTwoColumn =
+  jointEventDashboard.attendance.club.columns.find(
+    column => column.eventId === 'jointEventTwo'
+  );
+
+assert.ok(
+  jointEventOneColumn,
+  'first joint event is included in the safe attendance columns'
+);
+
+assert.ok(
+  jointEventTwoColumn,
+  'second joint event is included in the safe attendance columns'
+);
+
+assert.deepEqual(
+  jointEventOneColumn.avenueCodes,
+  ['CSD', 'RRRO'],
+  'first joint event exposes both associated avenue codes'
+);
+
+assert.deepEqual(
+  jointEventTwoColumn.avenueCodes,
+  ['CSD', 'RRRO'],
+  'second joint event normalizes and deduplicates all associated avenues'
+);
+
+assert.equal(
+  Object.prototype.hasOwnProperty.call(
+    jointEventOneColumn,
+    'associatedAvenues'
+  ),
+  false,
+  'raw associated avenue records are not exposed'
+);
+
+assertNoSensitivePayload(jointEventDashboard);
   assert.equal(districtByDefault.stats.treasuryIncome, 1000);
   assert.equal(districtByDefault.stats.treasuryExpense, 350.5);
   assert.equal(districtByDefault.stats.treasuryNet, 649.5);
@@ -938,16 +1078,33 @@ assertNoSensitivePayload(finesSummary);
   assert.equal(districtByDefault.attendance.club.summary.averageMemberAttendanceRate, 50);
   assert.equal(districtByDefault.attendance.club.columns.map(column => column.eventId).join(','), 'e1,e5');
   assert.deepEqual(
-    districtByDefault.attendance.club.columns.map(column => ({
-      eventId: column.eventId,
-      attendedCount: column.attendedCount,
-      eligibleCount: column.eligibleCount,
-      attendanceRate: column.attendanceRate,
-    })),
+districtByDefault.attendance.club.columns.map(column => ({
+  eventId: column.eventId,
+  avenueCode: column.avenueCode,
+  avenueCodes: column.avenueCodes,
+  attendedCount: column.attendedCount,
+  eligibleCount: column.eligibleCount,
+  attendanceRate: column.attendanceRate,
+})),
     [
-      { eventId: 'e1', attendedCount: 2, eligibleCount: 3, attendanceRate: 67 },
-      { eventId: 'e5', attendedCount: 0, eligibleCount: 1, attendanceRate: 0 },
-    ]
+[
+  {
+    eventId: 'e1',
+    avenueCode: 'CMD',
+    avenueCodes: ['CMD', 'CSD'],
+    attendedCount: 2,
+    eligibleCount: 3,
+    attendanceRate: 67,
+  },
+  {
+    eventId: 'e5',
+    avenueCode: 'CLUB',
+    avenueCodes: [],
+    attendedCount: 0,
+    eligibleCount: 1,
+    attendanceRate: 0,
+  },
+]
   );
   assert.equal(districtByDefault.attendance.club.rows.find(row => row.name === 'Private One').cells.e1, 'present');
   assert.equal(districtByDefault.attendance.club.rows.find(row => row.name === 'Private One').attendanceRate, 50);
