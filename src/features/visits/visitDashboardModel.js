@@ -47,6 +47,7 @@ export const VISIT_ATTENDANCE_TABS = Object.freeze([
 const VISIT_ATTENDANCE_TAB_KEYS = new Set(VISIT_ATTENDANCE_TABS.map((tab) => tab.key));
 const ATTENDANCE_STATUSES = new Set(["present", "absent", "late", "excused", "unknown"]);
 const TREASURY_TYPES = new Set(["income", "expense", "unknown"]);
+const FINE_STATUSES = new Set(["paid", "pending", "waived", "unknown"]);
 const ATTENDANCE_ROLE_CODES = Object.freeze({
   admin: "Admin",
   avenuechair: "Chair",
@@ -673,6 +674,105 @@ function normalizeTreasury(raw) {
   };
 }
 
+function fineReasonLabel(value) {
+  const reason = text(value, 180);
+  const key = reason.toLowerCase();
+  if (key === "missing_badge") return "Missing badge";
+  if (key === "late") return "Late to event/meeting";
+  return reason
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function normalizeFineStatus(raw) {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const statusText = [
+    source.status,
+    source.paymentStatus,
+    source.fineStatus,
+    source.collectionStatus,
+    source.paidStatus,
+  ].map((value) => text(value, 80).toLowerCase()).filter(Boolean).join(" ");
+
+  if (source.waived === true || /\b(waived|forgiven|cancelled|canceled)\b/.test(statusText)) return "waived";
+  if (/\b(pending|unpaid|due|open|outstanding)\b/.test(statusText)) return "pending";
+  if (/\b(paid|collected|settled|complete|completed|closed)\b/.test(statusText)) return "paid";
+  if (source.paid === true || source.collected === true || source.settled === true || text(source.treasuryEntryId, 128)) return "paid";
+  if (source.paid === false || source.collected === false || source.settled === false) return "pending";
+
+  const direct = text(source.status, 20).toLowerCase();
+  return FINE_STATUSES.has(direct) ? direct : "unknown";
+}
+
+function normalizeFineRow(raw, index = 0) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const amount = rowAmount(raw.amount);
+  const date = dateOnly(raw.date || raw.fineDate || raw.eventDate);
+  const memberName = text(raw.memberName || raw.member || raw.name, 160);
+  const reason = fineReasonLabel(raw.reason || raw.title || raw.description || raw.eventName);
+  if (amount === null || !date || !memberName || !reason) return null;
+  return {
+    fineKey: safeId(raw.fineKey, 180) || `fine-${index + 1}`,
+    memberName,
+    reason,
+    title: text(raw.title || raw.eventName, 180),
+    amount,
+    status: normalizeFineStatus(raw),
+    date,
+    notes: text(raw.notes || raw.note || raw.remarks, 500),
+  };
+}
+
+function summarizeFineRows(rows) {
+  const summary = rows.reduce((totals, row) => {
+    totals.totalAmount += row.amount;
+    if (row.status === "paid") {
+      totals.paidFines += 1;
+      totals.collectedAmount += row.amount;
+    } else if (row.status !== "waived") {
+      totals.pendingFines += 1;
+      totals.pendingAmount += row.amount;
+    }
+    return totals;
+  }, {
+    paidFines: 0,
+    pendingFines: 0,
+    totalAmount: 0,
+    collectedAmount: 0,
+    pendingAmount: 0,
+  });
+
+  return {
+    totalFines: rows.length,
+    paidFines: summary.paidFines,
+    pendingFines: summary.pendingFines,
+    totalAmount: money(summary.totalAmount),
+    collectedAmount: money(summary.collectedAmount),
+    pendingAmount: money(summary.pendingAmount),
+  };
+}
+
+function normalizeFines(raw) {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const rows = Array.isArray(source.rows)
+    ? source.rows.map(normalizeFineRow).filter(Boolean)
+    : [];
+  const derived = summarizeFineRows(rows);
+  const summary = source.summary && typeof source.summary === "object" ? source.summary : {};
+  return {
+    summary: {
+      totalFines: count(summary.totalFines ?? derived.totalFines),
+      paidFines: count(summary.paidFines ?? derived.paidFines),
+      pendingFines: count(summary.pendingFines ?? derived.pendingFines),
+      totalAmount: money(summary.totalAmount ?? derived.totalAmount),
+      collectedAmount: money(summary.collectedAmount ?? derived.collectedAmount),
+      pendingAmount: money(summary.pendingAmount ?? derived.pendingAmount),
+    },
+    rows,
+  };
+}
+
 export function visitTypeFromSlug(slug) {
   return VISIT_TYPE_BY_SLUG[text(slug, 80)] || "";
 }
@@ -703,6 +803,7 @@ export function normalizeVisitDashboardData(raw, fallbackVisitType = "") {
     stats: normalizeStats(source.stats),
     documentPanels: normalizeDocumentPanels(source.documentPanels),
     attendance: normalizeAttendance(source.attendance),
+    fines: normalizeFines(source.fines),
     treasury: normalizeTreasury(source.treasury),
     generatedAt: normalizeGeneratedAt(source.generatedAt),
   };

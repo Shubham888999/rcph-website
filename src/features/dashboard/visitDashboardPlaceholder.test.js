@@ -114,6 +114,51 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
         rows: [],
       },
     },
+    fines: {
+      summary: {
+        totalFines: 3,
+        paidFines: 1,
+        pendingFines: 1,
+        totalAmount: 175,
+        collectedAmount: 100,
+        pendingAmount: 50,
+        createdByEmail: "private@example.test",
+      },
+      rows: [{
+        fineKey: "safe-fine-1",
+        fineId: "raw-fine-1",
+        memberId: "private-member",
+        memberName: "Rtr. Fine Member",
+        reason: "late",
+        title: "BOD Meeting 2",
+        amount: 100,
+        status: "paid",
+        date: "2026-07-16",
+        notes: "Safe public note",
+        createdByUid: "private-uid",
+      }, {
+        fineKey: "safe-fine-2",
+        memberName: "Pending Member",
+        reason: "missing_badge",
+        title: "Club Event",
+        amount: 50,
+        paymentStatus: "unpaid",
+        date: "2026-07-15",
+      }, {
+        fineKey: "safe-fine-3",
+        memberName: "Waived Member",
+        reason: "late",
+        amount: 25,
+        status: "waived",
+        date: "2026-07-14",
+      }, {
+        fineKey: "bad/fine",
+        memberName: "Unsafe Fine",
+        reason: "late",
+        amount: 10,
+        date: "not-a-date",
+      }],
+    },
     treasury: {
       summary: {
         income: 1500,
@@ -214,6 +259,47 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
     "BOD Attendance",
     "District Events Attendance",
   ]);
+  assert.deepEqual(normalized.fines, {
+    summary: {
+      totalFines: 3,
+      paidFines: 1,
+      pendingFines: 1,
+      totalAmount: 175,
+      collectedAmount: 100,
+      pendingAmount: 50,
+    },
+    rows: [{
+      fineKey: "safe-fine-1",
+      memberName: "Rtr. Fine Member",
+      reason: "Late to event/meeting",
+      title: "BOD Meeting 2",
+      amount: 100,
+      status: "paid",
+      date: "2026-07-16",
+      notes: "Safe public note",
+    }, {
+      fineKey: "safe-fine-2",
+      memberName: "Pending Member",
+      reason: "Missing badge",
+      title: "Club Event",
+      amount: 50,
+      status: "pending",
+      date: "2026-07-15",
+      notes: "",
+    }, {
+      fineKey: "safe-fine-3",
+      memberName: "Waived Member",
+      reason: "Late to event/meeting",
+      title: "",
+      amount: 25,
+      status: "waived",
+      date: "2026-07-14",
+      notes: "",
+    }],
+  });
+  assert.equal("fineId" in normalized.fines.rows[0], false);
+  assert.equal("memberId" in normalized.fines.rows[0], false);
+  assert.equal("createdByUid" in normalized.fines.rows[0], false);
   assert.deepEqual(normalized.treasury, {
     summary: { income: 1500, expense: 250.5, net: 1249.5, transactionCount: 2 },
     rows: [{
@@ -324,6 +410,17 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       averageMemberAttendanceLabel: "N/A",
     },
     columns: [],
+    rows: [],
+  });
+  assert.deepEqual(empty.fines, {
+    summary: {
+      totalFines: 0,
+      paidFines: 0,
+      pendingFines: 0,
+      totalAmount: 0,
+      collectedAmount: 0,
+      pendingAmount: 0,
+    },
     rows: [],
   });
   assert.deepEqual(empty.treasury, {
@@ -439,6 +536,18 @@ assert.match(pageSource, /row\.count === 0 \? "is-zero" : ""/);
   assert.match(pageSource, /visit-dashboard-attendance-role/);
   assert.match(pageSource, /visit-dashboard-attendance-col-percent/);
   assert.match(pageSource, /visit-dashboard-attendance-percent/);
+  assert.match(pageSource, /visit-dashboard-attendance-scroll-inner/);
+  assert.match(pageSource, /visit-dashboard-attendance-scroll-spacer/);
+  assert.ok(
+    pageSource.indexOf('<th className="visit-dashboard-attendance-percent-heading" scope="col">Member %</th>')
+      < pageSource.indexOf('<th className="visit-dashboard-attendance-name-heading" scope="col">Name</th>'),
+    "Member % column renders before Name",
+  );
+  assert.ok(
+    pageSource.indexOf('<th className="visit-dashboard-attendance-name-heading" scope="col">Name</th>')
+      < pageSource.indexOf('<th className="visit-dashboard-attendance-role-heading" scope="col">Role</th>'),
+    "Name column renders before Role",
+  );
   assert.match(pageSource, /Event attendance %/);
   assert.match(pageSource, /Member attendance %/);
   assert.match(pageSource, /column\.attendanceLabel/);
@@ -453,6 +562,25 @@ assert.match(pageSource, /row\.count === 0 \? "is-zero" : ""/);
   assert.match(pageSource, /No members are available for this attendance view\./);
   assert.match(pageSource, /className="visit-dashboard-attendance"/);
   assert.doesNotMatch(pageSource, /<details className="visit-dashboard-attendance"[^>]* open/);
+  assert.match(pageSource, /Fines Records/);
+  assert.match(pageSource, /Read-only fine summary and member fine register for the selected visit\./);
+  assert.match(pageSource, /visit-dashboard-fines-summary/);
+  assert.match(pageSource, /visit-dashboard-fines-table/);
+  assert.match(pageSource, /Total fines/);
+  assert.match(pageSource, /Pending \/ Unpaid/);
+  assert.match(pageSource, /Collected amount/);
+  assert.match(pageSource, /Reason \/ Title/);
+  assert.match(pageSource, /fineStatusLabel/);
+  assert.match(pageSource, /No fines have been recorded yet\./);
+  assert.match(pageSource, /<FinesRecords fines=\{fines\} \/>/);
+  assert.ok(
+    pageSource.indexOf("<AttendanceRecords attendance={attendance} />") < pageSource.indexOf("<FinesRecords fines={fines} />"),
+    "Fines section renders after Attendance Records",
+  );
+  assert.ok(
+    pageSource.indexOf("<FinesRecords fines={fines} />") < pageSource.indexOf("<TreasuryRecords treasury={treasury} />"),
+    "Fines section renders before Treasury Records",
+  );
   assert.match(pageSource, /Treasury Records/);
   assert.match(pageSource, /Read-only financial summary and transaction register for the selected visit\./);
   assert.match(pageSource, /href="\/access"/);
@@ -466,14 +594,18 @@ assert.match(pageSource, /visit-dashboard-masthead__actions/);
   assert.match(pageSource, /className="visit-dashboard-bill-link"/);
   assert.match(pageSource, /href=\{row\.billOpenUrl\}/);
   assert.match(pageSource, /visit-dashboard-bill-empty/);
-  assert.doesNotMatch(pageSource, /Category \/ Avenue/);
-  assert.doesNotMatch(pageSource, /<th scope="col">Notes<\/th>/);
+  const treasurySource = pageSource.slice(
+    pageSource.indexOf("function TreasuryRecords"),
+    pageSource.indexOf("export default function VisitDashboardPage"),
+  );
+  assert.doesNotMatch(treasurySource, /Category \/ Avenue/);
+  assert.doesNotMatch(treasurySource, /<th scope="col">Notes<\/th>/);
   assert.match(pageSource, /No treasury records are available yet\./);
   assert.match(pageSource, /totalMembers|Total members/);
   assert.match(pageSource, /treasuryIncome|Income/);
   assert.doesNotMatch(
     pageSource,
-    /adminService|getVisitDashboardConfigs|getVisitDashboardFolderOptions|addTreasury|updateTreasury|deleteTreasury|setTreasuryById|newTreasuryId|treasuryTicket|uploadTreasuryBill|buildTreasuryPayload|uploadBytes|getDownloadURL|firebase\/storage|drive\.google|driveFolderId|folderId|fileUrl|billDriveFileId|billUrl|createdBy|updatedBy|deletedBy|archivedBy|audit|canEdit|canDelete|>Upload<|>Edit<|>Delete<|>Finalize<|>Archive<|>Save<|>Mark<|>Bulk<|>Export<|"Upload"|"Edit"|"Delete"|"Finalize"|"Archive"|"Save"|"Mark"|"Bulk"|"Export"/i,
+    /adminService|getVisitDashboardConfigs|getVisitDashboardFolderOptions|addTreasury|updateTreasury|deleteTreasury|setTreasuryById|newTreasuryId|treasuryTicket|uploadTreasuryBill|buildTreasuryPayload|addFine|updateFine|deleteFine|setFine|fineTicket|fineId|memberId|uploadBytes|getDownloadURL|firebase\/storage|drive\.google|driveFolderId|folderId|fileUrl|billDriveFileId|billUrl|createdBy|updatedBy|deletedBy|archivedBy|audit|canEdit|canDelete|>Upload<|>Edit<|>Delete<|>Finalize<|>Archive<|>Save<|>Mark<|>Bulk<|>Export<|"Upload"|"Edit"|"Delete"|"Finalize"|"Archive"|"Save"|"Mark"|"Bulk"|"Export"/i,
   );
   assert.doesNotMatch(pageSource, /<button[\s\S]{0,120}>Open<\/button>/i);
   assert.doesNotMatch(pageSource, /href=\{panel\.(?:folderUrl|fileUrl)/);
@@ -504,14 +636,25 @@ assert.match(visitCssSource, /\.visit-dashboard-folder-actions \{[\s\S]*inline-f
   assert.match(visitCssSource, /\.visit-dashboard-treasury-col-bill \{[\s\S]*width: 8rem/);
   assert.match(visitCssSource, /\.visit-dashboard-bill-link \{/);
   assert.match(visitCssSource, /\.visit-dashboard-bill-empty \{/);
-  assert.match(visitCssSource, /\.visit-dashboard-attendance-panel \{[\s\S]*margin-inline: auto/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance \{[\s\S]*width: calc\(100vw - \(var\(--visit-dashboard-attendance-side-gap\) \* 2\)\)/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance \{[\s\S]*justify-self: center/);
+  assert.doesNotMatch(visitCssSource, /margin-left: calc\(50% - 50vw/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-table-wrap \{[\s\S]*overflow-x: auto/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-scroll-inner \{[\s\S]*width: max-content/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-scroll-spacer \{[\s\S]*flex: 0 0 var\(--visit-dashboard-attendance-scroll-spacer/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-summary \{[\s\S]*repeat\(auto-fit, minmax\(7rem, 1fr\)\)/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-name \{[\s\S]*white-space: nowrap/);
-  assert.match(visitCssSource, /\.visit-dashboard-attendance-col-name \{[\s\S]*width: 18rem/);
-  assert.match(visitCssSource, /\.visit-dashboard-attendance-col-percent \{[\s\S]*width: 8rem/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-col-name \{[\s\S]*width: var\(--visit-dashboard-attendance-name-width\)/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-col-percent \{[\s\S]*width: var\(--visit-dashboard-attendance-percent-width\)/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-role \{[\s\S]*white-space: nowrap/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-role-heading,\s*\.visit-dashboard-attendance-role \{[\s\S]*box-shadow:/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-status \{[\s\S]*justify-content: center/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-percent \{[\s\S]*text-align: center/);
+  assert.match(visitCssSource, /\.visit-dashboard-fines \{[\s\S]*display: grid/);
+  assert.match(visitCssSource, /\.visit-dashboard-fines-summary \{[\s\S]*repeat\(6, minmax\(7\.5rem, 1fr\)\)/);
+  assert.match(visitCssSource, /\.visit-dashboard-fines-table-wrap \{[\s\S]*overflow-x: auto/);
+  assert.match(visitCssSource, /\.visit-dashboard-fines-status\.is-paid \{/);
+  assert.match(visitCssSource, /\.visit-dashboard-fines-status\.is-pending \{/);
 assert.match(visitCssSource, /\.visit-dashboard-masthead__actions \{/);
 assert.match(visitCssSource, /\.visit-dashboard-action-link \{/);
 assert.match(visitCssSource, /\.visit-dashboard-avenue-disclosure summary \{[\s\S]*cursor: pointer/);

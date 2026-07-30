@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAuth from "../../hooks/useAuth";
@@ -357,6 +357,30 @@ function attendanceStatusMarkValue(status) {
 }
 
 function AttendanceTable({ view }) {
+  const tableWrapRef = useRef(null);
+
+  const handleAttendanceWheel = useCallback((event) => {
+    const tableWrap = tableWrapRef.current;
+    if (!tableWrap) return;
+
+    const canScrollHorizontally = tableWrap.scrollWidth > tableWrap.clientWidth + 1;
+    if (!canScrollHorizontally) return;
+
+    const mostlyVerticalWheel = Math.abs(event.deltaY) > Math.abs(event.deltaX);
+    if (!mostlyVerticalWheel) return;
+
+    const maxScrollLeft = tableWrap.scrollWidth - tableWrap.clientWidth;
+    const nextScrollLeft = Math.max(
+      0,
+      Math.min(maxScrollLeft, tableWrap.scrollLeft + event.deltaY),
+    );
+
+    if (nextScrollLeft === tableWrap.scrollLeft) return;
+
+    event.preventDefault();
+    tableWrap.scrollLeft = nextScrollLeft;
+  }, []);
+
   if (!view.columns.length) {
     return (
       <div className="visit-dashboard-empty-state">
@@ -376,78 +400,90 @@ function AttendanceTable({ view }) {
   const tableMinWidth = Math.max(1280, 560 + view.columns.length * 118);
 
   return (
-    <div className="visit-dashboard-attendance-table-wrap">
-      <table className="visit-dashboard-attendance-table" style={{ minWidth: `${tableMinWidth}px` }}>
-        <caption>Read-only attendance overview</caption>
-<colgroup>
-  <col className="visit-dashboard-attendance-col-percent" />
-  <col className="visit-dashboard-attendance-col-name" />
-  <col className="visit-dashboard-attendance-col-role" />
-  {view.columns.map((column) => (
-    <col className="visit-dashboard-attendance-col-status" key={column.eventId} />
-  ))}
-</colgroup>
-        <thead>
-          <tr>
-<th scope="col">Member %</th>
-<th scope="col">Name</th>
-<th scope="col">Role</th>
-{view.columns.map((column) => (
-  <th scope="col" key={column.eventId}>
-    <span>{column.title}</span>
-    <small>{column.date || column.avenueName || column.avenueCode || "Event"}</small>
-    <small className="visit-dashboard-attendance-event-rate">
-      {column.attendanceLabel}
-    </small>
-  </th>
-))}
-          </tr>
-        </thead>
-        <tbody>
-          {view.rows.map((row) => {
-            const displayName = formatVisitAttendanceName(row.name);
-            const fullRole = row.roleOrPosition || "Member";
-            const roleCode = formatVisitAttendanceRoleCode(fullRole);
-            return (
-            <tr key={row.personId}>
-<td className="visit-dashboard-attendance-percent" title={`${displayName}: ${row.attendanceLabel}`}>
-  {row.attendanceLabel}
-</td>
-<th className="visit-dashboard-attendance-name" scope="row" title={displayName}>
-  {displayName}
-</th>
-<td className="visit-dashboard-attendance-role" title={fullRole} aria-label={`${displayName} role or position: ${fullRole}`}>
-  {roleCode}
-</td>
-{view.columns.map((column) => {
-  const status = row.cells[column.eventId] || "unknown";
-  const statusClass = ["present", "absent", "late", "excused", "unknown"].includes(status)
-    ? status
-    : "unknown";
-  const statusLabel = attendanceStatusLabel(statusClass);
-  return (
-    <td className="visit-dashboard-attendance-mark-cell" key={column.eventId}>
-      <span
-        className={`visit-dashboard-attendance-status is-${statusClass}`}
-        aria-label={`${displayName}, ${column.title}: ${statusLabel}`}
-        title={statusLabel}
-      >
-        <AttendanceMark
-          value={attendanceStatusMarkValue(statusClass)}
-          size="small"
-          ariaLabel={statusLabel}
-          title={statusLabel}
-        />
-      </span>
-    </td>
-  );
-})}
+<div
+  className="visit-dashboard-attendance-table-wrap"
+  onWheel={handleAttendanceWheel}
+  ref={tableWrapRef}
+>
+  <table
+    className="visit-dashboard-attendance-table"
+    style={{ "--visit-dashboard-attendance-table-width": `${tableMinWidth}px` }}
+  >
+          <caption>Read-only attendance overview</caption>
+          <colgroup>
+            <col className="visit-dashboard-attendance-col-percent" />
+            <col className="visit-dashboard-attendance-col-name" />
+            <col className="visit-dashboard-attendance-col-role" />
+            {view.columns.map((column) => (
+              <col className="visit-dashboard-attendance-col-status" key={column.eventId} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="visit-dashboard-attendance-percent-heading" scope="col">Member %</th>
+              <th className="visit-dashboard-attendance-name-heading" scope="col">Name</th>
+              <th className="visit-dashboard-attendance-role-heading" scope="col">Role</th>
+              {view.columns.map((column) => (
+                <th
+                  className="visit-dashboard-attendance-event-heading"
+                  key={column.eventId}
+                  scope="col"
+                  title={`${column.title} / ${column.date || column.avenueName || column.avenueCode || "Event"} / ${column.attendanceLabel}`}
+                >
+                  <span>{column.title}</span>
+                  <small>{column.date || column.avenueName || column.avenueCode || "Event"}</small>
+                  <small className="visit-dashboard-attendance-event-rate">
+                    {column.attendanceLabel}
+                  </small>
+                </th>
+              ))}
             </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {view.rows.map((row) => {
+              const displayName = formatVisitAttendanceName(row.name);
+              const fullRole = row.roleOrPosition || "Member";
+              const roleCode = formatVisitAttendanceRoleCode(fullRole);
+              return (
+                <tr key={row.personId}>
+                  <td className="visit-dashboard-attendance-percent" title={`${displayName}: ${row.attendanceLabel}`}>
+                    {row.attendanceLabel}
+                  </td>
+                  <th className="visit-dashboard-attendance-name" scope="row" title={displayName}>
+                    {displayName}
+                  </th>
+                  <td className="visit-dashboard-attendance-role" title={fullRole} aria-label={`${displayName} role or position: ${fullRole}`}>
+                    {roleCode}
+                  </td>
+                  {view.columns.map((column) => {
+                    const status = row.cells[column.eventId] || "unknown";
+                    const statusClass = ["present", "absent", "late", "excused", "unknown"].includes(status)
+                      ? status
+                      : "unknown";
+                    const statusLabel = attendanceStatusLabel(statusClass);
+                    return (
+                      <td className="visit-dashboard-attendance-mark-cell" key={column.eventId}>
+                        <span
+                          className={`visit-dashboard-attendance-status is-${statusClass}`}
+                          aria-label={`${displayName}, ${column.title}: ${statusLabel}`}
+                          title={statusLabel}
+                        >
+                          <AttendanceMark
+                            ariaLabel={statusLabel}
+                            size="small"
+                            title={statusLabel}
+                            value={attendanceStatusMarkValue(statusClass)}
+                          />
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+  </table>
+</div>
   );
 }
 
@@ -519,6 +555,112 @@ function AttendanceRecords({ attendance }) {
         );
       })}
     </details>
+  );
+}
+
+function fineStatusLabel(status) {
+  const labels = {
+    paid: "Paid",
+    pending: "Pending",
+    waived: "Waived",
+    unknown: "Unknown",
+  };
+  return labels[status] || labels.unknown;
+}
+
+function FinesRecords({ fines }) {
+  const summaryValues = [
+    { label: "Total fines", value: fines.summary.totalFines },
+    { label: "Paid", value: fines.summary.paidFines, tone: "paid" },
+    { label: "Pending / Unpaid", value: fines.summary.pendingFines, tone: "pending" },
+    { label: "Total amount", value: formatVisitDashboardMoney(fines.summary.totalAmount), money: true },
+    { label: "Collected amount", value: formatVisitDashboardMoney(fines.summary.collectedAmount), tone: "paid", money: true },
+    { label: "Pending amount", value: formatVisitDashboardMoney(fines.summary.pendingAmount), tone: "pending", money: true },
+  ];
+
+  return (
+    <section className="visit-dashboard-fines" aria-labelledby="visit-dashboard-fines-title">
+      <header className="visit-dashboard-section-heading">
+        <div>
+          <p className="visit-dashboard-eyebrow">Read-only</p>
+          <h2 id="visit-dashboard-fines-title">Fines Records</h2>
+        </div>
+        <p>Read-only fine summary and member fine register for the selected visit.</p>
+      </header>
+
+      <dl className="visit-dashboard-fines-summary">
+        {summaryValues.map((item) => {
+          const className = [
+            item.tone ? `is-${item.tone}` : "",
+            item.money ? "is-money" : "",
+          ].filter(Boolean).join(" ");
+          return (
+            <div className={className} key={item.label}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          );
+        })}
+      </dl>
+
+      {fines.rows.length ? (
+        <div className="visit-dashboard-fines-table-wrap">
+          <table className="visit-dashboard-fines-table">
+            <caption>Read-only fines register</caption>
+            <colgroup>
+              <col className="visit-dashboard-fines-col-member" />
+              <col className="visit-dashboard-fines-col-reason" />
+              <col className="visit-dashboard-fines-col-amount" />
+              <col className="visit-dashboard-fines-col-status" />
+              <col className="visit-dashboard-fines-col-date" />
+              <col className="visit-dashboard-fines-col-notes" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Member</th>
+                <th scope="col">Reason / Title</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Status</th>
+                <th scope="col">Date</th>
+                <th scope="col">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fines.rows.map((fine) => {
+                const statusClass = ["paid", "pending", "waived", "unknown"].includes(fine.status)
+                  ? fine.status
+                  : "unknown";
+                return (
+                  <tr key={fine.fineKey}>
+                    <th scope="row">{formatVisitAttendanceName(fine.memberName)}</th>
+                    <td>
+                      <strong>{fine.reason}</strong>
+                      {fine.title && fine.title !== fine.reason ? <small>{fine.title}</small> : null}
+                    </td>
+                    <td className="visit-dashboard-fines-amount">
+                      {formatVisitDashboardMoney(fine.amount)}
+                    </td>
+                    <td>
+                      <span className={`visit-dashboard-fines-status is-${statusClass}`}>
+                        {fineStatusLabel(statusClass)}
+                      </span>
+                    </td>
+                    <td>{formatVisitDashboardDate(fine.date) || fine.date}</td>
+                    <td className="visit-dashboard-fines-notes">
+                      {fine.notes ? fine.notes : <span className="visit-dashboard-fines-empty" aria-label="No notes available">&mdash;</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="visit-dashboard-empty-state">
+          <strong>No fines have been recorded yet.</strong>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -661,7 +803,7 @@ export default function VisitDashboardPage() {
   }, [loadDashboard]);
 
   const data = loadState.data || fallbackData;
-  const { visit, stats, documentPanels, attendance, treasury } = data;
+  const { visit, stats, documentPanels, attendance, fines, treasury } = data;
   const officialNames = visit.officialDisplayNames.length
     ? visit.officialDisplayNames
     : ["District Officials"];
@@ -703,6 +845,8 @@ export default function VisitDashboardPage() {
         <DocumentPanels panels={documentPanels} />
 
         <AttendanceRecords attendance={attendance} />
+
+        <FinesRecords fines={fines} />
 
         <TreasuryRecords treasury={treasury} />
 
