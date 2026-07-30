@@ -104,15 +104,16 @@ function StatRail({ stats }) {
   );
 }
 function AvenueCounts({ rows, attendance }) {
-const activeAvenueRows = rows
-  .filter((row) => (
-    row.avenueCode !== "GBM"
-    && Number(row.count) > 0
-  ))
-  .map((row) => ({
-    ...row,
-    events: getVisitAttendanceEventsForAvenue(attendance, row),
-  }));
+  const activeAvenueRows = rows
+    .filter((row) => (
+      row.avenueCode !== "GBM"
+      && Number(row.count) > 0
+    ))
+    .map((row) => ({
+      ...row,
+      events: getVisitAttendanceEventsForAvenue(attendance, row),
+    }))
+    .filter((row) => row.events.length > 0);
 
   return (
     <section className="visit-dashboard-avenue-section" aria-labelledby="visit-dashboard-avenues-title">
@@ -155,7 +156,7 @@ const activeAvenueRows = rows
                     </ul>
                   ) : (
                     <p className="visit-dashboard-avenue-empty">
-                      Event details are temporarily unavailable for this avenue.
+                      No linked attendance records found for this avenue yet.
                     </p>
                   )}
                 </details>
@@ -281,9 +282,13 @@ function DocumentPanels({ panels }) {
       title={`Preview of ${primary.title}`}
     />
   </div>
-) : null}
+) : (
+  <p className="visit-dashboard-document-empty">
+    No main presentation has been selected for this folder.
+  </p>
+)}
 
-<details className="visit-dashboard-document-files">
+<details className="visit-dashboard-document-files" aria-label="Other documents">
   <summary>
     <span className="visit-dashboard-document-files-title">
       All Files

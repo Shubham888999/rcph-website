@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  addBulkVisitFiles,
   addVisitFiles,
+  buildBulkUploadPairs,
   buildVisitUploadEndpoint,
+  bulkVisitFolderAvailability,
+  bulkVisitFolderStatus,
   formatVisitFileSize,
   getVisitThumbnailUrl,
   normalizeVisitUploadResponse,
@@ -48,6 +52,46 @@ test("selection deduplicates files and enforces the server-returned count limit"
   assert.equal(result.queue.length, 2);
   assert.equal(result.duplicateCount, 1);
   assert.equal(result.overflowCount, 1);
+});
+
+test("bulk selection allows duplicate visible names and enforces the session file limit", () => {
+  const result = addBulkVisitFiles([], [
+    file("Report.pdf", "application/pdf"),
+    file("Report.pdf", "application/pdf"),
+    file("Agenda.pdf", "application/pdf"),
+  ], 2, MB25, (() => { let i = 0; return () => `bulk-${++i}`; })());
+  assert.equal(result.queue.length, 2);
+  assert.equal(result.overflowCount, 1);
+  assert.deepEqual(result.queue.map((item) => item.file.name), ["Report.pdf", "Report.pdf"]);
+});
+
+test("bulk folder availability blocks locked, closed, disabled, oversized, and over-capacity folders", () => {
+  const visit = { enabled: true, submissionOpen: true };
+  const openFolder = { enabled: true, submissionOpen: true, locked: false, activeFileCount: 3, maxActiveFiles: 5, maxFilesPerSelection: 3, maxFileSizeBytes: MB25 };
+  const files = [{ file: file("one.pdf", "application/pdf") }, { file: file("two.pdf", "application/pdf") }];
+  assert.equal(bulkVisitFolderStatus(openFolder, visit), "open");
+  assert.equal(bulkVisitFolderAvailability(openFolder, files, visit).selectable, true);
+  assert.equal(bulkVisitFolderAvailability({ ...openFolder, locked: true }, files, visit).status, "locked");
+  assert.equal(bulkVisitFolderAvailability({ ...openFolder, submissionOpen: false }, files, visit).selectable, false);
+  assert.match(bulkVisitFolderAvailability({ ...openFolder, activeFileCount: 4 }, files, visit).message, /Only 1 more file/);
+  assert.match(bulkVisitFolderAvailability({ ...openFolder, maxFilesPerSelection: 1 }, files, visit).message, /Only 1 file/);
+  assert.match(bulkVisitFolderAvailability({ ...openFolder, maxFileSizeBytes: 10 }, files, visit).message, /exceeds/);
+  assert.equal(bulkVisitFolderAvailability(openFolder, [], visit).selectable, false);
+});
+
+test("bulk upload pairs schedule every selected file into every selected folder", () => {
+  const files = [
+    { clientFileId: "f1", file: file("Agenda.pdf", "application/pdf") },
+    { clientFileId: "f2", file: file("Constitution.pdf", "application/pdf") },
+  ];
+  const folders = [
+    { visitType: "clubAssembly", positionKey: "president", positionTitle: "President", avenueCode: "PRE" },
+    { visitType: "clubAssembly", positionKey: "secretary", positionTitle: "Secretary", avenueCode: "SEC" },
+    { visitType: "clubAssembly", positionKey: "rrro", positionTitle: "RRRO", avenueCode: "RRRO" },
+  ];
+  const pairs = buildBulkUploadPairs(files, folders);
+  assert.equal(pairs.length, 6);
+  assert.deepEqual(pairs.map((pair) => pair.pairId), ["president:f1", "president:f2", "secretary:f1", "secretary:f2", "rrro:f1", "rrro:f2"]);
 });
 
 test("only the exact production endpoint and local emulator endpoints are accepted", () => {

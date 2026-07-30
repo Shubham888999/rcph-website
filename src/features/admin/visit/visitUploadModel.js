@@ -1,6 +1,7 @@
 export const VISIT_UPLOAD_FUNCTION_NAME = "uploadVisitSubmissionFile";
 export const VISIT_UPLOAD_REGION = "us-central1";
 const PROD_UPLOAD_ENDPOINT = `https://${VISIT_UPLOAD_REGION}-rcph-admin.cloudfunctions.net/${VISIT_UPLOAD_FUNCTION_NAME}`;
+export const VISIT_BULK_UPLOAD_CONCURRENCY = 3;
 
 export const VISIT_FILE_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.webp";
 
@@ -93,6 +94,94 @@ export function addVisitFiles(queue, incoming, folder, makeId = () => crypto.ran
     });
   }
   return { queue: [...current, ...added], duplicateCount, overflowCount };
+}
+
+export function addBulkVisitFiles(queue, incoming, maxFilesPerSelection = 10, maxFileSizeBytes = 25 * 1024 * 1024, makeId = () => crypto.randomUUID()) {
+  const current = Array.isArray(queue) ? queue : [];
+  const files = Array.from(incoming || []);
+  const limit = Math.max(1, Math.min(10, Number(maxFilesPerSelection) || 10));
+  const available = Math.max(0, limit - current.length);
+  const added = [];
+  let overflowCount = 0;
+
+  for (const file of files) {
+    if (added.length >= available) {
+      overflowCount += 1;
+      continue;
+    }
+    const validationError = validateVisitUploadFile(file, maxFileSizeBytes);
+    added.push({
+      clientFileId: makeId(),
+      file,
+      status: validationError ? "Failed" : "Ready",
+      message: validationError || "Ready to upload.",
+      validationError,
+    });
+  }
+  return { queue: [...current, ...added], overflowCount };
+}
+
+export function bulkVisitFolderStatus(folder, visit = {}) {
+  if (visit.enabled === false || folder?.enabled === false) return "disabled";
+  if (folder?.locked === true) return "locked";
+  if (visit.submissionOpen === false || folder?.submissionOpen === false) return "closed";
+  return "open";
+}
+
+export function bulkVisitFolderAvailability(folder, files, visit = {}) {
+  const fileItems = Array.isArray(files) ? files : [];
+  const fileCount = fileItems.length;
+  const status = bulkVisitFolderStatus(folder, visit);
+  const activeFileCount = Math.max(0, Number(folder?.activeFileCount) || 0);
+  const maxActiveFiles = Math.max(1, Number(folder?.maxActiveFiles) || 40);
+  const remainingCapacity = Math.max(0, maxActiveFiles - activeFileCount);
+  const maxFilesPerSelection = Math.max(1, Number(folder?.maxFilesPerSelection) || 10);
+  const maxFileSizeBytes = Math.max(1, Number(folder?.maxFileSizeBytes) || 25 * 1024 * 1024);
+  const oversized = fileItems.find((item) => Number(item?.file?.size || 0) > maxFileSizeBytes);
+  let message = "";
+  if (status === "locked") message = folder?.lockReason ? `Locked: ${clean(folder.lockReason, 160)}` : "This folder is locked.";
+  else if (status === "closed") message = "This folder is closed.";
+  else if (status === "disabled") message = "This folder is disabled.";
+  else if (fileCount > maxFilesPerSelection) message = `Only ${maxFilesPerSelection} file${maxFilesPerSelection === 1 ? "" : "s"} can be selected for this folder.`;
+  else if (fileCount > remainingCapacity) message = `Only ${remainingCapacity} more file${remainingCapacity === 1 ? "" : "s"} can be uploaded to this folder.`;
+  else if (oversized) message = `${oversized.file.name} exceeds this folder's size limit.`;
+  return {
+    status,
+    selectable: status === "open" && fileCount > 0 && !message,
+    message,
+    remainingCapacity,
+    activeFileCount,
+    maxActiveFiles,
+    maxFilesPerSelection,
+    maxFileSizeBytes,
+  };
+}
+
+export function buildBulkUploadPairs(files, folders, existingPairs = []) {
+  const existing = new Map((Array.isArray(existingPairs) ? existingPairs : []).map((pair) => [pair.pairId, pair]));
+  const pairs = [];
+  for (const folder of Array.isArray(folders) ? folders : []) {
+    for (const item of Array.isArray(files) ? files : []) {
+      const pairId = `${folder.positionKey}:${item.clientFileId}`;
+      pairs.push({
+        pairId,
+        visitType: folder.visitType,
+        positionKey: folder.positionKey,
+        positionTitle: folder.positionTitle,
+        avenueCode: folder.avenueCode,
+        clientFileId: item.clientFileId,
+        fileName: item.file?.name || "",
+        file: item.file,
+        status: existing.get(pairId)?.status || "Queued",
+        message: existing.get(pairId)?.message || "Waiting to upload.",
+        sessionId: existing.get(pairId)?.sessionId || "",
+        ticket: existing.get(pairId)?.ticket || "",
+        completionProof: existing.get(pairId)?.completionProof || "",
+        submissionId: existing.get(pairId)?.submissionId || "",
+      });
+    }
+  }
+  return pairs;
 }
 
 export function validateVisitUploadEndpoint(value, projectId = "") {
