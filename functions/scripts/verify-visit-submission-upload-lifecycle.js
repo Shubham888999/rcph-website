@@ -69,6 +69,16 @@ function drive(overrides = {}) {
   };
 }
 
+function deactivateAssignment(env, assignmentId) {
+  const assignment = env.adapter.store.bodPositionAssignments[assignmentId] || {};
+  env.adapter.store.bodPositionAssignments[assignmentId] = {
+    ...assignment,
+    active: false,
+    status: 'inactive',
+    endedAtMillis: env.clock.now() - 1,
+  };
+}
+
 async function rejectsWithCode(promiseFactory, code, label) {
   let rejected = false;
   try {
@@ -131,7 +141,7 @@ function folderDoc(env, visitType = 'clubAssembly', positionKey = 'secretary') {
 }
 
 function assertNoInternalFields(submission) {
-  ['driveFileId', 'driveFolderId', 'uploadSessionId', 'deletedByUid', 'deleteReason', 'ticketId'].forEach((field) => {
+  ['driveFileId', 'driveFolderId', 'uploadSessionId', 'uploadedByUid', 'deletedByUid', 'deleteReason', 'ticketId'].forEach((field) => {
     assert.ok(!Object.prototype.hasOwnProperty.call(submission, field), `${field} hidden`);
   });
 }
@@ -156,6 +166,42 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   await rejectsWithCode(() => createSession(env, 'gbm-uid'), 'permission-denied', 'GBM denied');
   await rejectsWithCode(() => createSession(env, 'prospect-uid'), 'permission-denied', 'prospect denied');
   await rejectsWithCode(() => createSession(env, 'bod-secretary', { positionKey: 'treasurer' }), 'permission-denied');
+  const csdSession = await createSession(env, 'bod-csd-main', { positionKey: 'csd', file: { clientFileId: 'csd-main' } });
+  assert.strictEqual(csdSession.positionKey, 'csd', 'main CSD can upload to the main CSD folder');
+  await rejectsWithCode(
+    () => createSession(env, 'bod-csd-main', { positionKey: 'co-csd', file: { clientFileId: 'csd-tamper' } }),
+    'permission-denied',
+    'main CSD cannot tamper into Co-CSD folder'
+  );
+  const coCsdMainSession = await createSession(env, 'bod-co-csd', { positionKey: 'csd', file: { clientFileId: 'co-csd-main' } });
+  assert.strictEqual(coCsdMainSession.positionKey, 'csd', 'Co-CSD can upload to the main CSD folder');
+  const coCsdOwnSession = await createSession(env, 'bod-co-csd', { positionKey: 'co-csd', file: { clientFileId: 'co-csd-own' } });
+  assert.strictEqual(coCsdOwnSession.positionKey, 'co-csd', 'Co-CSD can upload to the Co-CSD folder');
+
+  const staleTicketEnv = await initializedEnv();
+  const staleTicketSession = await createSession(staleTicketEnv, 'bod-co-csd', {
+    positionKey: 'csd',
+    file: { clientFileId: 'stale-ticket' },
+  });
+  deactivateAssignment(staleTicketEnv, 'co-csd_bod-co-csd');
+  await rejectsWithCode(
+    () => consumeTicket(staleTicketEnv, staleTicketSession),
+    'permission-denied',
+    'ticket validation rechecks active folder access'
+  );
+
+  const staleCompletionEnv = await initializedEnv();
+  const staleCompletionSession = await createSession(staleCompletionEnv, 'bod-co-csd', {
+    positionKey: 'csd',
+    file: { clientFileId: 'stale-completion' },
+  });
+  const staleCompletionProof = await consumeTicket(staleCompletionEnv, staleCompletionSession);
+  deactivateAssignment(staleCompletionEnv, 'co-csd_bod-co-csd');
+  await rejectsWithCode(
+    () => completeDrive(staleCompletionEnv, staleCompletionSession, staleCompletionProof),
+    'permission-denied',
+    'Drive completion rechecks active folder access'
+  );
 
   let session = await createSession(env, 'bod-secretary');
   assert.strictEqual(folderDoc(env).reservedFileCount, 1, 'reservation counter increments');

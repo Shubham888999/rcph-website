@@ -26,6 +26,28 @@ const VISIT_ACCESS_ROLES = Object.freeze(['bod', 'admin', 'president']);
 const VISIT_ADMIN_ROLES = Object.freeze(['admin', 'president']);
 const VISIT_ACCESS_ROLE_SET = new Set(VISIT_ACCESS_ROLES);
 const VISIT_ADMIN_ROLE_SET = new Set(VISIT_ADMIN_ROLES);
+const VISIT_ASSIGNMENT_BLOCKED_STATUS_VALUES = new Set([
+  'inactive',
+  'expired',
+  'deleted',
+  'removed',
+  'archived',
+  'rejected',
+  'historical',
+  'ended',
+]);
+const VISIT_ASSIGNMENT_STATUS_FIELDS = Object.freeze(['status', 'assignmentStatus', 'approvalStatus', 'state']);
+const VISIT_ASSIGNMENT_ENDED_FIELDS = Object.freeze([
+  'endedAt',
+  'endedAtMillis',
+  'endAt',
+  'endAtMillis',
+  'removedAt',
+  'deletedAt',
+  'archivedAt',
+]);
+const VISIT_ASSIGNMENT_EXPIRY_FIELDS = Object.freeze(['expiresAt', 'expiresAtMillis', 'expiredAt', 'expiredAtMillis']);
+const VISIT_ASSIGNMENT_BLOCKED_FLAGS = Object.freeze(['deleted', 'isDeleted', 'removed', 'archived', 'historical', 'rejected']);
 
 const DEFAULT_MAX_ACTIVE_FILES = 40;
 const DEFAULT_MAX_FILES_PER_SELECTION = 10;
@@ -326,6 +348,89 @@ function visitPositionDocId(visitTypeValue, positionKeyValue, positionHelpers = 
   return `${visitType}_${positionKey}`;
 }
 
+function assignmentData(record) {
+  if (record?.data && typeof record.data === 'object') return record.data;
+  return record && typeof record === 'object' ? record : {};
+}
+
+function hasTerminalAssignmentTimestamp(assignment) {
+  return VISIT_ASSIGNMENT_ENDED_FIELDS.some((field) => {
+    const value = assignment?.[field];
+    return value !== null && value !== undefined && value !== '';
+  });
+}
+
+function hasExpiredAssignmentTimestamp(assignment, nowValue) {
+  for (const field of VISIT_ASSIGNMENT_EXPIRY_FIELDS) {
+    const value = assignment?.[field];
+    if (value === null || value === undefined || value === '') continue;
+    const expiresMillis = timestampToMillis(value);
+    if (!expiresMillis || expiresMillis <= nowValue) return true;
+  }
+  return false;
+}
+
+function hasBlockedAssignmentStatus(assignment) {
+  if (VISIT_ASSIGNMENT_BLOCKED_FLAGS.some(field => assignment?.[field] === true)) return true;
+  return VISIT_ASSIGNMENT_STATUS_FIELDS.some((field) => {
+    const value = normalizeText(assignment?.[field], 80).toLowerCase();
+    return value && VISIT_ASSIGNMENT_BLOCKED_STATUS_VALUES.has(value);
+  });
+}
+
+function isActiveVisitPositionAssignment(uid, assignmentInput, positionHelpers = defaultPositionHelpers, nowValue = Date.now()) {
+  const assignment = assignmentData(assignmentInput);
+  const positionKey = positionHelpers.normalizePositionKey(assignment.positionKey);
+  const definition = positionKey ? positionHelpers.getPositionDefinition(positionKey) : null;
+  return Boolean(
+    definition?.active === true
+      && positionHelpers.isActivePositionAssignment(uid, positionKey, assignment)
+      && !hasBlockedAssignmentStatus(assignment)
+      && !hasTerminalAssignmentTimestamp(assignment)
+      && !hasExpiredAssignmentTimestamp(assignment, nowValue)
+  );
+}
+
+function resolveActiveAssignmentPositionKeys(uid, assignmentRecords, positionHelpers = defaultPositionHelpers, nowValue = Date.now()) {
+  const keys = [];
+  const seen = new Set();
+  for (const record of Array.isArray(assignmentRecords) ? assignmentRecords : []) {
+    const assignment = assignmentData(record);
+    if (!isActiveVisitPositionAssignment(uid, assignment, positionHelpers, nowValue)) continue;
+    const key = positionHelpers.normalizePositionKey(assignment.positionKey);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    keys.push(key);
+  }
+  return positionHelpers.normalizePositionKeys(keys).positionKeys || [];
+}
+
+function mainPositionKeyForCoPosition(positionKeyValue, positionHelpers = defaultPositionHelpers) {
+  const positionKey = positionHelpers.normalizePositionKey(positionKeyValue);
+  if (!positionKey || !positionKey.startsWith('co-')) return '';
+  const mainKey = positionKey.slice(3);
+  const mainDefinition = positionHelpers.getPositionDefinition(mainKey);
+  return mainDefinition?.active === true ? mainDefinition.key : '';
+}
+
+function resolveVisitFolderPositionKeys(positionKeys, positionHelpers = defaultPositionHelpers) {
+  const normalized = normalizeCanonicalPositionKeys(positionKeys, positionHelpers);
+  const allowed = new Set();
+  for (const positionKey of normalized) {
+    const mainKey = mainPositionKeyForCoPosition(positionKey, positionHelpers);
+    if (mainKey) allowed.add(mainKey);
+    allowed.add(positionKey);
+  }
+  return getActivePositionDefinitions(positionHelpers)
+    .map(definition => definition.key)
+    .filter(key => allowed.has(key));
+}
+
+function folderAccessPositionKeys(access) {
+  if (Array.isArray(access?.folderPositionKeys)) return access.folderPositionKeys;
+  return Array.isArray(access?.positionKeys) ? access.positionKeys : [];
+}
+
 function isExplicitlyUidLinked(record, uid) {
   if (!record || typeof record !== 'object') return false;
   if (record.authLinked === false || record.userId === null || record.uid === null) return false;
@@ -404,16 +509,25 @@ function resolveAccessContextFromRecords(uid, records, positionHelpers = default
     );
   }
 
-  const positionResolution = resolvePositionKeysFromIdentity(userData, bodMemberData, uid, positionHelpers);
-  const positionAuthority = positionHelpers.buildPresidentAuthority(userRole, positionResolution.positionKeys);
-  const hasActiveWebsiteDirectorAssignment = websiteDirectorAssignment
-    && websiteDirectorAssignment.active === true
-    && websiteDirectorAssignment.uid === uid
-    && websiteDirectorAssignment.positionKey === positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY;
+  const identityPositionResolution = resolvePositionKeysFromIdentity(userData, bodMemberData, uid, positionHelpers);
+  const activeAssignmentRecords = Array.isArray(records?.activePositionAssignments)
+    ? records.activePositionAssignments.slice()
+    : [];
+  if (records?.websiteDirectorAssignment) {
+    activeAssignmentRecords.push(records.websiteDirectorAssignment);
+  }
+  const activeAssignmentPositionKeys = resolveActiveAssignmentPositionKeys(
+    uid,
+    activeAssignmentRecords,
+    positionHelpers
+  );
+  const folderPositionKeys = resolveVisitFolderPositionKeys(activeAssignmentPositionKeys, positionHelpers);
+  const positionAuthority = positionHelpers.buildPresidentAuthority(userRole, activeAssignmentPositionKeys);
+  const hasActiveWebsiteDirectorAssignment = activeAssignmentPositionKeys.includes(positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY);
   const hasPresidentAuthority = positionAuthority.isPresidentRole
     || (positionAuthority.hasWebsiteDirectorPosition && hasActiveWebsiteDirectorAssignment);
   const isManager = VISIT_ADMIN_ROLE_SET.has(userRole) || hasPresidentAuthority;
-  const canAccessVisitSystem = isManager || (userRole === 'bod' && positionResolution.positionKeys.length > 0);
+  const canAccessVisitSystem = isManager || (userRole === 'bod' && folderPositionKeys.length > 0);
 
   if (!canAccessVisitSystem) {
     throw makeVisitSubmissionError('permission-denied', 'Visit Submission access required.');
@@ -423,9 +537,10 @@ function resolveAccessContextFromRecords(uid, records, positionHelpers = default
     uid,
     role: userRole,
     status: 'approved',
-    positionKeys: positionResolution.positionKeys.slice(),
-    positionSource: positionResolution.source,
-    positionWarnings: positionResolution.warnings.slice(),
+    positionKeys: activeAssignmentPositionKeys.slice(),
+    folderPositionKeys: folderPositionKeys.slice(),
+    positionSource: activeAssignmentPositionKeys.length ? 'bodPositionAssignments.active' : null,
+    positionWarnings: identityPositionResolution.warnings.slice(),
     authority: {
       isPresidentRole: positionAuthority.isPresidentRole,
       hasWebsiteDirectorPosition: positionAuthority.hasWebsiteDirectorPosition && hasActiveWebsiteDirectorAssignment,
@@ -445,7 +560,7 @@ function assertManageAccess(access) {
 
 function assertFolderAccess(access, positionKey) {
   if (access?.canManageVisitSystem) return;
-  if (!access || access.role !== 'bod' || !access.positionKeys.includes(positionKey)) {
+  if (!access || access.role !== 'bod' || !folderAccessPositionKeys(access).includes(positionKey)) {
     throw makeVisitSubmissionError('permission-denied', 'You do not have access to this position folder.');
   }
 }
@@ -619,7 +734,7 @@ function submissionActionPermissions(submission, access) {
     return { canWithdraw: false, canReplace: true, canRemove: true };
   }
   const positionKey = submission.positionKey || '';
-  const authorizedPosition = Array.isArray(access.positionKeys) && access.positionKeys.includes(positionKey);
+  const authorizedPosition = folderAccessPositionKeys(access).includes(positionKey);
   const ownsSubmission = submission.uploadedByUid === access.uid;
   return {
     canWithdraw: authorizedPosition && ownsSubmission,
@@ -635,7 +750,6 @@ function shapeSubmission(submission, access) {
     visitType: submission.visitType,
     positionKey: submission.positionKey,
     positionTitle: submission.positionTitle || '',
-    uploadedByUid: submission.uploadedByUid || '',
     uploadedByName: submission.uploadedByName || '',
     uploadedByRole: submission.uploadedByRole || '',
     fileName: submission.fileName || '',
@@ -653,7 +767,7 @@ function shapeSubmission(submission, access) {
 }
 
 function buildFolderResponse(config, folder, access) {
-  const authorized = access.canManageVisitSystem || access.positionKeys.includes(folder.positionKey);
+  const authorized = access.canManageVisitSystem || folderAccessPositionKeys(access).includes(folder.positionKey);
   const canUpload = Boolean(
     authorized
       && config.enabled !== false
@@ -758,6 +872,12 @@ function createFirestoreVisitSubmissionAdapter(db, admin) {
         snap.docs.forEach(doc => results.set(doc.id, { id: doc.id, data: doc.data() || {} }));
       }
       return Array.from(results.values());
+    },
+    async queryPositionAssignmentsForUser(uid) {
+      const snap = await db.collection('bodPositionAssignments')
+        .where('uid', '==', uid)
+        .get();
+      return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
     },
     async querySubmissions(filters) {
       let query = db.collection('visitSubmissions');
@@ -895,6 +1015,12 @@ function createMemoryVisitSubmissionAdapter(initialData) {
         })
         .map(id => ({ id, data: clone(docs[id]) }));
     },
+    async queryPositionAssignmentsForUser(uid) {
+      const docs = store.bodPositionAssignments || {};
+      return Object.keys(docs)
+        .filter(id => docs[id]?.uid === uid)
+        .map(id => ({ id, data: clone(docs[id]) }));
+    },
     async querySubmissions(filters) {
       const docs = store.visitSubmissions || {};
       const cursor = filters.cursor || null;
@@ -954,18 +1080,34 @@ function createVisitSubmissionService(options) {
 
   async function resolveAccessContext(uid) {
     if (!uid) throw makeVisitSubmissionError('unauthenticated', 'Sign in required.');
-    const [userSnap, roleSnap, bodMemberSnap, cwdAssignmentSnap] = await Promise.all([
+    const [userSnap, roleSnap, bodMemberSnap, assignmentDocs, cwdAssignmentSnap] = await Promise.all([
       adapter.getDoc('users', uid),
       adapter.getDoc('roles', uid),
       adapter.getDoc('bodMembers', uid),
+      adapter.queryPositionAssignmentsForUser(uid),
       adapter.getDoc('bodPositionAssignments', `${positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY}_${uid}`),
     ]);
     return resolveAccessContextFromRecords(uid, {
       user: userSnap.exists ? userSnap.data : null,
       role: roleSnap.exists ? roleSnap.data : null,
       bodMember: bodMemberSnap.exists ? bodMemberSnap.data : null,
+      activePositionAssignments: assignmentDocs.map(doc => doc.data),
       websiteDirectorAssignment: cwdAssignmentSnap.exists ? cwdAssignmentSnap.data : null,
     }, positionHelpers);
+  }
+
+  async function assertCurrentTicketFolderAccess(ticketHash) {
+    const ticketSnap = await adapter.getDoc('driveUploadTickets', ticketHash);
+    if (!ticketSnap.exists) return;
+    const ticketData = ticketSnap.data || {};
+    if (ticketData.uploadType !== VISIT_UPLOAD_TYPE || ticketData.uploadPurpose !== VISIT_UPLOAD_PURPOSE) return;
+    const ticketUid = normalizeText(ticketData.uid, 128);
+    const ticketPositionKey = normalizeCanonicalPositionKey(ticketData.positionKey, positionHelpers);
+    if (!ticketUid || !ticketPositionKey) {
+      throw makeVisitSubmissionError('invalid-argument', 'Invalid upload ticket owner or folder.');
+    }
+    const access = await resolveAccessContext(ticketUid);
+    assertFolderAccess(access, ticketPositionKey);
   }
 
   async function initializeStructure(uid) {
@@ -1041,7 +1183,7 @@ function createVisitSubmissionService(options) {
   function accessiblePositionKeys(access) {
     return access.canManageVisitSystem
       ? getActivePositionDefinitions(positionHelpers).map(definition => definition.key)
-      : access.positionKeys.slice();
+      : folderAccessPositionKeys(access).slice();
   }
 
   function dashboardAccessPayload(access) {
@@ -1454,6 +1596,8 @@ function createVisitSubmissionService(options) {
     const nowValue = nowMillis(clock);
     let response;
 
+    await assertCurrentTicketFolderAccess(ticketHash);
+
     await adapter.runTransaction(async (tx) => {
       const ticketSnap = await tx.getDoc('driveUploadTickets', ticketHash);
       if (!ticketSnap.exists) throw makeVisitSubmissionError('not-found', 'Upload ticket not found.');
@@ -1539,6 +1683,8 @@ function createVisitSubmissionService(options) {
     const completionProof = generateRandomHex(32, tokenGenerator);
     const completionProofHash = hashSecret(completionProof);
     let response;
+
+    await assertCurrentTicketFolderAccess(ticketHash);
 
     await adapter.runTransaction(async (tx) => {
       const [ticketSnap, sessionSnap] = await Promise.all([
@@ -2045,6 +2191,10 @@ module.exports = {
   normalizeCanonicalPositionKey,
   normalizeCanonicalPositionKeys,
   visitPositionDocId,
+  isActiveVisitPositionAssignment,
+  resolveActiveAssignmentPositionKeys,
+  mainPositionKeyForCoPosition,
+  resolveVisitFolderPositionKeys,
   resolveAccessContextFromRecords,
   validateConfigUpdate,
   validateFolderUpdate,

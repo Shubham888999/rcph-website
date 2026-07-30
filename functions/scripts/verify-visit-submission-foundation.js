@@ -40,6 +40,17 @@ async function initializedEnv() {
   return env;
 }
 
+async function assertFoldersAcrossVisits(env, uid, expectedPositionKeys, label) {
+  for (const visitType of visit.VISIT_TYPE_KEYS) {
+    const folders = await env.service.getFolders(uid, visitType);
+    assert.deepStrictEqual(
+      folders.folders.map(folder => folder.positionKey),
+      expectedPositionKeys,
+      `${label || uid} folders for ${visitType}`
+    );
+  }
+}
+
 function assertNoSecretLikeValues(value, pathLabel = 'root') {
   const secretPattern = /private[_-]?key|credential|shared[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token/i;
   if (value == null) return;
@@ -63,6 +74,7 @@ function assertNoInternalSubmissionFields(submission) {
   [
     'driveFileId',
     'driveFolderId',
+    'uploadedByUid',
     'deletedByUid',
     'deleteReason',
     'uploadTicketId',
@@ -169,6 +181,56 @@ await rejectsWithCode(
   assert.strictEqual(multiPositionDashboard.visits[0].activeSubmissionCount, 2, 'multi-position BOD counts assigned positions only');
   const multiPositionFolders = await first.service.getFolders('bod-multi', 'clubAssembly');
   assert.deepStrictEqual(multiPositionFolders.folders.map(folder => folder.positionKey), ['secretary', 'editor']);
+
+  assert.deepStrictEqual(visit.resolveVisitFolderPositionKeys(['csd'], positionHelpers), ['csd'], 'main director resolves only main folder');
+  assert.deepStrictEqual(visit.resolveVisitFolderPositionKeys(['co-csd'], positionHelpers), ['csd', 'co-csd'], 'co-director resolves main and co folders');
+  assert.deepStrictEqual(visit.resolveVisitFolderPositionKeys(['pdd', 'co-pdd'], positionHelpers), ['pdd', 'co-pdd'], 'main/co overlap dedupes canonical folder keys');
+  [
+    'pdd',
+    'csd',
+    'cmd',
+    'isd',
+    'rrro',
+    'pro',
+    'dei',
+    'cwd',
+    'sports-representative',
+    'treasurer',
+  ].forEach((mainKey) => {
+    const coKey = `co-${mainKey}`;
+    assert.strictEqual(visit.mainPositionKeyForCoPosition(coKey, positionHelpers), mainKey, `${coKey} maps to ${mainKey}`);
+    const resolved = visit.resolveVisitFolderPositionKeys([coKey], positionHelpers);
+    assert.ok(resolved.includes(mainKey), `${coKey} grants ${mainKey}`);
+    assert.ok(resolved.includes(coKey), `${coKey} grants ${coKey}`);
+  });
+  assert.deepStrictEqual(
+    visit.resolveActiveAssignmentPositionKeys('assignment-filter-user', [
+      { uid: 'assignment-filter-user', positionKey: 'csd', active: true },
+      { uid: 'assignment-filter-user', positionKey: 'co-csd', active: false },
+      { uid: 'assignment-filter-user', positionKey: 'cmd', active: true, expiresAtMillis: 1 },
+      { uid: 'assignment-filter-user', positionKey: 'isd', active: true, deleted: true },
+      { uid: 'assignment-filter-user', positionKey: 'pdd', active: true, status: 'rejected' },
+      { uid: 'assignment-filter-user', positionKey: 'rrro', active: true, status: 'historical' },
+    ], positionHelpers, 10),
+    ['csd'],
+    'only active current assignments survive resolver filtering'
+  );
+
+  const coCsdAccess = await first.service.resolveAccessContext('bod-co-csd');
+  assert.deepStrictEqual(coCsdAccess.positionKeys, ['co-csd'], 'co assignment remains the raw active assignment key');
+  assert.deepStrictEqual(coCsdAccess.folderPositionKeys, ['csd', 'co-csd'], 'co assignment expands to main and co folder keys');
+
+  await assertFoldersAcrossVisits(first, 'bod-csd-main', ['csd'], 'main CSD');
+  await assertFoldersAcrossVisits(first, 'bod-co-csd', ['csd', 'co-csd'], 'co CSD');
+  await assertFoldersAcrossVisits(first, 'bod-editor-co-pdd', ['pdd', 'editor', 'co-pdd'], 'editor plus co PDD');
+  await assertFoldersAcrossVisits(first, 'bod-editor-csd', ['csd', 'editor'], 'editor plus CSD');
+  await assertFoldersAcrossVisits(first, 'bod-pdd-overlap', ['pdd', 'co-pdd'], 'PDD overlap');
+  await assertFoldersAcrossVisits(first, 'bod-editor-inactive-co-csd', ['editor'], 'inactive co CSD with active editor');
+  await rejectsWithCode(
+    () => first.service.getFolders('bod-inactive-co-csd', 'clubAssembly'),
+    'permission-denied',
+    'inactive-only co assignment grants no visit folder access'
+  );
 
   const secretaryFolder = await first.service.getFolder('bod-secretary', 'clubAssembly', 'secretary');
   assert.deepStrictEqual(secretaryFolder.submissions.map(item => item.positionKey), ['secretary']);

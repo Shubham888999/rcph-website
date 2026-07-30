@@ -28,6 +28,20 @@
       "email": "editor@example.com",
       "positionKeys": ["editor"]
     },
+    "bod-csd-main": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Main CSD User",
+      "email": "main-csd@example.com",
+      "positionKeys": ["csd"]
+    },
+    "bod-co-csd": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Co CSD User",
+      "email": "co-csd@example.com",
+      "positionKeys": ["co-csd"]
+    },
     "gbm-uid": {
       "role": "gbm",
       "status": "approved",
@@ -48,10 +62,44 @@
     "admin-uid": { "role": "admin", "status": "approved" },
     "bod-secretary": { "role": "bod", "status": "approved" },
     "bod-editor": { "role": "bod", "status": "approved" },
+    "bod-csd-main": { "role": "bod", "status": "approved" },
+    "bod-co-csd": { "role": "bod", "status": "approved" },
     "gbm-uid": { "role": "gbm", "status": "approved" },
     "prospect-uid": { "role": "prospect", "status": "approved" }
   },
   "bodMembers": {},
+  "bodPositionAssignments": {
+    "president_president-uid": {
+      "assignmentId": "president_president-uid",
+      "positionKey": "president",
+      "uid": "president-uid",
+      "active": true
+    },
+    "secretary_bod-secretary": {
+      "assignmentId": "secretary_bod-secretary",
+      "positionKey": "secretary",
+      "uid": "bod-secretary",
+      "active": true
+    },
+    "editor_bod-editor": {
+      "assignmentId": "editor_bod-editor",
+      "positionKey": "editor",
+      "uid": "bod-editor",
+      "active": true
+    },
+    "csd_bod-csd-main": {
+      "assignmentId": "csd_bod-csd-main",
+      "positionKey": "csd",
+      "uid": "bod-csd-main",
+      "active": true
+    },
+    "co-csd_bod-co-csd": {
+      "assignmentId": "co-csd_bod-co-csd",
+      "positionKey": "co-csd",
+      "uid": "bod-co-csd",
+      "active": true
+    }
+  },
   "visitSubmissionConfig": {},
   "visitSubmissionPositions": {},
   "visitSubmissions": {},

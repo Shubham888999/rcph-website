@@ -40,6 +40,15 @@ function cwdAssignment(uid = 'uid', overrides = {}) {
   };
 }
 
+function assignment(positionKey, uid = 'uid', overrides = {}) {
+  return {
+    uid,
+    positionKey,
+    active: overrides.active !== false,
+    ...overrides,
+  };
+}
+
 function access(uid, records) {
   return resolveAccessContextFromRecords(uid, records, positionHelpers);
 }
@@ -248,6 +257,7 @@ test('approved admin plus cwd has President authority in Visit backend', () => {
   const result = access('uid', {
     user: user('admin', ['cwd']),
     role: roleDoc('admin'),
+    activePositionAssignments: [assignment('cwd')],
     websiteDirectorAssignment: cwdAssignment(),
   });
   assert.strictEqual(result.role, 'admin');
@@ -259,6 +269,7 @@ test('approved bod plus cwd has President authority in Visit backend', () => {
   const result = access('uid', {
     user: user('bod', ['cwd']),
     role: roleDoc('bod'),
+    activePositionAssignments: [assignment('cwd')],
     websiteDirectorAssignment: cwdAssignment(),
   });
   assert.strictEqual(result.role, 'bod');
@@ -279,6 +290,7 @@ test('approved bod without cwd has no President authority', () => {
   const result = access('uid', {
     user: user('bod', ['secretary']),
     role: roleDoc('bod'),
+    activePositionAssignments: [assignment('secretary')],
   });
   assert.strictEqual(result.authority.hasPresidentAuthority, false);
   assert.strictEqual(result.canManageVisitSystem, false);
@@ -317,19 +329,21 @@ test('unknown position key is denied President authority', () => {
 
 test('removed cwd assignment removes President authority', () => {
   const result = access('uid', {
-    user: user('bod', ['cwd']),
+    user: user('bod', ['secretary', 'cwd']),
     role: roleDoc('bod'),
+    activePositionAssignments: [assignment('secretary'), assignment('cwd', 'uid', { active: false })],
     websiteDirectorAssignment: cwdAssignment('uid', { active: false }),
   });
   assert.strictEqual(result.authority.hasPresidentAuthority, false);
   assert.strictEqual(result.canManageVisitSystem, false);
-  assert.strictEqual(result.positionKeys.includes('cwd'), true);
+  assert.strictEqual(result.positionKeys.includes('cwd'), false);
 });
 
 test('multiple positions including cwd are allowed', () => {
   const result = access('uid', {
     user: user('bod', ['secretary', 'cwd']),
     role: roleDoc('bod'),
+    activePositionAssignments: [assignment('secretary'), assignment('cwd')],
     websiteDirectorAssignment: cwdAssignment(),
   });
   assert.strictEqual(result.authority.hasPresidentAuthority, true);

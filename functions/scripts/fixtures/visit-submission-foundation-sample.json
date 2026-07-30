@@ -28,6 +28,55 @@
       "email": "multi@example.com",
       "positionKeys": ["secretary", "editor"]
     },
+    "bod-csd-main": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Main CSD User",
+      "email": "main-csd@example.com",
+      "positionKeys": ["csd"]
+    },
+    "bod-co-csd": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Co CSD User",
+      "email": "co-csd@example.com",
+      "positionKeys": ["co-csd"]
+    },
+    "bod-editor-co-pdd": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Editor Co PDD User",
+      "email": "editor-co-pdd@example.com",
+      "positionKeys": ["editor", "co-pdd"]
+    },
+    "bod-editor-csd": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Editor CSD User",
+      "email": "editor-csd@example.com",
+      "positionKeys": ["editor", "csd"]
+    },
+    "bod-pdd-overlap": {
+      "role": "bod",
+      "status": "approved",
+      "name": "PDD Overlap User",
+      "email": "pdd-overlap@example.com",
+      "positionKeys": ["pdd", "co-pdd"]
+    },
+    "bod-editor-inactive-co-csd": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Editor Inactive Co CSD User",
+      "email": "editor-inactive-co-csd@example.com",
+      "positionKeys": ["editor", "co-csd"]
+    },
+    "bod-inactive-co-csd": {
+      "role": "bod",
+      "status": "approved",
+      "name": "Inactive Co CSD User",
+      "email": "inactive-co-csd@example.com",
+      "positionKeys": ["co-csd"]
+    },
     "gbm-uid": {
       "role": "gbm",
       "status": "approved",
@@ -96,6 +145,13 @@
     "admin-uid": { "role": "admin", "status": "approved" },
     "bod-secretary": { "role": "bod", "status": "approved" },
     "bod-multi": { "role": "bod", "status": "approved" },
+    "bod-csd-main": { "role": "bod", "status": "approved" },
+    "bod-co-csd": { "role": "bod", "status": "approved" },
+    "bod-editor-co-pdd": { "role": "bod", "status": "approved" },
+    "bod-editor-csd": { "role": "bod", "status": "approved" },
+    "bod-pdd-overlap": { "role": "bod", "status": "approved" },
+    "bod-editor-inactive-co-csd": { "role": "bod", "status": "approved" },
+    "bod-inactive-co-csd": { "role": "bod", "status": "approved" },
     "gbm-uid": { "role": "gbm", "status": "approved" },
     "prospect-uid": { "role": "prospect", "status": "approved" },
     "pending-bod": { "role": "bod", "status": "approved" },
@@ -112,6 +168,102 @@
       "name": "Manual Generated Row",
       "positionKeys": ["secretary"],
       "position": "Secretary"
+    }
+  },
+  "bodPositionAssignments": {
+    "president_president-uid": {
+      "assignmentId": "president_president-uid",
+      "positionKey": "president",
+      "uid": "president-uid",
+      "active": true
+    },
+    "secretary_bod-secretary": {
+      "assignmentId": "secretary_bod-secretary",
+      "positionKey": "secretary",
+      "uid": "bod-secretary",
+      "active": true
+    },
+    "secretary_bod-multi": {
+      "assignmentId": "secretary_bod-multi",
+      "positionKey": "secretary",
+      "uid": "bod-multi",
+      "active": true
+    },
+    "editor_bod-multi": {
+      "assignmentId": "editor_bod-multi",
+      "positionKey": "editor",
+      "uid": "bod-multi",
+      "active": true
+    },
+    "csd_bod-csd-main": {
+      "assignmentId": "csd_bod-csd-main",
+      "positionKey": "csd",
+      "uid": "bod-csd-main",
+      "active": true
+    },
+    "co-csd_bod-co-csd": {
+      "assignmentId": "co-csd_bod-co-csd",
+      "positionKey": "co-csd",
+      "uid": "bod-co-csd",
+      "active": true
+    },
+    "editor_bod-editor-co-pdd": {
+      "assignmentId": "editor_bod-editor-co-pdd",
+      "positionKey": "editor",
+      "uid": "bod-editor-co-pdd",
+      "active": true
+    },
+    "co-pdd_bod-editor-co-pdd": {
+      "assignmentId": "co-pdd_bod-editor-co-pdd",
+      "positionKey": "co-pdd",
+      "uid": "bod-editor-co-pdd",
+      "active": true
+    },
+    "editor_bod-editor-csd": {
+      "assignmentId": "editor_bod-editor-csd",
+      "positionKey": "editor",
+      "uid": "bod-editor-csd",
+      "active": true
+    },
+    "csd_bod-editor-csd": {
+      "assignmentId": "csd_bod-editor-csd",
+      "positionKey": "csd",
+      "uid": "bod-editor-csd",
+      "active": true
+    },
+    "pdd_bod-pdd-overlap": {
+      "assignmentId": "pdd_bod-pdd-overlap",
+      "positionKey": "pdd",
+      "uid": "bod-pdd-overlap",
+      "active": true
+    },
+    "co-pdd_bod-pdd-overlap": {
+      "assignmentId": "co-pdd_bod-pdd-overlap",
+      "positionKey": "co-pdd",
+      "uid": "bod-pdd-overlap",
+      "active": true
+    },
+    "editor_bod-editor-inactive-co-csd": {
+      "assignmentId": "editor_bod-editor-inactive-co-csd",
+      "positionKey": "editor",
+      "uid": "bod-editor-inactive-co-csd",
+      "active": true
+    },
+    "co-csd_bod-editor-inactive-co-csd": {
+      "assignmentId": "co-csd_bod-editor-inactive-co-csd",
+      "positionKey": "co-csd",
+      "uid": "bod-editor-inactive-co-csd",
+      "active": false,
+      "endedAt": "2026-06-01T00:00:00.000Z",
+      "endReason": "fixture-inactive"
+    },
+    "co-csd_bod-inactive-co-csd": {
+      "assignmentId": "co-csd_bod-inactive-co-csd",
+      "positionKey": "co-csd",
+      "uid": "bod-inactive-co-csd",
+      "active": false,
+      "endedAt": "2026-06-01T00:00:00.000Z",
+      "endReason": "fixture-inactive"
     }
   },
   "visitSubmissionConfig": {},
