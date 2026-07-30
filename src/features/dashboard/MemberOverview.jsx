@@ -8,12 +8,35 @@ export default function MemberOverview({ data }) {
   const stats = data.clubStats;
   const avenueActivity = sortAvenueActivity(stats.eventsByAvenue);
   const maxAvenueCount = Math.max(...avenueActivity.map(({ count }) => count), 1);
-  const metrics = [
-    { key: "attended", label: "Events attended", value: data.myAttendance.present },
-    { key: "missed", label: "Events missed", value: data.myAttendance.absent },
-    { key: "club-events", label: "Club events", value: stats.totalEvents },
-    { key: "active-avenue", label: "Most active avenue", value: stats.mostActiveAvenue || null },
-  ];
+const metrics = [
+  {
+    key: "dues",
+    label: "Dues",
+    displayValue: data.profile?.duesPaid === true
+      ? "Paid"
+      : "Not paid",
+  },
+  {
+    key: "attended",
+    label: "Events attended",
+    value: data.myAttendance.present,
+  },
+  {
+    key: "missed",
+    label: "Events missed",
+    value: data.myAttendance.absent,
+  },
+  {
+    key: "club-events",
+    label: "Club events",
+    value: stats.totalEvents,
+  },
+  {
+    key: "active-avenue",
+    label: "Most active avenue",
+    value: stats.mostActiveAvenue || null,
+  },
+];
   if (data.clubRanking.enabled) {
     metrics.push({ key: "club-ranking", label: "Club ranking", value: data.clubRanking.value, detail: data.clubRanking.subtitle });
   }

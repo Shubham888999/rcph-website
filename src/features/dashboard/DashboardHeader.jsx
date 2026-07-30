@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { getPositionLabels } from "./accessHubModel";
 import { getRoleLabel } from "./dashboardPresentationModel";
 import { formatRotaractorName } from "../../utils/memberName";
+import { calculateMemberCompleteness } from "../admin/modules/memberOperationsModel";
 
 export default function DashboardHeader({ profile, mode, access, onEditProfile, onSignOut }) {
   const reduceMotion = useReducedMotion();
@@ -31,7 +32,9 @@ function closeActions() {
   const legacyPosition = profile.memberPosition || profile.clubPosition;
   const positions = canonicalPositions.length ? canonicalPositions : legacyPosition ? [legacyPosition] : [];
   const identity = positions.length ? positions.join(" · ") : getRoleLabel(profile.role);
-
+const profileCompleteness = mode === "prospect"
+  ? null
+  : calculateMemberCompleteness(profile, profile);
   return (
     <motion.header
       className={`dashboard-masthead dashboard-masthead--${mode}`}
@@ -56,8 +59,37 @@ function closeActions() {
     </>
   )}
 </motion.h1>
-        <motion.p className="dashboard-masthead__role" variants={reduceMotion ? undefined : mastheadItem}>{identity}</motion.p>
-        <motion.p className="dashboard-masthead__context" variants={reduceMotion ? undefined : mastheadItem}>
+        <motion.p
+  className="dashboard-masthead__role"
+  variants={reduceMotion ? undefined : mastheadItem}
+>
+  {identity}
+</motion.p>
+
+<motion.div
+  className="dashboard-masthead__profile-tools"
+  variants={reduceMotion ? undefined : mastheadItem}
+>
+  <button
+    type="button"
+    className="dashboard-masthead__profile-edit"
+    onClick={onEditProfile}
+  >
+    Edit profile
+  </button>
+
+  {profileCompleteness ? (
+    <span className="dashboard-masthead__profile-completion">
+      <strong>{profileCompleteness.score}%</strong>
+      {" profile completed"}
+    </span>
+  ) : null}
+</motion.div>
+
+<motion.p
+  className="dashboard-masthead__context"
+  variants={reduceMotion ? undefined : mastheadItem}
+>
           {mode === "prospect"
             ? "Your path to becoming an RCPH member,one step at a time."
             : "Your attendance, activity, and upcoming club events in one personal view."}
@@ -90,7 +122,6 @@ function closeActions() {
     className={actionsOpen ? "is-open" : ""}
     aria-label="Dashboard actions"
   >
-    <button type="button" onClick={() => { onEditProfile(); closeActions(); }}>Edit profile</button>
     <Link to="/access" onClick={closeActions}>Access Hub</Link>
     <Link to="/" onClick={closeActions}>Public homepage</Link>
     <Link to="/website-guide" onClick={closeActions}>Website Guide</Link>

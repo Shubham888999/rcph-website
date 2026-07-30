@@ -4,7 +4,49 @@ import test from "node:test";
 
 const source = readFileSync(new URL("./MemberAnnouncements.jsx", import.meta.url), "utf8");
 const pageSource = readFileSync(new URL("../../pages/dashboard/DashboardPage.jsx", import.meta.url), "utf8");
+const accessPageSource = readFileSync(
+  new URL(
+    "../../pages/protected/AccessPage.jsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+test("Access Hub reuses dashboard announcements and their account-level actions", () => {
+  assert.match(
+    accessPageSource,
+    /<MemberAnnouncements/,
+  );
 
+  assert.match(
+    accessPageSource,
+    /announcements=\{accessAnnouncements\}/,
+  );
+
+  assert.match(
+    accessPageSource,
+    /markDashboardAnnouncementRead/,
+  );
+
+  assert.match(
+    accessPageSource,
+    /markDashboardAnnouncementUnread/,
+  );
+
+  assert.match(
+    accessPageSource,
+    /dismissDashboardAnnouncement/,
+  );
+
+  assert.match(
+    accessPageSource,
+    /updateAnnouncements\(\(current\) =>/,
+  );
+
+  assert.match(
+    accessPageSource,
+    /updateAnnouncements\(previous\)/,
+  );
+});
 test("announcement cards expose one state-appropriate action and per-user removal", () => {
   assert.match(source, /announcement\.read \? "Mark as unread" : "Mark as read"/);
   assert.match(source, /Remove from dashboard/);

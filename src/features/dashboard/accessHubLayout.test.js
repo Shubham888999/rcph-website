@@ -20,7 +20,54 @@ test("Access Hub renders one unified destination list with Member Dashboard elig
   assert.match(accessPage, /destination\.fullWidth \? "access-hub__destination--full" : undefined/);
   assert.match(accessPage, /Sign out/);
 });
+test("Access Hub renders dashboard announcements immediately before available areas", () => {
+  assert.match(
+    accessPage,
+    /import MemberAnnouncements/,
+  );
 
+  assert.match(
+    accessPage,
+    /useDashboardData/,
+  );
+
+  assert.match(
+    accessPage,
+    /className="access-hub__announcements"/,
+  );
+
+  assert.match(
+    accessPage,
+    /<MemberAnnouncements/,
+  );
+
+  assert.match(
+    accessPage,
+    /onToggleRead=\{updateAnnouncementReadState\}/,
+  );
+
+  assert.match(
+    accessPage,
+    /onDismiss=\{dismissAccessAnnouncement\}/,
+  );
+
+  const announcementsIndex = accessPage.indexOf(
+    'className="access-hub__announcements"',
+  );
+
+  const destinationsIndex = accessPage.indexOf(
+    'className="access-hub__destinations"',
+  );
+
+  assert.ok(announcementsIndex >= 0);
+  assert.ok(destinationsIndex >= 0);
+  assert.ok(announcementsIndex < destinationsIndex);
+
+  assert.match(
+    accessCss,
+    /\.access-hub__announcements\s*\{/,
+  );
+});
 test("Access Hub CSS preserves the sleek divider-based destination rail", () => {
   const shellRule = cssRule(accessCss, ".auth-access-page .access-hub");
   const mastheadRule = cssRule(accessCss, ".access-hub__masthead");

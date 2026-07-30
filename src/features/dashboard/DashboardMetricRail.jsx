@@ -21,7 +21,9 @@ export default function DashboardMetricRail({ items, label = "Dashboard metrics"
           }}
         >
           <dt>{item.label}</dt>
-          <dd>{formatDashboardMetric(item.value, item.suffix)}</dd>
+          <dd>
+  {item.displayValue ?? formatDashboardMetric(item.value, item.suffix)}
+</dd>
           {item.detail ? <small>{item.detail}</small> : null}
         </motion.div>
       ))}

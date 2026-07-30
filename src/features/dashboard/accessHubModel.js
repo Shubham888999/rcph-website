@@ -101,5 +101,12 @@ export function getAccessHubViewModel(access) {
 export const getAccessHubCards = getAccessHubDestinations;
 
 export function canRequestDashboard(uid, access) {
-  return Boolean(uid && access?.isApproved && access.canAccessMemberDashboard);
+  return Boolean(
+    uid
+      && access?.isApproved
+      && (
+        access.canAccessMemberDashboard
+        || access.canAccessProspectDashboard
+      )
+  );
 }

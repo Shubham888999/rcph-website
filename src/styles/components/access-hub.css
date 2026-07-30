@@ -173,7 +173,18 @@
 .access-hub__unavailable p {
   color: var(--internal-text-muted);
 }
+.access-hub__announcements {
+  min-width: 0;
+  margin-top: clamp(1.35rem, 3vw, 2.5rem);
+}
 
+.access-hub__announcements .dashboard-announcement-notice {
+  margin-bottom: 1rem;
+}
+
+.access-hub__announcements .dashboard-announcements {
+  width: 100%;
+}
 .access-hub__destinations {
   margin-top: clamp(1.35rem, 3vw, 2.5rem);
 }

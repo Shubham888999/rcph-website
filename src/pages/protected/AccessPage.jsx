@@ -1,7 +1,19 @@
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { getAccessHubViewModel } from "../../features/dashboard/accessHubModel";
-import { clearDashboardDataCache } from "../../features/dashboard/dashboardService";
+import MemberAnnouncements from "../../features/dashboard/MemberAnnouncements";
+import {
+  canRequestDashboard,
+  getAccessHubViewModel,
+} from "../../features/dashboard/accessHubModel";
+import {
+  clearDashboardDataCache,
+  dismissDashboardAnnouncement,
+  getAnnouncementMutationErrorMessage,
+  markDashboardAnnouncementRead,
+  markDashboardAnnouncementUnread,
+} from "../../features/dashboard/dashboardService";
+import useDashboardData from "../../features/dashboard/useDashboardData";
 import useAuth from "../../hooks/useAuth";
 import "../../styles/components/auth-access.css";
 import "../../styles/components/access-hub.css";
@@ -22,12 +34,127 @@ export default function AccessPage() {
   const email = profile.email || user?.email || "";
   const hub = getAccessHubViewModel(access);
   const isProspect = access?.canAccessProspectDashboard === true;
+const announcementsEnabled = canRequestDashboard(
+  user?.uid,
+  access,
+);
 
+const {
+  status: dashboardStatus,
+  data: dashboardData,
+  updateAnnouncements,
+} = useDashboardData({
+  uid: user?.uid || "",
+  enabled: announcementsEnabled,
+});
+
+const [announcementBusyId, setAnnouncementBusyId] =
+  useState("");
+
+const [announcementNotice, setAnnouncementNotice] =
+  useState(null);
+
+const accessAnnouncements =
+  dashboardStatus === "success"
+    ? dashboardData?.announcements || []
+    : [];
   async function handleSignOut() {
     clearDashboardDataCache(user?.uid);
     await signOut();
   }
+async function updateAnnouncementReadState(announcement) {
+  if (announcement?.dismissible === false) return;
 
+  if (
+    !user?.uid
+    || announcementBusyId
+    || dashboardStatus !== "success"
+  ) {
+    return;
+  }
+
+  const previous = accessAnnouncements;
+  const nextRead = !announcement.read;
+
+  setAnnouncementBusyId(announcement.id);
+  setAnnouncementNotice(null);
+
+  updateAnnouncements((current) =>
+    current.map((item) =>
+      item.id === announcement.id
+        ? { ...item, read: nextRead }
+        : item
+    )
+  );
+
+  try {
+    if (nextRead) {
+      await markDashboardAnnouncementRead(
+        user.uid,
+        announcement.id,
+      );
+    } else {
+      await markDashboardAnnouncementUnread(
+        user.uid,
+        announcement.id,
+      );
+    }
+  } catch {
+    updateAnnouncements(previous);
+
+    setAnnouncementNotice({
+      type: "error",
+      message: getAnnouncementMutationErrorMessage(),
+    });
+  } finally {
+    setAnnouncementBusyId("");
+  }
+}
+
+async function dismissAccessAnnouncement(announcement) {
+  if (announcement?.dismissible === false) return;
+
+  if (
+    !user?.uid
+    || announcementBusyId
+    || dashboardStatus !== "success"
+  ) {
+    return;
+  }
+
+  const previous = accessAnnouncements;
+
+  setAnnouncementBusyId(announcement.id);
+  setAnnouncementNotice(null);
+
+  updateAnnouncements((current) =>
+    current.filter(
+      (item) => item.id !== announcement.id
+    )
+  );
+
+  try {
+    await dismissDashboardAnnouncement(
+      user.uid,
+      announcement.id,
+    );
+
+    setAnnouncementNotice({
+      type: "success",
+      message:
+        "Announcement removed from your Dashboard and Access Hub.",
+    });
+  } catch {
+    updateAnnouncements(previous);
+
+    setAnnouncementNotice({
+      type: "error",
+      message: getAnnouncementMutationErrorMessage(),
+    });
+  } finally {
+    setAnnouncementBusyId("");
+  }
+}
   return (
     <main className="auth-access-page access-command-page">
       <motion.section
@@ -78,13 +205,56 @@ export default function AccessPage() {
           </motion.section>
         )}
 
-        {isProspect ? (
-          <motion.div className="access-hub__prospect-whatsapp" variants={reduceMotion ? undefined : revealItem}>
-            <ProspectWhatsAppGroup />
-          </motion.div>
-        ) : null}
+{isProspect ? (
+  <motion.div
+    className="access-hub__prospect-whatsapp"
+    variants={reduceMotion ? undefined : revealItem}
+  >
+    <ProspectWhatsAppGroup />
+  </motion.div>
+) : null}
 
-        <nav className="access-hub__destinations" aria-labelledby="access-destinations-title">
+{announcementNotice || accessAnnouncements.length ? (
+  <motion.div
+    className="access-hub__announcements"
+    variants={reduceMotion ? undefined : revealItem}
+  >
+    {announcementNotice ? (
+      <div
+        className={`dashboard-announcement-notice dashboard-announcement-notice--${announcementNotice.type}`}
+        role={
+          announcementNotice.type === "error"
+            ? "alert"
+            : "status"
+        }
+        aria-live="polite"
+      >
+        <span>{announcementNotice.message}</span>
+
+        <button
+          type="button"
+          onClick={() => setAnnouncementNotice(null)}
+          aria-label="Dismiss announcement notice"
+        >
+          ×
+        </button>
+      </div>
+    ) : null}
+
+    <MemberAnnouncements
+      uid={user?.uid || ""}
+      announcements={accessAnnouncements}
+      busyId={announcementBusyId}
+      onToggleRead={updateAnnouncementReadState}
+      onDismiss={dismissAccessAnnouncement}
+    />
+  </motion.div>
+) : null}
+
+<nav
+  className="access-hub__destinations"
+  aria-labelledby="access-destinations-title"
+>
           <motion.header variants={reduceMotion ? undefined : revealItem}>
             <p className="access-hub__eyebrow">Available areas</p>
             <h2 id="access-destinations-title">Continue through RCPH</h2>

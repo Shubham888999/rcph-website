@@ -21,10 +21,40 @@ function access(role, extras = {}) {
   };
 }
 
-test("dashboard fetch requires UID and approved capability", () => {
-  assert.equal(canRequestDashboard("", access("gbm")), false);
-  assert.equal(canRequestDashboard("uid", { ...access("gbm"), isApproved: false }), false);
-  assert.equal(canRequestDashboard("uid", access("gbm")), true);
+test("dashboard fetch requires UID and an approved personal dashboard capability", () => {
+  assert.equal(
+    canRequestDashboard("", access("gbm")),
+    false,
+  );
+
+  assert.equal(
+    canRequestDashboard("uid", {
+      ...access("gbm"),
+      isApproved: false,
+    }),
+    false,
+  );
+
+  assert.equal(
+    canRequestDashboard("uid", access("gbm")),
+    true,
+  );
+
+  assert.equal(
+    canRequestDashboard("uid", access("prospect", {
+      canAccessMemberDashboard: false,
+      canAccessProspectDashboard: true,
+    })),
+    true,
+  );
+
+  assert.equal(
+    canRequestDashboard("uid", access("districtOfficial", {
+      canAccessMemberDashboard: false,
+      canAccessProspectDashboard: false,
+    })),
+    false,
+  );
 });
 
 test("Prospect receives one primary journey and no BOD or Admin tools", () => {
