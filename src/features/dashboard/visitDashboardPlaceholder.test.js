@@ -10,6 +10,7 @@ import {
   formatVisitDashboardFileSize,
   formatVisitDashboardMoney,
   getVisitDocumentPanelActionLabel,
+  getVisitAttendanceEventsForAvenue,
   normalizeVisitDashboardData,
   visitSlugFromType,
   visitTypeFromSlug,
@@ -522,6 +523,52 @@ test("visit dashboard attendance display helpers keep names and roles compact", 
   assert.equal(formatVisitAttendanceRoleCode("Member"), "Member");
 });
 
+test("visit dashboard avenue details list joint events under every associated avenue", () => {
+  const normalized = normalizeVisitDashboardData({
+    visit: { visitType: "drrVisit" },
+    stats: {
+      avenueEventCounts: [
+        { avenueCode: "CSD", count: 2 },
+        { avenueCode: "RRRO", count: 2 },
+      ],
+    },
+    attendance: {
+      club: {
+        columns: [{
+          eventId: "joint-fellowship",
+          title: "Joint Club Fellowship",
+          date: "2026-07-20",
+          avenueCode: "CSD",
+          avenueName: "Club Service",
+          avenues: ["CSD", "RRRO"],
+        }, {
+          eventId: "joint-rotary-connect",
+          title: "Rotary Connect",
+          date: "2026-07-21",
+          avenueCode: "CSD",
+          avenueName: "Club Service",
+          associatedAvenues: [{ label: "Club Service Avenue" }, { code: "RRRO" }],
+        }],
+        rows: [],
+      },
+    },
+  }, "drrVisit");
+
+  const csdRow = normalized.stats.avenueEventCounts.find((row) => row.avenueCode === "CSD");
+  const rrroRow = normalized.stats.avenueEventCounts.find((row) => row.avenueCode === "RRRO");
+  const csdEvents = getVisitAttendanceEventsForAvenue(normalized.attendance, csdRow);
+  const rrroEvents = getVisitAttendanceEventsForAvenue(normalized.attendance, rrroRow);
+
+  assert.deepEqual(normalized.attendance.club.columns.map((column) => column.avenueCodes), [
+    ["CSD", "RRRO"],
+    ["CSD", "RRRO"],
+  ]);
+  assert.deepEqual(csdEvents.map((event) => event.title), ["Joint Club Fellowship", "Rotary Connect"]);
+  assert.deepEqual(rrroEvents.map((event) => event.title), ["Joint Club Fellowship", "Rotary Connect"]);
+  assert.equal(csdRow.count, csdEvents.length);
+  assert.equal(rrroRow.count, rrroEvents.length);
+});
+
 test("visit dashboard attendance role codes preserve primary and co positions", () => {
   assert.equal(formatVisitAttendanceRoleCode("Club Service Director"), "CSD");
   assert.equal(formatVisitAttendanceRoleCode("Co-Club Service Director"), "Co-CSD");
@@ -576,16 +623,17 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /Welcome District Officials/);
   assert.match(pageSource, /officialDisplayNames/);
   assert.match(pageSource, /Avenue-wise events/);
-assert.match(pageSource, /visit-dashboard-avenue-chip__label/);
-assert.match(pageSource, /visit-dashboard-avenue-disclosure/);
-assert.match(pageSource, /visitEventsForAvenue\(attendance, row\)/);
-assert.match(pageSource, /visit-dashboard-avenue-event-list/);
-assert.match(pageSource, /const activeAvenueRows = rows\.filter\(\(row\) => Number\(row\.count\) > 0\)/);
-assert.match(pageSource, /activeAvenueRows\.map\(\(row\)/);
-assert.match(pageSource, /No linked attendance records found for this avenue yet\./);
-assert.doesNotMatch(pageSource, /No events recorded for this avenue yet\./);
-assert.doesNotMatch(pageSource, /is-zero/);
-assert.doesNotMatch(pageSource, /keep existing summary\/body exactly same/i);
+  assert.match(pageSource, /visit-dashboard-avenue-chip__label/);
+  assert.match(pageSource, /visit-dashboard-avenue-disclosure/);
+  assert.match(pageSource, /getVisitAttendanceEventsForAvenue\(attendance, row\)/);
+  assert.match(pageSource, /visit-dashboard-avenue-event-list/);
+  assert.match(pageSource, /\.filter\(\(row\) => row\.events\.length > 0\)/);
+  assert.match(pageSource, /const eventCount = events\.length/);
+  assert.match(pageSource, /activeAvenueRows\.map\(\(row\)/);
+  assert.match(pageSource, /No linked attendance records found for this avenue yet\./);
+  assert.doesNotMatch(pageSource, /No events recorded for this avenue yet\./);
+  assert.doesNotMatch(pageSource, /is-zero/);
+  assert.doesNotMatch(pageSource, /keep existing summary\/body exactly same/i);
   assert.doesNotMatch(pageSource, /visit-dashboard-avenue-meter/);
   assert.match(pageSource, /BOD Documents/);
   assert.match(pageSource, /visit-dashboard-folder-directory/);

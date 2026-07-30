@@ -8,10 +8,10 @@ import {
   formatVisitAttendanceName,
   formatVisitAttendanceRoleCode,
   formatVisitDashboardDate,
-  formatVisitDashboardDateTime,
   formatVisitDashboardFileSize,
   formatVisitDashboardMoney,
   getVisitDocumentPanelActionLabel,
+  getVisitAttendanceEventsForAvenue,
   getVisitDashboardErrorMessage,
   normalizeVisitDashboardData,
   validVisitAttendanceTab,
@@ -103,37 +103,16 @@ function StatRail({ stats }) {
     </section>
   );
 }
-function avenueTokens(value) {
-  return String(value || "")
-    .toUpperCase()
-    .split(/[^A-Z0-9]+/)
-    .filter(Boolean);
-}
-
-function visitEventsForAvenue(attendance, row) {
-  const columns = attendance?.club?.columns || [];
-  const avenueCode = String(row.avenueCode || "").toUpperCase();
-  const avenueName = String(row.avenueName || "").trim().toLowerCase();
-  const seen = new Set();
-
-  return columns.filter((column) => {
-    const columnCodes = avenueTokens(column.avenueCode);
-    const columnName = String(column.avenueName || "").trim().toLowerCase();
-
-    return columnCodes.includes(avenueCode) || Boolean(avenueName && columnName === avenueName);
-  }).flatMap((column) => {
-    if (seen.has(column.eventId)) return [];
-    seen.add(column.eventId);
-
-    return [{
-      eventId: column.eventId,
-      title: column.title,
-      date: formatVisitDashboardDate(column.date) || column.date || "Date unavailable",
-    }];
-  });
-}
 function AvenueCounts({ rows, attendance }) {
-  const activeAvenueRows = rows.filter((row) => Number(row.count) > 0);
+const activeAvenueRows = rows
+  .filter((row) => (
+    row.avenueCode !== "GBM"
+    && Number(row.count) > 0
+  ))
+  .map((row) => ({
+    ...row,
+    events: getVisitAttendanceEventsForAvenue(attendance, row),
+  }));
 
   return (
     <section className="visit-dashboard-avenue-section" aria-labelledby="visit-dashboard-avenues-title">
@@ -145,7 +124,8 @@ function AvenueCounts({ rows, attendance }) {
       {activeAvenueRows.length ? (
         <ul className="visit-dashboard-avenue-list">
           {activeAvenueRows.map((row) => {
-            const events = visitEventsForAvenue(attendance, row);
+            const events = row.events;
+            const eventCount = events.length;
 
             return (
               <li key={row.avenueCode}>
@@ -157,8 +137,8 @@ function AvenueCounts({ rows, attendance }) {
                     </span>
 
                     <span className="visit-dashboard-avenue-count-wrap">
-                      <b aria-label={`${row.count} ${row.count === 1 ? "event" : "events"}`}>
-                        {row.count}
+                      <b aria-label={`${eventCount} ${eventCount === 1 ? "event" : "events"}`}>
+                        {eventCount}
                       </b>
                       <i aria-hidden="true">&gt;</i>
                     </span>
@@ -175,7 +155,7 @@ function AvenueCounts({ rows, attendance }) {
                     </ul>
                   ) : (
                     <p className="visit-dashboard-avenue-empty">
-                      No linked attendance records found for this avenue yet.
+                      Event details are temporarily unavailable for this avenue.
                     </p>
                   )}
                 </details>

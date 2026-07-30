@@ -39,6 +39,17 @@ const AVENUE_LABELS = Object.freeze({
 });
 
 const AVENUE_ORDER = Object.freeze(Object.keys(AVENUE_LABELS));
+const EVENT_AVENUE_ORDER = Object.freeze([
+  "ISD",
+  "CMD",
+  "CSD",
+  "PDD",
+  "RRRO",
+  "PRO",
+  "DEI",
+]);
+
+const EVENT_AVENUE_CODE_SET = new Set(EVENT_AVENUE_ORDER);
 export const VISIT_ATTENDANCE_TABS = Object.freeze([
   { key: "club", label: "Club Attendance" },
   { key: "bod", label: "BOD Attendance" },
@@ -177,6 +188,26 @@ function roleLookupKey(value) {
     .replace(/[^a-z0-9]+/g, "");
 }
 
+const AVENUE_CODE_ALIASES = Object.freeze({
+  internationalservice: "ISD",
+  internationalserviceavenue: "ISD",
+  communityservice: "CMD",
+  communityserviceavenue: "CMD",
+  clubservice: "CSD",
+  clubserviceavenue: "CSD",
+  professionaldevelopment: "PDD",
+  professionaldevelopmentavenue: "PDD",
+  rotaryrotaractrelations: "RRRO",
+  rotaryrotaractrelationsavenue: "RRRO",
+  publicrelations: "PRO",
+  publicrelationsavenue: "PRO",
+  diversityequityandinclusion: "DEI",
+  diversityequityandinclusionavenue: "DEI",
+  generalbodymeeting: "GBM",
+  club: "CLUB",
+  other: "OTHER",
+});
+
 function hasCoRolePrefix(value) {
   const raw = text(value, 120).trim();
   if (/^co[-_\s]+/i.test(raw)) return true;
@@ -210,11 +241,6 @@ function safeId(value, max = 160) {
 function count(value) {
   const number = Number(value);
   return Number.isInteger(number) && number >= 0 ? number : 0;
-}
-
-function percentage(value) {
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 && number <= 100 ? Math.round(number) : 0;
 }
 
 function money(value) {
@@ -265,28 +291,94 @@ function normalizeOfficialDisplayNames(value) {
 }
 
 function normalizeAvenueCode(value) {
-  const code = text(value, 24).toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return AVENUE_LABELS[code] ? code : "";
+  const raw = text(value, 120);
+  const code = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (AVENUE_LABELS[code]) return code;
+  return AVENUE_CODE_ALIASES[roleLookupKey(raw)] || "";
+}
+
+function normalizeAvenueCodes(value) {
+  const selected = new Set();
+  const collect = (item) => {
+    if (Array.isArray(item)) {
+      item.forEach(collect);
+      return;
+    }
+
+    if (item && typeof item === "object") {
+      collect([item.avenueCode, item.code, item.avenue, item.avenueName, item.name, item.label]);
+      return;
+    }
+
+    const raw = text(item, 240);
+    if (!raw) return;
+
+    const directCode = normalizeAvenueCode(raw);
+    if (directCode) {
+      selected.add(directCode);
+      return;
+    }
+
+    raw.split(/\s*(?:,|;|\/|\||\+|\band\b)\s*/i).forEach((part) => {
+      const partCode = normalizeAvenueCode(part);
+      if (partCode) selected.add(partCode);
+    });
+
+    raw.toUpperCase().split(/[^A-Z0-9]+/).forEach((token) => {
+      if (AVENUE_LABELS[token]) selected.add(token);
+    });
+  };
+
+  collect(value);
+  return AVENUE_ORDER.filter((code) => selected.has(code));
+}
+
+function attendanceColumnAvenueCodes(column) {
+  return normalizeAvenueCodes([
+    column?.avenueCodes,
+    column?.associatedAvenueCodes,
+    column?.associatedAvenues,
+    column?.avenues,
+    column?.avenue,
+    column?.avenueCode,
+    column?.avenueName,
+  ]);
+}
+
+function avenueNameKey(value) {
+  return text(value, 120).replace(/\s+/g, " ").toLowerCase();
 }
 
 function normalizeAvenueEventCounts(value) {
-  const byCode = new Map(AVENUE_ORDER.map((code) => [code, 0]));
+  const byCode = new Map(EVENT_AVENUE_ORDER.map((code) => [code, 0]));
 
   if (Array.isArray(value)) {
     value.forEach((row) => {
       if (!row || typeof row !== "object") return;
-      const code = normalizeAvenueCode(row.avenueCode || row.code || row.avenue);
-      if (!code) return;
-      byCode.set(code, count(row.count));
+      const rowCount = count(row.count);
+normalizeAvenueCodes([
+  row.avenueCodes,
+  row.associatedAvenueCodes,
+  row.associatedAvenues,
+  row.avenues,
+  row.avenue,
+  row.avenueCode,
+  row.code,
+]).forEach((code) => {
+  if (!EVENT_AVENUE_CODE_SET.has(code)) return;
+  byCode.set(code, (byCode.get(code) || 0) + rowCount);
+});
     });
   } else if (value && typeof value === "object") {
     Object.entries(value).forEach(([code, rawCount]) => {
-      const cleanCode = normalizeAvenueCode(code);
-      if (cleanCode) byCode.set(cleanCode, count(rawCount));
+normalizeAvenueCodes(code).forEach((cleanCode) => {
+  if (!EVENT_AVENUE_CODE_SET.has(cleanCode)) return;
+  byCode.set(cleanCode, (byCode.get(cleanCode) || 0) + count(rawCount));
+});
     });
   }
 
-  return AVENUE_ORDER.map((avenueCode) => ({
+  return EVENT_AVENUE_ORDER.map((avenueCode) => ({
     avenueCode,
     avenueName: AVENUE_LABELS[avenueCode],
     count: byCode.get(avenueCode) || 0,
@@ -523,12 +615,14 @@ function normalizeAttendanceColumn(raw) {
   const eventId = safeId(raw.eventId, 160);
   const title = text(raw.title, 180);
   if (!eventId || !title) return null;
+  const avenueCodes = attendanceColumnAvenueCodes(raw);
   return {
     eventId,
     title,
     date: text(raw.date, 20),
-    avenueCode: text(raw.avenueCode, 40).toUpperCase(),
-    avenueName: text(raw.avenueName, 80),
+    avenueCode: normalizeAvenueCode(raw.avenueCode) || avenueCodes[0] || text(raw.avenueCode, 40).toUpperCase(),
+    avenueCodes,
+    avenueName: text(raw.avenueName, 80) || AVENUE_LABELS[avenueCodes[0]] || "",
     attendedCount: count(raw.attendedCount),
     eligibleCount: count(raw.eligibleCount),
     attendanceRate: nullablePercentage(raw.attendanceRate),
@@ -792,6 +886,33 @@ export function visitSlugFromType(visitType) {
 
 export function visitDashboardName(visitType) {
   return VISIT_DASHBOARD_NAMES[visitType] || "Visit";
+}
+
+export function getVisitAttendanceEventsForAvenue(attendance, row) {
+  const columns = Array.isArray(attendance?.club?.columns) ? attendance.club.columns : [];
+  const avenueCode = normalizeAvenueCode(row?.avenueCode || row?.code || row?.avenue || row?.avenueName);
+  const avenueName = avenueNameKey(row?.avenueName);
+  const seen = new Set();
+
+  return columns.flatMap((column) => {
+    const columnCodes = attendanceColumnAvenueCodes(column);
+    const columnName = avenueNameKey(column?.avenueName);
+    const matchesAvenue = Boolean(
+      (avenueCode && columnCodes.includes(avenueCode))
+      || (avenueName && columnName === avenueName),
+    );
+    if (!matchesAvenue) return [];
+
+    const eventKey = safeId(column.eventId, 160) || text(column.title, 180).toLowerCase();
+    if (seen.has(eventKey)) return [];
+    seen.add(eventKey);
+
+    return [{
+      eventId: column.eventId,
+      title: column.title,
+      date: formatVisitDashboardDate(column.date) || column.date || "Date unavailable",
+    }];
+  });
 }
 
 export function normalizeVisitDashboardData(raw, fallbackVisitType = "") {
