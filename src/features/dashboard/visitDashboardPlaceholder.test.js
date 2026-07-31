@@ -329,6 +329,99 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
   }, "clubAssembly").documentPanels[0];
   assert.equal(explicitPrimarySelection.primaryPresentation.fileName, "club-assembly.pptx");
   assert.equal(explicitPrimarySelection.primaryPresentation.previewUrl, "https://drive.google.com/file/d/safeDeckFile/preview");
+    const expandedMainFileFormats = [
+    {
+      fileName: "report.doc",
+      mimeType: "application/msword",
+    },
+    {
+      fileName: "report.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    },
+    {
+      fileName: "attendance.xls",
+      mimeType: "application/vnd.ms-excel",
+    },
+    {
+      fileName: "attendance.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    },
+    {
+      fileName: "attendance.csv",
+      mimeType: "text/csv",
+    },
+    {
+      fileName: "Google document",
+      mimeType: "application/vnd.google-apps.document",
+    },
+    {
+      fileName: "Google sheet",
+      mimeType: "application/vnd.google-apps.spreadsheet",
+    },
+    {
+      fileName: "Google presentation",
+      mimeType: "application/vnd.google-apps.presentation",
+    },
+  ];
+
+  for (
+    const visitType of [
+      "clubAssembly",
+      "dzrVisit",
+      "drrVisit",
+    ]
+  ) {
+    for (
+      const [index, format] of expandedMainFileFormats.entries()
+    ) {
+      const submissionId = `${visitType}-main-${index}`;
+      const driveFileId = `safe${visitType}MainFile${index}`;
+
+      const selectedPanel = normalizeVisitDashboardData({
+        visit: {
+          visitType,
+        },
+        documentPanels: [{
+          positionKey: "secretary",
+          positionTitle: "Secretary",
+          avenueCode: "SEC",
+          folderLabel: "Secretary",
+          canOpen: true,
+          openUrl: "https://drive.google.com/drive/folders/safe-secretary-folder",
+          primaryPresentation: {
+            submissionId,
+            title: format.fileName,
+            fileName: format.fileName,
+            mimeType: format.mimeType,
+            canOpen: true,
+            canPreview: true,
+            driveFileId,
+          },
+          files: [{
+            submissionId,
+            title: format.fileName,
+            fileName: format.fileName,
+            mimeType: format.mimeType,
+            canOpen: true,
+            canPreview: true,
+            driveFileId,
+          }],
+        }],
+      }, visitType).documentPanels[0];
+
+      assert.equal(
+        selectedPanel.primaryPresentation?.fileName,
+        format.fileName,
+        `${format.fileName} is accepted for ${visitType}`,
+      );
+
+      assert.equal(
+        selectedPanel.primaryPresentation?.previewUrl,
+        `https://drive.google.com/file/d/${driveFileId}/preview`,
+        `${format.fileName} receives a safe preview URL for ${visitType}`,
+      );
+    }
+  }
   assert.equal(normalized.attendance.club.rows[0].cells["event-1"], "present");
   assert.equal(normalized.attendance.club.columns[0].attendanceLabel, "100%");
   assert.equal(normalized.attendance.club.rows[0].attendanceLabel, "100%");
