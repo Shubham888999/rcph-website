@@ -103,11 +103,33 @@ const FORBIDDEN_VISIT_UPLOAD_AUTHORITY_FIELDS = Object.freeze([
 ]);
 const PRIMARY_PRESENTATION_MIME_TYPES = new Set([
   'application/pdf',
+
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+  'text/csv',
+
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
   'application/vnd.google-apps.presentation',
 ]);
-const PRIMARY_PRESENTATION_EXTENSIONS = new Set(['pdf', 'ppt', 'pptx']);
+
+const PRIMARY_PRESENTATION_EXTENSIONS = new Set([
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
+  'csv',
+]);
 
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object || {}, key);
@@ -318,9 +340,13 @@ function driveFileIdFromUrl(value) {
         return safeDriveFileId(url.searchParams.get('id'));
       }
     }
-    if (url.hostname === 'docs.google.com' && segments[0] === 'presentation' && segments[1] === 'd') {
-      return safeDriveFileId(segments[2]);
-    }
+if (
+  url.hostname === 'docs.google.com'
+  && ['document', 'spreadsheets', 'presentation'].includes(segments[0])
+  && segments[1] === 'd'
+) {
+  return safeDriveFileId(segments[2]);
+}
   } catch {
     return '';
   }

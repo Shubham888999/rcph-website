@@ -990,7 +990,100 @@ assertNoSensitivePayload(jointEventDashboard);
     },
   }).getDashboardData(approvedContext());
   assert.equal(explicitPdfSelection.documentPanels[0].primaryPresentation.fileName, 'constitution.pdf', 'explicit PDF selection is allowed');
+  const expandedDashboardFormats = [
+    {
+      fileName: 'report.doc',
+      mimeType: 'application/msword',
+    },
+    {
+      fileName: 'report.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    },
+    {
+      fileName: 'attendance.xls',
+      mimeType: 'application/vnd.ms-excel',
+    },
+    {
+      fileName: 'attendance.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+    {
+      fileName: 'attendance.csv',
+      mimeType: 'text/csv',
+    },
+    {
+      fileName: 'Google document',
+      mimeType: 'application/vnd.google-apps.document',
+    },
+    {
+      fileName: 'Google sheet',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+    },
+    {
+      fileName: 'Google presentation',
+      mimeType: 'application/vnd.google-apps.presentation',
+    },
+  ];
 
+  for (const visitType of dashboards.VISIT_TYPE_KEYS) {
+    for (
+      const [index, format] of expandedDashboardFormats.entries()
+    ) {
+      const submissionId = `${visitType}-expanded-main-${index}`;
+      const driveFileId = `safe${visitType}ExpandedMain${index}`;
+
+      const expandedDashboard = await createService({
+        visitDashboardConfig: {
+          [visitType]: visibleConfig(visitType, {
+            visiblePositionKeys: ['president'],
+            allowDistrictOfficials: true,
+          }),
+        },
+        visitSubmissionPositions: {
+          [`${visitType}_president`]: {
+            visitType,
+            positionKey: 'president',
+            positionTitle: 'President',
+            avenueCode: 'PRES',
+            driveFolderId: `safe-${visitType}-president-folder`,
+            primaryPresentationSubmissionId: submissionId,
+          },
+        },
+        visitSubmissions: {
+          [submissionId]: {
+            submissionId,
+            visitType,
+            positionKey: 'president',
+            fileName: format.fileName,
+            originalFileName: format.fileName,
+            mimeType: format.mimeType,
+            sizeBytes: 1000,
+            driveFileId,
+            status: 'active',
+          },
+        },
+            }).getDashboardData(
+        approvedContext({ visitType }),
+      );
+
+      const selectedFile =
+        expandedDashboard.documentPanels[0].primaryPresentation;
+
+      assert.equal(
+        selectedFile?.fileName,
+        format.fileName,
+        `${format.fileName} is exposed as primary for ${visitType}`,
+      );
+
+      assert.equal(
+        selectedFile?.previewUrl,
+        `https://drive.google.com/file/d/${driveFileId}/preview`,
+        `${format.fileName} receives a preview URL for ${visitType}`,
+      );
+
+      assertNoSensitivePayload(expandedDashboard);
+    }
+  }
   const invalidSelection = await createService({
     visitDashboardConfig: {
       clubAssembly: visibleConfig('clubAssembly', { visiblePositionKeys: ['president'], allowDistrictOfficials: true }),

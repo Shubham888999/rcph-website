@@ -399,18 +399,31 @@ await rejectsWithCode(
     'invalid-argument',
     'cross-visit primary selection rejected'
   );
-  await rejectsWithCode(
-    () => primaryEnv.service.updateFolder('admin-uid', {
-      visitType: 'clubAssembly',
-      positionKey: 'secretary',
-      primaryPresentationSubmissionId: 'secretary-docx',
-    }),
-    'invalid-argument',
-    'DOCX cannot be selected as the main presentation'
+  await primaryEnv.service.updateFolder('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    primaryPresentationSubmissionId: 'secretary-docx',
+  });
+
+  assert.strictEqual(
+    primaryFolderDoc().primaryPresentationSubmissionId,
+    'secretary-docx',
+    'DOCX can be selected as the main presentation',
   );
+  await primaryEnv.service.updateFolder('admin-uid', {
+    visitType: 'clubAssembly',
+    positionKey: 'secretary',
+    primaryPresentationSubmissionId: 'secretary-sheet',
+  });
+
+  assert.strictEqual(
+    primaryFolderDoc().primaryPresentationSubmissionId,
+    'secretary-sheet',
+    'XLSX can be selected as the main presentation',
+  );
+
   for (const [submissionId, reason] of [
     ['secretary-image', 'images cannot be selected as the main presentation'],
-    ['secretary-sheet', 'spreadsheets cannot be selected as the main presentation'],
     ['secretary-inactive-pdf', 'active=false submissions cannot be selected as the main presentation'],
     ['secretary-removed-pdf', 'removed submissions cannot be selected as the main presentation'],
   ]) {
@@ -433,8 +446,12 @@ await rejectsWithCode(
     'invalid-argument',
     'inactive submissions cannot be selected as the main presentation'
   );
-  assert.strictEqual(primaryFolderDoc().primaryPresentationSubmissionId, 'secretary-pptx', 'failed selection attempts leave current selection unchanged');
-  await primaryEnv.service.updateFolder('president-uid', {
+  assert.strictEqual(
+    primaryFolderDoc().primaryPresentationSubmissionId,
+    'secretary-sheet',
+    'failed selection attempts leave the current selection unchanged',
+  );
+    await primaryEnv.service.updateFolder('president-uid', {
     visitType: 'clubAssembly',
     positionKey: 'secretary',
     primaryPresentationSubmissionId: '',
@@ -453,7 +470,100 @@ await rejectsWithCode(
   assert.strictEqual(primaryEnv.adapter.store.visitSubmissionPositions.clubAssembly_secretary.primaryPresentationSubmissionId, 'secretary-pptx');
   assert.strictEqual(primaryEnv.adapter.store.visitSubmissionPositions.drrVisit_secretary.primaryPresentationSubmissionId, 'drr-secretary-pptx');
   assert.strictEqual(primaryEnv.adapter.store.visitSubmissionPositions.dzrVisit_secretary.primaryPresentationSubmissionId, '', 'visit selections are independent and optional');
+  const expandedPrimaryFormats = [
+    {
+      extension: 'doc',
+      mimeType: 'application/msword',
+    },
+    {
+      extension: 'docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    },
+    {
+      extension: 'xls',
+      mimeType: 'application/vnd.ms-excel',
+    },
+    {
+      extension: 'xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+    {
+      extension: 'csv',
+      mimeType: 'text/csv',
+    },
+    {
+      extension: '',
+      label: 'google-document',
+      mimeType: 'application/vnd.google-apps.document',
+    },
+    {
+      extension: '',
+      label: 'google-sheet',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+    },
+    {
+      extension: '',
+      label: 'google-presentation',
+      mimeType: 'application/vnd.google-apps.presentation',
+    },
+  ];
 
+  const expandedPrimaryEnv = await initializedEnv();
+
+  for (const visitType of visit.VISIT_TYPE_KEYS) {
+    for (
+      const [index, format] of expandedPrimaryFormats.entries()
+    ) {
+      const formatLabel = format.label || format.extension;
+      const submissionId = `${visitType}-secretary-${formatLabel}`;
+      const fileName = format.extension
+        ? `main-file.${format.extension}`
+        : `Main ${formatLabel}`;
+      const driveFileId = `driveFile${visitType}${index}Main`;
+
+      expandedPrimaryEnv.adapter.store.visitSubmissions[submissionId] = {
+        ...expandedPrimaryEnv.adapter.store.visitSubmissions['secretary-file'],
+        submissionId,
+        visitType,
+        positionKey: 'secretary',
+        fileName,
+        originalFileName: fileName,
+        mimeType: format.mimeType,
+        driveFileId,
+        driveFileUrl: `https://drive.google.com/file/d/${driveFileId}/view`,
+        status: 'active',
+        active: true,
+      };
+
+      const beforeSelection = await expandedPrimaryEnv.service.getFolder(
+        'admin-uid',
+        visitType,
+        'secretary',
+      );
+
+      assert.strictEqual(
+        beforeSelection.submissions.find(
+          item => item.submissionId === submissionId,
+        )?.canSetPrimaryPresentation,
+        true,
+        `${formatLabel} exposes main-file selection for ${visitType}`,
+      );
+
+      await expandedPrimaryEnv.service.updateFolder('admin-uid', {
+        visitType,
+        positionKey: 'secretary',
+        primaryPresentationSubmissionId: submissionId,
+      });
+
+      assert.strictEqual(
+        expandedPrimaryEnv.adapter.store.visitSubmissionPositions[
+          `${visitType}_secretary`
+        ].primaryPresentationSubmissionId,
+        submissionId,
+        `${formatLabel} can be selected for ${visitType}`,
+      );
+    }
+  }
   const archivedShape = visit.shapeSubmission({
     submissionId: 'archived-submission',
     visitType: 'clubAssembly',

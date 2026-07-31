@@ -267,19 +267,63 @@ function roundMoney(value) {
 
 const PREVIEWABLE_DOCUMENT_MIME_TYPES = new Set([
   'application/pdf',
+
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+  'text/csv',
+
   'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
   'application/vnd.google-apps.presentation',
 ]);
-const PREVIEWABLE_DOCUMENT_EXTENSIONS = new Set(['pdf', 'ppt', 'pptx']);
+
+const PREVIEWABLE_DOCUMENT_EXTENSIONS = new Set([
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
+  'csv',
+]);
+
 const PRIMARY_PRESENTATION_MIME_TYPES = new Set([
   'application/pdf',
+
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+  'text/csv',
+
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
   'application/vnd.google-apps.presentation',
 ]);
-const PRIMARY_PRESENTATION_EXTENSIONS = new Set(['pdf', 'ppt', 'pptx']);
+
+const PRIMARY_PRESENTATION_EXTENSIONS = new Set([
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
+  'csv',
+]);
 
 function fileExtension(value) {
   const match = normalizeText(value, 220).toLowerCase().match(/\.([a-z0-9]{1,12})$/);
