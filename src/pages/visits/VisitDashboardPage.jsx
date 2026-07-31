@@ -58,15 +58,14 @@ function VisitDashboardError({ title, onRetry }) {
 }
 
 function StatRail({ stats }) {
-  const memberValues = [
-    { label: "Total events", value: stats.totalEvents },
-    { label: "Total members", value: stats.totalMembers },
-    { label: "Male", value: stats.maleMembers },
-    { label: "Female", value: stats.femaleMembers },
-    { label: "Other", value: stats.otherGenderMembers },
-    { label: "Not specified", value: stats.unknownGenderMembers },
-    { label: "Male/Female ratio", value: stats.maleFemaleRatio },
-  ];
+const memberValues = [
+  { label: "Total events", value: stats.totalEvents },
+  { label: "Total members", value: stats.totalMembers },
+  { label: "Male", value: stats.maleMembers },
+  { label: "Female", value: stats.femaleMembers },
+  { label: "Other", value: stats.otherGenderMembers },
+  { label: "Male/Female ratio", value: stats.maleFemaleRatio },
+];
 
   const financeValues = [
     { label: "Income", value: formatVisitDashboardMoney(stats.treasuryIncome), tone: "income" },
