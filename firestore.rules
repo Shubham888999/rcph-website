@@ -101,14 +101,18 @@ service cloud.firestore {
 
 function hasActiveSaaAssignment() {
   return hasAnyRole(['bod', 'admin', 'president'])
-    && get(userPath()).data.get('positionKeys', []).hasAny(['saa', 'sergeant', 'sergeant-at-arms'])
-    && hasActivePositionAssignment(saaAssignmentPath(), 'saa');
+    && hasActivePositionAssignment(
+      saaAssignmentPath(),
+      'saa'
+    );
 }
 
 function hasActiveCoSaaAssignment() {
   return hasAnyRole(['bod', 'admin', 'president'])
-    && get(userPath()).data.get('positionKeys', []).hasAny(['co-saa', 'co-sergeant-at-arms'])
-    && hasActivePositionAssignment(coSaaAssignmentPath(), 'co-saa');
+    && hasActivePositionAssignment(
+      coSaaAssignmentPath(),
+      'co-saa'
+    );
 }
 
 function hasActiveSergeantAtArmsAssignment() {

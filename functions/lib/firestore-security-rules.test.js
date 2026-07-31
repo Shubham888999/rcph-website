@@ -70,6 +70,23 @@ const identities = {
   cwd: account('cwd', 'bod', ['cwd']),
   saa: account('saa', 'bod', ['saa']),
   coSaa: account('co-saa', 'bod', ['co-saa']),
+  saaAssignmentOnly: account(
+  'saa-assignment-only',
+  'bod',
+  [],
+  {
+    assignments: ['saa'],
+  },
+),
+
+coSaaAssignmentOnly: account(
+  'co-saa-assignment-only',
+  'bod',
+  [],
+  {
+    assignments: ['co-saa'],
+  },
+),
   inactiveSaa: account('inactive-saa', 'bod', ['saa'], { assignment: { active: false, removedAt: NOW } }),
   removedCwd: account('removed-cwd', 'bod', ['cwd'], { assignment: { active: false, removedAt: NOW } }),
   expiredCwd: account('expired-cwd', 'bod', ['cwd'], { assignment: { expiresAt: new Date('2026-07-01T00:00:00.000Z') } }),
@@ -141,15 +158,17 @@ function hasPresidentAuthority(identity) {
 }
 
 function hasActiveSaaAssignment(identity) {
-  return hasAnyRole(identity, ['bod', 'admin', 'president'])
-    && ['saa', 'sergeant', 'sergeant-at-arms'].some(key => identity.user.positionKeys?.includes(key))
-    && activePositionAssignment(identity, 'saa');
+  return hasAnyRole(
+    identity,
+    ['bod', 'admin', 'president'],
+  ) && activePositionAssignment(identity, 'saa');
 }
 
 function hasActiveCoSaaAssignment(identity) {
-  return hasAnyRole(identity, ['bod', 'admin', 'president'])
-    && ['co-saa', 'co-sergeant-at-arms'].some(key => identity.user.positionKeys?.includes(key))
-    && activePositionAssignment(identity, 'co-saa');
+  return hasAnyRole(
+    identity,
+    ['bod', 'admin', 'president'],
+  ) && activePositionAssignment(identity, 'co-saa');
 }
 
 function hasActiveSergeantAtArmsAssignment(identity) {
@@ -222,6 +241,35 @@ test('rules source replaces broad role and lock reads with approved-active autho
   assert.doesNotMatch(bodyOfFunction(rules, 'isAdmin'), /hasRole\('admin'\)/);
   assert.match(rules, /match \/roles\/\{uid\} \{\s*allow get: if signedIn\(\) && \(request\.auth\.uid == uid \|\| isAdmin\(\)\);\s*allow list: if isAdmin\(\);/);
   assert.match(rules, /match \/locks\/\{panelId\} \{\s*allow read: if hasAdminPanelAuthority\(\) \|\| canReadAttendanceLock\(panelId\);\s*allow create, update, delete: if hasLockTools\(\);/);
+    const saaBody = bodyOfFunction(
+    rules,
+    'hasActiveSaaAssignment',
+  );
+
+  const coSaaBody = bodyOfFunction(
+    rules,
+    'hasActiveCoSaaAssignment',
+  );
+
+  assert.match(
+    saaBody,
+    /hasActivePositionAssignment\(saaAssignmentPath\(\),\s*'saa'\)/,
+  );
+
+  assert.match(
+    coSaaBody,
+    /hasActivePositionAssignment\(coSaaAssignmentPath\(\),\s*'co-saa'\)/,
+  );
+
+  assert.doesNotMatch(
+    saaBody,
+    /positionKeys|userPath/,
+  );
+
+  assert.doesNotMatch(
+    coSaaBody,
+    /positionKeys|userPath/,
+  );
 });
 
 test('role reads deny unauthenticated, cross-user, and ordinary collection queries', () => {
@@ -266,6 +314,48 @@ test('lock reads and writes deny ordinary and stale identities', () => {
   assert.equal(canReadLock(identities.saa, 'treasury'), false);
   assert.equal(canWriteLock(identities.saa), false);
   assert.equal(canWriteLock(identities.coSaa), false);
+    for (
+    const identity of [
+      identities.saaAssignmentOnly,
+      identities.coSaaAssignmentOnly,
+    ]
+  ) {
+    assert.equal(
+      canReadAdminCollection(
+        identity,
+        'members',
+      ),
+      true,
+      'active assignment permits member roster read without duplicated user positionKeys',
+    );
+
+    assert.equal(
+      canReadAdminCollection(
+        identity,
+        'attendance',
+      ),
+      true,
+      'active assignment permits attendance read without duplicated user positionKeys',
+    );
+
+    assert.equal(
+      canWriteAdminCollection(
+        identity,
+        'attendance',
+      ),
+      true,
+      'active assignment permits attendance marking without duplicated user positionKeys',
+    );
+
+    assert.equal(
+      canReadLock(
+        identity,
+        'attendance',
+      ),
+      true,
+      'active assignment permits attendance lock read without duplicated user positionKeys',
+    );
+  }
   assert.equal(canReadLock(identities.inactiveSaa, 'attendance'), false);
 });
 
