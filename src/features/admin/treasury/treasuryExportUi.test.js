@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-
+const balanceSheet = readFileSync(
+  new URL("./treasuryBalanceSheet.js", import.meta.url),
+  "utf8",
+);
 const financeModules = readFileSync(new URL("../modules/FinanceModules.jsx", import.meta.url), "utf8");
 const css = readFileSync(new URL("../../../styles/components/admin.css", import.meta.url), "utf8");
 const exportModel = readFileSync(new URL("./treasuryExportModel.js", import.meta.url), "utf8");
@@ -18,6 +21,14 @@ test("Treasury history exposes Excel and PDF exports tied to the active filtered
   assert.match(financeModules, /disabled=\{Boolean\(exporting\)\}/);
   assert.match(financeModules, /Generating Excel\.\.\./);
   assert.match(financeModules, /Generating PDF\.\.\./);
+  assert.match(financeModules, /downloadTreasuryBalanceSheet/);
+assert.match(financeModules, /Export Balance Sheet/);
+assert.match(financeModules, /openingCashInHand/);
+assert.match(financeModules, /cashInHandByMonth/);
+assert.match(
+  financeModules,
+  /treasuryBalanceSheetMonthRange/,
+);
 });
 
 test("Treasury export UI has scoped responsive styles", () => {
@@ -27,8 +38,23 @@ test("Treasury export UI has scoped responsive styles", () => {
 });
 
 test("Treasury export helpers remain read-only frontend generators", () => {
-  const combined = `${exportModel}\n${excel}\n${pdf}`;
+  const combined =
+  `${exportModel}\n${excel}\n${pdf}\n${balanceSheet}`;
   assert.doesNotMatch(combined, /addTreasury|updateTreasury|deleteTreasury|setTreasuryById|uploadTreasuryBill|adminService|firebase/);
   assert.match(combined, /filterAndSortTreasury/);
   assert.match(combined, /getBodAvenueReportLetterheadPng/);
+  assert.match(
+  balanceSheet,
+  /RCPH BALANCE SHEET \$\{first\}-\$\{last\}\.xlsx/,
+);
+
+assert.match(
+  balanceSheet,
+  /Monthly Closing Balance Summary/,
+);
+
+assert.match(
+  balanceSheet,
+  /Cash Withdrawn from Bank \(Contra\)/,
+);
 });

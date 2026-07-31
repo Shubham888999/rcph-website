@@ -14,6 +14,12 @@ import TreasuryAttachments from "../treasury/TreasuryAttachments";
 import TreasuryFileField from "../treasury/TreasuryFileField";
 import { buildTreasuryExportReport } from "../treasury/treasuryExportModel";
 import { downloadTreasuryWorkbook } from "../treasury/treasuryExcel";
+import {
+  buildTreasuryBalanceSheetModel,
+  downloadTreasuryBalanceSheet,
+  treasuryBalanceSheetMonthLabel,
+  treasuryBalanceSheetMonthRange,
+} from "../treasury/treasuryBalanceSheet";
 import { downloadTreasuryPdf } from "../treasury/treasuryPdf";
 import { createTreasuryUploadState, getSafeTreasuryUploadError, validateTreasuryUploadFile } from "../treasury/treasuryUploadModel";
 import {
@@ -299,6 +305,7 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const [target, setTarget] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_TREASURY_FILTERS);
   const [exporting, setExporting] = useState("");
+  const [balanceSheetDraft, setBalanceSheetDraft] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "treasury", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const summary = useMemo(() => buildTreasurySummary(transactions), [transactions]);
@@ -644,7 +651,163 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   function updateFilter(key, value) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
+function openBalanceSheetExport() {
+  const availableMonths = monthOptions
+    .map((item) => item.value)
+    .sort((a, b) => a.localeCompare(b));
 
+  if (!availableMonths.length) {
+    reportValidation(
+      "Add at least one dated Treasury transaction before exporting a Balance Sheet.",
+    );
+    return;
+  }
+
+  const startMonth = availableMonths[0];
+  const endMonth = availableMonths.at(-1);
+  const selectedMonths = treasuryBalanceSheetMonthRange(
+    startMonth,
+    endMonth,
+  );
+
+  setBalanceSheetDraft({
+    startMonth,
+    endMonth,
+    openingCashInHand: "0",
+    cashInHandByMonth: Object.fromEntries(
+      selectedMonths.map((month) => [month, "0"]),
+    ),
+  });
+}
+
+function updateBalanceSheetRange(key, value) {
+  setBalanceSheetDraft((current) => {
+    if (!current) return current;
+
+    const next = {
+      ...current,
+      [key]: value,
+    };
+
+    const selectedMonths = treasuryBalanceSheetMonthRange(
+      next.startMonth,
+      next.endMonth,
+    );
+
+    return {
+      ...next,
+      cashInHandByMonth: Object.fromEntries(
+        selectedMonths.map((month) => [
+          month,
+          current.cashInHandByMonth?.[month] ?? "0",
+        ]),
+      ),
+    };
+  });
+}
+
+function updateBalanceSheetCash(month, value) {
+  setBalanceSheetDraft((current) => (
+    current
+      ? {
+          ...current,
+          cashInHandByMonth: {
+            ...current.cashInHandByMonth,
+            [month]: value,
+          },
+        }
+      : current
+  ));
+}
+
+function validBalanceSheetAmount(value) {
+  if (value === "") return false;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0;
+}
+
+async function exportBalanceSheet() {
+  if (!balanceSheetDraft || exporting) return;
+
+  const selectedMonths = treasuryBalanceSheetMonthRange(
+    balanceSheetDraft.startMonth,
+    balanceSheetDraft.endMonth,
+  );
+
+  if (!selectedMonths.length) {
+    reportValidation(
+      "Choose a valid Balance Sheet month range.",
+    );
+    return;
+  }
+
+  if (
+    !validBalanceSheetAmount(
+      balanceSheetDraft.openingCashInHand,
+    )
+  ) {
+    reportValidation(
+      "Enter a valid opening Cash in Hand amount.",
+    );
+    return;
+  }
+
+  const invalidMonth = selectedMonths.find(
+    (month) => !validBalanceSheetAmount(
+      balanceSheetDraft.cashInHandByMonth?.[month],
+    ),
+  );
+
+  if (invalidMonth) {
+    reportValidation(
+      `Enter a valid closing Cash in Hand amount for ${
+        treasuryBalanceSheetMonthLabel(invalidMonth)
+      }.`,
+    );
+    return;
+  }
+
+  setExporting("balance-sheet");
+
+  try {
+    const model = buildTreasuryBalanceSheetModel({
+      transactions,
+      startMonth: balanceSheetDraft.startMonth,
+      endMonth: balanceSheetDraft.endMonth,
+      openingCashInHand: Number(
+        balanceSheetDraft.openingCashInHand,
+      ),
+      cashInHandByMonth: Object.fromEntries(
+        selectedMonths.map((month) => [
+          month,
+          Number(
+            balanceSheetDraft.cashInHandByMonth[month],
+          ),
+        ]),
+      ),
+    });
+
+    await downloadTreasuryBalanceSheet(model);
+
+    setBalanceSheetDraft(null);
+
+    onNotice?.({
+      type: "success",
+      message:
+        `${model.months.length} monthly Balance Sheet`
+        + `${model.months.length === 1 ? "" : "s"} exported.`,
+    });
+  } catch (error) {
+    onNotice?.({
+      type: "error",
+      message:
+        error?.message
+        || "The Balance Sheet workbook could not be generated. No Treasury data was changed.",
+    });
+  } finally {
+    setExporting("");
+  }
+}
   async function exportTreasury(format) {
     if (exporting) return;
     setExporting(format);
@@ -749,23 +912,196 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
           )}
         </div>
       </section>
-      <TreasuryHistory
-        transactions={transactions}
-        filteredTransactions={filteredTransactions}
-        groupedTransactions={groupedTransactions}
-        filters={filters}
-        monthOptions={monthOptions}
-        avenueOptions={avenueOptions}
-        locked={locked}
-        onFilter={updateFilter}
-        onClearFilters={() => setFilters(DEFAULT_TREASURY_FILTERS)}
-        onDetails={setDetails}
-        onEdit={startEdit}
-        onDelete={setTarget}
-        exporting={exporting}
-        onExportExcel={() => exportTreasury("excel")}
-        onExportPdf={() => exportTreasury("pdf")}
-      />
+<TreasuryHistory
+  transactions={transactions}
+  filteredTransactions={filteredTransactions}
+  groupedTransactions={groupedTransactions}
+  filters={filters}
+  monthOptions={monthOptions}
+  avenueOptions={avenueOptions}
+  locked={locked}
+  onFilter={updateFilter}
+  onClearFilters={() => setFilters(DEFAULT_TREASURY_FILTERS)}
+  onDetails={setDetails}
+  onEdit={startEdit}
+  onDelete={setTarget}
+  exporting={exporting}
+  onExportExcel={() => exportTreasury("excel")}
+  onExportPdf={() => exportTreasury("pdf")}
+  onExportBalanceSheet={openBalanceSheetExport}
+/>
+{balanceSheetDraft ? (
+  <AdminDialog
+    title="Export Treasury Balance Sheet"
+    busy={exporting === "balance-sheet"}
+    onClose={() => {
+      if (!exporting) setBalanceSheetDraft(null);
+    }}
+    className="admin-dialog--wide"
+  >
+    <div className="treasury-balance-sheet-dialog">
+      <p>
+        Choose the month range and enter the actual Cash in Hand.
+        All non-cash Treasury transactions will be placed under Bank.
+      </p>
+
+      <div className="treasury-balance-sheet-range">
+        <label>
+          <FieldLabel label="From month" required />
+
+          <select
+            value={balanceSheetDraft.startMonth}
+            onChange={(event) => updateBalanceSheetRange(
+              "startMonth",
+              event.target.value,
+            )}
+            disabled={Boolean(exporting)}
+          >
+            {[...monthOptions]
+              .sort((a, b) => a.value.localeCompare(b.value))
+              .map((month) => (
+                <option
+                  value={month.value}
+                  key={month.value}
+                >
+                  {month.label}
+                </option>
+              ))}
+          </select>
+        </label>
+
+        <label>
+          <FieldLabel label="To month" required />
+
+          <select
+            value={balanceSheetDraft.endMonth}
+            onChange={(event) => updateBalanceSheetRange(
+              "endMonth",
+              event.target.value,
+            )}
+            disabled={Boolean(exporting)}
+          >
+            {[...monthOptions]
+              .sort((a, b) => a.value.localeCompare(b.value))
+              .map((month) => (
+                <option
+                  value={month.value}
+                  key={month.value}
+                >
+                  {month.label}
+                </option>
+              ))}
+          </select>
+        </label>
+      </div>
+
+      <section className="treasury-balance-sheet-cash">
+        <header>
+          <span>Opening balance</span>
+          <h4>
+            Cash in Hand before {
+              treasuryBalanceSheetMonthLabel(
+                balanceSheetDraft.startMonth,
+              )
+            }
+          </h4>
+        </header>
+
+        <label>
+          <FieldLabel
+            label="Opening Cash in Hand"
+            required
+          />
+
+          <span className="treasury-amount-input">
+            <span aria-hidden="true">₹</span>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={balanceSheetDraft.openingCashInHand}
+              onChange={(event) => setBalanceSheetDraft(
+                (current) => ({
+                  ...current,
+                  openingCashInHand: event.target.value,
+                }),
+              )}
+              disabled={Boolean(exporting)}
+            />
+          </span>
+        </label>
+      </section>
+
+      <section className="treasury-balance-sheet-cash">
+        <header>
+          <span>Monthly closing balances</span>
+          <h4>Cash in Hand for each selected month</h4>
+          <p>
+            Enter the actual physical cash remaining at the end
+            of each month.
+          </p>
+        </header>
+
+        <div className="treasury-balance-sheet-months">
+          {treasuryBalanceSheetMonthRange(
+            balanceSheetDraft.startMonth,
+            balanceSheetDraft.endMonth,
+          ).map((month) => (
+            <label key={month}>
+              <FieldLabel
+                label={`${treasuryBalanceSheetMonthLabel(month)} ${
+                  month.slice(0, 4)
+                }`}
+                required
+              />
+
+              <span className="treasury-amount-input">
+                <span aria-hidden="true">₹</span>
+
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={
+                    balanceSheetDraft.cashInHandByMonth?.[
+                      month
+                    ] ?? ""
+                  }
+                  onChange={(event) => updateBalanceSheetCash(
+                    month,
+                    event.target.value,
+                  )}
+                  disabled={Boolean(exporting)}
+                />
+              </span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <div className="admin-actions">
+        <button
+          type="button"
+          onClick={exportBalanceSheet}
+          disabled={Boolean(exporting)}
+        >
+          {exporting === "balance-sheet"
+            ? "Generating Balance Sheet..."
+            : "Export Balance Sheet"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setBalanceSheetDraft(null)}
+          disabled={Boolean(exporting)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </AdminDialog>
+) : null}
       {editing ? (
         <AdminDialog title={`Editing transaction: ${editing.title || "Untitled transaction"}`} busy={busy} onClose={() => setEditing(null)} className="admin-dialog--wide">
           <div className="treasury-edit-shell">
@@ -1353,8 +1689,25 @@ function TreasuryReviewPanel({ value, upload, errors, compact = false }) {
   );
 }
 
-function TreasuryHistory({ transactions, filteredTransactions, groupedTransactions, filters, monthOptions, avenueOptions, locked, onFilter, onClearFilters, onDetails, onEdit, onDelete, exporting, onExportExcel, onExportPdf }) {
-  const [activeMobileMenuId, setActiveMobileMenuId] = useState("");
+function TreasuryHistory({
+  transactions,
+  filteredTransactions,
+  groupedTransactions,
+  filters,
+  monthOptions,
+  avenueOptions,
+  locked,
+  onFilter,
+  onClearFilters,
+  onDetails,
+  onEdit,
+  onDelete,
+  exporting,
+  onExportExcel,
+  onExportPdf,
+  onExportBalanceSheet,
+}) {
+    const [activeMobileMenuId, setActiveMobileMenuId] = useState("");
   const activeMobileMenuRef = useRef(null);
   const activeFilters = Object.entries(filters).some(([key, value]) => key !== "sort" && Boolean(value)) || filters.sort !== DEFAULT_TREASURY_FILTERS.sort;
 
@@ -1391,6 +1744,15 @@ function TreasuryHistory({ transactions, filteredTransactions, groupedTransactio
           <div className="admin-actions treasury-export-actions" aria-label="Treasury export actions">
             <button type="button" onClick={onExportExcel} disabled={Boolean(exporting)}>{exporting === "excel" ? "Generating Excel..." : "Export Excel"}</button>
             <button type="button" onClick={onExportPdf} disabled={Boolean(exporting)}>{exporting === "pdf" ? "Generating PDF..." : "Export PDF"}</button>
+          <button
+  type="button"
+  onClick={onExportBalanceSheet}
+  disabled={Boolean(exporting)}
+>
+  {exporting === "balance-sheet"
+    ? "Generating Balance Sheet..."
+    : "Export Balance Sheet"}
+</button>
           </div>
         </div>
       </div>
