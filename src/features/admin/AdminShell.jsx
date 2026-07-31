@@ -5,7 +5,7 @@ import {
   readAdminSidebarCollapsedPreference,
   writeAdminSidebarCollapsedPreference,
 } from "./adminSidebarPreference";
-import { ADMIN_NAV } from "./shared/adminNavigation";
+import { getAdminNavigation } from "./shared/adminNavigation";
 
 const ADMIN_SIDEBAR_DESKTOP_QUERY = "(min-width: 901px)";
 const ADMIN_SIDEBAR_NAV_ID = "admin-primary-navigation";
@@ -31,15 +31,16 @@ export default function AdminShell({ access, displayName, onSignOut, children })
   const canAccessLockTools = access.canAccessLockTools === true || access.canAccessPresidentControls === true;
   const canAccessBodManagement = canManageBodManagement(access);
   const canPreviewDashboards = canAccessDashboardPreview(access);
+  const navigationBase = getAdminNavigation(access);
   const navigation = access.canAccessAdminTools
-    ? ADMIN_NAV.filter(([path]) => (
+    ? navigationBase.filter(([path]) => (
       (path !== "resolutions" || access.canAccessResolutionTools)
       && (path !== "locks" || canAccessLockTools)
       && (path !== "logs" || access.canAccessSystemLogs)
       && (path !== "dashboard-preview" || canPreviewDashboards)
       && (path !== "bod-management" || canAccessBodManagement)
     ))
-    : ADMIN_NAV.filter(([path]) => (
+    : navigationBase.filter(([path]) => (
       (path === "resolutions" && access.canAccessResolutionTools)
       || (path === "locks" && canAccessLockTools)
       || (path === "logs" && access.canAccessSystemLogs)

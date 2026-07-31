@@ -15,6 +15,7 @@ import {
   normalizeAttendance,
 } from "../shared/adminModel";
 import { adminCalls, setAttendanceBulk, setAttendanceCell, setAttendanceRow } from "../shared/adminService";
+import { hasUnrestrictedAdminAccess } from "../shared/adminNavigation";
 import useAdminMutation from "../shared/useAdminMutation";
 import AttendanceExportPanel from "../attendance-export/AttendanceExportPanel";
 import { formatRotaractorName } from "../../../utils/memberName";
@@ -796,6 +797,7 @@ export function ClubAttendanceModule({ data, lock, uid, access, onNotice }) {
   const [includeProspectsInClubAttendance, setIncludeProspectsInClubAttendance] = useState(false);
   const { busy, run } = useAdminMutation({ uid, module: "club-attendance", onNotice });
   const locked = lock.status !== "success" || lock.locked;
+  const canManageEvents = hasUnrestrictedAdminAccess(access);
   const events = data.events.filter((event) => !event.archived);
   const activeEventsListId = "active-club-events-list";
   const {
@@ -895,7 +897,7 @@ const pendingRecords =
                 onNotice={onNotice}
               />
 
-              <div className="attendance-event-row__actions">
+              {canManageEvents ? <div className="attendance-event-row__actions">
                 <button
                   type="button"
                   className="admin-text-action"
@@ -913,7 +915,7 @@ const pendingRecords =
                 >
                   Archive
                 </button>
-              </div>
+              </div> : null}
             </article>
           )) : (
             <AdminEmpty message="No active club events are available." />
@@ -979,8 +981,8 @@ const pendingRecords =
     
     <AttendanceExportPanel panelKey="club" members={attendanceParticipants} events={events} attendance={data.attendance} onNotice={onNotice} />
 <AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} includeProspectsInSummary={includeProspectsInClubAttendance} onIncludeProspectsInSummaryChange={setIncludeProspectsInClubAttendance} />    <MailDraftTool members={attendanceParticipants} title="GBM" />
-    {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><ClubEventForm initial={editing} busy={busy} submitLabel="Save event" onSave={(payload) => run("update-event", () => adminCalls.updateClubEvent({ ...payload, eventId: editing.id }), "Club event updated.").then((result) => { if (result) setEditing(null); })} /></AdminDialog> : null}
-    {archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This soft-archives club event records and preserves attendance history.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-event", () => adminCalls.archiveClubEvent(archive.id), "Club event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
+    {canManageEvents && editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><ClubEventForm initial={editing} busy={busy} submitLabel="Save event" onSave={(payload) => run("update-event", () => adminCalls.updateClubEvent({ ...payload, eventId: editing.id }), "Club event updated.").then((result) => { if (result) setEditing(null); })} /></AdminDialog> : null}
+    {canManageEvents && archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This soft-archives club event records and preserves attendance history.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-event", () => adminCalls.archiveClubEvent(archive.id), "Club event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;
 }
 
@@ -1141,6 +1143,7 @@ export function DistrictModule({ data, lock, uid, access, onNotice }) {
   const [archive, setArchive] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "district", onNotice });
   const locked = lock.status !== "success" || lock.locked;
+  const canManageEvents = hasUnrestrictedAdminAccess(access);
   const events = data.districtEvents.filter((item) => !item.archived);
   const {
     activeParticipants: attendanceParticipants,
@@ -1157,11 +1160,11 @@ export function DistrictModule({ data, lock, uid, access, onNotice }) {
   return <>
     <AdminModuleHeader title="District Events & Attendance" />
     <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{locked ? "District changes are locked or unavailable." : "District changes are open."}</div>
-    <section className="admin-panel">{form(draft, setDraft, submit, "Add district event")}</section>
-    <div className="admin-card-grid">{events.map((event) => <article className="admin-record-card" key={event.id}><h3>{event.name}</h3><p>{event.date} · {event.visibility}</p><MomSection className="mom-section--card" target={momTarget(event, MOM_TARGET_TYPES.DISTRICT_EVENT)} access={access} uid={uid} onNotice={onNotice} /><div className="admin-actions"><button disabled={locked} onClick={() => setEditing({ ...event, public: event.visibility === "public" })}>Edit</button><button className="danger" disabled={locked} onClick={() => setArchive(event)}>Archive</button></div></article>)}</div>
+    {canManageEvents ? <section className="admin-panel">{form(draft, setDraft, submit, "Add district event")}</section> : null}
+    <div className="admin-card-grid">{events.map((event) => <article className="admin-record-card" key={event.id}><h3>{event.name}</h3><p>{event.date} · {event.visibility}</p><MomSection className="mom-section--card" target={momTarget(event, MOM_TARGET_TYPES.DISTRICT_EVENT)} access={access} uid={uid} onNotice={onNotice} />{canManageEvents ? <div className="admin-actions"><button disabled={locked} onClick={() => setEditing({ ...event, public: event.visibility === "public" })}>Edit</button><button className="danger" disabled={locked} onClick={() => setArchive(event)}>Archive</button></div> : null}</article>)}</div>
     <AttendanceExportPanel panelKey="district" members={attendanceParticipants} events={events} attendance={data.districtAttendance} onNotice={onNotice} />
 <AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} />
-    {editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}>{form(editing, setEditing, save, "Save district event")}</AdminDialog> : null}
-    {archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This archives district, mirrored BOD, and conditional public records while preserving attendance.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-district", () => adminCalls.archiveDistrictEvent(archive.id), "District event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
+    {canManageEvents && editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}>{form(editing, setEditing, save, "Save district event")}</AdminDialog> : null}
+    {canManageEvents && archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This archives district, mirrored BOD, and conditional public records while preserving attendance.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-district", () => adminCalls.archiveDistrictEvent(archive.id), "District event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;
 }

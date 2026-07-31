@@ -334,7 +334,7 @@ test("callable failure fallback grants no access", () => {
   assert.equal(hasCapability(access, "memberDashboard"), false);
   assert.equal(hasCapability(access, "adminTools"), false);
 });
-test("BOD with trusted Sergeant-at-Arms authority gets ordinary Admin access", () => {
+test("BOD with trusted Sergeant-at-Arms authority gets delegated Admin access", () => {
   const access = approved("bod", {
     hasSergeantAtArmsPosition: true,
   });
@@ -345,6 +345,25 @@ test("BOD with trusted Sergeant-at-Arms authority gets ordinary Admin access", (
   assert.equal(access.canAccessPresidentControls, false);
   assert.equal(access.canAccessLockTools, false);
   assert.equal(access.canAccessResolutionTools, false);
+});
+test("BOD with trusted Co-Sergeant-at-Arms authority gets delegated Admin access", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "trusted-co-saa",
+    user: { status: "approved" },
+    role: { role: "bod", status: "approved" },
+    positionKeys: ["co-saa"],
+    authority: {
+      hasSergeantAtArmsPosition: true,
+    },
+  });
+
+  assert.equal(access.storedRole, "bod");
+  assert.deepEqual(access.positionKeys, ["co-saa"]);
+  assert.equal(access.hasSergeantAtArmsPosition, true);
+  assert.equal(access.canAccessAdminTools, true);
+  assert.equal(access.canManageBodManagement, false);
+  assert.equal(access.canAccessPresidentControls, false);
 });
 test("plain saa position key without trusted authority does not grant Admin access", () => {
   const access = normalizeTrustedAccess({

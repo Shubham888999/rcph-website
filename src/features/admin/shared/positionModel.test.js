@@ -12,6 +12,7 @@ test("canonical options retain deterministic server catalog order", () => {
 
 test("multiple selections are canonical, deduplicated, and ordered", () => {
   assert.deepEqual(normalizePositionSelection(["RRRO", "secretary", "rrro", "Co-Secretary"]).selectedKeys, ["secretary", "rrro", "co-secretary"]);
+  assert.deepEqual(normalizePositionSelection(["sergeant", "co-saa"]).selectedKeys, ["saa", "co-saa"]);
 });
 
 test("search matches display titles, codes, and canonical keys", () => {

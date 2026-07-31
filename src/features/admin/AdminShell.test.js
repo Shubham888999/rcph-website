@@ -50,7 +50,8 @@ test("AdminShell controls are accessible and keep hidden sidebar links unfocusab
 });
 
 test("AdminShell preserves navigation, active route behavior, and content during collapse", () => {
-  assert.match(shell, /ADMIN_NAV\.filter/);
+  assert.match(shell, /getAdminNavigation\(access\)/);
+  assert.match(shell, /navigationBase\.filter/);
   assert.match(shell, /<NavLink key=\{path \|\| "home"\} end=\{!path\} to=\{path \? `\/admin\/\$\{path\}` : "\/admin"\}>/);
   assert.match(shell, /Access Hub/);
   assert.match(shell, /Dashboard/);

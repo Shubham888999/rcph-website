@@ -27,7 +27,7 @@ export const POSITION_CATALOG = Object.freeze([
   ["sports-representative", "Sports Representative", "SPORTS", "bod", 29, "bod", true, ["Club Sports Representative", "Sports Director"]],
   ["wrwc", "World Rotaract Week Chairperson", "WRWC", "bod", 30, "bod", true, ["World Rotaract Week Chair"]],
   ["wr", "Women's Representative", "WR", "bod", 31, "bod", true, ["Womens Representative", "Women Representative"]],
-  ["saa", "Sergeant-at-Arms", "SAA", "bod", 32, "bod", true, ["Sergeant at Arms"]],
+  ["saa", "Sergeant-at-Arms", "SAA", "bod", 32, "bod", true, ["Sergeant", "Sergeant at Arms"]],
   ["co-president", "Co-President", "CPRES", "co-admin", 50, "admin", true, ["Co President"]],
   ["co-vice-president", "Co-Vice President", "CVP", "co-admin", 51, "admin", true, ["Co Vice President", "Co-Vice-President"]],
   ["co-secretary", "Co-Secretary", "CSEC", "co-admin", 52, "admin", true, ["Co Secretary", "Co Club Secretary"]],
