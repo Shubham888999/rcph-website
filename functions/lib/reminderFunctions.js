@@ -95,7 +95,7 @@ const CALLABLE_OPTIONS = {
 
 const ROLE_COLLECTIONS = ['roles', 'userRoles', 'access'];
 const ACTIVE_ACCOUNT_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president', 'secretary', 'saa', 'sergeant']);
-const ADMIN_PANEL_POSITION_KEYS = new Set(['cwd', 'co-cwd', 'saa', 'co-saa', 'sergeant', 'sergeant-at-arms']);
+const ADMIN_PANEL_POSITION_KEYS = new Set(['cwd', 'co-cwd']);
 
 function chunkArray(items, size) {
   const chunks = [];

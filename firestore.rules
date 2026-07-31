@@ -26,6 +26,10 @@ service cloud.firestore {
   return /databases/$(database)/documents/bodPositionAssignments/$(("saa_" + request.auth.uid));
 }
 
+    function coSaaAssignmentPath() {
+  return /databases/$(database)/documents/bodPositionAssignments/$(("co-saa_" + request.auth.uid));
+}
+
     function hasNoTerminalLifecycleFields(data) {
       return !data.keys().hasAny([
         'revokedAt',
@@ -97,8 +101,18 @@ service cloud.firestore {
 
 function hasActiveSaaAssignment() {
   return hasAnyRole(['bod', 'admin', 'president'])
-    && get(userPath()).data.get('positionKeys', []).hasAny(['saa'])
+    && get(userPath()).data.get('positionKeys', []).hasAny(['saa', 'sergeant', 'sergeant-at-arms'])
     && hasActivePositionAssignment(saaAssignmentPath(), 'saa');
+}
+
+function hasActiveCoSaaAssignment() {
+  return hasAnyRole(['bod', 'admin', 'president'])
+    && get(userPath()).data.get('positionKeys', []).hasAny(['co-saa', 'co-sergeant-at-arms'])
+    && hasActivePositionAssignment(coSaaAssignmentPath(), 'co-saa');
+}
+
+function hasActiveSergeantAtArmsAssignment() {
+  return hasActiveSaaAssignment() || hasActiveCoSaaAssignment();
 }
 
     function hasWebsiteDirectorPosition() {
@@ -114,15 +128,13 @@ function hasActiveSaaAssignment() {
 function isAdmin() {
   return hasApprovedActiveRole('admin')
     || hasApprovedActiveRole('president')
-    || hasPresidentAuthority()
-    || hasActiveSaaAssignment();
+    || hasPresidentAuthority();
 }
 
 function hasAdminPanelAuthority() {
   return hasApprovedActiveRole('admin')
     || hasApprovedActiveRole('president')
-    || hasPresidentAuthority()
-    || hasActiveSaaAssignment();
+    || hasPresidentAuthority();
 }
     function isApprovedBod() {
       return hasApprovedActiveRole('bod') || isAdmin();
@@ -133,6 +145,15 @@ function hasAdminPanelAuthority() {
         || hasApprovedActiveRole('president')
         || hasPresidentAuthority();
     }
+
+function hasSergeantAttendanceCollectionAccess() {
+  return hasActiveSergeantAtArmsAssignment();
+}
+
+function canReadAttendanceLock(panelId) {
+  return panelId in ['attendance', 'bodAttendance']
+    && hasSergeantAttendanceCollectionAccess();
+}
 
 function isFineLinkedTreasury(data) {
   return data.keys().hasAny([
@@ -308,7 +329,7 @@ function isFineLinkedTreasury(data) {
     }
 
     match /members/{memberId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || hasSergeantAttendanceCollectionAccess();
       allow create, update: if isAdmin()
         && !panelLocked('attendance')
         && validMemberProfileWrite(request.resource.data);
@@ -316,33 +337,33 @@ function isFineLinkedTreasury(data) {
     }
 
     match /attendance/{attendanceId} {
-      allow read: if isAdmin();
-      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+      allow read: if isAdmin() || hasSergeantAttendanceCollectionAccess();
+      allow create, update, delete: if (isAdmin() || hasSergeantAttendanceCollectionAccess()) && !panelLocked('attendance');
     }
 
     match /districtEvents/{eventId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || hasSergeantAttendanceCollectionAccess();
       allow create, update, delete: if isAdmin() && !panelLocked('attendance');
     }
 
     match /districtAttendance/{attendanceId} {
-      allow read: if isAdmin();
-      allow create, update, delete: if isAdmin() && !panelLocked('attendance');
+      allow read: if isAdmin() || hasSergeantAttendanceCollectionAccess();
+      allow create, update, delete: if (isAdmin() || hasSergeantAttendanceCollectionAccess()) && !panelLocked('attendance');
     }
 
     match /bodMembers/{memberId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || hasSergeantAttendanceCollectionAccess();
       allow create, update, delete: if isAdmin() && !panelLocked('bodAttendance');
     }
 
     match /bodMeetings/{meetingId} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || hasSergeantAttendanceCollectionAccess();
       allow create, update, delete: if isAdmin() && !panelLocked('bodAttendance');
     }
 
     match /bodAttendance/{attendanceId} {
-      allow read: if isAdmin();
-      allow create, update, delete: if isAdmin() && !panelLocked('bodAttendance');
+      allow read: if isAdmin() || hasSergeantAttendanceCollectionAccess();
+      allow create, update, delete: if (isAdmin() || hasSergeantAttendanceCollectionAccess()) && !panelLocked('bodAttendance');
     }
 
     match /bodEvents/{eventId} {
@@ -395,7 +416,7 @@ match /treasury/{transactionId} {
       allow read, create, update, delete: if hasAdminPanelAuthority();
     }
     match /locks/{panelId} {
-      allow read: if hasAdminPanelAuthority();
+      allow read: if hasAdminPanelAuthority() || canReadAttendanceLock(panelId);
       allow create, update, delete: if hasLockTools();
     }
 

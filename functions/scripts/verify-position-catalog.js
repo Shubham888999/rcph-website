@@ -81,6 +81,11 @@ assertDeepEqual(
   'duplicates should be removed and keys sorted'
 );
 assertDeepEqual(
+  normalizePositionKeys(['sergeant', 'Sergeant-at-Arms', 'co-saa']).positionKeys,
+  ['saa', 'co-saa'],
+  'Sergeant-at-Arms aliases should resolve to canonical SAA keys'
+);
+assertDeepEqual(
   normalizePositionKeys('Secretary, RRRO, Mystery'),
   { positionKeys: ['secretary', 'rrro'], unknownValues: ['Mystery'] },
   'legacy comma-separated input should resolve with unknown reporting'

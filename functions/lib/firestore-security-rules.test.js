@@ -68,6 +68,9 @@ const identities = {
   disabledAdmin: account('disabled-admin', 'admin', [], { role: { disabled: true }, user: { disabled: true } }),
   president: account('president', 'president', ['president']),
   cwd: account('cwd', 'bod', ['cwd']),
+  saa: account('saa', 'bod', ['saa']),
+  coSaa: account('co-saa', 'bod', ['co-saa']),
+  inactiveSaa: account('inactive-saa', 'bod', ['saa'], { assignment: { active: false, removedAt: NOW } }),
   removedCwd: account('removed-cwd', 'bod', ['cwd'], { assignment: { active: false, removedAt: NOW } }),
   expiredCwd: account('expired-cwd', 'bod', ['cwd'], { assignment: { expiresAt: new Date('2026-07-01T00:00:00.000Z') } }),
   staleCwdPositionKey: account('stale-cwd-key', 'bod', ['cwd'], { assignments: [] }),
@@ -139,22 +142,30 @@ function hasPresidentAuthority(identity) {
 
 function hasActiveSaaAssignment(identity) {
   return hasAnyRole(identity, ['bod', 'admin', 'president'])
-    && identity.user.positionKeys?.includes('saa')
+    && ['saa', 'sergeant', 'sergeant-at-arms'].some(key => identity.user.positionKeys?.includes(key))
     && activePositionAssignment(identity, 'saa');
+}
+
+function hasActiveCoSaaAssignment(identity) {
+  return hasAnyRole(identity, ['bod', 'admin', 'president'])
+    && ['co-saa', 'co-sergeant-at-arms'].some(key => identity.user.positionKeys?.includes(key))
+    && activePositionAssignment(identity, 'co-saa');
+}
+
+function hasActiveSergeantAtArmsAssignment(identity) {
+  return hasActiveSaaAssignment(identity) || hasActiveCoSaaAssignment(identity);
 }
 
 function isAdmin(identity) {
   return hasApprovedActiveRole(identity, 'admin')
     || hasApprovedActiveRole(identity, 'president')
-    || hasPresidentAuthority(identity)
-    || hasActiveSaaAssignment(identity);
+    || hasPresidentAuthority(identity);
 }
 
 function hasAdminPanelAuthority(identity) {
   return hasApprovedActiveRole(identity, 'admin')
     || hasApprovedActiveRole(identity, 'president')
-    || hasPresidentAuthority(identity)
-    || hasActiveSaaAssignment(identity);
+    || hasPresidentAuthority(identity);
 }
 
 function hasLockTools(identity) {
@@ -171,8 +182,9 @@ function canListRoles(identity) {
   return isAdmin(identity);
 }
 
-function canReadLock(identity) {
-  return hasAdminPanelAuthority(identity);
+function canReadLock(identity, panelId) {
+  return hasAdminPanelAuthority(identity)
+    || (['attendance', 'bodAttendance'].includes(panelId) && hasActiveSergeantAtArmsAssignment(identity));
 }
 
 function canWriteLock(identity) {
@@ -181,7 +193,20 @@ function canWriteLock(identity) {
 
 function canReadAdminCollection(identity, collection) {
   if (['systemLogs', 'auditLogs'].includes(collection)) return false;
+  if (['members', 'events', 'attendance', 'bodMembers', 'bodMeetings', 'bodAttendance', 'districtEvents', 'districtAttendance'].includes(collection)) {
+    return isAdmin(identity) || hasActiveSergeantAtArmsAssignment(identity);
+  }
   return isAdmin(identity);
+}
+
+function canWriteAdminCollection(identity, collection, panelLocked = false) {
+  if (['attendance', 'districtAttendance'].includes(collection)) {
+    return (isAdmin(identity) || hasActiveSergeantAtArmsAssignment(identity)) && !panelLocked;
+  }
+  if (collection === 'bodAttendance') {
+    return (isAdmin(identity) || hasActiveSergeantAtArmsAssignment(identity)) && !panelLocked;
+  }
+  return isAdmin(identity) && !panelLocked;
 }
 
 test('rules source replaces broad role and lock reads with approved-active authority', () => {
@@ -196,7 +221,7 @@ test('rules source replaces broad role and lock reads with approved-active autho
   assert.match(bodyOfFunction(rules, 'hasWebsiteDirectorPosition'), /websiteDirectorAssignmentPath\(\)/);
   assert.doesNotMatch(bodyOfFunction(rules, 'isAdmin'), /hasRole\('admin'\)/);
   assert.match(rules, /match \/roles\/\{uid\} \{\s*allow get: if signedIn\(\) && \(request\.auth\.uid == uid \|\| isAdmin\(\)\);\s*allow list: if isAdmin\(\);/);
-  assert.match(rules, /match \/locks\/\{panelId\} \{\s*allow read: if hasAdminPanelAuthority\(\);\s*allow create, update, delete: if hasLockTools\(\);/);
+  assert.match(rules, /match \/locks\/\{panelId\} \{\s*allow read: if hasAdminPanelAuthority\(\) \|\| canReadAttendanceLock\(panelId\);\s*allow create, update, delete: if hasLockTools\(\);/);
 });
 
 test('role reads deny unauthenticated, cross-user, and ordinary collection queries', () => {
@@ -236,6 +261,35 @@ test('lock reads and writes deny ordinary and stale identities', () => {
   assert.equal(canWriteLock(identities.expiredCwd), false);
   assert.equal(canReadLock(identities.staleCwdPositionKey), false);
   assert.equal(canReadLock(identities.staleCwdOccupancy), false);
+  assert.equal(canReadLock(identities.saa, 'attendance'), true);
+  assert.equal(canReadLock(identities.coSaa, 'bodAttendance'), true);
+  assert.equal(canReadLock(identities.saa, 'treasury'), false);
+  assert.equal(canWriteLock(identities.saa), false);
+  assert.equal(canWriteLock(identities.coSaa), false);
+  assert.equal(canReadLock(identities.inactiveSaa, 'attendance'), false);
+});
+
+test('Sergeant-at-Arms and Co-Sergeant-at-Arms rules are scoped to attendance data', () => {
+  for (const identity of [identities.saa, identities.coSaa]) {
+    for (const collection of ['members', 'events', 'attendance', 'bodMembers', 'bodMeetings', 'bodAttendance', 'districtEvents', 'districtAttendance']) {
+      assert.equal(canReadAdminCollection(identity, collection), true, `${collection} delegated read`);
+    }
+
+    for (const collection of ['attendance', 'bodAttendance', 'districtAttendance']) {
+      assert.equal(canWriteAdminCollection(identity, collection), true, `${collection} delegated write`);
+      assert.equal(canWriteAdminCollection(identity, collection, true), false, `${collection} locked delegated write`);
+    }
+
+    for (const collection of ['roles', 'users', 'treasury', 'fines', 'reminders', 'systemLogs', 'auditLogs']) {
+      assert.equal(canReadAdminCollection(identity, collection), false, `${collection} remains denied`);
+      assert.equal(canWriteAdminCollection(identity, collection), false, `${collection} write remains denied`);
+    }
+  }
+
+  assert.equal(canReadAdminCollection(identities.inactiveSaa, 'attendance'), false, 'inactive SAA read denied');
+  assert.equal(canWriteAdminCollection(identities.inactiveSaa, 'attendance'), false, 'inactive SAA write denied');
+  assert.equal(canReadAdminCollection(identities.mainDirector, 'attendance'), false, 'plain BOD cannot forge delegated read authority');
+  assert.equal(canWriteAdminCollection(identities.mainDirector, 'attendance'), false, 'plain BOD cannot forge delegated write authority');
 });
 
 test('admin lifecycle checks protect representative sensitive collections', () => {

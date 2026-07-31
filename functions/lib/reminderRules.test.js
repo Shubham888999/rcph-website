@@ -12,12 +12,12 @@ test('reminders rules use existing admin panel authority', () => {
   assert.match(rules, /hasApprovedActiveRole\('admin'\)/);
   assert.match(rules, /hasApprovedActiveRole\('president'\)/);
   assert.match(rules, /hasPresidentAuthority\(\)/);
-  assert.match(rules, /hasActiveSaaAssignment\(\)/);
+  assert.doesNotMatch(rules.match(/function hasAdminPanelAuthority\(\) \{[\s\S]*?\n\}/)?.[0] || '', /hasActiveSaaAssignment|hasActiveSergeantAtArmsAssignment/);
   assert.match(rules, /match \/reminders\/\{reminderId\} \{\s*allow read, create, update, delete: if hasAdminPanelAuthority\(\);/);
 });
 
 test('lock rules remain restricted while backend can create avenue locks with Admin SDK', () => {
   assert.match(rules, /match \/locks\/\{panelId\} \{/);
-  assert.match(rules, /allow read: if hasAdminPanelAuthority\(\);/);
+  assert.match(rules, /allow read: if hasAdminPanelAuthority\(\) \|\| canReadAttendanceLock\(panelId\);/);
   assert.match(rules, /allow create, update, delete: if hasLockTools\(\);/);
 });

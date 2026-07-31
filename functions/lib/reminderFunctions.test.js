@@ -30,7 +30,8 @@ test('manual reminder sweep callable requires admin panel authority', () => {
   assert.match(functionsSource, /const runReminderEmailSweep = onCall/);
   assert.match(functionsSource, /requireAdminPanelReminderAccess\(request, 'run reminder emails'\)/);
   assert.match(functionsSource, /hasAdminPanelAuthority/);
-  assert.match(functionsSource, /ADMIN_PANEL_POSITION_KEYS = new Set\(\['cwd', 'co-cwd', 'saa', 'co-saa', 'sergeant', 'sergeant-at-arms'\]\)/);
+  assert.match(functionsSource, /ADMIN_PANEL_POSITION_KEYS = new Set\(\['cwd', 'co-cwd'\]\)/);
+  assert.doesNotMatch(functionsSource, /ADMIN_PANEL_POSITION_KEYS = new Set\(\[[^\]]*saa/);
   assert.match(functionsSource, /writeReminderSystemLog/);
 });
 
@@ -76,7 +77,8 @@ test('reminder template test callable validates admin authority, email, and temp
   assert.match(functionsSource, /const sendReminderTemplateTestEmail = onCall/);
   assert.match(functionsSource, /requireAdminPanelReminderAccess\(request, 'send reminder template tests'\)/);
   assert.match(functionsSource, /hasAdminPanelAuthority/);
-  assert.match(functionsSource, /ADMIN_PANEL_POSITION_KEYS = new Set\(\['cwd', 'co-cwd', 'saa', 'co-saa', 'sergeant', 'sergeant-at-arms'\]\)/);
+  assert.match(functionsSource, /ADMIN_PANEL_POSITION_KEYS = new Set\(\['cwd', 'co-cwd'\]\)/);
+  assert.doesNotMatch(functionsSource, /ADMIN_PANEL_POSITION_KEYS = new Set\(\[[^\]]*saa/);
   assert.match(functionsSource, /normalizeReminderTemplateTestType\(request\.data\?\.templateType\)/);
   assert.match(functionsSource, /normalizeMomEmailAddress\(request\.data\?\.recipientEmail\)/);
   assert.match(functionsSource, /Enter a valid recipient email address/);

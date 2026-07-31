@@ -310,6 +310,7 @@ const RESOLUTIONS_COLLECTION = 'resolutions';
 const RESOLUTION_NUMBER_INDEX_COLLECTION = 'resolutionNumberIndex';
 const ADMIN_MAINTENANCE_AUDIT_COLLECTION = 'adminMaintenanceAudit';
 const ADMIN_LOCK_KEYS = new Set(['attendance', 'bodAttendance', 'bodEvents', 'fines', 'treasury']);
+const SERGEANT_AT_ARMS_POSITION_KEYS = Object.freeze(['saa', 'co-saa']);
 const FINE_EVENT_SOURCES = new Set([
   'events',
   'bodMeetings',
@@ -1877,6 +1878,21 @@ function isActivePositionAssignment(uid, positionKey, snap) {
   return positionHelpers.isActivePositionAssignment(uid, positionKey, snap.data() || {});
 }
 
+function preloadedPositionAssignmentSnap(preloaded, positionKey) {
+  if (positionKey === 'saa') return preloaded.saaAssignmentSnap;
+  if (positionKey === 'co-saa') return preloaded.coSaaAssignmentSnap;
+  return null;
+}
+
+async function hasActiveAnyPositionAssignment(uid, positionKeys, preloaded = {}) {
+  for (const positionKey of positionKeys) {
+    const assignmentSnap = preloadedPositionAssignmentSnap(preloaded, positionKey)
+      || await db.collection('bodPositionAssignments').doc(`${positionKey}_${uid}`).get();
+    if (isActivePositionAssignment(uid, positionKey, assignmentSnap)) return true;
+  }
+  return false;
+}
+
 async function getAuthorityContext(uid, preloaded = {}) {
   const active = preloaded.activeRole || await getActiveRole(uid);
   const base = {
@@ -1903,9 +1919,11 @@ authority: {
 const canHoldPresidentAuthority = ['bod', 'admin', 'president'].includes(active.role)
   && presidentDefinition?.active === true;
 
-const sergeantDefinition = positionHelpers.getPositionDefinition('saa');
+const sergeantDefinitions = SERGEANT_AT_ARMS_POSITION_KEYS
+  .map(positionKey => positionHelpers.getPositionDefinition(positionKey))
+  .filter(Boolean);
 const canHoldSergeantAtArmsAuthority = ['bod', 'admin', 'president'].includes(active.role)
-  && sergeantDefinition?.active === true;
+  && sergeantDefinitions.some(definition => definition.active === true);
 
 if (
   !canHoldWebsiteDirectorAuthority
@@ -1958,15 +1976,12 @@ if (
   canHoldSergeantAtArmsAuthority
   && isApprovedActiveUserRecord(userData)
   && positionKeysAreWellFormed
-  && metadata.positionKeys.includes('saa')
+  && SERGEANT_AT_ARMS_POSITION_KEYS.some(positionKey => metadata.positionKeys.includes(positionKey))
 ) {
-  const assignmentSnap = preloaded.saaAssignmentSnap
-    || await db.collection('bodPositionAssignments').doc(`saa_${uid}`).get();
-
-  hasSergeantAtArmsPosition = isActivePositionAssignment(
+  hasSergeantAtArmsPosition = await hasActiveAnyPositionAssignment(
     uid,
-    'saa',
-    assignmentSnap
+    SERGEANT_AT_ARMS_POSITION_KEYS.filter(positionKey => metadata.positionKeys.includes(positionKey)),
+    preloaded
   );
 }
   return {
@@ -1981,13 +1996,13 @@ if (
 },
   };
 }
-function hasOrdinaryAdminAuthority(authority) {
+function hasUnrestrictedAdminAuthority(authority) {
   return Boolean(
     authority?.role
     && (
       authority.role === 'admin'
+      || authority.role === 'president'
       || authority.authority?.hasPresidentAuthority === true
-      || authority.authority?.hasSergeantAtArmsPosition === true
     )
   );
 }
@@ -1996,7 +2011,7 @@ function rolePositionSyncAuthority(authority) {
   return {
     actorRole: normalizeRole(authority?.role),
     actorHasPresidentAuthority: authority?.authority?.hasPresidentAuthority === true,
-    actorHasAdminPanelAuthority: hasOrdinaryAdminAuthority(authority),
+    actorHasAdminPanelAuthority: hasUnrestrictedAdminAuthority(authority),
   };
 }
 
@@ -2026,7 +2041,7 @@ function hasResolutionToolsAuthority({ role, userData, resolutionManager }) {
 async function assertAdminOrPresident(uid) {
   const authority = await getAuthorityContext(uid);
 
-  if (!hasOrdinaryAdminAuthority(authority)) {
+  if (!hasUnrestrictedAdminAuthority(authority)) {
     throw new HttpsError(
       'permission-denied',
       'Administrative access required.'
@@ -2039,7 +2054,7 @@ async function assertAdminOrPresident(uid) {
 async function assertAdminOrPresidentAuthority(uid) {
   const authority = await getAuthorityContext(uid);
 
-  if (!hasOrdinaryAdminAuthority(authority)) {
+  if (!hasUnrestrictedAdminAuthority(authority)) {
     throw new HttpsError(
       'permission-denied',
       'Administrative access required.'
@@ -5160,6 +5175,7 @@ const [
   cwdAssignmentSnap,
   presidentAssignmentSnap,
   saaAssignmentSnap,
+  coSaaAssignmentSnap,
 ] = await Promise.all([
   db.collection('users').doc(uid).get(),
   db.collection('roles').doc(uid).get(),
@@ -5168,6 +5184,7 @@ const [
     .get(),
   db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
   db.collection('bodPositionAssignments').doc(`saa_${uid}`).get(),
+  db.collection('bodPositionAssignments').doc(`co-saa_${uid}`).get(),
 ]);
   const roleData = roleSnap.exists ? (roleSnap.data() || {}) : null;
   const role = roleData && String(roleData.status || 'approved').toLowerCase() === 'approved'
@@ -5180,6 +5197,7 @@ const authorityContext = await getAuthorityContext(uid, {
   cwdAssignmentSnap,
   presidentAssignmentSnap,
   saaAssignmentSnap,
+  coSaaAssignmentSnap,
 });
   const resolutionManager = await hasResolutionManagerAuthority(uid, { activeRole, userSnap });
   const userData = userSnap.exists ? (userSnap.data() || {}) : null;

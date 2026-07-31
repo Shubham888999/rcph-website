@@ -223,7 +223,7 @@ const RAW_POSITION_CATALOG = [
     sortOrder: 32,
     effectiveRole: 'bod',
     bodRoster: true,
-    aliases: ['SAA', 'Sergeant-at-Arms', 'Sergeant at Arms'],
+    aliases: ['SAA', 'Sergeant', 'Sergeant-at-Arms', 'Sergeant at Arms'],
     active: true,
   },
   { key: 'co-president', displayTitle: 'Co-President', avenueCode: 'CPRES', group: 'co-admin', sortOrder: 50, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-President', 'Co President'], active: true },
