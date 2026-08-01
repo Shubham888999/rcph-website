@@ -157,6 +157,46 @@ const emptyMetadata = positions.derivePositionMetadata([]);
 const fullMetadata = positions.derivePositionMetadata(['Secretary', 'RRRO']);
 const now = 'NOW';
 const profile = { uid: 'uid-one', name: 'Example User', email: 'user@example.com' };
+const gbmUserPayload = buildUserPositionPayload({
+  role: 'gbm',
+  metadata: emptyMetadata,
+  actorUid: 'admin-uid',
+  now,
+});
+
+const gbmMemberPayload = buildMemberPositionPayload({
+  profile,
+  role: 'gbm',
+  metadata: emptyMetadata,
+  existing: {
+    position: 'Secretary',
+  },
+  now,
+});
+
+assertEqual(
+  gbmUserPayload.clubPosition,
+  'Member',
+  'GBM user payload should store canonical Member club position'
+);
+
+assertEqual(
+  gbmMemberPayload.position,
+  'Member',
+  'GBM member payload should overwrite old BOD position with Member'
+);
+
+assertDeepEqual(
+  gbmUserPayload.positionKeys,
+  [],
+  'GBM user payload should clear position keys'
+);
+
+assertDeepEqual(
+  gbmMemberPayload.positionKeys,
+  [],
+  'GBM member payload should clear member position keys'
+);
 const adminBodPayload = buildBodMemberPositionPayload({
   profile,
   role: 'admin',

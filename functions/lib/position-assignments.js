@@ -226,7 +226,16 @@ function profileFromRecords(targetUid, userData, memberData, bodMemberData) {
     email: toSafeText(userData?.email || memberData?.email || bodMemberData?.email || '', 200).toLowerCase(),
   };
 }
+function displayClubPositionForRole(role, metadata) {
+  const normalizedRole = normalizeRoleValue(role);
+  const clubPosition = toSafeText(metadata?.clubPosition, 240);
 
+  if (normalizedRole === 'gbm') {
+    return 'Member';
+  }
+
+  return clubPosition;
+}
 function buildUserPositionPayload(params) {
   const metadata = params.metadata || defaultPositionHelpers.derivePositionMetadata([]);
   return {
@@ -236,7 +245,7 @@ function buildUserPositionPayload(params) {
     positionKeys: metadata.positionKeys.slice(),
     positionTitles: metadata.positionTitles.slice(),
     avenueCodes: metadata.avenueCodes.slice(),
-    clubPosition: metadata.clubPosition,
+    clubPosition: displayClubPositionForRole(params.role, metadata),
     hasBodPosition: metadata.hasBodPosition,
     addToBodAttendance: metadata.hasBodPosition,
     positionsUpdatedAt: params.now,
@@ -267,7 +276,7 @@ function buildMemberPositionPayload(params) {
     name: stripRotaractorPrefix(params.profile.name || existing.name || ''),
     email: params.profile.email || existing.email || '',
     role: params.role,
-    position: metadata.clubPosition,
+    position: displayClubPositionForRole(params.role, metadata),
     positionKeys: metadata.positionKeys.slice(),
     positionTitles: metadata.positionTitles.slice(),
     avenueCodes: metadata.avenueCodes.slice(),
@@ -730,7 +739,7 @@ if (!actorHasAdminPanelAuthority) {
         positionKeys: plan.metadata.positionKeys.slice(),
         positionTitles: plan.metadata.positionTitles.slice(),
         avenueCodes: plan.metadata.avenueCodes.slice(),
-        clubPosition: plan.metadata.clubPosition,
+        clubPosition: displayClubPositionForRole(plan.role, plan.metadata),
         addedPositionKeys: plan.addedPositionKeys.slice(),
         removedPositionKeys: plan.removedPositionKeys.slice(),
         jointPositionKeys: plan.jointPositionKeys.slice(),
