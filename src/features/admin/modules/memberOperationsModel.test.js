@@ -356,3 +356,35 @@ test("attendance and fine summaries use loaded data", () => {
 function rowMatchesMissingRid(row) {
   return filterAndSortMemberRows([row], { issue: "missingRid" }).length === 1;
 }
+test("member operations displays demoted GBM accounts as Members when position data is cleared", () => {
+  const model = getMemberOperationsModel({
+    members: [
+      {
+        id: "demoted-gbm",
+        name: "Rusha Bhagwat",
+        email: "rusha@example.com",
+        role: "",
+        position: "",
+        active: true,
+      },
+    ],
+    users: [
+      {
+        id: "demoted-gbm",
+        name: "Rusha Bhagwat",
+        email: "rusha@example.com",
+        role: "gbm",
+        status: "approved",
+        active: true,
+        clubPosition: "",
+        positionKeys: [],
+      },
+    ],
+  });
+
+  const row = model.rows[0];
+
+  assert.equal(row.trustedRole, "gbm");
+  assert.equal(row.clubPosition, "Member");
+  assert.equal(row.positionLabel, "Member");
+});

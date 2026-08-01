@@ -218,11 +218,16 @@ export function buildMemberOperationsRows({
     const completeness = calculateMemberCompleteness(member, linkedAccount);
     const displayName = text(linkedAccount?.name, 160) || text(member.name, 160);
     const displayEmail = normalizeMemberEmail(linkedAccount?.email) || email;
-    const trustedRole = text(linkedAccount?.role, 80);
-    const memberRole = text(member.role, 80);
-    const clubPosition = text(member.position, 180);
-    const positionLabel = clubPosition || memberRole || trustedRole;
-    const roleOrPositionLabel = trustedRole || memberRole || clubPosition;
+const trustedRole = text(linkedAccount?.role, 80);
+const memberRole = text(member.role, 80);
+const effectiveRole = trustedRole || memberRole;
+const rosterClubPosition = text(member.position, 180);
+const linkedClubPosition = text(linkedAccount?.clubPosition, 180);
+const clubPosition = effectiveRole.toLowerCase() === "gbm"
+  ? "Member"
+  : rosterClubPosition || linkedClubPosition;
+const positionLabel = clubPosition || memberRole || trustedRole;
+const roleOrPositionLabel = trustedRole || memberRole || clubPosition;
 
     return {
       ...member,
