@@ -5,6 +5,16 @@ const RSVP_URL = "https://forms.gle/gQ8JcgWHDHWvGakP7";
 const VENUE_URL = "https://maps.app.goo.gl/iNXahK8kMDFVURij8?g_st=ac";
 const VOX_INSTALLATION_POSTS = [
   {
+    id: "t-minus-one-day",
+    title: "T-Minus 1 Day",
+    shortTitle: "T-1 Day",
+    label: "Tomorrow",
+    instagramUrl: "https://www.instagram.com/p/Dbxr9lmN3vJ/?hl=en",
+    embedUrl: "https://www.instagram.com/p/Dbxr9lmN3vJ/embed",
+    accent: "amber",
+    isLatest: true,
+  },
+  {
     id: "save-the-date",
     title: "Save the Date",
     shortTitle: "Save Date",
@@ -21,7 +31,15 @@ const VOX_INSTALLATION_POSTS = [
     instagramUrl: "https://www.instagram.com/reel/DbJIe5ltc5l/?igsh=d2VrMHh0dWZ6eGtx",
     embedUrl: "https://www.instagram.com/reel/DbJIe5ltc5l/embed",
     accent: "pink",
-    isLatest: true,
+  },
+  {
+    id: "mouse-transition",
+    title: "One Click to VOX",
+    shortTitle: "One Click",
+    label: "Then → Now",
+    instagramUrl: "https://www.instagram.com/p/DboAFwrNsNK/?hl=en",
+    embedUrl: "https://www.instagram.com/p/DboAFwrNsNK/embed",
+    accent: "pink",
   },
 ];
 const VOX_RECORD_SHELF_SLOT_COUNT = 4;

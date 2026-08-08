@@ -52,8 +52,12 @@ test("InstallationSection contains emoji-free VOX event content and external act
     /COUNTDOWN TO VOX \/\/ '26/,
     /https:\/\/forms\.gle\/gQ8JcgWHDHWvGakP7/,
     /https:\/\/maps\.app\.goo\.gl\/iNXahK8kMDFVURij8\?g_st=ac/,
-    /https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/embed/,
-    /https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx/,
+/https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/embed/,
+/https:\/\/www\.instagram\.com\/reel\/DbJIe5ltc5l\/\?igsh=d2VrMHh0dWZ6eGtx/,
+/https:\/\/www\.instagram\.com\/p\/Dbxr9lmN3vJ\/embed/,
+/https:\/\/www\.instagram\.com\/p\/Dbxr9lmN3vJ\/\?hl=en/,
+/https:\/\/www\.instagram\.com\/p\/DboAFwrNsNK\/embed/,
+/https:\/\/www\.instagram\.com\/p\/DboAFwrNsNK\/\?hl=en/,
     /RSVP Now/,
     /View Venue/,
     /Open on Instagram/,
@@ -134,11 +138,27 @@ test("InstallationSection loads one selected VOX installation record at a time",
 
   for (const expected of [
     /const VOX_INSTALLATION_POSTS = \[/,
-    /id: "save-the-date"/,
-    /title: "Save the Date"/,
-    /id: "theme-reveal"/,
-    /title: "Theme Reveal"/,
-    /isLatest: true/,
+/id: "t-minus-one-day"/,
+/title: "T-Minus 1 Day"/,
+/shortTitle: "T-1 Day"/,
+/label: "Tomorrow"/,
+/id: "t-minus-one-day"[\s\S]{0,300}isLatest: true/,
+
+/id: "save-the-date"/,
+/title: "Save the Date"/,
+
+/id: "theme-reveal"/,
+/title: "Theme Reveal"/,
+
+/id: "mouse-transition"/,
+/title: "One Click to VOX"/,
+/shortTitle: "One Click"/,
+/label: "Then → Now"/,
+/https:\/\/www\.instagram\.com\/p\/DboAFwrNsNK\/embed/,
+/https:\/\/www\.instagram\.com\/p\/DboAFwrNsNK\/\?hl=en/,
+/https:\/\/www\.instagram\.com\/p\/Dbxr9lmN3vJ\/embed/,
+/https:\/\/www\.instagram\.com\/p\/Dbxr9lmN3vJ\/\?hl=en/,
+/id: "t-minus-one-day"[\s\S]{0,300}isLatest: true/,
     /const DEFAULT_VOX_POST_ID =/,
     /const RECORD_LOAD_DURATION_MS = 2000;/,
     /const \[selectedPostId, setSelectedPostId\] = useState\(DEFAULT_VOX_POST_ID\);/,
@@ -188,7 +208,14 @@ test("InstallationSection loads one selected VOX installation record at a time",
     1,
     "Only one Instagram iframe should exist in the component source",
   );
-  
+  const tMinusIndex = source.indexOf('id: "t-minus-one-day"');
+const saveDateIndex = source.indexOf('id: "save-the-date"');
+const themeRevealIndex = source.indexOf('id: "theme-reveal"');
+const mouseTransitionIndex = source.indexOf('id: "mouse-transition"');
+
+assert.ok(tMinusIndex < saveDateIndex, "T-Minus 1 Day should be the first installation record");
+assert.ok(saveDateIndex < themeRevealIndex, "Save the Date should follow T-Minus 1 Day");
+assert.ok(themeRevealIndex < mouseTransitionIndex, "Mouse transition should be the fourth installation record");
 });
 
 test("InstallationSection provides a second-based VOX countdown above the record card", async () => {
