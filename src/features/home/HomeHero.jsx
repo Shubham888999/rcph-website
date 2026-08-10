@@ -5,7 +5,15 @@ export default function HomeHero() {
 
   return (
     <section className="home-hero" aria-labelledby="home-hero-title">
-      <div className="home-hero__media">
+      <motion.figure
+        className="home-hero__photo"
+        initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: reduceMotion ? 0 : 0.7,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      >
         <img
           className="home-hero__image"
           src="/images/vox26.jpeg"
@@ -13,55 +21,43 @@ export default function HomeHero() {
           width="2048"
           height="1004"
           fetchPriority="high"
-          decoding="sync"
+          decoding="async"
         />
-      </div>
+      </motion.figure>
 
-      <div className="home-hero__overlay" aria-hidden="true" />
-
-      <div className="home-hero__content">
-        <div className="home-hero__title-stage">
-          <motion.span
-            className="home-hero__light"
-            aria-hidden="true"
-            initial={reduceMotion ? false : { opacity: 0.55, scaleX: 0.18 }}
-            animate={{ opacity: 1, scaleX: 1 }}
-            transition={{ duration: reduceMotion ? 0 : 0.68, ease: [0.22, 1, 0.36, 1] }}
-          />
-          <motion.h1
-            id="home-hero-title"
-            initial={reduceMotion ? false : { opacity: 1, filter: "blur(2px)", letterSpacing: "-0.065em" }}
-            animate={{ opacity: 1, filter: "blur(0px)", letterSpacing: "-0.05em" }}
-            transition={{ duration: reduceMotion ? 0 : 0.55, delay: reduceMotion ? 0 : 0.16 }}
-          >
-            Rotaract Club of Pune Heritage
-          </motion.h1>
+      <motion.div
+        className="home-hero__editorial"
+        initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: reduceMotion ? 0 : 0.62,
+          delay: reduceMotion ? 0 : 0.16,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      >
+        <div className="home-hero__eyebrow">
+          <span>RIY 2026-27</span>
+          <span className="home-hero__eyebrow-rule" aria-hidden="true" />
+          <span>Rotaract District 3131</span>
         </div>
 
-        <motion.p
-          className="home-kicker home-hero__kicker"
-          initial={reduceMotion ? false : { opacity: 1, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.4, delay: reduceMotion ? 0 : 0.48 }}
-        >
-          RID 3131 <span aria-hidden="true">|</span> ZONE 4
-        </motion.p>
+        <h1 id="home-hero-title">Rotaract Club of Pune Heritage</h1>
 
-<motion.p
-  className="home-hero__motto"
-  initial={reduceMotion ? false : { opacity: 1, y: 8 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{
-    duration: reduceMotion ? 0 : 0.4,
-    delay: reduceMotion ? 0 : 0.66,
-  }}
->
-  <span className="home-hero__theme-name">Lakshya</span>
-  <span className="home-hero__theme-tagline">
-    Shaping Aim Through Experience.
-  </span>
-</motion.p>
-      </div>
+        <p className="home-hero__meta">
+          <span>RID 3131</span>
+          <span className="home-hero__meta-separator" aria-hidden="true">
+            •
+          </span>
+          <span>Zone 4</span>
+        </p>
+
+        <div className="home-hero__theme">
+          <span className="home-hero__theme-name">Lakshya</span>
+          <span className="home-hero__theme-tagline">
+            Shaping Aim Through Experience.
+          </span>
+        </div>
+      </motion.div>
     </section>
   );
 }

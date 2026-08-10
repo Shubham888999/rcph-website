@@ -14,9 +14,12 @@ export default function ClubIntroduction() {
       whileInView={reduceMotion ? undefined : "visible"}
       viewport={{ once: true, amount: 0.2 }}
     >
-      <motion.h2 variants={reduceMotion ? undefined : headingReveal} id="club-introduction-title">
-        Rotaract Club of Pune Heritage
-      </motion.h2>
+<motion.h2
+  variants={reduceMotion ? undefined : headingReveal}
+  id="club-introduction-title"
+>
+  Who We Are
+</motion.h2>
 
       <div className="home-introduction__copy">
         <motion.p variants={reduceMotion ? undefined : copyRevealLeft}>

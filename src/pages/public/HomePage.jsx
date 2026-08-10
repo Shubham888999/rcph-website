@@ -14,9 +14,7 @@ const SHOW_RECRUITMENT_SECTION = true;
 export default function HomePage() {
   return (
     <main className="home-page">
-      <div className="home-hero-shell">
-        <HomeHero />
-      </div>
+<HomeHero />
       <ClubIntroduction />
       {SHOW_RECRUITMENT_SECTION ? <RecruitmentSection /> : null}
       <MonthlyHighlight />
