@@ -73,6 +73,25 @@ test("dashboard profile normalizes editable profile fields", () => {
   assert.equal(model.profile.hobbies, "Reading");
   assert.equal("uid" in model.profile, false);
 });
+test("dashboard profile accepts member alias as canonical GBM without affecting Prospect", () => {
+  const member = normalizeDashboardResponse(memberResponse({
+    profile: { name: "Member", email: "m@example.com", role: "member" },
+  }));
+  assert.equal(member.profile.role, "gbm");
+
+  const prospect = normalizeDashboardResponse({
+    ok: true,
+    mode: "prospect",
+    profile: { name: "Prospect", email: "p@example.com", role: "prospect" },
+    prospectProgress: {
+      meetings: { attended: 0, required: 2 },
+      events: { attended: 0, required: 1 },
+      duesPaid: false,
+      ready: false,
+    },
+  });
+  assert.equal(prospect.profile.role, "prospect");
+});
 test("profile merge keeps trusted dashboard role", () => {
   const model = normalizeDashboardResponse(memberResponse());
   const merged = mergeDashboardProfile(model, { role: "president", phone: "999" });

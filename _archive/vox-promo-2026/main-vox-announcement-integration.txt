@@ -1,0 +1,11 @@
+Archived August 10, 2026 from src/main.jsx.
+This was the fixed top VOX announcement strip integration at the app root.
+
+Import:
+
+import VoxAnnouncementBar from "./components/VoxAnnouncementBar";
+
+Render location:
+
+<VoxAnnouncementBar />
+        <App />

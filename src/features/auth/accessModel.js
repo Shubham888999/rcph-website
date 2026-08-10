@@ -1,6 +1,6 @@
 const DISTRICT_OFFICIAL_ROLE = "districtOfficial";
 const ACTIVE_ROLES = new Set(["prospect", "gbm", "bod", "admin", "president", DISTRICT_OFFICIAL_ROLE]);
-const DASHBOARD_ROLES = new Set(["prospect", "gbm", "bod", "admin", "president"]);
+const MEMBER_DASHBOARD_ROLES = new Set(["gbm", "bod", "admin", "president"]);
 export const VISIT_DASHBOARD_TYPES = Object.freeze(["clubAssembly", "dzrVisit", "drrVisit"]);
 export const VISIT_DASHBOARD_PATHS = Object.freeze({
   clubAssembly: "/visits/club-assembly",
@@ -19,8 +19,19 @@ function cleanString(value) {
 
 function cleanRole(value) {
   const role = cleanString(value);
-  if (role.replace(/[\s_-]+/g, "") === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
+  const compact = role.replace(/[\s_-]+/g, "");
+  if (["gbm", "member", "generalbody", "generalbodymember"].includes(compact)) return "gbm";
+  if (["bod", "board", "boardmember", "boardofdirectors"].includes(compact)) return "bod";
+  if (["admin", "administrator"].includes(compact)) return "admin";
+  if (["president", "clubpresident"].includes(compact)) return "president";
+  if (compact === "prospect") return "prospect";
+  if (compact === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
   return role;
+}
+
+function cleanRoleList(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((role) => cleanRole(role)).filter(Boolean))];
 }
 
 function cleanPositionKeys(value) {
@@ -84,6 +95,7 @@ hasPresidentAuthority: false,
     isInactive: false,
     canAccessMemberDashboard: false,
     canAccessProspectDashboard: false,
+    canAccessPersonalDashboard: false,
     canAccessBodTools: false,
     canAccessAdminTools: false,
     canManageBodManagement: false,
@@ -107,43 +119,85 @@ export function normalizeTrustedAccess(payload) {
   const roleDocument = payload.role && typeof payload.role === "object" ? payload.role : null;
   const roleStatus = cleanString(roleDocument?.status);
   const userStatus = cleanString(user?.status);
+  const approvalStatus = cleanString(user?.approvalStatus);
   const candidateRole = cleanRole(roleDocument?.role);
-  const storedRole = roleStatus === "approved" && ACTIVE_ROLES.has(candidateRole)
+  const declaredUserRoles = [...new Set([
+    cleanRole(user?.role),
+    cleanRole(user?.accountType),
+    ...cleanRoleList(user?.roles),
+    ...cleanRoleList(roleDocument?.roles),
+  ].filter(Boolean))];
+  const hasContradictoryRole = declaredUserRoles.length > 0
+    && (declaredUserRoles.length > 1 || declaredUserRoles[0] !== candidateRole);
+  const roleDocumentAllowsAccess = roleStatus === "approved"
+    && roleDocument?.active !== false
+    && roleDocument?.isActive !== false
+    && roleDocument?.isApproved !== false;
+  const storedRole = roleDocumentAllowsAccess
+    && !hasContradictoryRole
+    && ACTIVE_ROLES.has(candidateRole)
     ? candidateRole
     : "";
-  const isRejected = roleStatus === "rejected" || userStatus === "rejected";
-  const isPending = !isRejected && (roleStatus === "pending" || userStatus === "pending");
+  const isRejected = roleStatus === "rejected" || userStatus === "rejected" || approvalStatus === "rejected";
+  const isPending = !isRejected && !hasContradictoryRole && (
+    roleStatus === "pending"
+    || userStatus === "pending"
+    || approvalStatus === "pending"
+    || user?.isApproved === false
+  );
   const isProfileMissing = !isPending && !isRejected && (!user || !roleDocument);
   const isInactive = !isProfileMissing
     && !isPending
     && !isRejected
-    && (user?.active === false || !storedRole);
+    && (
+      user?.active === false
+      || user?.isActive === false
+      || user?.isApproved === false
+      || hasContradictoryRole
+      || !storedRole
+    );
   const userStatusAllowsAccess = !userStatus || userStatus === "approved";
-  const isApproved = Boolean(user && storedRole && userStatusAllowsAccess && user.active !== false);
+  const approvalStatusAllowsAccess = !approvalStatus || approvalStatus === "approved";
+  const isApproved = Boolean(
+    user
+      && storedRole
+      && userStatusAllowsAccess
+      && approvalStatusAllowsAccess
+      && user.active !== false
+      && user.isActive !== false
+      && user.isApproved !== false
+  );
   const authority = payload.authority && typeof payload.authority === "object"
     ? payload.authority
     : {};
   // Copy server authority flags strictly; position names and keys never create authority locally.
-  const isPresidentRole = authority.isPresidentRole === true;
+  const canCarryProtectedAuthority = ["bod", "admin", "president"].includes(storedRole);
+  const isPresidentRole = canCarryProtectedAuthority && authority.isPresidentRole === true;
 const hasWebsiteDirectorPosition =
-  authority.hasWebsiteDirectorPosition === true;
+  canCarryProtectedAuthority && authority.hasWebsiteDirectorPosition === true;
 
 const hasSergeantAtArmsPosition =
-  authority.hasSergeantAtArmsPosition === true;
+  canCarryProtectedAuthority && authority.hasSergeantAtArmsPosition === true;
 
 const hasPresidentAuthority =
-  authority.hasPresidentAuthority === true;
-  const resolutionManager = payload.resolutionManager === true;
-  const trustedLockTools = payload.canAccessLockTools === true
-    || authority.canAccessLockTools === true;
-  const trustedResolutionTools = payload.canAccessResolutionTools === true
+  canCarryProtectedAuthority && authority.hasPresidentAuthority === true;
+  const resolutionManager = canCarryProtectedAuthority && payload.resolutionManager === true;
+  const trustedLockTools = canCarryProtectedAuthority && (
+    payload.canAccessLockTools === true
+    || authority.canAccessLockTools === true
+  );
+  const trustedResolutionTools = canCarryProtectedAuthority && (
+    payload.canAccessResolutionTools === true
     || authority.canAccessResolutionTools === true
-    || resolutionManager;
-  const trustedSystemLogs = payload.canAccessSystemLogs === true;
-  const hasDashboardRole = DASHBOARD_ROLES.has(storedRole);
+    || resolutionManager
+  );
+  const trustedSystemLogs = canCarryProtectedAuthority && payload.canAccessSystemLogs === true;
+  const hasMemberDashboardRole = MEMBER_DASHBOARD_ROLES.has(storedRole);
+  const canAccessMemberDashboard = isApproved && hasMemberDashboardRole;
+  const canAccessProspectDashboard = isApproved && storedRole === "prospect";
   const visitDashboardAccess = normalizeVisitDashboardAccess(payload.visitDashboardAccess);
   const visitDashboardEntries = normalizeVisitDashboardEntries(payload.visitDashboardEntries, visitDashboardAccess);
-  const trustedVisitDashboards = payload.canAccessVisitDashboards === true && visitDashboardEntries.length > 0;
+  const trustedVisitDashboards = storedRole !== "prospect" && payload.canAccessVisitDashboards === true && visitDashboardEntries.length > 0;
   const allowedVisitDashboardAccess = isApproved && trustedVisitDashboards
     ? visitDashboardAccess
     : createEmptyVisitDashboardAccessMap();
@@ -168,8 +222,9 @@ hasPresidentAuthority,
     isRejected,
     isProfileMissing,
     isInactive,
-    canAccessMemberDashboard: isApproved && hasDashboardRole,
-    canAccessProspectDashboard: isApproved && storedRole === "prospect",
+    canAccessMemberDashboard,
+    canAccessProspectDashboard,
+    canAccessPersonalDashboard: canAccessMemberDashboard || canAccessProspectDashboard,
     canAccessBodTools: isApproved && ["bod", "admin", "president"].includes(storedRole),
 canAccessAdminTools: isApproved
   && (
@@ -214,6 +269,7 @@ export function hasCapability(access, capability) {
   const capabilityFields = {
     memberDashboard: "canAccessMemberDashboard",
     prospectDashboard: "canAccessProspectDashboard",
+    personalDashboard: "canAccessPersonalDashboard",
     bodTools: "canAccessBodTools",
     adminTools: "canAccessAdminTools",
     bodManagement: "canManageBodManagement",

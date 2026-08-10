@@ -95,6 +95,11 @@ test("District Official signup renders a bounded free-text position input", asyn
   assert.doesNotMatch(formSource, /<select[\s\S]*signup-districtOfficialPosition/);
   assert.doesNotMatch(formSource, /DISTRICT_OFFICIAL_POSITIONS\.map/);
 });
+test("existing member signup copy does not promise automatic approval", async () => {
+  const formSource = await readFile(new URL("./ExistingMemberSignupForm.jsx", import.meta.url), "utf8");
+  assert.match(formSource, /access requests require approval/i);
+  assert.doesNotMatch(formSource, /approved automatically/i);
+});
 test("selecting Prospect clears member credentials and forces role", () => {
   const next = selectSignupPath({ ...validMember("admin"), password: "x", inviteCode: "code" }, "prospect");
   assert.equal(next.requestedRole, "prospect");
@@ -187,6 +192,10 @@ test("district official role normalization preserves canonical camelCase", () =>
   assert.equal(normalizeSignupRole("districtOfficial"), DISTRICT_OFFICIAL_ROLE);
   assert.equal(normalizeSignupRole("district-official"), DISTRICT_OFFICIAL_ROLE);
   assert.equal(normalizeSignupRole("District Official"), DISTRICT_OFFICIAL_ROLE);
+});
+test("member role aliases normalize to canonical GBM", () => {
+  assert.equal(normalizeSignupRole("member"), "gbm");
+  assert.equal(normalizeSignupRole("General Body Member"), "gbm");
 });
 test("mandatory legal acceptance blocks signup", () => {
   const result = validateSignup({ ...validMember(), legalAccepted: false });
@@ -312,6 +321,7 @@ test("President role is rejected", () => {
 });
 test("invite code is required only for Admin", () => {
   assert.ok(validateSignup({ ...validMember("admin"), inviteCode: "" }).errors.inviteCode);
+  assert.ok(validateSignup({ ...validMember("admin"), requestedRole: "administrator", inviteCode: "" }).errors.inviteCode);
   assert.equal(validateSignup(validMember("bod")).errors.inviteCode, undefined);
 });
 test("switching away from Admin clears invite code", () => {
@@ -322,6 +332,10 @@ test("existing-member payload uses requested role exactly", () => {
   const payload = buildSignupPayload(validMember("bod"));
   assert.equal(payload.requestedRole, "bod");
   assert.equal(payload.consentSource, "member-signup");
+});
+test("existing-member payload canonicalizes role aliases before sending", () => {
+  const payload = buildSignupPayload({ ...validMember(), requestedRole: "member" });
+  assert.equal(payload.requestedRole, "gbm");
 });
 test("existing-member payload includes optional RID only when supplied", () => {
   const empty = buildSignupPayload(validMember("bod"));
@@ -349,10 +363,15 @@ test("Prospect payload never includes RID", () => {
   const payload = buildSignupPayload({ ...validProspect(), rid: "RID-3131" });
   assert.equal("rid" in payload, false);
 });
-test("payload builders whitelist fields", () => {
-  const payload = buildSignupPayload({ ...validMember(), arbitraryAuthority: true, role: "president" });
+test("payload builders whitelist fields and drop lifecycle escalation attempts", () => {
+  const payload = buildSignupPayload({ ...validMember(), arbitraryAuthority: true, role: "president", approved: true, active: true, status: "approved", isApproved: true, isActive: true });
   assert.equal("arbitraryAuthority" in payload, false);
   assert.equal("role" in payload, false);
+  assert.equal("approved" in payload, false);
+  assert.equal("active" in payload, false);
+  assert.equal("status" in payload, false);
+  assert.equal("isApproved" in payload, false);
+  assert.equal("isActive" in payload, false);
 });
 test("password is never included in callable profile payload", () => {
   const payload = buildSignupPayload(validMember());
@@ -410,8 +429,17 @@ test("existing-member profile completion includes RID only when supplied", () =>
 test("Prospect approved outcome requests trusted refresh", () => {
   assert.equal(classifySignupOutcome({ status: "approved", role: "prospect" }).refreshTrustedAccess, true);
 });
-test("GBM approved outcome requests trusted refresh", () => {
-  assert.equal(classifySignupOutcome({ status: "approved", role: "gbm" }).refreshTrustedAccess, true);
+test("new GBM approved outcome is treated as pending unless backend marks it existing", () => {
+  const outcome = classifySignupOutcome({ status: "approved", role: "gbm" });
+  assert.equal(outcome.kind, "pending");
+  assert.equal(outcome.requestedRole, "gbm");
+  assert.equal(outcome.signOut, true);
+});
+test("existing approved GBM outcome requests trusted refresh", () => {
+  const outcome = classifySignupOutcome({ status: "approved", role: "member", existing: true });
+  assert.equal(outcome.kind, "approved");
+  assert.equal(outcome.role, "gbm");
+  assert.equal(outcome.refreshTrustedAccess, true);
 });
 test("BOD pending outcome signs out", () => {
   assert.equal(classifySignupOutcome({ status: "pending", requestedRole: "bod" }).signOut, true);

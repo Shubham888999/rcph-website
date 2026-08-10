@@ -25,6 +25,10 @@ test("search matches display titles, codes, and canonical keys", () => {
 
 test("positions derive effective roles while empty Admin remains valid", () => {
   assert.deepEqual(applyPositionRole("gbm", ["co-cmd"]), ["co-cmd"]);
+  assert.deepEqual(applyPositionRole("prospect", ["president", "cwd"]), []);
+  assert.equal(validatePositionRole("prospect", ["president"]).ok, true);
+  assert.deepEqual(validatePositionRole("prospect", ["president"]).positionKeys, []);
+  assert.equal(validatePositionRole("member", []).effectiveRole, "gbm");
   assert.equal(validatePositionRole("bod", []).ok, false);
   assert.equal(validatePositionRole("admin", []).ok, true);
   assert.equal(validatePositionRole("districtOfficial", []).ok, true);

@@ -37,10 +37,11 @@ function approvedWithCapabilities(role, capabilities = {}, authority = {}, resol
   });
 }
 
-test("approved Prospect gets member and prospect access only", () => {
+test("approved Prospect gets prospect access without member dashboard authority", () => {
   const access = approved("prospect");
-  assert.equal(hasCapability(access, "memberDashboard"), true);
+  assert.equal(hasCapability(access, "memberDashboard"), false);
   assert.equal(hasCapability(access, "prospectDashboard"), true);
+  assert.equal(hasCapability(access, "personalDashboard"), true);
   assert.equal(hasCapability(access, "adminTools"), false);
 });
 
@@ -48,6 +49,13 @@ test("approved GBM gets member access but not Admin", () => {
   const access = approved("gbm");
   assert.equal(access.canAccessMemberDashboard, true);
   assert.equal(access.canAccessAdminTools, false);
+});
+
+test("member role alias normalizes to GBM access", () => {
+  const access = approved("member");
+  assert.equal(access.storedRole, "gbm");
+  assert.equal(access.canAccessMemberDashboard, true);
+  assert.equal(access.canAccessProspectDashboard, false);
 });
 
 test("approved BOD gets BOD access but not Admin", () => {
@@ -269,6 +277,18 @@ test("pending BOD request grants no protected capability", () => {
   assert.equal(access.canAccessAdminTools, false);
 });
 
+test("pending GBM request grants no member dashboard capability", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "pending-gbm",
+    user: { status: "pending", requestedRole: "gbm", isApproved: false },
+    role: { role: "gbm", status: "pending" },
+  });
+  assert.equal(access.isPending, true);
+  assert.equal(access.canAccessMemberDashboard, false);
+  assert.equal(access.canAccessPersonalDashboard, false);
+});
+
 test("rejected account grants no protected capability", () => {
   const access = normalizeTrustedAccess({
     ok: true,
@@ -327,6 +347,62 @@ test("role status other than approved is inactive and denied", () => {
   });
   assert.equal(access.isInactive, true);
   assert.equal(access.canAccessAdminTools, false);
+});
+
+test("contradictory canonical user role and stale role document fail closed", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "demoted",
+    user: { status: "approved", role: "prospect", active: true },
+    role: { role: "admin", status: "approved" },
+    authority: { hasPresidentAuthority: true },
+  });
+  assert.equal(access.isApproved, false);
+  assert.equal(access.isInactive, true);
+  assert.equal(access.canAccessAdminTools, false);
+  assert.equal(access.canAccessMemberDashboard, false);
+});
+
+test("contradictory legacy roles array does not preserve protected access", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "legacy-conflict",
+    user: { status: "approved", role: "gbm", roles: ["gbm", "admin"], active: true },
+    role: { role: "gbm", status: "approved" },
+  });
+  assert.equal(access.isApproved, false);
+  assert.equal(access.canAccessMemberDashboard, false);
+});
+
+test("approved Prospect ignores stale protected authority flags", () => {
+  const access = normalizeTrustedAccess({
+    ok: true,
+    uid: "prospect-stale-authority",
+    user: { status: "approved", role: "prospect", active: true },
+    role: { role: "prospect", status: "approved" },
+    authority: {
+      hasPresidentAuthority: true,
+      hasWebsiteDirectorPosition: true,
+      hasSergeantAtArmsPosition: true,
+      canAccessResolutionTools: true,
+      canAccessLockTools: true,
+    },
+    resolutionManager: true,
+    canAccessSystemLogs: true,
+    canAccessVisitDashboards: true,
+    visitDashboardAccess: { clubAssembly: true },
+    visitDashboardEntries: [
+      { visitType: "clubAssembly", visitName: "Club Assembly", path: "/visits/club-assembly" },
+    ],
+  });
+
+  assert.equal(access.canAccessProspectDashboard, true);
+  assert.equal(access.canAccessAdminTools, false);
+  assert.equal(access.canAccessResolutionTools, false);
+  assert.equal(access.canAccessLockTools, false);
+  assert.equal(access.canAccessSystemLogs, false);
+  assert.equal(access.canAccessVisitDashboards, false);
+  assert.deepEqual(access.visitDashboardEntries, []);
 });
 
 test("callable failure fallback grants no access", () => {

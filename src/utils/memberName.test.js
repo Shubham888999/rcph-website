@@ -8,6 +8,7 @@ test("stripRotaractorPrefix removes repeated manual prefixes", () => {
 
 test("formatRotaractorName prefixes actual members only once", () => {
   assert.equal(formatRotaractorName("Shubham Deshpande", { role: "gbm", status: "approved" }), "Rtr. Shubham Deshpande");
+  assert.equal(formatRotaractorName("Shubham Deshpande", { role: "member", status: "approved" }), "Rtr. Shubham Deshpande");
   assert.equal(formatRotaractorName("Rtr. Shubham Deshpande", { role: "bod", status: "approved" }), "Rtr. Shubham Deshpande");
   assert.equal(formatRotaractorName("Rtr. Rtr. Shubham Deshpande", { role: "admin", status: "approved" }), "Rtr. Shubham Deshpande");
   assert.equal(formatRotaractorName("RTR Shubham Deshpande", { role: "president", status: "approved" }), "Rtr. Shubham Deshpande");

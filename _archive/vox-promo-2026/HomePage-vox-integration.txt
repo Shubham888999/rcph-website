@@ -1,0 +1,36 @@
+Archived August 10, 2026 from src/pages/public/HomePage.jsx.
+These were the pre-installation VOX // '26 homepage integration points.
+
+React hook import for the temporary hero auto-dismiss:
+
+import { useEffect, useState } from "react";
+
+Installation section import:
+
+import InstallationSection from "../../features/home/InstallationSection";
+
+Hero auto-fade constant:
+
+const HERO_AUTO_FADE_DELAY_MS = 1000;
+
+Hero auto-dismiss state/effect:
+
+const [heroDismissed, setHeroDismissed] = useState(false);
+
+  useEffect(() => {
+    const heroTimer = window.setTimeout(() => {
+      setHeroDismissed(true);
+    }, HERO_AUTO_FADE_DELAY_MS);
+
+    return () => window.clearTimeout(heroTimer);
+  }, []);
+
+Hero shell and VOX installation render order:
+
+<div
+        className={`home-hero-shell${heroDismissed ? " home-hero-shell--dismissed" : ""}`}
+        aria-hidden={heroDismissed ? "true" : undefined}
+      >
+        <HomeHero />
+      </div>
+      <InstallationSection autoRevealActive={heroDismissed} />

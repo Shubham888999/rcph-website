@@ -16,7 +16,6 @@ export default function EventStories() {
       <div className="events-section-react__heading">
         <p className="events-kicker">From the field</p>
         <h2 id="event-stories-title">Event Stories &amp; Reports</h2>
-        <p>Read public reports from selected RCPH events and service initiatives.</p>
       </div>
       <article className="event-story-card">
         <div>

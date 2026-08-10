@@ -1,0 +1,23 @@
+/*
+Archived August 10, 2026 from src/styles/components/admin.css.
+This temporary offset kept the admin sidebar open button below the fixed VOX announcement strip.
+*/
+
+.admin-sidebar-open-button {
+  position: sticky;
+  top: calc(var(--vox-announcement-height, 0rem) + 0.75rem);
+  z-index: 8;
+  width: max-content;
+  max-width: 100%;
+  min-height: 2.35rem;
+  margin: 0 0 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  border-color: rgba(96, 195, 196, 0.42) !important;
+  color: var(--internal-text) !important;
+  background:
+    linear-gradient(135deg, rgba(96, 195, 196, 0.12), rgba(229, 194, 104, 0.07)),
+    var(--internal-surface-raised) !important;
+  box-shadow: 0 0.6rem 1.3rem rgba(0, 0, 0, 0.18);
+}

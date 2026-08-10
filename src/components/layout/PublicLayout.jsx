@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
-const VOX_RSVP_URL = "https://forms.gle/gQ8JcgWHDHWvGakP7";
-
 const navigationItems = [
   { label: "Home", to: "/" },
   { label: "About", to: "/about" },
@@ -70,24 +68,6 @@ export default function PublicLayout() {
               <small>Rotaract Club of Pune Heritage</small>
             </span>
           </NavLink>
-
-          <a
-            className="public-header__vox-ticket"
-            href={VOX_RSVP_URL}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="RSVP for RCPH's 12th Installation Ceremony"
-          >
-            <span className="public-header__vox-ticket-kicker">
-              <span className="public-header__vox-ticket-desktop">VOX // '26 Admit One</span>
-              <span className="public-header__vox-ticket-mobile">VOX // '26</span>
-            </span>
-            <strong className="public-header__vox-ticket-main">
-              <span className="public-header__vox-ticket-desktop">RSVP Now</span>
-              <span className="public-header__vox-ticket-mobile">RSVP</span>
-            </strong>
-            <span className="public-header__vox-ticket-meta">09.08.26</span>
-          </a>
 
           <nav
             id="primary-navigation"

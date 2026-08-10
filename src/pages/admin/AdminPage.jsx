@@ -50,7 +50,7 @@ const SERGEANT_LOCK_REQUIREMENTS = {
 };
 
 export default function AdminPage() {
-  const { access, user, signOut } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, "");
+  const { access, user, signOut, refreshAccess } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, "");
   const displayName = formatRotaractorName(access?.user?.name || user?.displayName || "RCPH Admin", access?.user || access?.storedRole);
   const canAccessLockTools = access?.canAccessLockTools === true || access?.canAccessPresidentControls === true;
   const canAccessResolutionTools = access?.canAccessResolutionTools === true;
@@ -72,7 +72,7 @@ export default function AdminPage() {
   else if (state.status === "loading") content = <AdminLoading />;
   else if (state.status === "error") content = <AdminError message={state.error} />;
   else if (segment === "") content = <CommandCenter data={data} access={access} uid={uid} onNotice={setNotice} />;
-  else if (segment === "requests") content = <AccountsModule users={data.users} access={access} uid={uid} onNotice={setNotice} />;
+  else if (segment === "requests") content = <AccountsModule users={data.users} access={access} uid={uid} onNotice={setNotice} onAccessChanged={refreshAccess} />;
   else if (segment === "members") content = <MembersModule members={data.members} users={data.users} events={data.events} attendance={data.attendance} fines={data.fines} uid={uid} onNotice={setNotice} />;
   else if (segment === "attendance") content = <ClubAttendanceModule data={data} lock={locks.attendance} uid={uid} access={access} onNotice={setNotice} />;
   else if (segment === "bod") content = <BodOperationsModule data={data} lock={locks.bodAttendance} uid={uid} access={access} onNotice={setNotice} />;

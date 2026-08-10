@@ -33,7 +33,6 @@ export default function EventAvenues() {
       <div className="events-section-react__heading">
         <p className="events-kicker">The avenues we serve</p>
         <h2 id="event-avenues-title">Avenue-wise Events</h2>
-        <p>RCPH events span service, learning, fellowship, and district participation.</p>
       </div>
       <motion.div
         className="event-avenues-grid"

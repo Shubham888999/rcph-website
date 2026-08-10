@@ -6,7 +6,13 @@ const ROLE_RANK = Object.freeze({ prospect: 0, gbm: 1, districtOfficial: 1, bod:
 
 function normalizeRole(value) {
   const role = typeof value === "string" ? value.trim() : "";
-  if (role.toLowerCase().replace(/[\s_-]+/g, "") === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
+  const compact = role.toLowerCase().replace(/[\s_-]+/g, "");
+  if (["gbm", "member", "generalbody", "generalbodymember"].includes(compact)) return "gbm";
+  if (["bod", "board", "boardmember", "boardofdirectors"].includes(compact)) return "bod";
+  if (["admin", "administrator"].includes(compact)) return "admin";
+  if (["president", "clubpresident"].includes(compact)) return "president";
+  if (compact === "prospect") return "prospect";
+  if (compact === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
   return role.toLowerCase();
 }
 
@@ -84,12 +90,14 @@ export function deriveEffectiveRole(selectedKeys, fallbackRole = "gbm") {
 }
 
 export function applyPositionRole(role, selectedKeys) {
+  if (normalizeRole(role) === "prospect") return [];
   return normalizePositionSelection(selectedKeys).selectedKeys;
 }
 
 export function validatePositionRole(role, selectedKeys, unknownValues = []) {
   const normalizedRole = normalizeRole(role);
   const keys = applyPositionRole(role, selectedKeys);
+  if (normalizedRole === "prospect") return { ok: true, message: "", positionKeys: [], effectiveRole: "prospect" };
   if (normalizedRole === DISTRICT_OFFICIAL_ROLE && keys.length > 0) return { ok: false, message: "District Official access cannot include club positions.", positionKeys: keys, effectiveRole: DISTRICT_OFFICIAL_ROLE };
   const effectiveRole = deriveEffectiveRole(keys, normalizedRole);
   if (normalizedRole === "bod" && keys.length === 0) return { ok: false, message: "BOD access requires at least one club position.", positionKeys: keys, effectiveRole };

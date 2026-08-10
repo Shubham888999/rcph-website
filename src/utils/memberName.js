@@ -1,4 +1,4 @@
-const MEMBER_ROLES = new Set(["gbm", "bod", "admin", "president"]);
+const MEMBER_ROLES = new Set(["gbm", "member", "bod", "admin", "president"]);
 const NON_MEMBER_ROLES = new Set(["prospect", "pending", "rejected", "unauthenticated", "external", "districtofficial"]);
 const ROTARACTOR_PREFIX_PATTERN = /^(?:rtr\.?\s*)+/i;
 

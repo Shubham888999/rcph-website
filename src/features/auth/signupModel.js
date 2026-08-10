@@ -65,6 +65,10 @@ export function normalizeSignupText(value) {
 export function normalizeSignupRole(value) {
   const role = normalizeSignupText(value);
   const normalized = role.toLowerCase().replace(/[\s_-]+/g, "");
+  if (["gbm", "member", "generalbody", "generalbodymember"].includes(normalized)) return "gbm";
+  if (["bod", "board", "boardmember", "boardofdirectors"].includes(normalized)) return "bod";
+  if (["admin", "administrator"].includes(normalized)) return "admin";
+  if (normalized === "prospect") return "prospect";
   if (normalized === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
   return role.toLowerCase();
 }
@@ -143,9 +147,10 @@ export function selectSignupPath(form, path) {
     return { ...base, requestedRole: "prospect", rid: "" };
   }
   if (base.path === SIGNUP_PATHS.EXISTING_MEMBER) {
+    const requestedRole = normalizeSignupRole(form.requestedRole);
     return {
       ...base,
-      requestedRole: SIGNUP_ROLES.includes(form.requestedRole) ? form.requestedRole : "gbm",
+      requestedRole: SIGNUP_ROLES.includes(requestedRole) ? requestedRole : "gbm",
       rid: normalizeSignupRid(form.rid),
       hobbies: "",
       previousRotaract: "",
@@ -230,10 +235,11 @@ export function validateSignup(form, options = {}) {
       errors.referredBy = "Enter the name of the person who referred you.";
     }
   } else if (form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
-    if (!SIGNUP_ROLES.includes(form.requestedRole)) errors.requestedRole = "Choose GBM, BOD, or Admin.";
+    const requestedRole = normalizeSignupRole(form.requestedRole);
+    if (!SIGNUP_ROLES.includes(requestedRole)) errors.requestedRole = "Choose GBM, BOD, or Admin.";
     const ridError = validateSignupRid(rid);
     if (ridError) errors.rid = ridError;
-    if (form.requestedRole === "admin" && !normalizeSignupText(form.inviteCode)) {
+    if (requestedRole === "admin" && !normalizeSignupText(form.inviteCode)) {
       errors.inviteCode = "Enter the Admin invite code.";
     }
   } else if (districtOfficialSignup) {
@@ -269,6 +275,10 @@ export function validateSignup(form, options = {}) {
 
 export function buildSignupPayload(form, options = {}) {
   const provider = options.provider === "google" ? "google" : "password";
+  const normalizedRequestedRole = normalizeSignupRole(form.requestedRole);
+  const requestedMemberRole = SIGNUP_ROLES.includes(normalizedRequestedRole)
+    ? normalizedRequestedRole
+    : "";
   const consentSource = form.path === SIGNUP_PATHS.PROSPECT
     ? "prospect-signup"
     : form.path === SIGNUP_PATHS.DISTRICT_OFFICIAL
@@ -302,11 +312,11 @@ export function buildSignupPayload(form, options = {}) {
     const rid = normalizeSignupRid(form.rid);
     return {
       name: normalizeSignupName(form.name),
-      requestedRole: form.requestedRole,
+      requestedRole: requestedMemberRole,
       provider,
       ...(rid ? { rid } : {}),
       ...consent,
-      ...(form.requestedRole === "admin"
+      ...(requestedMemberRole === "admin"
         ? { inviteCode: normalizeSignupText(form.inviteCode) }
         : {}),
     };
@@ -316,7 +326,7 @@ export function buildSignupPayload(form, options = {}) {
     phone: normalizeSignupPhone(form.phone),
     dateOfBirth: normalizeSignupDateOfBirth(form.dateOfBirth),
     email: normalizeSignupEmail(options.identityEmail || form.email),
-    requestedRole: form.path === SIGNUP_PATHS.PROSPECT ? "prospect" : form.requestedRole,
+    requestedRole: form.path === SIGNUP_PATHS.PROSPECT ? "prospect" : requestedMemberRole,
     provider,
     gender: SIGNUP_GENDERS.includes(form.gender) ? form.gender : "",
 genderSelfDescribe: form.gender === "self-describe"
@@ -344,7 +354,7 @@ previousRotaractDetails: form.previousRotaract === "yes"
   return {
     ...base,
     ...(normalizeSignupRid(form.rid) ? { rid: normalizeSignupRid(form.rid) } : {}),
-    ...(form.requestedRole === "admin"
+    ...(requestedMemberRole === "admin"
       ? { inviteCode: normalizeSignupText(form.inviteCode) }
       : {}),
   };
@@ -354,6 +364,9 @@ export function classifySignupOutcome(result) {
   const status = typeof result?.status === "string" ? result.status.trim().toLowerCase() : "";
   const role = normalizeSignupRole(result?.role);
   if (status === "approved" && ["prospect", "gbm", "bod", "admin", "president", DISTRICT_OFFICIAL_ROLE].includes(role)) {
+    if (role !== "prospect" && result?.existing !== true) {
+      return { kind: "pending", role: "pending", requestedRole: role, signOut: true };
+    }
     return { kind: "approved", role, existing: result?.existing === true, refreshTrustedAccess: true };
   }
   if (status === "pending") {

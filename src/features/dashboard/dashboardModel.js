@@ -10,6 +10,17 @@ function text(value, max = 300) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+function normalizeDashboardRole(value) {
+  const role = text(value, 40).toLowerCase();
+  const compact = role.replace(/[\s_-]+/g, "");
+  if (["gbm", "member", "generalbody", "generalbodymember"].includes(compact)) return "gbm";
+  if (["bod", "board", "boardmember", "boardofdirectors"].includes(compact)) return "bod";
+  if (["admin", "administrator"].includes(compact)) return "admin";
+  if (["president", "clubpresident"].includes(compact)) return "president";
+  if (compact === "prospect") return "prospect";
+  return role;
+}
+
 function count(value) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
@@ -152,7 +163,7 @@ export function normalizeDashboardAnnouncements(raw, now = Date.now()) {
 
 export function normalizeDashboardProfile(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const role = text(raw.role, 40).toLowerCase();
+  const role = normalizeDashboardRole(raw.role);
   if (!ROLES.has(role)) return null;
   const authority = raw.authority && typeof raw.authority === "object" ? raw.authority : {};
   const profile = {

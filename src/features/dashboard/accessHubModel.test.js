@@ -12,7 +12,7 @@ function access(role, extras = {}) {
     isApproved: true,
     storedRole: role,
     positionKeys: [],
-    canAccessMemberDashboard: true,
+    canAccessMemberDashboard: role !== "prospect",
     canAccessProspectDashboard: role === "prospect",
     canAccessBodTools: ["bod", "admin", "president"].includes(role),
     canAccessAdminTools: ["admin", "president"].includes(role),

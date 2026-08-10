@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   ANNOUNCEMENT_ATTACHMENT_MAX_BYTES,
+  ADMIN_ROLES,
   attendancePatch,
   buildAccessPayload,
   buildAnnouncementPayload,
@@ -34,9 +35,11 @@ test("delegated authority does not alter stored role",()=>{const a={isApproved:t
 test("user normalization ignores raw fields",()=>{const u=normalizeAdminUser("u",{name:" A ",status:"pending",requestedRole:"bod",secret:"x",raw:{token:"hidden"},accessToken:"hidden"});assert.equal(u.name,"A");assert.equal(Object.hasOwn(u,"secret"),false);assert.equal(Object.hasOwn(u,"raw"),false);assert.equal(Object.hasOwn(u,"accessToken"),false)});
 test("user normalization preserves editable canonical profile fields",()=>{const u=normalizeAdminUser("u",{name:" A ",status:"approved",phone:"123",rotaryId:" RI-3131A ",dateOfBirth:"1998-02-28",gender:"self-describe",genderSelfDescribe:"Agender",hobbies:"Reading",previousRotaract:true,previousRotaractDetails:"College club",joinReason:"Service",referred:true,referredBy:"Member"});assert.equal(u.phone,"123");assert.equal(u.rotaryId,"RI-3131A");assert.equal(u.dateOfBirth,"1998-02-28");assert.equal(u.gender,"self-describe");assert.equal(u.genderSelfDescribe,"Agender");assert.equal(u.hobbies,"Reading");assert.equal(u.previousRotaract,true);assert.equal(u.referredBy,"Member")});
 test("District Official account requests keep canonical role and position labels",()=>{const u=normalizeAdminUser("u",{name:" Official ",status:"pending",role:"districtOfficial",requestedRole:"district-official",position:"DZR",districtOfficialPosition:"DZR"});assert.equal(u.role,"districtOfficial");assert.equal(u.requestedRole,"districtOfficial");assert.equal(u.districtOfficialPosition,"DZR");assert.equal(formatAdminRole(u.requestedRole),"District Official");assert.equal(normalizeAdminRole("District Official"),"districtOfficial")});
+test("Prospect is available as a complete account-maintenance destination",()=>{assert.equal(ADMIN_ROLES.includes("prospect"),true);assert.equal(formatAdminRole("prospect"),"Prospect");assert.equal(normalizeAdminRole("member"),"gbm")});
 test("user normalization distinguishes explicit position keys from legacy-only records",()=>{assert.equal(normalizeAdminUser("u",{positionKeys:[]}).hasExplicitPositionKeys,true);assert.equal(normalizeAdminUser("u",{clubPosition:"Secretary"}).hasExplicitPositionKeys,false)});
 test("access payload is whitelisted and President cannot be injected through unknown role",()=>{const p=buildAccessPayload({targetUid:"u",role:"root",positionKeys:["cwd"],raw:true});assert.equal(p.role,"");assert.equal(Object.hasOwn(p,"raw"),false)});
 test("access payload allows canonical District Official approval without club positions",()=>{const p=buildAccessPayload({targetUid:"u",role:"District Official",positionKeys:[],mode:"approval"});assert.equal(p.role,"districtOfficial");assert.deepEqual(p.positionKeys,[]);assert.equal(p.operationSource,"accountApproval")});
+test("access payload demotes to Prospect without carrying stale positions",()=>{const p=buildAccessPayload({targetUid:"u",role:"Prospect",positionKeys:["president","cwd"],confirmJointPositionKeys:["president"]});assert.equal(p.role,"prospect");assert.deepEqual(p.positionKeys,[]);assert.deepEqual(p.confirmJointPositionKeys,[]);assert.equal(p.operationSource,"roleMaintenance")});
 test("dates include valid leap years",()=>{assert.equal(validDate("2028-02-29"),true);assert.equal(validDate("2027-02-29"),false)});
 test("club event payload has only verified fields",()=>{const p=buildEventPayload({name:"E",date:"2026-07-01",endDate:"",desc:"D",avenue:["CMD"],raw:true},"e");assert.deepEqual(Object.keys(p),["name","date","endDate","desc","avenue","eventId"])});
 test("event normalizer rejects invalid essential date",()=>assert.equal(normalizeEvent("e",{name:"E",date:"bad"}),null));

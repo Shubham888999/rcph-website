@@ -608,7 +608,7 @@
 }
 .admin-sidebar-open-button {
   position: sticky;
-  top: calc(var(--vox-announcement-height, 0rem) + 0.75rem);
+  top: 0.75rem;
   z-index: 8;
   width: max-content;
   max-width: 100%;

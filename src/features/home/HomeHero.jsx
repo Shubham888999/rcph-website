@@ -8,7 +8,7 @@ export default function HomeHero() {
       <div className="home-hero__media">
         <img
           className="home-hero__image"
-          src="/images/group.webp"
+          src="/images/vox26.jpeg"
           alt="Members of Rotaract Club of Pune Heritage gathered for a club group photograph"
           width="2048"
           height="1004"

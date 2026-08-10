@@ -17,7 +17,7 @@ export default function ExistingMemberSignupForm(props) {
       <button className="signup-back-button" type="button" disabled={busy} onClick={onBack}>Back to account type</button>
       <p className="login-kicker">Existing member access</p>
       <h2 ref={headingRef} tabIndex={-1}>Request your RCPH account</h2>
-      <p className="signup-intro">Member access is approved automatically. Director and Admin requests require approval.</p>
+      <p className="signup-intro">Member, Director, and Admin access requests require approval before protected tools unlock.</p>
       <AuthNotice message={notice?.message} tone={notice?.tone} />
       <form className="signup-form" onSubmit={(event) => { event.preventDefault(); onSubmit("password"); }} noValidate aria-busy={busy}>
         <SignupCommonFields

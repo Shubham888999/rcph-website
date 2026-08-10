@@ -42,7 +42,7 @@ export const router = createBrowserRouter([{
           { path: "/access", element: lazyRoute(lazy(() => import("../pages/protected/AccessPage"))) },
           { path: "/website-guide", element: lazyRoute(lazy(() => import("../features/websiteGuide/WebsiteGuidePage"))) },
           {
-            element: <RoleRoute capability="memberDashboard" />,
+            element: <RoleRoute capability="personalDashboard" />,
             children: [{ path: "/dashboard", element: lazyRoute(lazy(() => import("../pages/dashboard/DashboardPage"))) }],
           },
           {

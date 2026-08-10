@@ -1,0 +1,206 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function hasUser(uid) {
+      return exists(userPath(uid));
+    }
+
+    function userData(uid) {
+      return get(userPath(uid)).data;
+    }
+
+    function activeApprovedUser(uid) {
+      return signedIn()
+        && hasUser(uid)
+        && userData(uid).status == "approved"
+        && userData(uid).active != false
+        && userData(uid).isActive != false
+        && userData(uid).isApproved != false
+        && !(userData(uid).approvalStatus in ["pending", "rejected"]);
+    }
+
+    function approvedRole(uid, roles) {
+      return activeApprovedUser(uid)
+        && (
+          userData(uid).role in roles
+          || (("gbm" in roles) && userData(uid).role in ["member", "generalBody", "generalBodyMember"])
+          || (("bod" in roles) && userData(uid).role in ["board", "boardMember", "boardOfDirectors"])
+          || (("admin" in roles) && userData(uid).role in ["administrator"])
+        )
+        && !(userData(uid).accountType in ["prospect"])
+        && !((userData(uid).roles is list) && ("prospect" in userData(uid).roles));
+    }
+
+    function hasPosition(uid, key) {
+      return activeApprovedUser(uid)
+        && userData(uid).positionKeys is list
+        && key in userData(uid).positionKeys;
+    }
+
+    function hasSergeantAuthority(uid) {
+      return approvedRole(uid, ["bod", "admin", "president"])
+        && (hasPosition(uid, "saa") || hasPosition(uid, "co-saa"));
+    }
+
+    function hasPresidentPositionAuthority(uid) {
+      return approvedRole(uid, ["bod", "admin", "president"])
+        && (hasPosition(uid, "president") || hasPosition(uid, "co-president"));
+    }
+
+    function isAccountAdmin() {
+      return signedIn()
+        && (
+          approvedRole(request.auth.uid, ["admin", "president"])
+          || hasPresidentPositionAuthority(request.auth.uid)
+        );
+    }
+
+    function isAttendanceAdmin() {
+      return signedIn()
+        && (
+          isAccountAdmin()
+          || hasSergeantAuthority(request.auth.uid)
+        );
+    }
+
+    function isApprovedMember() {
+      return signedIn()
+        && approvedRole(request.auth.uid, ["gbm", "bod", "admin", "president"]);
+    }
+
+    function isBodToolUser() {
+      return signedIn()
+        && approvedRole(request.auth.uid, ["bod", "admin", "president"]);
+    }
+
+    function publicEvent() {
+      return resource.data.visibility == "public";
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAccountAdmin());
+      allow list: if isAccountAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /events/{eventId} {
+      allow get, list: if publicEvent() || isAttendanceAdmin();
+      allow create, update, delete: if isAccountAdmin();
+    }
+
+    match /members/{memberId} {
+      allow read: if isAttendanceAdmin();
+      allow create, update, delete: if isAccountAdmin();
+    }
+
+    match /attendance/{recordId} {
+      allow read, write: if isAttendanceAdmin();
+    }
+
+    match /bodMeetings/{meetingId} {
+      allow read: if isAttendanceAdmin() || isBodToolUser();
+      allow create, update, delete: if isAccountAdmin();
+    }
+
+    match /bodMembers/{memberId} {
+      allow read: if isAttendanceAdmin() || isBodToolUser();
+      allow create, update, delete: if isAccountAdmin();
+    }
+
+    match /bodAttendance/{recordId} {
+      allow read, write: if isAttendanceAdmin();
+    }
+
+    match /bodEvents/{eventId} {
+      allow read: if isBodToolUser();
+      allow create, update, delete: if false;
+    }
+
+    match /districtEvents/{eventId} {
+      allow read: if isAttendanceAdmin();
+      allow create, update, delete: if isAccountAdmin();
+    }
+
+    match /districtAttendance/{recordId} {
+      allow read, write: if isAttendanceAdmin();
+    }
+
+    match /fines/{fineId} {
+      allow read: if isAccountAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /treasury/{transactionId} {
+      allow read, write: if isAccountAdmin();
+    }
+
+    match /locks/{lockId} {
+      allow read: if isAttendanceAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /reminders/{reminderId} {
+      allow read: if isAccountAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /announcements/{announcementId} {
+      allow read, write: if false;
+    }
+
+    match /announcementReads/{readId} {
+      allow read, write: if false;
+    }
+
+    match /resolutions/{resolutionId} {
+      allow read, write: if false;
+    }
+
+    match /visitDashboardConfigs/{configId} {
+      allow read, write: if false;
+    }
+
+    match /visitSubmissions/{submissionId} {
+      allow read, write: if false;
+    }
+
+    match /positionAssignments/{assignmentId} {
+      allow read, write: if false;
+    }
+
+    match /bodPositionAssignments/{assignmentId} {
+      allow read, write: if false;
+    }
+
+    match /roleAssignments/{assignmentId} {
+      allow read, write: if false;
+    }
+
+    match /userRoles/{roleId} {
+      allow read, write: if false;
+    }
+
+    match /profileChanges/{changeId} {
+      allow read: if isAccountAdmin();
+      allow write: if false;
+    }
+
+    match /publicContent/{document=**} {
+      allow read: if true;
+      allow write: if isAccountAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -4,7 +4,6 @@ import test from "node:test";
 
 const shell = readFileSync(new URL("./AdminShell.jsx", import.meta.url), "utf8");
 const css = readFileSync(new URL("../../styles/components/admin.css", import.meta.url), "utf8");
-const main = readFileSync(new URL("../../main.jsx", import.meta.url), "utf8");
 
 function functionBody(name) {
   const start = shell.indexOf(`function ${name}() {`);
@@ -66,15 +65,13 @@ test("Admin CSS reclaims the sidebar column and gives main content the full widt
   assert.match(css, /\.admin-shell\.is-sidebar-collapsed \{[\s\S]*grid-template-columns: 0 minmax\(0, 1fr\);/);
   assert.match(css, /\.admin-shell\.is-sidebar-collapsed \.admin-sidebar \{[\s\S]*width: 0;[\s\S]*max-width: 0;[\s\S]*padding: 0;[\s\S]*visibility: hidden;[\s\S]*overflow: hidden;[\s\S]*pointer-events: none;/);
   assert.match(css, /\.admin-main \{[\s\S]*min-width:0;[\s\S]*padding:clamp\(1rem,3vw,2rem\);/);
-  assert.match(css, /\.admin-sidebar-open-button \{[\s\S]*position: sticky;[\s\S]*top: calc\(var\(--vox-announcement-height, 0rem\) \+ 0\.75rem\);/);
+  assert.match(css, /\.admin-sidebar-open-button \{[\s\S]*position: sticky;[\s\S]*top: 0\.75rem;/);
 });
 
-test("Admin sidebar collapse respects mobile navigation and the top announcement banner", () => {
+test("Admin sidebar collapse respects mobile navigation", () => {
   assert.match(css, /@media \(max-width: 900px\) \{[\s\S]*\.admin-shell \{[\s\S]*display: block;[\s\S]*\.admin-shell\.is-sidebar-collapsed \.admin-sidebar,[\s\S]*\.admin-sidebar \{[\s\S]*width: auto;[\s\S]*visibility: visible;[\s\S]*pointer-events: auto;/);
   assert.match(css, /@media \(max-width: 900px\) \{[\s\S]*\.admin-sidebar__collapse,[\s\S]*\.admin-sidebar-open-button \{[\s\S]*display: none;/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.admin-shell\{transition:none\}/);
-  assert.match(main, /<VoxAnnouncementBar \/>[\s\S]*<App \/>/);
-  assert.doesNotMatch(shell, /VoxAnnouncementBar/);
 });
 
 test("Individual Admin modules do not duplicate sidebar collapse state", () => {

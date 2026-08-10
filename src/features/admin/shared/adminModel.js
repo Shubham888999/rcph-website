@@ -2,8 +2,9 @@ import { stripRotaractorPrefix } from "../../../utils/memberName.js";
 import { MOM_TARGET_TYPES, normalizeMomEmailHistory, normalizeMomMetadata } from "../../mom/momModel.js";
 
 export const DISTRICT_OFFICIAL_ROLE = "districtOfficial";
-export const ADMIN_ROLES = ["gbm", "bod", "admin", DISTRICT_OFFICIAL_ROLE, "president"];
+export const ADMIN_ROLES = ["prospect", "gbm", "bod", "admin", DISTRICT_OFFICIAL_ROLE, "president"];
 export const ADMIN_ROLE_LABELS = Object.freeze({
+  prospect: "Prospect",
   gbm: "GBM",
   bod: "BOD",
   admin: "Admin",
@@ -57,7 +58,13 @@ function removalDateText(record = {}) {
 export function attendancePatch(eventId, value) { const id = text(eventId, 128); if (!id || id.includes("/")) throw new TypeError("Valid event ID required."); return { [id]: normalizeAttendance(value) }; }
 export function normalizeAdminRole(value) {
   const raw = text(value, 60).toLowerCase();
-  if (raw.replace(/[\s_-]+/g, "") === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
+  const compact = raw.replace(/[\s_-]+/g, "");
+  if (["gbm", "member", "generalbody", "generalbodymember"].includes(compact)) return "gbm";
+  if (["bod", "board", "boardmember", "boardofdirectors"].includes(compact)) return "bod";
+  if (["admin", "administrator"].includes(compact)) return "admin";
+  if (["president", "clubpresident"].includes(compact)) return "president";
+  if (compact === "prospect") return "prospect";
+  if (compact === "districtofficial") return DISTRICT_OFFICIAL_ROLE;
   return raw;
 }
 export function formatAdminRole(value) {
@@ -440,11 +447,17 @@ export function buildAttendanceParticipants(options = {}) {
 
 export function buildAccessPayload({ targetUid, role, positionKeys = [], confirmJointPositionKeys = [], mode = "maintenance" }) {
   const normalizedRole = normalizeAdminRole(role);
+  const canonicalRole = ADMIN_ROLES.includes(normalizedRole) ? normalizedRole : "";
+  const sanitizedPositionKeys = Array.isArray(positionKeys)
+    ? [...new Set(positionKeys.map((x) => text(x, 80)).filter(Boolean))]
+    : [];
   return {
     targetUid: text(targetUid, 128),
-    role: ADMIN_ROLES.includes(normalizedRole) ? normalizedRole : "",
-    positionKeys: [...new Set(positionKeys.map((x) => text(x, 80)).filter(Boolean))],
-    confirmJointPositionKeys: [...new Set(confirmJointPositionKeys.map((x) => text(x, 80)).filter(Boolean))],
+    role: canonicalRole,
+    positionKeys: canonicalRole === "prospect" ? [] : sanitizedPositionKeys,
+    confirmJointPositionKeys: canonicalRole === "prospect" || !Array.isArray(confirmJointPositionKeys)
+      ? []
+      : [...new Set(confirmJointPositionKeys.map((x) => text(x, 80)).filter(Boolean))],
     operationSource: mode === "approval" ? "accountApproval" : "roleMaintenance",
   };
 }

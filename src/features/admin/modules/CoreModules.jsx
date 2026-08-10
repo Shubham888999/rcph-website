@@ -564,20 +564,21 @@ function Metric({ label, value, detail, accent = "gold" }) {
   );
 }
 
-export function AccountsModule({ users, access, uid, onNotice }) {
+export function AccountsModule({ users, access, uid, onNotice, onAccessChanged }) {
   const [filter, setFilter] = useState("pending");
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "accounts", onNotice });
   const rows = users.filter((user) => (filter === "all" || user.status === filter) && `${user.name} ${user.email}`.toLowerCase().includes(search.toLowerCase()));
   const roles = access.canAccessPresidentControls ? ADMIN_ROLES : ADMIN_ROLES.filter((role) => role !== "president");
+  const isProspectDemotion = (state) => Boolean(state?.user.status !== "pending" && state?.user.role !== "prospect" && state?.role === "prospect");
   function open(user) {
     const role = user.status === "pending" ? user.requestedRole || "gbm" : user.role || "gbm";
     const initial = initializePositionSelection(user);
-    setEditor({ user, role, selectedPositionKeys: applyPositionRole(role, initial.selectedKeys), unknownPositionValues: initial.unknownValues, positionSearch: "", selectionError: "", jointConflict: null, pendingPayload: null, reason: "" });
+    setEditor({ user, role, selectedPositionKeys: applyPositionRole(role, initial.selectedKeys), unknownPositionValues: initial.unknownValues, positionSearch: "", selectionError: "", confirmationError: "", demotionConfirm: "", jointConflict: null, pendingPayload: null, reason: "" });
   }
   function changeRole(role) {
-    setEditor((current) => ({ ...current, role, selectedPositionKeys: applyPositionRole(role, current.selectedPositionKeys), selectionError: "", jointConflict: null, pendingPayload: null }));
+    setEditor((current) => ({ ...current, role, selectedPositionKeys: applyPositionRole(role, current.selectedPositionKeys), selectionError: "", confirmationError: "", demotionConfirm: "", jointConflict: null, pendingPayload: null }));
   }
   function handleAccessError(error, payload) {
     const conflict = extractJointPositionConflict(error);
@@ -587,11 +588,17 @@ export function AccountsModule({ users, access, uid, onNotice }) {
   }
   async function submitAccess(payload) {
     const result = await run("update-access", () => adminCalls.updateAccess(payload), "Account access updated.", { onError: (error) => handleAccessError(error, payload) });
-    if (result) setEditor(null);
+    if (result) {
+      if (payload.targetUid === uid) await onAccessChanged?.();
+      setEditor(null);
+    }
   }
   async function save() {
+    if (isProspectDemotion(editor) && editor.demotionConfirm.trim() !== "PROSPECT") {
+      return setEditor({ ...editor, confirmationError: "Type PROSPECT to confirm this access removal.", jointConflict: null, pendingPayload: null });
+    }
     const validation = validatePositionRole(editor.role, editor.selectedPositionKeys, editor.unknownPositionValues);
-    if (!validation.ok) return setEditor({ ...editor, selectionError: validation.message, jointConflict: null, pendingPayload: null });
+    if (!validation.ok) return setEditor({ ...editor, selectionError: validation.message, confirmationError: "", jointConflict: null, pendingPayload: null });
     const payload = buildAccessPayload({ targetUid: editor.user.id, role: validation.effectiveRole, positionKeys: validation.positionKeys, confirmJointPositionKeys: [], mode: editor.user.status === "pending" ? "approval" : "maintenance" });
     if (!payload.targetUid || !payload.role) return onNotice({ type: "error", message: "Choose a valid role." });
     await submitAccess(payload);
@@ -606,6 +613,7 @@ export function AccountsModule({ users, access, uid, onNotice }) {
     if (result) setEditor(null);
   }
   const protectedPresident = editor?.user.role === "president" && !access.canAccessPresidentControls;
+  const confirmProspectDemotion = isProspectDemotion(editor);
   return <>
     <AdminModuleHeader title="Accounts & Roles" description="Approve requests and maintain role/position assignments through this page." />
     <div className="admin-filterbar"><label>Search<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label>Status<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="all">All</option></select></label></div>
@@ -613,16 +621,20 @@ export function AccountsModule({ users, access, uid, onNotice }) {
     {editor ? <AdminDialog title={`Manage ${formatRotaractorName(editor.user.name, editor.user)}`} busy={busy} onClose={() => setEditor(null)}><div className="admin-form">
       {protectedPresident ? <p>This President account can only be changed by trusted President controls.</p> : <>
         <label>Access role<select value={editor.role} onChange={(event) => changeRole(event.target.value)}>{roles.map((role) => <option key={role} value={role}>{formatAdminRole(role)}</option>)}</select></label>
-        <p className="admin-position-picker__role-note">Selected positions determine the saved effective access role. Leave positions empty for a plain GBM/Admin or District Official role assignment.</p>
-        <PositionMultiSelect
-          selectedKeys={editor.selectedPositionKeys}
-          onChange={(selectedPositionKeys) => setEditor({ ...editor, selectedPositionKeys, selectionError: "", jointConflict: null, pendingPayload: null })}
-          disabledKeys={access.canAccessPresidentControls ? [] : [WEBSITE_DIRECTOR_POSITION_KEY]}
-          searchValue={editor.positionSearch}
-          onSearchChange={(positionSearch) => setEditor({ ...editor, positionSearch })}
-          error={editor.selectionError}
-          unknownValues={editor.unknownPositionValues}
-        />
+        {editor.role === "prospect" ? <section className="admin-position-picker__warning" role="alert"><p>Changing this account to Prospect removes member, BOD, Admin, President, position, Club Visits, and module access after the backend confirms the update. Historical records are preserved.</p></section> : <>
+          <p className="admin-position-picker__role-note">Selected positions determine the saved effective access role. Leave positions empty for a plain GBM/Admin or District Official role assignment.</p>
+          <PositionMultiSelect
+            selectedKeys={editor.selectedPositionKeys}
+            onChange={(selectedPositionKeys) => setEditor({ ...editor, selectedPositionKeys, selectionError: "", confirmationError: "", jointConflict: null, pendingPayload: null })}
+            disabledKeys={access.canAccessPresidentControls ? [] : [WEBSITE_DIRECTOR_POSITION_KEY]}
+            searchValue={editor.positionSearch}
+            onSearchChange={(positionSearch) => setEditor({ ...editor, positionSearch })}
+            error={editor.selectionError}
+            unknownValues={editor.unknownPositionValues}
+          />
+        </>}
+        {confirmProspectDemotion ? <label>Type PROSPECT to confirm<input value={editor.demotionConfirm} onChange={(event) => setEditor({ ...editor, demotionConfirm: event.target.value, confirmationError: "" })} autoComplete="off" aria-invalid={Boolean(editor.confirmationError)} /></label> : null}
+        {editor.confirmationError ? <p className="signup-field-error" role="alert">{editor.confirmationError}</p> : null}
         {editor.jointConflict ? <section className="admin-position-conflict" role="alert" aria-labelledby="joint-position-conflict-title">
           <h3 id="joint-position-conflict-title">Confirm joint position assignment</h3>
           <p>The following positions already have active holders. Confirming retains those holders and adds this user jointly.</p>
@@ -631,7 +643,7 @@ export function AccountsModule({ users, access, uid, onNotice }) {
         </section> : null}
         {editor.user.status === "pending" ? <label>Optional rejection reason<textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} maxLength="500" /></label> : null}
       </>}
-      <div className="admin-actions"><button type="button" onClick={() => setEditor(null)} disabled={busy}>Cancel</button>{!protectedPresident && editor.user.status === "pending" ? <button className="danger" type="button" onClick={reject} disabled={busy}>Reject</button> : null}{!protectedPresident ? <button type="button" onClick={save} disabled={busy || Boolean(editor.jointConflict)}>{editor.user.status === "pending" ? "Approve" : "Save access"}</button> : null}</div>
+      <div className="admin-actions"><button type="button" onClick={() => setEditor(null)} disabled={busy}>Cancel</button>{!protectedPresident && editor.user.status === "pending" ? <button className="danger" type="button" onClick={reject} disabled={busy}>Reject</button> : null}{!protectedPresident ? <button type="button" onClick={save} disabled={busy || Boolean(editor.jointConflict)}>{confirmProspectDemotion ? "Change to Prospect" : editor.user.status === "pending" ? "Approve" : "Save access"}</button> : null}</div>
     </div></AdminDialog> : null}
   </>;
 }

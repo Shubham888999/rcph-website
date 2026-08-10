@@ -10,7 +10,9 @@ export default function SignupSuccess({ requestedRole }) {
     ? "Admin"
     : requestedRole === "districtOfficial"
       ? "District Official"
-      : "BOD";
+      : requestedRole === "gbm"
+        ? "GBM"
+        : "BOD";
   return (
     <section className="signup-success" role="status" aria-live="polite">
       <p className="login-kicker">Request submitted</p>

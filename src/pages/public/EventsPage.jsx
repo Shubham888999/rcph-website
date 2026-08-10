@@ -16,7 +16,6 @@ export default function EventsPage() {
         id="upcoming-events-title"
         kicker="What’s ahead"
         title="Upcoming Events"
-        description="Upcoming events from the public RCPH calendar."
         events={upcomingEvents}
         status={status}
         emptyMessage="No upcoming events are listed yet. Please check back soon or contact RCPH."
@@ -26,7 +25,6 @@ export default function EventsPage() {
         id="recent-events-title"
         kicker="Recently at RCPH"
         title="Recent Events"
-        description="A quick look at activities recently added to the public RCPH calendar."
         events={recentEvents}
         status={status}
         emptyMessage="Recent public events will appear here after they are added to the RCPH calendar."
