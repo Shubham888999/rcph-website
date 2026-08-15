@@ -40,6 +40,7 @@ test("HomePage renders the standard homepage flow", () => {
     "<HomeHero />",
     "<ClubIntroduction />",
     "<RecruitmentSection />",
+    "<InstallationFilmGallery />",
     "<MonthlyHighlight />",
     "<FeaturedProjects />",
     "<HomeBoardSection />",
@@ -55,7 +56,7 @@ test("HomePage renders the standard homepage flow", () => {
     previousIndex = index;
   }
 
-  assert.match(homePage, /<div className="home-hero-shell">[\s\S]*<HomeHero \/>[\s\S]*<\/div>/);
+  assert.match(homePage, /<main className="home-page">[\s\S]*<HomeHero \/>/);
 });
 
 test("HomePage no longer auto-collapses the hero for a retired promo section", () => {
@@ -98,8 +99,8 @@ test("HomeHero uses the post-event hero image", () => {
   assert.match(homeHero, new RegExp(`src="/images/${imageName}"`));
   assert.doesNotMatch(homeHero, /group\.webp/);
   assert.match(homeHero, /fetchPriority="high"/);
-  assert.match(homeHero, /decoding="sync"/);
-  assert.match(homeCss, /\.home-hero__image \{[\s\S]*object-fit: cover;[\s\S]*object-position: 50% 52%;/);
+  assert.match(homeHero, /decoding="async"/);
+  assert.match(homeCss, /\.home-hero__image \{[\s\S]*object-fit: cover;[\s\S]*object-position: 50% 58%;/);
 });
 
 test("Active styles no longer include retired promo selectors", () => {
