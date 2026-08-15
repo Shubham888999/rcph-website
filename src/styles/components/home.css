@@ -2569,19 +2569,6 @@ width: min(150rem, calc(100% - (2 * var(--page-gutter))));}
 }
 
 
-/* tiny label before instruction */
-.home-film-gallery__hint::before {
-  content: "SPOOL";
-
-  color: var(--home-film-gold);
-  font-size: 0.54rem;
-  font-weight: 900;
-  letter-spacing: 0.17em;
-
-  opacity: 0.78;
-}
-
-
 /* miniature film strip instead of plain line */
 .home-film-gallery__hint span {
   position: relative;
