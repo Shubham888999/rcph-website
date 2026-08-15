@@ -9,11 +9,12 @@ const homePageSource = readFileSync(new URL("../../pages/public/HomePage.jsx", i
 const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
 
 const expectedFrames = Array.from({ length: 10 }, (_, index) => String(index + 1).padStart(2, "0"));
+const expectedExtensions = ["jpeg", "jpeg", "jpeg", "mp4", "mp4", "mp4", "mp4", "mp4", "mp4", "mp4"];
 const expectedFilenames = expectedFrames.map(
-  (frame) => `/media/installation/vox26-installation-${frame}.jpeg`,
+  (frame, index) => `/media/installation/vox26-installation-${frame}.${expectedExtensions[index]}`,
 );
 
-test("VOX installation media data keeps exactly ten default JPEG frames", () => {
+test("VOX installation media data keeps exactly ten mixed image and video frames", () => {
   assert.equal(installationPhotos.length, 10);
   assert.deepEqual(
     installationPhotos.map((photo) => photo.src),
@@ -91,7 +92,8 @@ test("broken image and broken video media share the themed fallback", () => {
 });
 
 test("InstallationFilmGallery exposes accessible controls, modal, and mixed viewer behavior", () => {
-  assert.match(componentSource, /THE INSTALLATION CUT/);
+  assert.match(componentSource, /id="installation-cut"/);
+  assert.match(componentSource, /The Installation Cut/);
   assert.match(componentSource, /aria-label="Previous installation photos"/);
   assert.match(componentSource, /aria-label="Next installation photos"/);
   assert.match(componentSource, /aria-label="Scrollable VOX installation film roll"/);
@@ -125,7 +127,8 @@ test("no new media player dependency is introduced", () => {
 });
 
 test("installationPhotos remains the only per-frame media path configuration", () => {
-  assert.match(dataSource, /\/media\/installation\/vox26-installation-\$\{frame\}\.jpeg/);
+  assert.match(dataSource, /const FRAME_EXTENSIONS = \[/);
+  assert.match(dataSource, /\/media\/installation\/vox26-installation-\$\{frame\}\.\$\{extension\}/);
   assert.doesNotMatch(dataSource, /\/images\/installation\//);
   assert.doesNotMatch(componentSource, /\/media\/installation\/vox26-installation-/);
   assert.doesNotMatch(componentSource, /\/images\/installation\//);

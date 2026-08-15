@@ -310,6 +310,7 @@ export default function InstallationFilmGallery() {
 
   return (
     <motion.section
+      id="installation-cut"
       ref={sectionRef}
       className="home-section home-film-gallery"
       aria-labelledby="home-film-gallery-title"
@@ -376,7 +377,7 @@ export default function InstallationFilmGallery() {
           variants={reduceMotion ? undefined : filmReveal}
           initial={reduceMotion ? false : "hidden"}
           whileInView={reduceMotion ? undefined : "visible"}
-          viewport={{ once: true, amount: 0.18 }}
+          viewport={{ once: true, amount: 0.02 }}
         >
           {installationPhotos.map((photo, index) => (
             <FilmFrame

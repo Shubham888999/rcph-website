@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+
+const VOX_MOMENTS_TARGET = "/#installation-cut";
+const HASH_SCROLL_MAX_ATTEMPTS = 24;
+const HASH_SCROLL_OFFSET = 16;
 
 const navigationItems = [
   { label: "Home", to: "/" },
@@ -15,6 +19,7 @@ const navigationItems = [
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
+  const location = useLocation();
 
   const closeMenu = () => {
     setMenuOpen(false);
@@ -35,6 +40,66 @@ export default function PublicLayout() {
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!location.hash) {
+      return undefined;
+    }
+
+    let frameId = 0;
+    let cancelled = false;
+    const hash = location.hash;
+
+    const getTargetId = () => {
+      const rawId = hash.slice(1);
+
+      try {
+        return decodeURIComponent(rawId);
+      } catch {
+        return rawId;
+      }
+    };
+
+    const getHeaderOffset = () => {
+      const rawHeaderHeight = window
+        .getComputedStyle(document.documentElement)
+        .getPropertyValue("--header-height");
+      const headerHeight = Number.parseFloat(rawHeaderHeight);
+
+      return (Number.isFinite(headerHeight) ? headerHeight : 0) + HASH_SCROLL_OFFSET;
+    };
+
+    const scrollToHashTarget = (attempt = 0) => {
+      if (cancelled) return;
+
+      const target = document.getElementById(getTargetId());
+
+      if (!target) {
+        if (attempt >= HASH_SCROLL_MAX_ATTEMPTS) return;
+
+        frameId = window.requestAnimationFrame(() => scrollToHashTarget(attempt + 1));
+        return;
+      }
+
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const targetTop = target.getBoundingClientRect().top + window.scrollY - getHeaderOffset();
+
+      window.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+      });
+    };
+
+    frameId = window.requestAnimationFrame(() => scrollToHashTarget());
+
+    return () => {
+      cancelled = true;
+
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [location.hash, location.pathname]);
 
   return (
     <div className="public-site-shell">
@@ -68,6 +133,20 @@ export default function PublicLayout() {
               <small>Rotaract Club of Pune Heritage</small>
             </span>
           </NavLink>
+
+          <Link
+            className="public-vox-link"
+            to={VOX_MOMENTS_TARGET}
+            aria-label="View the newly released VOX &rsquo;26 Installation moments"
+            onClick={closeMenu}
+          >
+            <span className="public-vox-link__event">VOX &rsquo;26</span>
+            <span className="public-vox-link__divider" aria-hidden="true" />
+            <span className="public-vox-link__live">
+              <span className="public-vox-link__live-dot" aria-hidden="true" />
+              MOMENTS LIVE
+            </span>
+          </Link>
 
           <nav
             id="primary-navigation"
