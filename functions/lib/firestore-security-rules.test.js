@@ -239,8 +239,12 @@ test('rules source replaces broad role and lock reads with approved-active autho
   assert.match(bodyOfFunction(rules, 'hasActivePositionAssignment'), /isActiveLifecycleRecord\(get\(assignmentPath\)\.data\)/);
   assert.match(bodyOfFunction(rules, 'hasWebsiteDirectorPosition'), /websiteDirectorAssignmentPath\(\)/);
   assert.doesNotMatch(bodyOfFunction(rules, 'isAdmin'), /hasRole\('admin'\)/);
+  assert.match(bodyOfFunction(rules, 'validBodAvenueCodes'), /'CWD'/);
+  assert.match(bodyOfFunction(rules, 'validBodAvenueCodes'), /'SPORTS'/);
+  assert.match(bodyOfFunction(rules, 'validBodAvenueCodes'), /'FINANCE'/);
+  assert.match(bodyOfFunction(rules, 'validBodEventWrite'), /data\.avenues\.size\(\) <= 11/);
   assert.match(rules, /match \/roles\/\{uid\} \{\s*allow get: if signedIn\(\) && \(request\.auth\.uid == uid \|\| isAdmin\(\)\);\s*allow list: if isAdmin\(\);/);
-  assert.match(rules, /match \/locks\/\{panelId\} \{\s*allow read: if hasAdminPanelAuthority\(\) \|\| canReadAttendanceLock\(panelId\);\s*allow create, update, delete: if hasLockTools\(\);/);
+  assert.match(rules, /match \/locks\/\{panelId\} \{\s*allow read: if canReadAttendanceLock\(panelId\) \|\| hasAdminPanelAuthority\(\);\s*allow create, update, delete: if hasLockTools\(\);/);
     const saaBody = bodyOfFunction(
     rules,
     'hasActiveSaaAssignment',
@@ -253,12 +257,12 @@ test('rules source replaces broad role and lock reads with approved-active autho
 
   assert.match(
     saaBody,
-    /hasActivePositionAssignment\(saaAssignmentPath\(\),\s*'saa'\)/,
+    /hasActivePositionAssignment\(\s*saaAssignmentPath\(\),\s*'saa'\s*\)/,
   );
 
   assert.match(
     coSaaBody,
-    /hasActivePositionAssignment\(coSaaAssignmentPath\(\),\s*'co-saa'\)/,
+    /hasActivePositionAssignment\(\s*coSaaAssignmentPath\(\),\s*'co-saa'\s*\)/,
   );
 
   assert.doesNotMatch(

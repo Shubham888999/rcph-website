@@ -177,7 +177,7 @@ function isFineLinkedTreasury(data) {
     }
 
     function validBodAvenueCodes() {
-      return ['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI', 'GBM'];
+      return ['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI', 'CWD', 'SPORTS', 'FINANCE', 'GBM'];
     }
 
     function validBodAvenueDescriptionValue(descriptions, code) {
@@ -224,7 +224,7 @@ function isFineLinkedTreasury(data) {
         && data.avenue is list
         && data.avenues == data.avenue
         && data.avenues.size() > 0
-        && data.avenues.size() <= 8
+        && data.avenues.size() <= 11
         && data.avenues.hasOnly(validBodAvenueCodes())
         && validBodAvenueDescriptions(data);
     }
@@ -420,7 +420,7 @@ match /treasury/{transactionId} {
       allow read, create, update, delete: if hasAdminPanelAuthority();
     }
     match /locks/{panelId} {
-      allow read: if hasAdminPanelAuthority() || canReadAttendanceLock(panelId);
+      allow read: if canReadAttendanceLock(panelId) || hasAdminPanelAuthority();
       allow create, update, delete: if hasLockTools();
     }
 

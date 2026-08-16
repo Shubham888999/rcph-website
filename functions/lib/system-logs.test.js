@@ -97,5 +97,8 @@ test('index exports and logs through the System Logs service', () => {
   assert.match(systemLogsSource, /derivedAvenueReportingWindowNotices/);
   assert.match(systemLogsSource, /normalizeOpenAvenueReportingWindows/);
   assert.match(systemLogsSource, /reportingWindowOpenDashboardMessage/);
+  assert.match(systemLogsSource, /recipientPositionKeysForAvenues/);
+  assert.match(systemLogsSource, /openAvenues: windowAvenues/);
+  assert.match(systemLogsSource, /lockedAvenues: lockAvenues/);
   assert.match(systemLogsSource, /\.\.\.reportingWindows/);
 });

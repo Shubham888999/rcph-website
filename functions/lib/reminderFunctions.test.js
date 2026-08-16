@@ -115,13 +115,80 @@ test('reporting workflow prefill and linked reminders are backend enforced', () 
   assert.match(functionsSource, /existingWorkflowLifecyclePatch/);
   assert.match(functionsSource, /existing\.status === 'completed'/);
   assert.match(functionsSource, /existing\.status === 'stopped'/);
+  assert.match(functionsSource, /evaluateReportingWindowAvenueCoverage/);
+  assert.match(functionsSource, /reportingCoveragePersistenceFields/);
+  assert.match(functionsSource, /eventReportStatus: coverage\.complete \? 'recorded' : coverage\.status/);
+  assert.match(functionsSource, /fields\.completedAt = admin\.firestore\.FieldValue\.delete\(\)/);
+  assert.match(functionsSource, /fields\.completionReason = ''/);
   assert.match(functionsSource, /reportingWindowId/);
   assert.match(indexSource, /requireReportingWindowForBodPayload/);
   assert.match(indexSource, /Event name must match the reporting window event name/);
   assert.match(indexSource, /BOD Meeting reporting windows must be submitted as Board of Directors meetings in BOD Tools/);
+  assert.match(functionsSource, /const normalized = normalizeReportingWindowConfig\(target\.id, draftPayload\)/);
+  assert.match(functionsSource, /avenues: normalized\.avenues/);
+  assert.match(functionsSource, /recipientPositionKeys: normalized\.recipientPositionKeys/);
   assert.match(functionsSource, /isBodMeetingWindow \? 'BOD' : reminder\.avenue/);
-  assert.match(functionsSource, /isBodMeetingWindow \? 'Board of Directors' : avenueDisplayLabel\(reminder\.avenue\)/);
+  assert.match(functionsSource, /avenues: prefillAvenues/);
+  assert.match(functionsSource, /avenueLabels: prefillAvenueLabels/);
+  assert.match(functionsSource, /avenuesLabel: prefillAvenuesLabel/);
+  assert.match(functionsSource, /isBodMeetingWindow \? 'Board of Directors' : reminder\.avenueLabel/);
   assert.match(functionsSource, /bodToolsCreateSupported: true/);
+});
+
+test('BOD reporting queue callable is read-only and BOD Tools scoped', () => {
+  const queueSource = functionsSource.slice(
+    functionsSource.indexOf('const getBodReportingQueue = onCall'),
+    functionsSource.indexOf('const getReportingWindowPrefill = onCall'),
+  );
+
+  assert.match(indexSource, /exports\.getBodReportingQueue = reminderFunctions\.getBodReportingQueue;/);
+  assert.match(functionsSource, /function hasBodToolsReportingAccess/);
+  assert.match(functionsSource, /requireBodToolsReportingAccess\(request, 'view the BOD reporting queue'\)/);
+  assert.match(functionsSource, /requireBodToolsReportingAccess\(request, 'open BOD Tools'\)/);
+  assert.match(functionsSource, /db\.collection\(REMINDERS_COLLECTION\)\.get\(\)/);
+  assert.match(functionsSource, /normalizeReportingWindowConfig\(doc\.id, doc\.data\(\) \|\| \{\}\)/);
+  assert.match(functionsSource, /reportingWindowQueueCoverage\(reminder, eventSnap\?\.exists \? eventSnap\.data\(\) \|\| \{\} : \{\}\)/);
+  assert.match(functionsSource, /evaluateReportingWindowAvenueCoverage\(reminder, linkedEvent \|\| \{\}\)/);
+  assert.match(functionsSource, /buildBodReportingQueueResponsibilities\(reminder\.avenues, queueAssignees\)/);
+  assert.match(functionsSource, /SECRETARY_POSITION_KEYS/);
+  assert.match(functionsSource, /action: linkedTargetId \? 'continue_event' : 'add_event'/);
+  assert.match(functionsSource, /coverage\.complete !== true/);
+  assert.match(functionsSource, /items\.sort\(compareBodReportingQueueItems\)/);
+  assert.doesNotMatch(queueSource, /\.set\(|\.update\(|\.delete\(|sendMail|writeReminderSystemLog|findReportingWindowBodEventMatch/);
+});
+
+test('BOD event create and update refresh reporting coverage with server-side link recovery', () => {
+  assert.match(indexSource, /function recoverReportingWindowIdForBodEventUpdate/);
+  assert.match(indexSource, /This event is already linked to a different reporting window/);
+  assert.match(indexSource, /function allowedMissingAvenuesForReportingWindow/);
+  assert.match(indexSource, /loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(data\)\)/);
+  assert.match(indexSource, /allowedMissingAvenues: allowedMissingAvenuesForReportingWindow\(reportingWindow\)/);
+  assert.match(indexSource, /const recoveredData = recoverReportingWindowIdForBodEventUpdate\(request\.data \|\| \{\}, bodEventData\)/);
+  assert.match(indexSource, /loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(recoveredData\)\)/);
+  assert.match(indexSource, /const \{ eventCreated, bodEventDoc \} = await writeSyncedBodEvent/);
+  assert.match(indexSource, /const \{ bodEventDoc \} = await writeSyncedBodEvent\(\{ eventId, payload, uid, userProfile, now \}\)/);
+  assert.match(indexSource, /eventData: bodEventDoc/);
+  assert.match(indexSource, /const reportingWindowId = payload\.reportingWindowId \|\| existingBod\.reportingWindowId \|\| existingEvent\.reportingWindowId \|\| ''/);
+  assert.match(indexSource, /function assertCompletedReportingWindowCoveragePreserved/);
+  assert.match(indexSource, /Completed reporting windows must keep every required avenue report complete/);
+  assert.match(indexSource, /evaluateReportingWindowAvenueCoverage\(reportingWindow, payload\)/);
+});
+
+test('BOD event reporting-window partial validation is server-authorized only', () => {
+  const submitSource = indexSource.slice(indexSource.indexOf('exports.submitBodEvent'), indexSource.indexOf('exports.syncBodEventToAttendance'));
+  const updateSource = indexSource.slice(indexSource.indexOf('exports.updateBodEvent'), indexSource.indexOf('exports.archiveBodEvent'));
+  const reportingWindowSource = indexSource.slice(indexSource.indexOf('async function loadReportingWindowForBodPayloadId'), indexSource.indexOf('async function requireReportingWindowForBodMeetingPayload'));
+
+  assert.match(submitSource, /loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(data\)\)[\s\S]*normalizeBodEventPayload\(data, \{/);
+  assert.match(updateSource, /recoverReportingWindowIdForBodEventUpdate\(request\.data \|\| \{\}, bodEventData\)[\s\S]*loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(recoveredData\)\)[\s\S]*normalizeBodEventPayload\(recoveredData, \{/);
+  assert.match(reportingWindowSource, /if \(!snap\.exists\) throw new HttpsError\('not-found', 'Reporting window not found\.'\)/);
+  assert.match(reportingWindowSource, /This record is not a valid reporting window/);
+  assert.match(reportingWindowSource, /This reporting window is locked/);
+  assert.match(reportingWindowSource, /BOD Meeting reporting windows must be submitted as Board of Directors meetings in BOD Tools/);
+  assert.match(reportingWindowSource, /Event date must match the reporting window conducted date/);
+  assert.match(reportingWindowSource, /Event name must match the reporting window event name/);
+  assert.match(reportingWindowSource, /Event avenue must match the reporting window avenue/);
+  assert.doesNotMatch(indexSource, /Boolean\(raw\.reportingWindowId\)|Boolean\(payload\.reportingWindowId\)|allowIncomplete\s*=\s*Boolean/);
 });
 
 test('manual fallback matching is strict and low confidence remains pending', () => {
@@ -134,16 +201,68 @@ test('manual fallback matching is strict and low confidence remains pending', ()
 test('avenue recipient resolution uses position assignments and secretary special cases', () => {
   assert.match(functionsSource, /activePositionKeysByUidForAvenue/);
   assert.match(functionsSource, /avenueRecipientPositionKeys\(avenue\)/);
+  assert.match(functionsSource, /normalizeReportingAvenues/);
+  assert.match(functionsSource, /reportingWindowRecipientPositionKeys/);
+  assert.match(functionsSource, /candidateUidsForAvenues/);
   assert.match(functionsSource, /positionHelpers\.normalizePositionKey\(assignment\.positionKey\)/);
   assert.match(functionsSource, /if \(reminder\.recipientRole === 'secretary'\) return resolveReminderRecipients\('secretary'\)/);
   assert.match(functionsSource, /normalizePositionKeys\(recipient\.positionKeys\)\.some\(key => allowed\.has\(key\)\)/);
 });
 
+test('avenue reporting reminder sends target only live pending avenues', () => {
+  const resolverSource = functionsSource.slice(
+    functionsSource.indexOf('async function resolveAvenueReportingRecipients'),
+    functionsSource.indexOf('async function loadReminderTarget'),
+  );
+  const processingSource = functionsSource.slice(
+    functionsSource.indexOf('async function processAvenueReportingWindowDoc'),
+    functionsSource.indexOf('async function processReminderDoc'),
+  );
+
+  assert.match(functionsSource, /function reportingReminderLogMetadata/);
+  assert.match(functionsSource, /async function loadLiveReportingReminderCoverage/);
+  assert.match(functionsSource, /evaluateReportingWindowAvenueCoverage\(reminder, linkedEventData \|\| \{\}\)/);
+  assert.match(resolverSource, /async function resolveAvenueReportingRecipients\(reminder, options = \{\}\)/);
+  assert.match(resolverSource, /Object\.prototype\.hasOwnProperty\.call\(options, 'avenues'\)/);
+  assert.match(resolverSource, /const avenues = hasScopedAvenues \? scopedAvenues : reportingWindowAvenuesForReminder\(reminder\)/);
+  assert.match(processingSource, /liveCoverage = await loadLiveReportingReminderCoverage\(reminder\)/);
+  assert.match(processingSource, /reportingReminderAudienceConfig\(reminder, liveCoverage\)/);
+  assert.match(processingSource, /completeReportingWindowFromLiveCoverage\(doc, reminder, liveCoverage, now\)/);
+  assert.match(processingSource, /withReportingReminderPendingAudience\(reminder, liveCoverage\)/);
+  assert.match(processingSource, /resolveAvenueReportingRecipients\(sendReminder, \{ avenues: sendReminder\.pendingAvenues \}\)/);
+  assert.match(processingSource, /sendReminderMessages\(\{ reminder: sendReminder, recipients \}\)/);
+  assert.doesNotMatch(processingSource, /resolveAvenueReportingRecipients\(reminder\)/);
+});
+
+test('avenue reporting reminder logs pending audience metadata without private contact data', () => {
+  const metadataSource = functionsSource.slice(
+    functionsSource.indexOf('function reportingReminderLogMetadata'),
+    functionsSource.indexOf('async function persistLiveReportingCoverage'),
+  );
+  const processingSource = functionsSource.slice(
+    functionsSource.indexOf('async function processAvenueReportingWindowDoc'),
+    functionsSource.indexOf('async function processReminderDoc'),
+  );
+
+  assert.match(metadataSource, /requiredAvenues/);
+  assert.match(metadataSource, /pendingAvenues/);
+  assert.match(metadataSource, /pendingAvenueCount/);
+  assert.match(metadataSource, /reportedAvenues/);
+  assert.match(metadataSource, /recipientCount/);
+  assert.match(processingSource, /pendingAvenuesLabel/);
+  assert.match(processingSource, /\.\.\.reportingReminderLogMetadata\(reminder, liveCoverage, recipients\.length\)/);
+  assert.doesNotMatch(processingSource, /recipientEmail/);
+  assert.doesNotMatch(processingSource, /phone/);
+  assert.doesNotMatch(metadataSource, /email|phone/);
+});
+
 test('avenue recipient resolution preserves primary and co-director coverage with dedupe', () => {
   assert.match(functionsSource, /const allowed = new Set\(avenueRecipientPositionKeys\(avenue\)\)/);
+  assert.match(functionsSource, /const allowed = new Set\(reportingWindowRecipientPositionKeys\(avenues\)\)/);
   assert.match(functionsSource, /allowed\.has\(positionKey\)/);
   assert.match(functionsSource, /positionKeysByUid\.forEach\(\(_, uid\) => candidateUids\.add\(uid\)\)/);
   assert.match(functionsSource, /positionKeysByUid\.set\(doc\.id, Array\.from\(new Set\(existing\.concat\(keys\)\)\)\)/);
+  assert.match(functionsSource, /result\.positionKeysByUid\.forEach\(\(keys, uid\) =>/);
   assert.match(functionsSource, /return dedupeReminderRecipients\(candidateUids/);
   assert.match(functionsSource, /byUid\.has\(uid\) \|\| emails\.has\(email\.email\)/);
 });
@@ -165,6 +284,18 @@ test('avenue report submission detection uses reportingWindowId and strict fallb
   assert.match(functionsSource, /reportingWindowId/);
   assert.match(functionsSource, /strict_fallback/);
   assert.match(functionsSource, /alreadySubmitted/);
+  assert.match(functionsSource, /if \(linked\.complete === true\)/);
+  assert.match(functionsSource, /eventData: submitted\.match\.data/);
   assert.match(functionsSource, /locked: 0/);
   assert.match(functionsSource, /avenueReportSubmissionDetection/);
+});
+
+test('partial reporting coverage remains non-terminal while downstream reminders stay idempotent', () => {
+  assert.match(functionsSource, /const reminderIds = await upsertWorkflowReminderConfigs/);
+  assert.match(functionsSource, /coverage\?\.complete === true/);
+  assert.match(functionsSource, /coverage\?\.complete === false \? 'info' : 'success'/);
+  assert.match(functionsSource, /reportingCoverageChanged\(reportingWindow, coverageFields\)/);
+  assert.match(functionsSource, /existingWorkflowLifecyclePatch\(snap\)/);
+  assert.match(functionsSource, /snap\.exists \? \{\} : \{/);
+  assert.match(functionsSource, /remindersSent: existing\.remindersSent/);
 });

@@ -126,6 +126,14 @@ const AVENUE_RECIPIENT_POSITION_KEYS = Object.freeze({
 });
 
 const AVENUE_SECRETARY_RECIPIENTS = new Set(['GBM', 'BOD_MEETING']);
+const REPORTING_WINDOW_EXCLUSIVE_AVENUES = Object.freeze(['GBM', 'BOD_MEETING']);
+const REPORTING_WINDOW_EXCLUSIVE_AVENUE_SET = new Set(REPORTING_WINDOW_EXCLUSIVE_AVENUES);
+const REPORTING_WINDOW_MAX_AVENUES = Object.keys(AVENUE_LABELS).length;
+const REPORTING_WINDOW_AVENUE_COVERAGE_STATUSES = new Set([
+  'reported',
+  'missing_avenue',
+  'missing_description',
+]);
 
 function cleanText(value, max = 300) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -173,6 +181,183 @@ function avenueRecipientRole(value) {
 function avenueRecipientPositionKeys(value) {
   const key = normalizeAvenueKey(value);
   return AVENUE_RECIPIENT_POSITION_KEYS[key] || [];
+}
+
+function normalizeReportingAvenues(value) {
+  const input = Array.isArray(value) ? value : (value == null || value === '' ? [] : [value]);
+  const seen = new Set();
+  const avenues = [];
+  for (const item of input) {
+    const key = normalizeAvenueKey(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    avenues.push(key);
+    if (avenues.length >= REPORTING_WINDOW_MAX_AVENUES) break;
+  }
+  return avenues;
+}
+
+function hasExclusiveReportingAvenueConflict(avenues = []) {
+  const normalized = normalizeReportingAvenues(avenues);
+  return normalized.length > 1 && normalized.some(avenue => REPORTING_WINDOW_EXCLUSIVE_AVENUE_SET.has(avenue));
+}
+
+function reportingWindowAvenuesFromRaw(raw = {}) {
+  return normalizeReportingAvenues(Object.prototype.hasOwnProperty.call(raw, 'avenues') ? raw.avenues : raw.avenue);
+}
+
+function reportingAvenuesLabel(avenues = []) {
+  return normalizeReportingAvenues(avenues).join(' + ');
+}
+
+function reportingWindowRecipientPositionKeys(avenues = []) {
+  const keys = [];
+  const seen = new Set();
+  normalizeReportingAvenues(avenues).forEach((avenue) => {
+    avenueRecipientPositionKeys(avenue).forEach((key) => {
+      if (seen.has(key)) return;
+      seen.add(key);
+      keys.push(key);
+    });
+  });
+  return keys;
+}
+
+function reportingWindowRequiredAvenues(reportingWindow = {}) {
+  return normalizeReportingAvenues(
+    Object.prototype.hasOwnProperty.call(reportingWindow, 'avenues') && Array.isArray(reportingWindow.avenues)
+      ? reportingWindow.avenues
+      : reportingWindow.avenue,
+  );
+}
+
+function normalizedEventAvenueSet(event = {}) {
+  const source = Array.isArray(event?.avenues)
+    ? event.avenues
+    : (Array.isArray(event?.avenue) ? event.avenue : [event?.avenue]);
+  return new Set(normalizeReportingAvenues(source));
+}
+
+function normalizedAvenueDescriptions(event = {}) {
+  const source = event?.avenueDescriptions;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
+  const descriptions = {};
+  Object.entries(source).forEach(([key, value]) => {
+    const avenue = normalizeAvenueKey(key);
+    if (!avenue || typeof value !== 'string') return;
+    const description = value.trim();
+    if (!description) return;
+    if (!descriptions[avenue]) descriptions[avenue] = description;
+  });
+  return descriptions;
+}
+
+function normalizeAvenueStatusMap(value = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out = {};
+  Object.entries(value).forEach(([key, status]) => {
+    const avenue = normalizeAvenueKey(key);
+    const normalizedStatus = cleanLower(status, 40);
+    if (!avenue || !REPORTING_WINDOW_AVENUE_COVERAGE_STATUSES.has(normalizedStatus)) return;
+    out[avenue] = normalizedStatus;
+  });
+  return out;
+}
+
+function evaluateReportingWindowAvenueCoverage(reportingWindow = {}, event = {}) {
+  const requiredAvenues = reportingWindowRequiredAvenues(reportingWindow);
+  const selectedAvenues = normalizedEventAvenueSet(event || {});
+  const descriptions = normalizedAvenueDescriptions(event || {});
+  const avenueStatuses = {};
+  const reportedAvenues = [];
+  const pendingAvenues = [];
+  const missingAvenues = [];
+  const missingDescriptionAvenues = [];
+
+  requiredAvenues.forEach((avenue) => {
+    let status = 'reported';
+    if (!selectedAvenues.has(avenue)) {
+      status = 'missing_avenue';
+      missingAvenues.push(avenue);
+    } else if (!descriptions[avenue]) {
+      status = 'missing_description';
+      missingDescriptionAvenues.push(avenue);
+    } else {
+      reportedAvenues.push(avenue);
+    }
+    if (status !== 'reported') pendingAvenues.push(avenue);
+    avenueStatuses[avenue] = status;
+  });
+
+  const totalAvenues = requiredAvenues.length;
+  const reportedCount = reportedAvenues.length;
+  const complete = totalAvenues > 0 && reportedCount === totalAvenues;
+  const status = complete ? 'complete' : (reportedCount > 0 ? 'partial' : 'pending');
+
+  return {
+    requiredAvenues,
+    avenueStatuses,
+    reportedAvenues,
+    pendingAvenues,
+    missingAvenues,
+    missingDescriptionAvenues,
+    totalAvenues,
+    reportedCount,
+    status,
+    complete,
+  };
+}
+
+function reportingReminderPendingAvenues(reportingWindow = {}, coverage = {}) {
+  const requiredAvenues = reportingWindowRequiredAvenues(reportingWindow);
+  if (!coverage || typeof coverage !== 'object') return requiredAvenues;
+  const statuses = coverage.avenueStatuses && typeof coverage.avenueStatuses === 'object'
+    ? coverage.avenueStatuses
+    : {};
+  return requiredAvenues.filter((avenue) => {
+    const status = cleanLower(statuses[avenue], 40);
+    return status === 'missing_avenue' || status === 'missing_description';
+  });
+}
+
+function reportingReminderAudienceConfig(reportingWindow = {}, coverage = {}) {
+  const requiredAvenues = reportingWindowRequiredAvenues(reportingWindow);
+  const pendingAvenues = reportingReminderPendingAvenues(reportingWindow, coverage);
+  const reportedAvenues = normalizeReportingAvenues(coverage?.reportedAvenues || []);
+  const pendingAvenueStatuses = pendingAvenues.reduce((out, avenue) => {
+    const status = cleanLower(coverage?.avenueStatuses?.[avenue], 40);
+    out[avenue] = REPORTING_WINDOW_AVENUE_COVERAGE_STATUSES.has(status) ? status : 'missing_avenue';
+    return out;
+  }, {});
+  return {
+    requiredAvenues,
+    reportedAvenues,
+    pendingAvenues,
+    pendingAvenueCount: pendingAvenues.length,
+    pendingAvenuesLabel: reportingAvenuesLabel(pendingAvenues),
+    pendingAvenueStatuses,
+    complete: coverage?.complete === true && pendingAvenues.length === 0,
+  };
+}
+
+function withReportingReminderPendingAudience(reminder = {}, coverage = {}) {
+  const audience = reportingReminderAudienceConfig(reminder, coverage);
+  const pendingAvenues = audience.pendingAvenues;
+  const primaryAvenue = pendingAvenues[0] || normalizeAvenueKey(reminder.avenue);
+  return {
+    ...reminder,
+    avenue: primaryAvenue,
+    avenueLabel: avenueDisplayLabel(primaryAvenue),
+    avenues: pendingAvenues,
+    avenueLabels: pendingAvenues.map(avenueDisplayLabel),
+    avenuesLabel: audience.pendingAvenuesLabel,
+    requiredAvenues: audience.requiredAvenues,
+    reportedAvenues: audience.reportedAvenues,
+    pendingAvenues,
+    pendingAvenueCount: audience.pendingAvenueCount,
+    pendingAvenueStatuses: audience.pendingAvenueStatuses,
+    pendingAudienceOnly: true,
+  };
 }
 
 function normalizeReminderRecipientRole(value, reminderType = '') {
@@ -266,7 +451,9 @@ function normalizeReminderConfig(id, raw = {}) {
 function normalizeReportingWindowConfig(id, raw = {}) {
   const recordType = cleanText(raw.recordType || raw.type, 80);
   if (!id || recordType !== REPORTING_WINDOW_RECORD_TYPE) return null;
-  const avenueKey = normalizeAvenueKey(raw.avenue);
+  const avenues = reportingWindowAvenuesFromRaw(raw);
+  if (hasExclusiveReportingAvenueConflict(avenues)) return null;
+  const avenueKey = avenues[0] || '';
   const conductedDate = cleanText(raw.conductedDate || raw.eventConductedDate || raw.targetDate, 40);
   const reportingOpensAt = raw.reportingOpensAt || raw.windowOpensAt;
   const reportingDueAt = raw.reportingDueAt || raw.reportDueAt;
@@ -291,6 +478,9 @@ function normalizeReportingWindowConfig(id, raw = {}) {
     conductedDate,
     eventConductedDate: conductedDate,
     eventTime: cleanText(raw.eventTime, 20),
+    avenues,
+    avenueLabels: avenues.map(avenueDisplayLabel),
+    avenuesLabel: reportingAvenuesLabel(avenues),
     reportingOpensAt: reminderTimestampIso(reportingOpensAt),
     reportingOpensAtMillis: timestampMillis(reportingOpensAt),
     windowOpensAt: reminderTimestampIso(reportingOpensAt),
@@ -307,13 +497,21 @@ function normalizeReportingWindowConfig(id, raw = {}) {
     remindersSent: numericCount(raw.remindersSent, 0),
     maxReminders,
     recipientRole: avenueRecipientRole(avenueKey),
-    recipientPositionKeys: avenueRecipientPositionKeys(avenueKey),
+    recipientPositionKeys: reportingWindowRecipientPositionKeys(avenues),
     bodToolsUrl: cleanText(raw.bodToolsUrl || raw.prefillUrl, 1000),
     linkedTargetType: cleanLower(raw.linkedTargetType || raw.linkedEventTargetType, 80),
     linkedTargetId: safeDocumentId(raw.linkedTargetId || raw.linkedEventId || raw.linkedBodEventId || raw.linkedMeetingId),
     linkedBodEventId: safeDocumentId(raw.linkedBodEventId || raw.linkedEventId),
     linkedMeetingId: safeDocumentId(raw.linkedMeetingId),
     eventReportStatus: cleanLower(raw.eventReportStatus || raw.reportStatus, 40),
+    reportedAvenues: normalizeReportingAvenues(raw.reportedAvenues),
+    pendingAvenues: normalizeReportingAvenues(raw.pendingAvenues),
+    missingAvenues: normalizeReportingAvenues(raw.missingAvenues),
+    missingDescriptionAvenues: normalizeReportingAvenues(raw.missingDescriptionAvenues),
+    avenueReportStatuses: normalizeAvenueStatusMap(raw.avenueReportStatuses),
+    reportedAvenueCount: numericCount(raw.reportedAvenueCount, 0),
+    requiredAvenueCount: numericCount(raw.requiredAvenueCount, 0),
+    reportingCoverageUpdatedAt: reminderTimestampIso(raw.reportingCoverageUpdatedAt),
     momStatus: cleanLower(raw.momStatus, 40),
     attendanceStatus: cleanLower(raw.attendanceStatus, 40),
     workflowStatus: cleanLower(raw.workflowStatus, 40),
@@ -503,6 +701,13 @@ function escapeEmailHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function reportingReminderPendingStatusText(status) {
+  const normalized = cleanLower(status, 40);
+  if (normalized === 'missing_avenue') return 'avenue not yet added to the BOD event';
+  if (normalized === 'missing_description') return 'report description pending';
+  return 'report pending';
+}
+
 function buildReminderBody({ reminder, recipient }) {
   const targetName = cleanText(reminder.targetName, 180) || 'RCPH event/meeting';
   const recipientName = cleanText(recipient?.name, 180) || recipientRoleLabel(reminder.recipientRole);
@@ -512,11 +717,35 @@ function buildReminderBody({ reminder, recipient }) {
   const workflowWarningLines = workflowWarning ? [workflowWarning, ''] : [];
 
   if (reminder.reminderType === AVENUE_REPORTING_REMINDER_TYPE) {
-    const avenue = avenueDisplayLabel(reminder.avenue || reminder.avenueLabel);
-    const avenueKey = normalizeAvenueKey(reminder.avenue);
+    const reminderAvenues = normalizeReportingAvenues(Array.isArray(reminder.avenues) && reminder.avenues.length ? reminder.avenues : reminder.avenue);
+    const multiAvenue = reminderAvenues.length > 1;
+    const avenue = multiAvenue
+      ? (cleanText(reminder.avenuesLabel, 160) || reportingAvenuesLabel(reminderAvenues))
+      : (reminder.pendingAudienceOnly === true
+          ? (cleanText(reminder.avenuesLabel, 160) || reportingAvenuesLabel(reminderAvenues))
+          : avenueDisplayLabel(reminder.avenue || reminder.avenueLabel || reminderAvenues[0]));
+    const avenuePhrase = multiAvenue ? `the ${avenue}` : avenue;
+    const avenueKey = reminderAvenues[0] || normalizeAvenueKey(reminder.avenue);
     const specialMeeting = ['GBM', 'BOD_MEETING'].includes(avenueKey);
     const itemNoun = specialMeeting ? 'record' : 'event';
     const bodToolsUrl = cleanText(reminder.bodToolsUrl || reminder.prefillUrl, 1000);
+    const pendingAvenues = reminder.pendingAudienceOnly === true
+      ? normalizeReportingAvenues(reminder.pendingAvenues || reminderAvenues)
+      : [];
+    const pendingStatuses = reminder.pendingAvenueStatuses && typeof reminder.pendingAvenueStatuses === 'object'
+      ? reminder.pendingAvenueStatuses
+      : {};
+    const pendingLines = pendingAvenues.length && !specialMeeting
+      ? [
+          pendingAvenues.length === 1
+            ? `The ${reportingAvenuesLabel(pendingAvenues)} report for "${targetName}" is still pending.`
+            : `The ${reportingAvenuesLabel(pendingAvenues)} reports for "${targetName}" are still pending.`,
+          '',
+          'Pending reporting:',
+          ...pendingAvenues.map(avenue => `- ${avenue} - ${reportingReminderPendingStatusText(pendingStatuses[avenue])}`),
+          '',
+        ]
+      : [];
     const actionLines = specialMeeting
       ? [
           GBM_BOD_TOOLS_RECORD_WARNING,
@@ -532,8 +761,9 @@ function buildReminderBody({ reminder, recipient }) {
       text: [
         `Dear Rtr. ${recipientName},`,
         '',
-        `The reporting window for ${avenue} ${itemNoun}, "${targetName}", is now open on the Club Website.`,
+        `The reporting window for ${avenuePhrase} ${itemNoun}, "${targetName}", is now open on the Club Website.`,
         '',
+        ...pendingLines,
         `The event was conducted on ${formatReminderDate(reminder.conductedDate || reminder.targetDate)} and must be reported by ${formatReminderDueDate(reminder.reportingDueAt || reminder.reportDueAt)}.`,
         '',
         ...actionLines,
@@ -721,12 +951,17 @@ function avenueReportingLockId(reminderId) {
 }
 
 function avenueReportingLockPayload(reminder, now) {
+  const avenues = normalizeReportingAvenues(Array.isArray(reminder.avenues) && reminder.avenues.length ? reminder.avenues : reminder.avenue);
+  const avenueKey = avenues[0] || normalizeAvenueKey(reminder.avenue);
   return {
     type: AVENUE_REPORTING_LOCK_TYPE,
     locked: true,
     status: 'active',
-    avenue: reminder.avenue,
-    avenueLabel: reminder.avenueLabel,
+    avenue: avenueKey || reminder.avenue,
+    avenueLabel: reminder.avenueLabel || avenueDisplayLabel(avenueKey),
+    avenues,
+    avenueLabels: avenues.map(avenueDisplayLabel),
+    avenuesLabel: cleanText(reminder.avenuesLabel, 160) || reportingAvenuesLabel(avenues),
     targetName: reminder.targetName,
     eventName: reminder.targetName,
     conductedDate: reminder.conductedDate,
@@ -757,10 +992,19 @@ module.exports = {
   REMINDER_RECIPIENT_BY_TYPE,
   AVENUE_LABELS,
   AVENUE_RECIPIENT_POSITION_KEYS,
+  REPORTING_WINDOW_EXCLUSIVE_AVENUES,
   cleanText,
   cleanLower,
   safeDocumentId,
   normalizeAvenueKey,
+  normalizeReportingAvenues,
+  hasExclusiveReportingAvenueConflict,
+  reportingAvenuesLabel,
+  reportingWindowRecipientPositionKeys,
+  evaluateReportingWindowAvenueCoverage,
+  reportingReminderPendingAvenues,
+  reportingReminderAudienceConfig,
+  withReportingReminderPendingAudience,
   avenueDisplayLabel,
   avenueRecipientRole,
   avenueRecipientPositionKeys,

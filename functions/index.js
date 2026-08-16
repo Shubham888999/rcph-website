@@ -39,6 +39,9 @@ const momFunctions = require('./lib/momFunctions');
 const reminderFunctions = require('./lib/reminderFunctions');
 const {
   normalizeAvenueKey: normalizeReportingAvenueKey,
+  normalizeReportingAvenues,
+  reportingAvenuesLabel,
+  evaluateReportingWindowAvenueCoverage,
   normalizeReportingWindowConfig,
   normalizedNameSimilarity: reportingNameSimilarity,
 } = require('./lib/reminderCore');
@@ -264,7 +267,8 @@ const DISTRICT_OFFICIAL_SIGNUP_TYPE = 'district-official';
 const DISTRICT_OFFICIAL_POSITION_MAX_LENGTH = 120;
 const ACTIVE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president']);
 const REQUESTABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', DISTRICT_OFFICIAL_ROLE]);
-const APPROVABLE_ROLES = new Set(['gbm', 'bod', 'admin', 'president', DISTRICT_OFFICIAL_ROLE]);
+const APPROVABLE_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president', DISTRICT_OFFICIAL_ROLE]);
+const CANONICAL_ACCESS_ROLES = new Set([...ACTIVE_ROLES, DISTRICT_OFFICIAL_ROLE]);
 const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
 const DRIVE_UPLOAD_SHARED_SECRET = defineSecret('DRIVE_UPLOAD_SHARED_SECRET');
 const DRIVE_UPLOAD_TICKET_TTL_MS = 5 * 60 * 1000;
@@ -1068,18 +1072,15 @@ function roleMatchesAnnouncementTarget(role, targetRoles) {
 
 function buildEligibleAnnouncementRecipient(uid, { authRecord, userSnap, roleSnap }) {
   if (!authRecord || authRecord.disabled === true || !userSnap?.exists || !roleSnap?.exists) return null;
-  const userData = userSnap.data() || {};
-  const roleData = roleSnap.data() || {};
-  const role = normalizeRole(roleData.role);
-  const roleStatus = String(roleData.status || 'approved').toLowerCase();
-  if (!isApprovedActiveUserRecord(userData)) return null;
-  if (!ANNOUNCEMENT_ACCOUNT_ROLES.has(role) || roleStatus !== 'approved') return null;
+  const account = canonicalAccessStateFromSnaps(uid, userSnap, roleSnap);
+  if (!account.approvedActive || !ANNOUNCEMENT_ACCOUNT_ROLES.has(account.role)) return null;
+  const userData = account.userData || {};
 
   return {
     uid,
     name: stripRotaractorPrefix(normalizeText(userData.name || authRecord.displayName || authRecord.email || uid, 160)),
     email: normalizeEmail(userData.email || authRecord.email || ''),
-    role,
+    role: account.role,
   };
 }
 
@@ -1663,7 +1664,7 @@ function getSignupNotificationHighlight(userData) {
   if (role === 'prospect') {
     return 'Prospect Member auto-approved. Onboarding criteria: 3 consecutive eligible meetings/events, then dues paid.';
   }
-  if (role === 'gbm') return 'GBM auto-approved.';
+  if (role === 'gbm') return 'Pending approval. Admin action required in Account Requests.';
   if (role === 'bod' || role === 'admin' || role === DISTRICT_OFFICIAL_ROLE) {
     return 'Pending approval. Admin action required in Account Requests.';
   }
@@ -1828,23 +1829,68 @@ function safeProviderFromAuth(request, fallback) {
 function isApprovedRoleDoc(data, role) {
   return data
     && normalizeRole(data.role) === role
-    && String(data.status || 'approved').toLowerCase() === 'approved';
+    && String(data.status || 'approved').toLowerCase() === 'approved'
+    && data.active !== false;
 }
 
-async function getActiveRole(uid) {
-  const snap = await db.collection('roles').doc(uid).get();
-  if (!snap.exists) return null;
-  const data = snap.data() || {};
-  const role = normalizeRole(data.role);
-  if (!ACTIVE_ROLES.has(role)) return null;
-  if (String(data.status || 'approved').toLowerCase() !== 'approved') return null;
-  return { role, data };
+function hasOwnField(data, field) {
+  return Object.prototype.hasOwnProperty.call(data || {}, field);
 }
 
 function isApprovedActiveUserRecord(data) {
   return data
     && String(data.status || '').toLowerCase() === 'approved'
     && data.active !== false;
+}
+
+function isApprovedActiveRoleRecord(data) {
+  return data
+    && String(data.status || 'approved').toLowerCase() === 'approved'
+    && data.active !== false;
+}
+
+function canonicalAccessStateFromSnaps(uid, userSnap, roleSnap) {
+  const userData = userSnap?.exists ? (userSnap.data() || {}) : null;
+  const roleData = roleSnap?.exists ? (roleSnap.data() || {}) : null;
+  const userRole = normalizeRole(userData?.role);
+  const roleDocRole = normalizeRole(roleData?.role);
+  const userApprovedActive = isApprovedActiveUserRecord(userData);
+  const roleApprovedActive = isApprovedActiveRoleRecord(roleData);
+  const roleIsCanonical = CANONICAL_ACCESS_ROLES.has(userRole);
+  const recordsAgree = Boolean(userRole && roleDocRole && userRole === roleDocRole);
+  const approvedActive = userApprovedActive && roleApprovedActive && roleIsCanonical && recordsAgree;
+  return {
+    uid,
+    userSnap,
+    roleSnap,
+    userData,
+    roleData,
+    userRole,
+    roleDocRole,
+    userApprovedActive,
+    roleApprovedActive,
+    recordsAgree,
+    approvedActive,
+    role: approvedActive ? userRole : '',
+    activeRole: approvedActive ? { role: userRole, data: roleData } : null,
+  };
+}
+
+async function getCanonicalAccessState(uid, preloaded = {}) {
+  const [userSnap, roleSnap] = await Promise.all([
+    hasOwnField(preloaded, 'userSnap')
+      ? Promise.resolve(preloaded.userSnap)
+      : db.collection('users').doc(uid).get(),
+    hasOwnField(preloaded, 'roleSnap')
+      ? Promise.resolve(preloaded.roleSnap)
+      : db.collection('roles').doc(uid).get(),
+  ]);
+  return canonicalAccessStateFromSnaps(uid, userSnap, roleSnap);
+}
+
+async function getActiveRole(uid) {
+  const account = await getCanonicalAccessState(uid);
+  return account.activeRole;
 }
 
 async function assertApprovedActiveCallableAccount(uid) {
@@ -1894,7 +1940,7 @@ async function hasActiveAnyPositionAssignment(uid, positionKeys, preloaded = {})
 }
 
 async function getAuthorityContext(uid, preloaded = {}) {
-  const active = preloaded.activeRole || await getActiveRole(uid);
+  const active = hasOwnField(preloaded, 'activeRole') ? preloaded.activeRole : await getActiveRole(uid);
   const base = {
     uid,
     role: active?.role || '',
@@ -2113,8 +2159,8 @@ async function getResolutionManagerContext(uid) {
 
 async function hasResolutionManagerAuthority(uid, preloaded = {}) {
   try {
-    const active = preloaded.activeRole || await getActiveRole(uid);
-    const userSnap = preloaded.userSnap || await db.collection('users').doc(uid).get();
+    const active = hasOwnField(preloaded, 'activeRole') ? preloaded.activeRole : await getActiveRole(uid);
+    const userSnap = hasOwnField(preloaded, 'userSnap') ? preloaded.userSnap : await db.collection('users').doc(uid).get();
     const userData = userSnap.exists ? (userSnap.data() || {}) : {};
     if (!active || !isApprovedActiveUserRecord(userData)) return false;
     if (active.role === 'admin' || active.role === 'president') return true;
@@ -2177,13 +2223,11 @@ async function loadActiveResolutionVoters() {
   ]);
   const voters = [];
   uids.forEach((uid, index) => {
-    const user = userSnaps[index]?.exists ? (userSnaps[index].data() || {}) : {};
-    const roleData = roleSnaps[index]?.exists ? (roleSnaps[index].data() || {}) : {};
+    const account = canonicalAccessStateFromSnaps(uid, userSnaps[index], roleSnaps[index]);
+    if (!account.approvedActive || !['bod', 'admin', 'president'].includes(account.role)) return;
+    const user = account.userData || {};
     const bodMember = bodMemberSnaps[index]?.exists ? (bodMemberSnaps[index].data() || {}) : {};
-    const role = normalizeRole(roleData.role);
-    if (!isApprovedActiveUserRecord(user)
-      || String(roleData.status || 'approved').toLowerCase() !== 'approved'
-      || !['bod', 'admin', 'president'].includes(role)) return;
+    const role = account.role;
     const positions = Array.from(byUid.get(uid).positions.values()).sort((a, b) => a.sortOrder - b.sortOrder);
     const name = stripRotaractorPrefix(normalizeText(user.name || bodMember.name, 160));
     if (!name || !positions.length) return;
@@ -3086,8 +3130,12 @@ function httpStatusFromHttpsError(err) {
 
 function normalizeVisibility(value, fallback = 'public') {
   const cleaned = normalizeText(value, 40).toLowerCase();
-  if (cleaned === 'public' || cleaned === 'internal') return cleaned;
+  if (cleaned === 'public' || cleaned === 'internal' || cleaned === 'private') return cleaned;
   return fallback;
+}
+
+function isPublicVisibility(value) {
+  return normalizeVisibility(value, '') === 'public';
 }
 
 function normalizeEventType(value, fallback = 'clubEvent') {
@@ -3160,7 +3208,9 @@ function normalizeBodEventPayload(raw, options = {}) {
   try {
     bodDescriptionFields = options.allowNonBodAvenues
       ? normalizeLegacyClubEventDescriptionFields(raw || {})
-      : bodEventSchema.normalizeBodEventDescriptionFields(raw || {});
+      : bodEventSchema.normalizeBodEventDescriptionFields(raw || {}, {
+        allowedMissingAvenues: options.allowedMissingAvenues,
+      });
   } catch (error) {
     if (error instanceof bodEventSchema.BodEventSchemaError) {
       throw new HttpsError('invalid-argument', error.message);
@@ -3356,6 +3406,11 @@ function shapeBodEventLockState(lockSnap) {
 }
 
 function shapeAvenueReportingLockState(lock) {
+  const avenues = normalizeReportingAvenues(Array.isArray(lock.avenues) && lock.avenues.length ? lock.avenues : lock.avenue);
+  const avenueLabels = Array.isArray(lock.avenueLabels)
+    ? lock.avenueLabels.map(label => normalizeText(label, 120)).filter(Boolean)
+    : [];
+  const primaryAvenue = avenues[0] || normalizeText(lock.avenue, 40);
   return {
     id: normalizeText(lock.id || lock.lockId, 180),
     lockId: normalizeText(lock.lockId || lock.id, 180),
@@ -3363,8 +3418,11 @@ function shapeAvenueReportingLockState(lock) {
     type: 'avenue_reporting',
     status: 'active',
     reason: normalizeText(lock.reason, 160) || 'reporting_window_expired',
-    avenue: normalizeText(lock.avenue, 40),
-    avenueLabel: normalizeText(lock.avenueLabel, 120),
+    avenue: primaryAvenue,
+    avenueLabel: normalizeText(lock.avenueLabel, 120) || avenueLabels[0] || primaryAvenue,
+    avenues,
+    avenueLabels,
+    avenuesLabel: normalizeText(lock.avenuesLabel, 160) || reportingAvenuesLabel(avenues),
     reportingWindowId: normalizeText(lock.reportingWindowId, 180),
     reminderId: normalizeText(lock.reminderId || lock.reportingWindowId, 180),
     targetName: normalizeText(lock.targetName, 180),
@@ -3445,15 +3503,50 @@ async function getReportingWindowDashboardNotices(positionKeys) {
 }
 
 function bodPayloadIncludesReportingWindowAvenue(payload, reportingWindow) {
-  const expected = normalizeReportingAvenueKey(reportingWindow.avenue);
+  const reportingAvenues = normalizeReportingAvenues(Array.isArray(reportingWindow.avenues) && reportingWindow.avenues.length ? reportingWindow.avenues : reportingWindow.avenue);
+  const expected = new Set(reportingAvenues.length ? reportingAvenues : [normalizeReportingAvenueKey(reportingWindow.avenue)].filter(Boolean));
   return Array.isArray(payload.avenues)
-    && payload.avenues.map(normalizeReportingAvenueKey).includes(expected);
+    && payload.avenues.map(normalizeReportingAvenueKey).some(avenue => expected.has(avenue));
 }
 
-async function requireReportingWindowForBodPayload(payload) {
+function allowedMissingAvenuesForReportingWindow(reportingWindow = {}) {
+  const avenues = normalizeReportingAvenues(Array.isArray(reportingWindow.avenues) && reportingWindow.avenues.length ? reportingWindow.avenues : reportingWindow.avenue);
+  if (avenues.some(avenue => avenue === 'GBM' || avenue === 'BOD_MEETING')) return [];
+  return avenues;
+}
+
+function storedReportingWindowId(data = {}) {
+  return validateEventDocId(data.reportingWindowId || data.reminderId);
+}
+
+function suppliedReportingWindowId(raw = {}) {
+  return validateEventDocId(raw.reportingWindowId || raw.reminderId);
+}
+
+function recoverReportingWindowIdForBodEventUpdate(raw = {}, existingData = {}) {
+  const existingId = storedReportingWindowId(existingData);
+  const incomingId = suppliedReportingWindowId(raw);
+  if (existingId && incomingId && incomingId !== existingId) {
+    throw new HttpsError('failed-precondition', 'This event is already linked to a different reporting window.');
+  }
+  return {
+    ...raw,
+    reportingWindowId: incomingId || existingId,
+  };
+}
+
+async function requireReportingWindowForBodPayload(payload, loadedReportingWindow = null) {
   const reportingWindowId = validateEventDocId(payload.reportingWindowId);
   if (!reportingWindowId) return null;
-  const snap = await db.collection('reminders').doc(reportingWindowId).get();
+  const reportingWindow = loadedReportingWindow || await loadReportingWindowForBodPayloadId(reportingWindowId);
+  assertReportingWindowMatchesBodPayload(payload, reportingWindow);
+  return reportingWindow;
+}
+
+async function loadReportingWindowForBodPayloadId(reportingWindowId) {
+  const safeReportingWindowId = validateEventDocId(reportingWindowId);
+  if (!safeReportingWindowId) return null;
+  const snap = await db.collection('reminders').doc(safeReportingWindowId).get();
   if (!snap.exists) throw new HttpsError('not-found', 'Reporting window not found.');
   const reportingWindow = normalizeReportingWindowConfig(snap.id, snap.data() || {});
   if (!reportingWindow) {
@@ -3462,9 +3555,31 @@ async function requireReportingWindowForBodPayload(payload) {
   if (reportingWindow.status === 'locked' || (reportingWindow.lockEnabled && Date.now() >= reportingWindow.lockAtMillis)) {
     throw new HttpsError('failed-precondition', 'This reporting window is locked.');
   }
-  if (normalizeReportingAvenueKey(reportingWindow.avenue) === 'BOD_MEETING') {
+  const reportingAvenue = normalizeReportingAvenues(Array.isArray(reportingWindow.avenues) && reportingWindow.avenues.length ? reportingWindow.avenues : reportingWindow.avenue)[0]
+    || normalizeReportingAvenueKey(reportingWindow.avenue);
+  if (reportingAvenue === 'BOD_MEETING') {
     throw new HttpsError('invalid-argument', 'BOD Meeting reporting windows must be submitted as Board of Directors meetings in BOD Tools.');
   }
+  return reportingWindow;
+}
+
+function reportingWindowIsCompleted(record = {}) {
+  return normalizeText(record.status, 40).toLowerCase() === 'completed'
+    || normalizeText(record.eventReportStatus, 40).toLowerCase() === 'recorded'
+    || normalizeText(record.completionReason, 80).toLowerCase() === 'report_submitted';
+}
+
+function assertCompletedReportingWindowCoveragePreserved(payload, reportingWindow) {
+  if (!reportingWindow || !reportingWindowIsCompleted(reportingWindow)) return;
+  if (!allowedMissingAvenuesForReportingWindow(reportingWindow).length) return;
+  const coverage = evaluateReportingWindowAvenueCoverage(reportingWindow, payload);
+  if (!coverage.complete) {
+    throw new HttpsError('failed-precondition', 'Completed reporting windows must keep every required avenue report complete.');
+  }
+}
+
+function assertReportingWindowMatchesBodPayload(payload, reportingWindow) {
+  if (!reportingWindow) return;
   if (payload.date !== reportingWindow.conductedDate) {
     throw new HttpsError('invalid-argument', 'Event date must match the reporting window conducted date.');
   }
@@ -3474,7 +3589,7 @@ async function requireReportingWindowForBodPayload(payload) {
   if (!bodPayloadIncludesReportingWindowAvenue(payload, reportingWindow)) {
     throw new HttpsError('invalid-argument', 'Event avenue must match the reporting window avenue.');
   }
-  return reportingWindow;
+  assertCompletedReportingWindowCoveragePreserved(payload, reportingWindow);
 }
 
 async function requireReportingWindowForBodMeetingPayload(payload) {
@@ -3790,7 +3905,7 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
   batch.set(eventRef, eventDoc, { merge: true });
   await batch.commit();
 
-  return { eventCreated: !eventSnap.exists };
+  return { eventCreated: !eventSnap.exists, bodEventDoc, eventDoc };
 }
 
 const BOD_MEETING_MOM_FIELDS = [
@@ -4313,7 +4428,7 @@ async function recalcAllActiveProspects(options = {}) {
 function isDashboardClubEvent(event) {
   return event
     && event.archived !== true
-    && String(event.visibility || 'public').toLowerCase() !== 'internal'
+    && isPublicVisibility(event.visibility)
     && String(event.type || 'clubEvent') === 'clubEvent';
 }
 
@@ -4451,25 +4566,20 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
   const userRef = db.collection('users').doc(uid);
   const roleRef = db.collection('roles').doc(uid);
   const prospectProgressRef = db.collection('prospectProgress').doc(uid);
-  let eventIds = [];
-  let districtEventIds = [];
-
-  if (requestedRole === 'gbm') {
-    const [eventMap, districtEventMap] = await Promise.all([
-      buildNaMapFromCollection('events'),
-      buildNaMapFromCollection('districtEvents'),
-    ]);
-    eventIds = Object.keys(eventMap);
-    districtEventIds = Object.keys(districtEventMap);
-  }
 
   const result = await db.runTransaction(async (tx) => {
     const [userSnap, roleSnap] = await Promise.all([tx.get(userRef), tx.get(roleRef)]);
     const roleData = roleSnap.exists ? (roleSnap.data() || {}) : null;
     const existingRole = roleData ? normalizeRole(roleData.role) : '';
+    const userData = userSnap.exists ? (userSnap.data() || {}) : null;
+    const existingUserRole = normalizeRole(userData?.role);
 
     const approvedExistingSignupRole = ACTIVE_ROLES.has(existingRole) || existingRole === DISTRICT_OFFICIAL_ROLE;
-    if (roleData && approvedExistingSignupRole && isApprovedRoleDoc(roleData, existingRole)) {
+    const roleCanRefreshApprovedAccount = roleData
+      && approvedExistingSignupRole
+      && isApprovedRoleDoc(roleData, existingRole)
+      && (!userData || (isApprovedActiveUserRecord(userData) && existingUserRole === existingRole));
+    if (roleCanRefreshApprovedAccount) {
       let ridResult = ridSignupResult(signupRid ? 'unmatched' : 'not-provided');
       if (signupRid && existingRole !== 'prospect') {
         const memberMatch = await findMemberMatchForSignup(tx, uid, profile.email);
@@ -4508,7 +4618,6 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       return { status: 'approved', role: existingRole, existing: true, shouldNotify: false, ...ridResult };
     }
 
-    const userData = userSnap.exists ? (userSnap.data() || {}) : null;
     if (userData && String(userData.status || '').toLowerCase() === 'approved') {
       let ridResult = ridSignupResult(signupRid ? 'unmatched' : 'not-provided');
       if (signupRid && normalizeRole(userData.role) !== 'prospect') {
@@ -4602,49 +4711,6 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
         existing: false,
         shouldNotify: !userSnap.exists,
       };
-    }
-
-    if (requestedRole === 'gbm') {
-      const clubPosition = 'Member';
-      const memberMatch = await findMemberMatchForSignup(tx, uid, profile.email);
-      const memberRef = memberMatch.ref;
-      const memberSnap = memberMatch.snap;
-      const attendanceRef = db.collection('attendance').doc(memberRef.id);
-      const districtAttendanceRef = db.collection('districtAttendance').doc(memberRef.id);
-      const [attendanceSnap, districtAttendanceSnap] = await Promise.all([
-        tx.get(attendanceRef),
-        tx.get(districtAttendanceRef),
-      ]);
-      const ridResult = setMemberProfileDoc(
-        tx,
-        memberRef,
-        memberSnap,
-        profile,
-        'gbm',
-        clubPosition,
-        now,
-        { rid: signupRid }
-      );
-
-      tx.set(userRef, {
-        ...base,
-        role: 'gbm',
-        clubPosition,
-        addToBodAttendance: false,
-        status: 'approved',
-        approvedAt: now,
-        approvedBy: 'system',
-        createdAt: userData?.createdAt || now,
-      }, { merge: true });
-      tx.set(roleRef, {
-        role: 'gbm',
-        status: 'approved',
-        updatedAt: now,
-        approvedBy: 'system',
-      }, { merge: true });
-      setDocPreservingExistingAttendance(tx, attendanceRef, attendanceSnap, eventIds, now);
-      setDocPreservingExistingAttendance(tx, districtAttendanceRef, districtAttendanceSnap, districtEventIds, now);
-      return { status: 'approved', role: 'gbm', existing: false, shouldNotify: !userSnap.exists, ...ridResult };
     }
 
     let pendingRidResult = ridSignupResult(signupRid ? 'unmatched' : 'not-provided');
@@ -4772,6 +4838,9 @@ exports.approveUserRole = onCall(CALLABLE_OPTIONS, async (request) => {
   if (!targetUid || !APPROVABLE_ROLES.has(approvedRole)) {
     throw new HttpsError('invalid-argument', 'Valid target user and approved role required.');
   }
+  if (targetUid === approverUid) {
+    throw new HttpsError('failed-precondition', 'You cannot approve your own account request.');
+  }
 
   const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
   const syncOptions = {
@@ -4815,6 +4884,9 @@ exports.updateUserAccessAndPositions = onCall(CALLABLE_OPTIONS, async (request) 
   const operationSource = normalizeText(data.operationSource || 'roleMaintenance', 80);
   if (!targetUid || !APPROVABLE_ROLES.has(role)) {
     throw new HttpsError('invalid-argument', 'Valid target user and role required.');
+  }
+  if (operationSource === 'accountApproval' && targetUid === actorUid) {
+    throw new HttpsError('failed-precondition', 'You cannot approve your own account request.');
   }
 
   const positionKeysProvided = Object.prototype.hasOwnProperty.call(data, 'positionKeys');
@@ -5186,11 +5258,10 @@ const [
   db.collection('bodPositionAssignments').doc(`saa_${uid}`).get(),
   db.collection('bodPositionAssignments').doc(`co-saa_${uid}`).get(),
 ]);
-  const roleData = roleSnap.exists ? (roleSnap.data() || {}) : null;
-  const role = roleData && String(roleData.status || 'approved').toLowerCase() === 'approved'
-    ? normalizeRole(roleData.role)
-    : '';
-  const activeRole = role && ACTIVE_ROLES.has(role) ? { role, data: roleData } : null;
+  const account = canonicalAccessStateFromSnaps(uid, userSnap, roleSnap);
+  const roleData = account.approvedActive ? account.roleData : null;
+  const role = account.approvedActive ? account.role : '';
+  const activeRole = account.activeRole;
 const authorityContext = await getAuthorityContext(uid, {
   activeRole,
   userSnap,
@@ -5211,7 +5282,7 @@ const authorityContext = await getAuthorityContext(uid, {
     authority: authorityContext,
     userData,
   });
-  const visitDashboardAccess = isApprovedActiveUserRecord(userData) && role
+  const visitDashboardAccess = account.approvedActive && role
     ? await visitDashboards.getAccessForRole({ role, roleData })
     : visitDashboards.emptyAccess();
 
@@ -7687,7 +7758,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
     const upcomingEvents = eventsSnap.docs
       .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
       .filter(event => event.archived !== true
-        && String(event.visibility || 'public').toLowerCase() !== 'internal'
+        && isPublicVisibility(event.visibility)
         && String(event.date || '') >= today)
       .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
       .slice(0, 5)
@@ -7809,7 +7880,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const publicEvents = eventsSnap.docs
     .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
-    .filter(event => event.archived !== true && String(event.visibility || 'public').toLowerCase() !== 'internal');
+    .filter(event => event.archived !== true && isPublicVisibility(event.visibility));
 
   const eventsByAvenueMap = new Map();
   events.forEach(event => {
@@ -8389,13 +8460,16 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   }
 
   const eventId = validateEventDocId(data.eventId) || db.collection('events').doc().id;
-  const payload = normalizeBodEventPayload(data);
+  const reportingWindow = await loadReportingWindowForBodPayloadId(suppliedReportingWindowId(data));
+  const payload = normalizeBodEventPayload(data, {
+    allowedMissingAvenues: allowedMissingAvenuesForReportingWindow(reportingWindow),
+  });
   await assertBodEventAvenuesUnlocked(payload.avenues);
-  const reportingWindow = await requireReportingWindowForBodPayload(payload);
+  await requireReportingWindowForBodPayload(payload, reportingWindow);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
-  const { eventCreated } = await writeSyncedBodEvent({
+  const { eventCreated, bodEventDoc } = await writeSyncedBodEvent({
     eventId,
     payload,
     uid,
@@ -8409,6 +8483,7 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
       targetType: 'club_event',
       targetId: eventId,
       bodEventId: eventId,
+      eventData: bodEventDoc,
       access: {
         uid,
         displayName: userProfile.name,
@@ -8623,13 +8698,17 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   }
   await assertBodEventRecordIsClubEvent(eventId);
 
-  const payload = normalizeBodEventPayload(request.data || {});
+  const recoveredData = recoverReportingWindowIdForBodEventUpdate(request.data || {}, bodEventData);
+  const reportingWindow = await loadReportingWindowForBodPayloadId(suppliedReportingWindowId(recoveredData));
+  const payload = normalizeBodEventPayload(recoveredData, {
+    allowedMissingAvenues: allowedMissingAvenuesForReportingWindow(reportingWindow),
+  });
   await assertBodEventAvenuesUnlocked(payload.avenues);
-  const reportingWindow = await requireReportingWindowForBodPayload(payload);
+  await requireReportingWindowForBodPayload(payload, reportingWindow);
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
-  await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
+  const { bodEventDoc } = await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
   let reportingWorkflow = null;
   if (reportingWindow) {
     reportingWorkflow = await reminderFunctions.linkReportingWindowToTarget({
@@ -8637,6 +8716,7 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
       targetType: 'club_event',
       targetId: eventId,
       bodEventId: eventId,
+      eventData: bodEventDoc,
       access: {
         uid,
         displayName: userProfile.name,
@@ -9233,6 +9313,7 @@ exports.finalizeMomUpload = momFunctions.finalizeMomUpload;
 exports.downloadMomPdf = momFunctions.downloadMomPdf;
 exports.sendMomEmail = momFunctions.sendMomEmail;
 exports.createReportingWindowReminder = reminderFunctions.createReportingWindowReminder;
+exports.getBodReportingQueue = reminderFunctions.getBodReportingQueue;
 exports.getReportingWindowPrefill = reminderFunctions.getReportingWindowPrefill;
 exports.upsertEventReminderConfig = reminderFunctions.upsertEventReminderConfig;
 exports.stopEventReminderConfig = reminderFunctions.stopEventReminderConfig;

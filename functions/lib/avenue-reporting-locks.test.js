@@ -15,6 +15,7 @@ const {
   reportingWindowLockDashboardMessage,
   reportingWindowOpenDashboardMessage,
   recipientPositionKeysForAvenue,
+  recipientPositionKeysForAvenues,
 } = require('./avenue-reporting-locks');
 
 class TestHttpsError extends Error {
@@ -195,6 +196,55 @@ test('open reporting-window dashboard notices target assigned director and co-di
   assert.deepEqual(unrelatedNotice, []);
 });
 
+test('multi-avenue reporting-window notices target any selected avenue assignment', () => {
+  assert.deepEqual(recipientPositionKeysForAvenues(['ISD', 'RRRO']), ['isd', 'co-isd', 'rrro', 'co-rrro']);
+
+  const windows = normalizeOpenAvenueReportingWindows({
+    reminderDocs: [
+      reminderDoc('window-joint', {
+        avenue: 'ISD',
+        avenues: ['ISD', 'RRRO'],
+        avenueLabels: ['International Service', 'Rotary-Rotaract Relations'],
+        avenuesLabel: 'ISD + RRRO',
+        targetName: 'Joint Fellowship Project',
+      }),
+    ],
+    now: new Date('2026-07-25T00:00:00.000Z'),
+  });
+  assert.deepEqual(windows.map(window => window.avenues), [['ISD', 'RRRO']]);
+
+  const rrroNotice = buildReportingWindowOpenDashboardNotices({
+    windows,
+    positionKeys: ['co-rrro'],
+    now: new Date('2026-07-25T00:00:00.000Z'),
+  });
+  assert.equal(rrroNotice.length, 1);
+  assert.equal(rrroNotice[0].title, 'ISD + RRRO reporting window open');
+  assert.equal(rrroNotice[0].body, 'ISD + RRRO reporting window is open. Please submit the event report before the deadline. Due by 26 July 2026, 11:59 PM.');
+  assert.equal(rrroNotice[0].openAvenue, 'ISD');
+  assert.deepEqual(rrroNotice[0].openAvenues, ['ISD', 'RRRO']);
+
+  const locks = normalizeActiveAvenueReportingLocks({
+    lockDocs: [
+      lockDoc('avenueReporting_window-joint', {
+        avenue: 'ISD',
+        avenues: ['ISD', 'RRRO'],
+        avenuesLabel: 'ISD + RRRO',
+        reportingWindowId: 'window-joint',
+      }),
+    ],
+  });
+  assert.deepEqual(lockedBodAvenuesForPayload(['RRRO'], locks), ['RRRO']);
+
+  const lockNotice = buildReportingWindowLockDashboardNotice({
+    locks,
+    positionKeys: ['rrro'],
+    now: new Date('2026-07-27T00:00:00.000Z'),
+  });
+  assert.deepEqual(lockNotice.lockedAvenues, ['ISD', 'RRRO']);
+  assert.equal(lockNotice.avenuesLabel, 'ISD + RRRO');
+});
+
 test('reporting-window dashboard notices disappear after completion, unlock, or expiry', () => {
   const openWindows = normalizeOpenAvenueReportingWindows({
     reminderDocs: [
@@ -246,6 +296,6 @@ test('submitBodEvent and updateBodEvent call avenue lock enforcement after paylo
   assert.match(indexSource, /async function getActiveBodPositionKeysForUser\(uid\)/);
   assert.match(indexSource, /const dashboardPositionKeys = mergePositionKeysForDashboard\(/);
   assert.match(indexSource, /getReportingWindowDashboardNotices\(dashboardPositionKeys\)/);
-  assert.match(indexSource, /exports\.submitBodEvent[\s\S]*const payload = normalizeBodEventPayload\(data\);\s*await assertBodEventAvenuesUnlocked\(payload\.avenues\);/);
-  assert.match(indexSource, /exports\.updateBodEvent[\s\S]*const payload = normalizeBodEventPayload\(request\.data \|\| \{\}\);\s*await assertBodEventAvenuesUnlocked\(payload\.avenues\);/);
+  assert.match(indexSource, /exports\.submitBodEvent[\s\S]*const reportingWindow = await loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(data\)\);[\s\S]*const payload = normalizeBodEventPayload\(data, \{[\s\S]*allowedMissingAvenues: allowedMissingAvenuesForReportingWindow\(reportingWindow\),[\s\S]*\}\);\s*await assertBodEventAvenuesUnlocked\(payload\.avenues\);/);
+  assert.match(indexSource, /exports\.updateBodEvent[\s\S]*const recoveredData = recoverReportingWindowIdForBodEventUpdate\(request\.data \|\| \{\}, bodEventData\);[\s\S]*const reportingWindow = await loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(recoveredData\)\);[\s\S]*const payload = normalizeBodEventPayload\(recoveredData, \{[\s\S]*allowedMissingAvenues: allowedMissingAvenuesForReportingWindow\(reportingWindow\),[\s\S]*\}\);\s*await assertBodEventAvenuesUnlocked\(payload\.avenues\);/);
 });

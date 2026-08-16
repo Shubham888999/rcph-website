@@ -20,12 +20,18 @@ const {
   cleanText,
   safeDocumentId,
   normalizeAvenueKey,
+  normalizeReportingAvenues,
+  reportingAvenuesLabel,
+  reportingWindowRecipientPositionKeys,
   avenueDisplayLabel,
   avenueRecipientPositionKeys,
+  reportingReminderAudienceConfig,
+  withReportingReminderPendingAudience,
   sourceForTargetType,
   normalizeReminderConfig,
   normalizeReportingWindowConfig,
   normalizeReminderRecipientRole,
+  evaluateReportingWindowAvenueCoverage,
   reminderSkipReason,
   reportingWindowRuntimeState,
   targetCollectionForReminder,
@@ -51,6 +57,7 @@ const {
   normalizeMomAccess,
   normalizeMomEmailAddress,
   normalizePositionKeys,
+  SECRETARY_POSITION_KEYS,
 } = require('./momCore');
 
 if (!admin.apps.length) {
@@ -175,12 +182,27 @@ function hasAdminPanelAuthority(access = {}) {
   return normalizePositionKeys(access.positionKeys).some(key => ADMIN_PANEL_POSITION_KEYS.has(key));
 }
 
+function hasBodToolsReportingAccess(access = {}) {
+  return access.isApproved === true
+    && (['bod', 'admin', 'president'].includes(access.storedRole) || access.hasPresidentAuthority === true);
+}
+
 async function requireAdminPanelReminderAccess(request, action = 'manage reminders') {
   const uid = request.auth?.uid || '';
   if (!uid) throw new HttpsError('unauthenticated', `Sign in before you ${action}.`);
   const access = await resolveReminderAccess(uid, request.auth?.token || {});
   if (!hasAdminPanelAuthority(access)) {
     throw new HttpsError('permission-denied', 'Admin panel authority is required for reminder operations.');
+  }
+  return access;
+}
+
+async function requireBodToolsReportingAccess(request, action = 'open BOD Tools') {
+  const uid = request.auth?.uid || '';
+  if (!uid) throw new HttpsError('unauthenticated', `Sign in before you ${action}.`);
+  const access = await resolveReminderAccess(uid, request.auth?.token || {});
+  if (!hasBodToolsReportingAccess(access)) {
+    throw new HttpsError('permission-denied', 'Approved BOD Tools access is required.');
   }
   return access;
 }
@@ -270,8 +292,252 @@ function bodToolsPrefillUrl(reportingWindowId) {
   return safeId ? `${RCPH_APP_BASE_URL}/bod-tools?reportingWindowId=${safeId}` : '';
 }
 
+function reportingWindowAvenuesForReminder(reminder = {}) {
+  return normalizeReportingAvenues(Array.isArray(reminder.avenues) && reminder.avenues.length ? reminder.avenues : reminder.avenue);
+}
+
+function reportingWindowAudienceLabel(reminder = {}) {
+  const avenues = reportingWindowAvenuesForReminder(reminder);
+  return cleanText(reminder.avenuesLabel, 160) || reportingAvenuesLabel(avenues) || reminder.avenue || '';
+}
+
 function isSpecialReportingWindow(reminder = {}) {
-  return ['GBM', 'BOD_MEETING'].includes(normalizeAvenueKey(reminder.avenue));
+  const avenue = reportingWindowAvenuesForReminder(reminder)[0] || normalizeAvenueKey(reminder.avenue);
+  return ['GBM', 'BOD_MEETING'].includes(avenue);
+}
+
+const REPORTING_QUEUE_STOPPED_STATUSES = new Set(['stopped', 'cancelled', 'canceled', 'disabled', 'inactive']);
+const REPORTING_QUEUE_STOPPED_REASONS = new Set(['reminders_disabled', 'admin_removed', 'cancelled', 'canceled']);
+
+function queueTimestampMillis(value) {
+  if (!value) return 0;
+  if (Number.isFinite(Number(value))) return Number(value);
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getTime();
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function reportingWindowAdministrativelyStopped(reminder = {}) {
+  const status = cleanLower(reminder.status, 40);
+  const reason = cleanLower(reminder.completionReason || reminder.stoppedReason || reminder.failureReason, 160);
+  return REPORTING_QUEUE_STOPPED_STATUSES.has(status) || REPORTING_QUEUE_STOPPED_REASONS.has(reason);
+}
+
+function reportingWindowQueueLocked(reminder = {}, nowMillis = Date.now()) {
+  return cleanLower(reminder.status, 40) === 'locked'
+    || (Number.isFinite(Number(reminder.lockAtMillis)) && nowMillis >= Number(reminder.lockAtMillis));
+}
+
+function reportingWindowQueueRuntimeState(reminder = {}, nowMillis = Date.now()) {
+  if (reportingWindowAdministrativelyStopped(reminder)) return 'stopped';
+  if (cleanLower(reminder.status, 40) === 'completed') return 'completed';
+  if (reportingWindowQueueLocked(reminder, nowMillis)) return 'locked';
+  return reportingWindowRuntimeState(reminder, nowMillis);
+}
+
+function specialReportingWindowCoverage(reminder = {}) {
+  const requiredAvenues = reportingWindowAvenuesForReminder(reminder);
+  const complete = cleanLower(reminder.eventReportStatus, 40) === 'recorded'
+    || cleanLower(reminder.status, 40) === 'completed'
+    || cleanLower(reminder.completionReason, 160) === 'report_submitted';
+  const avenueStatuses = requiredAvenues.reduce((out, avenue) => {
+    out[avenue] = complete ? 'reported' : 'missing_avenue';
+    return out;
+  }, {});
+  return {
+    requiredAvenues,
+    avenueStatuses,
+    reportedAvenues: complete ? requiredAvenues.slice() : [],
+    pendingAvenues: complete ? [] : requiredAvenues.slice(),
+    missingAvenues: complete ? [] : requiredAvenues.slice(),
+    missingDescriptionAvenues: [],
+    totalAvenues: requiredAvenues.length,
+    reportedCount: complete ? requiredAvenues.length : 0,
+    status: complete ? 'complete' : 'pending',
+    complete,
+  };
+}
+
+function reportingWindowQueueCoverage(reminder = {}, linkedEvent = null) {
+  return isSpecialReportingWindow(reminder)
+    ? specialReportingWindowCoverage(reminder)
+    : evaluateReportingWindowAvenueCoverage(reminder, linkedEvent || {});
+}
+
+function shouldIncludeBodReportingQueueItem(reminder = {}, coverage = {}) {
+  if (!reminder || reportingWindowAdministrativelyStopped(reminder)) return false;
+  if (cleanLower(reminder.status, 40) === 'completed') return false;
+  return coverage.complete !== true;
+}
+
+function positionDisplayLabel(positionKey) {
+  const definition = positionHelpers.getPositionDefinition(positionKey);
+  return cleanText(definition?.displayTitle, 120) || cleanText(positionKey, 80);
+}
+
+function positionSortOrder(positionKey) {
+  const definition = positionHelpers.getPositionDefinition(positionKey);
+  return Number.isFinite(Number(definition?.sortOrder)) ? Number(definition.sortOrder) : Number.MAX_SAFE_INTEGER;
+}
+
+function isCoPositionKey(positionKey) {
+  const definition = positionHelpers.getPositionDefinition(positionKey);
+  return cleanLower(definition?.group, 40).startsWith('co-') || cleanText(positionKey, 80).startsWith('co-');
+}
+
+function compareQueueAssignees(a = {}, b = {}) {
+  return Number(a.isCo === true) - Number(b.isCo === true)
+    || (Number(a.positionSortOrder) || Number.MAX_SAFE_INTEGER) - (Number(b.positionSortOrder) || Number.MAX_SAFE_INTEGER)
+    || String(a.positionLabel || '').localeCompare(String(b.positionLabel || ''))
+    || String(a.name || '').localeCompare(String(b.name || ''))
+    || String(a.uid || '').localeCompare(String(b.uid || ''));
+}
+
+function secretaryPositionKeys() {
+  return Array.from(SECRETARY_POSITION_KEYS || []).map(positionHelpers.normalizePositionKey).filter(Boolean);
+}
+
+function responsibilityPositionKeysForAvenue(avenue) {
+  const key = normalizeAvenueKey(avenue);
+  return ['GBM', 'BOD_MEETING'].includes(key) ? secretaryPositionKeys() : avenueRecipientPositionKeys(key);
+}
+
+function buildBodReportingQueueResponsibilities(avenues = [], assignees = []) {
+  return normalizeReportingAvenues(avenues).map((avenue) => {
+    const allowed = new Set(responsibilityPositionKeysForAvenue(avenue));
+    const seenUids = new Set();
+    const groupAssignees = assignees
+      .filter(assignee => allowed.has(positionHelpers.normalizePositionKey(assignee.positionKey)))
+      .slice()
+      .sort(compareQueueAssignees)
+      .reduce((list, assignee) => {
+        const uid = safeDocumentId(assignee.uid);
+        const positionKey = positionHelpers.normalizePositionKey(assignee.positionKey);
+        if (!uid || !positionKey || seenUids.has(uid)) return list;
+        seenUids.add(uid);
+        list.push({
+          uid,
+          name: cleanText(assignee.name, 180) || uid,
+          role: cleanLower(assignee.role, 80),
+          positionKey,
+          positionLabel: positionDisplayLabel(positionKey),
+          assignmentType: isCoPositionKey(positionKey) ? 'co' : 'primary',
+        });
+        return list;
+      }, []);
+    return {
+      avenue,
+      avenueLabel: avenueDisplayLabel(avenue),
+      assignees: groupAssignees,
+    };
+  });
+}
+
+async function loadBodReportingQueueAssignees() {
+  const snap = await db.collection('bodPositionAssignments').where('active', '==', true).get().catch(() => null);
+  if (!snap) return [];
+  const rows = snap.docs.map((doc) => {
+    const data = doc.data() || {};
+    return {
+      uid: safeDocumentId(data.uid),
+      positionKey: positionHelpers.normalizePositionKey(data.positionKey),
+    };
+  }).filter(row => row.uid && row.positionKey);
+  const uids = rows.map(row => row.uid);
+  const [userSnaps, roleSnaps, authUsers] = await Promise.all([
+    getFirestoreDocsById('users', uids),
+    getFirestoreDocsById('roles', uids),
+    getAuthUsersById(uids),
+  ]);
+
+  return rows.reduce((list, row) => {
+    const recipient = buildEligibleReminderRecipient(row.uid, {
+      authRecord: authUsers.get(row.uid),
+      userSnap: userSnaps.get(row.uid),
+      roleSnap: roleSnaps.get(row.uid),
+      positionKeys: [row.positionKey],
+    });
+    if (!recipient) return list;
+    list.push({
+      uid: recipient.uid,
+      name: recipient.name,
+      role: recipient.role,
+      positionKey: row.positionKey,
+      positionLabel: positionDisplayLabel(row.positionKey),
+      positionSortOrder: positionSortOrder(row.positionKey),
+      isCo: isCoPositionKey(row.positionKey),
+    });
+    return list;
+  }, []);
+}
+
+function queueLinkedBodEventId(reminder = {}) {
+  return safeDocumentId(reminder.linkedBodEventId || reminder.linkedEventId || reminder.linkedTargetId);
+}
+
+function queueLinkedTargetId(reminder = {}) {
+  return safeDocumentId(reminder.linkedTargetId || reminder.linkedBodEventId || reminder.linkedEventId || reminder.linkedMeetingId);
+}
+
+function shapeBodReportingQueueItem({ reminder, coverage, responsibilities, nowMillis = Date.now() }) {
+  const targetType = reportingWindowExpectedTargetType(reminder);
+  const linkedTargetId = queueLinkedTargetId(reminder);
+  const linkedBodEventId = queueLinkedBodEventId(reminder);
+  return {
+    id: reminder.id,
+    reportingWindowId: reminder.id,
+    source: REMINDERS_COLLECTION,
+    targetType,
+    targetId: linkedTargetId,
+    linkedTargetType: cleanLower(reminder.linkedTargetType, 80) || targetType,
+    linkedTargetId,
+    linkedBodEventId,
+    linkedMeetingId: safeDocumentId(reminder.linkedMeetingId),
+    eventName: reminder.targetName,
+    name: reminder.targetName,
+    conductedDate: reminder.conductedDate,
+    date: reminder.conductedDate,
+    time: reminder.eventTime,
+    avenue: reminder.avenue,
+    avenueLabel: reminder.avenueLabel,
+    avenues: reminder.avenues.slice(),
+    avenueLabels: reminder.avenueLabels.slice(),
+    avenuesLabel: reminder.avenuesLabel,
+    reportingOpensAt: reminder.reportingOpensAt,
+    reportingDueAt: reminder.reportingDueAt,
+    deadline: reminder.reportingDueAt,
+    lockAt: reminder.lockAt,
+    timezone: reminder.timezone,
+    status: reminder.status,
+    runtimeState: reportingWindowQueueRuntimeState(reminder, nowMillis),
+    locked: reportingWindowQueueLocked(reminder, nowMillis),
+    lockReason: reminder.lockReason,
+    eventReportStatus: coverage.complete ? 'recorded' : coverage.status,
+    coverage: {
+      requiredAvenues: coverage.requiredAvenues.slice(),
+      avenueStatuses: { ...coverage.avenueStatuses },
+      reportedAvenues: coverage.reportedAvenues.slice(),
+      pendingAvenues: coverage.pendingAvenues.slice(),
+      missingAvenues: coverage.missingAvenues.slice(),
+      missingDescriptionAvenues: coverage.missingDescriptionAvenues.slice(),
+      totalAvenues: coverage.totalAvenues,
+      reportedCount: coverage.reportedCount,
+      status: coverage.status,
+      complete: coverage.complete === true,
+    },
+    responsibilities,
+    action: linkedTargetId ? 'continue_event' : 'add_event',
+    createdAt: reminder.createdAt,
+    updatedAt: reminder.updatedAt,
+  };
+}
+
+function compareBodReportingQueueItems(a = {}, b = {}) {
+  return (queueTimestampMillis(a.reportingDueAt) || Number.MAX_SAFE_INTEGER) - (queueTimestampMillis(b.reportingDueAt) || Number.MAX_SAFE_INTEGER)
+    || (queueTimestampMillis(a.lockAt) || Number.MAX_SAFE_INTEGER) - (queueTimestampMillis(b.lockAt) || Number.MAX_SAFE_INTEGER)
+    || queueTimestampMillis(b.createdAt) - queueTimestampMillis(a.createdAt)
+    || String(a.reportingWindowId || a.id || '').localeCompare(String(b.reportingWindowId || b.id || ''));
 }
 
 function workflowReminderConfigId(reportingWindowId, reminderType) {
@@ -297,6 +563,7 @@ function workflowReminderPayload({ reportingWindow, reminderType, targetType, ta
   const source = sourceForTargetType(targetType);
   const safeTargetId = safeDocumentId(targetId);
   if (!source || !safeTargetId) return null;
+  const avenues = reportingWindowAvenuesForReminder(reportingWindow);
   const configId = workflowReminderConfigId(reportingWindow.id, definition.reminderType);
   return {
     configId,
@@ -309,7 +576,10 @@ function workflowReminderPayload({ reportingWindow, reminderType, targetType, ta
     targetName: reportingWindow.targetName,
     eventType: targetType,
     eventTypeLabel: targetType === 'bod_meeting' ? 'BOD meeting' : targetType === 'avenue_reporting_window' ? 'Reporting workflow' : 'Club event',
-    avenue: [reportingWindow.avenue].filter(Boolean),
+    avenue: avenues.length ? avenues : [reportingWindow.avenue].filter(Boolean),
+    avenues,
+    avenueLabels: avenues.map(avenueDisplayLabel),
+    avenuesLabel: reportingAvenuesLabel(avenues),
     conductedDate: reportingWindow.conductedDate,
     targetDate: reportingWindow.conductedDate,
     reminderType: definition.reminderType,
@@ -401,12 +671,15 @@ async function upsertWorkflowReminderConfigs({ reportingWindow, targetType, targ
       targetType: 'reporting_workflow_reminders',
       targetId: reportingWindow.id,
       targetLabel: reportingWindow.targetName,
-      targetAudience: reportingWindow.avenue,
+      targetAudience: reportingWindowAudienceLabel(reportingWindow),
       details: `${createdOrUpdated.length} linked MOM/attendance reminder configs started.`,
       source: 'upsertWorkflowReminderConfigs',
       relatedDocPath: `${REMINDERS_COLLECTION}/${reportingWindow.id}`,
       metadata: {
         reportingWindowId: reportingWindow.id,
+        avenue: reportingWindow.avenue,
+        avenues: reportingWindowAvenuesForReminder(reportingWindow),
+        avenuesLabel: reportingWindowAudienceLabel(reportingWindow),
         targetType,
         targetId,
         enabled: enabled === true,
@@ -427,6 +700,116 @@ async function updateReportingWindowWorkflowFields(reportingWindowId, fields, no
     updatedAt: now,
   }, { merge: true });
   return true;
+}
+
+function reportingCoveragePersistenceFields(coverage, now) {
+  return {
+    eventReportStatus: coverage.complete ? 'recorded' : coverage.status,
+    reportedAvenues: coverage.reportedAvenues,
+    pendingAvenues: coverage.pendingAvenues,
+    missingAvenues: coverage.missingAvenues,
+    missingDescriptionAvenues: coverage.missingDescriptionAvenues,
+    avenueReportStatuses: coverage.avenueStatuses,
+    reportedAvenueCount: coverage.reportedCount,
+    requiredAvenueCount: coverage.totalAvenues,
+    reportingCoverageUpdatedAt: now,
+  };
+}
+
+function arraysMatch(left = [], right = []) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  return left.every((item, index) => item === right[index]);
+}
+
+function objectsMatch(left = {}, right = {}) {
+  const leftKeys = Object.keys(left || {}).sort();
+  const rightKeys = Object.keys(right || {}).sort();
+  return arraysMatch(leftKeys, rightKeys) && leftKeys.every(key => left[key] === right[key]);
+}
+
+function reportingCoverageChanged(reportingWindow = {}, fields = {}) {
+  return cleanLower(reportingWindow.eventReportStatus, 40) !== fields.eventReportStatus
+    || !arraysMatch(reportingWindow.reportedAvenues || [], fields.reportedAvenues || [])
+    || !arraysMatch(reportingWindow.pendingAvenues || [], fields.pendingAvenues || [])
+    || !arraysMatch(reportingWindow.missingAvenues || [], fields.missingAvenues || [])
+    || !arraysMatch(reportingWindow.missingDescriptionAvenues || [], fields.missingDescriptionAvenues || [])
+    || !objectsMatch(reportingWindow.avenueReportStatuses || {}, fields.avenueReportStatuses || {})
+    || Number(reportingWindow.reportedAvenueCount || 0) !== Number(fields.reportedAvenueCount || 0)
+    || Number(reportingWindow.requiredAvenueCount || 0) !== Number(fields.requiredAvenueCount || 0);
+}
+
+function partialReportingWindowStatus(reportingWindow = {}) {
+  const status = cleanLower(reportingWindow.status, 40);
+  if (['configured', 'not_open', 'open', 'active', 'failed', 'no_recipient'].includes(status)) return status;
+  return reportingWindow.remindersSent > 0 ? 'active' : 'open';
+}
+
+async function reportingCoverageEventData({ targetId, bodEventId = '', eventData = null } = {}) {
+  if (eventData && typeof eventData === 'object') return eventData;
+  const safeBodEventId = safeDocumentId(bodEventId) || safeDocumentId(targetId);
+  if (!safeBodEventId) return {};
+  const snap = await db.collection('bodEvents').doc(safeBodEventId).get().catch(() => null);
+  return snap?.exists ? (snap.data() || {}) : {};
+}
+
+async function loadLiveReportingReminderCoverage(reminder = {}, eventData = null) {
+  if (isSpecialReportingWindow(reminder)) return specialReportingWindowCoverage(reminder);
+  const linkedEventData = eventData && typeof eventData === 'object'
+    ? eventData
+    : await reportingCoverageEventData({
+        targetId: queueLinkedTargetId(reminder),
+        bodEventId: queueLinkedBodEventId(reminder),
+      });
+  return evaluateReportingWindowAvenueCoverage(reminder, linkedEventData || {});
+}
+
+function reportingReminderLogMetadata(reminder = {}, coverage = {}, recipientCount = 0) {
+  const audience = reportingReminderAudienceConfig(reminder, coverage);
+  return {
+    requiredAvenues: audience.requiredAvenues,
+    pendingAvenues: audience.pendingAvenues,
+    pendingAvenueCount: audience.pendingAvenueCount,
+    reportedAvenues: audience.reportedAvenues,
+    recipientCount,
+  };
+}
+
+async function persistLiveReportingCoverage(doc, reminder, coverage, now) {
+  if (isSpecialReportingWindow(reminder) || !coverage) return false;
+  const coverageFields = reportingCoveragePersistenceFields(coverage, now);
+  const fields = coverage.complete === true
+    ? {
+        ...coverageFields,
+        status: 'completed',
+        completedAt: now,
+        completionReason: 'report_submitted',
+        eventReportStatus: 'recorded',
+        failureReason: '',
+      }
+    : {
+        ...coverageFields,
+        status: partialReportingWindowStatus(reminder),
+        completedAt: admin.firestore.FieldValue.delete(),
+        completionReason: '',
+      };
+  if (coverage.complete !== true && !reportingCoverageChanged(reminder, coverageFields)) return false;
+  await doc.ref.set({
+    ...fields,
+    updatedAt: now,
+  }, { merge: true });
+  return true;
+}
+
+async function completeReportingWindowFromLiveCoverage(doc, reminder, coverage, now) {
+  await persistLiveReportingCoverage(doc, reminder, coverage, now);
+  await writeReminderHistory([reminderHistoryPayload({
+    reminder,
+    status: 'skipped',
+    errorCode: 'report_submitted',
+    attemptNumber: reminder.remindersSent,
+    maxReminders: reminder.maxReminders,
+    sentAt: now,
+  })]);
 }
 
 async function completeLinkedWorkflowRemindersForTarget({ targetType, targetId, reminderType, reason, now = admin.firestore.Timestamp.now(), metadata = {} }) {
@@ -494,26 +877,42 @@ async function completeLinkedWorkflowRemindersForTarget({ targetType, targetId, 
   return { completed, reportingWindowIds: Array.from(reportingWindowIds) };
 }
 
-async function linkReportingWindowToTarget({ reportingWindow, targetType, targetId, bodEventId = '', access = null, now = admin.firestore.Timestamp.now(), match = null }) {
+async function linkReportingWindowToTarget({ reportingWindow, targetType, targetId, bodEventId = '', access = null, now = admin.firestore.Timestamp.now(), match = null, eventData = null }) {
   const safeTargetId = safeDocumentId(targetId);
   const normalizedTargetType = cleanLower(targetType, 80);
   if (!reportingWindow?.id || !safeTargetId || !sourceForTargetType(normalizedTargetType)) {
-    return { ok: false, reminderIds: [] };
+    return { ok: false, reminderIds: [], complete: false };
   }
+  const safeBodEventId = safeDocumentId(bodEventId) || safeTargetId;
+  const specialWindow = isSpecialReportingWindow(reportingWindow);
+  const coverage = specialWindow
+    ? null
+    : evaluateReportingWindowAvenueCoverage(
+        reportingWindow,
+        await reportingCoverageEventData({ targetId: safeTargetId, bodEventId: safeBodEventId, eventData }),
+      );
+  const coverageFields = coverage ? reportingCoveragePersistenceFields(coverage, now) : {};
 
   const fields = {
-    status: 'completed',
-    completedAt: now,
-    completionReason: 'report_submitted',
-    eventReportStatus: 'recorded',
     workflowStatus: 'in_progress',
     linkedTargetType: normalizedTargetType,
     linkedTargetId: safeTargetId,
     linkedEventId: safeTargetId,
-    linkedBodEventId: safeDocumentId(bodEventId) || safeTargetId,
+    linkedBodEventId: safeBodEventId,
     failureReason: '',
     possibleMatchStatus: '',
+    ...coverageFields,
   };
+  if (specialWindow || coverage?.complete === true) {
+    fields.status = 'completed';
+    fields.completedAt = now;
+    fields.completionReason = 'report_submitted';
+    fields.eventReportStatus = 'recorded';
+  } else {
+    fields.status = partialReportingWindowStatus(reportingWindow);
+    fields.completedAt = admin.firestore.FieldValue.delete();
+    fields.completionReason = '';
+  }
   if (normalizedTargetType === 'bod_meeting') fields.linkedMeetingId = safeTargetId;
   await updateReportingWindowWorkflowFields(reportingWindow.id, fields, now);
 
@@ -527,28 +926,45 @@ async function linkReportingWindowToTarget({ reportingWindow, targetType, target
     now,
   });
 
-  await writeReminderSystemLog({
-    access: access || { uid: 'system', displayName: 'System', storedRole: 'system' },
-    action: 'linked',
-    status: 'success',
-    targetType: 'avenue_reporting_window',
-    targetId: reportingWindow.id,
-    targetLabel: reportingWindow.targetName,
-    targetAudience: reportingWindow.avenue,
-    details: 'BOD event linked to reporting window; MOM and attendance reminders started.',
-    source: 'linkReportingWindowToTarget',
-    relatedDocPath: `${REMINDERS_COLLECTION}/${reportingWindow.id}`,
-    metadata: {
-      reportingWindowId: reportingWindow.id,
-      targetType: normalizedTargetType,
-      targetId: safeTargetId,
-      bodEventId: safeDocumentId(bodEventId) || safeTargetId,
-      match,
-      reminderIds,
-    },
-  }, { safe: true });
+  const alreadyLinked = reportingWindow.linkedTargetId === safeTargetId
+    && (reportingWindow.linkedBodEventId || reportingWindow.linkedEventId || '') === safeBodEventId;
+  const shouldLog = !alreadyLinked || (coverage && reportingCoverageChanged(reportingWindow, coverageFields));
+  if (shouldLog) {
+    await writeReminderSystemLog({
+      access: access || { uid: 'system', displayName: 'System', storedRole: 'system' },
+      action: 'linked',
+      status: coverage?.complete === false ? 'info' : 'success',
+      targetType: 'avenue_reporting_window',
+      targetId: reportingWindow.id,
+      targetLabel: reportingWindow.targetName,
+      targetAudience: reportingWindowAudienceLabel(reportingWindow),
+      details: coverage
+        ? `BOD event linked to reporting window; coverage ${coverage.reportedCount}/${coverage.totalAvenues}. MOM and attendance reminders started.`
+        : 'BOD event linked to reporting window; MOM and attendance reminders started.',
+      source: 'linkReportingWindowToTarget',
+      relatedDocPath: `${REMINDERS_COLLECTION}/${reportingWindow.id}`,
+      metadata: {
+        reportingWindowId: reportingWindow.id,
+        avenue: reportingWindow.avenue,
+        avenues: reportingWindowAvenuesForReminder(reportingWindow),
+        avenuesLabel: reportingWindowAudienceLabel(reportingWindow),
+        targetType: normalizedTargetType,
+        targetId: safeTargetId,
+        bodEventId: safeBodEventId,
+        match,
+        coverage,
+        reminderIds,
+      },
+    }, { safe: true });
+  }
 
-  return { ok: true, reminderIds };
+  return {
+    ok: true,
+    reminderIds,
+    coverage,
+    complete: specialWindow || coverage?.complete === true,
+    eventReportStatus: fields.eventReportStatus,
+  };
 }
 
 async function activePositionKeysByUidForReminderRole(recipientRole) {
@@ -653,6 +1069,20 @@ async function candidateUidsForAvenue(avenue) {
   return { candidateUids: Array.from(candidateUids), positionKeysByUid };
 }
 
+async function candidateUidsForAvenues(avenues = []) {
+  const candidateUids = new Set();
+  const positionKeysByUid = new Map();
+  for (const avenue of normalizeReportingAvenues(avenues)) {
+    const result = await candidateUidsForAvenue(avenue);
+    result.candidateUids.forEach(uid => candidateUids.add(uid));
+    result.positionKeysByUid.forEach((keys, uid) => {
+      const existing = positionKeysByUid.get(uid) || [];
+      positionKeysByUid.set(uid, Array.from(new Set(existing.concat(keys))));
+    });
+  }
+  return { candidateUids: Array.from(candidateUids), positionKeysByUid };
+}
+
 async function resolveReminderRecipients(recipientRole) {
   const normalizedRole = normalizeReminderRecipientRole(recipientRole);
   const { candidateUids, positionKeysByUid } = await candidateUidsForReminderRole(normalizedRole);
@@ -673,11 +1103,14 @@ async function resolveReminderRecipients(recipientRole) {
     .filter(recipient => reminderRecipientMatchesRole(recipient, normalizedRole)));
 }
 
-async function resolveAvenueReportingRecipients(reminder) {
+async function resolveAvenueReportingRecipients(reminder, options = {}) {
+  const hasScopedAvenues = Object.prototype.hasOwnProperty.call(options, 'avenues');
+  const scopedAvenues = normalizeReportingAvenues(options.avenues || []);
+  const avenues = hasScopedAvenues ? scopedAvenues : reportingWindowAvenuesForReminder(reminder);
   if (reminder.recipientRole === 'secretary') return resolveReminderRecipients('secretary');
-  const { candidateUids, positionKeysByUid } = await candidateUidsForAvenue(reminder.avenue);
+  const { candidateUids, positionKeysByUid } = await candidateUidsForAvenues(avenues);
   if (!candidateUids.length) return [];
-  const allowed = new Set(avenueRecipientPositionKeys(reminder.avenue));
+  const allowed = new Set(reportingWindowRecipientPositionKeys(avenues));
   const [userSnapsByUid, roleSnapsByUid, authUsersByUid] = await Promise.all([
     getFirestoreDocsById('users', candidateUids),
     getFirestoreDocsById('roles', candidateUids),
@@ -710,6 +1143,7 @@ async function loadReminderTarget(config) {
 }
 
 function reminderHistoryPayload({ reminder, recipient = {}, status, errorCode = '', attemptNumber, maxReminders, sentAt }) {
+  const avenues = reportingWindowAvenuesForReminder(reminder);
   return {
     reminderId: reminder.id,
     reminderType: reminder.reminderType,
@@ -717,7 +1151,9 @@ function reminderHistoryPayload({ reminder, recipient = {}, status, errorCode = 
     targetId: reminder.targetId,
     targetName: reminder.targetName,
     targetDate: reminder.targetDate,
-    avenue: reminder.avenue || '',
+    avenue: reminder.avenue || avenues[0] || '',
+    avenues,
+    avenuesLabel: cleanText(reminder.avenuesLabel, 160) || reportingAvenuesLabel(avenues),
     recipientRole: reminder.recipientRole,
     recipientUid: cleanText(recipient.uid, 160),
     recipientEmail: cleanLower(recipient.email, 320),
@@ -837,7 +1273,8 @@ function eventAvenueKeys(data = {}) {
 }
 
 function reportingWindowExpectedTargetType(reminder = {}) {
-  return normalizeAvenueKey(reminder.avenue) === 'BOD_MEETING' ? 'bod_meeting' : 'club_event';
+  const avenue = reportingWindowAvenuesForReminder(reminder)[0] || normalizeAvenueKey(reminder.avenue);
+  return avenue === 'BOD_MEETING' ? 'bod_meeting' : 'club_event';
 }
 
 function bodEventTargetForWorkflow(doc) {
@@ -871,7 +1308,7 @@ function bodEventMatchesReportingWindowShape(reminder, data, targetType) {
   if (eventDateFromBodEvent(data) !== reminder.conductedDate) return false;
   const expectedTargetType = reportingWindowExpectedTargetType(reminder);
   if (targetType !== expectedTargetType) return false;
-  const avenueKey = normalizeAvenueKey(reminder.avenue);
+  const avenueKey = reportingWindowAvenuesForReminder(reminder)[0] || normalizeAvenueKey(reminder.avenue);
   if (avenueKey === 'BOD_MEETING') return true;
   return eventAvenueKeys(data).includes(avenueKey);
 }
@@ -1145,12 +1582,14 @@ async function createOrActivateAvenueReportingLock(doc, reminder, now) {
       targetType: 'avenue_reporting_window',
       targetId: reminder.id,
       targetLabel: reminder.targetName || reminder.eventName || reminder.avenue,
-      targetAudience: reminder.avenue,
+      targetAudience: reportingWindowAudienceLabel(reminder),
       details: 'Avenue reporting window locked after deadline.',
       source: 'createOrActivateAvenueReportingLock',
       relatedDocPath: `locks/${lockId}`,
       metadata: {
         avenue: reminder.avenue,
+        avenues: reportingWindowAvenuesForReminder(reminder),
+        avenuesLabel: reportingWindowAudienceLabel(reminder),
         reportingWindowId: reminder.id,
         lockReason: AVENUE_REPORTING_LOCK_REASON,
       },
@@ -1177,13 +1616,16 @@ async function processAvenueReportingWindowDoc(doc, options = {}) {
     return { outcome: 'skipped', reason: runtimeState };
   }
 
+  let liveCoverage = null;
+  let liveCoveragePersisted = false;
   const submitted = await hasAvenueReportSubmission(reminder);
   if (submitted.submitted) {
-    await linkReportingWindowToTarget({
+    const linked = await linkReportingWindowToTarget({
       reportingWindow: reminder,
       targetType: submitted.match.targetType,
       targetId: submitted.match.targetId,
       bodEventId: submitted.match.bodEventId,
+      eventData: submitted.match.data,
       access: { uid: 'system', displayName: 'System', storedRole: 'system' },
       now,
       match: {
@@ -1192,15 +1634,19 @@ async function processAvenueReportingWindowDoc(doc, options = {}) {
         matchType: submitted.match.matchType,
       },
     });
-    await writeReminderHistory([reminderHistoryPayload({
-      reminder,
-      status: 'skipped',
-      errorCode: 'report_submitted',
-      attemptNumber: reminder.remindersSent,
-      maxReminders: reminder.maxReminders,
-      sentAt: now,
-    })]);
-    return { outcome: 'alreadySubmitted', reason: 'report_submitted' };
+    if (linked.complete === true) {
+      await writeReminderHistory([reminderHistoryPayload({
+        reminder,
+        status: 'skipped',
+        errorCode: 'report_submitted',
+        attemptNumber: reminder.remindersSent,
+        maxReminders: reminder.maxReminders,
+        sentAt: now,
+      })]);
+      return { outcome: 'alreadySubmitted', reason: 'report_submitted' };
+    }
+    liveCoverage = linked.coverage || null;
+    liveCoveragePersisted = Boolean(linked.coverage);
   }
   if (submitted.possibleMatchId) {
     await doc.ref.set({
@@ -1211,6 +1657,14 @@ async function processAvenueReportingWindowDoc(doc, options = {}) {
       updatedAt: now,
     }, { merge: true });
   }
+
+  if (!liveCoverage) liveCoverage = await loadLiveReportingReminderCoverage(reminder);
+  const liveAudience = reportingReminderAudienceConfig(reminder, liveCoverage);
+  if (liveAudience.complete === true) {
+    await completeReportingWindowFromLiveCoverage(doc, reminder, liveCoverage, now);
+    return { outcome: 'alreadySubmitted', reason: 'report_submitted' };
+  }
+  if (!liveCoveragePersisted) await persistLiveReportingCoverage(doc, reminder, liveCoverage, now);
 
   if (runtimeState === 'not_open') {
     if (reminder.status !== 'not_open') await setReportingWindowStatus(doc, 'not_open', now);
@@ -1239,16 +1693,37 @@ async function processAvenueReportingWindowDoc(doc, options = {}) {
     return { outcome: 'skipped', reason: 'max_reminders_reached' };
   }
 
-  const recipients = await resolveAvenueReportingRecipients(reminder);
+  const sendReminder = withReportingReminderPendingAudience(reminder, liveCoverage);
+  const recipients = await resolveAvenueReportingRecipients(sendReminder, { avenues: sendReminder.pendingAvenues });
   if (!recipients.length) {
-    await failReminder(doc, reminder, 'no_recipient', 'no_eligible_recipient', now);
+    await failReminder(doc, sendReminder, 'no_recipient', 'no_eligible_recipient', now);
+    await writeReminderSystemLog({
+      access: { uid: 'system', displayName: 'System', storedRole: 'system' },
+      action: 'no_recipient',
+      status: 'failed',
+      targetType: 'avenue_reporting_window',
+      targetId: reminder.id,
+      targetLabel: reminder.targetName,
+      targetAudience: reportingWindowAudienceLabel(sendReminder),
+      details: 'No eligible recipients found for the pending avenue reporting audience.',
+      source: 'processAvenueReportingWindowDoc',
+      relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
+      metadata: {
+        reportingWindowId: reminder.id,
+        avenue: reminder.avenue,
+        avenues: reportingWindowAvenuesForReminder(reminder),
+        avenuesLabel: reportingWindowAudienceLabel(reminder),
+        pendingAvenuesLabel: reportingWindowAudienceLabel(sendReminder),
+        ...reportingReminderLogMetadata(reminder, liveCoverage, 0),
+      },
+    }, { safe: true });
     return { outcome: 'noRecipient', reason: 'no_eligible_recipient' };
   }
 
-  const { summary, results, failureReason } = await sendReminderMessages({ reminder, recipients });
+  const { summary, results, failureReason } = await sendReminderMessages({ reminder: sendReminder, recipients });
   const attemptNumber = reminder.remindersSent + 1;
   await writeReminderHistory(results.map(result => reminderHistoryPayload({
-    reminder,
+    reminder: sendReminder,
     recipient: result.recipient,
     status: result.status,
     errorCode: result.errorCode,
@@ -1282,19 +1757,24 @@ async function processAvenueReportingWindowDoc(doc, options = {}) {
     targetType: 'avenue_reporting_window',
     targetId: reminder.id,
     targetLabel: reminder.targetName,
-    targetAudience: reminder.avenue,
+    targetAudience: reportingWindowAudienceLabel(sendReminder),
     details: `${summary.sent}/${summary.attempted} reporting workflow email recipients sent.`,
     source: 'processAvenueReportingWindowDoc',
     relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
     metadata: {
       reportingWindowId: reminder.id,
+      avenue: reminder.avenue,
+      avenues: reportingWindowAvenuesForReminder(reminder),
+      avenuesLabel: reportingWindowAudienceLabel(reminder),
+      pendingAvenuesLabel: reportingWindowAudienceLabel(sendReminder),
+      ...reportingReminderLogMetadata(reminder, liveCoverage, recipients.length),
       sent: summary.sent,
       failed: summary.failed,
       bodToolsUrl: reminder.bodToolsUrl,
     },
   }, { safe: true });
 
-  return { outcome: 'sent', sent: summary.sent, failed: summary.failed };
+  return { outcome: 'sent', sent: summary.sent, failed: summary.failed, pendingAvenues: sendReminder.pendingAvenues };
 }
 
 async function processReminderDoc(doc) {
@@ -1404,7 +1884,7 @@ const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) =
   const targetName = cleanText(payload.targetName || payload.eventName || payload.name, 180);
   if (!targetName) throw new HttpsError('invalid-argument', 'Event/meeting name is required.');
   const now = admin.firestore.Timestamp.now();
-  const persistedPayload = {
+  const draftPayload = {
     ...payload,
     targetName,
     eventName: targetName,
@@ -1421,8 +1901,18 @@ const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) =
     createdAt: now,
     updatedAt: now,
   };
-  const normalized = normalizeReportingWindowConfig(target.id, persistedPayload);
+  const normalized = normalizeReportingWindowConfig(target.id, draftPayload);
   if (!normalized) throw new HttpsError('invalid-argument', 'Reporting window payload is invalid.');
+  const persistedPayload = {
+    ...draftPayload,
+    avenue: normalized.avenue,
+    avenueLabel: normalized.avenueLabel,
+    avenues: normalized.avenues,
+    avenueLabels: normalized.avenueLabels,
+    avenuesLabel: normalized.avenuesLabel,
+    recipientRole: normalized.recipientRole,
+    recipientPositionKeys: normalized.recipientPositionKeys,
+  };
   await target.set(persistedPayload);
   await writeReminderSystemLog({
     access,
@@ -1430,16 +1920,18 @@ const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) =
     status: 'active',
     targetType: 'avenue_reporting_window',
     targetId: target.id,
-    targetLabel: targetName || payload.avenue,
-    targetAudience: payload.recipientRole || payload.avenue,
+    targetLabel: targetName || normalized.avenue,
+    targetAudience: reportingWindowAudienceLabel(normalized),
     details: 'Reporting window reminder created.',
     source: 'createReportingWindowReminder',
     relatedDocPath: `${REMINDERS_COLLECTION}/${target.id}`,
     metadata: {
-      avenue: payload.avenue,
-      conductedDate: payload.conductedDate,
-      remindersEnabled: payload.remindersEnabled === true,
-      lockEnabled: payload.lockEnabled === true,
+      avenue: normalized.avenue,
+      avenues: normalized.avenues,
+      avenuesLabel: normalized.avenuesLabel,
+      conductedDate: normalized.conductedDate,
+      remindersEnabled: normalized.remindersEnabled === true,
+      lockEnabled: normalized.lockEnabled === true,
     },
   });
 
@@ -1464,15 +1956,43 @@ const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) =
   return { ok: true, reminderId: target.id, initialEmail };
 });
 
+const getBodReportingQueue = onCall(CALLABLE_OPTIONS, async (request) => {
+  await requireBodToolsReportingAccess(request, 'view the BOD reporting queue');
+  const nowMillis = Date.now();
+  const reminderSnap = await db.collection(REMINDERS_COLLECTION).get();
+  const reportingWindows = reminderSnap.docs
+    .map(doc => normalizeReportingWindowConfig(doc.id, doc.data() || {}))
+    .filter(Boolean);
+  const linkedBodEventIds = reportingWindows
+    .filter(reminder => !isSpecialReportingWindow(reminder))
+    .map(queueLinkedBodEventId)
+    .filter(Boolean);
+  const [linkedBodEvents, queueAssignees] = await Promise.all([
+    getFirestoreDocsById('bodEvents', linkedBodEventIds),
+    loadBodReportingQueueAssignees(),
+  ]);
+
+  const items = reportingWindows.reduce((list, reminder) => {
+    const linkedBodEventId = queueLinkedBodEventId(reminder);
+    const eventSnap = linkedBodEventId ? linkedBodEvents.get(linkedBodEventId) : null;
+    const coverage = reportingWindowQueueCoverage(reminder, eventSnap?.exists ? eventSnap.data() || {} : {});
+    if (!shouldIncludeBodReportingQueueItem(reminder, coverage)) return list;
+    const responsibilities = buildBodReportingQueueResponsibilities(reminder.avenues, queueAssignees);
+    list.push(shapeBodReportingQueueItem({
+      reminder,
+      coverage,
+      responsibilities,
+      nowMillis,
+    }));
+    return list;
+  }, []);
+
+  items.sort(compareBodReportingQueueItems);
+  return { ok: true, items };
+});
+
 const getReportingWindowPrefill = onCall(CALLABLE_OPTIONS, async (request) => {
-  const uid = request.auth?.uid || '';
-  if (!uid) throw new HttpsError('unauthenticated', 'Sign in before opening BOD Tools.');
-  const access = await resolveReminderAccess(uid, request.auth?.token || {});
-  const canAccessBodTools = access.isApproved === true
-    && (['bod', 'admin', 'president'].includes(access.storedRole) || access.hasPresidentAuthority === true);
-  if (!canAccessBodTools) {
-    throw new HttpsError('permission-denied', 'Approved BOD Tools access is required.');
-  }
+  await requireBodToolsReportingAccess(request, 'open BOD Tools');
 
   const reportingWindowId = safeDocumentId(request.data?.reportingWindowId || request.data?.reminderId);
   if (!reportingWindowId) throw new HttpsError('invalid-argument', 'Choose a valid reporting window.');
@@ -1487,11 +2007,17 @@ const getReportingWindowPrefill = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const normalizedAvenueKey = normalizeAvenueKey(reminder.avenue);
   const isBodMeetingWindow = normalizedAvenueKey === 'BOD_MEETING';
+  const prefillAvenues = isBodMeetingWindow ? ['BOD'] : reminder.avenues;
+  const prefillAvenueLabels = isBodMeetingWindow ? ['Board of Directors'] : reminder.avenueLabels;
+  const prefillAvenuesLabel = isBodMeetingWindow ? 'Board of Directors' : reminder.avenuesLabel;
   return {
     ok: true,
     reportingWindowId: reminder.id,
     avenue: isBodMeetingWindow ? 'BOD' : reminder.avenue,
-    avenueLabel: isBodMeetingWindow ? 'Board of Directors' : avenueDisplayLabel(reminder.avenue),
+    avenues: prefillAvenues,
+    avenueLabel: isBodMeetingWindow ? 'Board of Directors' : reminder.avenueLabel,
+    avenueLabels: prefillAvenueLabels,
+    avenuesLabel: prefillAvenuesLabel,
     eventName: reminder.targetName,
     name: reminder.targetName,
     conductedDate: reminder.conductedDate,
@@ -1605,12 +2131,14 @@ const markReportingWindowSubmitted = onCall(CALLABLE_OPTIONS, async (request) =>
     targetType: 'avenue_reporting_window',
     targetId: reminder.id,
     targetLabel: reminder.data.targetName || reminder.data.eventName || reminder.data.avenue,
-    targetAudience: reminder.data.avenue,
+    targetAudience: reportingWindowAudienceLabel(reminder.data),
     details: 'Reporting window marked completed.',
     source: 'markReportingWindowSubmitted',
     relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
     metadata: {
       avenue: reminder.data.avenue,
+      avenues: reportingWindowAvenuesForReminder(reminder.data),
+      avenuesLabel: reportingWindowAudienceLabel(reminder.data),
       completionReason: 'report_submitted',
       hasAdminNote: Boolean(adminNote),
     },
@@ -1642,12 +2170,14 @@ const stopReportingWindowReminders = onCall(CALLABLE_OPTIONS, async (request) =>
     targetType: 'avenue_reporting_window',
     targetId: reminder.id,
     targetLabel: reminder.data.targetName || reminder.data.eventName || reminder.data.avenue,
-    targetAudience: reminder.data.avenue,
+    targetAudience: reportingWindowAudienceLabel(reminder.data),
     details: 'Reporting window reminder emails stopped.',
     source: 'stopReportingWindowReminders',
     relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
     metadata: {
       avenue: reminder.data.avenue,
+      avenues: reportingWindowAvenuesForReminder(reminder.data),
+      avenuesLabel: reportingWindowAudienceLabel(reminder.data),
       stoppedReason: 'reminders_disabled',
       hasAdminNote: Boolean(adminNote),
     },
@@ -1676,12 +2206,14 @@ const updateReportingWindowAdminNote = onCall(CALLABLE_OPTIONS, async (request) 
     targetType: 'avenue_reporting_window',
     targetId: reminder.id,
     targetLabel: reminder.data.targetName || reminder.data.eventName || reminder.data.avenue,
-    targetAudience: reminder.data.avenue,
+    targetAudience: reportingWindowAudienceLabel(reminder.data),
     details: 'Reporting window admin note updated.',
     source: 'updateReportingWindowAdminNote',
     relatedDocPath: `${REMINDERS_COLLECTION}/${reminder.id}`,
     metadata: {
       avenue: reminder.data.avenue,
+      avenues: reportingWindowAvenuesForReminder(reminder.data),
+      avenuesLabel: reportingWindowAudienceLabel(reminder.data),
       hasAdminNote: Boolean(adminNote),
     },
   });
@@ -1842,12 +2374,14 @@ const unlockAvenueReportingWindow = onCall(CALLABLE_OPTIONS, async (request) => 
     targetType: 'avenue_reporting_window',
     targetId: reminder.id,
     targetLabel: reminder.targetName || reminder.eventName || reminder.avenue,
-    targetAudience: reminder.avenue,
+    targetAudience: reportingWindowAudienceLabel(reminder),
     details: unlockReason,
     source: 'unlockAvenueReportingWindow',
     relatedDocPath: `locks/${lockId}`,
     metadata: {
       avenue: reminder.avenue,
+      avenues: reportingWindowAvenuesForReminder(reminder),
+      avenuesLabel: reportingWindowAudienceLabel(reminder),
       reportingWindowId: reminder.id,
       unlockReason,
     },
@@ -1872,6 +2406,7 @@ const runReminderEmailSweep = onCall(CALLABLE_OPTIONS, async (request) => {
 
 module.exports = {
   createReportingWindowReminder,
+  getBodReportingQueue,
   getReportingWindowPrefill,
   upsertEventReminderConfig,
   stopEventReminderConfig,
@@ -1892,5 +2427,10 @@ module.exports = {
   hasAvenueReportSubmission,
   hasAttendanceSubmission,
   findReportingWindowBodEventMatch,
+  buildBodReportingQueueResponsibilities,
+  compareBodReportingQueueItems,
+  reportingWindowQueueCoverage,
+  shapeBodReportingQueueItem,
+  shouldIncludeBodReportingQueueItem,
   bodToolsPrefillUrl,
 };

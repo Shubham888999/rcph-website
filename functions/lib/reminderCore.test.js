@@ -10,6 +10,13 @@ const {
   hasMomMetadata,
   normalizedNameSimilarity,
   attendanceValueIsMarked,
+  normalizeReportingAvenues,
+  reportingAvenuesLabel,
+  reportingWindowRecipientPositionKeys,
+  evaluateReportingWindowAvenueCoverage,
+  reportingReminderPendingAvenues,
+  reportingReminderAudienceConfig,
+  withReportingReminderPendingAudience,
   avenueRecipientPositionKeys,
   avenueRecipientRole,
   reminderRecipientMatchesRole,
@@ -113,6 +120,9 @@ test('avenue reporting windows normalize aliases and runtime states', () => {
   assert.equal(config.targetType, 'avenue_reporting_window');
   assert.equal(config.source, 'reminders');
   assert.equal(config.avenue, 'CWD');
+  assert.deepEqual(config.avenues, ['CWD']);
+  assert.deepEqual(config.avenueLabels, ['CWD']);
+  assert.equal(config.avenuesLabel, 'CWD');
   assert.equal(config.recipientRole, 'avenue_director');
   assert.deepEqual(config.recipientPositionKeys, ['cwd', 'co-cwd']);
   assert.equal(config.reportingOpensAt, '2026-07-14T18:30:00.000Z');
@@ -122,6 +132,249 @@ test('avenue reporting windows normalize aliases and runtime states', () => {
   assert.equal(reportingWindowRuntimeState(config, Date.parse('2026-07-14T18:30:00.000Z')), 'open');
   assert.equal(reportingWindowRuntimeState({ ...config, remindersSent: 1 }, Date.parse('2026-07-15T18:30:00.000Z')), 'active');
   assert.equal(reportingWindowRuntimeState(config, Date.parse('2026-07-17T18:30:00.000Z')), 'lock_due');
+});
+
+test('multi-avenue reporting windows normalize arrays, aliases, and recipient unions', () => {
+  const config = normalizeReportingWindowConfig('window-multi', {
+    recordType: 'avenue_reporting_window',
+    avenues: ['International Service', 'RRRO', 'ISD'],
+    targetName: 'Joint Fellowship Project',
+    conductedDate: '2026-07-14',
+    reportingOpensAt: new Date('2026-07-14T18:30:00.000Z'),
+    reportingDueAt: new Date('2026-07-17T18:29:00.000Z'),
+    lockAt: new Date('2026-07-17T18:30:00.000Z'),
+  });
+
+  assert.equal(config.avenue, 'ISD');
+  assert.deepEqual(config.avenues, ['ISD', 'RRRO']);
+  assert.deepEqual(config.avenueLabels, ['International Service', 'Rotary-Rotaract Relations']);
+  assert.equal(config.avenuesLabel, 'ISD + RRRO');
+  assert.equal(config.recipientRole, 'avenue_director');
+  assert.deepEqual(config.recipientPositionKeys, ['isd', 'co-isd', 'rrro', 'co-rrro']);
+  assert.deepEqual(normalizeReportingAvenues(['Club Service', 'CSD', 'bad']), ['CSD']);
+  assert.equal(reportingAvenuesLabel(['ISD', 'RRRO']), 'ISD + RRRO');
+  assert.deepEqual(reportingWindowRecipientPositionKeys(['ISD', 'RRRO']), ['isd', 'co-isd', 'rrro', 'co-rrro']);
+});
+
+test('reporting window avenue arrays reject empty selections and exclusive meeting conflicts', () => {
+  const base = {
+    recordType: 'avenue_reporting_window',
+    avenue: 'CWD',
+    targetName: 'Website Launch',
+    conductedDate: '2026-07-14',
+    reportingOpensAt: new Date('2026-07-14T18:30:00.000Z'),
+    reportingDueAt: new Date('2026-07-17T18:29:00.000Z'),
+    lockAt: new Date('2026-07-17T18:30:00.000Z'),
+  };
+
+  assert.equal(normalizeReportingWindowConfig('empty-array', { ...base, avenues: [] }), null);
+  assert.equal(normalizeReportingWindowConfig('invalid-array', { ...base, avenues: ['bad'] }), null);
+  assert.equal(normalizeReportingWindowConfig('gbm-conflict', { ...base, avenues: ['GBM', 'ISD'] }), null);
+  assert.equal(normalizeReportingWindowConfig('bod-conflict', { ...base, avenues: ['BOD Meeting', 'RRRO'] }), null);
+
+  const gbm = normalizeReportingWindowConfig('gbm', { ...base, avenues: ['General Body Meeting'] });
+  assert.equal(gbm.avenue, 'GBM');
+  assert.deepEqual(gbm.avenues, ['GBM']);
+  assert.equal(gbm.recipientRole, 'secretary');
+
+  const bod = normalizeReportingWindowConfig('bod', { ...base, avenues: ['BOD Meeting'] });
+  assert.equal(bod.avenue, 'BOD_MEETING');
+  assert.deepEqual(bod.avenues, ['BOD_MEETING']);
+  assert.equal(bod.recipientRole, 'secretary');
+});
+
+test('reporting window coverage is pending with no event data', () => {
+  const coverage = evaluateReportingWindowAvenueCoverage({ avenues: ['ISD', 'RRRO'] }, null);
+
+  assert.deepEqual(coverage.requiredAvenues, ['ISD', 'RRRO']);
+  assert.deepEqual(coverage.avenueStatuses, {
+    ISD: 'missing_avenue',
+    RRRO: 'missing_avenue',
+  });
+  assert.deepEqual(coverage.reportedAvenues, []);
+  assert.deepEqual(coverage.pendingAvenues, ['ISD', 'RRRO']);
+  assert.deepEqual(coverage.missingAvenues, ['ISD', 'RRRO']);
+  assert.deepEqual(coverage.missingDescriptionAvenues, []);
+  assert.equal(coverage.reportedCount, 0);
+  assert.equal(coverage.totalAvenues, 2);
+  assert.equal(coverage.status, 'pending');
+  assert.equal(coverage.complete, false);
+});
+
+test('reporting window coverage detects reported and missing avenues independently', () => {
+  const coverage = evaluateReportingWindowAvenueCoverage(
+    { avenues: ['ISD', 'RRRO'] },
+    {
+      avenues: ['ISD'],
+      avenueDescriptions: { ISD: 'ISD report' },
+    },
+  );
+
+  assert.deepEqual(coverage.avenueStatuses, {
+    ISD: 'reported',
+    RRRO: 'missing_avenue',
+  });
+  assert.deepEqual(coverage.reportedAvenues, ['ISD']);
+  assert.deepEqual(coverage.pendingAvenues, ['RRRO']);
+  assert.deepEqual(coverage.missingAvenues, ['RRRO']);
+  assert.deepEqual(coverage.missingDescriptionAvenues, []);
+  assert.equal(coverage.reportedCount, 1);
+  assert.equal(coverage.totalAvenues, 2);
+  assert.equal(coverage.status, 'partial');
+  assert.equal(coverage.complete, false);
+});
+
+test('reporting window coverage requires avenue-specific descriptions', () => {
+  const coverage = evaluateReportingWindowAvenueCoverage(
+    { avenues: ['ISD', 'RRRO'] },
+    {
+      avenues: ['ISD', 'RRRO'],
+      description: 'General report must not count',
+      desc: 'General report must not count',
+      avenueDescriptions: { ISD: 'ISD report' },
+    },
+  );
+
+  assert.deepEqual(coverage.avenueStatuses, {
+    ISD: 'reported',
+    RRRO: 'missing_description',
+  });
+  assert.deepEqual(coverage.reportedAvenues, ['ISD']);
+  assert.deepEqual(coverage.pendingAvenues, ['RRRO']);
+  assert.deepEqual(coverage.missingAvenues, []);
+  assert.deepEqual(coverage.missingDescriptionAvenues, ['RRRO']);
+  assert.equal(coverage.status, 'partial');
+  assert.equal(coverage.complete, false);
+});
+
+test('reporting reminder pending audience filters reported avenues from live coverage', () => {
+  const reminder = { avenues: ['ISD', 'RRRO', 'CMD'], avenue: 'ISD' };
+  const coverage = evaluateReportingWindowAvenueCoverage(reminder, {
+    avenues: ['ISD', 'RRRO'],
+    avenueDescriptions: { ISD: 'ISD report' },
+  });
+
+  assert.deepEqual(reportingReminderPendingAvenues(reminder, coverage), ['RRRO', 'CMD']);
+  assert.deepEqual(reportingReminderAudienceConfig(reminder, coverage), {
+    requiredAvenues: ['ISD', 'RRRO', 'CMD'],
+    reportedAvenues: ['ISD'],
+    pendingAvenues: ['RRRO', 'CMD'],
+    pendingAvenueCount: 2,
+    pendingAvenuesLabel: 'RRRO + CMD',
+    pendingAvenueStatuses: {
+      RRRO: 'missing_description',
+      CMD: 'missing_avenue',
+    },
+    complete: false,
+  });
+});
+
+test('reporting reminder send envelope uses only pending avenues for subject and body', () => {
+  const reminder = {
+    reminderType: 'avenue_reporting',
+    recipientRole: 'avenue_director',
+    targetName: 'Joint Fellowship Project',
+    conductedDate: '2026-07-14',
+    reportingDueAt: new Date('2026-07-17T18:29:00.000Z'),
+    avenue: 'ISD',
+    avenues: ['ISD', 'RRRO'],
+    avenuesLabel: 'ISD + RRRO',
+    bodToolsUrl: 'https://example.test/bod-tools?reportingWindowId=rw1',
+  };
+  const coverage = evaluateReportingWindowAvenueCoverage(reminder, {
+    avenues: ['ISD', 'RRRO'],
+    avenueDescriptions: { ISD: 'ISD report' },
+  });
+  const email = buildReminderEmail({
+    reminder: withReportingReminderPendingAudience(reminder, coverage),
+    recipient: { name: 'Meera' },
+  });
+
+  assert.equal(email.subject, 'Avenue Reporting Window Open: RRRO - Joint Fellowship Project');
+  assert.match(email.text, /The RRRO report for "Joint Fellowship Project" is still pending/);
+  assert.match(email.text, /- RRRO - report description pending/);
+  assert.doesNotMatch(email.subject, /ISD/);
+  assert.doesNotMatch(email.text, /ISD \+ RRRO reports/);
+});
+
+test('reporting window coverage completes when every required avenue has a specific description', () => {
+  const coverage = evaluateReportingWindowAvenueCoverage(
+    { avenues: ['ISD', 'RRRO'] },
+    {
+      avenues: ['ISD', 'RRRO'],
+      avenueDescriptions: {
+        ISD: 'ISD report',
+        RRRO: 'RRRO report',
+      },
+    },
+  );
+
+  assert.deepEqual(coverage.avenueStatuses, {
+    ISD: 'reported',
+    RRRO: 'reported',
+  });
+  assert.deepEqual(coverage.reportedAvenues, ['ISD', 'RRRO']);
+  assert.deepEqual(coverage.pendingAvenues, []);
+  assert.equal(coverage.reportedCount, 2);
+  assert.equal(coverage.totalAvenues, 2);
+  assert.equal(coverage.status, 'complete');
+  assert.equal(coverage.complete, true);
+});
+
+test('reporting window coverage ignores extra event avenues and whitespace descriptions', () => {
+  const coverage = evaluateReportingWindowAvenueCoverage(
+    { avenues: ['ISD', 'RRRO'] },
+    {
+      avenues: ['ISD', 'RRRO', 'CMD'],
+      avenueDescriptions: {
+        ISD: 'ISD report',
+        RRRO: '   ',
+        CMD: 'Extra report',
+      },
+    },
+  );
+
+  assert.deepEqual(coverage.requiredAvenues, ['ISD', 'RRRO']);
+  assert.deepEqual(coverage.avenueStatuses, {
+    ISD: 'reported',
+    RRRO: 'missing_description',
+  });
+  assert.deepEqual(coverage.reportedAvenues, ['ISD']);
+  assert.deepEqual(coverage.missingDescriptionAvenues, ['RRRO']);
+  assert.equal(coverage.status, 'partial');
+});
+
+test('reporting window coverage supports legacy avenue, aliases, and immutable inputs', () => {
+  const reportingWindow = { avenue: 'Club Service' };
+  const event = {
+    avenues: ['csd'],
+    avenueDescriptions: { csd: 'Club Service report' },
+    description: 'General report',
+  };
+  const reportingWindowBefore = JSON.stringify(reportingWindow);
+  const eventBefore = JSON.stringify(event);
+
+  const coverage = evaluateReportingWindowAvenueCoverage(reportingWindow, event);
+
+  assert.deepEqual(coverage.requiredAvenues, ['CSD']);
+  assert.deepEqual(coverage.avenueStatuses, { CSD: 'reported' });
+  assert.equal(coverage.status, 'complete');
+  assert.equal(coverage.complete, true);
+  assert.equal(JSON.stringify(reportingWindow), reportingWindowBefore);
+  assert.equal(JSON.stringify(event), eventBefore);
+});
+
+test('reporting window coverage never treats an empty required list as complete', () => {
+  const coverage = evaluateReportingWindowAvenueCoverage({}, {
+    avenues: ['ISD'],
+    avenueDescriptions: { ISD: 'ISD report' },
+  });
+
+  assert.deepEqual(coverage.requiredAvenues, []);
+  assert.equal(coverage.reportedCount, 0);
+  assert.equal(coverage.totalAvenues, 0);
+  assert.equal(coverage.status, 'pending');
+  assert.equal(coverage.complete, false);
 });
 
 test('avenue recipient mapping covers director, secretary, sports, and finance targets', () => {
@@ -165,6 +418,27 @@ test('avenue reporting email uses formal deadline wording', () => {
   assert.match(email.html, /Open prefilled BOD Tools form/);
   assert.match(email.text, /portal will automatically close/);
   assert.match(email.html, /Rotaract Club of Pune Heritage/);
+});
+
+test('multi-avenue reporting email uses combined code label and deduped grammar', () => {
+  const email = buildReminderEmail({
+    reminder: {
+      reminderType: 'avenue_reporting',
+      recipientRole: 'avenue_director',
+      avenue: 'ISD',
+      avenues: ['ISD', 'RRRO'],
+      avenuesLabel: 'ISD + RRRO',
+      targetName: 'Joint Fellowship Project',
+      conductedDate: '2026-07-14',
+      reportingDueAt: '2026-07-17T18:29:00.000Z',
+      bodToolsUrl: 'https://www.rcph3131.org/bod-tools?reportingWindowId=window-multi',
+    },
+    recipient: { name: 'Dev' },
+  });
+
+  assert.equal(email.subject, 'Avenue Reporting Window Open: ISD + RRRO - Joint Fellowship Project');
+  assert.match(email.text, /The reporting window for the ISD \+ RRRO event, "Joint Fellowship Project"/);
+  assert.match(email.html, /ISD \+ RRRO/);
 });
 
 test('GBM and BOD Meeting workflow reminders include the exact BOD Tools warning', () => {
@@ -220,6 +494,9 @@ test('avenue reporting lock payload uses deterministic lock records', () => {
     id: 'window/1',
     avenue: 'CWD',
     avenueLabel: 'CWD',
+    avenues: ['CWD'],
+    avenueLabels: ['CWD'],
+    avenuesLabel: 'CWD',
     targetName: 'Website Launch',
     conductedDate: '2026-07-14',
     reportingDueAt: '2026-07-17T18:29:00.000Z',
@@ -229,6 +506,9 @@ test('avenue reporting lock payload uses deterministic lock records', () => {
   assert.equal(payload.type, 'avenue_reporting');
   assert.equal(payload.locked, true);
   assert.equal(payload.status, 'active');
+  assert.deepEqual(payload.avenues, ['CWD']);
+  assert.deepEqual(payload.avenueLabels, ['CWD']);
+  assert.equal(payload.avenuesLabel, 'CWD');
   assert.equal(payload.reason, 'reporting_window_expired');
   assert.equal(payload.reportingWindowId, 'window/1');
   assert.equal(payload.lockedBySystem, true);

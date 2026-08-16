@@ -834,9 +834,12 @@ async function derivedAvenueLockNotices(db, avenueReportingLocks) {
   const allTargetUids = new Set();
   const targetsByLock = new Map();
   locks.forEach((lock) => {
-    const allowed = new Set(avenueReportingLocks.recipientPositionKeysForAvenue(lock.avenue));
+    const lockAvenues = Array.isArray(lock.avenues) && lock.avenues.length ? lock.avenues : [lock.avenue].filter(Boolean);
+    const allowed = new Set(avenueReportingLocks.recipientPositionKeysForAvenues
+      ? avenueReportingLocks.recipientPositionKeysForAvenues(lockAvenues)
+      : avenueReportingLocks.recipientPositionKeysForAvenue(lock.avenue));
     const assignments = assignmentsForAvenue(assignmentDocs, allowed);
-    targetsByLock.set(lock.lockId, { allowed: Array.from(allowed), assignments });
+    targetsByLock.set(lock.lockId, { allowed: Array.from(allowed), assignments, lockAvenues });
     assignments.forEach(assignment => {
       const uid = cleanText(assignment.uid, 160);
       if (uid) allTargetUids.add(uid);
@@ -858,14 +861,16 @@ async function derivedAvenueLockNotices(db, avenueReportingLocks) {
     const targetAudience = visibleFor.length
       ? visibleFor.map(item => item.name).filter(Boolean).join(', ')
       : `Positions: ${targetInfo.allowed.join(', ') || lock.avenue}`;
+    const lockAvenues = targetInfo.lockAvenues?.length ? targetInfo.lockAvenues : [lock.avenue].filter(Boolean);
+    const avenuesLabel = cleanText(lock.avenuesLabel, 160) || lockAvenues.join(' + ') || lock.avenue;
     return {
       id: `derived:reportingWindowLock:${lock.lockId}`,
       persisted: false,
       derived: true,
       source: 'reportingWindowLock',
       category: 'dashboard_notice',
-      title: `${lock.avenue} reporting window locked`,
-      body: avenueReportingLocks.reportingWindowLockDashboardMessage([lock.avenue]),
+      title: `${avenuesLabel} reporting window locked`,
+      body: avenueReportingLocks.reportingWindowLockDashboardMessage(lockAvenues),
       priority: 'urgent',
       status: 'active',
       active: true,
@@ -876,7 +881,10 @@ async function derivedAvenueLockNotices(db, avenueReportingLocks) {
       visibleFor,
       deliverySummary: null,
       lockedAvenue: lock.avenue,
+      lockedAvenues: lockAvenues,
       avenueLabel: lock.avenueLabel,
+      avenueLabels: lock.avenueLabels || [],
+      avenuesLabel,
       reportingWindowId: lock.reportingWindowId,
       lockReason: lock.reason,
       targetLabel: lock.targetName,
@@ -900,21 +908,25 @@ async function derivedAvenueReportingWindowNotices(db, avenueReportingLocks) {
   if (!windows.length) return [];
 
   return Promise.all(windows.map(async (window) => {
-    const allowed = new Set(avenueReportingLocks.recipientPositionKeysForAvenue(window.avenue));
+    const windowAvenues = Array.isArray(window.avenues) && window.avenues.length ? window.avenues : [window.avenue].filter(Boolean);
+    const allowed = new Set(avenueReportingLocks.recipientPositionKeysForAvenues
+      ? avenueReportingLocks.recipientPositionKeysForAvenues(windowAvenues)
+      : avenueReportingLocks.recipientPositionKeysForAvenue(window.avenue));
     const assignments = assignmentsForAvenue(assignmentDocs, allowed);
     const visibleFor = await visibleUsersForAssignments(db, assignments);
     const targetAudience = visibleFor.length
       ? visibleFor.map(item => item.name).filter(Boolean).join(', ')
       : `Positions: ${Array.from(allowed).join(', ') || window.avenue}`;
     const dueAt = window.reportingDueAt || window.reportDueAt;
+    const avenuesLabel = cleanText(window.avenuesLabel, 160) || windowAvenues.join(' + ') || window.avenue;
     return {
       id: `derived:reportingWindowOpen:${window.id}`,
       persisted: false,
       derived: true,
       source: 'reportingWindowOpen',
       category: 'dashboard_notice',
-      title: `${window.avenue} reporting window open`,
-      body: avenueReportingLocks.reportingWindowOpenDashboardMessage(window.avenue, dueAt),
+      title: `${avenuesLabel} reporting window open`,
+      body: avenueReportingLocks.reportingWindowOpenDashboardMessage(avenuesLabel, dueAt),
       priority: 'important',
       status: 'active',
       active: true,
@@ -925,7 +937,10 @@ async function derivedAvenueReportingWindowNotices(db, avenueReportingLocks) {
       visibleFor,
       deliverySummary: null,
       openAvenue: window.avenue,
+      openAvenues: windowAvenues,
       avenueLabel: window.avenueLabel,
+      avenueLabels: window.avenueLabels || [],
+      avenuesLabel,
       reportingWindowId: window.id,
       targetLabel: window.targetName,
       conductedDate: window.conductedDate,

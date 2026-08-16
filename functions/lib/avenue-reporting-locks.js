@@ -4,8 +4,11 @@ const {
   AVENUE_REPORTING_LOCK_REASON,
   AVENUE_REPORTING_LOCK_TYPE,
   normalizeAvenueKey,
+  normalizeReportingAvenues,
+  reportingAvenuesLabel,
   avenueDisplayLabel,
   avenueRecipientPositionKeys,
+  reportingWindowRecipientPositionKeys,
   normalizeReportingWindowConfig,
   reportingWindowRuntimeState,
 } = require('./reminderCore');
@@ -60,8 +63,9 @@ function normalizeReminderDoc(doc) {
   const data = docData(doc);
   const recordType = cleanText(data.recordType || data.type, 80);
   if (recordType !== 'avenue_reporting_window') return null;
-  const avenue = normalizeAvenueKey(data.avenue);
-  if (!avenue) return null;
+  const avenues = normalizeReportingAvenues(Array.isArray(data.avenues) && data.avenues.length ? data.avenues : data.avenue);
+  if (!avenues.length) return null;
+  const avenue = avenues[0];
   const id = docId(doc);
   const lockId = cleanText(data.lockId, 180)
     || `avenueReporting_${safeAnnouncementIdSegment(id)}`;
@@ -70,6 +74,9 @@ function normalizeReminderDoc(doc) {
     lockId,
     avenue,
     avenueLabel: avenueDisplayLabel(avenue),
+    avenues,
+    avenueLabels: Array.isArray(data.avenueLabels) && data.avenueLabels.length ? data.avenueLabels.map(label => cleanText(label, 120)).filter(Boolean) : avenues.map(avenueDisplayLabel),
+    avenuesLabel: cleanText(data.avenuesLabel, 160) || reportingAvenuesLabel(avenues),
     targetName: cleanText(data.targetName || data.eventName || data.name, 180),
     conductedDate: cleanText(data.conductedDate || data.eventConductedDate || data.targetDate, 40),
     reportingDueAt: data.reportingDueAt || data.reportDueAt || null,
@@ -84,14 +91,18 @@ function normalizeActiveAvenueReportingLockDoc(doc) {
   if (cleanLower(data.status, 40) !== 'active') return null;
   const reason = cleanText(data.reason, 160);
   if (reason && reason !== AVENUE_REPORTING_LOCK_REASON) return null;
-  const avenue = normalizeAvenueKey(data.avenue);
-  if (!avenue) return null;
+  const avenues = normalizeReportingAvenues(Array.isArray(data.avenues) && data.avenues.length ? data.avenues : data.avenue);
+  if (!avenues.length) return null;
+  const avenue = avenues[0];
 
   return {
     lockId: id,
     id,
     avenue,
     avenueLabel: cleanText(data.avenueLabel, 120) || avenueDisplayLabel(avenue),
+    avenues,
+    avenueLabels: Array.isArray(data.avenueLabels) && data.avenueLabels.length ? data.avenueLabels.map(label => cleanText(label, 120)).filter(Boolean) : avenues.map(avenueDisplayLabel),
+    avenuesLabel: cleanText(data.avenuesLabel, 160) || reportingAvenuesLabel(avenues),
     reportingWindowId: cleanText(data.reportingWindowId || data.reminderId, 180),
     reminderId: cleanText(data.reminderId || data.reportingWindowId, 180),
     targetName: cleanText(data.targetName || data.eventName || data.name, 180),
@@ -120,11 +131,15 @@ function normalizeActiveAvenueReportingLocks({ lockDocs = [], reminderDocs = [] 
       || reminders.get(lock.lockId)
       || null;
     const reportingWindowId = lock.reportingWindowId || reminder?.id || lock.reminderId || '';
+    const avenues = lock.avenues?.length ? lock.avenues : (reminder?.avenues?.length ? reminder.avenues : [lock.avenue].filter(Boolean));
     const enriched = {
       ...lock,
       reportingWindowId,
       reminderId: lock.reminderId || reportingWindowId,
       avenueLabel: lock.avenueLabel || reminder?.avenueLabel || avenueDisplayLabel(lock.avenue),
+      avenues,
+      avenueLabels: lock.avenueLabels?.length ? lock.avenueLabels : (reminder?.avenueLabels?.length ? reminder.avenueLabels : avenues.map(avenueDisplayLabel)),
+      avenuesLabel: lock.avenuesLabel || reminder?.avenuesLabel || reportingAvenuesLabel(avenues),
       targetName: lock.targetName || reminder?.targetName || '',
       conductedDate: lock.conductedDate || reminder?.conductedDate || '',
       dueAt: lock.dueAt || reminder?.reportingDueAt || null,
@@ -154,7 +169,7 @@ function normalizeOpenAvenueReportingWindows({ reminderDocs = [], now = new Date
   }
 
   return Array.from(byId.values())
-    .sort((a, b) => String(a.avenue).localeCompare(String(b.avenue))
+    .sort((a, b) => String(a.avenuesLabel || a.avenue).localeCompare(String(b.avenuesLabel || b.avenue))
       || (timestampToMillis(a.reportingDueAt) - timestampToMillis(b.reportingDueAt))
       || String(a.id).localeCompare(String(b.id)));
 }
@@ -204,7 +219,7 @@ function reportingWindowOpenDashboardMessage(avenue, dueAt) {
 function lockedBodAvenuesForPayload(avenues, locks = []) {
   const selected = bodEventSchema.normalizeBodAvenues(avenues);
   const lockedCodes = new Set((Array.isArray(locks) ? locks : [])
-    .map(lock => normalizeAvenueKey(lock?.avenue))
+    .flatMap(lock => normalizeReportingAvenues(Array.isArray(lock?.avenues) && lock.avenues.length ? lock.avenues : lock?.avenue))
     .filter(code => BOD_AVENUE_CODE_SET.has(code)));
   return selected.filter(code => lockedCodes.has(code));
 }
@@ -237,9 +252,17 @@ function recipientPositionKeysForAvenue(avenue) {
   return [];
 }
 
+function recipientPositionKeysForAvenues(avenues = []) {
+  const normalized = normalizeReportingAvenues(avenues);
+  const direct = reportingWindowRecipientPositionKeys(normalized);
+  if (direct.length) return direct;
+  if (normalized.some(key => key === 'GBM' || key === 'BOD_MEETING')) return Array.from(SECRETARY_POSITION_KEYS);
+  return [];
+}
+
 function positionMatchesLock(positionKeys, lock) {
   const userKeys = new Set(positionKeys);
-  return recipientPositionKeysForAvenue(lock?.avenue).some(key => userKeys.has(key));
+  return recipientPositionKeysForAvenues(Array.isArray(lock?.avenues) && lock.avenues.length ? lock.avenues : lock?.avenue).some(key => userKeys.has(key));
 }
 
 function buildReportingWindowLockDashboardNotice({ locks = [], positionKeys = [], positionHelpers = defaultPositionHelpers, now = new Date() } = {}) {
@@ -252,8 +275,10 @@ function buildReportingWindowLockDashboardNotice({ locks = [], positionKeys = []
   const lockedAvenues = [];
   const lockedWindowIds = [];
   for (const lock of relevantLocks) {
-    const avenue = normalizeAvenueKey(lock.avenue);
-    if (avenue && !lockedAvenues.includes(avenue)) lockedAvenues.push(avenue);
+    normalizeReportingAvenues(Array.isArray(lock.avenues) && lock.avenues.length ? lock.avenues : lock.avenue)
+      .forEach((avenue) => {
+        if (avenue && !lockedAvenues.includes(avenue)) lockedAvenues.push(avenue);
+      });
     const windowId = cleanText(lock.reportingWindowId || lock.reminderId || lock.lockId, 180);
     if (windowId && !lockedWindowIds.includes(windowId)) lockedWindowIds.push(windowId);
   }
@@ -273,6 +298,7 @@ function buildReportingWindowLockDashboardNotice({ locks = [], positionKeys = []
     read: true,
     dismissible: false,
     lockedAvenues,
+    avenuesLabel: reportingAvenuesLabel(lockedAvenues),
     reportingWindowIds: lockedWindowIds,
   };
 }
@@ -285,22 +311,28 @@ function buildReportingWindowOpenDashboardNotices({ windows = [], reminderDocs =
     : normalizeOpenAvenueReportingWindows({ reminderDocs, now });
 
   return candidates
-    .filter(window => recipientPositionKeysForAvenue(window?.avenue).some(key => userKeys.includes(key)))
+    .filter(window => recipientPositionKeysForAvenues(Array.isArray(window?.avenues) && window.avenues.length ? window.avenues : window?.avenue).some(key => userKeys.includes(key)))
     .map((window) => {
-      const avenue = normalizeAvenueKey(window.avenue) || cleanText(window.avenue, 40);
+      const avenues = normalizeReportingAvenues(Array.isArray(window.avenues) && window.avenues.length ? window.avenues : window.avenue);
+      const avenue = avenues[0] || normalizeAvenueKey(window.avenue) || cleanText(window.avenue, 40);
+      const avenuesLabel = cleanText(window.avenuesLabel, 160) || reportingAvenuesLabel(avenues) || avenue;
       const dueAt = window.reportingDueAt || window.reportDueAt;
       const lockAt = window.lockAt || dueAt;
       return {
         id: `reportingWindowOpen_${safeAnnouncementIdSegment(window.id || `${avenue}_${window.targetName}`)}`,
         source: 'reportingWindowOpen',
-        title: `${avenue} reporting window open`,
-        body: reportingWindowOpenDashboardMessage(avenue, dueAt),
+        title: `${avenuesLabel} reporting window open`,
+        body: reportingWindowOpenDashboardMessage(avenuesLabel, dueAt),
         priority: 'important',
         publishedAt: timestampToIso(window.reportingOpensAt || now) || new Date().toISOString(),
         expiresAt: timestampToIso(lockAt),
         read: true,
         dismissible: false,
         openAvenue: avenue,
+        openAvenues: avenues,
+        avenueLabel: window.avenueLabel || avenueDisplayLabel(avenue),
+        avenueLabels: Array.isArray(window.avenueLabels) && window.avenueLabels.length ? window.avenueLabels : avenues.map(avenueDisplayLabel),
+        avenuesLabel,
         reportingWindowId: window.id,
         reportingWindowIds: window.id ? [window.id] : [],
         dueAt: timestampToIso(dueAt),
@@ -320,6 +352,7 @@ module.exports = {
   reportingWindowOpenDashboardMessage,
   assertBodEventAvenuesUnlocked,
   recipientPositionKeysForAvenue,
+  recipientPositionKeysForAvenues,
   buildReportingWindowLockDashboardNotice,
   buildReportingWindowOpenDashboardNotices,
 };

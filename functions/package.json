@@ -5,6 +5,7 @@
     "test:profile-updates": "node scripts/verify-profile-updates.js",
     "test:profile-removal": "node scripts/verify-profile-removal-preview.js",
     "test:district-official-signup": "node scripts/verify-district-official-signup.js",
+    "test:firestore-emulator": "npx --yes firebase-tools emulators:exec --only firestore \"node scripts/firestore-emulator-security-test.js\"",
     "test:admin-access": "node scripts/verify-admin-lock-resolution-access.js",
     "test:resolutions": "node scripts/verify-resolutions.js",
     "test:announcement-attachments": "node scripts/verify-announcement-attachments.js",
@@ -22,5 +23,9 @@
     "googleapis": "^144.0.0",
     "nodemailer": "^7.0.13",
     "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.17.0"
   }
 }

@@ -1,6 +1,6 @@
 'use strict';
 
-const BOD_AVENUE_CODES = Object.freeze(['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI', 'GBM']);
+const BOD_AVENUE_CODES = Object.freeze(['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI', 'CWD', 'SPORTS', 'FINANCE', 'GBM']);
 const BOD_AVENUE_CODE_SET = new Set(BOD_AVENUE_CODES);
 const RESERVED_DESCRIPTION_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const BOD_EVENT_DESCRIPTION_MAX = 2500;
@@ -119,20 +119,33 @@ function normalizeEventDescription(raw = {}) {
   return normalizeText(value, BOD_EVENT_DESCRIPTION_MAX, 'description');
 }
 
-function normalizeAvenueDescriptions({ avenues, avenueDescriptions, fallbackDescription = '' } = {}) {
+function normalizeAllowedMissingAvenues(value = [], selectedSet = null) {
+  const allowed = normalizeBodAvenues(value).filter(code => code !== 'GBM');
+  return new Set(selectedSet ? allowed.filter(code => selectedSet.has(code)) : allowed);
+}
+
+function normalizeAvenueDescriptions({
+  avenues,
+  avenueDescriptions,
+  fallbackDescription = '',
+  allowedMissingAvenues = [],
+} = {}) {
   const selected = normalizeBodAvenues(avenues);
   if (!selected.length) throw new BodEventSchemaError('Select at least one avenue.', { fieldName: 'avenues' });
+  const selectedSet = new Set(selected);
+  const allowedMissing = normalizeAllowedMissingAvenues(allowedMissingAvenues, selectedSet);
 
   if (avenueDescriptions === undefined || avenueDescriptions === null) {
+    const requiredFromFallback = selected.filter(code => !allowedMissing.has(code));
+    if (!requiredFromFallback.length) return {};
     const fallback = normalizeText(fallbackDescription, BOD_EVENT_DESCRIPTION_MAX, 'description', { required: true });
-    return Object.fromEntries(selected.map(code => [code, fallback]));
+    return Object.fromEntries(requiredFromFallback.map(code => [code, fallback]));
   }
 
   if (!isPlainObject(avenueDescriptions)) {
     throw new BodEventSchemaError('avenueDescriptions must be a plain object.', { fieldName: 'avenueDescriptions' });
   }
 
-  const selectedSet = new Set(selected);
   const seen = new Set();
   for (const key of Object.keys(avenueDescriptions)) {
     if (RESERVED_DESCRIPTION_KEYS.has(key)) {
@@ -151,17 +164,23 @@ function normalizeAvenueDescriptions({ avenues, avenueDescriptions, fallbackDesc
   const normalized = {};
   for (const code of selected) {
     if (!seen.has(code)) {
+      if (allowedMissing.has(code)) continue;
       throw new BodEventSchemaError('Description is required for ' + code + '.', { fieldName: 'avenueDescriptions', key: code });
     }
-    normalized[code] = normalizeText(avenueDescriptions[code], BOD_EVENT_DESCRIPTION_MAX, 'avenueDescriptions.' + code, { required: true });
+    const description = normalizeText(avenueDescriptions[code], BOD_EVENT_DESCRIPTION_MAX, 'avenueDescriptions.' + code, { required: !allowedMissing.has(code) });
+    if (description || allowedMissing.has(code)) normalized[code] = description;
   }
   return normalized;
 }
 
-function validateAvenueDescriptionCoverage(avenues, avenueDescriptions) {
+function validateAvenueDescriptionCoverage(avenues, avenueDescriptions, options = {}) {
   try {
     const selected = normalizeBodAvenues(avenues);
-    const descriptions = normalizeAvenueDescriptions({ avenues: selected, avenueDescriptions });
+    const descriptions = normalizeAvenueDescriptions({
+      avenues: selected,
+      avenueDescriptions,
+      allowedMissingAvenues: options.allowedMissingAvenues,
+    });
     return { ok: true, avenues: selected, descriptions, errors: [] };
   } catch (error) {
     return { ok: false, avenues: [], descriptions: {}, errors: [error.message], error };
@@ -176,13 +195,14 @@ function getEventDescriptionForAvenue(event = {}, avenueCode = '') {
   return specific || normalizeText(event.description || event.desc || '', BOD_EVENT_DESCRIPTION_MAX, 'description') || 'Not available';
 }
 
-function normalizeBodEventDescriptionFields(raw = {}) {
+function normalizeBodEventDescriptionFields(raw = {}, options = {}) {
   const description = normalizeEventDescription(raw);
   const avenues = normalizeBodEventAvenues(raw);
   const avenueDescriptions = normalizeAvenueDescriptions({
     avenues,
     avenueDescriptions: raw.avenueDescriptions,
     fallbackDescription: description,
+    allowedMissingAvenues: options.allowedMissingAvenues,
   });
   return {
     desc: description,

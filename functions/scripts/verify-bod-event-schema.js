@@ -24,6 +24,30 @@ assert.deepEqual(valid().avenue, ['CMD', 'PDD']);
 assert.equal(valid().description, 'Public/general description');
 assert.deepEqual(valid({ avenues: ['CMD'], avenue: ['CMD'], avenueDescriptions: { CMD: 'Only CMD' } }).avenueDescriptions, { CMD: 'Only CMD' });
 assert.deepEqual(schema.normalizeBodEventDescriptionFields({ desc: 'Legacy shared', avenue: ['CMD', 'PDD'] }).avenueDescriptions, { CMD: 'Legacy shared', PDD: 'Legacy shared' });
+assert.throws(() => schema.normalizeBodEventDescriptionFields({
+  description: 'General summary',
+  avenues: ['ISD', 'RRRO'],
+  avenueDescriptions: { ISD: 'ISD report', RRRO: '' },
+}), schema.BodEventSchemaError);
+assert.deepEqual(schema.normalizeBodEventDescriptionFields({
+  description: 'General summary',
+  avenues: ['ISD', 'RRRO'],
+  avenueDescriptions: { ISD: 'ISD report', RRRO: '' },
+}, { allowedMissingAvenues: ['ISD', 'RRRO'] }).avenueDescriptions, { ISD: 'ISD report', RRRO: '' });
+assert.deepEqual(schema.normalizeBodEventDescriptionFields({
+  description: 'General summary',
+  avenues: ['ISD', 'RRRO'],
+  avenueDescriptions: { ISD: 'ISD report' },
+}, { allowedMissingAvenues: ['ISD', 'RRRO'] }).avenueDescriptions, { ISD: 'ISD report' });
+assert.throws(() => schema.normalizeBodEventDescriptionFields({
+  description: 'General summary',
+  avenues: ['ISD', 'CMD', 'RRRO'],
+  avenueDescriptions: { ISD: 'ISD report', RRRO: '', CMD: '' },
+}, { allowedMissingAvenues: ['ISD', 'RRRO'] }), schema.BodEventSchemaError);
+assert.deepEqual(schema.normalizeBodEventDescriptionFields({
+  description: 'General summary',
+  avenues: ['ISD', 'RRRO'],
+}, { allowedMissingAvenues: ['ISD', 'RRRO'] }).avenueDescriptions, {});
 assert.equal(schema.getEventDescriptionForAvenue({ description: 'General', avenueDescriptions: { CMD: 'Community' } }, 'CMD'), 'Community');
 assert.equal(schema.getEventDescriptionForAvenue({ description: 'General' }, 'CMD'), 'General');
 assert.deepEqual(schema.normalizeBodReportFinance(), { hasFinance: false, entries: [] });

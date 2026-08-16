@@ -33,7 +33,7 @@ test('BOD Tools submit route accepts only BOD meeting avenue before club event v
   assert.match(submitSource, /const bodMeetingPayload = normalizeBodToolsMeetingPayload\(data\)/);
   assert.match(submitSource, /stableBodToolsMeetingId\(data, bodMeetingPayload\)/);
   assert.match(submitSource, /saveBodToolsMeetingFromBodEventCallable/);
-  assert.match(submitSource, /normalizeBodEventPayload\(data\)/);
+  assert.match(submitSource, /normalizeBodEventPayload\(data, \{/);
 });
 
 test('BOD Tools meeting sync keeps bodMeetings as canonical attendance identity', () => {
