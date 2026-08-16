@@ -24,6 +24,7 @@ export const REPORTING_WINDOW_POSITION_KEYS = Object.freeze({
   Finance: "treasurer",
   "BOD Meeting": "secretary",
 });
+export const REPORTING_WINDOW_EXCLUSIVE_AVENUES = Object.freeze(["GBM", "BOD Meeting"]);
 export const REPORTING_WINDOW_TIMEZONE = "Asia/Kolkata";
 
 export const EVENT_REMINDER_TYPES = Object.freeze({
@@ -120,6 +121,14 @@ export function todayDateString(now = new Date()) {
 
 export function reminderDateValue(value) {
   if (!value) return null;
+  if (typeof value?.toMillis === "function") {
+    try {
+      const date = new Date(value.toMillis());
+      return Number.isNaN(date.getTime()) ? null : date;
+    } catch {
+      return null;
+    }
+  }
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   if (typeof value?.toDate === "function") {
     try {
@@ -141,7 +150,47 @@ export function reminderDateValue(value) {
       : new Date(raw);
     return Number.isNaN(date.getTime()) ? null : date;
   }
+  if (typeof value === "object") {
+    const seconds = Number(value.seconds);
+    const nanoseconds = Number(value.nanoseconds ?? value.nanosecond ?? 0);
+    if (!Number.isFinite(seconds) || !Number.isFinite(nanoseconds)) return null;
+    const date = new Date((seconds * 1000) + Math.floor(nanoseconds / 1000000));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
   return null;
+}
+
+function reminderTimestampMillis(value) {
+  const date = reminderDateValue(value);
+  return date ? date.getTime() : null;
+}
+
+export function sortReportingWindowsNewestFirst(items = []) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .map((item, index) => ({
+      item,
+      index,
+      createdAtMillis: reminderTimestampMillis(item?.createdAt),
+      id: text(item?.id, 180),
+    }))
+    .sort((a, b) => {
+      const aHasCreatedAt = Number.isFinite(a.createdAtMillis);
+      const bHasCreatedAt = Number.isFinite(b.createdAtMillis);
+
+      if (aHasCreatedAt && bHasCreatedAt) {
+        const createdAtSort = b.createdAtMillis - a.createdAtMillis;
+        if (createdAtSort !== 0) return createdAtSort;
+        const idSort = a.id.localeCompare(b.id);
+        return idSort || a.index - b.index;
+      }
+
+      if (aHasCreatedAt) return -1;
+      if (bHasCreatedAt) return 1;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
 }
 
 export function safeFormatReminderDateTime(value, fallback = "Not available") {
@@ -177,7 +226,7 @@ export function calculateReportingWindowDates(eventDate) {
   };
 }
 
-function normalizeReportingAvenue(value) {
+export function normalizeReportingAvenue(value) {
   const raw = text(value, 80);
   const normalized = raw
     .toUpperCase()
@@ -202,6 +251,52 @@ function normalizeReportingAvenue(value) {
   return REPORTING_WINDOW_AVENUE_OPTIONS.find((option) =>
     option.toUpperCase() === candidate.toUpperCase()
   ) || "";
+}
+
+export function isExclusiveReportingAvenue(value) {
+  return REPORTING_WINDOW_EXCLUSIVE_AVENUES.includes(normalizeReportingAvenue(value));
+}
+
+export function normalizeReportingAvenues(value) {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  const seen = new Set();
+  const avenues = [];
+
+  for (const item of values) {
+    const avenue = normalizeReportingAvenue(item);
+    if (!avenue || seen.has(avenue)) continue;
+    seen.add(avenue);
+    avenues.push(avenue);
+    if (avenues.length >= REPORTING_WINDOW_AVENUE_OPTIONS.length) break;
+  }
+
+  return avenues;
+}
+
+export function hasExclusiveReportingAvenueConflict(avenues = []) {
+  const normalized = normalizeReportingAvenues(avenues);
+  return normalized.some((avenue) => REPORTING_WINDOW_EXCLUSIVE_AVENUES.includes(avenue))
+    && normalized.length > 1;
+}
+
+export function toggleReportingAvenueSelection(currentAvenues = [], value) {
+  const avenue = normalizeReportingAvenue(value);
+  const avenues = normalizeReportingAvenues(currentAvenues);
+  if (!avenue) return avenues;
+  if (avenues.includes(avenue)) return avenues.filter((item) => item !== avenue);
+  if (REPORTING_WINDOW_EXCLUSIVE_AVENUES.includes(avenue)) return [avenue];
+  return [
+    ...avenues.filter((item) => !REPORTING_WINDOW_EXCLUSIVE_AVENUES.includes(item)),
+    avenue,
+  ];
+}
+
+export function reportingWindowAvenuesText(config = {}) {
+  const normalizedAvenues = normalizeReportingAvenues(config.avenues);
+  const avenues = normalizedAvenues.length
+    ? normalizedAvenues
+    : normalizeReportingAvenues(config.avenue);
+  return avenues.join(" + ") || "Not available";
 }
 
 export function isValidReminderTime(value) {
@@ -241,13 +336,17 @@ export function buildReminderTemplateTestPayload(draft = {}) {
 }
 
 export function buildReportingWindowPayload(draft = {}) {
-  const avenue = normalizeReportingAvenue(draft.avenue);
+  const avenues = normalizeReportingAvenues(draft.avenues ?? draft.avenue);
+  const avenue = avenues[0] || "";
   const eventConductedDate = text(draft.eventConductedDate, 20);
   const eventTime = text(draft.eventTime, 20);
   const targetName = text(draft.targetName || draft.eventName, 180);
   const errors = [];
 
-  if (!REPORTING_WINDOW_AVENUE_OPTIONS.includes(avenue)) errors.push("Choose a valid avenue.");
+  if (!avenues.length) errors.push("Choose at least one valid avenue.");
+  if (hasExclusiveReportingAvenueConflict(avenues)) {
+    errors.push("GBM and BOD Meeting reporting windows cannot be combined with other avenues.");
+  }
   if (!targetName) errors.push("Event/meeting name is required.");
   if (!validDate(eventConductedDate)) errors.push("Enter a valid conducted date.");
   if (!isValidReminderTime(eventTime)) errors.push("Enter a valid event time.");
@@ -264,6 +363,7 @@ export function buildReportingWindowPayload(draft = {}) {
       recordType: REPORTING_WINDOW_RECORD_TYPE,
       type: REPORTING_WINDOW_RECORD_TYPE,
       avenue,
+      avenues,
       targetName,
       eventName: targetName,
       eventConductedDate,
@@ -370,11 +470,19 @@ export function normalizeReminder(id, raw) {
 
   if (recordType === REPORTING_WINDOW_RECORD_TYPE) {
     const eventConductedDate = text(raw.eventConductedDate || raw.conductedDate || raw.targetDate, 20);
-    const avenue = normalizeReportingAvenue(raw.avenue);
+    const normalizedAvenues = normalizeReportingAvenues(raw.avenues);
+    const avenues = normalizedAvenues.length
+      ? normalizedAvenues
+      : normalizeReportingAvenues(raw.avenue);
+    const avenue = avenues[0] || "";
     if (!eventConductedDate || !avenue) return null;
     return {
       ...base,
       avenue,
+      avenues,
+      avenueLabel: avenue,
+      avenueLabels: avenues,
+      avenuesLabel: avenues.join(" + "),
       targetName: text(raw.targetName || raw.eventName || raw.name, 180),
       eventConductedDate,
       conductedDate: eventConductedDate,

@@ -16,6 +16,7 @@ import {
   buildBodEventPayload,
   getLockedBodAvenues,
   isBodMeetingAvenueSelection,
+  normalizeBodAvenues,
   normalizeBodReportFinance,
 } from "./bodEventModel";
 import useAccessibleDialog from "./useAccessibleDialog";
@@ -34,11 +35,15 @@ function reportFinanceDraft(event) {
 
 function initialDraft(event, displayName, prefill = null) {
   const normalizedPrefillAvenue = prefill?.avenue === "BOD_MEETING" ? BOD_MEETING_AVENUE : prefill?.avenue;
-  const prefillAvenue = !event && BOD_AVENUES.includes(normalizedPrefillAvenue) ? normalizedPrefillAvenue : "";
+  const prefillAvenue = BOD_AVENUES.includes(normalizedPrefillAvenue) ? normalizedPrefillAvenue : "";
+  const prefillAvenues = normalizeBodAvenues(prefill?.avenues?.length ? prefill.avenues : (prefillAvenue ? [prefillAvenue] : []));
+  const reportingWindowId = event?.reportingWindowId || prefill?.reportingWindowId || "";
+  const requiredReportingAvenues = reportingWindowId ? prefillAvenues.filter((avenue) => avenue !== BOD_MEETING_AVENUE) : [];
   const avenues = event?.recordKind === "bodMeeting" && !event?.avenues?.length
     ? [BOD_MEETING_AVENUE]
     : event?.avenues || [];
-  const isMeetingDraft = isBodMeetingAvenueSelection(avenues);
+  const selectedAvenues = avenues.length ? avenues : (!event && prefillAvenues.length ? prefillAvenues : []);
+  const isMeetingDraft = isBodMeetingAvenueSelection(selectedAvenues);
 
   const conductedBy = event
     ? event.conductedBy === "Unavailable"
@@ -53,19 +58,20 @@ function initialDraft(event, displayName, prefill = null) {
     endDate: event?.endDate || prefill?.date || prefill?.conductedDate || "",
     time: event?.time || prefill?.time || "",
     description: event?.description || "",
-    avenues: avenues.length ? avenues : (prefillAvenue ? [prefillAvenue] : []),
+    avenues: selectedAvenues,
     avenueDescriptions: isMeetingDraft
       ? {}
       : avenues.length
-      ? buildAvenueDescriptionDraft(event || {}, avenues)
-      : (prefillAvenue && prefillAvenue !== BOD_MEETING_AVENUE ? { [prefillAvenue]: "" } : {}),
+      ? buildAvenueDescriptionDraft(event || {}, avenues, { reportingWindowId, allowedMissingAvenues: requiredReportingAvenues })
+      : Object.fromEntries(prefillAvenues.filter((avenue) => avenue !== BOD_MEETING_AVENUE).map((avenue) => [avenue, ""])),
     rcphRole: event?.rcphRole || "host",
     hostClub: event?.hostClub || "Rotaract Club of Pune Heritage",
     collaborators: event?.collaborators?.length ? event.collaborators : [{ name: "" }],
     collaborationNotes: event?.collaborationNotes || "",
     reportFinance: reportFinanceDraft(event),
     driveFolder: event?.driveFolder || "",
-    reportingWindowId: event?.reportingWindowId || prefill?.reportingWindowId || "",
+    reportingWindowId,
+    requiredReportingAvenues,
     reportingWindowNote: prefill?.note || "",
   };
 }
@@ -86,6 +92,11 @@ export default function BodEventForm({ event, displayName, prefill = null, busy,
   );
   const isBodMeetingDraft = isBodMeetingAvenueSelection(draft.avenues);
   const selectedReportAvenues = draft.avenues.filter((avenue) => avenue !== BOD_MEETING_AVENUE);
+  const requiredReportingAvenues = useMemo(
+    () => new Set(normalizeBodAvenues(draft.requiredReportingAvenues)),
+    [draft.requiredReportingAvenues],
+  );
+  const isReportingLinked = Boolean(draft.reportingWindowId && requiredReportingAvenues.size);
 
   function update(key, value) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -109,7 +120,13 @@ export default function BodEventForm({ event, displayName, prefill = null, busy,
         ? {}
         : { ...(current.avenueDescriptions || {}) };
       if (selected) delete avenueDescriptions[avenue];
-      else avenueDescriptions[avenue] = avenueDescriptions[avenue] || current.description;
+      else {
+        const requiredReportingAvenue = Boolean(
+          current.reportingWindowId
+            && normalizeBodAvenues(current.requiredReportingAvenues).includes(avenue),
+        );
+        avenueDescriptions[avenue] = avenueDescriptions[avenue] || (requiredReportingAvenue ? "" : current.description);
+      }
       const nextAvenues = selected
         ? current.avenues.filter((item) => item !== avenue)
         : [...current.avenues.filter((item) => item !== BOD_MEETING_AVENUE), avenue];
@@ -172,7 +189,11 @@ export default function BodEventForm({ event, displayName, prefill = null, busy,
   async function handleSubmit(submitEvent) {
     submitEvent.preventDefault();
     if (formBusy) return;
-    const result = buildBodEventPayload(draft, savedEventId, { lockedAvenueReportingLocks });
+    const result = buildBodEventPayload(draft, savedEventId, {
+      lockedAvenueReportingLocks,
+      reportingWindowId: draft.reportingWindowId,
+      allowedMissingAvenues: draft.requiredReportingAvenues,
+    });
     if (!result.payload) {
       setErrors(result.errors);
       const first = Object.keys(result.errors)[0];
@@ -335,8 +356,11 @@ if (!isMeetingPayload && completed.length) {
           {!isBodMeetingDraft && selectedReportAvenues.length ? (
             <fieldset className="bod-avenue-descriptions" aria-describedby={described("avenueDescriptions")}>
               <legend>Avenue report descriptions *</legend>
+              {isReportingLinked ? (
+                <p className="bod-reporting-helper">This event is linked to a reporting window. Required avenue reports may be completed separately before the reporting deadline.</p>
+              ) : null}
               {selectedReportAvenues.map((avenue) => (
-                <label key={avenue}>Description for {avenue}<textarea name="avenueDescriptions" value={draft.avenueDescriptions?.[avenue] || ""} onChange={(e) => updateAvenueDescription(avenue, e.target.value)} maxLength={BOD_EVENT_DESCRIPTION_LIMIT} rows="3" /></label>
+                <label key={avenue}>Description for {avenue}<textarea name="avenueDescriptions" value={draft.avenueDescriptions?.[avenue] || ""} onChange={(e) => updateAvenueDescription(avenue, e.target.value)} maxLength={BOD_EVENT_DESCRIPTION_LIMIT} rows="3" />{isReportingLinked && requiredReportingAvenues.has(avenue) && !draft.avenueDescriptions?.[avenue]?.trim() ? <small className="bod-reporting-status">Pending report</small> : null}</label>
               ))}
               {errors.avenueDescriptions ? <span id="bod-avenueDescriptions-error" className="bod-field-error">{errors.avenueDescriptions}</span> : null}
             </fieldset>

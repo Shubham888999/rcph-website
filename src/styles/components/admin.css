@@ -8093,6 +8093,55 @@ min-width: 250px;
   border-bottom: 1px solid rgba(244, 180, 58, 0.14);
 }
 
+.reminders-avenue-picker {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.reminders-avenue-picker legend {
+  margin: 0 0 0.35rem;
+  color: var(--internal-text-muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.reminders-avenue-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.25rem, 1fr));
+  gap: 0.45rem;
+}
+
+.reminders-avenue-picker__option {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--internal-radius-control);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--internal-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.reminders-avenue-picker__option input {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: auto;
+  margin: 0;
+}
+
+.reminders-avenue-picker__option:has(input:checked) {
+  border-color: rgba(96, 195, 196, 0.42);
+  background: rgba(96, 195, 196, 0.075);
+}
+
 .reminders-window-toggles {
   display: flex;
   flex-wrap: wrap;

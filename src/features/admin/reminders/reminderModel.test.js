@@ -11,7 +11,9 @@ import {
   canStopEventReminderConfig,
   EVENT_REMINDER_RECORD_TYPE,
   eventReminderConfigId,
+  normalizeReportingAvenues,
   normalizeReminder,
+  reportingWindowAvenuesText,
   reportingWindowAttendanceText,
   reportingWindowEventReportText,
   reportingWindowLockText,
@@ -26,6 +28,8 @@ import {
   REPORTING_WINDOW_POSITION_KEYS,
   REPORTING_WINDOW_RECORD_TYPE,
   safeFormatReminderDateTime,
+  sortReportingWindowsNewestFirst,
+  toggleReportingAvenueSelection,
 } from "./reminderModel.js";
 
 function assertIso(value, iso) {
@@ -52,6 +56,7 @@ test("Avenue reporting window payload stores Phase 5 defaults", () => {
   assert.equal(result.payload.recordType, REPORTING_WINDOW_RECORD_TYPE);
   assert.equal(result.payload.type, REPORTING_WINDOW_RECORD_TYPE);
   assert.equal(result.payload.avenue, "CSD");
+  assert.deepEqual(result.payload.avenues, ["CSD"]);
   assert.equal(result.payload.targetName, "Test Project");
   assert.equal(result.payload.eventName, "Test Project");
   assert.equal(result.payload.eventConductedDate, "2026-07-14");
@@ -85,6 +90,135 @@ test("Avenue reporting window payload requires an exact event or meeting name", 
   assert.match(result.errors.join(" "), /Event\/meeting name is required/);
 });
 
+test("reporting window payload accepts legacy single avenue input", () => {
+  const result = buildReportingWindowPayload({
+    avenue: "ISD",
+    targetName: "Legacy Single Avenue",
+    eventConductedDate: "2026-08-15",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.payload.avenue, "ISD");
+  assert.deepEqual(result.payload.avenues, ["ISD"]);
+});
+
+test("reporting window payload accepts canonical multi-avenue input", () => {
+  const result = buildReportingWindowPayload({
+    avenues: ["ISD", "RRRO"],
+    targetName: "Joint Fellowship Project",
+    eventConductedDate: "2026-08-15",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.payload.avenue, "ISD");
+  assert.deepEqual(result.payload.avenues, ["ISD", "RRRO"]);
+});
+
+test("reporting avenue normalization dedupes duplicate aliases in selection order", () => {
+  assert.deepEqual(normalizeReportingAvenues(["isd", "RRRO"]), ["ISD", "RRRO"]);
+  assert.deepEqual(normalizeReportingAvenues(["CWD", "Website Director"]), ["CWD"]);
+  assert.deepEqual(normalizeReportingAvenues("CSD"), ["CSD"]);
+  assert.deepEqual(normalizeReportingAvenues(["BAD", "ISD"]), ["ISD"]);
+});
+
+test("reporting window payload rejects zero selected avenues", () => {
+  const result = buildReportingWindowPayload({
+    avenues: [],
+    targetName: "No Avenue",
+    eventConductedDate: "2026-08-15",
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /at least one valid avenue/i);
+});
+
+test("reporting window payload rejects invalid-only avenue arrays", () => {
+  const result = buildReportingWindowPayload({
+    avenues: ["BAD", "UNKNOWN"],
+    targetName: "Invalid Avenue",
+    eventConductedDate: "2026-08-15",
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /at least one valid avenue/i);
+});
+
+test("reporting window payload allows single special reporting avenues", () => {
+  const gbm = buildReportingWindowPayload({
+    avenues: ["GBM"],
+    targetName: "GBM",
+    eventConductedDate: "2026-08-15",
+  });
+  const bodMeeting = buildReportingWindowPayload({
+    avenues: ["BOD Meeting"],
+    targetName: "BOD Meeting 1",
+    eventConductedDate: "2026-08-15",
+  });
+
+  assert.equal(gbm.ok, true);
+  assert.equal(gbm.payload.avenue, "GBM");
+  assert.deepEqual(gbm.payload.avenues, ["GBM"]);
+  assert.equal(bodMeeting.ok, true);
+  assert.equal(bodMeeting.payload.avenue, "BOD Meeting");
+  assert.deepEqual(bodMeeting.payload.avenues, ["BOD Meeting"]);
+});
+
+test("reporting window payload rejects mixed special avenue selections", () => {
+  const gbmMixed = buildReportingWindowPayload({
+    avenues: ["GBM", "ISD"],
+    targetName: "Mixed GBM",
+    eventConductedDate: "2026-08-15",
+  });
+  const bodMixed = buildReportingWindowPayload({
+    avenues: ["BOD Meeting", "RRRO"],
+    targetName: "Mixed BOD",
+    eventConductedDate: "2026-08-15",
+  });
+  const bothSpecial = buildReportingWindowPayload({
+    avenues: ["GBM", "BOD Meeting"],
+    targetName: "Mixed Special",
+    eventConductedDate: "2026-08-15",
+  });
+
+  assert.equal(gbmMixed.ok, false);
+  assert.match(gbmMixed.errors.join(" "), /cannot be combined/i);
+  assert.equal(bodMixed.ok, false);
+  assert.match(bodMixed.errors.join(" "), /cannot be combined/i);
+  assert.equal(bothSpecial.ok, false);
+  assert.match(bothSpecial.errors.join(" "), /cannot be combined/i);
+});
+
+test("reporting window multi-avenue payload keeps date and reminder defaults unchanged", () => {
+  const result = buildReportingWindowPayload({
+    avenues: ["ISD", "RRRO"],
+    targetName: "Joint Fellowship Project",
+    eventConductedDate: "2026-07-14",
+    eventTime: "18:30",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.payload.remindersEnabled, true);
+  assert.equal(result.payload.lockEnabled, true);
+  assert.equal(result.payload.status, "configured");
+  assert.equal(result.payload.eventReportStatus, "pending");
+  assert.equal(result.payload.momStatus, "pending");
+  assert.equal(result.payload.attendanceStatus, "pending");
+  assert.equal(result.payload.workflowStatus, "created");
+  assert.equal(result.payload.remindersSent, 0);
+  assert.equal(result.payload.maxReminders, 3);
+  assert.equal(result.payload.reminderTime, "00:00");
+  assertIso(result.payload.reportingOpensAt, "2026-07-14T18:30:00.000Z");
+  assertIso(result.payload.reportingDueAt, "2026-07-17T18:29:00.000Z");
+  assertIso(result.payload.lockAt, "2026-07-17T18:30:00.000Z");
+});
+
+test("reporting avenue toggle helper enforces special avenue exclusivity", () => {
+  assert.deepEqual(toggleReportingAvenueSelection(["ISD"], "RRRO"), ["ISD", "RRRO"]);
+  assert.deepEqual(toggleReportingAvenueSelection(["ISD", "RRRO"], "GBM"), ["GBM"]);
+  assert.deepEqual(toggleReportingAvenueSelection(["BOD Meeting"], "CSD"), ["CSD"]);
+  assert.deepEqual(toggleReportingAvenueSelection(["GBM"], "GBM"), []);
+});
+
 test("CWD and Phase 5 reporting avenues are available without removing existing avenues", () => {
   assert.ok(REPORTING_WINDOW_AVENUE_OPTIONS.includes("CWD"));
   assert.ok(REPORTING_WINDOW_AVENUE_OPTIONS.includes("Sports"));
@@ -116,6 +250,7 @@ test("CWD reporting window payload preserves calculated dates", () => {
   assert.equal(result.ok, true);
   assert.equal(result.payload.recordType, REPORTING_WINDOW_RECORD_TYPE);
   assert.equal(result.payload.avenue, "CWD");
+  assert.deepEqual(result.payload.avenues, ["CWD"]);
   assert.equal(result.payload.eventTime, "");
   assert.equal(result.payload.remindersEnabled, true);
   assert.equal(result.payload.lockEnabled, true);
@@ -145,12 +280,15 @@ test("Phase 5 reporting avenues can be created with the same calculated dates", 
 
   assert.equal(sports.ok, true);
   assert.equal(sports.payload.avenue, "Sports");
+  assert.deepEqual(sports.payload.avenues, ["Sports"]);
   assert.equal(sports.payload.remindersEnabled, false);
   assert.equal(sports.payload.lockEnabled, false);
   assert.equal(finance.ok, true);
   assert.equal(finance.payload.avenue, "Finance");
+  assert.deepEqual(finance.payload.avenues, ["Finance"]);
   assert.equal(bodMeeting.ok, true);
   assert.equal(bodMeeting.payload.avenue, "BOD Meeting");
+  assert.deepEqual(bodMeeting.payload.avenues, ["BOD Meeting"]);
   assertIso(sports.payload.reportingOpensAt, "2026-07-14T18:30:00.000Z");
   assertIso(finance.payload.reportingDueAt, "2026-07-17T18:29:00.000Z");
   assertIso(bodMeeting.payload.lockAt, "2026-07-17T18:30:00.000Z");
@@ -191,11 +329,42 @@ test("reporting window normalization accepts timestamp aliases and canonical ave
   });
 
   assert.equal(normalized.avenue, "Sports");
+  assert.deepEqual(normalized.avenues, ["Sports"]);
+  assert.deepEqual(normalized.avenueLabels, ["Sports"]);
+  assert.equal(normalized.avenuesLabel, "Sports");
   assert.equal(normalized.targetName, "Sports Meet");
   assert.equal(normalized.reportingOpensAt, "2026-07-14T18:30:00.000Z");
   assert.equal(normalized.reportingDueAt, "2026-07-17T18:29:00.000Z");
   assert.equal(normalized.lockAt, "2026-07-17T18:30:00.000Z");
   assert.equal(reportingWindowStatusText(normalized), "Locked");
+});
+
+test("reporting window normalization preserves legacy and multi-avenue records", () => {
+  const legacy = normalizeReminder("legacy-window", {
+    recordType: REPORTING_WINDOW_RECORD_TYPE,
+    avenue: "CSD",
+    avenues: [],
+    targetName: "Legacy Event",
+    eventConductedDate: "2026-08-15",
+  });
+  const multi = normalizeReminder("multi-window", {
+    recordType: REPORTING_WINDOW_RECORD_TYPE,
+    avenue: "ISD",
+    avenues: ["ISD", "RRRO"],
+    targetName: "Joint Fellowship Project",
+    eventConductedDate: "2026-08-15",
+  });
+
+  assert.equal(legacy.avenue, "CSD");
+  assert.deepEqual(legacy.avenues, ["CSD"]);
+  assert.deepEqual(legacy.avenueLabels, ["CSD"]);
+  assert.equal(legacy.avenuesLabel, "CSD");
+  assert.equal(reportingWindowAvenuesText(legacy), "CSD");
+  assert.equal(multi.avenue, "ISD");
+  assert.deepEqual(multi.avenues, ["ISD", "RRRO"]);
+  assert.deepEqual(multi.avenueLabels, ["ISD", "RRRO"]);
+  assert.equal(multi.avenuesLabel, "ISD + RRRO");
+  assert.equal(reportingWindowAvenuesText(multi), "ISD + RRRO");
 });
 
 test("reporting window normalization preserves linked workflow status fields", () => {
@@ -260,6 +429,148 @@ test("reporting window normalization preserves manual notes and stopped reminder
   assert.equal(reminder.stoppedAt, "2026-07-20T15:00:00.000Z");
   assert.equal(reminder.stoppedByName, "Rtr. Admin");
 });
+
+test("reporting windows sort newest createdAt first", () => {
+  const oldWindow = {
+    id: "old-window",
+    createdAt: "2026-08-01T00:00:00.000Z",
+  };
+  const newWindow = {
+    id: "new-window",
+    createdAt: "2026-08-15T00:00:00.000Z",
+  };
+
+  assert.deepEqual(
+    sortReportingWindowsNewestFirst([oldWindow, newWindow]).map((item) => item.id),
+    ["new-window", "old-window"],
+  );
+});
+
+test("reporting window sort ignores conducted date", () => {
+  const olderConductedButNewerCreated = {
+    id: "created-later",
+    createdAt: "2026-08-15T08:50:00.000Z",
+    conductedDate: "2026-08-09",
+  };
+  const newerConductedButOlderCreated = {
+    id: "created-earlier",
+    createdAt: "2026-08-14T11:30:00.000Z",
+    conductedDate: "2026-08-14",
+  };
+
+  assert.deepEqual(
+    sortReportingWindowsNewestFirst([
+      newerConductedButOlderCreated,
+      olderConductedButNewerCreated,
+    ]).map((item) => item.id),
+    ["created-later", "created-earlier"],
+  );
+});
+
+test("reporting window sort ignores updatedAt", () => {
+  const editedToday = {
+    id: "old-created-edited-today",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-15T12:00:00.000Z",
+  };
+  const createdLater = {
+    id: "newer-created",
+    createdAt: "2026-08-10T00:00:00.000Z",
+    updatedAt: "2026-08-10T01:00:00.000Z",
+  };
+
+  assert.deepEqual(
+    sortReportingWindowsNewestFirst([editedToday, createdLater]).map((item) => item.id),
+    ["newer-created", "old-created-edited-today"],
+  );
+});
+
+test("reporting window sort supports Firestore Timestamp-like toMillis values", () => {
+  const earlier = {
+    id: "timestamp-earlier",
+    createdAt: { toMillis: () => Date.parse("2026-08-14T00:00:00.000Z") },
+  };
+  const later = {
+    id: "timestamp-later",
+    createdAt: { toMillis: () => Date.parse("2026-08-15T00:00:00.000Z") },
+  };
+
+  assert.deepEqual(
+    sortReportingWindowsNewestFirst([earlier, later]).map((item) => item.id),
+    ["timestamp-later", "timestamp-earlier"],
+  );
+});
+
+test("reporting window sort supports seconds and nanoseconds timestamp values", () => {
+  const lowerNanoseconds = {
+    id: "lower-nanos",
+    createdAt: { seconds: 1786800000, nanoseconds: 0 },
+  };
+  const higherNanoseconds = {
+    id: "higher-nanos",
+    createdAt: { seconds: 1786800000, nanoseconds: 500000000 },
+  };
+
+  assert.deepEqual(
+    sortReportingWindowsNewestFirst([lowerNanoseconds, higherNanoseconds]).map((item) => item.id),
+    ["higher-nanos", "lower-nanos"],
+  );
+});
+
+test("reporting window sort handles missing and invalid createdAt safely", () => {
+  const missing = { id: "legacy-missing" };
+  const invalid = { id: "legacy-invalid", createdAt: "not-a-date" };
+  const valid = { id: "valid-created", createdAt: "2026-08-15T00:00:00.000Z" };
+
+  assert.deepEqual(
+    sortReportingWindowsNewestFirst([missing, invalid, valid]).map((item) => item.id),
+    ["valid-created", "legacy-missing", "legacy-invalid"],
+  );
+});
+
+test("reporting window sort does not mutate the input array", () => {
+  const oldWindow = {
+    id: "old-window",
+    createdAt: "2026-08-01T00:00:00.000Z",
+  };
+  const newWindow = {
+    id: "new-window",
+    createdAt: "2026-08-15T00:00:00.000Z",
+  };
+  const windows = [oldWindow, newWindow];
+  const sorted = sortReportingWindowsNewestFirst(windows);
+
+  assert.notStrictEqual(sorted, windows);
+  assert.deepEqual(windows.map((item) => item.id), ["old-window", "new-window"]);
+  assert.deepEqual(sorted.map((item) => item.id), ["new-window", "old-window"]);
+});
+
+test("reporting window sort uses document id as a deterministic tie-breaker", () => {
+  const createdAt = "2026-08-15T00:00:00.000Z";
+
+  assert.deepEqual(
+    sortReportingWindowsNewestFirst([
+      { id: "window-b", createdAt },
+      { id: "window-a", createdAt },
+    ]).map((item) => item.id),
+    ["window-a", "window-b"],
+  );
+});
+
+test("reporting window sort preserves single-avenue record shape", () => {
+  const window = {
+    id: "single-avenue-window",
+    recordType: REPORTING_WINDOW_RECORD_TYPE,
+    avenue: "CSD",
+    createdAt: "2026-08-15T00:00:00.000Z",
+  };
+  const [sorted] = sortReportingWindowsNewestFirst([window]);
+
+  assert.strictEqual(sorted, window);
+  assert.equal(sorted.avenue, "CSD");
+  assert.equal(Array.isArray(sorted.avenue), false);
+});
+
 test("safe reminder date formatting handles supported timestamp shapes", () => {
   assert.match(
     safeFormatReminderDateTime("2026-07-14T18:30:00.000Z"),

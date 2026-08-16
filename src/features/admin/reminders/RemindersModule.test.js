@@ -5,6 +5,7 @@ import test from "node:test";
 const moduleSource = readFileSync(new URL("./RemindersModule.jsx", import.meta.url), "utf8");
 const modelSource = readFileSync(new URL("./reminderModel.js", import.meta.url), "utf8");
 const serviceSource = readFileSync(new URL("./reminderService.js", import.meta.url), "utf8");
+const adminStyles = readFileSync(new URL("../../../styles/components/admin.css", import.meta.url), "utf8");
 const adminPage = readFileSync(new URL("../../../pages/admin/AdminPage.jsx", import.meta.url), "utf8");
 const navigation = readFileSync(new URL("../shared/adminNavigation.js", import.meta.url), "utf8");
 const dataHook = readFileSync(new URL("../shared/useAdminData.js", import.meta.url), "utf8");
@@ -21,6 +22,7 @@ test("Reminders section is registered in Admin for authorized users", () => {
   assert.match(dataHook, /OPTIONAL_COLLECTIONS\.has\(module\)/);
   assert.match(adminService, /reminders: \["reminders"\]/);
   assert.doesNotMatch(adminService, /reminders: \["reminders", "updatedAt"/);
+  assert.doesNotMatch(adminService, /reminders: \["reminders", "createdAt"/);
 });
 
 test("Reminders UI exposes the required subsections and actions", () => {
@@ -28,6 +30,7 @@ test("Reminders UI exposes the required subsections and actions", () => {
   assert.match(moduleSource, /Reporting workflow setup/);
   assert.match(moduleSource, /Reporting starts the BOD event, MOM, and attendance follow-up workflow\./);
   assert.match(moduleSource, /REPORTING_WINDOW_AVENUE_OPTIONS\.map/);
+  assert.match(moduleSource, /<legend>Avenues<\/legend>/);
   assert.match(moduleSource, /Event\/meeting name/);
   assert.match(moduleSource, /placeholder="Exact event or meeting name"/);
   assert.match(moduleSource, /Send reminder emails/);
@@ -45,6 +48,20 @@ test("Reminders UI exposes the required subsections and actions", () => {
   assert.match(moduleSource, /Sets reminder for Seargeant-At-Arms to mark or review attendance/);
   assert.match(moduleSource, /aria-expanded=\{conductedExpanded\}/);
   assert.match(moduleSource, /reminders-action-menu__trigger/);
+});
+
+test("Reminders reporting window form uses multi-avenue checkbox selection", () => {
+  assert.match(moduleSource, /avenues: \[\]/);
+  assert.match(moduleSource, /toggleDraftAvenue/);
+  assert.match(moduleSource, /toggleReportingAvenueSelection\(current\.avenues, avenue\)/);
+  assert.match(moduleSource, /className="reminders-avenue-picker"/);
+  assert.match(moduleSource, /className="reminders-avenue-picker__grid"/);
+  assert.match(moduleSource, /type="checkbox"/);
+  assert.match(moduleSource, /checked=\{draft\.avenues\.includes\(avenue\)\}/);
+  assert.doesNotMatch(moduleSource, /draft\.avenue(?!s)/);
+  assert.doesNotMatch(moduleSource, /<select[\s\S]*value=\{draft\.avenue/);
+  assert.match(adminStyles, /\.reminders-avenue-picker__grid/);
+  assert.match(adminStyles, /\.reminders-avenue-picker__option:has\(input:checked\)/);
 });
 
 test("Reminders permissions reuse admin panel authority", () => {
@@ -179,6 +196,16 @@ test("Saved reporting windows section is collapsible and closed by default", () 
   assert.match(moduleSource, /<details className="reminders-saved-list">/);
   assert.match(moduleSource, /<summary className="reminders-saved-list__summary">/);
   assert.doesNotMatch(moduleSource, /<details className="reminders-saved-list" open/);
+});
+test("Saved reporting windows table displays all selected avenues", () => {
+  assert.match(moduleSource, /<th>Avenue\(s\)<\/th>/);
+  assert.match(moduleSource, /reportingWindowAvenuesText\(item\)/);
+  assert.match(modelSource, /join\(" \+ "\)/);
+});
+test("Saved reporting windows are sorted client-side by createdAt", () => {
+  assert.match(modelSource, /sortReportingWindowsNewestFirst/);
+  assert.match(moduleSource, /sortReportingWindowsNewestFirst\(\s*reminders\.filter/);
+  assert.doesNotMatch(adminService, /orderBy\("createdAt"|orderBy\('createdAt'/);
 });
 test("Reminder frontend does not send direct email, lock, upload, or use Storage directly", () => {
   const combined = `${moduleSource}\n${serviceSource}`;

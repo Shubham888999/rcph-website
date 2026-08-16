@@ -7,6 +7,7 @@ const details = readFileSync(new URL("./BodEventDetailsDialog.jsx", import.meta.
 const card = readFileSync(new URL("./BodEventCard.jsx", import.meta.url), "utf8");
 const filters = readFileSync(new URL("./BodEventFilters.jsx", import.meta.url), "utf8");
 const list = readFileSync(new URL("./BodEventList.jsx", import.meta.url), "utf8");
+const reportingQueue = readFileSync(new URL("./BodReportingQueuePanel.jsx", import.meta.url), "utf8");
 const page = readFileSync(new URL("../../pages/bod/BodToolsPage.jsx", import.meta.url), "utf8");
 const service = readFileSync(new URL("./bodEventService.js", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../../styles/components/bod-tools.css", import.meta.url), "utf8");
@@ -19,6 +20,7 @@ test("BOD event form keeps public and per-avenue descriptions separate", () => {
   assert.match(form, /Description for \{avenue\}/);
   assert.match(form, /name="avenueDescriptions"/);
   assert.match(form, /window\.confirm\(`Remove the \$\{avenue\} report description\?`\)/);
+  assert.match(form, /requiredReportingAvenue \? "" : current\.description/);
 });
 
 test("BOD event form keeps locked reporting-window avenues visible but unavailable", () => {
@@ -26,13 +28,29 @@ test("BOD event form keeps locked reporting-window avenues visible but unavailab
   assert.match(form, /getLockedBodAvenues\(BOD_AVENUES, lockedAvenueReportingLocks\)/);
   assert.match(form, /disabled=\{locked && !selected\}/);
   assert.match(form, /AVENUE_REPORTING_LOCK_HELP_TEXT/);
-  assert.match(form, /buildBodEventPayload\(draft, savedEventId, \{ lockedAvenueReportingLocks \}\)/);
+  assert.match(form, /buildBodEventPayload\(draft, savedEventId, \{/);
+  assert.match(form, /lockedAvenueReportingLocks,/);
   assert.match(page, /avenueReportingLocks\.items/);
   assert.match(service, /subscribeBodToolsLockState/);
   assert.match(service, /getBodToolsLockState/);
   assert.doesNotMatch(service, /collection\(db, "locks"\)/);
   assert.doesNotMatch(service, /doc\(db, "locks"/);
   assert.match(service, /normalizeAvenueReportingLock/);
+});
+
+test("BOD event form supports verified partial reporting-window edits with separate queue UI", () => {
+  assert.match(form, /requiredReportingAvenues/);
+  assert.match(form, /allowedMissingAvenues: draft\.requiredReportingAvenues/);
+  assert.match(form, /This event is linked to a reporting window/);
+  assert.match(form, /Pending report/);
+  assert.match(form, /buildAvenueDescriptionDraft\(event \|\| \{\}, avenues, \{ reportingWindowId, allowedMissingAvenues: requiredReportingAvenues \}\)/);
+  assert.match(form, /Object\.fromEntries\(prefillAvenues\.filter/);
+  assert.match(page, /async function openEditForm\(event\)/);
+  assert.match(page, /fetchReportingWindowPrefill\(event\.reportingWindowId\)/);
+  assert.match(page, /Reporting window metadata could not be verified/);
+  assert.match(service, /requiredReportingAvenues: avenues\.length \? avenues : \(avenue \? \[avenue\] : \[\]\)/);
+  assert.match(page, /BodReportingQueuePanel/);
+  assert.match(reportingQueue, /Events to be reported/);
 });
 
 test("BOD Tools opens a prefilled create form from reportingWindowId query links", () => {
@@ -50,6 +68,10 @@ test("BOD Tools opens a prefilled create form from reportingWindowId query links
   assert.match(form, /bod-form-prefill-note/);
   assert.match(service, /export async function fetchReportingWindowPrefill/);
   assert.match(service, /httpsCallable\(functions, "getReportingWindowPrefill"\)/);
+  assert.match(service, /avenues: avenues\.length \? avenues : \(avenue \? \[avenue\] : \[\]\)/);
+  assert.match(service, /requiredReportingAvenues: avenues\.length \? avenues : \(avenue \? \[avenue\] : \[\]\)/);
+  assert.match(service, /avenueLabels: stringList\(data\.avenueLabels\)/);
+  assert.match(service, /avenuesLabel: typeof data\.avenuesLabel === "string"/);
 });
 
 test("BOD event form includes a Board of Directors meeting path", () => {

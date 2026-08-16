@@ -44,9 +44,11 @@ export default function useBodEvents({ uid, enabled }) {
   }, [enabled, uid]);
 
   const reload = useCallback(() => {
-    if (!enabled || !uid) return;
+    if (!enabled || !uid) return Promise.resolve([]);
     setState({ status: "loading", events: [], error: null });
-    resolve(refreshBodEvents(uid), uid);
+    const request = refreshBodEvents(uid);
+    resolve(request, uid);
+    return request;
   }, [enabled, resolve, uid]);
 
   const currentLock = lock.uid === uid ? lock : { uid, status: "loading", locked: true, reason: "", updatedByName: "", updatedAt: "" };

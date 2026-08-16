@@ -4,11 +4,16 @@ const EVENT_KINDS = new Set(["clubEvent", "bodMeeting", "districtEvent"]);
 const RCPH_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
 const REPORT_FINANCE_TYPES = new Set(["income", "expense"]);
 export const BOD_MEETING_AVENUE = "BOD";
-export const BOD_SERVICE_AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
+export const BOD_SERVICE_AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "CWD", "SPORTS", "FINANCE", "GBM"];
 export const BOD_AVENUES = [...BOD_SERVICE_AVENUES, BOD_MEETING_AVENUE];
+const BOD_AVENUE_LABELS = Object.freeze({
+  SPORTS: "Sports",
+  FINANCE: "Finance",
+  [BOD_MEETING_AVENUE]: "Board of Directors",
+});
 export const BOD_AVENUE_OPTIONS = [
-  ...BOD_SERVICE_AVENUES.map((code) => ({ code, label: code })),
-  { code: BOD_MEETING_AVENUE, label: "Board of Directors" },
+  ...BOD_SERVICE_AVENUES.map((code) => ({ code, label: BOD_AVENUE_LABELS[code] || code })),
+  { code: BOD_MEETING_AVENUE, label: BOD_AVENUE_LABELS[BOD_MEETING_AVENUE] },
 ];
 export const BOD_EVENT_SOURCE = "bodEventManager";
 export const BOD_EVENT_DESCRIPTION_LIMIT = 2500;
@@ -35,6 +40,11 @@ function cleanLower(value, max = 120) {
   return cleanString(value).toLowerCase().slice(0, max);
 }
 
+function safeReportingWindowId(value) {
+  const id = cleanString(value).slice(0, 128);
+  return id && !id.includes("/") ? id : "";
+}
+
 function safeLockIdSegment(value) {
   return cleanString(value, "window")
     .replace(/[^A-Za-z0-9_-]+/g, "_")
@@ -51,7 +61,7 @@ export function normalizeAvenueReportingLock(id, raw) {
   const [avenue] = normalizeBodAvenues([raw.avenue]);
   if (!avenue) return null;
   const lockId = cleanString(id || raw.lockId || raw.id);
-  const reportingWindowId = cleanString(raw.reportingWindowId || raw.reminderId);
+  const reportingWindowId = safeReportingWindowId(raw.reportingWindowId || raw.reminderId);
   return {
     id: lockId || `avenueReporting_${safeLockIdSegment(reportingWindowId || avenue)}`,
     lockId,
@@ -113,11 +123,15 @@ export function normalizeAvenueDescriptions(value, avenues = []) {
   ]).filter(([, description]) => description));
 }
 
-export function buildAvenueDescriptionDraft(event = {}, avenues = event?.avenues ?? event?.avenue) {
+export function buildAvenueDescriptionDraft(event = {}, avenues = event?.avenues ?? event?.avenue, options = {}) {
   const selected = normalizeBodAvenues(avenues).filter((code) => code !== BOD_MEETING_AVENUE);
   const existing = normalizeAvenueDescriptions(event?.avenueDescriptions, selected);
   const fallback = cleanString(event?.description || event?.desc).slice(0, BOD_EVENT_DESCRIPTION_LIMIT);
-  return Object.fromEntries(selected.map((code) => [code, existing[code] || fallback]));
+  const allowedMissing = new Set(allowedMissingAvenuesForReportingContext(options, event));
+  return Object.fromEntries(selected.map((code) => [
+    code,
+    existing[code] || (allowedMissing.has(code) ? "" : fallback),
+  ]));
 }
 
 export function getEventDescriptionForAvenue(event, avenueCode) {
@@ -126,7 +140,26 @@ export function getEventDescriptionForAvenue(event, avenueCode) {
   return description || cleanString(event?.description || event?.desc).slice(0, BOD_EVENT_DESCRIPTION_LIMIT) || "Not available";
 }
 
-export function validateAvenueDescriptionCoverage(avenues, avenueDescriptions) {
+function allowedMissingAvenuesForReportingContext(context = {}, draft = context) {
+  const reportingWindowId = safeReportingWindowId(context.reportingWindowId || draft?.reportingWindowId);
+  if (!reportingWindowId) return [];
+  const source = context.allowedMissingAvenues
+    ?? context.requiredReportingAvenues
+    ?? draft?.allowedMissingAvenues
+    ?? draft?.requiredReportingAvenues
+    ?? [];
+  return normalizeBodAvenues(source).filter((code) => code !== BOD_MEETING_AVENUE && code !== "GBM");
+}
+
+function reportingValidationContext(options = {}, draft = {}) {
+  const reportingWindowId = safeReportingWindowId(options.reportingWindowId || draft?.reportingWindowId);
+  return {
+    reportingWindowId,
+    allowedMissingAvenues: reportingWindowId ? allowedMissingAvenuesForReportingContext(options, draft) : [],
+  };
+}
+
+export function validateAvenueDescriptionCoverage(avenues, avenueDescriptions, options = {}) {
   const selected = normalizeBodAvenues(avenues);
   const errors = [];
   const invalidKeys = [];
@@ -143,6 +176,7 @@ export function validateAvenueDescriptionCoverage(avenues, avenueDescriptions) {
     return { ok: false, errors, selected, invalidKeys, extraKeys, missing, descriptions: {} };
   }
   const selectedSet = new Set(reportableSelected);
+  const allowedMissing = new Set(allowedMissingAvenuesForReportingContext(options));
   Object.keys(avenueDescriptions).forEach((key) => {
     const code = cleanString(key).toUpperCase();
     if (RESERVED_DESCRIPTION_KEYS.has(key) || !BOD_AVENUE_SET.has(code)) invalidKeys.push(key);
@@ -150,7 +184,7 @@ export function validateAvenueDescriptionCoverage(avenues, avenueDescriptions) {
   });
   const descriptions = normalizeAvenueDescriptions(avenueDescriptions, reportableSelected);
   reportableSelected.forEach((code) => {
-    if (!descriptions[code]) missing.push(code);
+    if (!descriptions[code] && !allowedMissing.has(code)) missing.push(code);
   });
   if (invalidKeys.length) errors.push("Avenue descriptions include invalid keys.");
   if (extraKeys.length) errors.push("Remove descriptions for unselected avenues.");
@@ -372,6 +406,7 @@ export function getBodEventPermissions(event, access, lockState = "unlocked") {
 export function validateBodEventDraft(draft, options = {}) {
   const errors = {};
   const avenues = normalizeBodAvenues(draft?.avenues);
+  const reportingContext = reportingValidationContext(options, draft);
   const isBodMeeting = isBodMeetingAvenueSelection(avenues);
   if (!cleanString(draft?.name)) errors.name = isBodMeeting ? "Meeting name is required." : "Event name is required.";
   const startDate = cleanString(draft?.startDate);
@@ -390,8 +425,9 @@ export function validateBodEventDraft(draft, options = {}) {
     const coverage = validateAvenueDescriptionCoverage(
       avenues,
       draft?.avenueDescriptions == null
-        ? buildAvenueDescriptionDraft(draft, avenues)
+        ? buildAvenueDescriptionDraft(draft, avenues, reportingContext)
         : draft.avenueDescriptions,
+      reportingContext,
     );
     if (avenues.length && !coverage.ok) errors.avenueDescriptions = coverage.errors.at(-1);
     const reportFinanceError = validateBodReportFinanceDraft(draft?.reportFinance);
@@ -405,6 +441,7 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
   if (Object.keys(errors).length) return { payload: null, errors };
   const avenues = normalizeBodAvenues(draft.avenues).slice(0, 12);
   const description = cleanString(draft.description).slice(0, BOD_EVENT_DESCRIPTION_LIMIT);
+  const reportingContext = reportingValidationContext(options, draft);
   if (isBodMeetingAvenueSelection(avenues)) {
     const meetingDate = cleanString(draft.startDate);
     const payload = {
@@ -421,13 +458,13 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
       visibility: "internal",
     };
     if (eventId) payload.eventId = cleanString(eventId);
-    if (cleanString(draft.reportingWindowId)) payload.reportingWindowId = cleanString(draft.reportingWindowId).slice(0, 160);
+    if (reportingContext.reportingWindowId) payload.reportingWindowId = reportingContext.reportingWindowId;
     return { payload, errors: {} };
   }
   const avenueDescriptionDraft = draft.avenueDescriptions == null
-    ? buildAvenueDescriptionDraft(draft, avenues)
+    ? buildAvenueDescriptionDraft(draft, avenues, reportingContext)
     : draft.avenueDescriptions;
-  const coverage = validateAvenueDescriptionCoverage(avenues, avenueDescriptionDraft);
+  const coverage = validateAvenueDescriptionCoverage(avenues, avenueDescriptionDraft, reportingContext);
   if (!coverage.ok) return { payload: null, errors: { ...errors, avenueDescriptions: coverage.errors.at(-1) } };
   const payload = {
     name: cleanString(draft.name).slice(0, 180),
@@ -451,7 +488,7 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
     driveFolder: safeExternalUrl(draft.driveFolder),
   };
   if (eventId) payload.eventId = cleanString(eventId);
-  if (cleanString(draft.reportingWindowId)) payload.reportingWindowId = cleanString(draft.reportingWindowId).slice(0, 160);
+  if (reportingContext.reportingWindowId) payload.reportingWindowId = reportingContext.reportingWindowId;
   return { payload, errors: {} };
 }
 

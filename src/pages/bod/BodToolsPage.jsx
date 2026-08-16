@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import BodEventArchiveDialog from "../../features/bod-tools/BodEventArchiveDialog";
 import BodAvenueReportPanel from "../../features/bod-tools/BodAvenueReportPanel";
@@ -7,11 +7,13 @@ import BodEventFilters from "../../features/bod-tools/BodEventFilters";
 import BodEventForm from "../../features/bod-tools/BodEventForm";
 import BodEventList from "../../features/bod-tools/BodEventList";
 import BodEventMutationNotice from "../../features/bod-tools/BodEventMutationNotice";
+import BodReportingQueuePanel from "../../features/bod-tools/BodReportingQueuePanel";
 import { getBodEventDiagnostic, getSafeBodEventError } from "../../features/bod-tools/bodEventErrors";
 import { filterBodEvents } from "../../features/bod-tools/bodEventModel";
 import {
   archiveBodEvent,
   clearBodEventCache,
+  fetchBodReportingQueue,
   fetchReportingWindowPrefill,
   submitBodEvent,
   syncBodEventToAttendance,
@@ -29,6 +31,16 @@ import "../../styles/components/bod-tools.css";
 
 const DEFAULT_FILTERS = { status: "active", type: "", avenue: "", month: "", mine: false, search: "" };
 
+function queueEventIds(item = {}) {
+  return new Set([item.linkedBodEventId, item.linkedEventId, item.linkedTargetId].filter(Boolean));
+}
+
+function findLinkedQueueEvent(item, candidates = []) {
+  const ids = queueEventIds(item);
+  if (!ids.size) return null;
+  return candidates.find((event) => ids.has(event.id) || ids.has(event.syncedEventId) || ids.has(event.bodMeetingId) || ids.has(event.syncedMeetingId)) || null;
+}
+
 export default function BodToolsPage() {
   const { access, user, signOut } = useAuth();
   const [searchParams] = useSearchParams();
@@ -43,10 +55,51 @@ export default function BodToolsPage() {
   const [mutationError, setMutationError] = useState("");
   const [busy, setBusy] = useState(false);
   const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
+  const [reportingQueue, setReportingQueue] = useState({ status: "idle", items: [], error: "" });
+  const [queueOpeningId, setQueueOpeningId] = useState("");
   const mutationLockRef = useRef(false);
   const sessionUidRef = useRef(uid);
   const prefillAppliedRef = useRef("");
+  const reportingQueueVersionRef = useRef(0);
   useEffect(() => { sessionUidRef.current = uid; }, [uid]);
+
+  const refreshReportingQueue = useCallback(async () => {
+    if (!uid || access?.canAccessBodTools !== true) {
+      setReportingQueue({ status: "idle", items: [], error: "" });
+      return [];
+    }
+    const requestUid = uid;
+    const version = ++reportingQueueVersionRef.current;
+    setReportingQueue((current) => ({
+      status: "loading",
+      items: current.items,
+      error: "",
+    }));
+    try {
+      const items = await fetchBodReportingQueue();
+      if (sessionUidRef.current !== requestUid || version !== reportingQueueVersionRef.current) return items;
+      setReportingQueue({ status: "success", items, error: "" });
+      return items;
+    } catch (error) {
+      if (sessionUidRef.current === requestUid && version === reportingQueueVersionRef.current) {
+        setReportingQueue((current) => ({
+          status: "error",
+          items: current.items,
+          error: getSafeBodEventError(error),
+        }));
+      }
+      return [];
+    }
+  }, [access?.canAccessBodTools, uid]);
+
+  useEffect(() => {
+    if (!uid || access?.canAccessBodTools !== true) {
+      reportingQueueVersionRef.current += 1;
+      setReportingQueue({ status: "idle", items: [], error: "" });
+      return;
+    }
+    refreshReportingQueue();
+  }, [access?.canAccessBodTools, refreshReportingQueue, uid]);
 
   useEffect(() => {
     if (!reportingWindowId) {
@@ -71,12 +124,13 @@ export default function BodToolsPage() {
           type: "error",
           message: "Reporting window prefill could not be opened. Check that the window is still open and your account has BOD Tools access.",
         });
+        refreshReportingQueue();
       });
 
     return () => {
       active = false;
     };
-  }, [access?.canAccessBodTools, reportingWindowId, status, uid]);
+  }, [access?.canAccessBodTools, refreshReportingQueue, reportingWindowId, status, uid]);
 
   const lockState = lock.status === "success" ? (lock.locked ? "locked" : "unlocked") : "unknown";
   const canMutate = lockState === "unlocked" || (lockState === "locked" && access.canAccessPresidentControls);
@@ -99,6 +153,7 @@ export default function BodToolsPage() {
       const rows = result.attendanceRowsUpdated;
       setNotice({ type: "success", message: `${successMessage}${rows === null ? "" : ` Attendance initialized for ${rows} member rows.`}` });
       reload();
+      refreshReportingQueue();
     } catch (error) {
       if (sessionUidRef.current !== requestUid) return;
       if (import.meta.env.DEV) console.error("BOD event operation failed.", getBodEventDiagnostic(error, operation, requestUid));
@@ -122,6 +177,7 @@ export default function BodToolsPage() {
     } catch (error) {
       if (import.meta.env.DEV) console.error("BOD event operation failed.", getBodEventDiagnostic(error, editing ? "update" : "create", uid));
       setMutationError(getSafeBodEventError(error));
+      refreshReportingQueue();
       throw error;
     } finally {
       setBusy(false);
@@ -136,6 +192,77 @@ export default function BodToolsPage() {
     const recordLabel = result?.meetingId || result?.bodMeetingId ? "Meeting" : "Event";
     setNotice({ type: "success", message: `${recordLabel} saved and synchronized.${rows === null ? "" : ` Attendance initialized for ${rows} member rows.`}` });
     reload();
+    refreshReportingQueue();
+  }
+
+  async function openEditForm(event) {
+    setMutationError("");
+    if (!event?.reportingWindowId) {
+      setForm({ event });
+      return;
+    }
+    setBusy(true);
+    try {
+      const prefill = await fetchReportingWindowPrefill(event.reportingWindowId);
+      setForm({ event, prefill });
+    } catch {
+      setNotice({
+        type: "error",
+        message: "Reporting window metadata could not be verified for this event. Try again before editing the linked report.",
+      });
+      refreshReportingQueue();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openReportingQueueAdd(item) {
+    if (queueOpeningId || item?.locked) return;
+    const reportingId = item?.reportingWindowId || "";
+    if (!reportingId) return;
+    setQueueOpeningId(reportingId);
+    setMutationError("");
+    try {
+      const prefill = await fetchReportingWindowPrefill(reportingId);
+      setForm({ event: null, prefill });
+      setSubmissionsExpanded(false);
+    } catch (error) {
+      setNotice({ type: "error", message: getSafeBodEventError(error) });
+      refreshReportingQueue();
+    } finally {
+      setQueueOpeningId("");
+    }
+  }
+
+  async function openReportingQueueContinue(item) {
+    if (queueOpeningId || item?.locked) return;
+    const reportingId = item?.reportingWindowId || item?.linkedBodEventId || "";
+    setQueueOpeningId(reportingId);
+    setMutationError("");
+    try {
+      let linkedEvent = findLinkedQueueEvent(item, events);
+      if (!linkedEvent) {
+        const refreshedEvents = await reload();
+        linkedEvent = findLinkedQueueEvent(item, refreshedEvents);
+      }
+      if (!linkedEvent?.reportingWindowId) {
+        setNotice({
+          type: "error",
+          message: "The linked BOD event could not be loaded. Refresh and try again.",
+        });
+        return;
+      }
+      await openEditForm(linkedEvent);
+    } catch (error) {
+      if (import.meta.env.DEV) console.error("BOD reporting queue continue failed.", getBodEventDiagnostic(error, "reporting-continue", uid));
+      setNotice({
+        type: "error",
+        message: "The linked BOD event could not be loaded. Refresh and try again.",
+      });
+      refreshReportingQueue();
+    } finally {
+      setQueueOpeningId("");
+    }
   }
 
   function confirmMutation() {
@@ -221,6 +348,16 @@ export default function BodToolsPage() {
         {status === "error" ? <BodToolsErrorState onRetry={reload} onSignOut={handleSignOut} /> : null}
 {status === "success" ? (
   <>
+    <BodReportingQueuePanel
+      status={reportingQueue.status}
+      items={reportingQueue.items}
+      error={reportingQueue.error}
+      openingId={queueOpeningId}
+      onRetry={refreshReportingQueue}
+      onAddEvent={openReportingQueueAdd}
+      onContinueEvent={openReportingQueueContinue}
+    />
+
     <section className="bod-submissions" aria-labelledby="bod-submissions-title">
       <header className="bod-submissions__header">
         <div>
@@ -259,10 +396,7 @@ export default function BodToolsPage() {
           access={access}
           lockState={lockState}
           onDetails={setDetails}
-          onEdit={(event) => {
-            setMutationError("");
-            setForm({ event });
-          }}
+          onEdit={openEditForm}
           onArchive={(event) => {
             setMutationError("");
             setConfirmation({ event, mode: "archive" });
@@ -290,6 +424,7 @@ export default function BodToolsPage() {
         onUploaded={(mom) => {
           setDetails((current) => current ? { ...current, mom } : current);
           reload();
+          refreshReportingQueue();
         }}
         onClose={() => setDetails(null)}
       />

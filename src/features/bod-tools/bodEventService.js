@@ -5,6 +5,7 @@ import { db } from "../../app/firestore";
 import { createBodEventCache } from "./bodEventCache";
 import { registerBodCacheClear } from "./bodCacheRegistry";
 import { normalizeAvenueReportingLock, normalizeBodEvent } from "./bodEventModel";
+import { normalizeBodReportingQueueResponse } from "./bodReportingQueueModel";
 
 const BOD_LOCK_STATE_POLL_MS = 30000;
 
@@ -65,6 +66,14 @@ function normalizeBodLockState(data) {
     },
     avenueReportingLocks,
   };
+}
+
+function stringList(value, maxLength = 120) {
+  return Array.isArray(value)
+    ? [...new Set(value
+      .map((item) => (typeof item === "string" ? item.trim().slice(0, maxLength) : ""))
+      .filter(Boolean))]
+    : [];
 }
 
 async function fetchBodToolsLockState() {
@@ -135,11 +144,17 @@ export async function fetchReportingWindowPrefill(reportingWindowId) {
   if (!safeId) throw new Error("Choose a valid reporting window.");
   const result = await httpsCallable(functions, "getReportingWindowPrefill")({ reportingWindowId: safeId });
   const data = result?.data && typeof result.data === "object" ? result.data : {};
+  const avenue = typeof data.avenue === "string" ? data.avenue : "";
+  const avenues = stringList(data.avenues, 80);
   return {
     ok: data.ok === true,
     reportingWindowId: typeof data.reportingWindowId === "string" ? data.reportingWindowId : "",
-    avenue: typeof data.avenue === "string" ? data.avenue : "",
+    avenue,
+    avenues: avenues.length ? avenues : (avenue ? [avenue] : []),
+    requiredReportingAvenues: avenues.length ? avenues : (avenue ? [avenue] : []),
     avenueLabel: typeof data.avenueLabel === "string" ? data.avenueLabel : "",
+    avenueLabels: stringList(data.avenueLabels),
+    avenuesLabel: typeof data.avenuesLabel === "string" ? data.avenuesLabel : "",
     name: typeof data.name === "string" ? data.name : "",
     eventName: typeof data.eventName === "string" ? data.eventName : "",
     date: typeof data.date === "string" ? data.date : "",
@@ -150,6 +165,12 @@ export async function fetchReportingWindowPrefill(reportingWindowId) {
     warning: typeof data.warning === "string" ? data.warning : "",
     note: typeof data.note === "string" ? data.note : "",
   };
+}
+
+export async function fetchBodReportingQueue() {
+  requireCurrentUser();
+  const result = await httpsCallable(functions, "getBodReportingQueue")({});
+  return normalizeBodReportingQueueResponse(result?.data);
 }
 
 export async function fetchBodAvenueReportDirectors(avenueCode) {

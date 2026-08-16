@@ -30,7 +30,10 @@ import {
   REMINDER_TEMPLATE_TEST_OPTIONS,
   REPORTING_WINDOW_AVENUE_OPTIONS,
   REPORTING_WINDOW_RECORD_TYPE,
+  reportingWindowAvenuesText,
   safeFormatReminderDateTime,
+  sortReportingWindowsNewestFirst,
+  toggleReportingAvenueSelection,
 } from "./reminderModel";
 import {
   createReportingWindowReminder,
@@ -45,7 +48,7 @@ import {
 } from "./reminderService";
 
 const createEmptyReportingWindow = () => ({
-  avenue: REPORTING_WINDOW_AVENUE_OPTIONS[0],
+  avenues: [],
   targetName: "",
   eventConductedDate: "",
   eventTime: "",
@@ -246,8 +249,10 @@ export default function RemindersModule({
   });
   const canManage = canManageReminders(access);
   const reminders = Array.isArray(data.reminders) ? data.reminders : [];
-  const reportingWindows = reminders.filter((item) =>
-    item.recordType === REPORTING_WINDOW_RECORD_TYPE
+  const reportingWindows = sortReportingWindowsNewestFirst(
+    reminders.filter((item) =>
+      item.recordType === REPORTING_WINDOW_RECORD_TYPE
+    )
   );
   const eventReminderConfigs = reminders.filter((item) =>
     item.recordType === EVENT_REMINDER_RECORD_TYPE
@@ -397,6 +402,13 @@ export default function RemindersModule({
         message: `${reminderTemplateTestLabel(result.payload.templateType)} test sent to ${sent.recipientEmail}.`,
       });
     });
+  }
+
+  function toggleDraftAvenue(avenue) {
+    setDraft((current) => ({
+      ...current,
+      avenues: toggleReportingAvenueSelection(current.avenues, avenue),
+    }));
   }
 
   function configureReminder(row, reminderType) {
@@ -611,23 +623,21 @@ export default function RemindersModule({
 
         <form className="admin-form reminders-window-form" onSubmit={saveReportingWindow}>
           <div className="admin-form-grid">
-            <label>
-              Avenue
-              <select
-                value={draft.avenue}
-                onChange={(event) => setDraft({
-                  ...draft,
-                  avenue: event.target.value,
-                })}
-                required
-              >
+            <fieldset className="reminders-avenue-picker">
+              <legend>Avenues</legend>
+              <div className="reminders-avenue-picker__grid">
                 {REPORTING_WINDOW_AVENUE_OPTIONS.map((avenue) => (
-                  <option key={avenue} value={avenue}>
-                    {avenue}
-                  </option>
+                  <label key={avenue} className="reminders-avenue-picker__option">
+                    <input
+                      type="checkbox"
+                      checked={draft.avenues.includes(avenue)}
+                      onChange={() => toggleDraftAvenue(avenue)}
+                    />
+                    <span>{avenue}</span>
+                  </label>
                 ))}
-              </select>
-            </label>
+              </div>
+            </fieldset>
 
             <label>
               Event/meeting name
@@ -712,7 +722,7 @@ export default function RemindersModule({
               <table>
                 <thead>
                   <tr>
-                    <th>Avenue</th>
+                    <th>Avenue(s)</th>
                     <th>Event/meeting</th>
                     <th>Conducted</th>
                     <th>Opens</th>
@@ -734,7 +744,7 @@ export default function RemindersModule({
                 <tbody>
                   {reportingWindows.map((item) => (
                     <tr key={item.id}>
-                      <td>{item.avenue}</td>
+                      <td>{reportingWindowAvenuesText(item)}</td>
                       <td>{item.targetName || "Not recorded"}</td>
                       <td>
                         {safeFormatReminderDateTime(item.conductedDate || item.eventConductedDate)}

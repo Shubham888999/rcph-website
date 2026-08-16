@@ -117,6 +117,51 @@ test("arrays are cleaned, malformed values ignored, and avenues deduplicated", (
   assert.deepEqual(event.imageLinks, ["https://example.com/a.jpg"]);
 });
 
+test("BOD events accept all normal reporting-window avenues", () => {
+  assert.deepEqual(
+    BOD_AVENUE_OPTIONS
+      .filter((option) => ["CWD", "SPORTS", "FINANCE"].includes(option.code))
+      .map((option) => [option.code, option.label]),
+    [["CWD", "CWD"], ["SPORTS", "Sports"], ["FINANCE", "Finance"]],
+  );
+
+  const event = normalizeBodEvent("reporting", {
+    ...base,
+    avenues: ["cwd", "sports", "finance"],
+    avenueDescriptions: {
+      CWD: "Website report",
+      SPORTS: "Sports report",
+      FINANCE: "Finance report",
+    },
+  });
+  assert.deepEqual(event.avenues, ["CWD", "SPORTS", "FINANCE"]);
+  assert.deepEqual(event.avenueDescriptions, {
+    CWD: "Website report",
+    SPORTS: "Sports report",
+    FINANCE: "Finance report",
+  });
+
+  const { payload, errors } = buildBodEventPayload({
+    name: "Reporting project",
+    conductedBy: "BOD team",
+    startDate: "2026-07-05",
+    avenues: ["CWD", "SPORTS", "FINANCE"],
+    description: "Public summary",
+    avenueDescriptions: {
+      CWD: "Website report",
+      SPORTS: "Sports report",
+      FINANCE: "Finance report",
+    },
+  });
+  assert.deepEqual(errors, {});
+  assert.deepEqual(payload.avenues, ["CWD", "SPORTS", "FINANCE"]);
+  assert.deepEqual(payload.avenueDescriptions, {
+    CWD: "Website report",
+    SPORTS: "Sports report",
+    FINANCE: "Finance report",
+  });
+});
+
 test("canonical BOD events normalize avenue descriptions without exposing invalid keys", () => {
   const event = normalizeBodEvent("a", {
     ...base,
@@ -403,6 +448,126 @@ test("payload builder requires a complete selected-avenue description map", () =
       description: "Public text",
       avenueDescriptions,
     });
+    assert.equal(result.payload, null);
+    assert.ok(result.errors.avenueDescriptions);
+  }
+});
+
+test("reporting-linked payloads allow only required reporting avenue descriptions to be pending", () => {
+  const reportingOptions = {
+    reportingWindowId: "window-isd-rrro",
+    allowedMissingAvenues: ["ISD", "RRRO"],
+  };
+
+  const blankRequired = buildBodEventPayload({
+    name: "Joint Project",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["ISD", "RRRO"],
+    description: "Public summary",
+    reportingWindowId: "window-isd-rrro",
+    avenueDescriptions: { ISD: "ISD report", RRRO: "" },
+  }, "", reportingOptions);
+  assert.deepEqual(blankRequired.errors, {});
+  assert.equal(blankRequired.payload.reportingWindowId, "window-isd-rrro");
+  assert.deepEqual(blankRequired.payload.avenueDescriptions, { ISD: "ISD report" });
+
+  const omittedRequired = buildBodEventPayload({
+    name: "Joint Project",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["ISD"],
+    description: "Public summary",
+    reportingWindowId: "window-isd-rrro",
+    avenueDescriptions: { ISD: "ISD report" },
+  }, "", reportingOptions);
+  assert.deepEqual(omittedRequired.errors, {});
+  assert.deepEqual(omittedRequired.payload.avenues, ["ISD"]);
+
+  const extraBlank = buildBodEventPayload({
+    name: "Joint Project",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["ISD", "CMD", "RRRO"],
+    description: "Public summary",
+    reportingWindowId: "window-isd-rrro",
+    avenueDescriptions: { ISD: "ISD report", RRRO: "", CMD: "" },
+  }, "", reportingOptions);
+  assert.equal(extraBlank.payload, null);
+  assert.match(extraBlank.errors.avenueDescriptions, /every selected/i);
+
+  const extraFilled = buildBodEventPayload({
+    name: "Joint Project",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["ISD", "CMD", "RRRO"],
+    description: "Public summary",
+    reportingWindowId: "window-isd-rrro",
+    avenueDescriptions: { ISD: "ISD report", RRRO: "", CMD: "Community report" },
+  }, "", reportingOptions);
+  assert.deepEqual(extraFilled.errors, {});
+  assert.deepEqual(extraFilled.payload.avenueDescriptions, { ISD: "ISD report", CMD: "Community report" });
+});
+
+test("reporting context does not use the general description as a required avenue fallback", () => {
+  const draft = {
+    description: "General public summary",
+    reportingWindowId: "window-isd-rrro",
+    requiredReportingAvenues: ["ISD", "RRRO"],
+    avenueDescriptions: { ISD: "ISD report" },
+  };
+
+  assert.deepEqual(
+    buildAvenueDescriptionDraft(draft, ["ISD", "RRRO"], {
+      reportingWindowId: draft.reportingWindowId,
+      allowedMissingAvenues: draft.requiredReportingAvenues,
+    }),
+    { ISD: "ISD report", RRRO: "" },
+  );
+
+  assert.equal(
+    validateAvenueDescriptionCoverage(["ISD", "RRRO"], { ISD: "ISD report", RRRO: "" }, {
+      reportingWindowId: "window-isd-rrro",
+      allowedMissingAvenues: ["ISD", "RRRO"],
+    }).ok,
+    true,
+  );
+});
+
+test("reportingWindowId alone does not relax strict avenue description validation", () => {
+  const result = buildBodEventPayload({
+    name: "Joint Project",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["ISD", "RRRO"],
+    description: "Public summary",
+    reportingWindowId: "window-isd-rrro",
+    avenueDescriptions: { ISD: "ISD report", RRRO: "" },
+  });
+
+  assert.equal(result.payload, null);
+  assert.match(result.errors.avenueDescriptions, /every selected/i);
+});
+
+test("reporting-linked validation still rejects malformed, extra, and invalid description keys", () => {
+  const options = {
+    reportingWindowId: "window-isd-rrro",
+    allowedMissingAvenues: ["ISD", "RRRO"],
+  };
+  for (const avenueDescriptions of [
+    [],
+    { ISD: "ISD report", BAD: "Invalid" },
+    { ISD: "ISD report", PDD: "Unselected" },
+    JSON.parse('{"ISD":"ISD report","__proto__":"reserved"}'),
+  ]) {
+    const result = buildBodEventPayload({
+      name: "Joint Project",
+      conductedBy: "Member",
+      startDate: "2026-07-05",
+      avenues: ["ISD", "RRRO"],
+      reportingWindowId: "window-isd-rrro",
+      avenueDescriptions,
+    }, "", options);
     assert.equal(result.payload, null);
     assert.ok(result.errors.avenueDescriptions);
   }
