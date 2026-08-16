@@ -97,9 +97,8 @@ test('BOD reporting queue keeps unlocked, upcoming, no-event, and locked incompl
   assert.equal(addItem.locked, false);
 
   const upcoming = reportingWindow('rw-upcoming', {
-    reportingOpensAt: '2026-08-18T00:00:00.000Z',
-    reportingDueAt: '2026-08-19T00:00:00.000Z',
-    lockAt: '2026-08-20T00:00:00.000Z',
+    conductedDate: '2026-08-18',
+    createdAt: '2026-08-12T00:00:00.000Z',
   });
   const upcomingItem = shapeBodReportingQueueItem({
     reminder: upcoming,
@@ -112,13 +111,14 @@ test('BOD reporting queue keeps unlocked, upcoming, no-event, and locked incompl
 
   const locked = reportingWindow('rw-locked', {
     status: 'active',
-    lockAt: '2026-08-12T00:00:00.000Z',
+    reportingDueAt: '2026-08-13T18:29:59.999Z',
+    lockAt: '2026-08-13T18:30:00.000Z',
   });
   const lockedItem = shapeBodReportingQueueItem({
     reminder: locked,
     coverage: reportingWindowQueueCoverage(locked, {}),
     responsibilities: [],
-    nowMillis: Date.parse('2026-08-13T00:00:00.000Z'),
+    nowMillis: Date.parse('2026-08-14T00:00:00.000Z'),
   });
   assert.equal(shouldIncludeBodReportingQueueItem(locked, lockedItem.coverage), true);
   assert.equal(lockedItem.runtimeState, 'locked');
@@ -126,6 +126,60 @@ test('BOD reporting queue keeps unlocked, upcoming, no-event, and locked incompl
 
   const unlocked = reportingWindow('rw-unlocked', { status: 'unlocked' });
   assert.equal(shouldIncludeBodReportingQueueItem(unlocked, reportingWindowQueueCoverage(unlocked, {})), true);
+});
+
+test('BOD reporting queue treats manually unlocked overdue windows as actionable', () => {
+  const unlocked = reportingWindow('rw-unlocked-expired', {
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-09T04:30:00.000Z',
+    reportingDueAt: '2026-08-12T18:29:00.000Z',
+    lockAt: '2026-08-12T18:30:00.000Z',
+    lockEnabled: true,
+    status: 'unlocked',
+    unlockedAt: '2026-08-14T04:30:00.000Z',
+  });
+  const item = shapeBodReportingQueueItem({
+    reminder: unlocked,
+    coverage: reportingWindowQueueCoverage(unlocked, {}),
+    responsibilities: [],
+    nowMillis: Date.parse('2026-08-15T00:00:00.000Z'),
+  });
+
+  assert.equal(item.locked, false);
+  assert.equal(item.effectiveLocked, false);
+  assert.equal(item.deadlinePassed, true);
+  assert.equal(item.manualUnlockActive, true);
+  assert.equal(item.runtimeState, 'active');
+  assert.equal(item.action, 'add_event');
+});
+
+test('BOD reporting queue uses createdAt to recover legacy late-created reporting windows', () => {
+  const vox = reportingWindow('rw-vox', {
+    avenue: 'CSD',
+    avenues: ['CSD'],
+    targetName: 'VOX//26',
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-16T04:30:00.000Z',
+    reportingOpensAt: '2026-08-09T18:30:00.000Z',
+    reportingDueAt: '2026-08-12T18:29:00.000Z',
+    lockAt: '2026-08-12T18:30:00.000Z',
+    lockEnabled: true,
+    status: 'unlocked',
+    unlockedAt: '2026-08-16T05:00:00.000Z',
+  });
+  const item = shapeBodReportingQueueItem({
+    reminder: vox,
+    coverage: reportingWindowQueueCoverage(vox, {}),
+    responsibilities: [],
+    nowMillis: Date.parse('2026-08-16T06:00:00.000Z'),
+  });
+
+  assert.equal(vox.anchorDate, '2026-08-16');
+  assert.equal(item.reportingDueAt, '2026-08-19T18:29:59.999Z');
+  assert.equal(item.lockAt, '2026-08-19T18:30:00.000Z');
+  assert.equal(item.locked, false);
+  assert.equal(item.runtimeState, 'active');
+  assert.deepEqual(item.coverage.pendingAvenues, ['CSD']);
 });
 
 test('BOD reporting queue responsibilities group by avenue without private contact data', () => {

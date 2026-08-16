@@ -250,7 +250,10 @@ test('reporting-window dashboard notices disappear after completion, unlock, or 
     reminderDocs: [
       reminderDoc('completed', { status: 'completed' }),
       reminderDoc('unlocked', { status: 'unlocked' }),
-      reminderDoc('expired', { lockAt: '2026-07-24T18:30:00.000Z' }),
+      reminderDoc('expired', {
+        reportingDueAt: '2026-07-18T18:29:59.999Z',
+        lockAt: '2026-07-18T18:30:00.000Z',
+      }),
     ],
     now: new Date('2026-07-25T00:00:00.000Z'),
   });

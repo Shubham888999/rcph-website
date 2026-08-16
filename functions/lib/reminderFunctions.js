@@ -34,6 +34,7 @@ const {
   evaluateReportingWindowAvenueCoverage,
   reminderSkipReason,
   reportingWindowRuntimeState,
+  resolveReportingWindowLifecycle,
   targetCollectionForReminder,
   normalizedNameSimilarity,
   attendanceValueIsMarked,
@@ -324,16 +325,13 @@ function reportingWindowAdministrativelyStopped(reminder = {}) {
   return REPORTING_QUEUE_STOPPED_STATUSES.has(status) || REPORTING_QUEUE_STOPPED_REASONS.has(reason);
 }
 
-function reportingWindowQueueLocked(reminder = {}, nowMillis = Date.now()) {
-  return cleanLower(reminder.status, 40) === 'locked'
-    || (Number.isFinite(Number(reminder.lockAtMillis)) && nowMillis >= Number(reminder.lockAtMillis));
+function reportingWindowQueueLocked(reminder = {}, nowMillis = Date.now(), lock = null) {
+  return resolveReportingWindowLifecycle(reminder, { nowMillis, lock }).effectiveLocked;
 }
 
-function reportingWindowQueueRuntimeState(reminder = {}, nowMillis = Date.now()) {
+function reportingWindowQueueRuntimeState(reminder = {}, nowMillis = Date.now(), lock = null) {
   if (reportingWindowAdministrativelyStopped(reminder)) return 'stopped';
-  if (cleanLower(reminder.status, 40) === 'completed') return 'completed';
-  if (reportingWindowQueueLocked(reminder, nowMillis)) return 'locked';
-  return reportingWindowRuntimeState(reminder, nowMillis);
+  return resolveReportingWindowLifecycle(reminder, { nowMillis, lock }).runtimeState;
 }
 
 function specialReportingWindowCoverage(reminder = {}) {
@@ -480,10 +478,11 @@ function queueLinkedTargetId(reminder = {}) {
   return safeDocumentId(reminder.linkedTargetId || reminder.linkedBodEventId || reminder.linkedEventId || reminder.linkedMeetingId);
 }
 
-function shapeBodReportingQueueItem({ reminder, coverage, responsibilities, nowMillis = Date.now() }) {
+function shapeBodReportingQueueItem({ reminder, coverage, responsibilities, nowMillis = Date.now(), lock = null }) {
   const targetType = reportingWindowExpectedTargetType(reminder);
   const linkedTargetId = queueLinkedTargetId(reminder);
   const linkedBodEventId = queueLinkedBodEventId(reminder);
+  const lifecycle = resolveReportingWindowLifecycle(reminder, { nowMillis, lock });
   return {
     id: reminder.id,
     reportingWindowId: reminder.id,
@@ -504,14 +503,23 @@ function shapeBodReportingQueueItem({ reminder, coverage, responsibilities, nowM
     avenues: reminder.avenues.slice(),
     avenueLabels: reminder.avenueLabels.slice(),
     avenuesLabel: reminder.avenuesLabel,
+    anchorDate: reminder.anchorDate,
+    reportingDeadlineAnchorDate: reminder.reportingDeadlineAnchorDate,
+    countdownStartAt: reminder.countdownStartAt,
+    reportingAvailableAt: reminder.reportingAvailableAt,
     reportingOpensAt: reminder.reportingOpensAt,
     reportingDueAt: reminder.reportingDueAt,
     deadline: reminder.reportingDueAt,
     lockAt: reminder.lockAt,
     timezone: reminder.timezone,
     status: reminder.status,
-    runtimeState: reportingWindowQueueRuntimeState(reminder, nowMillis),
-    locked: reportingWindowQueueLocked(reminder, nowMillis),
+    runtimeState: lifecycle.runtimeState,
+    locked: lifecycle.effectiveLocked,
+    effectiveLocked: lifecycle.effectiveLocked,
+    deadlinePassed: lifecycle.deadlinePassed,
+    lockTargetReached: lifecycle.lockTargetReached,
+    manualUnlockActive: lifecycle.manualUnlockActive,
+    lockSource: lifecycle.lockSource,
     lockReason: reminder.lockReason,
     eventReportStatus: coverage.complete ? 'recorded' : coverage.status,
     coverage: {
@@ -1609,9 +1617,10 @@ async function processAvenueReportingWindowDoc(doc, options = {}) {
 
   const now = admin.firestore.Timestamp.now();
   const nowMillis = now.toMillis();
-  const runtimeState = options.forceSend === true
+  const scheduleRuntimeState = reportingWindowRuntimeState(reminder, nowMillis);
+  const runtimeState = options.forceSend === true && scheduleRuntimeState !== 'not_open'
     ? (nowMillis >= reminder.lockAtMillis ? 'lock_due' : (reminder.remindersSent > 0 ? 'active' : 'open'))
-    : reportingWindowRuntimeState(reminder, nowMillis);
+    : scheduleRuntimeState;
   if (runtimeState === 'completed' || runtimeState === 'locked' || runtimeState === 'unlocked' || runtimeState === 'no_recipient') {
     return { outcome: 'skipped', reason: runtimeState };
   }
@@ -1910,6 +1919,16 @@ const createReportingWindowReminder = onCall(CALLABLE_OPTIONS, async (request) =
     avenues: normalized.avenues,
     avenueLabels: normalized.avenueLabels,
     avenuesLabel: normalized.avenuesLabel,
+    anchorDate: normalized.anchorDate,
+    reportingDeadlineAnchorDate: normalized.reportingDeadlineAnchorDate,
+    countdownStartAt: new Date(normalized.countdownStartAt),
+    reportingAvailableAt: new Date(normalized.reportingAvailableAt),
+    reportingOpensAt: new Date(normalized.reportingOpensAt),
+    windowOpensAt: new Date(normalized.windowOpensAt),
+    reportingDueAt: new Date(normalized.reportingDueAt),
+    reportDueAt: new Date(normalized.reportDueAt),
+    lockAt: new Date(normalized.lockAt),
+    timezone: normalized.timezone,
     recipientRole: normalized.recipientRole,
     recipientPositionKeys: normalized.recipientPositionKeys,
   };
@@ -1967,14 +1986,19 @@ const getBodReportingQueue = onCall(CALLABLE_OPTIONS, async (request) => {
     .filter(reminder => !isSpecialReportingWindow(reminder))
     .map(queueLinkedBodEventId)
     .filter(Boolean);
-  const [linkedBodEvents, queueAssignees] = await Promise.all([
+  const reportingLockIds = reportingWindows
+    .map(reminder => safeDocumentId(reminder.lockId))
+    .filter(Boolean);
+  const [linkedBodEvents, queueAssignees, reportingLocks] = await Promise.all([
     getFirestoreDocsById('bodEvents', linkedBodEventIds),
     loadBodReportingQueueAssignees(),
+    getFirestoreDocsById('locks', reportingLockIds),
   ]);
 
   const items = reportingWindows.reduce((list, reminder) => {
     const linkedBodEventId = queueLinkedBodEventId(reminder);
     const eventSnap = linkedBodEventId ? linkedBodEvents.get(linkedBodEventId) : null;
+    const lockSnap = reminder.lockId ? reportingLocks.get(reminder.lockId) : null;
     const coverage = reportingWindowQueueCoverage(reminder, eventSnap?.exists ? eventSnap.data() || {} : {});
     if (!shouldIncludeBodReportingQueueItem(reminder, coverage)) return list;
     const responsibilities = buildBodReportingQueueResponsibilities(reminder.avenues, queueAssignees);
@@ -1983,6 +2007,7 @@ const getBodReportingQueue = onCall(CALLABLE_OPTIONS, async (request) => {
       coverage,
       responsibilities,
       nowMillis,
+      lock: lockSnap?.exists ? lockSnap.data() || {} : null,
     }));
     return list;
   }, []);
@@ -2000,8 +2025,8 @@ const getReportingWindowPrefill = onCall(CALLABLE_OPTIONS, async (request) => {
   if (!snap.exists) throw new HttpsError('not-found', 'Reporting window not found.');
   const reminder = normalizeReportingWindowConfig(snap.id, snap.data() || {});
   if (!reminder) throw new HttpsError('failed-precondition', 'This record is not a reporting window.');
-  const runtimeState = reportingWindowRuntimeState(reminder, Date.now());
-  if (reminder.status === 'locked' || runtimeState === 'lock_due') {
+  const lifecycle = resolveReportingWindowLifecycle(reminder, { nowMillis: Date.now() });
+  if (lifecycle.effectiveLocked) {
     throw new HttpsError('failed-precondition', 'This reporting window is locked.');
   }
 

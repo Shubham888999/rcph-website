@@ -5,8 +5,10 @@ const test = require('node:test');
 const {
   normalizeReminderConfig,
   normalizeReportingWindowConfig,
+  deriveReportingWindowLifecycle,
   reminderSkipReason,
   reportingWindowRuntimeState,
+  resolveReportingWindowLifecycle,
   hasMomMetadata,
   normalizedNameSimilarity,
   attendanceValueIsMarked,
@@ -126,12 +128,141 @@ test('avenue reporting windows normalize aliases and runtime states', () => {
   assert.equal(config.recipientRole, 'avenue_director');
   assert.deepEqual(config.recipientPositionKeys, ['cwd', 'co-cwd']);
   assert.equal(config.reportingOpensAt, '2026-07-14T18:30:00.000Z');
-  assert.equal(config.reportingDueAt, '2026-07-17T18:29:00.000Z');
+  assert.equal(config.reportingDueAt, '2026-07-17T18:29:59.999Z');
   assert.equal(config.lockAt, '2026-07-17T18:30:00.000Z');
   assert.equal(reportingWindowRuntimeState(config, Date.parse('2026-07-14T18:29:00.000Z')), 'not_open');
   assert.equal(reportingWindowRuntimeState(config, Date.parse('2026-07-14T18:30:00.000Z')), 'open');
   assert.equal(reportingWindowRuntimeState({ ...config, remindersSent: 1 }, Date.parse('2026-07-15T18:30:00.000Z')), 'active');
   assert.equal(reportingWindowRuntimeState(config, Date.parse('2026-07-17T18:30:00.000Z')), 'lock_due');
+});
+
+test('reporting lifecycle uses later IST calendar date of conducted and created dates', () => {
+  const beforeEvent = deriveReportingWindowLifecycle({
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-05T04:30:00.000Z',
+    reportingDueAt: '2026-08-12T18:29:00.000Z',
+    lockAt: '2026-08-12T18:30:00.000Z',
+  });
+  assert.equal(beforeEvent.anchorDate, '2026-08-09');
+  assert.equal(beforeEvent.countdownStartAt, '2026-08-09T18:30:00.000Z');
+  assert.equal(beforeEvent.reportingDueAt, '2026-08-12T18:29:59.999Z');
+  assert.equal(beforeEvent.lockAt, '2026-08-12T18:30:00.000Z');
+
+  const afterEvent = deriveReportingWindowLifecycle({
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-11T04:30:00.000Z',
+  });
+  assert.equal(afterEvent.anchorDate, '2026-08-11');
+  assert.equal(afterEvent.countdownStartAt, '2026-08-11T18:30:00.000Z');
+  assert.equal(afterEvent.reportingDueAt, '2026-08-14T18:29:59.999Z');
+  assert.equal(afterEvent.lockAt, '2026-08-14T18:30:00.000Z');
+
+  const muchLater = deriveReportingWindowLifecycle({
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-16T04:30:00.000Z',
+  });
+  assert.equal(muchLater.anchorDate, '2026-08-16');
+  assert.equal(muchLater.countdownStartAt, '2026-08-16T18:30:00.000Z');
+  assert.equal(muchLater.reportingDueAt, '2026-08-19T18:29:59.999Z');
+  assert.equal(muchLater.lockAt, '2026-08-19T18:30:00.000Z');
+
+  const sameDate = deriveReportingWindowLifecycle({
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-09T08:30:00.000Z',
+  });
+  assert.equal(sameDate.anchorDate, '2026-08-09');
+  assert.equal(sameDate.reportingDueAt, '2026-08-12T18:29:59.999Z');
+});
+
+test('reporting lifecycle uses IST dates for UTC timestamps near midnight', () => {
+  const lifecycle = deriveReportingWindowLifecycle({
+    conductedDate: '2026-08-08T20:00:00.000Z',
+    createdAt: '2026-08-09T20:00:00.000Z',
+  });
+
+  assert.equal(lifecycle.conductedCalendarDate, '2026-08-09');
+  assert.equal(lifecycle.createdCalendarDate, '2026-08-10');
+  assert.equal(lifecycle.anchorDate, '2026-08-10');
+  assert.equal(lifecycle.countdownStartAt, '2026-08-10T18:30:00.000Z');
+  assert.equal(lifecycle.reportingDueAt, '2026-08-13T18:29:59.999Z');
+  assert.equal(lifecycle.lockAt, '2026-08-13T18:30:00.000Z');
+});
+
+test('reporting lifecycle keeps legacy windows from shortening stored deadlines', () => {
+  const legacyShort = normalizeReportingWindowConfig('legacy-short', {
+    recordType: 'avenue_reporting_window',
+    avenue: 'CSD',
+    targetName: 'VOX',
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-16T04:30:00.000Z',
+    reportingOpensAt: '2026-08-09T18:30:00.000Z',
+    reportingDueAt: '2026-08-12T18:29:00.000Z',
+    lockAt: '2026-08-12T18:30:00.000Z',
+    lockEnabled: true,
+  });
+  assert.equal(legacyShort.anchorDate, '2026-08-16');
+  assert.equal(legacyShort.reportingDueAt, '2026-08-19T18:29:59.999Z');
+  assert.equal(legacyShort.lockAt, '2026-08-19T18:30:00.000Z');
+
+  const legacyLong = normalizeReportingWindowConfig('legacy-long', {
+    recordType: 'avenue_reporting_window',
+    avenue: 'CSD',
+    targetName: 'Extended Project',
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-09T04:30:00.000Z',
+    reportingDueAt: '2026-08-20T18:29:59.999Z',
+    lockAt: '2026-08-20T18:30:00.000Z',
+    lockEnabled: true,
+  });
+  assert.equal(legacyLong.reportingDueAt, '2026-08-20T18:29:59.999Z');
+  assert.equal(legacyLong.lockAt, '2026-08-20T18:30:00.000Z');
+});
+
+test('effective reporting lock state honors automatic locks, manual unlocks, and completion', () => {
+  const expired = normalizeReportingWindowConfig('expired', {
+    recordType: 'avenue_reporting_window',
+    avenue: 'CSD',
+    targetName: 'Expired Project',
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-09T04:30:00.000Z',
+    lockEnabled: true,
+  });
+  const afterLock = Date.parse('2026-08-13T18:30:00.000Z');
+  assert.equal(resolveReportingWindowLifecycle(expired, { nowMillis: afterLock }).effectiveLocked, true);
+  assert.equal(resolveReportingWindowLifecycle(expired, { nowMillis: afterLock }).runtimeState, 'locked');
+
+  const unlocked = {
+    ...expired,
+    status: 'unlocked',
+    unlockedAt: '2026-08-14T04:30:00.000Z',
+  };
+  const unlockedState = resolveReportingWindowLifecycle(unlocked, { nowMillis: afterLock });
+  assert.equal(unlockedState.effectiveLocked, false);
+  assert.equal(unlockedState.manualUnlockActive, true);
+  assert.equal(unlockedState.runtimeState, 'active');
+
+  const completed = { ...unlocked, status: 'completed', eventReportStatus: 'recorded' };
+  const completedState = resolveReportingWindowLifecycle(completed, { nowMillis: afterLock });
+  assert.equal(completedState.runtimeState, 'completed');
+  assert.equal(completedState.effectiveLocked, false);
+});
+
+test('reporting reminders wait for countdown while BOD queue can open after creation', () => {
+  const vox = normalizeReportingWindowConfig('vox', {
+    recordType: 'avenue_reporting_window',
+    avenue: 'CSD',
+    targetName: 'VOX//26',
+    conductedDate: '2026-08-09',
+    createdAt: '2026-08-16T04:30:00.000Z',
+    reportingDueAt: '2026-08-12T18:29:00.000Z',
+    lockAt: '2026-08-12T18:30:00.000Z',
+    lockEnabled: true,
+  });
+  const createdDayRead = Date.parse('2026-08-16T06:00:00.000Z');
+
+  assert.equal(reportingWindowRuntimeState(vox, createdDayRead), 'not_open');
+  assert.equal(resolveReportingWindowLifecycle(vox, { nowMillis: createdDayRead }).runtimeState, 'open');
+  assert.equal(resolveReportingWindowLifecycle(vox, { nowMillis: createdDayRead }).effectiveLocked, false);
 });
 
 test('multi-avenue reporting windows normalize arrays, aliases, and recipient unions', () => {

@@ -15,6 +15,7 @@ const AVENUE_REPORTING_REMINDER_TYPE = 'avenue_reporting';
 const AVENUE_REPORTING_LOCK_TYPE = 'avenue_reporting';
 const AVENUE_REPORTING_LOCK_REASON = 'reporting_window_expired';
 const REPORTING_WINDOW_TIMEZONE = 'Asia/Kolkata';
+const REPORTING_WINDOW_IST_OFFSET_MILLIS = 330 * 60 * 1000;
 const REMINDER_DEFAULT_MAX = 3;
 const GBM_BOD_TOOLS_RECORD_WARNING = 'Please first add this meeting/event in BOD Tools using the exact name below if not already present.';
 
@@ -396,6 +397,88 @@ function reminderTimestampIso(value) {
   return date ? date.toISOString() : '';
 }
 
+function validIstDateString(value) {
+  const text = cleanText(value, 20);
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const [, yearText, monthText, dayText] = match;
+  const date = new Date(Date.UTC(Number(yearText), Number(monthText) - 1, Number(dayText)));
+  return date.toISOString().slice(0, 10) === text ? text : '';
+}
+
+function istCalendarDate(value) {
+  const text = cleanText(value, 80);
+  const dateOnly = validIstDateString(text);
+  if (dateOnly) return dateOnly;
+  const date = timestampDate(value);
+  if (!date) return '';
+  return new Date(date.getTime() + REPORTING_WINDOW_IST_OFFSET_MILLIS).toISOString().slice(0, 10);
+}
+
+function istDateAt(dateString, dayOffset, hours, minutes, seconds = 0, milliseconds = 0) {
+  const validDateString = validIstDateString(dateString);
+  if (!validDateString) return null;
+  const [year, month, day] = validDateString.split('-').map(Number);
+  return new Date(
+    Date.UTC(year, month - 1, day + dayOffset, hours, minutes, seconds, milliseconds)
+      - REPORTING_WINDOW_IST_OFFSET_MILLIS,
+  );
+}
+
+function laterDate(baseDate, candidateValue) {
+  const candidate = timestampDate(candidateValue);
+  if (!candidate) return baseDate;
+  return candidate.getTime() > baseDate.getTime() ? candidate : baseDate;
+}
+
+function reportingWindowAvailableAt(raw = {}, conductedCalendarDate = '', createdCalendarDate = '', anchorDate = '') {
+  const createdAt = timestampDate(raw.createdAt);
+  if (createdAt && (!conductedCalendarDate || createdCalendarDate >= conductedCalendarDate)) {
+    return createdAt;
+  }
+  return istDateAt(conductedCalendarDate || anchorDate, 0, 0, 0, 0, 0);
+}
+
+function deriveReportingWindowLifecycle(raw = {}) {
+  const conductedDate = cleanText(raw.conductedDate || raw.eventConductedDate || raw.targetDate, 40);
+  const conductedCalendarDate = istCalendarDate(conductedDate);
+  const createdCalendarDate = istCalendarDate(raw.createdAt);
+  const anchorDate = [conductedCalendarDate, createdCalendarDate]
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
+  if (!anchorDate) return null;
+
+  const countdownStartAt = istDateAt(anchorDate, 1, 0, 0, 0, 0);
+  const policyReportingDueAt = istDateAt(anchorDate, 3, 23, 59, 59, 999);
+  const policyLockAt = istDateAt(anchorDate, 4, 0, 0, 0, 0);
+  if (!countdownStartAt || !policyReportingDueAt || !policyLockAt) return null;
+
+  const reportingDueAt = laterDate(policyReportingDueAt, raw.reportingDueAt || raw.reportDueAt);
+  let lockAt = laterDate(policyLockAt, raw.lockAt);
+  if (lockAt.getTime() <= reportingDueAt.getTime()) {
+    lockAt = new Date(reportingDueAt.getTime() + 1);
+  }
+  const availableAt = reportingWindowAvailableAt(raw, conductedCalendarDate, createdCalendarDate, anchorDate);
+
+  return {
+    anchorDate,
+    conductedCalendarDate,
+    createdCalendarDate,
+    countdownStartAt: countdownStartAt.toISOString(),
+    countdownStartAtMillis: countdownStartAt.getTime(),
+    reportingAvailableAt: availableAt ? availableAt.toISOString() : '',
+    reportingAvailableAtMillis: availableAt ? availableAt.getTime() : 0,
+    reportingOpensAt: countdownStartAt.toISOString(),
+    reportingOpensAtMillis: countdownStartAt.getTime(),
+    reportingDueAt: reportingDueAt.toISOString(),
+    reportingDueAtMillis: reportingDueAt.getTime(),
+    lockAt: lockAt.toISOString(),
+    lockAtMillis: lockAt.getTime(),
+    timezone: REPORTING_WINDOW_TIMEZONE,
+  };
+}
+
 function targetTypeForSource(source) {
   return SOURCE_TARGET_TYPES[cleanText(source, 80)] || '';
 }
@@ -455,12 +538,10 @@ function normalizeReportingWindowConfig(id, raw = {}) {
   if (hasExclusiveReportingAvenueConflict(avenues)) return null;
   const avenueKey = avenues[0] || '';
   const conductedDate = cleanText(raw.conductedDate || raw.eventConductedDate || raw.targetDate, 40);
-  const reportingOpensAt = raw.reportingOpensAt || raw.windowOpensAt;
-  const reportingDueAt = raw.reportingDueAt || raw.reportDueAt;
-  const lockAt = raw.lockAt;
+  const lifecycle = deriveReportingWindowLifecycle({ ...raw, conductedDate });
   const targetName = cleanText(raw.targetName || raw.eventName || raw.name, 180) || `${avenueDisplayLabel(avenueKey)} event`;
   const maxReminders = numericCount(raw.maxReminders, REMINDER_DEFAULT_MAX) || REMINDER_DEFAULT_MAX;
-  if (!avenueKey || !conductedDate || !timestampMillis(reportingOpensAt) || !timestampMillis(reportingDueAt) || !timestampMillis(lockAt)) return null;
+  if (!avenueKey || !conductedDate || !lifecycle) return null;
 
   return {
     id,
@@ -481,14 +562,20 @@ function normalizeReportingWindowConfig(id, raw = {}) {
     avenues,
     avenueLabels: avenues.map(avenueDisplayLabel),
     avenuesLabel: reportingAvenuesLabel(avenues),
-    reportingOpensAt: reminderTimestampIso(reportingOpensAt),
-    reportingOpensAtMillis: timestampMillis(reportingOpensAt),
-    windowOpensAt: reminderTimestampIso(reportingOpensAt),
-    reportingDueAt: reminderTimestampIso(reportingDueAt),
-    reportingDueAtMillis: timestampMillis(reportingDueAt),
-    reportDueAt: reminderTimestampIso(reportingDueAt),
-    lockAt: reminderTimestampIso(lockAt),
-    lockAtMillis: timestampMillis(lockAt),
+    anchorDate: lifecycle.anchorDate,
+    reportingDeadlineAnchorDate: lifecycle.anchorDate,
+    countdownStartAt: lifecycle.countdownStartAt,
+    countdownStartAtMillis: lifecycle.countdownStartAtMillis,
+    reportingAvailableAt: lifecycle.reportingAvailableAt,
+    reportingAvailableAtMillis: lifecycle.reportingAvailableAtMillis,
+    reportingOpensAt: lifecycle.reportingOpensAt,
+    reportingOpensAtMillis: lifecycle.reportingOpensAtMillis,
+    windowOpensAt: lifecycle.reportingOpensAt,
+    reportingDueAt: lifecycle.reportingDueAt,
+    reportingDueAtMillis: lifecycle.reportingDueAtMillis,
+    reportDueAt: lifecycle.reportingDueAt,
+    lockAt: lifecycle.lockAt,
+    lockAtMillis: lifecycle.lockAtMillis,
     timezone: cleanText(raw.timezone, 80) || REPORTING_WINDOW_TIMEZONE,
     remindersEnabled: raw.remindersEnabled === true,
     lockEnabled: raw.lockEnabled === true,
@@ -558,6 +645,74 @@ function reportingWindowRuntimeState(config, nowMillis) {
   if (nowMillis < config.reportingOpensAtMillis) return 'not_open';
   if (nowMillis >= config.lockAtMillis) return 'lock_due';
   return config.remindersSent > 0 ? 'active' : 'open';
+}
+
+function normalizeReportingWindowLockData(lock) {
+  if (!lock) return {};
+  if (typeof lock.data === 'function') return lock.data() || {};
+  return lock && typeof lock === 'object' ? lock : {};
+}
+
+function latestTimestampMillis(...values) {
+  return values.reduce((latest, value) => Math.max(latest, timestampMillis(value)), 0);
+}
+
+function reportingWindowManualUnlockActive(config = {}, lock = null) {
+  const lockData = normalizeReportingWindowLockData(lock);
+  const status = cleanLower(config.status, 40);
+  const lockStatus = cleanLower(lockData.status, 40);
+  const unlockSignal = status === 'unlocked'
+    || (lockData.locked === false && lockStatus === 'unlocked')
+    || Boolean(config.unlockedAt || lockData.unlockedAt);
+  if (!unlockSignal) return false;
+
+  const latestUnlockedAt = latestTimestampMillis(config.unlockedAt, lockData.unlockedAt);
+  const latestLockedAt = latestTimestampMillis(config.lockedAt, lockData.lockedAt);
+  if (latestUnlockedAt && latestLockedAt && latestLockedAt > latestUnlockedAt) return false;
+  return true;
+}
+
+function resolveReportingWindowLifecycle(config = {}, options = {}) {
+  const nowMillis = Number.isFinite(Number(options.nowMillis)) ? Number(options.nowMillis) : Date.now();
+  const lockData = normalizeReportingWindowLockData(options.lock);
+  const status = cleanLower(config.status, 40);
+  const lockStatus = cleanLower(lockData.status, 40);
+  const completionReason = cleanLower(config.completionReason, 160);
+  const completed = status === 'completed'
+    || cleanLower(config.eventReportStatus, 40) === 'recorded'
+    || completionReason === 'report_submitted';
+  const manualUnlockActive = !completed && reportingWindowManualUnlockActive(config, lockData);
+  const deadlinePassed = Boolean(config.reportingDueAtMillis && nowMillis > Number(config.reportingDueAtMillis));
+  const lockTargetReached = Boolean(config.lockAtMillis && nowMillis >= Number(config.lockAtMillis));
+  const explicitLockActive = status === 'locked'
+    || (lockData.locked === true && (!lockStatus || lockStatus === 'active' || lockStatus === 'locked'));
+  const automaticLockDue = config.lockEnabled === true && lockTargetReached;
+  const effectiveLocked = !completed && !manualUnlockActive && (explicitLockActive || automaticLockDue);
+  const lockSource = effectiveLocked
+    ? (explicitLockActive ? 'explicit_lock' : 'deadline')
+    : (manualUnlockActive ? 'manual_unlock' : '');
+
+  let runtimeState = 'open';
+  if (completed) runtimeState = 'completed';
+  else if (effectiveLocked) runtimeState = 'locked';
+  else if (manualUnlockActive) runtimeState = 'active';
+  else if (config.reportingAvailableAtMillis && nowMillis < Number(config.reportingAvailableAtMillis)) runtimeState = 'not_open';
+  else runtimeState = config.remindersSent > 0 ? 'active' : 'open';
+
+  return {
+    anchorDate: config.anchorDate || config.reportingDeadlineAnchorDate || '',
+    countdownStartAt: config.countdownStartAt || config.reportingOpensAt || '',
+    reportingAvailableAt: config.reportingAvailableAt || '',
+    reportingDueAt: config.reportingDueAt || config.reportDueAt || '',
+    lockAt: config.lockAt || '',
+    deadlinePassed,
+    lockTargetReached,
+    manualUnlockActive,
+    effectiveLocked,
+    locked: effectiveLocked,
+    lockSource,
+    runtimeState,
+  };
 }
 
 function targetCollectionForReminder(config) {
@@ -1010,11 +1165,14 @@ module.exports = {
   avenueRecipientPositionKeys,
   sourceForTargetType,
   normalizeReminderRecipientRole,
+  deriveReportingWindowLifecycle,
   normalizeReminderConfig,
   normalizeReportingWindowConfig,
   reminderSkipReason,
   reportingWindowSkipReason,
   reportingWindowRuntimeState,
+  reportingWindowManualUnlockActive,
+  resolveReportingWindowLifecycle,
   targetCollectionForReminder,
   targetNameFromData,
   targetDateFromData,

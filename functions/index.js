@@ -43,6 +43,7 @@ const {
   reportingAvenuesLabel,
   evaluateReportingWindowAvenueCoverage,
   normalizeReportingWindowConfig,
+  resolveReportingWindowLifecycle,
   normalizedNameSimilarity: reportingNameSimilarity,
 } = require('./lib/reminderCore');
 const avenueReportingLocks = require('./lib/avenue-reporting-locks');
@@ -3552,7 +3553,7 @@ async function loadReportingWindowForBodPayloadId(reportingWindowId) {
   if (!reportingWindow) {
     throw new HttpsError('failed-precondition', 'This record is not a valid reporting window.');
   }
-  if (reportingWindow.status === 'locked' || (reportingWindow.lockEnabled && Date.now() >= reportingWindow.lockAtMillis)) {
+  if (resolveReportingWindowLifecycle(reportingWindow, { nowMillis: Date.now() }).effectiveLocked) {
     throw new HttpsError('failed-precondition', 'This reporting window is locked.');
   }
   const reportingAvenue = normalizeReportingAvenues(Array.isArray(reportingWindow.avenues) && reportingWindow.avenues.length ? reportingWindow.avenues : reportingWindow.avenue)[0]
@@ -3601,7 +3602,7 @@ async function requireReportingWindowForBodMeetingPayload(payload) {
   if (!reportingWindow) {
     throw new HttpsError('failed-precondition', 'This record is not a valid reporting window.');
   }
-  if (reportingWindow.status === 'locked' || (reportingWindow.lockEnabled && Date.now() >= reportingWindow.lockAtMillis)) {
+  if (resolveReportingWindowLifecycle(reportingWindow, { nowMillis: Date.now() }).effectiveLocked) {
     throw new HttpsError('failed-precondition', 'This reporting window is locked.');
   }
   if (normalizeReportingAvenueKey(reportingWindow.avenue) !== 'BOD_MEETING') {
