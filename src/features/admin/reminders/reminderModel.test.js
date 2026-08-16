@@ -6,7 +6,6 @@ import {
   buildReminderTemplateTestPayload,
   buildReminderStatusSummaries,
   buildReportingWindowPayload,
-  calculateReportingWindowDates,
   canManageReminders,
   canStopEventReminderConfig,
   EVENT_REMINDER_RECORD_TYPE,
@@ -31,18 +30,6 @@ import {
   sortReportingWindowsNewestFirst,
   toggleReportingAvenueSelection,
 } from "./reminderModel.js";
-
-function assertIso(value, iso) {
-  assert.equal(value.toISOString(), iso);
-}
-
-test("reporting window dates are calculated in IST from the conducted date", () => {
-  const dates = calculateReportingWindowDates("2026-07-14");
-
-  assertIso(dates.reportingOpensAt, "2026-07-14T18:30:00.000Z");
-  assertIso(dates.reportingDueAt, "2026-07-17T18:29:00.000Z");
-  assertIso(dates.lockAt, "2026-07-17T18:30:00.000Z");
-});
 
 test("Avenue reporting window payload stores Phase 5 defaults", () => {
   const result = buildReportingWindowPayload({
@@ -72,11 +59,11 @@ test("Avenue reporting window payload stores Phase 5 defaults", () => {
   assert.equal(result.payload.workflowStatus, "created");
   assert.equal(result.payload.remindersSent, 0);
   assert.equal(result.payload.maxReminders, 3);
-  assertIso(result.payload.reportingOpensAt, "2026-07-14T18:30:00.000Z");
-  assertIso(result.payload.reportingDueAt, "2026-07-17T18:29:00.000Z");
-  assertIso(result.payload.lockAt, "2026-07-17T18:30:00.000Z");
-  assertIso(result.payload.windowOpensAt, "2026-07-14T18:30:00.000Z");
-  assertIso(result.payload.reportDueAt, "2026-07-17T18:29:00.000Z");
+  assert.equal(Object.hasOwn(result.payload, "reportingOpensAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "reportingDueAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "lockAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "windowOpensAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "reportDueAt"), false);
 });
 
 test("Avenue reporting window payload requires an exact event or meeting name", () => {
@@ -188,7 +175,7 @@ test("reporting window payload rejects mixed special avenue selections", () => {
   assert.match(bothSpecial.errors.join(" "), /cannot be combined/i);
 });
 
-test("reporting window multi-avenue payload keeps date and reminder defaults unchanged", () => {
+test("reporting window multi-avenue payload keeps event facts and reminder defaults unchanged", () => {
   const result = buildReportingWindowPayload({
     avenues: ["ISD", "RRRO"],
     targetName: "Joint Fellowship Project",
@@ -207,9 +194,9 @@ test("reporting window multi-avenue payload keeps date and reminder defaults unc
   assert.equal(result.payload.remindersSent, 0);
   assert.equal(result.payload.maxReminders, 3);
   assert.equal(result.payload.reminderTime, "00:00");
-  assertIso(result.payload.reportingOpensAt, "2026-07-14T18:30:00.000Z");
-  assertIso(result.payload.reportingDueAt, "2026-07-17T18:29:00.000Z");
-  assertIso(result.payload.lockAt, "2026-07-17T18:30:00.000Z");
+  assert.equal(Object.hasOwn(result.payload, "reportingOpensAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "reportingDueAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "lockAt"), false);
 });
 
 test("reporting avenue toggle helper enforces special avenue exclusivity", () => {
@@ -240,7 +227,7 @@ test("CWD and Phase 5 reporting avenues are available without removing existing 
   assert.equal(REPORTING_WINDOW_POSITION_KEYS["BOD Meeting"], "secretary");
 });
 
-test("CWD reporting window payload preserves calculated dates", () => {
+test("CWD reporting window payload leaves lifecycle dates to the backend", () => {
   const result = buildReportingWindowPayload({
     avenue: "CWD",
     targetName: "Website Launch",
@@ -254,12 +241,12 @@ test("CWD reporting window payload preserves calculated dates", () => {
   assert.equal(result.payload.eventTime, "");
   assert.equal(result.payload.remindersEnabled, true);
   assert.equal(result.payload.lockEnabled, true);
-  assertIso(result.payload.reportingOpensAt, "2026-07-14T18:30:00.000Z");
-  assertIso(result.payload.reportingDueAt, "2026-07-17T18:29:00.000Z");
-  assertIso(result.payload.lockAt, "2026-07-17T18:30:00.000Z");
+  assert.equal(Object.hasOwn(result.payload, "reportingOpensAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "reportingDueAt"), false);
+  assert.equal(Object.hasOwn(result.payload, "lockAt"), false);
 });
 
-test("Phase 5 reporting avenues can be created with the same calculated dates", () => {
+test("Phase 5 reporting avenues can be created without client deadline math", () => {
   const sports = buildReportingWindowPayload({
     avenue: "Sports",
     targetName: "Sports Meet",
@@ -289,9 +276,9 @@ test("Phase 5 reporting avenues can be created with the same calculated dates", 
   assert.equal(bodMeeting.ok, true);
   assert.equal(bodMeeting.payload.avenue, "BOD Meeting");
   assert.deepEqual(bodMeeting.payload.avenues, ["BOD Meeting"]);
-  assertIso(sports.payload.reportingOpensAt, "2026-07-14T18:30:00.000Z");
-  assertIso(finance.payload.reportingDueAt, "2026-07-17T18:29:00.000Z");
-  assertIso(bodMeeting.payload.lockAt, "2026-07-17T18:30:00.000Z");
+  assert.equal(Object.hasOwn(sports.payload, "reportingOpensAt"), false);
+  assert.equal(Object.hasOwn(finance.payload, "reportingDueAt"), false);
+  assert.equal(Object.hasOwn(bodMeeting.payload, "lockAt"), false);
 });
 
 test("reporting window status helpers render Phase 5 lifecycle states", () => {

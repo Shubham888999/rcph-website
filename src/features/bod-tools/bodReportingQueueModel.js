@@ -138,6 +138,10 @@ export function normalizeBodReportingQueueItem(raw = {}) {
     avenueLabel: cleanString(raw.avenueLabel, 140),
     avenueLabels: stringList(raw.avenueLabels),
     avenuesLabel: cleanString(raw.avenuesLabel, 180),
+    anchorDate: cleanString(raw.anchorDate || raw.reportingDeadlineAnchorDate, 40),
+    reportingDeadlineAnchorDate: cleanString(raw.reportingDeadlineAnchorDate || raw.anchorDate, 40),
+    countdownStartAt: cleanString(raw.countdownStartAt, 80),
+    reportingAvailableAt: cleanString(raw.reportingAvailableAt, 80),
     reportingOpensAt: cleanString(raw.reportingOpensAt, 80),
     reportingDueAt: cleanString(raw.reportingDueAt || raw.deadline, 80),
     lockAt: cleanString(raw.lockAt, 80),
@@ -145,6 +149,11 @@ export function normalizeBodReportingQueueItem(raw = {}) {
     runtimeState: cleanLower(raw.runtimeState, 80),
     eventReportStatus: cleanLower(raw.eventReportStatus, 80),
     locked: raw.locked === true,
+    effectiveLocked: raw.effectiveLocked === true || raw.locked === true,
+    deadlinePassed: raw.deadlinePassed === true,
+    lockTargetReached: raw.lockTargetReached === true,
+    manualUnlockActive: raw.manualUnlockActive === true,
+    lockSource: cleanLower(raw.lockSource, 80),
     targetType: cleanLower(raw.targetType, 80),
     linkedEventId: cleanString(raw.linkedEventId || raw.linkedTargetId || raw.linkedBodEventId, 180),
     linkedBodEventId: cleanString(raw.linkedBodEventId || raw.linkedEventId, 180),
@@ -184,6 +193,7 @@ export function reportingActionLabel(action) {
 
 export function runtimeStateLabel(item = {}) {
   if (item.locked) return "Deadline passed · Locked";
+  if (item.manualUnlockActive) return "Unlocked by Admin";
   if (item.runtimeState === "not_open" || item.runtimeState === "upcoming") return "Upcoming";
   if (item.runtimeState === "active") return "Active";
   if (item.runtimeState === "open") return "Open";

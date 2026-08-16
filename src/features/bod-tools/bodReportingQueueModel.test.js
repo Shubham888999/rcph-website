@@ -7,6 +7,7 @@ import {
   normalizeBodReportingQueueResponse,
   reportingStatusLabel,
   reportingStatusTone,
+  runtimeStateLabel,
   shouldRenderBodReportingQueuePanel,
 } from "./bodReportingQueueModel.js";
 
@@ -40,6 +41,13 @@ test("reporting queue response normalization strips unknown and private fields w
         ],
         action: "continue_event",
         linkedBodEventId: "event-1",
+        anchorDate: "2026-08-16",
+        countdownStartAt: "2026-08-16T18:30:00.000Z",
+        reportingAvailableAt: "2026-08-16T04:30:00.000Z",
+        effectiveLocked: false,
+        deadlinePassed: true,
+        manualUnlockActive: true,
+        lockSource: "manual_unlock",
         secret: "ignore",
       },
       {
@@ -55,6 +63,14 @@ test("reporting queue response normalization strips unknown and private fields w
   assert.deepEqual(items.map((item) => item.reportingWindowId), ["window-a", "window-b"]);
   assert.equal(items[0].action, "continue_event");
   assert.equal(items[0].linkedBodEventId, "event-1");
+  assert.equal(items[0].anchorDate, "2026-08-16");
+  assert.equal(items[0].countdownStartAt, "2026-08-16T18:30:00.000Z");
+  assert.equal(items[0].reportingAvailableAt, "2026-08-16T04:30:00.000Z");
+  assert.equal(items[0].effectiveLocked, false);
+  assert.equal(items[0].deadlinePassed, true);
+  assert.equal(items[0].manualUnlockActive, true);
+  assert.equal(items[0].lockSource, "manual_unlock");
+  assert.equal(runtimeStateLabel(items[0]), "Unlocked by Admin");
   assert.equal(items[0].coverage.avenueStatuses.RRRO, "missing_avenue");
   assert.equal(Object.hasOwn(items[0], "secret"), false);
   assert.equal(Object.hasOwn(items[0].responsibilities[0].assignees[0], "email"), false);

@@ -99,18 +99,6 @@ export const REMINDER_COMPLETION_REASONS = Object.freeze({
   target_not_found: "Target not found",
 });
 
-function dateParts(value) {
-  if (!validDate(value)) return null;
-  return value.split("-").map(Number);
-}
-
-function istDateAt(value, dayOffset, hours, minutes) {
-  const parts = dateParts(value);
-  if (!parts) return null;
-  const [year, month, day] = parts;
-  return new Date(Date.UTC(year, month - 1, day + dayOffset, hours, minutes, 0, 0) - 330 * 60 * 1000);
-}
-
 export function todayDateString(now = new Date()) {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) return "";
   const year = now.getFullYear();
@@ -215,15 +203,6 @@ export function safeFormatReminderDateTime(value, fallback = "Not available") {
       return fallback;
     }
   }
-}
-
-export function calculateReportingWindowDates(eventDate) {
-  if (!validDate(eventDate)) return null;
-  return {
-    reportingOpensAt: istDateAt(eventDate, 1, 0, 0),
-    reportingDueAt: istDateAt(eventDate, 3, 23, 59),
-    lockAt: istDateAt(eventDate, 4, 0, 0),
-  };
 }
 
 export function normalizeReportingAvenue(value) {
@@ -351,9 +330,6 @@ export function buildReportingWindowPayload(draft = {}) {
   if (!validDate(eventConductedDate)) errors.push("Enter a valid conducted date.");
   if (!isValidReminderTime(eventTime)) errors.push("Enter a valid event time.");
 
-  const calculated = calculateReportingWindowDates(eventConductedDate);
-  if (!calculated) errors.push("Reporting window dates could not be calculated.");
-
   if (errors.length) return { ok: false, errors, payload: null };
 
   return {
@@ -370,11 +346,6 @@ export function buildReportingWindowPayload(draft = {}) {
       conductedDate: eventConductedDate,
       targetDate: eventConductedDate,
       eventTime,
-      reportingOpensAt: calculated.reportingOpensAt,
-      reportingDueAt: calculated.reportingDueAt,
-      lockAt: calculated.lockAt,
-      windowOpensAt: calculated.reportingOpensAt,
-      reportDueAt: calculated.reportingDueAt,
       timezone: REPORTING_WINDOW_TIMEZONE,
       remindersEnabled: draft.remindersEnabled !== false,
       lockEnabled: draft.lockEnabled !== false,
@@ -487,6 +458,10 @@ export function normalizeReminder(id, raw) {
       eventConductedDate,
       conductedDate: eventConductedDate,
       eventTime: isValidReminderTime(text(raw.eventTime, 20)) ? text(raw.eventTime, 20) : "",
+      anchorDate: text(raw.anchorDate || raw.reportingDeadlineAnchorDate, 20),
+      reportingDeadlineAnchorDate: text(raw.reportingDeadlineAnchorDate || raw.anchorDate, 20),
+      countdownStartAt: reminderTimestamp(raw.countdownStartAt || raw.reportingOpensAt || raw.windowOpensAt),
+      reportingAvailableAt: reminderTimestamp(raw.reportingAvailableAt),
       reportingOpensAt: reminderTimestamp(raw.reportingOpensAt || raw.windowOpensAt),
       reportingDueAt: reminderTimestamp(raw.reportingDueAt || raw.reportDueAt),
       lockAt: reminderTimestamp(raw.lockAt),
