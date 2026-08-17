@@ -7,6 +7,7 @@ const test = require('node:test');
 
 const functionsSource = readFileSync(path.join(__dirname, 'reminderFunctions.js'), 'utf8');
 const indexSource = readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
+const reportingLinkRecoverySource = readFileSync(path.join(__dirname, 'bod-reporting-link-recovery.js'), 'utf8');
 
 test('scheduled and manual reminder email functions are exported additively', () => {
   assert.match(indexSource, /const reminderFunctions = require\('\.\/lib\/reminderFunctions'\);/);
@@ -158,20 +159,30 @@ test('BOD reporting queue callable is read-only and BOD Tools scoped', () => {
 });
 
 test('BOD event create and update refresh reporting coverage with server-side link recovery', () => {
+  assert.match(indexSource, /const bodReportingLinkRecovery = require\('\.\/lib\/bod-reporting-link-recovery'\);/);
   assert.match(indexSource, /function recoverReportingWindowIdForBodEventUpdate/);
   assert.match(indexSource, /This event is already linked to a different reporting window/);
   assert.match(indexSource, /function allowedMissingAvenuesForReportingWindow/);
+  assert.match(reportingLinkRecoverySource, /function allowedMissingAvenuesForReportingWindow/);
+  assert.match(reportingLinkRecoverySource, /function recoverDirectLinkedReportingWindowForBodEventUpdate/);
+  assert.match(reportingLinkRecoverySource, /directReportingWindowLinkField/);
+  assert.match(reportingLinkRecoverySource, /linkedBodEventId/);
+  assert.match(reportingLinkRecoverySource, /linkedEventId/);
+  assert.match(reportingLinkRecoverySource, /linkedTargetId/);
+  assert.match(reportingLinkRecoverySource, /multiple reporting windows/);
   assert.match(indexSource, /loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(data\)\)/);
   assert.match(indexSource, /allowedMissingAvenues: allowedMissingAvenuesForReportingWindow\(reportingWindow\)/);
   assert.match(indexSource, /const recoveredData = recoverReportingWindowIdForBodEventUpdate\(request\.data \|\| \{\}, bodEventData\)/);
-  assert.match(indexSource, /loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(recoveredData\)\)/);
+  assert.match(indexSource, /const reportingWindow = await loadReportingWindowForBodEventUpdate\(eventId, recoveredData\)/);
+  assert.match(indexSource, /const payloadData = withRecoveredReportingWindowId\(recoveredData, reportingWindow\)/);
+  assert.match(indexSource, /const payload = normalizeBodEventPayload\(payloadData, \{/);
   assert.match(indexSource, /const \{ eventCreated, bodEventDoc \} = await writeSyncedBodEvent/);
   assert.match(indexSource, /const \{ bodEventDoc \} = await writeSyncedBodEvent\(\{ eventId, payload, uid, userProfile, now \}\)/);
   assert.match(indexSource, /eventData: bodEventDoc/);
   assert.match(indexSource, /const reportingWindowId = payload\.reportingWindowId \|\| existingBod\.reportingWindowId \|\| existingEvent\.reportingWindowId \|\| ''/);
   assert.match(indexSource, /function assertCompletedReportingWindowCoveragePreserved/);
-  assert.match(indexSource, /Completed reporting windows must keep every required avenue report complete/);
-  assert.match(indexSource, /evaluateReportingWindowAvenueCoverage\(reportingWindow, payload\)/);
+  assert.match(reportingLinkRecoverySource, /Completed reporting windows must keep every required avenue report complete/);
+  assert.match(reportingLinkRecoverySource, /evaluateReportingWindowAvenueCoverage\(reportingWindow, payload\)/);
 });
 
 test('BOD event reporting-window partial validation is server-authorized only', () => {
@@ -180,7 +191,7 @@ test('BOD event reporting-window partial validation is server-authorized only', 
   const reportingWindowSource = indexSource.slice(indexSource.indexOf('async function loadReportingWindowForBodPayloadId'), indexSource.indexOf('async function requireReportingWindowForBodMeetingPayload'));
 
   assert.match(submitSource, /loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(data\)\)[\s\S]*normalizeBodEventPayload\(data, \{/);
-  assert.match(updateSource, /recoverReportingWindowIdForBodEventUpdate\(request\.data \|\| \{\}, bodEventData\)[\s\S]*loadReportingWindowForBodPayloadId\(suppliedReportingWindowId\(recoveredData\)\)[\s\S]*normalizeBodEventPayload\(recoveredData, \{/);
+  assert.match(updateSource, /recoverReportingWindowIdForBodEventUpdate\(request\.data \|\| \{\}, bodEventData\)[\s\S]*loadReportingWindowForBodEventUpdate\(eventId, recoveredData\)[\s\S]*normalizeBodEventPayload\(payloadData, \{/);
   assert.match(reportingWindowSource, /if \(!snap\.exists\) throw new HttpsError\('not-found', 'Reporting window not found\.'\)/);
   assert.match(reportingWindowSource, /This record is not a valid reporting window/);
   assert.match(reportingWindowSource, /This reporting window is locked/);

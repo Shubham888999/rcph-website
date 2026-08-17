@@ -33,6 +33,7 @@ const {
 const bodAvenueReport = require('./lib/bod-avenue-report');
 const bodSecretarialReport = require('./lib/bod-secretarial-report');
 const bodEventSchema = require('./lib/bod-event-schema');
+const bodReportingLinkRecovery = require('./lib/bod-reporting-link-recovery');
 const { createBodManagementService } = require('./lib/bod-management');
 const { createBodPhotoUploadService } = require('./lib/bod-photo-upload');
 const momFunctions = require('./lib/momFunctions');
@@ -41,7 +42,6 @@ const {
   normalizeAvenueKey: normalizeReportingAvenueKey,
   normalizeReportingAvenues,
   reportingAvenuesLabel,
-  evaluateReportingWindowAvenueCoverage,
   normalizeReportingWindowConfig,
   resolveReportingWindowLifecycle,
   normalizedNameSimilarity: reportingNameSimilarity,
@@ -3511,9 +3511,7 @@ function bodPayloadIncludesReportingWindowAvenue(payload, reportingWindow) {
 }
 
 function allowedMissingAvenuesForReportingWindow(reportingWindow = {}) {
-  const avenues = normalizeReportingAvenues(Array.isArray(reportingWindow.avenues) && reportingWindow.avenues.length ? reportingWindow.avenues : reportingWindow.avenue);
-  if (avenues.some(avenue => avenue === 'GBM' || avenue === 'BOD_MEETING')) return [];
-  return avenues;
+  return bodReportingLinkRecovery.allowedMissingAvenuesForReportingWindow(reportingWindow);
 }
 
 function storedReportingWindowId(data = {}) {
@@ -3533,6 +3531,43 @@ function recoverReportingWindowIdForBodEventUpdate(raw = {}, existingData = {}) 
   return {
     ...raw,
     reportingWindowId: incomingId || existingId,
+  };
+}
+
+async function loadRecoveredReportingWindowForBodEventUpdate(eventId) {
+  const safeEventId = validateEventDocId(eventId);
+  if (!safeEventId) return null;
+  const reminders = db.collection('reminders');
+  const [canonicalSnap, legacyEventSnap, legacyTargetSnap] = await Promise.all([
+    reminders.where('linkedBodEventId', '==', safeEventId).get(),
+    reminders.where('linkedEventId', '==', safeEventId).get(),
+    reminders.where('linkedTargetId', '==', safeEventId).get(),
+  ]);
+  const recoveredReportingWindow = bodReportingLinkRecovery.recoverDirectLinkedReportingWindowForBodEventUpdate({
+    docs: [
+      ...canonicalSnap.docs,
+      ...legacyEventSnap.docs,
+      ...legacyTargetSnap.docs,
+    ],
+    eventId: safeEventId,
+    normalizeReportingWindowConfig,
+    HttpsError,
+  });
+  if (!recoveredReportingWindow?.id) return null;
+  return loadReportingWindowForBodPayloadId(recoveredReportingWindow.id);
+}
+
+async function loadReportingWindowForBodEventUpdate(eventId, data = {}) {
+  const reportingWindowId = suppliedReportingWindowId(data);
+  if (reportingWindowId) return loadReportingWindowForBodPayloadId(reportingWindowId);
+  return loadRecoveredReportingWindowForBodEventUpdate(eventId);
+}
+
+function withRecoveredReportingWindowId(data = {}, reportingWindow = null) {
+  if (!reportingWindow?.id || suppliedReportingWindowId(data)) return data;
+  return {
+    ...data,
+    reportingWindowId: reportingWindow.id,
   };
 }
 
@@ -3565,18 +3600,11 @@ async function loadReportingWindowForBodPayloadId(reportingWindowId) {
 }
 
 function reportingWindowIsCompleted(record = {}) {
-  return normalizeText(record.status, 40).toLowerCase() === 'completed'
-    || normalizeText(record.eventReportStatus, 40).toLowerCase() === 'recorded'
-    || normalizeText(record.completionReason, 80).toLowerCase() === 'report_submitted';
+  return bodReportingLinkRecovery.reportingWindowIsCompleted(record);
 }
 
 function assertCompletedReportingWindowCoveragePreserved(payload, reportingWindow) {
-  if (!reportingWindow || !reportingWindowIsCompleted(reportingWindow)) return;
-  if (!allowedMissingAvenuesForReportingWindow(reportingWindow).length) return;
-  const coverage = evaluateReportingWindowAvenueCoverage(reportingWindow, payload);
-  if (!coverage.complete) {
-    throw new HttpsError('failed-precondition', 'Completed reporting windows must keep every required avenue report complete.');
-  }
+  bodReportingLinkRecovery.assertCompletedReportingWindowCoveragePreserved({ payload, reportingWindow, HttpsError });
 }
 
 function assertReportingWindowMatchesBodPayload(payload, reportingWindow) {
@@ -8700,8 +8728,9 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   await assertBodEventRecordIsClubEvent(eventId);
 
   const recoveredData = recoverReportingWindowIdForBodEventUpdate(request.data || {}, bodEventData);
-  const reportingWindow = await loadReportingWindowForBodPayloadId(suppliedReportingWindowId(recoveredData));
-  const payload = normalizeBodEventPayload(recoveredData, {
+  const reportingWindow = await loadReportingWindowForBodEventUpdate(eventId, recoveredData);
+  const payloadData = withRecoveredReportingWindowId(recoveredData, reportingWindow);
+  const payload = normalizeBodEventPayload(payloadData, {
     allowedMissingAvenues: allowedMissingAvenuesForReportingWindow(reportingWindow),
   });
   await assertBodEventAvenuesUnlocked(payload.avenues);
