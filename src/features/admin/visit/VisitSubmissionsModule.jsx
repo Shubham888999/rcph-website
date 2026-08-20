@@ -5,7 +5,18 @@ import { AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
 import { normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
-import VisitSubmissionFiles from "./VisitSubmissionFiles";
+import VisitSubmissionFiles, { VisitFileTypeBadge } from "./VisitSubmissionFiles";
+import {
+  getFolderSummaryItems,
+  getVisitAvailability,
+  getVisitFileKind,
+  getVisitFolderChips,
+  getVisitFolderCode,
+  getVisitFolderPresentation,
+  getVisitStatus,
+  getVisitSummaryItems,
+  groupVisitFolders,
+} from "./visitPresentationModel.js";
 import {
   addBulkVisitFiles,
   addVisitFiles,
@@ -53,19 +64,190 @@ export default function VisitSubmissionsModule({ onNotice }) {
   const access = state.dashboard?.access || state.folders?.access || state.detail?.access || {};
   const reload = () => route.position ? openFolder(route.visit, route.position) : route.visit ? openVisit(route.visit) : loadDashboard();
   return <>
-    <AdminModuleHeader title="Club Visits" description="Club Assembly, DZR Visit, and DRR Visit document workflows." action={route.visit ? <button onClick={() => { setRoute({ visit: "", position: "" }); loadDashboard(); }}>Submission dashboard</button> : null} />
-    {!route.visit ? <VisitDashboard data={state.dashboard} access={access} openVisit={openVisit} busy={busy} mutate={mutate} setDialog={setDialog} load={loadDashboard} /> : route.position ? <FolderDetail data={state.detail} busy={busy} mutate={mutate} reload={reload} setDialog={setDialog} /> : <VisitFolders data={state.folders} openFolder={openFolder} setDialog={setDialog} />}
+    <AdminModuleHeader kicker="Official filing room" title="Club Visits" description="Official visit document workspace for Club Assembly, DZR Visit, and DRR Visit." action={route.visit ? <button onClick={() => { setRoute({ visit: "", position: "" }); loadDashboard(); }}>Submission dashboard</button> : null} />
+    {!route.visit ? <VisitDashboardWorkspace data={state.dashboard} access={access} openVisit={openVisit} busy={busy} mutate={mutate} setDialog={setDialog} load={loadDashboard} /> : route.position ? <FolderDetail data={state.detail} busy={busy} mutate={mutate} reload={reload} setDialog={setDialog} /> : <VisitFoldersWorkspace data={state.folders} openFolder={openFolder} setDialog={setDialog} />}
     {dialog ? <VisitDialog dialog={dialog} visits={state.dashboard?.visits || []} busy={busy} mutate={mutate} onClose={() => setDialog(null)} reload={reload} /> : null}
   </>;
 }
 
-function VisitDashboard({ data, access, openVisit, busy, mutate, setDialog, load }) {
-  if (!data?.initialized) return <section className="admin-panel"><h3>Visit structure is not initialized</h3>{data.canInitialize ? <button disabled={busy} onClick={() => mutate("initialize", visitCalls.initialize, "Visit structure initialized.", load)}>Initialize structure</button> : null}</section>;
-  return <><div className="admin-card-grid">{data.visits.map((visit) => <article className="admin-record-card" key={visit.visitType}><header className="visit-section-header"><h3>{visit.displayTitle}</h3>{access.canManage ? <button type="button" onClick={() => setDialog({ type: "bulk-upload", visit })}>Bulk upload</button> : null}</header><p>{visit.description}</p><p>{visit.enabled ? visit.submissionOpen ? "Open" : "Submissions closed" : "Disabled"}</p><p>Visit: {visit.visitDate || "Not scheduled"}</p><p>Deadline: {visit.submissionDeadline || "Not set"}</p><p>{visit.accessiblePositionCount} folders · {visit.activeSubmissionCount} active files</p><div className="admin-actions"><button onClick={() => openVisit(visit.visitType)}>Open</button>{access.canManage ? <button onClick={() => setDialog({ type: "visit-settings", visit })}>Settings</button> : null}</div></article>)}</div>{access.canManage ? <section className="admin-panel"><h3>Maintenance</h3><div className="admin-actions"><button disabled={busy} onClick={() => mutate("cleanup", visitCalls.cleanup, "Expired sessions cleaned.")}>Clean expired sessions</button><button onClick={() => setDialog({ type: "moderation" })}>Moderation</button></div></section> : null}</>;
+function VisitStatusBadge({ statusKey, children }) {
+  return <span className={`visit-status-badge is-${statusKey || "neutral"}`}>{children}</span>;
 }
 
-function VisitFolders({ data, openFolder, setDialog }) {
-  return <><section className="admin-panel"><h3>{data.visit?.displayTitle}</h3><p>{data.visit?.instructions || data.visit?.description}</p><p>Deadline: {data.visit?.submissionDeadline || "Not set"}</p></section><div className="admin-card-grid">{data.folders.map((folder) => <article className="admin-record-card" key={folder.positionKey}><h3>{folder.positionTitle}</h3><p>{folder.avenueCode}</p><p>{folder.locked ? `Locked: ${folder.lockReason || "No reason"}` : folder.submissionOpen ? "Open" : "Closed"}</p><p>{folder.activeFileCount} / {folder.maxActiveFiles} active files</p><div className="admin-actions">{folder.canOpen ? <button onClick={() => openFolder(folder.visitType, folder.positionKey)}>Open</button> : null}{data.access.canManage || folder.canManage ? <button onClick={() => setDialog({ type: "folder-settings", folder })}>Settings</button> : null}</div></article>)}</div></>;
+function VisitSummaryList({ items }) {
+  return (
+    <dl className="visit-summary-list">
+      {items.map((item) => (
+        <div key={item.label}>
+          <dt>{item.label}</dt>
+          <dd>{item.statusKey ? <VisitStatusBadge statusKey={item.statusKey}>{item.value}</VisitStatusBadge> : item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function VisitDashboardWorkspace({ data, access, openVisit, busy, mutate, setDialog, load }) {
+  if (!data?.initialized) {
+    return (
+      <section className="visit-workspace-panel">
+        <h3>Visit structure is not initialized</h3>
+        {data.canInitialize ? <button disabled={busy} onClick={() => mutate("initialize", visitCalls.initialize, "Visit structure initialized.", load)}>Initialize structure</button> : null}
+      </section>
+    );
+  }
+  const totals = data.visits.reduce((summary, visit) => ({
+    folders: summary.folders + (Number(visit.accessiblePositionCount) || 0),
+    files: summary.files + (Number(visit.activeSubmissionCount) || 0),
+    locked: summary.locked + (Number(visit.lockedPositionCount) || 0),
+  }), { folders: 0, files: 0, locked: 0 });
+  return (
+    <div className="visit-workspace">
+      <section className="visit-workspace-hero" aria-labelledby="visit-workspace-title">
+        <div>
+          <p className="visit-eyebrow">Club Visits</p>
+          <h3 id="visit-workspace-title">Official visit document workspace</h3>
+          <p>File, review, and maintain the visit folders prepared for Club Assembly, DZR Visit, and DRR Visit.</p>
+        </div>
+        <dl className="visit-hero-stats" aria-label="Club Visits summary">
+          <div><dt>Visit types</dt><dd>{data.visits.length}</dd></div>
+          <div><dt>Folders</dt><dd>{totals.folders}</dd></div>
+          <div><dt>Active files</dt><dd>{totals.files}</dd></div>
+          <div><dt>Locked</dt><dd>{totals.locked}</dd></div>
+        </dl>
+      </section>
+
+      <section className="visit-type-grid" aria-label="Visit types">
+        {data.visits.map((visit) => {
+          const status = getVisitStatus(visit);
+          return (
+            <article className="visit-type-card" key={visit.visitType}>
+              <header className="visit-type-card__header">
+                <div>
+                  <p className="visit-eyebrow">Visit type</p>
+                  <h3>{visit.displayTitle}</h3>
+                </div>
+                <VisitStatusBadge statusKey={status.key}>{status.label}</VisitStatusBadge>
+              </header>
+              {visit.description ? <p>{visit.description}</p> : null}
+              <VisitSummaryList items={getVisitSummaryItems(visit)} />
+              <div className="visit-card-actions">
+                <button type="button" className="visit-primary-action" onClick={() => openVisit(visit.visitType)}>Open workspace <span aria-hidden="true">-&gt;</span></button>
+                {access.canManage ? <button type="button" className="visit-secondary-action" onClick={() => setDialog({ type: "bulk-upload", visit })}>Bulk upload</button> : null}
+                {access.canManage ? <button type="button" className="visit-secondary-action" onClick={() => setDialog({ type: "visit-settings", visit })}>Settings</button> : null}
+              </div>
+            </article>
+          );
+        })}
+      </section>
+
+      {access.canManage ? (
+        <section className="visit-workspace-panel visit-maintenance-panel" aria-labelledby="visit-maintenance-title">
+          <div>
+            <p className="visit-eyebrow">Maintenance</p>
+            <h3 id="visit-maintenance-title">Workspace tools</h3>
+          </div>
+          <div className="visit-card-actions">
+            <button disabled={busy} onClick={() => mutate("cleanup", visitCalls.cleanup, "Expired sessions cleaned.")}>Clean expired sessions</button>
+            <button onClick={() => setDialog({ type: "moderation" })}>Moderation</button>
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function VisitFolderCard({ folder, visit, openFolder, setDialog, canManageWorkspace, featured = false }) {
+  const presentation = getVisitFolderPresentation(folder);
+  const availability = getVisitAvailability(folder, visit);
+  const chips = getVisitFolderChips(folder, visit);
+  const canManageFolder = canManageWorkspace || folder.canManage;
+  return (
+    <article className={`visit-folder-card${featured ? " visit-folder-card--featured" : ""}`}>
+      <button
+        type="button"
+        className="visit-folder-card__open"
+        disabled={!folder.canOpen}
+        onClick={() => openFolder(folder.visitType, folder.positionKey)}
+      >
+        <span className="visit-folder-card__tab">{presentation.code}</span>
+        <span className="visit-folder-card__title">{presentation.title}</span>
+        <span className="visit-folder-card__chips">
+          {chips.map((chip) => <VisitStatusBadge statusKey={chip.key} key={chip.key}>{chip.label}</VisitStatusBadge>)}
+        </span>
+        <span className="visit-folder-card__meta">
+          <span>{folder.activeFileCount} / {folder.maxActiveFiles} active files</span>
+          {availability.detail ? <span>{availability.detail}</span> : null}
+        </span>
+        <span className="visit-folder-card__cta">Open folder <span aria-hidden="true">-&gt;</span></span>
+      </button>
+      {canManageFolder ? (
+        <button type="button" className="visit-folder-card__settings" aria-label={`Settings for ${presentation.title}`} onClick={() => setDialog({ type: "folder-settings", folder })}>
+          Settings
+        </button>
+      ) : null}
+    </article>
+  );
+}
+
+function VisitFoldersWorkspace({ data, openFolder, setDialog }) {
+  const folders = data.folders || [];
+  const canManageWorkspace = data.access?.canManage === true;
+  const singleLimitedFolder = !canManageWorkspace && folders.length === 1;
+  const groupedFolders = groupVisitFolders(folders);
+  return (
+    <div className="visit-workspace">
+      <section className="visit-workspace-hero visit-workspace-hero--compact" aria-labelledby="visit-folders-title">
+        <div>
+          <p className="visit-eyebrow">{canManageWorkspace ? "Visit file room" : singleLimitedFolder ? "Your visit folder" : "Your visit folders"}</p>
+          <h3 id="visit-folders-title">{data.visit?.displayTitle}</h3>
+          <p>{data.visit?.instructions || data.visit?.description || "Authorized document folders for this visit."}</p>
+        </div>
+        <VisitSummaryList items={getVisitSummaryItems(data.visit || {})} />
+      </section>
+
+      {singleLimitedFolder ? (
+        <section className="visit-folder-hero" aria-label="Your visit folder">
+          <VisitFolderCard folder={folders[0]} visit={data.visit} openFolder={openFolder} setDialog={setDialog} canManageWorkspace={canManageWorkspace} featured />
+        </section>
+      ) : canManageWorkspace ? (
+        <div className="visit-folder-directory">
+          {groupedFolders.map((group) => (
+            <section className="visit-folder-group" aria-labelledby={`visit-folder-group-${group.key}`} key={group.key}>
+              <header className="visit-folder-group__header">
+                <div>
+                  <p className="visit-eyebrow">Folder section</p>
+                  <h3 id={`visit-folder-group-${group.key}`}>{group.label}</h3>
+                  <p>{group.description}</p>
+                </div>
+                <span>{group.folders.length} folder{group.folders.length === 1 ? "" : "s"}</span>
+              </header>
+              <div className="visit-folder-grid">
+                {group.folders.map((folder) => (
+                  <VisitFolderCard folder={folder} visit={data.visit} openFolder={openFolder} setDialog={setDialog} canManageWorkspace={canManageWorkspace} key={folder.positionKey} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <section className="visit-folder-group" aria-labelledby="visit-authorized-folders-title">
+          <header className="visit-folder-group__header">
+            <div>
+              <p className="visit-eyebrow">Your visit folders</p>
+              <h3 id="visit-authorized-folders-title">Authorized folders</h3>
+            </div>
+            <span>{folders.length} folder{folders.length === 1 ? "" : "s"}</span>
+          </header>
+          <div className="visit-folder-grid visit-folder-grid--limited">
+            {folders.map((folder) => (
+              <VisitFolderCard folder={folder} visit={data.visit} openFolder={openFolder} setDialog={setDialog} canManageWorkspace={canManageWorkspace} key={folder.positionKey} />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
 }
 
 function FolderDetail({ data, busy, mutate, reload, setDialog }) {
@@ -73,6 +255,7 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
   const [uploading, setUploading] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [primarySelectionBusy, setPrimarySelectionBusy] = useState("");
+  const uploadInputRef = useRef(null);
   const folder = data.folder;
   const uploadConfigured = Boolean(resolveVisitUploadEndpoint(import.meta.env));
 
@@ -244,10 +427,150 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
       setPrimarySelectionBusy("");
     }
   }
+  if (data) return <FolderDetailWorkspaceView data={data} folder={folder} queue={queue} setQueue={setQueue} busy={busy} uploading={uploading} uploadConfigured={uploadConfigured} announcement={announcement} primarySelectionBusy={primarySelectionBusy} uploadInputRef={uploadInputRef} selectFiles={selectFiles} upload={upload} cancelRemaining={cancelRemaining} mutate={mutate} reload={reload} setDialog={setDialog} updatePrimaryPresentation={updatePrimaryPresentation} />;
   return <><section className="admin-panel"><h3>{data.visit?.displayTitle} · {folder.positionTitle}</h3><p>{folder.locked ? `Locked: ${folder.lockReason}` : `${folder.activeFileCount} of ${folder.maxActiveFiles} active files`}</p><p>Up to {folder.maxFilesPerSelection} files per selection, {Math.round(folder.maxFileSizeBytes / 1048576)} MB each.</p><div className="admin-actions">{data.access.canManage ? <button onClick={() => setDialog({ type: "folder-settings", folder })}>Folder settings</button> : null}{data.access.canManage ? <button onClick={() => mutate("reconcile", () => visitCalls.reconcile(folder.visitType, folder.positionKey), "Folder counts reconciled.", reload)}>Reconcile counts</button> : null}</div></section>
     {folder.canUpload ? <section className="admin-panel visit-upload" aria-labelledby="visit-upload-title"><h3 id="visit-upload-title">Supporting files</h3><p>Upload invitation letters, visit reports, photographs, attendance sheets, or other supporting documents for this Club Visit.</p>{!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload endpoint could not be resolved. Configure VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT or VITE_FIREBASE_PROJECT_ID for uploadVisitSubmissionFile.</p> : null}<label className="visit-upload__label" htmlFor="visit-supporting-files">Choose supporting files</label><input id="visit-supporting-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={uploading || !uploadConfigured} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} /><p>{queue.length} selected · maximum {folder.maxFilesPerSelection}</p><p className="sr-only" aria-live="polite">{announcement}</p>{queue.length ? <ul className="visit-upload__queue">{queue.map((item) => <li key={item.clientFileId}><div><strong>{item.file.name}</strong><span>{item.file.type || "Unknown type"} · {formatVisitFileSize(item.file.size)}</span><span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span></div>{!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}</li>)}</ul> : null}<div className="admin-actions"><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>{queue.some((item) => item.sessionId && item.status !== "Uploaded") ? <button type="button" disabled={uploading} onClick={cancelRemaining}>Cancel remaining uploads</button> : null}</div></section> : <p className="admin-lock-banner is-locked">Uploads are unavailable for this folder.</p>}
     <section className="admin-panel" aria-labelledby="visit-active-files"><h3 id="visit-active-files">Supporting files</h3><VisitSubmissionFiles submissions={data.submissions} canManagePrimaryPresentation={data.access.canManage === true} primaryPresentationSubmissionId={folder.primaryPresentationSubmissionId} primarySelectionBusy={primarySelectionBusy} onSetPrimaryPresentation={(item) => updatePrimaryPresentation(item.submissionId, item.submissionId, "Main presentation selected.")} onClearPrimaryPresentation={() => updatePrimaryPresentation("", "__clear__", "Main presentation selection cleared.")} onReplace={(item) => setDialog({ type: "replace", item, folder })} onWithdraw={(item) => setDialog({ type: "withdraw", item })} onRemove={(item) => setDialog({ type: "remove", item })} /></section>
   </>;
+}
+
+function FolderDetailWorkspaceView({
+  data,
+  folder,
+  queue,
+  setQueue,
+  busy,
+  uploading,
+  uploadConfigured,
+  announcement,
+  primarySelectionBusy,
+  uploadInputRef,
+  selectFiles,
+  upload,
+  cancelRemaining,
+  mutate,
+  reload,
+  setDialog,
+  updatePrimaryPresentation,
+}) {
+  const folderPresentation = getVisitFolderPresentation(folder);
+  const primaryPresentation = data.submissions.find((item) => (
+    item.isPrimaryPresentation || item.submissionId === folder.primaryPresentationSubmissionId
+  ));
+  const canManageFolder = data.access.canManage === true;
+  const focusUploadInput = () => uploadInputRef.current?.click();
+  return (
+    <div className="visit-workspace visit-folder-workspace">
+      <section className="visit-workspace-hero visit-folder-masthead" aria-labelledby="visit-folder-title">
+        <div>
+          <nav className="visit-breadcrumb" aria-label="Club Visit breadcrumb">
+            <span>Club Visits</span>
+            <span>{data.visit?.displayTitle}</span>
+            <span>{folderPresentation.title}</span>
+          </nav>
+          <p className="visit-eyebrow">{getVisitFolderCode(folder)}</p>
+          <h3 id="visit-folder-title">{folderPresentation.title}</h3>
+          <p>{data.visit?.displayTitle} official document workspace.</p>
+        </div>
+        <VisitSummaryList items={getFolderSummaryItems(folder, data.visit || {})} />
+      </section>
+
+      {canManageFolder ? (
+        <section className="visit-workspace-panel visit-maintenance-panel" aria-labelledby="visit-folder-tools-title">
+          <div>
+            <p className="visit-eyebrow">Workspace tools</p>
+            <h3 id="visit-folder-tools-title">Folder administration</h3>
+          </div>
+          <div className="visit-card-actions">
+            <button type="button" onClick={() => setDialog({ type: "folder-settings", folder })}>Folder settings</button>
+            <button type="button" onClick={() => mutate("reconcile", () => visitCalls.reconcile(folder.visitType, folder.positionKey), "Folder counts reconciled.", reload)}>Reconcile counts</button>
+          </div>
+        </section>
+      ) : null}
+
+      {primaryPresentation ? (
+        <section className="visit-main-presentation" aria-labelledby="visit-main-presentation-title">
+          <div className="visit-main-presentation__icon">
+            <VisitFileTypeBadge file={primaryPresentation} />
+          </div>
+          <div>
+            <p className="visit-eyebrow">Main presentation</p>
+            <h3 id="visit-main-presentation-title">{primaryPresentation.fileName}</h3>
+            <p>{getVisitFileKind(primaryPresentation).label}{primaryPresentation.sizeBytes ? ` - ${formatVisitFileSize(primaryPresentation.sizeBytes)}` : ""}</p>
+          </div>
+          <div className="visit-card-actions">
+            {primaryPresentation.fileUrl ? <a className="visit-file-open" href={primaryPresentation.fileUrl} target="_blank" rel="noopener noreferrer">View presentation</a> : null}
+            {canManageFolder ? <button type="button" disabled={Boolean(primarySelectionBusy)} onClick={() => updatePrimaryPresentation("", "__clear__", "Main presentation selection cleared.")}>{primarySelectionBusy === "__clear__" ? "Changing..." : "Change"}</button> : null}
+          </div>
+        </section>
+      ) : canManageFolder && data.submissions.some((item) => item.canSetPrimaryPresentation) ? (
+        <p className="visit-subtle-note">No main presentation selected. Use a document's action menu to set one.</p>
+      ) : null}
+
+      {folder.canUpload ? (
+        <section className="visit-upload visit-workspace-panel" aria-labelledby="visit-upload-title">
+          <div className="visit-section-heading">
+            <div>
+              <p className="visit-eyebrow">Upload documents</p>
+              <h3 id="visit-upload-title">Add supporting files</h3>
+            </div>
+            <span>Up to {folder.maxFilesPerSelection} files per selection - {Math.round(folder.maxFileSizeBytes / 1048576)} MB each</span>
+          </div>
+          {!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload endpoint could not be resolved. Configure VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT or VITE_FIREBASE_PROJECT_ID for uploadVisitSubmissionFile.</p> : null}
+          <label className="visit-upload-zone" htmlFor="visit-supporting-files" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (!uploading && uploadConfigured) selectFiles(event.dataTransfer.files); }}>
+            <span className="visit-upload-zone__title">Drop files here or browse files</span>
+            <span>Invitation letters, visit reports, photographs, attendance sheets, and supporting documents.</span>
+            <input ref={uploadInputRef} id="visit-supporting-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={uploading || !uploadConfigured} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} />
+          </label>
+          <p className="visit-upload__count">{queue.length} selected - maximum {folder.maxFilesPerSelection}</p>
+          <p className="sr-only" aria-live="polite">{announcement}</p>
+          {queue.length ? (
+            <ul className="visit-upload__queue" aria-label="Upload queue">
+              {queue.map((item) => (
+                <li key={item.clientFileId}>
+                  <VisitFileTypeBadge file={item.file} />
+                  <div>
+                    <strong>{item.file.name}</strong>
+                    <span>{getVisitFileKind(item.file).label} - {formatVisitFileSize(item.file.size)}</span>
+                    <span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span>
+                  </div>
+                  {!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="visit-card-actions">
+            <button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button>
+            <button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>
+            {queue.some((item) => item.sessionId && item.status !== "Uploaded") ? <button type="button" disabled={uploading} onClick={cancelRemaining}>Cancel remaining uploads</button> : null}
+          </div>
+        </section>
+      ) : <p className="admin-lock-banner is-locked">Uploads are unavailable for this folder.</p>}
+
+      <section className="visit-workspace-panel visit-document-library" aria-labelledby="visit-active-files">
+        <div className="visit-section-heading">
+          <div>
+            <p className="visit-eyebrow">Document library</p>
+            <h3 id="visit-active-files">Supporting files</h3>
+          </div>
+          <span>{folder.activeFileCount} / {folder.maxActiveFiles} active files</span>
+        </div>
+        <VisitSubmissionFiles
+          submissions={data.submissions}
+          canManagePrimaryPresentation={canManageFolder}
+          canUpload={folder.canUpload}
+          onUploadRequest={focusUploadInput}
+          primaryPresentationSubmissionId={folder.primaryPresentationSubmissionId}
+          primarySelectionBusy={primarySelectionBusy}
+          onSetPrimaryPresentation={(item) => updatePrimaryPresentation(item.submissionId, item.submissionId, "Main presentation selected.")}
+          onClearPrimaryPresentation={() => updatePrimaryPresentation("", "__clear__", "Main presentation selection cleared.")}
+          onReplace={(item) => setDialog({ type: "replace", item, folder })}
+          onWithdraw={(item) => setDialog({ type: "withdraw", item })}
+          onRemove={(item) => setDialog({ type: "remove", item })}
+        />
+      </section>
+    </div>
+  );
 }
 
 function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {

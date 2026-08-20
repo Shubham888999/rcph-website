@@ -1,6 +1,6 @@
 import EventAvenues from "../../features/events/EventAvenues";
 import EventList from "../../features/events/EventList";
-import EventStories from "../../features/events/EventStories";
+// import EventStories from "../../features/events/EventStories";
 import EventsCallToAction from "../../features/events/EventsCallToAction";
 import EventsHero from "../../features/events/EventsHero";
 import usePublicEvents from "../../features/events/usePublicEvents";
@@ -30,9 +30,11 @@ export default function EventsPage() {
         emptyMessage="Recent public events will appear here after they are added to the RCPH calendar."
         reload={reload}
       />
-      <EventStories />
-      <EventAvenues />
-      <EventsCallToAction />
+{/* Temporarily hidden until event reports are ready */}
+{/* <EventStories /> */}
+
+<EventAvenues />
+<EventsCallToAction />
     </main>
   );
 }

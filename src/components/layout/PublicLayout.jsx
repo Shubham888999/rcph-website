@@ -113,7 +113,7 @@ export default function PublicLayout() {
         <span className="public-affiliation-logo public-affiliation-logo--lakshya rcph-logo-mark">
           <img
             src="/images/rcph-lakshya-logo.webp"
-            alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026–27"
+            alt="Rotaract Club of Pune Heritage - Lakshya RIY 2026-27"
           />
         </span>
       </div>
@@ -170,9 +170,24 @@ export default function PublicLayout() {
               Login
             </NavLink>
 
-            <NavLink className="public-join-link" to="/join" onClick={closeMenu}>
-              Join RCPH
-            </NavLink>
+<NavLink className="public-join-link" to="/join" onClick={closeMenu}>
+  <span>Join RCPH</span>
+
+  <svg
+    className="public-join-link__arrow"
+    viewBox="0 0 20 20"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path
+      d="M4 10h11M11 6l4 4-4 4"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+</NavLink>
           </nav>
 
           <button

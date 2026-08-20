@@ -4,6 +4,7 @@ import test from "node:test";
 
 const moduleSource = readFileSync(new URL("./VisitSubmissionsModule.jsx", import.meta.url), "utf8");
 const detailsSource = readFileSync(new URL("./VisitSubmissionFiles.jsx", import.meta.url), "utf8");
+const presentationSource = readFileSync(new URL("./visitPresentationModel.js", import.meta.url), "utf8");
 const routerSource = readFileSync(new URL("../../../app/router.jsx", import.meta.url), "utf8");
 
 test("Club Visits upload exposes labelled sequential queue, retry, cancellation, and live status", () => {
@@ -20,6 +21,33 @@ test("manager dashboard exposes one mapped bulk upload button per visit section"
   assert.match(moduleSource, /setDialog\(\{ type: "bulk-upload", visit \}\)/);
   assert.match(moduleSource, />Bulk upload</);
   assert.match(moduleSource, /access\.canManage \? <button type="button"[\s\S]*>Bulk upload<\/button>/);
+});
+
+test("Club Visits renders the executive filing-room workspace components", () => {
+  for (const copy of [
+    "Official visit document workspace",
+    "VisitDashboardWorkspace",
+    "VisitFoldersWorkspace",
+    "VisitFolderCard",
+    "Your visit folder",
+    "Open folder",
+  ]) assert.match(moduleSource, new RegExp(copy));
+  assert.match(presentationSource, /Core Board/);
+  assert.match(moduleSource, /groupVisitFolders\(folders\)/);
+  assert.match(moduleSource, /singleLimitedFolder/);
+});
+
+test("folder workspace promotes main presentation, upload surface, and document library", () => {
+  for (const copy of [
+    "FolderDetailWorkspaceView",
+    "Main presentation",
+    "View presentation",
+    "Drop files here or browse files",
+    "Document library",
+    "No main presentation selected",
+  ]) assert.match(moduleSource, new RegExp(copy));
+  assert.match(moduleSource, /onDragOver=\{\(event\) => event\.preventDefault\(\)\}/);
+  assert.match(moduleSource, /VisitSubmissionFiles[\s\S]*canUpload=\{folder\.canUpload\}/);
 });
 
 test("bulk upload dialog is visit-specific and uses trusted backend sessions", () => {

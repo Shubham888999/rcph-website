@@ -916,3 +916,315 @@
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   }
 }
+/* =========================================================
+   SHARP EDITORIAL PUBLIC CTA SYSTEM
+   ========================================================= */
+
+.public-site-shell {
+  --public-action-radius: 0.28rem;
+}
+
+
+/* =========================================================
+   HEADER — JOIN RCPH
+   ========================================================= */
+
+.public-join-link {
+  position: relative;
+  isolation: isolate;
+
+  min-height: 2.78rem;
+  padding: 0.66rem 1.05rem 0.66rem 1.15rem;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+
+  overflow: hidden;
+
+  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.78);
+  border-radius: var(--public-action-radius);
+
+  color: var(--lakshya-burgundy-950);
+
+  background:
+    linear-gradient(
+      135deg,
+      #fff8e8 0%,
+      #f3dba8 54%,
+      #e8c791 100%
+    );
+
+  box-shadow:
+    0 0.38rem 0.9rem rgba(17, 1, 5, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: 0.025em;
+
+  text-decoration: none;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    transform 170ms ease,
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    background 200ms ease;
+}
+
+
+/* thin editorial accent */
+
+.public-join-link::before {
+  content: "";
+  position: absolute;
+
+  top: 0;
+  right: 0;
+  left: 0;
+
+  height: 2px;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.9),
+      transparent
+    );
+
+  opacity: 0.7;
+
+  pointer-events: none;
+}
+
+
+.public-join-link > span,
+.public-join-link__arrow {
+  position: relative;
+  z-index: 1;
+}
+
+
+.public-join-link__arrow {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+
+  transition: transform 170ms ease;
+}
+
+
+@media (hover: hover) and (pointer: fine) {
+
+  .public-join-link:hover {
+    color: var(--lakshya-burgundy-950);
+
+    border-color: rgba(var(--lakshya-cream-rgb), 0.95);
+
+    background:
+      linear-gradient(
+        135deg,
+        #fffaf0 0%,
+        #f7e2b7 50%,
+        #edcd96 100%
+      );
+
+    transform: translateY(-2px);
+
+    box-shadow:
+      0 0.6rem 1.25rem rgba(17, 1, 5, 0.28),
+      0 0 0 1px rgba(var(--lakshya-gold-rgb), 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  }
+
+  .public-join-link:hover .public-join-link__arrow {
+    transform: translateX(3px);
+  }
+}
+
+
+.public-join-link:active {
+  transform: translateY(0);
+}
+
+
+.public-join-link:focus-visible {
+  outline: none;
+  box-shadow:
+    var(--focus-ring),
+    0 0.55rem 1.2rem rgba(17, 1, 5, 0.25);
+}
+
+
+/* Light mode */
+
+:root[data-theme="light"] .public-join-link {
+  color: var(--lakshya-cream);
+
+  border-color: var(--lakshya-burgundy-700);
+
+  background:
+    linear-gradient(
+      135deg,
+      var(--lakshya-burgundy-700),
+      var(--lakshya-burgundy-600)
+    );
+}
+
+
+:root[data-theme="light"] .public-join-link:hover {
+  color: #fff;
+
+  border-color: var(--lakshya-burgundy-900);
+
+  background:
+    linear-gradient(
+      135deg,
+      var(--lakshya-burgundy-600),
+      var(--lakshya-rose-deep)
+    );
+}
+
+
+/* Mobile menu */
+
+@media (max-width: 1120px) {
+  .public-join-link {
+    width: 100%;
+    margin-top: 0.65rem;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .public-join-link,
+  .public-join-link__arrow {
+    transition: none;
+  }
+}
+/* =========================================================
+   ALL PUBLIC PAGE BUTTONS — SHARP EDITORIAL SHAPE
+   ========================================================= */
+
+.public-site-shell .public-page-content .button {
+  border-radius: var(--public-action-radius);
+
+  letter-spacing: 0.015em;
+
+  box-shadow:
+    0 0.35rem 0.9rem rgba(17, 1, 5, 0.18);
+
+  transition:
+    transform 170ms ease,
+    color 170ms ease,
+    border-color 170ms ease,
+    background 200ms ease,
+    box-shadow 170ms ease;
+}
+
+
+/* Primary */
+
+.public-site-shell .public-page-content .button-primary {
+  color: var(--lakshya-burgundy-950);
+
+  border-color: rgba(var(--lakshya-gold-rgb), 0.72);
+
+  background:
+    linear-gradient(
+      135deg,
+      #fff6df 0%,
+      #efd59f 52%,
+      #e4bf7f 100%
+    );
+
+  box-shadow:
+    0 0.42rem 1rem rgba(17, 1, 5, 0.21),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+}
+
+
+/* Secondary */
+
+.public-site-shell .public-page-content .button-secondary {
+  color: var(--color-gold-soft);
+
+  border-color: rgba(var(--lakshya-gold-rgb), 0.38);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(var(--lakshya-gold-rgb), 0.06),
+      rgba(var(--lakshya-rose-rgb), 0.035)
+    ),
+    rgba(var(--lakshya-burgundy-950-rgb), 0.54);
+
+  box-shadow:
+    0 0.32rem 0.8rem rgba(17, 1, 5, 0.17);
+}
+
+
+/* Hover */
+
+@media (hover: hover) and (pointer: fine) {
+
+  .public-site-shell
+  .public-page-content
+  .button:hover:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(-2px);
+  }
+
+
+  .public-site-shell
+  .public-page-content
+  .button-primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    color: var(--lakshya-burgundy-950);
+
+    border-color: rgba(var(--lakshya-cream-rgb), 0.9);
+
+    background:
+      linear-gradient(
+        135deg,
+        #fffaef 0%,
+        #f5dfb3 48%,
+        #eac98e 100%
+      );
+
+    box-shadow:
+      0 0.58rem 1.25rem rgba(17, 1, 5, 0.27),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+
+  .public-site-shell
+  .public-page-content
+  .button-secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+    color: var(--lakshya-cream);
+
+    border-color: rgba(var(--lakshya-gold-rgb), 0.68);
+
+    background:
+      linear-gradient(
+        135deg,
+        rgba(var(--lakshya-gold-rgb), 0.11),
+        rgba(var(--lakshya-rose-rgb), 0.06)
+      ),
+      rgba(var(--lakshya-burgundy-900-rgb), 0.72);
+
+    box-shadow:
+      0 0.5rem 1rem rgba(17, 1, 5, 0.22);
+  }
+}
+
+
+.public-site-shell
+.public-page-content
+.button:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(0);
+}
