@@ -32,6 +32,8 @@ const {
 } = require('./lib/announcement-attachments');
 const bodAvenueReport = require('./lib/bod-avenue-report');
 const bodSecretarialReport = require('./lib/bod-secretarial-report');
+const { createLetterheadExchangeService } = require('./lib/letterhead-exchanges');
+const { createLetterheadExchangeImageService } = require('./lib/letterhead-exchange-images');
 const bodEventSchema = require('./lib/bod-event-schema');
 const bodReportingLinkRecovery = require('./lib/bod-reporting-link-recovery');
 const { createBodManagementService } = require('./lib/bod-management');
@@ -140,6 +142,7 @@ const CALLABLE_OPTIONS = {
 const RESOLUTION_DRIVE_SECRETS = [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN];
 const RESOLUTION_PDF_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: '1GiB', secrets: RESOLUTION_DRIVE_SECRETS };
 const BOD_PHOTO_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: RESOLUTION_DRIVE_SECRETS };
+const LETTERHEAD_EXCHANGE_IMAGE_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: RESOLUTION_DRIVE_SECRETS };
 const ANNOUNCEMENT_ATTACHMENT_SECRETS = RESOLUTION_DRIVE_SECRETS;
 const ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: ANNOUNCEMENT_ATTACHMENT_SECRETS };
 const resolutionDrive = createResolutionDriveService({
@@ -192,6 +195,60 @@ const systemLogsService = systemLogs.createSystemLogsService({
   assertApprovedActiveCallableAccount,
   avenueReportingLocks,
   logger: console,
+});
+const letterheadExchanges = createLetterheadExchangeService({
+  db,
+  admin,
+  HttpsError,
+  assertBodToolsAccess: assertLetterheadExchangeAccess,
+  getActorProfile: getCallableUserProfile,
+  writeLog: ({ uid, request, authority, exchange, metadata }) => writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'letterhead_exchange',
+    action: 'created',
+    status: 'success',
+    targetType: 'letterhead_exchange',
+    targetId: exchange.id,
+    targetLabel: `Letterhead Exchange ${exchange.exchangeDate}`,
+    targetAudience: 'BOD Tools',
+    details: 'Letterhead Exchange record created.',
+    source: 'createLetterheadExchange',
+    relatedDocPath: `letterheadExchanges/${exchange.id}`,
+    metadata,
+  }),
+});
+const letterheadExchangeImages = createLetterheadExchangeImageService({
+  db,
+  admin,
+  HttpsError,
+  assertLetterheadExchangeAccess,
+  getActorProfile: getCallableUserProfile,
+  env: process.env,
+  secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
+  allowedOrigins: CALLABLE_OPTIONS.cors,
+  logger: console,
+  writeLog: ({ uid, request, authority, exchangeId, action, metadata }) => writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'letterhead_exchange',
+    action,
+    status: 'success',
+    targetType: 'letterhead_exchange',
+    targetId: exchangeId,
+    targetLabel: `Letterhead Exchange ${exchangeId}`,
+    targetAudience: 'BOD Tools',
+    details: action === 'image_upload_session_created'
+      ? 'Letterhead Exchange image upload session created.'
+      : 'Letterhead Exchange image uploaded.',
+    source: action === 'image_upload_session_created'
+      ? 'createLetterheadExchangeImageUploadSession'
+      : 'finalizeLetterheadExchangeImageUpload',
+    relatedDocPath: `letterheadExchanges/${exchangeId}`,
+    metadata,
+  }),
 });
 
 const transporter = nodemailer.createTransport({
@@ -2125,6 +2182,14 @@ async function assertBodAdminOrPresident(uid) {
     throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
   }
   return authority.role;
+}
+
+async function assertLetterheadExchangeAccess(uid) {
+  const [role, account] = await Promise.all([
+    assertBodAdminOrPresident(uid),
+    assertApprovedActiveCallableAccount(uid),
+  ]);
+  return { uid, role, account };
 }
 
 function isActiveResolutionPositionAssignment(uid, snap, positionKey) {
@@ -8616,6 +8681,79 @@ exports.getBodSecretarialReportMetrics = onCall(CALLABLE_OPTIONS, async (request
   const membersSnap = await db.collection('members').get();
   return bodSecretarialReport.buildBodSecretarialReportMetrics(membersSnap);
 });
+
+exports.getLetterheadExchangeFormOptions = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchanges.formOptions(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not load Letterhead Exchange form options.');
+  }
+});
+
+exports.createLetterheadExchange = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchanges.create(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not create Letterhead Exchange.');
+  }
+});
+
+exports.listLetterheadExchanges = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchanges.list(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not list Letterhead Exchanges.');
+  }
+});
+
+exports.getLetterheadExchangesForReport = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchanges.forReport(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not load Letterhead Exchanges for report.');
+  }
+});
+
+exports.createLetterheadExchangeImageUploadSession = onCall(LETTERHEAD_EXCHANGE_IMAGE_CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchangeImages.createUploadSession(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not create Letterhead Exchange image upload session.');
+  }
+});
+
+exports.finalizeLetterheadExchangeImageUpload = onCall(LETTERHEAD_EXCHANGE_IMAGE_CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchangeImages.finalizeUpload(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not finalize Letterhead Exchange image upload.');
+  }
+});
+
+exports.getLetterheadExchangeImageAccess = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchangeImages.getImageAccess(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not open Letterhead Exchange image.');
+  }
+});
+
+exports.uploadLetterheadExchangeImage = onRequest(
+  { region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', maxInstances: 5, concurrency: 10, secrets: RESOLUTION_DRIVE_SECRETS },
+  (req, res) => letterheadExchangeImages.uploadHttp(req, res)
+);
+
+exports.downloadLetterheadExchangeImage = onRequest(
+  { region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', maxInstances: 5, concurrency: 20, secrets: RESOLUTION_DRIVE_SECRETS },
+  (req, res) => letterheadExchangeImages.downloadImageHttp(req, res)
+);
 
 exports.syncBodEventToAttendance = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);

@@ -11,6 +11,7 @@ const LOG_CATEGORIES = new Set([
   'email',
   'event',
   'bod_event',
+  'letterhead_exchange',
   'reminder',
   'lock',
   'dashboard_notice',
@@ -34,6 +35,8 @@ const LOG_ACTIONS = new Set([
   'synced',
   'viewed',
   'completed',
+  'image_upload_session_created',
+  'image_uploaded',
 ]);
 
 const LOG_STATUSES = new Set(['success', 'failed', 'active', 'inactive', 'info']);

@@ -440,6 +440,18 @@ match /treasury/{transactionId} {
       allow read, write: if false;
     }
 
+    match /letterheadExchanges/{exchangeId} {
+      allow read, write: if false;
+    }
+
+    match /letterheadExchangeImageUploadSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /letterheadExchangeImageAccessSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
     match /resolutions/{resolutionId} {
       allow read, write: if false;
 

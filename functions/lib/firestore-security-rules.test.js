@@ -218,6 +218,10 @@ function canReadAdminCollection(identity, collection) {
   return isAdmin(identity);
 }
 
+function canAccessLetterheadExchangeDirectly() {
+  return false;
+}
+
 function canWriteAdminCollection(identity, collection, panelLocked = false) {
   if (['attendance', 'districtAttendance'].includes(collection)) {
     return (isAdmin(identity) || hasActiveSergeantAtArmsAssignment(identity)) && !panelLocked;
@@ -245,6 +249,9 @@ test('rules source replaces broad role and lock reads with approved-active autho
   assert.match(bodyOfFunction(rules, 'validBodEventWrite'), /data\.avenues\.size\(\) <= 11/);
   assert.match(rules, /match \/roles\/\{uid\} \{\s*allow get: if signedIn\(\) && \(request\.auth\.uid == uid \|\| isAdmin\(\)\);\s*allow list: if isAdmin\(\);/);
   assert.match(rules, /match \/locks\/\{panelId\} \{\s*allow read: if canReadAttendanceLock\(panelId\) \|\| hasAdminPanelAuthority\(\);\s*allow create, update, delete: if hasLockTools\(\);/);
+  assert.match(rules, /match \/letterheadExchanges\/\{exchangeId\} \{\s*allow read, write: if false;\s*\}/);
+  assert.match(rules, /match \/letterheadExchangeImageUploadSessions\/\{sessionId\} \{\s*allow read, write: if false;\s*\}/);
+  assert.match(rules, /match \/letterheadExchangeImageAccessSessions\/\{sessionId\} \{\s*allow read, write: if false;\s*\}/);
     const saaBody = bodyOfFunction(
     rules,
     'hasActiveSaaAssignment',
@@ -290,6 +297,20 @@ test('role reads deny unauthenticated, cross-user, and ordinary collection queri
   assert.equal(canGetRole(identities.inactiveAdmin, 'member'), false);
   assert.equal(canGetRole(identities.rejectedAdmin, 'member'), false);
   assert.equal(canGetRole(identities.disabledAdmin, 'member'), false);
+});
+
+test('Letterhead Exchanges collection is callable-only through direct Firestore rules', () => {
+  for (const identity of [
+    identities.unauthenticated,
+    identities.member,
+    identities.mainDirector,
+    identities.admin,
+    identities.president,
+    identities.cwd,
+    identities.saa,
+  ]) {
+    assert.equal(canAccessLetterheadExchangeDirectly(identity), false);
+  }
 });
 
 test('lock reads and writes deny ordinary and stale identities', () => {

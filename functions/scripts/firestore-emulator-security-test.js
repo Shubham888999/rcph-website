@@ -91,8 +91,12 @@ function validBodEventPayload(overrides = {}) {
       });
       await setDoc(doc(db, 'members', 'member-1'), { name: 'Member One', active: true });
       await setDoc(doc(db, 'bodEvents', 'bod-event-1'), validBodEventPayload());
+      await setDoc(doc(db, 'letterheadExchanges', 'exchange-1'), { exchangeDate: '2026-08-21', status: 'active' });
+      await setDoc(doc(db, 'letterheadExchangeImageUploadSessions', 'session-1'), { exchangeId: 'exchange-1', status: 'pending' });
+      await setDoc(doc(db, 'letterheadExchangeImageAccessSessions', 'access-1'), { exchangeId: 'exchange-1', status: 'active' });
     });
 
+    const anon = testEnv.unauthenticatedContext().firestore();
     const gbm = testEnv.authenticatedContext('gbm').firestore();
     const bod = testEnv.authenticatedContext('bod').firestore();
     const admin = testEnv.authenticatedContext('admin').firestore();
@@ -134,6 +138,16 @@ function validBodEventPayload(overrides = {}) {
       avenue: Array.from({ length: 12 }, () => 'CSD'),
       avenueDescriptions: { CSD: 'Too many selections' },
     })));
+
+    await assertFails(getDoc(doc(anon, 'letterheadExchanges', 'exchange-1')));
+    await assertFails(getDoc(doc(bod, 'letterheadExchanges', 'exchange-1')));
+    await assertFails(getDoc(doc(admin, 'letterheadExchanges', 'exchange-1')));
+    await assertFails(setDoc(doc(bod, 'letterheadExchanges', 'exchange-2'), { exchangeDate: '2026-08-21' }));
+    await assertFails(setDoc(doc(admin, 'letterheadExchanges', 'exchange-3'), { exchangeDate: '2026-08-21' }));
+    await assertFails(getDoc(doc(bod, 'letterheadExchangeImageUploadSessions', 'session-1')));
+    await assertFails(setDoc(doc(admin, 'letterheadExchangeImageUploadSessions', 'session-2'), { exchangeId: 'exchange-1' }));
+    await assertFails(getDoc(doc(admin, 'letterheadExchangeImageAccessSessions', 'access-1')));
+    await assertFails(setDoc(doc(bod, 'letterheadExchangeImageAccessSessions', 'access-2'), { exchangeId: 'exchange-1' }));
 
     console.log('Firestore emulator security verification passed.');
   } finally {

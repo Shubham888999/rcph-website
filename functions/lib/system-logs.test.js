@@ -54,6 +54,33 @@ test('system log writer stores only safe metadata fields', () => {
   assert.deepEqual(payload.metadata.nested, { count: 2 });
 });
 
+test('Letterhead Exchange logs keep their semantic category', () => {
+  const payload = normalizeSystemLogForWrite({
+    category: 'letterhead_exchange',
+    action: 'created',
+    status: 'success',
+    actorUid: 'u1',
+    targetType: 'letterhead_exchange',
+    targetId: 'exchange-1',
+  });
+
+  assert.equal(payload.category, 'letterhead_exchange');
+  assert.equal(payload.action, 'created');
+  assert.equal(payload.targetType, 'letterhead_exchange');
+
+  const imagePayload = normalizeSystemLogForWrite({
+    category: 'letterhead_exchange',
+    action: 'image_uploaded',
+    status: 'success',
+    actorUid: 'u1',
+    targetType: 'letterhead_exchange',
+    targetId: 'exchange-1',
+  });
+
+  assert.equal(imagePayload.category, 'letterhead_exchange');
+  assert.equal(imagePayload.action, 'image_uploaded');
+});
+
 test('serialized log entries expose normalized feed fields', () => {
   const entry = serializeLogEntry('log-1', {
     createdAt: new Date('2026-07-25T10:00:00.000Z'),
