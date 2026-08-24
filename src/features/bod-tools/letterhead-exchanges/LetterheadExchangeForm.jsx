@@ -37,6 +37,7 @@ export default function LetterheadExchangeForm({ members, events, optionsStatus,
   const [errors, setErrors] = useState({});
   const [imageState, setImageState] = useState(EMPTY_IMAGE_STATE);
   const [memberQuery, setMemberQuery] = useState("");
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
   const [submission, setSubmission] = useState({
     status: "idle",
     message: "",
@@ -47,16 +48,25 @@ export default function LetterheadExchangeForm({ members, events, optionsStatus,
   const participantRefs = useRef(new Map());
   const pendingParticipantFocusRef = useRef("");
   const formRef = useRef(null);
-
+  const memberDropdownRef = useRef(null);
   const busy = ["creating_exchange", "uploading_images"].includes(submission.status);
-  const selectedMemberIds = useMemo(() => new Set(draft.rcphMemberIds), [draft.rcphMemberIds]);
-  const filteredMembers = useMemo(() => {
-    const query = memberQuery.trim().toLowerCase();
-    if (!query) return members;
-    return members.filter((member) =>
-      [member.name, member.position, member.role].some((value) => String(value || "").toLowerCase().includes(query)),
-    );
-  }, [memberQuery, members]);
+const selectedMemberIds = useMemo(() => new Set(draft.rcphMemberIds), [draft.rcphMemberIds]);
+
+const filteredMembers = useMemo(() => {
+  const query = memberQuery.trim().toLowerCase();
+  if (!query) return members;
+
+  return members.filter((member) =>
+    [member.name, member.position, member.role].some((value) =>
+      String(value || "").toLowerCase().includes(query),
+    ),
+  );
+}, [memberQuery, members]);
+
+const selectedMembers = useMemo(
+  () => members.filter((member) => selectedMemberIds.has(member.id)),
+  [members, selectedMemberIds],
+);
 
   useEffect(() => {
     const rowId = pendingParticipantFocusRef.current;
@@ -64,7 +74,31 @@ export default function LetterheadExchangeForm({ members, events, optionsStatus,
     pendingParticipantFocusRef.current = "";
     participantRefs.current.get(rowId)?.focus?.();
   }, [draft.externalParticipants.length]);
+useEffect(() => {
+  if (!memberDropdownOpen) return undefined;
 
+  function handlePointerDown(event) {
+    if (!memberDropdownRef.current?.contains(event.target)) {
+      setMemberDropdownOpen(false);
+      setMemberQuery("");
+    }
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Escape") {
+      setMemberDropdownOpen(false);
+      setMemberQuery("");
+    }
+  }
+
+  document.addEventListener("mousedown", handlePointerDown);
+  document.addEventListener("keydown", handleKeyDown);
+
+  return () => {
+    document.removeEventListener("mousedown", handlePointerDown);
+    document.removeEventListener("keydown", handleKeyDown);
+  };
+}, [memberDropdownOpen]);
   function updateDraft(key, value) {
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: "" }));
@@ -106,13 +140,13 @@ export default function LetterheadExchangeForm({ members, events, optionsStatus,
     }));
   }
 
-  function resetForm() {
-    setDraft(createLetterheadExchangeDraft());
-    setErrors({});
-    setImageState(EMPTY_IMAGE_STATE);
-    setMemberQuery("");
-  }
-
+function resetForm() {
+  setDraft(createLetterheadExchangeDraft());
+  setErrors({});
+  setImageState(EMPTY_IMAGE_STATE);
+  setMemberQuery("");
+  setMemberDropdownOpen(false);
+}
   async function uploadImagesForExchange(exchangeId, files) {
     setSubmission((current) => ({ ...current, status: "uploading_images", message: "" }));
     const result = await uploadLetterheadExchangeImages(exchangeId, files, {
@@ -288,36 +322,164 @@ export default function LetterheadExchangeForm({ members, events, optionsStatus,
           </button>
         </fieldset>
 
-        <fieldset className="letterhead-members" disabled={busy || optionsUnavailable}>
-          <legend>RCPH Representative(s) *</legend>
-          <label htmlFor="letterhead-member-search">
-            Search members
-            <input
-              id="letterhead-member-search"
-              type="search"
-              value={memberQuery}
-              onChange={(change) => setMemberQuery(change.target.value)}
-              placeholder="Search by name, role, or position"
-            />
-          </label>
-          {errors.rcphMemberIds ? <p className="bod-field-error" role="alert">{errors.rcphMemberIds}</p> : null}
-          <div className="letterhead-member-selector" role="group" aria-label="RCPH representatives">
-            {filteredMembers.length ? filteredMembers.map((member) => (
-              <label key={member.id} className={selectedMemberIds.has(member.id) ? "is-selected" : ""}>
-                <input
-                  type="checkbox"
-                  checked={selectedMemberIds.has(member.id)}
-                  onChange={(change) => updateDraft("rcphMemberIds", toggleMemberSelection(draft.rcphMemberIds, member.id, change.target.checked))}
-                />
-                <span>
-                  <strong>{member.name}</strong>
-                  <small>{[member.position, member.role].filter(Boolean).join(" / ") || "RCPH member"}</small>
-                </span>
-              </label>
-            )) : <p className="letterhead-empty-inline">No members match this search.</p>}
-          </div>
-          <p className="letterhead-selection-count" aria-live="polite">{draft.rcphMemberIds.length} selected</p>
-        </fieldset>
+<fieldset className="letterhead-members" disabled={busy || optionsUnavailable}>
+  <legend>RCPH Representative(s) *</legend>
+
+  {errors.rcphMemberIds ? (
+    <p className="bod-field-error" role="alert">
+      {errors.rcphMemberIds}
+    </p>
+  ) : null}
+
+  <div
+    className="letterhead-member-dropdown"
+    ref={memberDropdownRef}
+  >
+    <button
+      type="button"
+      className={`letterhead-member-dropdown__trigger ${
+        memberDropdownOpen ? "is-open" : ""
+      }`}
+      onClick={() => {
+        setMemberDropdownOpen((open) => {
+          const next = !open;
+          if (!next) setMemberQuery("");
+          return next;
+        });
+      }}
+      disabled={busy || optionsUnavailable}
+      aria-expanded={memberDropdownOpen}
+      aria-haspopup="listbox"
+      aria-controls="letterhead-member-options"
+    >
+      <span>
+        {draft.rcphMemberIds.length
+          ? `${draft.rcphMemberIds.length} representative${
+              draft.rcphMemberIds.length === 1 ? "" : "s"
+            } selected`
+          : "Select RCPH representatives"}
+      </span>
+
+      <span
+        className="letterhead-member-dropdown__chevron"
+        aria-hidden="true"
+      >
+        ▾
+      </span>
+    </button>
+
+    {memberDropdownOpen ? (
+      <div className="letterhead-member-dropdown__panel">
+        <label
+          className="letterhead-member-dropdown__search"
+          htmlFor="letterhead-member-search"
+        >
+          <span className="sr-only">Search RCPH representatives</span>
+          <input
+            id="letterhead-member-search"
+            type="search"
+            value={memberQuery}
+            onChange={(change) => setMemberQuery(change.target.value)}
+            placeholder="Search by name, role, or position"
+            autoComplete="off"
+            autoFocus
+          />
+        </label>
+
+        <div
+          id="letterhead-member-options"
+          className="letterhead-member-dropdown__options"
+          role="listbox"
+          aria-label="RCPH representatives"
+          aria-multiselectable="true"
+        >
+          {filteredMembers.length ? (
+            filteredMembers.map((member) => {
+              const selected = selectedMemberIds.has(member.id);
+
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  className={`letterhead-member-dropdown__option ${
+                    selected ? "is-selected" : ""
+                  }`}
+                  onClick={() =>
+                    updateDraft(
+                      "rcphMemberIds",
+                      toggleMemberSelection(
+                        draft.rcphMemberIds,
+                        member.id,
+                        !selected,
+                      ),
+                    )
+                  }
+                >
+                  <span className="letterhead-member-dropdown__member">
+                    <strong>{member.name}</strong>
+                    <small>
+                      {[member.position, member.role]
+                        .filter(Boolean)
+                        .join(" / ") || "RCPH member"}
+                    </small>
+                  </span>
+
+                  <span
+                    className="letterhead-member-dropdown__state"
+                    aria-hidden="true"
+                  >
+                    {selected ? "✓ Selected" : "Add"}
+                  </span>
+                </button>
+              );
+            })
+          ) : (
+            <p className="letterhead-empty-inline">
+              No members match this search.
+            </p>
+          )}
+        </div>
+      </div>
+    ) : null}
+  </div>
+
+  {selectedMembers.length ? (
+    <div
+      className="letterhead-member-chips"
+      aria-label="Selected RCPH representatives"
+    >
+      {selectedMembers.map((member) => (
+        <span className="letterhead-member-chip" key={member.id}>
+          <span>{member.name}</span>
+
+          <button
+            type="button"
+            onClick={() =>
+              updateDraft(
+                "rcphMemberIds",
+                toggleMemberSelection(
+                  draft.rcphMemberIds,
+                  member.id,
+                  false,
+                ),
+              )
+            }
+            aria-label={`Remove ${member.name}`}
+            title={`Remove ${member.name}`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  ) : (
+    <p className="letterhead-selection-count">
+      No representatives selected.
+    </p>
+  )}
+</fieldset>
 
         <div className="letterhead-form-grid">
           <label htmlFor="letterhead-exchange-date">
@@ -353,7 +515,7 @@ export default function LetterheadExchangeForm({ members, events, optionsStatus,
         </div>
 
         <label htmlFor="letterhead-other">
-          Other
+          Other Event
           <textarea
             id="letterhead-other"
             value={draft.other}
