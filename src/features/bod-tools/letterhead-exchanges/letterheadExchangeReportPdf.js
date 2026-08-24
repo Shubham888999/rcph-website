@@ -33,12 +33,17 @@ export function normalizeLetterheadExchangeCellText(value, max = 2200) {
 
 export function buildLetterheadExchangeCellLines(row, options = {}) {
   const columns = options.columns || LETTERHEAD_EXCHANGE_TABLE_COLUMNS;
+  const cellSpecs = options.cellSpecs && typeof options.cellSpecs === "object" ? options.cellSpecs : {};
   const padding = Number.isFinite(Number(options.padding)) ? Number(options.padding) : 0;
   const wrapText = options.wrapText;
   if (typeof wrapText !== "function") throw new TypeError("Letterhead Exchange PDF cell wrapping is required.");
   return Object.fromEntries(columns.map((column) => {
-    const spec = CELL_SPECS[column.key] || Object.freeze({ max: 2200, read: (source) => source?.[column.key] });
-    const value = normalizeLetterheadExchangeCellText(spec.read(row), spec.max) || "Not available";
+    const baseSpec = CELL_SPECS[column.key] || Object.freeze({ max: 2200, read: (source) => source?.[column.key] });
+    const overrideSpec = cellSpecs[column.key] && typeof cellSpecs[column.key] === "object" ? cellSpecs[column.key] : {};
+    const spec = { ...baseSpec, ...overrideSpec };
+    const rawValue = typeof spec.read === "function" ? spec.read(row) : row?.[column.key];
+    const formattedValue = typeof spec.format === "function" ? spec.format(rawValue, row, column) : rawValue;
+    const value = normalizeLetterheadExchangeCellText(formattedValue, spec.max) || "Not available";
     const width = Math.max(1, column.width - padding * 2);
     const lines = wrapText(value, width, column);
     return [column.key, Array.isArray(lines) && lines.length ? lines : [" "]];

@@ -5,6 +5,7 @@ import { buildBodAvenueReportModel } from "./bodAvenueReportModel.js";
 import {
   BOD_AVENUE_REPORT_LAYOUT,
   BOD_AVENUE_REPORT_LETTERHEAD_URL,
+  BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
   buildBodAvenueReportPdfDocument,
   buildBodAvenueReportPdfPages,
   getBodAvenueReportLetterheadPng,
@@ -265,8 +266,7 @@ test("ISD reports render Letterhead Exchanges after existing finance content", (
     "Club",
     "Rotaractor",
     "Position / RID",
-    "RCPH Representative",
-    "Associated Event / Remarks",
+    "RCPH Member",
     "Rotaract Club A",
     "Person 1",
     "Person 2",
@@ -275,12 +275,49 @@ test("ISD reports render Letterhead Exchanges after existing finance content", (
     "President",
     "RID: 3131",
     "RID: 3132",
-    "Aarav Joshi, Mira Shah",
-    "Project Across Borders",
-    "Remarks: Exchange during",
-    "fellowship\\.",
+    "Rtr\\. Aarav Joshi, Rtr\\. Mira Shah",
   ]) assert.match(text, new RegExp(expected));
+  assert.equal(BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS.length, 5);
+  assert.deepEqual(BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS.map((column) => column.label), [
+    "Date",
+    "Club",
+    "Rotaractor",
+    "Position / RID",
+    "RCPH Member(s)",
+  ]);
+  assert.equal(BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS.reduce((sum, column) => sum + column.width, 0), 523);
+  assert.doesNotMatch(text, /Associated Event \/ Remarks/);
+  assert.doesNotMatch(text, /Project Across Borders/);
+  assert.doesNotMatch(text, /Remarks: Exchange during/);
   assert.ok(text.indexOf("Total expense for July 2026") < text.indexOf("LETTERHEAD EXCHANGES"));
+});
+
+test("Monthly Letterhead PDF prefixes one and multiple RCPH member names", () => {
+  const model = report([makeEvent("ISD", "International service activity", "2026-07-09", ["ISD"])], {
+    avenueCode: "ISD",
+    selectedAvenueCodes: ["ISD"],
+    includeLetterheadExchanges: true,
+    letterheadExchanges: [
+      makeLetterheadExchange("exchange-single", {
+        rcphRepresentatives: [{ name: "Aarya Godbole" }],
+      }),
+      makeLetterheadExchange("exchange-multiple", {
+        exchangeDate: "2026-07-13",
+        rcphRepresentatives: [{ name: "Rtr. Nupura Danait" }, { name: "Mira Shah" }],
+      }),
+    ],
+  });
+  const text = buildBodAvenueReportPdfPages(model).flat().join("\n");
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD));
+  assert.match(text, /RCPH Member\\\(s\\\)/);
+  assert.match(text, /Rtr\. Aarya Godbole/);
+  assert.match(text, /Rtr\. Nupura Danait, Rtr\. Mira Shah/);
+  assert.doesNotMatch(text, /Rtr\. Rtr\./);
+  assert.doesNotMatch(text, /Associated Event \/ Remarks/);
+  assert.match(pdf, /RCPH Member\\\(s\\\)/);
+  assert.match(pdf, /Rtr\. Aarya Godbole/);
+  assert.match(pdf, /Rtr\. Nupura Danait, Rtr\. Mira Shah/);
+  assert.doesNotMatch(pdf, /Associated Event \/ Remarks/);
 });
 
 test("zero Letterhead Exchanges render the approved no-record message", () => {
@@ -295,7 +332,7 @@ test("zero Letterhead Exchanges render the approved no-record message", () => {
   assert.match(text, /No Letterhead Exchanges were recorded for the selected reporting period\./);
 });
 
-test("many Letterhead Exchanges with long names and remarks paginate safely", () => {
+test("many Letterhead Exchanges with long names paginate safely", () => {
   const exchanges = Array.from({ length: 18 }, (_, index) => makeLetterheadExchange(`exchange-${index + 1}`, {
     exchangeDate: `2026-07-${String((index % 25) + 1).padStart(2, "0")}`,
     externalParticipants: [
@@ -321,9 +358,10 @@ test("many Letterhead Exchanges with long names and remarks paginate safely", ()
   const text = pages.flat().join("\n");
   assert.match(text, /LETTERHEAD EXCHANGES/);
   assert.match(text, /Long Name 18/);
-  assert.match(text, /Representative/);
+  assert.match(text, /RCPH Member\\\(s\\\)/);
+  assert.doesNotMatch(text, /Associated Event \/ Remarks/);
   assert.ok(pages.filter((page) => page.join("\n").includes("Rotaractor")).length >= 2);
-  assert.equal(pages.slice(1).some((page) => page.join("\n").includes("\\(continued\\)")), true);
+  assert.ok(pages.filter((page) => page.join("\n").includes("RCPH Member\\(s\\)")).length >= 2);
 });
 
 test("meeting-only PDFs render a BOD Meetings section without requiring an avenue", () => {

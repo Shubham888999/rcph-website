@@ -9,7 +9,6 @@ import { RESOLUTION_OFFICIAL_LETTERHEAD_URL } from "../resolutions/resolutionLet
 import {
   LETTERHEAD_EXCHANGE_EMPTY_MESSAGE,
   LETTERHEAD_EXCHANGE_SECTION_TITLE,
-  LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
   buildLetterheadExchangeCellLines,
 } from "./letterhead-exchanges/letterheadExchangeReportPdf.js";
 
@@ -88,7 +87,13 @@ export const BOD_AVENUE_REPORT_TABLE_COLUMNS = Object.freeze([
   Object.freeze({ key: "expense", label: "Expense", width: 76 }),
 ]);
 
-export const BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS = LETTERHEAD_EXCHANGE_TABLE_COLUMNS;
+export const BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS = Object.freeze([
+  Object.freeze({ key: "date", label: "Date", width: 58 }),
+  Object.freeze({ key: "club", label: "Club", width: 112 }),
+  Object.freeze({ key: "rotaractor", label: "Rotaractor", width: 104 }),
+  Object.freeze({ key: "positionRid", label: "Position / RID", width: 96 }),
+  Object.freeze({ key: "representatives", label: "RCPH Member(s)", width: 153 }),
+]);
 
 const BODY_SIZE_STYLES = Object.freeze({
   compact: Object.freeze({ fontSize: 7.5, headerFontSize: 7.3 }),
@@ -318,6 +323,19 @@ function uniqueLines(lines) {
   return output;
 }
 
+function letterheadRcphMemberText(value) {
+  const source = Array.isArray(value) ? value : String(value ?? "").split(/\n|,\s*/);
+  const names = source
+    .map((item) => normalizedLine(item, 160).replace(/^Rtr\.\s*/i, ""))
+    .filter((name) => name && name.toLowerCase() !== "not available")
+    .map((name) => `Rtr. ${name}`);
+  return uniqueLines(names).join(", ");
+}
+
+const BOD_LETTERHEAD_EXCHANGE_CELL_SPECS = Object.freeze({
+  representatives: Object.freeze({ max: 360, format: letterheadRcphMemberText }),
+});
+
 function strokeRect(commands, x, y, width, height, gray = 0.45, lineWidth = 0.7) {
   commands.push(
     pdfLineCommand({ x1: x, y1: y, x2: x + width, y2: y, gray, width: lineWidth }),
@@ -491,6 +509,7 @@ function letterheadCellLines(row, style) {
   const table = style.table;
   return buildLetterheadExchangeCellLines(row, {
     columns: BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
+    cellSpecs: BOD_LETTERHEAD_EXCHANGE_CELL_SPECS,
     padding: table.padding,
     wrapText: (value, width) => wrapText(value, width, table.fontSize, style.fontFamily),
   });
