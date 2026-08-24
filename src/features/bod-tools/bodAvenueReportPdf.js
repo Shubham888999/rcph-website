@@ -6,6 +6,12 @@ import {
   pdfLineCommand,
 } from "../pdf/simplePdf.js";
 import { RESOLUTION_OFFICIAL_LETTERHEAD_URL } from "../resolutions/resolutionLetterhead.js";
+import {
+  LETTERHEAD_EXCHANGE_EMPTY_MESSAGE,
+  LETTERHEAD_EXCHANGE_SECTION_TITLE,
+  LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
+  buildLetterheadExchangeCellLines,
+} from "./letterhead-exchanges/letterheadExchangeReportPdf.js";
 
 export const BOD_AVENUE_REPORT_LETTERHEAD_URL = RESOLUTION_OFFICIAL_LETTERHEAD_URL;
 
@@ -81,6 +87,8 @@ export const BOD_AVENUE_REPORT_TABLE_COLUMNS = Object.freeze([
   Object.freeze({ key: "description", label: "Description", width: 273 }),
   Object.freeze({ key: "expense", label: "Expense", width: 76 }),
 ]);
+
+export const BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS = LETTERHEAD_EXCHANGE_TABLE_COLUMNS;
 
 const BODY_SIZE_STYLES = Object.freeze({
   compact: Object.freeze({ fontSize: 7.5, headerFontSize: 7.3 }),
@@ -435,12 +443,12 @@ function drawReportHeader(commands, report, style) {
   return drawSummaryRow(commands, drawTitleBox(commands, report, style), report, style);
 }
 
-function drawTableHeader(commands, top, style) {
+function drawTableHeader(commands, top, style, columns = BOD_AVENUE_REPORT_TABLE_COLUMNS) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
   const table = style.table;
   commands.push(pdfFillRectCommand({ x: safe.left, y: top - table.headerHeight, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: table.headerHeight, gray: table.headerGray }));
   let x = safe.left;
-  for (const column of BOD_AVENUE_REPORT_TABLE_COLUMNS) {
+  for (const column of columns) {
     commands.push(textCommand({ x: x + table.padding, y: top - 15, text: column.label, size: table.headerFontSize, bold: true, fontFamily: style.fontFamily }));
     commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - table.headerHeight, gray: table.headerBorderGray }));
     x += column.width;
@@ -479,18 +487,27 @@ function eventCellLines(event, style) {
   };
 }
 
+function letterheadCellLines(row, style) {
+  const table = style.table;
+  return buildLetterheadExchangeCellLines(row, {
+    columns: BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
+    padding: table.padding,
+    wrapText: (value, width) => wrapText(value, width, table.fontSize, style.fontFamily),
+  });
+}
+
 function rowHeightForLines(lines, style) {
   const table = style.table;
   return Math.max(1, ...Object.values(lines).map((cellLines) => cellLines.length)) * table.lineHeight + table.padding * 2;
 }
 
-function drawRow(commands, lines, top, shade, style) {
+function drawRow(commands, lines, top, shade, style, columns = BOD_AVENUE_REPORT_TABLE_COLUMNS) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
   const table = style.table;
   const rowHeight = rowHeightForLines(lines, style);
   if (shade) commands.push(pdfFillRectCommand({ x: safe.left, y: top - rowHeight, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: rowHeight, gray: table.alternateRowGray }));
   let x = safe.left;
-  BOD_AVENUE_REPORT_TABLE_COLUMNS.forEach((column) => {
+  columns.forEach((column) => {
     lines[column.key].forEach((line, index) => commands.push(textCommand({
       x: x + table.padding,
       y: top - table.padding - table.fontSize - index * table.lineHeight,
@@ -506,30 +523,31 @@ function drawRow(commands, lines, top, shade, style) {
   return top - rowHeight;
 }
 
-function splitOversizedRow(lines, style) {
+function splitOversizedRow(lines, style, columns = BOD_AVENUE_REPORT_TABLE_COLUMNS) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
   const table = style.table;
+  const keys = columns.map(column => column.key);
+  const continuationKey = keys.includes("event") ? "event" : (keys.includes("rotaractor") ? "rotaractor" : keys[0]);
   const availableLines = Math.max(1, Math.floor((safe.top - table.headerHeight - safe.bottom - table.padding * 2) / table.lineHeight));
   const remaining = Object.fromEntries(Object.entries(lines).map(([key, value]) => [key, [...value]]));
   const chunks = [];
   let first = true;
   while (Object.values(remaining).some((cellLines) => cellLines.length)) {
     const chunk = {};
-    for (const key of Object.keys(remaining)) chunk[key] = remaining[key].splice(0, availableLines);
-    if (!first && !chunk.event.length) chunk.event = ["(continued)"];
-    if (!first && !chunk.date.length) chunk.date = [""];
-    if (!first && !chunk.expense.length) chunk.expense = [""];
-    if (!first && !chunk.description.length) chunk.description = [""];
+    for (const key of keys) {
+      chunk[key] = (remaining[key] || []).splice(0, availableLines);
+      if (!chunk[key].length) chunk[key] = !first && key === continuationKey ? ["(continued)"] : [""];
+    }
     chunks.push(chunk);
     first = false;
   }
   return chunks;
 }
 
-function createTablePage(pages, style) {
+function createTablePage(pages, style, columns = BOD_AVENUE_REPORT_TABLE_COLUMNS) {
   const commands = [];
   pages.push(commands);
-  return { commands, y: drawTableHeader(commands, BOD_AVENUE_REPORT_LAYOUT.safeArea.top, style) };
+  return { commands, y: drawTableHeader(commands, BOD_AVENUE_REPORT_LAYOUT.safeArea.top, style, columns) };
 }
 
 function createBlankPage(pages) {
@@ -560,6 +578,29 @@ function drawEventRows(pages, events, startY, style) {
     // Atomic row pagination: measure the complete event row before drawing it.
     if (y - rowHeight < safe.bottom) ({ commands, y } = createTablePage(pages, style));
     y = drawRow(commands, lines, y, eventIndex % 2 === 1, style);
+  });
+  return y;
+}
+
+function drawLetterheadRows(pages, rows, startY, style) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const table = style.table;
+  let commands = pages.at(-1);
+  let y = startY;
+  const freshPageRowCapacity = safe.top - table.headerHeight - safe.bottom;
+  rows.forEach((row, rowIndex) => {
+    const lines = letterheadCellLines(row, style);
+    const rowHeight = rowHeightForLines(lines, style);
+    if (rowHeight > freshPageRowCapacity) {
+      for (const chunk of splitOversizedRow(lines, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS)) {
+        const chunkHeight = rowHeightForLines(chunk, style);
+        if (y - chunkHeight < safe.bottom) ({ commands, y } = createTablePage(pages, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS));
+        y = drawRow(commands, chunk, y, rowIndex % 2 === 1, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS);
+      }
+      return;
+    }
+    if (y - rowHeight < safe.bottom) ({ commands, y } = createTablePage(pages, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS));
+    y = drawRow(commands, lines, y, rowIndex % 2 === 1, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS);
   });
   return y;
 }
@@ -716,6 +757,71 @@ function drawGrandTotal(pages, commands, y, report, style) {
   };
 }
 
+function letterheadRowsForReport(report) {
+  return report?.includeLetterheadExchanges === true && Array.isArray(report?.letterheadExchangeRows)
+    ? report.letterheadExchangeRows
+    : [];
+}
+
+function letterheadHeadingModel(style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const headingLines = wrapText(LETTERHEAD_EXCHANGE_SECTION_TITLE, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.headingSize, style.fontFamily, true);
+  return {
+    headingLines,
+    height: headingLines.length * layout.headingLineHeight + layout.headingToTableGap,
+  };
+}
+
+function drawLetterheadHeading(commands, y, style) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const heading = letterheadHeadingModel(style);
+  addTextLines(commands, heading.headingLines, safe.left, y, {
+    size: layout.headingSize,
+    lineHeight: layout.headingLineHeight,
+    bold: true,
+    gray: 0.06,
+    fontFamily: style.fontFamily,
+  });
+  return y - heading.headingLines.length * layout.headingLineHeight - layout.headingToTableGap;
+}
+
+function drawNoLetterheadMessage(commands, y, style) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const table = style.table;
+  const lines = wrapText(LETTERHEAD_EXCHANGE_EMPTY_MESSAGE, BOD_AVENUE_REPORT_CONTENT_WIDTH - table.padding * 2, table.fontSize, style.fontFamily);
+  const height = lines.length * table.lineHeight + table.padding * 2;
+  commands.push(pdfFillRectCommand({ x: safe.left, y: y - height, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height, gray: table.alternateRowGray }));
+  strokeRect(commands, safe.left, y, BOD_AVENUE_REPORT_CONTENT_WIDTH, height, table.borderGray, 0.55);
+  addTextLines(commands, lines, safe.left + table.padding, y - table.padding - table.fontSize, {
+    size: table.fontSize,
+    lineHeight: table.lineHeight,
+    gray: 0.18,
+    fontFamily: style.fontFamily,
+  });
+  return y - height - BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable;
+}
+
+function drawLetterheadExchangeSection(pages, commands, y, report, style) {
+  if (report?.includeLetterheadExchanges !== true) return { commands, y };
+  const rows = letterheadRowsForReport(report);
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const table = style.table;
+  const heading = letterheadHeadingModel(style);
+  const gap = BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable;
+  const firstRowHeight = rows[0] ? rowHeightForLines(letterheadCellLines(rows[0], style), style) : table.lineHeight + table.padding * 2;
+  const required = heading.height + (rows.length ? table.headerHeight + firstRowHeight : firstRowHeight);
+  ({ commands, y } = ensureSpace(pages, commands, y - gap, required));
+  y = drawLetterheadHeading(commands, y, style);
+  if (!rows.length) {
+    if (y - firstRowHeight < safe.bottom) ({ commands, y } = createBlankPage(pages));
+    return { commands, y: drawNoLetterheadMessage(commands, y, style) };
+  }
+  y = drawTableHeader(commands, y, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS);
+  y = drawLetterheadRows(pages, rows, y, style);
+  return { commands: pages.at(-1), y };
+}
+
 function drawReportContent(pages, report, startY, style) {
   let commands = pages.at(-1);
   let y = startY;
@@ -752,7 +858,8 @@ function drawReportContent(pages, report, startY, style) {
     }
   }
 
-  if (showGrandTotal) drawGrandTotal(pages, commands, y, report, style);
+  if (showGrandTotal) ({ commands, y } = drawGrandTotal(pages, commands, y, report, style));
+  drawLetterheadExchangeSection(pages, commands, y, report, style);
 }
 
 function addPageChrome(pages, report) {

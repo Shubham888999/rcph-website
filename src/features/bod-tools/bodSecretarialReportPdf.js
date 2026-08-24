@@ -11,6 +11,12 @@ import {
   BOD_AVENUE_REPORT_LETTERHEAD_URL,
   getBodAvenueReportLetterheadPng,
 } from "./bodAvenueReportPdf.js";
+import {
+  LETTERHEAD_EXCHANGE_EMPTY_MESSAGE,
+  LETTERHEAD_EXCHANGE_SECTION_TITLE,
+  LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
+  buildLetterheadExchangeCellLines,
+} from "./letterhead-exchanges/letterheadExchangeReportPdf.js";
 
 export const BOD_SECRETARIAL_REPORT_LETTERHEAD_URL = BOD_AVENUE_REPORT_LETTERHEAD_URL;
 export const BOD_SECRETARIAL_REPORT_FRAME_URL = "/images/Report_Frame.png";
@@ -40,10 +46,16 @@ export const BOD_SECRETARIAL_REPORT_PDF_LAYOUT = Object.freeze({
 });
 
 const CONTENT_WIDTH = A4_PDF_SIZE.width - BOD_SECRETARIAL_REPORT_PDF_LAYOUT.margin * 2;
-const STAT_ROWS = Object.freeze([
+const BASE_STAT_ROWS = Object.freeze([
   Object.freeze(["Club Strength", "clubStrength"]),
+]);
+
+const OPTIONAL_SCORE_RANK_ROWS = Object.freeze([
   Object.freeze(["Club Score", "clubScore"]),
   Object.freeze(["Club Rank (As of Now)", "clubRank"]),
+]);
+
+const TRAILING_STAT_ROWS = Object.freeze([
   Object.freeze(["Overall Projects", "overallProjects"]),
   Object.freeze(["No. of meetings (BOD)", "bodMeetingCount"]),
   Object.freeze(["No. of meetings (GBM)", "gbmMeetingCount"]),
@@ -75,6 +87,18 @@ function displayText(value, fallback = "Not available") {
 function stringValue(value) {
   if (value === undefined || value === null || value === "") return "Not available";
   return displayText(value);
+}
+
+function hasOptionalStatValue(value) {
+  return cleanText(value, 180) !== "";
+}
+
+function statRowsForReport(report) {
+  return [
+    ...BASE_STAT_ROWS,
+    ...OPTIONAL_SCORE_RANK_ROWS.filter(([, key]) => hasOptionalStatValue(report?.[key])),
+    ...TRAILING_STAT_ROWS,
+  ];
 }
 
 function text(commands, x, y, value, options = {}) {
@@ -288,6 +312,134 @@ function drawTable(state, month, sectionTitle, columns, rows, emptyText) {
   return { ...state, y: state.y - 18 };
 }
 
+function letterheadRowsForReport(report) {
+  return report?.includeLetterheadExchanges === true && Array.isArray(report?.letterheadExchangeRows)
+    ? report.letterheadExchangeRows
+    : [];
+}
+
+function newSecretarialContentPage(pages) {
+  const commands = [];
+  pages.push(commands);
+  return { pages, commands, y: BOD_SECRETARIAL_REPORT_PDF_LAYOUT.top };
+}
+
+function letterheadHeadingHeight() {
+  return BOD_SECRETARIAL_REPORT_PDF_LAYOUT.sectionSize + 8;
+}
+
+function drawLetterheadHeading(commands, y, continued = false) {
+  const title = `${LETTERHEAD_EXCHANGE_SECTION_TITLE}${continued ? " (continued)" : ""}`;
+  text(commands, BOD_SECRETARIAL_REPORT_PDF_LAYOUT.margin, y, title, {
+    size: BOD_SECRETARIAL_REPORT_PDF_LAYOUT.sectionSize,
+    bold: true,
+  });
+  return y - letterheadHeadingHeight();
+}
+
+function letterheadCellLines(row) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  return buildLetterheadExchangeCellLines(row, {
+    columns: LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
+    padding: layout.padding,
+    wrapText: (value, width) => wrapPdfText(value, width, layout.bodySize).map((line) => line || " "),
+  });
+}
+
+function letterheadMessageLines() {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  return wrapPdfText(LETTERHEAD_EXCHANGE_EMPTY_MESSAGE, CONTENT_WIDTH - layout.padding * 2, layout.bodySize)
+    .map((line) => line || " ");
+}
+
+function letterheadMessageHeight() {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  return letterheadMessageLines().length * layout.lineHeight + layout.padding * 2;
+}
+
+function ensureLetterheadStartSpace(state, requiredHeight) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const gapBefore = 18;
+  if (state.y - gapBefore - requiredHeight >= layout.bottom) return { ...state, y: state.y - gapBefore };
+  return newSecretarialContentPage(state.pages);
+}
+
+function letterheadContinuationPage(state) {
+  let next = newSecretarialContentPage(state.pages);
+  next.y = drawLetterheadHeading(next.commands, next.y, true);
+  next.y = drawTableHeader(next.commands, next.y, LETTERHEAD_EXCHANGE_TABLE_COLUMNS);
+  return next;
+}
+
+function splitLetterheadOversizedRow(lines) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const keys = LETTERHEAD_EXCHANGE_TABLE_COLUMNS.map((column) => column.key);
+  const availableLines = Math.max(1, Math.floor((layout.top - letterheadHeadingHeight() - layout.tableHeaderHeight - layout.bottom - layout.padding * 2) / layout.lineHeight));
+  const remaining = Object.fromEntries(keys.map((key) => [key, [...(lines[key] || [])]]));
+  const chunks = [];
+  let first = true;
+  while (Object.values(remaining).some((cellLines) => cellLines.length)) {
+    const chunk = {};
+    for (const key of keys) {
+      chunk[key] = remaining[key].splice(0, availableLines);
+      if (!chunk[key].length) chunk[key] = !first && key === "rotaractor" ? ["(continued)"] : [""];
+    }
+    chunks.push(chunk);
+    first = false;
+  }
+  return chunks;
+}
+
+function drawLetterheadEmptyMessage(state) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const lines = letterheadMessageLines();
+  const height = letterheadMessageHeight();
+  state.commands.push(pdfFillRectCommand({
+    x: layout.margin,
+    y: state.y - height,
+    width: CONTENT_WIDTH,
+    height,
+    gray: 0.965,
+  }));
+  strokeRect(state.commands, layout.margin, state.y, CONTENT_WIDTH, height, 0.72);
+  lines.forEach((line, index) => {
+    text(state.commands, layout.margin + layout.padding, state.y - layout.padding - layout.bodySize - index * layout.lineHeight, line, { gray: 0.35 });
+  });
+  return { ...state, y: state.y - height };
+}
+
+function drawLetterheadRows(state, rows) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const freshPageRowCapacity = layout.top - letterheadHeadingHeight() - layout.tableHeaderHeight - layout.bottom;
+  rows.forEach((row, rowIndex) => {
+    const lines = letterheadCellLines(row);
+    const height = rowHeight(lines);
+    if (height > freshPageRowCapacity) {
+      for (const chunk of splitLetterheadOversizedRow(lines)) {
+        const chunkHeight = rowHeight(chunk);
+        if (state.y - chunkHeight < layout.bottom) state = letterheadContinuationPage(state);
+        state.y = drawRow(state.commands, state.y, LETTERHEAD_EXCHANGE_TABLE_COLUMNS, chunk, rowIndex % 2 === 1);
+      }
+      return;
+    }
+    if (state.y - height < layout.bottom) state = letterheadContinuationPage(state);
+    state.y = drawRow(state.commands, state.y, LETTERHEAD_EXCHANGE_TABLE_COLUMNS, lines, rowIndex % 2 === 1);
+  });
+  return state;
+}
+
+function drawLetterheadExchangeSection(state, report) {
+  if (report?.includeLetterheadExchanges !== true) return state;
+  const rows = letterheadRowsForReport(report);
+  const firstContentHeight = rows[0] ? rowHeight(letterheadCellLines(rows[0])) : letterheadMessageHeight();
+  const requiredHeight = letterheadHeadingHeight() + (rows.length ? BOD_SECRETARIAL_REPORT_PDF_LAYOUT.tableHeaderHeight + firstContentHeight : firstContentHeight);
+  state = ensureLetterheadStartSpace(state, requiredHeight);
+  state.y = drawLetterheadHeading(state.commands, state.y);
+  if (!rows.length) return drawLetterheadEmptyMessage(state);
+  state.y = drawTableHeader(state.commands, state.y, LETTERHEAD_EXCHANGE_TABLE_COLUMNS);
+  return drawLetterheadRows(state, rows);
+}
+
 function frameBox(frame) {
   const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
   const safe = layout.safeArea;
@@ -329,7 +481,7 @@ function summaryPage(report, frame) {
   });
 
   const firstLineY = titleY - 48;
-  STAT_ROWS.forEach(([label, key], index) => {
+  statRowsForReport(report).forEach(([label, key], index) => {
     centerInlineText(commands, center, firstLineY - index * layout.frameStatLineGap, [
       { text: `${label}:`, bold: true },
       { text: stringValue(report?.[key]), bold: false },
@@ -357,12 +509,15 @@ function validateReport(report) {
 export function buildBodSecretarialReportPdfPages(report, options = {}) {
   validateReport(report);
   const pages = [summaryPage(report, options.frame)];
+  let finalState = null;
   report.months.forEach((month) => {
     let state = monthPage(pages, month);
     state.pages = pages;
     state = drawTable(state, month, "1. Meetings", MEETING_COLUMNS, Array.isArray(month?.meetings) ? month.meetings : [], "No meetings recorded.");
     state = drawTable(state, month, "2. Events", EVENT_COLUMNS, Array.isArray(month?.events) ? month.events : [], "No events recorded.");
+    finalState = state;
   });
+  if (finalState) drawLetterheadExchangeSection(finalState, report);
   addPageNumbers(pages);
   return pages;
 }

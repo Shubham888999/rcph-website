@@ -23,6 +23,7 @@ import BodToolsErrorState from "../../features/bod-tools/BodToolsErrorState";
 import BodToolsHeader from "../../features/bod-tools/BodToolsHeader";
 import BodToolsShell from "../../features/bod-tools/BodToolsShell";
 import BodToolsSkeleton from "../../features/bod-tools/BodToolsSkeleton";
+import BodLetterheadExchangePanel from "../../features/bod-tools/letterhead-exchanges/BodLetterheadExchangePanel";
 import useBodEvents from "../../features/bod-tools/useBodEvents";
 import { clearDashboardDataCache } from "../../features/dashboard/dashboardService";
 import useAuth from "../../hooks/useAuth";
@@ -414,6 +415,8 @@ export default function BodToolsPage() {
       events={events}
       onNotice={setNotice}
     />
+
+    <BodLetterheadExchangePanel />
   </>
 ) : null}      </BodToolsShell>
       <BodEventDetailsDialog

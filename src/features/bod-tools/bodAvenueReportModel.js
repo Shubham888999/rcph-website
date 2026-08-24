@@ -46,6 +46,10 @@ function cleanText(value, max = 2500) {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : "";
 }
 
+function cleanReportText(value, max = 2500) {
+  return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max);
+}
+
 function unique(values) {
   return [...new Set(values)];
 }
@@ -260,15 +264,99 @@ function directorTextFromLines(lines) {
   return lines.length ? lines.join(", ") : "Not available";
 }
 
-function directorText(directors) {
-  return directorTextFromLines(directorLines(directors));
-}
-
 function selectedIdsFromOptions(value) {
   if (Array.isArray(value)) return new Set(value);
   if (value instanceof Set) return new Set(value);
   if (value && typeof value[Symbol.iterator] === "function") return new Set(value);
   return new Set();
+}
+
+function normalizeReportExternalParticipants(value) {
+  return Array.isArray(value)
+    ? value
+      .map((row) => ({
+        clubName: cleanReportText(row?.clubName, 150),
+        rotaractorName: cleanReportText(row?.rotaractorName, 120),
+        position: cleanReportText(row?.position, 120),
+        rotaractDistrictId: cleanReportText(row?.rotaractDistrictId, 20),
+      }))
+      .filter((row) => row.clubName && row.rotaractorName)
+    : [];
+}
+
+function normalizeReportRepresentatives(value) {
+  const seen = new Set();
+  const representatives = [];
+  for (const row of Array.isArray(value) ? value : []) {
+    const name = cleanReportText(row?.name || row, 160);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    representatives.push({ name });
+  }
+  return representatives;
+}
+
+function normalizeReportAssociatedEvent(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const label = cleanReportText(value.label || value.name, 260);
+  const name = cleanReportText(value.name || value.label, 180);
+  const date = cleanReportText(value.date, 20);
+  return label || name || date ? { label: label || name, name: name || label, date } : null;
+}
+
+export function normalizeLetterheadExchangeReportItems(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((row) => ({
+      id: cleanReportText(row?.id, 160),
+      exchangeDate: cleanReportText(row?.exchangeDate, 20),
+      exchangeMonth: cleanReportText(row?.exchangeMonth, 7),
+      externalParticipants: normalizeReportExternalParticipants(row?.externalParticipants),
+      rcphRepresentatives: normalizeReportRepresentatives(row?.rcphRepresentatives),
+      associatedEvent: normalizeReportAssociatedEvent(row?.associatedEvent),
+      other: cleanReportText(row?.other, 2000),
+    }))
+    .filter((row) => row.id && isValidReportMonth(row.exchangeMonth) && /^\d{4}-\d{2}-\d{2}$/.test(row.exchangeDate) && row.externalParticipants.length)
+    .sort((left, right) => (
+      left.exchangeDate.localeCompare(right.exchangeDate)
+      || left.id.localeCompare(right.id)
+    ));
+}
+
+function representativeNamesText(exchange) {
+  const names = normalizeReportRepresentatives(exchange?.rcphRepresentatives).map((row) => row.name);
+  return names.length ? names.join(", ") : "Not available";
+}
+
+function associatedEventRemarksText(exchange) {
+  const lines = [];
+  const event = normalizeReportAssociatedEvent(exchange?.associatedEvent);
+  const remarks = cleanReportText(exchange?.other, 2000);
+  if (event?.label) lines.push(event.label);
+  if (remarks) lines.push(event?.label ? `Remarks: ${remarks}` : remarks);
+  return lines.join("\n");
+}
+
+export function flattenLetterheadExchangeReportRows(exchanges) {
+  return normalizeLetterheadExchangeReportItems(exchanges).flatMap((exchange) =>
+    exchange.externalParticipants.map((participant) => {
+      const position = cleanReportText(participant.position, 120);
+      const rid = cleanReportText(participant.rotaractDistrictId, 20);
+      const positionRid = [position, rid ? `RID: ${rid}` : ""].filter(Boolean).join("\n") || "Not available";
+      return {
+        exchangeId: exchange.id,
+        date: exchange.exchangeDate,
+        dateLabel: formatBodReportDate(exchange.exchangeDate),
+        clubName: participant.clubName,
+        rotaractorName: participant.rotaractorName,
+        position,
+        rotaractDistrictId: rid,
+        positionRid,
+        rcphRepresentativesText: representativeNamesText(exchange),
+        associatedEventRemarks: associatedEventRemarksText(exchange) || "Not available",
+      };
+    })
+  );
 }
 
 export function createBodAvenueSelection(events) {
@@ -519,8 +607,15 @@ export function buildBodAvenueReportModel(options = {}) {
   const reportTitle = reportTitleForSelection(selectedAvenueCodes, includeBodMeetings);
   const grandExpenseTotal = sumEventMoney(reportEvents, "expenseTotal");
   const grandIncomeTotal = sumEventMoney(reportEvents, "incomeTotal");
+  const includeLetterheadExchanges = options.includeLetterheadExchanges === true;
+  const letterheadExchanges = includeLetterheadExchanges
+    ? normalizeLetterheadExchangeReportItems(options.letterheadExchanges)
+    : [];
+  const letterheadExchangeRows = includeLetterheadExchanges
+    ? flattenLetterheadExchangeReportRows(letterheadExchanges)
+    : [];
 
-  return {
+  const report = {
     selectedMonths,
     selectedAvenueCodes,
     includeBodMeetings,
@@ -552,6 +647,12 @@ export function buildBodAvenueReportModel(options = {}) {
     bodMeetingGroups: meetingGroups,
     avenueGroups: reportAvenueGroups,
   };
+  if (includeLetterheadExchanges) {
+    report.includeLetterheadExchanges = true;
+    report.letterheadExchanges = letterheadExchanges;
+    report.letterheadExchangeRows = letterheadExchangeRows;
+  }
+  return report;
 }
 
 export function getBodAvenueReportFilename(report) {

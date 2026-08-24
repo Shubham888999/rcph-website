@@ -33,6 +33,19 @@ const bodMeeting = (id, overrides = {}) => ({
   ...overrides,
 });
 
+const letterheadExchange = (id, overrides = {}) => ({
+  id,
+  exchangeDate: "2026-07-18",
+  exchangeMonth: "2026-07",
+  externalParticipants: [
+    { clubName: "Rotaract Club A", rotaractorName: "External One", position: "President", rotaractDistrictId: "3131" },
+  ],
+  rcphRepresentatives: [{ name: "RCPH One" }],
+  associatedEvent: null,
+  other: "",
+  ...overrides,
+});
+
 function buildReport(options = {}) {
   return buildBodSecretarialReportModel({
     events: [],
@@ -131,6 +144,74 @@ test("creates separate month sections for multiple selected months", () => {
   assert.equal(report.months[1].events.length, 1);
 });
 
+test("club score and rank are optional in all four combinations", () => {
+  const both = buildReport({ clubScore: " 91 ", clubRank: " 3 " });
+  assert.equal(both.clubScore, "91");
+  assert.equal(both.clubRank, "3");
+
+  const scoreOnly = buildReport({ clubScore: "91", clubRank: " " });
+  assert.equal(scoreOnly.clubScore, "91");
+  assert.equal(Object.hasOwn(scoreOnly, "clubRank"), false);
+
+  const rankOnly = buildReport({ clubScore: "", clubRank: "3" });
+  assert.equal(Object.hasOwn(rankOnly, "clubScore"), false);
+  assert.equal(rankOnly.clubRank, "3");
+
+  const neither = buildReport({ clubScore: "", clubRank: "" });
+  assert.equal(Object.hasOwn(neither, "clubScore"), false);
+  assert.equal(Object.hasOwn(neither, "clubRank"), false);
+
+  for (const model of [scoreOnly, rankOnly, neither]) {
+    assert.doesNotMatch(JSON.stringify(model), /N\/A|undefined|null/);
+  }
+});
+
+test("secretarial model normalizes Letterhead Exchanges only when explicitly included", () => {
+  const disabled = buildReport({
+    includeLetterheadExchanges: false,
+    letterheadExchanges: [letterheadExchange("ignored")],
+  });
+  assert.equal(Object.hasOwn(disabled, "includeLetterheadExchanges"), false);
+  assert.equal(Object.hasOwn(disabled, "letterheadExchanges"), false);
+  assert.equal(Object.hasOwn(disabled, "letterheadExchangeRows"), false);
+
+  const report = buildReport({
+    includeLetterheadExchanges: true,
+    letterheadExchanges: [
+      letterheadExchange("exchange-1", {
+        externalParticipants: [
+          { clubName: "Rotaract Club A", rotaractorName: "External One", position: "President", rotaractDistrictId: "3131" },
+          { clubName: "Rotaract Club A", rotaractorName: "External Two", position: "", rotaractDistrictId: "3131" },
+          { clubName: "Rotaract Club B", rotaractorName: "External Three", position: "Secretary", rotaractDistrictId: "" },
+        ],
+        rcphRepresentatives: [{ name: "RCPH One" }, { name: "RCPH One" }, { name: "RCPH Two" }],
+        associatedEvent: { label: "July GBM", date: "2026-06-01" },
+        other: "Badge handover",
+      }),
+      letterheadExchange("outside-event-month", {
+        exchangeDate: "2026-07-22",
+        exchangeMonth: "2026-07",
+        associatedEvent: { label: "June Project", date: "2026-06-29" },
+      }),
+    ],
+  });
+
+  assert.equal(report.includeLetterheadExchanges, true);
+  assert.equal(report.letterheadExchanges.length, 2);
+  assert.equal(report.letterheadExchangeRows.length, 4);
+  assert.deepEqual(report.letterheadExchangeRows.slice(0, 3).map((row) => [row.clubName, row.rotaractorName]), [
+    ["Rotaract Club A", "External One"],
+    ["Rotaract Club A", "External Two"],
+    ["Rotaract Club B", "External Three"],
+  ]);
+  assert.equal(report.letterheadExchangeRows[0].positionRid, "President\nRID: 3131");
+  assert.equal(report.letterheadExchangeRows[1].positionRid, "RID: 3131");
+  assert.equal(report.letterheadExchangeRows[2].positionRid, "Secretary");
+  assert.equal(report.letterheadExchangeRows[0].rcphRepresentativesText, "RCPH One, RCPH Two");
+  assert.equal(report.letterheadExchangeRows[0].associatedEventRemarks, "July GBM\nRemarks: Badge handover");
+  assert.equal(report.letterheadExchangeRows[3].associatedEventRemarks, "June Project");
+});
+
 test("skips invalid, inactive, archived, and removed records safely", () => {
   const report = buildReport({
     events: [
@@ -150,8 +231,8 @@ test("skips invalid, inactive, archived, and removed records safely", () => {
 
 test("validates required inputs and generated timestamp", () => {
   assert.throws(() => buildReport({ selectedMonths: ["2026-13"] }), /month/i);
-  assert.throws(() => buildReport({ clubScore: " " }), /score/i);
-  assert.throws(() => buildReport({ clubRank: "" }), /rank/i);
+  assert.doesNotThrow(() => buildReport({ clubScore: " " }));
+  assert.doesNotThrow(() => buildReport({ clubRank: "" }));
   assert.throws(() => buildReport({ generatedAt: "not-a-date" }), /timestamp/i);
   assert.equal(buildReport({ metrics: { clubStrength: "" } }).clubStrength, "Not available");
   assert.equal(buildReport({ metrics: { clubStrength: "not numeric" } }).clubStrength, "Not available");

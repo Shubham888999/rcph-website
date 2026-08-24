@@ -16,6 +16,10 @@ import {
 } from "./bodAvenueReportModel";
 import { buildBodSecretarialReportModel } from "./bodSecretarialReportModel";
 import { fetchBodAvenueReportDirectors, fetchBodSecretarialReportMetrics } from "./bodEventService";
+import {
+  getLetterheadExchangesForReport,
+  getSafeLetterheadExchangeError,
+} from "./letterhead-exchanges/letterheadExchangeService";
 
 const EMPTY_DIRECTOR_MAP = Object.freeze({});
 
@@ -35,15 +39,13 @@ function reportItemDate(event) {
   return event?.startDate || event?.date || event?.eventStart || "";
 }
 
-function cleanRequired(value) {
+function cleanOptional(value) {
   return String(value || "").trim();
 }
 
-function getSecretarialValidationErrors({ selectedMonths, clubScore, clubRank }) {
+function getSecretarialValidationErrors({ selectedMonths }) {
   const errors = [];
   if (!selectedMonths.length) errors.push("Select at least one month.");
-  if (!cleanRequired(clubScore)) errors.push("Club Score is required.");
-  if (!cleanRequired(clubRank)) errors.push("Club Rank (As of Now) is required.");
   return errors;
 }
 
@@ -53,6 +55,18 @@ function formatReportAmount(value) {
 
 function createPreview(options) {
   try { return buildBodAvenueReportModel(options); } catch { return null; }
+}
+
+async function loadLetterheadExchangeReport(enabled, selectedMonths) {
+  if (!enabled) return { exchanges: [] };
+  try {
+    return await getLetterheadExchangesForReport(selectedMonths);
+  } catch (error) {
+    throw new Error(getSafeLetterheadExchangeError(
+      error,
+      "Unable to load Letterhead Exchanges for the selected reporting period. Please try again.",
+    ), { cause: error });
+  }
 }
 
 function toggleValue(values, value, checked, normalize) {
@@ -72,6 +86,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
   const [secretarialMode, setSecretarialMode] = useState(false);
   const [clubScore, setClubScore] = useState("");
   const [clubRank, setClubRank] = useState("");
+  const [includeMonthlyLetterheadExchanges, setIncludeMonthlyLetterheadExchanges] = useState(false);
+  const [includeSecretarialLetterheadExchanges, setIncludeSecretarialLetterheadExchanges] = useState(false);
   const [selection, setSelection] = useState(() => ({ scope: "", ids: new Set() }));
   const [directorData, setDirectorData] = useState(() => ({ scope: "", state: "idle", directorsByAvenue: {} }));
   const [appearance, setAppearance] = useState(BOD_AVENUE_REPORT_DEFAULT_APPEARANCE);
@@ -96,6 +112,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
   const directorState = secretarialMode
     ? "idle"
     : (directorData.scope === directorScope ? directorData.state : (selectedAvenueCodes.length ? "loading" : "idle"));
+  const isIsdSelected = selectedAvenueCodes.includes("ISD");
+  const showMonthlyLetterheadExchangeOption = !secretarialMode && isIsdSelected;
 
   useEffect(() => {
     let cancelled = false;
@@ -130,8 +148,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
   }, [appearance, directorsByAvenue, events, secretarialMode, selectedAvenueCodes, selectedIds, selectedMonths]);
   const tooMany = !secretarialMode && selectedEvents.length > BOD_AVENUE_REPORT_LIMIT;
   const secretarialValidationErrors = useMemo(
-    () => getSecretarialValidationErrors({ selectedMonths, clubScore, clubRank }),
-    [clubRank, clubScore, selectedMonths],
+    () => getSecretarialValidationErrors({ selectedMonths }),
+    [selectedMonths],
   );
   const canDownload = secretarialMode
     ? Boolean(!secretarialValidationErrors.length && !downloading)
@@ -145,6 +163,7 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
 
   function updateAvenues(next) {
     setSelectedAvenueCodes(next);
+    if (!next.includes("ISD")) setIncludeMonthlyLetterheadExchanges(false);
     setShowPreview(false);
     setMessage("");
   }
@@ -154,6 +173,9 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     if (!checked) {
       setClubScore("");
       setClubRank("");
+      setIncludeSecretarialLetterheadExchanges(false);
+    } else {
+      setIncludeSecretarialLetterheadExchanges(false);
     }
     setShowPreview(false);
     setMessage("");
@@ -185,12 +207,15 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
       setMessage("");
       try {
         const metrics = await fetchBodSecretarialReportMetrics();
+        const letterheadReport = await loadLetterheadExchangeReport(includeSecretarialLetterheadExchanges, selectedMonths);
         const finalized = buildBodSecretarialReportModel({
           selectedMonths,
           events,
           clubScore,
           clubRank,
           metrics,
+          includeLetterheadExchanges: includeSecretarialLetterheadExchanges,
+          letterheadExchanges: letterheadReport.exchanges,
           generatedAt: new Date(),
         });
         const { downloadBodSecretarialReportPdf } = await import("./bodSecretarialReportPdf.js");
@@ -209,6 +234,7 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     setDownloading(true);
     setMessage("");
     try {
+      const letterheadReport = await loadLetterheadExchangeReport(includeMonthlyLetterheadExchanges && showMonthlyLetterheadExchangeOption, selectedMonths);
       const finalized = buildBodAvenueReportModel({
         selectedMonths,
         selectedAvenueCodes,
@@ -217,6 +243,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
         selectedEventIds: selectedIds,
         directorsByAvenue,
         appearance,
+        includeLetterheadExchanges: includeMonthlyLetterheadExchanges && showMonthlyLetterheadExchangeOption,
+        letterheadExchanges: letterheadReport.exchanges,
         generatedAt: new Date(),
       });
       const { downloadBodAvenueReportPdf } = await import("./bodAvenueReportPdf.js");
@@ -224,8 +252,9 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
       setMessage(`${finalized.eventCount} report item${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.`);
       onNotice?.({ type: "success", message: "Monthly avenue report downloaded. No event records were changed." });
     } catch (error) {
-      setMessage(error?.message || "The report could not be generated. Please review the selected events and try again.");
-      onNotice?.({ type: "error", message: error?.message || "The report could not be generated." });
+      const safeMessage = error?.message || "The report could not be generated. Please review the selected events and try again.";
+      setMessage(safeMessage);
+      onNotice?.({ type: "error", message: safeMessage });
     } finally {
       setDownloading(false);
     }
@@ -237,6 +266,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     appearanceLabel(BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.bodySizes, appearance.bodySize),
     appearanceLabel(BOD_AVENUE_REPORT_APPEARANCE_OPTIONS.densities, appearance.density),
   ].join(" / ");
+
+  const isErrorMessage = message.startsWith("The report") || message.startsWith("Unable") || message.startsWith("Select");
 
   return (
     <section className="bod-avenue-report" aria-labelledby="bod-avenue-report-title">
@@ -268,15 +299,39 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
             <button type="button" onClick={() => updateAvenues([])} disabled={secretarialMode || !selectedAvenueCodes.length}>Clear selection</button>
           </div>
           <div className="bod-avenue-report__check-grid">
-            {REPORTABLE_BOD_AVENUES.map((avenue) => <label key={avenue.code} htmlFor={`bod-report-avenue-${avenue.code}`}><input id={`bod-report-avenue-${avenue.code}`} type="checkbox" checked={selectedAvenueCodes.includes(avenue.code)} disabled={secretarialMode} onChange={(event) => updateAvenues(toggleValue(selectedAvenueCodes, avenue.code, event.target.checked, normalizeBodReportAvenueCodes))} /> {avenue.label}</label>)}
+            {REPORTABLE_BOD_AVENUES.map((avenue) => {
+              const selected = selectedAvenueCodes.includes(avenue.code);
+              const showLetterheadOption = showMonthlyLetterheadExchangeOption && avenue.code === "ISD" && selected;
+              return (
+                <div className="bod-avenue-report__avenue-option" key={avenue.code}>
+                  <label htmlFor={`bod-report-avenue-${avenue.code}`}><input id={`bod-report-avenue-${avenue.code}`} type="checkbox" checked={selected} disabled={secretarialMode} onChange={(event) => updateAvenues(toggleValue(selectedAvenueCodes, avenue.code, event.target.checked, normalizeBodReportAvenueCodes))} /> {avenue.label}</label>
+                  {showLetterheadOption ? (
+                    <label className="bod-avenue-report__letterhead-toggle" htmlFor="bod-report-include-letterhead-exchanges">
+                      <input id="bod-report-include-letterhead-exchanges" type="checkbox" checked={includeMonthlyLetterheadExchanges} onChange={(event) => { setIncludeMonthlyLetterheadExchanges(event.target.checked); setShowPreview(false); setMessage(""); }} />
+                      <span>
+                        <strong>Include Letterhead Exchanges</strong>
+                        <small>Add recorded Letterhead Exchanges from the selected reporting month(s).</small>
+                      </span>
+                    </label>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
           <div className="bod-avenue-report__mode">
             <label className="bod-avenue-report__mode-toggle" htmlFor="bod-report-secretarial-mode">
               <input id="bod-report-secretarial-mode" type="checkbox" checked={secretarialMode} onChange={(event) => updateSecretarialMode(event.target.checked)} /> Secretarial Reporting
             </label>
             {secretarialMode ? <div className="bod-avenue-report__secretarial-fields">
-              <label htmlFor="bod-report-club-score">Club Score<input id="bod-report-club-score" type="text" value={clubScore} onChange={(event) => updateClubScore(event.target.value)} required /></label>
-              <label htmlFor="bod-report-club-rank">Club Rank (As of Now)<input id="bod-report-club-rank" type="text" value={clubRank} onChange={(event) => updateClubRank(event.target.value)} required /></label>
+              <label htmlFor="bod-report-club-score">Club Score (optional)<input id="bod-report-club-score" type="text" value={clubScore} onChange={(event) => updateClubScore(event.target.value)} /></label>
+              <label htmlFor="bod-report-club-rank">Club Rank (As of Now, optional)<input id="bod-report-club-rank" type="text" value={clubRank} onChange={(event) => updateClubRank(event.target.value)} /></label>
+              <label className="bod-avenue-report__letterhead-toggle bod-avenue-report__letterhead-toggle--secretarial" htmlFor="bod-report-include-secretarial-letterhead-exchanges">
+                <input id="bod-report-include-secretarial-letterhead-exchanges" type="checkbox" checked={includeSecretarialLetterheadExchanges} onChange={(event) => { setIncludeSecretarialLetterheadExchanges(event.target.checked); setMessage(""); }} />
+                <span>
+                  <strong>Include Letterhead Exchanges</strong>
+                  <small>Add recorded Letterhead Exchanges from the selected reporting period.</small>
+                </span>
+              </label>
             </div> : null}
           </div>
         </fieldset>
@@ -304,15 +359,16 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
           <p>PDF generation uses trusted club strength from the server and does not update event records.</p>
           <dl>
             <div><dt>Selected months</dt><dd>{selectedMonths.length || "None"}</dd></div>
-            <div><dt>Club Score</dt><dd>{cleanRequired(clubScore) || "Required"}</dd></div>
-            <div><dt>Club Rank (As of Now)</dt><dd>{cleanRequired(clubRank) || "Required"}</dd></div>
+            {cleanOptional(clubScore) ? <div><dt>Club Score</dt><dd>{cleanOptional(clubScore)}</dd></div> : null}
+            {cleanOptional(clubRank) ? <div><dt>Club Rank (As of Now)</dt><dd>{cleanOptional(clubRank)}</dd></div> : null}
+            <div><dt>Letterhead Exchanges</dt><dd>{includeSecretarialLetterheadExchanges ? "Included on download" : "Not included"}</dd></div>
           </dl>
           {secretarialValidationErrors.length ? (
             <ul className="bod-avenue-report__secretarial-errors" role="alert">
               {secretarialValidationErrors.map((error) => <li key={error}>{error}</li>)}
             </ul>
           ) : (
-            <p className="bod-avenue-report__success" role="status">Required fields are complete for PDF generation.</p>
+            <p className="bod-avenue-report__success" role="status">Ready for PDF generation.</p>
           )}
         </section>
       ) : (
@@ -356,13 +412,14 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
           <div><dt>Total expense</dt><dd>{formatReportAmount(preview.grandExpenseTotal)}</dd></div>
           {preview.monthTotals?.length > 1 ? <div><dt>Month expenses</dt><dd>{preview.monthTotals.map((month) => `${month.monthLabel}: ${formatReportAmount(month.monthExpenseTotal)}`).join(" / ")}</dd></div> : null}
           <div><dt>Groups</dt><dd>{preview.groupCount}</dd></div>
+          {showMonthlyLetterheadExchangeOption ? <div><dt>Letterhead Exchanges</dt><dd>{includeMonthlyLetterheadExchanges ? "Included on download" : "Not included"}</dd></div> : null}
         </dl>
         <ol>{preview.events.map((event, index) => {
           const scopeText = event.avenues.join(", ");
           return <li key={`${event.date}-${event.name}-${index}`}><strong>{event.name}</strong><span>{event.dateLabel} / {scopeText} / Expense {formatReportAmount(event.expenseTotal)}</span></li>;
         })}</ol>
       </section> : null}
-      {message ? <p className={message.startsWith("The report") ? "bod-avenue-report__error" : "bod-avenue-report__success"} role={message.startsWith("The report") ? "alert" : "status"} aria-live="polite">{message}</p> : null}
+      {message ? <p className={isErrorMessage ? "bod-avenue-report__error" : "bod-avenue-report__success"} role={isErrorMessage ? "alert" : "status"} aria-live="polite">{message}</p> : null}
     </section>
   );
 }

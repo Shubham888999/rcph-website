@@ -64,6 +64,19 @@ const bodMeeting = (id, overrides = {}) => ({
   ...overrides,
 });
 
+const letterheadExchange = (id, overrides = {}) => ({
+  id,
+  exchangeDate: "2026-07-18",
+  exchangeMonth: "2026-07",
+  externalParticipants: [
+    { clubName: "Rotaract Club A", rotaractorName: "External One", position: "President", rotaractDistrictId: "3131" },
+  ],
+  rcphRepresentatives: [{ name: "RCPH One" }],
+  associatedEvent: null,
+  other: "",
+  ...overrides,
+});
+
 function report(options = {}) {
   return buildBodSecretarialReportModel({
     selectedMonths: ["2026-07"],
@@ -140,6 +153,28 @@ test("secretarial page one uses the uploaded frame image with stacked centered s
   assert.doesNotMatch(firstPage, /\bre f\b| m .* l S/);
 });
 
+test("secretarial PDF conditionally renders optional Club Score and Club Rank rows", () => {
+  const firstPage = (options) => buildBodSecretarialReportPdfPages(report(options), { frame: MOCK_FRAME })[0].join("\n");
+  const both = firstPage({ clubScore: "91", clubRank: "3" });
+  assert.match(both, /Club Score:/);
+  assert.equal(both.includes("Club Rank \\(As of Now\\):"), true);
+
+  const scoreOnly = firstPage({ clubScore: "91", clubRank: "" });
+  assert.match(scoreOnly, /Club Score:/);
+  assert.equal(scoreOnly.includes("Club Rank \\(As of Now\\):"), false);
+
+  const rankOnly = firstPage({ clubScore: "", clubRank: "3" });
+  assert.doesNotMatch(rankOnly, /Club Score:/);
+  assert.equal(rankOnly.includes("Club Rank \\(As of Now\\):"), true);
+
+  const neither = firstPage({ clubScore: "", clubRank: "" });
+  assert.doesNotMatch(neither, /Club Score:/);
+  assert.equal(neither.includes("Club Rank \\(As of Now\\):"), false);
+  for (const output of [scoreOnly, rankOnly, neither]) {
+    assert.doesNotMatch(output, /N\/A|undefined|null/);
+  }
+});
+
 test("secretarial PDF contains month headings and meetings table headers", () => {
   const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD, MOCK_FRAME));
   for (const text of ["Monthly Report: July 2026", "Sr. No.", "Type", "Date", "Description"]) {
@@ -182,6 +217,99 @@ test("overflowing month content continues on letterhead pages with repeated tabl
   assert.equal(occurrences(pdf, /\/BG Do/g), pages.length);
   assert.equal(occurrences(pdf, /\/FRAME Do/g), 1);
   assert.ok(pages.slice(1).every((page) => page.join("\n").includes("Description")));
+});
+
+test("secretarial Letterhead section is absent unless explicitly included", () => {
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD, MOCK_FRAME));
+  assert.doesNotMatch(pdf, /LETTERHEAD EXCHANGES/);
+  assert.doesNotMatch(pdf, /No Letterhead Exchanges were recorded/);
+});
+
+test("secretarial Letterhead section renders last with zero-record message", () => {
+  const model = report({ includeLetterheadExchanges: true, letterheadExchanges: [] });
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));
+  assert.match(pdf, /LETTERHEAD EXCHANGES/);
+  assert.match(pdf, /No Letterhead Exchanges were recorded for the selected reporting period\./);
+  assert.ok(pdf.indexOf("2. Events") < pdf.indexOf("LETTERHEAD EXCHANGES"));
+});
+
+test("secretarial Letterhead table renders participants, representatives, RID, event, and remarks", () => {
+  const model = report({
+    includeLetterheadExchanges: true,
+    letterheadExchanges: [
+      letterheadExchange("exchange-1", {
+        externalParticipants: [
+          { clubName: "Rotaract Club A", rotaractorName: "External One", position: "President", rotaractDistrictId: "3131" },
+          { clubName: "Rotaract Club A", rotaractorName: "External Two", position: "", rotaractDistrictId: "3131" },
+          { clubName: "Rotaract Club B", rotaractorName: "External Three", position: "Secretary", rotaractDistrictId: "" },
+          { clubName: "Rotaract Club C", rotaractorName: "External Four", position: "", rotaractDistrictId: "" },
+        ],
+        rcphRepresentatives: [{ name: "RCPH One" }, { name: "RCPH Two" }],
+        associatedEvent: { label: "July GBM", date: "2026-07-12" },
+        other: "Exchanged letterheads after fellowship",
+      }),
+      letterheadExchange("exchange-2", {
+        exchangeDate: "2026-07-19",
+        associatedEvent: null,
+        other: "Remarks only",
+      }),
+    ],
+  });
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));
+  for (const text of [
+    "Date",
+    "Club",
+    "Rotaractor",
+    "Position / RID",
+    "Associated Event / Remarks",
+    "External One",
+    "External Two",
+    "External Four",
+    "President",
+    "RID: 3131",
+    "Secretary",
+    "RCPH One, RCPH Two",
+    "July GBM",
+    "Remarks only",
+    "Not available",
+  ]) assert.match(pdf, new RegExp(text));
+  assert.match(pdf, /\(External\) Tj ET[\s\S]*\(Three\) Tj ET/);
+  assert.match(pdf, /Remarks: Exchanged/);
+  assert.match(pdf, /letterheads after/);
+  assert.match(pdf, /fellowship/);
+  assert.equal(pdf.includes("RCPH Representative\\(s\\)"), true);
+  assert.ok(occurrences(pdf, /Rotaract Club/g) >= 5);
+  assert.doesNotMatch(pdf, /undefined|null|RID:\s*\)/);
+});
+
+test("secretarial Letterhead table paginates long final sections with repeated headers", () => {
+  const exchanges = Array.from({ length: 54 }, (_, index) => letterheadExchange(`exchange-${index + 1}`, {
+    exchangeDate: `2026-07-${String((index % 20) + 1).padStart(2, "0")}`,
+    externalParticipants: [{
+      clubName: `Very Long Rotaract Club Name ${index + 1} For Cross District Fellowship`,
+      rotaractorName: `External Participant With Long Name ${index + 1}`,
+      position: index % 3 === 0 ? "President" : "",
+      rotaractDistrictId: index % 3 === 1 ? "3131" : "",
+    }],
+    rcphRepresentatives: [{ name: "RCPH One" }, { name: "RCPH Two" }],
+    associatedEvent: index % 2 ? null : { label: `Long Associated Event Name ${index + 1}` },
+    other: "Long remarks ".repeat(12),
+  }));
+  const model = report({
+    events: Array.from({ length: 14 }, (_, index) => clubEvent(`project-${index + 1}`, {
+      startDate: `2026-07-${String((index % 20) + 1).padStart(2, "0")}`,
+      description: "Existing Secretarial content ".repeat(20),
+    })),
+    includeLetterheadExchanges: true,
+    letterheadExchanges: exchanges,
+  });
+  const pages = buildBodSecretarialReportPdfPages(model, { frame: MOCK_FRAME });
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));
+  assert.ok(pages.length > 4);
+  assert.ok(occurrences(pdf, /LETTERHEAD EXCHANGES/g) >= 1);
+  assert.ok(occurrences(pdf, /RCPH Representative\\\(s\\\)/g) > 1);
+  assert.match(pdf, /Page 1 of \d+/);
+  assert.doesNotMatch(pdf, /undefined|null/);
 });
 
 test("long descriptions do not throw during PDF generation", () => {

@@ -7,9 +7,11 @@ import {
   createBodAvenueSelection,
   filterBodAvenueReportEvents,
   filterBodAvenueReportMeetings,
+  flattenLetterheadExchangeReportRows,
   formatBodReportMonth,
   formatBodReportPeriod,
   getBodAvenueReportFilename,
+  normalizeLetterheadExchangeReportItems,
   getBodAvenueReportMonthOptions,
   normalizeBodAvenueDirectors,
   normalizeBodReportAppearance,
@@ -46,6 +48,19 @@ const meeting = (id, overrides = {}) => ({
   archived: false,
   description: "",
   desc: "Meeting description",
+  ...overrides,
+});
+
+const letterheadExchange = (id, overrides = {}) => ({
+  id,
+  exchangeDate: "2026-07-10",
+  exchangeMonth: "2026-07",
+  externalParticipants: [
+    { clubName: "Rotaract Club A", rotaractorName: "External One", position: "President", rotaractDistrictId: "3131" },
+  ],
+  rcphRepresentatives: [{ name: "RCPH One" }],
+  associatedEvent: null,
+  other: "",
   ...overrides,
 });
 
@@ -149,6 +164,98 @@ test("single month and avenue remain compatible with the Phase 1 report shape", 
   assert.equal(JSON.stringify(report).includes("hidden"), false);
   assert.equal(JSON.stringify(report).includes("private"), false);
   assert.equal(Object.hasOwn(report.events[0], "id"), false);
+});
+
+test("letterhead inclusion false leaves the existing report model unchanged", () => {
+  const options = {
+    month: "2026-07",
+    avenueCode: "ISD",
+    events: [event("isd", { avenues: ["ISD"] })],
+    selectedEventIds: ["isd"],
+    generatedAt: "2026-07-03T12:00:00.000Z",
+  };
+  const baseline = buildBodAvenueReportModel(options);
+  const withDisabledLetterheads = buildBodAvenueReportModel({
+    ...options,
+    includeLetterheadExchanges: false,
+    letterheadExchanges: [letterheadExchange("exchange-1")],
+  });
+  assert.deepEqual(withDisabledLetterheads, baseline);
+  assert.equal(Object.hasOwn(withDisabledLetterheads, "letterheadExchanges"), false);
+});
+
+test("letterhead exchanges normalize and flatten one row per external participant", () => {
+  const exchanges = normalizeLetterheadExchangeReportItems([
+    letterheadExchange("aug", { exchangeDate: "2026-08-02", exchangeMonth: "2026-08" }),
+    letterheadExchange("bad", { exchangeDate: "bad-date" }),
+    letterheadExchange("jul", {
+      exchangeDate: "2026-07-10",
+      exchangeMonth: "2026-07",
+      externalParticipants: [
+        { clubName: "Rotaract Club A", rotaractorName: "External One", position: "President", rotaractDistrictId: "3131" },
+        { clubName: "Rotaract Club A", rotaractorName: "External Two", position: "", rotaractDistrictId: "" },
+        { clubName: "Rotaract Club B", rotaractorName: "External Three", position: "", rotaractDistrictId: "3132" },
+      ],
+      rcphRepresentatives: [{ name: "RCPH One" }, { name: "RCPH Two" }, { memberId: "private", name: "RCPH One" }],
+      associatedEvent: { name: "Project Across Borders", label: "Project Across Borders - ISD - 10 Jul 2026", source: "events", id: "private" },
+      other: " Exchange during fellowship. ",
+      images: [{ imageId: "private" }],
+      driveFolderId: "private",
+    }),
+  ]);
+  assert.deepEqual(exchanges.map((exchange) => exchange.id), ["jul", "aug"]);
+  assert.equal(JSON.stringify(exchanges).includes("driveFolderId"), false);
+  assert.equal(JSON.stringify(exchanges).includes("images"), false);
+
+  const rows = flattenLetterheadExchangeReportRows(exchanges);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows.slice(0, 3).map((row) => `${row.clubName}:${row.rotaractorName}`), [
+    "Rotaract Club A:External One",
+    "Rotaract Club A:External Two",
+    "Rotaract Club B:External Three",
+  ]);
+  assert.equal(rows[0].positionRid, "President\nRID: 3131");
+  assert.equal(rows[1].positionRid, "Not available");
+  assert.equal(rows[2].positionRid, "RID: 3132");
+  assert.equal(rows[0].rcphRepresentativesText, "RCPH One, RCPH Two");
+  assert.match(rows[0].associatedEventRemarks, /Project Across Borders/);
+  assert.match(rows[0].associatedEventRemarks, /Remarks: Exchange during fellowship\./);
+});
+
+test("letterhead report model includes zero-record and populated sections only when true", () => {
+  const baseOptions = {
+    month: "2026-07",
+    avenueCode: "ISD",
+    events: [event("isd", { avenues: ["ISD"] })],
+    selectedEventIds: ["isd"],
+    generatedAt: "2026-07-03T12:00:00.000Z",
+  };
+  const zero = buildBodAvenueReportModel({
+    ...baseOptions,
+    includeLetterheadExchanges: true,
+    letterheadExchanges: [],
+  });
+  assert.equal(zero.includeLetterheadExchanges, true);
+  assert.deepEqual(zero.letterheadExchanges, []);
+  assert.deepEqual(zero.letterheadExchangeRows, []);
+
+  const populated = buildBodAvenueReportModel({
+    ...baseOptions,
+    includeLetterheadExchanges: true,
+    letterheadExchanges: [
+      letterheadExchange("exchange-1", {
+        externalParticipants: [
+          { clubName: "Rotaract Club A", rotaractorName: "Person 1", position: "", rotaractDistrictId: "" },
+          { clubName: "Rotaract Club B", rotaractorName: "Person 2", position: "Secretary", rotaractDistrictId: "" },
+        ],
+        associatedEvent: null,
+        other: "",
+      }),
+    ],
+  });
+  assert.equal(populated.letterheadExchangeRows.length, 2);
+  assert.equal(populated.letterheadExchangeRows[0].associatedEventRemarks, "Not available");
+  assert.equal(populated.letterheadExchangeRows[1].positionRid, "Secretary");
 });
 
 test("missing report finance defaults event, month, and grand totals to zero", () => {

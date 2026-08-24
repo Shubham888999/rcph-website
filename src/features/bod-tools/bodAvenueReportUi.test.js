@@ -49,12 +49,17 @@ test("secretarial reporting mode is scoped to the avenue filter area and validat
   assert.match(panel, /downloading \? "Generating PDF\.\.\." : "Download PDF"/);
   assert.match(panel, /Select at least one month and one avenue\./);
   assert.match(panel, /PDF generation uses trusted club strength from the server/);
-  assert.match(panel, /Required fields are complete for PDF generation\./);
+  assert.match(panel, /Ready for PDF generation\./);
+  assert.match(panel, /Club Score \(optional\)/);
+  assert.match(panel, /Club Rank \(As of Now, optional\)/);
+  assert.doesNotMatch(panel, /bod-report-club-score"[^>]*required/);
+  assert.doesNotMatch(panel, /bod-report-club-rank"[^>]*required/);
+  assert.doesNotMatch(panel, /aria-required/);
 
   const validationSource = panel.match(/function getSecretarialValidationErrors[\s\S]*?return errors;\r?\n}/)?.[0] || "";
   assert.match(validationSource, /selectedMonths\.length/);
-  assert.match(validationSource, /clubScore/);
-  assert.match(validationSource, /clubRank/);
+  assert.doesNotMatch(validationSource, /clubScore/);
+  assert.doesNotMatch(validationSource, /clubRank/);
   assert.doesNotMatch(validationSource, /selectedAvenueCodes/);
 });
 
@@ -72,4 +77,37 @@ test("secretarial metrics wrapper uses the trusted callable without a target UID
 test("report controls and preview stack at mobile widths without horizontal grids", () => {
   assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.bod-avenue-report__filters[\s\S]*\.bod-avenue-report__appearance[\s\S]*grid-template-columns: 1fr/);
   assert.match(styles, /\.bod-avenue-report__events \{[^}]*overflow: auto/);
+});
+
+test("ISD Letterhead Exchange checkbox is monthly-only, subordinate, and clears when ISD is removed", () => {
+  assert.match(panel, /includeMonthlyLetterheadExchanges/);
+  assert.match(panel, /const isIsdSelected = selectedAvenueCodes\.includes\("ISD"\)/);
+  assert.match(panel, /const showMonthlyLetterheadExchangeOption = !secretarialMode && isIsdSelected/);
+  assert.match(panel, /avenue\.code === "ISD" && selected/);
+  assert.match(panel, /Include Letterhead Exchanges/);
+  assert.match(panel, /Add recorded Letterhead Exchanges from the selected reporting month\(s\)\./);
+  assert.match(panel, /if \(!next\.includes\("ISD"\)\) setIncludeMonthlyLetterheadExchanges\(false\)/);
+  assert.match(styles, /\.bod-avenue-report__letterhead-toggle/);
+});
+
+test("Secretarial Letterhead Exchange checkbox is independent and defaults unchecked", () => {
+  assert.match(panel, /includeSecretarialLetterheadExchanges, setIncludeSecretarialLetterheadExchanges\] = useState\(false\)/);
+  assert.match(panel, /bod-report-include-secretarial-letterhead-exchanges/);
+  assert.match(panel, /Add recorded Letterhead Exchanges from the selected reporting period\./);
+  assert.match(panel, /checked=\{includeSecretarialLetterheadExchanges\}/);
+  assert.match(panel, /setIncludeSecretarialLetterheadExchanges\(false\)/);
+  assert.doesNotMatch(panel, /includeSecretarialLetterheadExchanges && showMonthlyLetterheadExchangeOption/);
+  assert.match(styles, /\.bod-avenue-report__letterhead-toggle--secretarial/);
+});
+
+test("Letterhead Exchange report fetch is gated by mode-specific checkboxes and sends selected months", () => {
+  assert.match(panel, /getLetterheadExchangesForReport/);
+  assert.match(panel, /loadLetterheadExchangeReport\(includeSecretarialLetterheadExchanges, selectedMonths\)/);
+  assert.match(panel, /loadLetterheadExchangeReport\(includeMonthlyLetterheadExchanges && showMonthlyLetterheadExchangeOption, selectedMonths\)/);
+  assert.match(panel, /includeLetterheadExchanges: includeSecretarialLetterheadExchanges/);
+  assert.match(panel, /includeLetterheadExchanges: includeMonthlyLetterheadExchanges && showMonthlyLetterheadExchangeOption/);
+  assert.match(panel, /letterheadExchanges: letterheadReport\.exchanges/);
+  assert.match(panel, /Unable to load Letterhead Exchanges for the selected reporting period\. Please try again\./);
+  assert.doesNotMatch(panel, /collection\(db, "letterheadExchanges"\)/);
+  assert.doesNotMatch(service, /letterheadExchanges/);
 });

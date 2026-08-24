@@ -66,9 +66,24 @@ function report(events, options = {}) {
     directors: options.directors || [{ name: "Aarav Joshi", positionTitle: "Community Service Director" }],
     directorsByAvenue: options.directorsByAvenue,
     appearance: options.appearance,
+    includeLetterheadExchanges: options.includeLetterheadExchanges,
+    letterheadExchanges: options.letterheadExchanges,
     generatedAt: options.generatedAt || "2026-07-03T12:00:00.000Z",
   });
 }
+
+const makeLetterheadExchange = (id, overrides = {}) => ({
+  id,
+  exchangeDate: "2026-07-12",
+  exchangeMonth: "2026-07",
+  externalParticipants: [
+    { clubName: "Rotaract Club of Long Partner Name", rotaractorName: "External Rotaractor", position: "President", rotaractDistrictId: "3131" },
+  ],
+  rcphRepresentatives: [{ name: "Aarav Joshi" }],
+  associatedEvent: null,
+  other: "",
+  ...overrides,
+});
 
 test("canonical BOD Avenue Report letterhead asset is the shared official Resolution A4 RGB PNG", () => {
   assert.equal(BOD_AVENUE_REPORT_LETTERHEAD_URL, RESOLUTION_OFFICIAL_LETTERHEAD_URL);
@@ -220,6 +235,95 @@ test("PDF expense cells use expense totals only and ignore income entries", () =
   assert.match(pdf, /Total expense for July 2026/);
   assert.doesNotMatch(pdf, /Rs\. 5,000/);
   assert.doesNotMatch(pdf, /Rs\. 6,500/);
+});
+
+test("ISD reports render Letterhead Exchanges after existing finance content", () => {
+  const model = report([
+    makeEvent("ISD", "International service activity", "2026-07-09", ["ISD"], {
+      reportFinance: { hasFinance: true, entries: [{ type: "expense", amount: 50, description: "Materials" }] },
+    }),
+  ], {
+    avenueCode: "ISD",
+    selectedAvenueCodes: ["ISD"],
+    includeLetterheadExchanges: true,
+    letterheadExchanges: [
+      makeLetterheadExchange("exchange-1", {
+        externalParticipants: [
+          { clubName: "Rotaract Club A", rotaractorName: "Person 1", position: "President", rotaractDistrictId: "3131" },
+          { clubName: "Rotaract Club A", rotaractorName: "Person 2", position: "", rotaractDistrictId: "" },
+          { clubName: "Rotaract Club B", rotaractorName: "Person 3", position: "", rotaractDistrictId: "3132" },
+        ],
+        rcphRepresentatives: [{ name: "Aarav Joshi" }, { name: "Mira Shah" }],
+        associatedEvent: { label: "Project Across Borders - ISD - 12 Jul 2026", name: "Project Across Borders" },
+        other: "Exchange during fellowship.",
+      }),
+    ],
+  });
+  const text = buildBodAvenueReportPdfPages(model).flat().join("\n");
+  for (const expected of [
+    "LETTERHEAD EXCHANGES",
+    "Club",
+    "Rotaractor",
+    "Position / RID",
+    "RCPH Representative",
+    "Associated Event / Remarks",
+    "Rotaract Club A",
+    "Person 1",
+    "Person 2",
+    "Rotaract Club B",
+    "Person 3",
+    "President",
+    "RID: 3131",
+    "RID: 3132",
+    "Aarav Joshi, Mira Shah",
+    "Project Across Borders",
+    "Remarks: Exchange during",
+    "fellowship\\.",
+  ]) assert.match(text, new RegExp(expected));
+  assert.ok(text.indexOf("Total expense for July 2026") < text.indexOf("LETTERHEAD EXCHANGES"));
+});
+
+test("zero Letterhead Exchanges render the approved no-record message", () => {
+  const model = report([makeEvent("ISD", "International service activity", "2026-07-09", ["ISD"])], {
+    avenueCode: "ISD",
+    selectedAvenueCodes: ["ISD"],
+    includeLetterheadExchanges: true,
+    letterheadExchanges: [],
+  });
+  const text = buildBodAvenueReportPdfPages(model).flat().join("\n");
+  assert.match(text, /LETTERHEAD EXCHANGES/);
+  assert.match(text, /No Letterhead Exchanges were recorded for the selected reporting period\./);
+});
+
+test("many Letterhead Exchanges with long names and remarks paginate safely", () => {
+  const exchanges = Array.from({ length: 18 }, (_, index) => makeLetterheadExchange(`exchange-${index + 1}`, {
+    exchangeDate: `2026-07-${String((index % 25) + 1).padStart(2, "0")}`,
+    externalParticipants: [
+      {
+        clubName: `Rotaract Club of Very Long International Partner Name ${index + 1}`,
+        rotaractorName: `External Rotaractor With A Long Name ${index + 1}`,
+        position: index % 2 ? "" : "International Service Director With Long Designation",
+        rotaractDistrictId: index % 3 ? "" : `RID-${3131 + index}`,
+      },
+    ],
+    rcphRepresentatives: [{ name: "Aarav Joshi" }, { name: "Mira Shah" }, { name: `Representative ${index + 1}` }],
+    associatedEvent: index % 2 ? null : { label: `Long Associated Event Name ${index + 1} For Cross Club Fellowship` },
+    other: "Long remarks ".repeat(index === 0 ? 260 : 16),
+  }));
+  const model = report([makeEvent("ISD", "International service activity", "2026-07-09", ["ISD"])], {
+    avenueCode: "ISD",
+    selectedAvenueCodes: ["ISD"],
+    includeLetterheadExchanges: true,
+    letterheadExchanges: exchanges,
+  });
+  const pages = buildBodAvenueReportPdfPages(model);
+  assert.ok(pages.length > 1);
+  const text = pages.flat().join("\n");
+  assert.match(text, /LETTERHEAD EXCHANGES/);
+  assert.match(text, /Long Name 18/);
+  assert.match(text, /Representative/);
+  assert.ok(pages.filter((page) => page.join("\n").includes("Rotaractor")).length >= 2);
+  assert.equal(pages.slice(1).some((page) => page.join("\n").includes("\\(continued\\)")), true);
 });
 
 test("meeting-only PDFs render a BOD Meetings section without requiring an avenue", () => {

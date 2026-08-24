@@ -1,4 +1,8 @@
 import { AVENUES } from "../calendar/avenues.js";
+import {
+  flattenLetterheadExchangeReportRows,
+  normalizeLetterheadExchangeReportItems,
+} from "./bodAvenueReportModel.js";
 
 export const BOD_SECRETARIAL_REPORT_TITLE = "Monthly Report RCPH RIY 26 - 27";
 
@@ -12,7 +16,7 @@ function cleanText(value, max = 2500) {
   return value.trim().replace(/\s+/g, " ").slice(0, max);
 }
 
-function cleanRequired(value) {
+function cleanOptional(value) {
   return cleanText(value, 180);
 }
 
@@ -249,11 +253,8 @@ export function buildBodSecretarialReportModel(options = {}) {
   const selectedMonths = normalizeReportMonths(options.selectedMonths);
   if (!selectedMonths.length) throw new TypeError("Select at least one valid report month.");
 
-  const clubScore = cleanRequired(options.clubScore);
-  if (!clubScore) throw new TypeError("Club Score is required.");
-
-  const clubRank = cleanRequired(options.clubRank);
-  if (!clubRank) throw new TypeError("Club Rank is required.");
+  const clubScore = cleanOptional(options.clubScore);
+  const clubRank = cleanOptional(options.clubRank);
 
   const monthSet = new Set(selectedMonths);
   const monthBuckets = new Map(selectedMonths.map((month) => [month, { meetings: [], events: [] }]));
@@ -306,11 +307,17 @@ export function buildBodSecretarialReportModel(options = {}) {
     };
   });
 
-  return {
+  const includeLetterheadExchanges = options.includeLetterheadExchanges === true;
+  const letterheadExchanges = includeLetterheadExchanges
+    ? normalizeLetterheadExchangeReportItems(options.letterheadExchanges)
+    : [];
+  const letterheadExchangeRows = includeLetterheadExchanges
+    ? flattenLetterheadExchangeReportRows(letterheadExchanges)
+    : [];
+
+  const report = {
     title: BOD_SECRETARIAL_REPORT_TITLE,
     clubStrength: normalizeClubStrength(options.metrics?.clubStrength),
-    clubScore,
-    clubRank,
     overallProjects,
     bodMeetingCount,
     gbmMeetingCount,
@@ -319,4 +326,12 @@ export function buildBodSecretarialReportModel(options = {}) {
     generatedAt: normalizeGeneratedAt(options.generatedAt),
     months,
   };
+  if (clubScore) report.clubScore = clubScore;
+  if (clubRank) report.clubRank = clubRank;
+  if (includeLetterheadExchanges) {
+    report.includeLetterheadExchanges = true;
+    report.letterheadExchanges = letterheadExchanges;
+    report.letterheadExchangeRows = letterheadExchangeRows;
+  }
+  return report;
 }
