@@ -4,8 +4,9 @@ import {
   BOD_FOCUS_AREA_CATEGORY_ASCEND,
   BOD_FOCUS_AREA_CATEGORY_OTHER,
   BOD_FOCUS_AREA_CATEGORY_ROTARY,
-  formatBodFocusAreasForReport,
-  normalizeBodFocusAreas,
+formatBodFocusAreasForReport,
+groupBodFocusAreasForReport,
+normalizeBodFocusAreas,
   validateAndNormalizeBodFocusAreas,
 } from "./bodFocusAreas.js";
 
@@ -40,6 +41,22 @@ test("multiple Focus Areas across Rotary and Ascend groups are preserved in orde
   ]);
   assert.equal(formatBodFocusAreasForReport(result.focusAreas), "Peacebuilding and conflict prevention, Harvesting Innovation, A.I Tech");
 });
+
+test("report grouping separates Rotary and Other Focus Areas from Ascend Chapters", () => {
+  const grouped = groupBodFocusAreasForReport([
+    { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+    { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Media" },
+    { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Finance" },
+    { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+  ]);
+
+  assert.deepEqual(grouped, {
+    focusAreas: ["Environment", "District Grant Partnerships"],
+    chapters: ["Media", "Finance"],
+    focusAreasText: "Environment, District Grant Partnerships",
+    chaptersText: "Media, Finance",
+  });
+}); 
 
 test("custom Other Focus Area stores the entered value instead of the literal option label", () => {
   const result = validateAndNormalizeBodFocusAreas([

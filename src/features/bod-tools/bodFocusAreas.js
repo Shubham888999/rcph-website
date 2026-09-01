@@ -126,3 +126,25 @@ export function focusAreaKey(area) {
 export function formatBodFocusAreasForReport(value) {
   return normalizeBodFocusAreas(value).map((area) => area.value).join(", ");
 }
+
+export function groupBodFocusAreasForReport(value) {
+  const normalized = normalizeBodFocusAreas(value);
+
+  const focusAreas = normalized
+    .filter((area) => (
+      area.category === BOD_FOCUS_AREA_CATEGORY_ROTARY
+      || area.category === BOD_FOCUS_AREA_CATEGORY_OTHER
+    ))
+    .map((area) => area.value);
+
+  const chapters = normalized
+    .filter((area) => area.category === BOD_FOCUS_AREA_CATEGORY_ASCEND)
+    .map((area) => area.value);
+
+  return {
+    focusAreas,
+    chapters,
+    focusAreasText: focusAreas.join(", "),
+    chaptersText: chapters.join(", "),
+  };
+}

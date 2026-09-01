@@ -194,7 +194,7 @@ test("secretarial PDF contains events table headers", () => {
   }
 });
 
-test("secretarial PDF description blocks render optional Focus Areas with bold labels", () => {
+test("secretarial PDF renders Focus Areas and Ascend Chapters under event or meeting names", () => {
   const model = report({
     events: [
       bodMeeting("focus-bod", {
@@ -215,23 +215,37 @@ test("secretarial PDF description blocks render optional Focus Areas with bold l
       }),
     ],
   });
-  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));
+
+  const pdf = decodePdf(
+    buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME),
+  );
 
   for (const text of [
     "Focus Area:",
+    "Environment",
+    "Chapter:",
     "Finance",
-    "Environment, Media",
-    "Description:",
+    "Media",
     "Board focus discussion",
     "Project focus description",
     "Host:",
     "Rotaract Club of Pune Heritage",
     "Collaborators:",
     "Partner Club",
-  ]) assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  for (const label of ["Focus Area:", "Description:", "Host:", "Collaborators:"]) {
-    assert.match(pdf, new RegExp(`/F2 9 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
+  ]) {
+    assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+
+  assert.doesNotMatch(pdf, /\(Description:\) Tj ET/);
+
+  for (const label of ["Focus Area:", "Chapter:", "Host:", "Collaborators:"]) {
+    assert.match(
+      pdf,
+      new RegExp(`/F2 9 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`),
+    );
+  }
+
+  assert.ok(occurrences(pdf, /\(Chapter:\) Tj ET/g) >= 2);
 });
 
 test("secretarial PDF custom Other Focus Areas use custom report text only", () => {
@@ -244,20 +258,30 @@ test("secretarial PDF custom Other Focus Areas use custom report text only", () 
       }),
     ],
   });
-  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));
+
+  const pdf = decodePdf(
+    buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME),
+  );
 
   assert.match(pdf, /Focus Area:/);
-  assert.match(pdf, /District Grant Partnerships/);
+  assert.match(pdf, /\(District\) Tj ET/);
+  assert.match(pdf, /\(Grant\) Tj ET/);
+  assert.match(pdf, /\(Partnership\) Tj ET/);
+  assert.doesNotMatch(pdf, /\(Chapter:\) Tj ET/);
   assert.doesNotMatch(pdf, /\(Other\) Tj ET/);
 });
 
-test("secretarial PDF omits Focus Area when none is selected but keeps bold base labels", () => {
-  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD, MOCK_FRAME));
+test("secretarial PDF without Focus Areas omits classification and Description prefixes", () => {
+  const pdf = decodePdf(
+    buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD, MOCK_FRAME),
+  );
 
   assert.doesNotMatch(pdf, /\(Focus Area:\) Tj ET/);
-  for (const label of ["Description:", "Host:", "Collaborators:"]) {
-    assert.match(pdf, new RegExp(`/F2 9 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
-  }
+  assert.doesNotMatch(pdf, /\(Chapter:\) Tj ET/);
+  assert.doesNotMatch(pdf, /\(Description:\) Tj ET/);
+
+  assert.match(pdf, /\/F2 9 Tf [^\n]*\(Host:\) Tj ET/);
+  assert.match(pdf, /\/F2 9 Tf [^\n]*\(Collaborators:\) Tj ET/);
 });
 
 test("multi-month reports create separate month pages", () => {

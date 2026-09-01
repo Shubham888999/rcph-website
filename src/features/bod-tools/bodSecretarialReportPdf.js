@@ -17,7 +17,7 @@ import {
   LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
   buildLetterheadExchangeCellLines,
 } from "./letterhead-exchanges/letterheadExchangeReportPdf.js";
-import { formatBodFocusAreasForReport } from "./bodFocusAreas.js";
+import { groupBodFocusAreasForReport } from "./bodFocusAreas.js";
 
 export const BOD_SECRETARIAL_REPORT_LETTERHEAD_URL = BOD_AVENUE_REPORT_LETTERHEAD_URL;
 export const BOD_SECRETARIAL_REPORT_FRAME_URL = "/images/Report_Frame.png";
@@ -64,7 +64,7 @@ const TRAILING_STAT_ROWS = Object.freeze([
 
 const MEETING_COLUMNS = Object.freeze([
   Object.freeze({ key: "serial", label: "Sr. No.", width: 46, maxLines: 1 }),
-  Object.freeze({ key: "type", label: "Type", width: 78, maxLines: 2 }),
+  Object.freeze({ key: "type", label: "Type", width: 78, maxLines: 12 }),
   Object.freeze({ key: "dateLabel", label: "Date", width: 78, maxLines: 1 }),
   Object.freeze({ key: "description", label: "Description", width: 321, maxLines: 18 }),
 ]);
@@ -73,7 +73,7 @@ const EVENT_COLUMNS = Object.freeze([
   Object.freeze({ key: "serial", label: "Sr. No.", width: 46, maxLines: 1 }),
   Object.freeze({ key: "avenueLabel", label: "Avenue", width: 82, maxLines: 2 }),
   Object.freeze({ key: "dateLabel", label: "Date", width: 62, maxLines: 1 }),
-  Object.freeze({ key: "name", label: "Name", width: 124, maxLines: 4 }),
+  Object.freeze({ key: "name", label: "Name", width: 124, maxLines: 12 }),
   Object.freeze({ key: "description", label: "Description", width: 209, maxLines: 18 }),
 ]);
 
@@ -218,24 +218,150 @@ function wrapLabeledValue(label, value, maxWidth, max = 2500) {
 function descriptionCellLines(row, width, maxLines) {
   const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
   const maxWidth = width - layout.padding * 2;
-  const focusAreas = cleanText(row?.focusAreasText || formatBodFocusAreasForReport(row?.focusAreas), 1000);
-  const rows = [];
-  if (focusAreas) rows.push({ label: "Focus Area:", value: focusAreas, max: 1000 });
-  rows.push(
-    { label: "Description:", value: displayText(row?.description), max: 2500 },
-    { label: "Host:", value: cleanText(row?.hostClub, 180) || "Not available", max: 180 },
-    { label: "Collaborators:", value: cleanText(row?.collaborators, 240) || "None", max: 240 },
+
+  const descriptionLines = wrapPdfText(
+    displayText(row?.description),
+    maxWidth,
+    layout.bodySize,
+  ).map((line) => line || " ");
+
+  const hostLines = wrapLabeledValue(
+    "Host:",
+    cleanText(row?.hostClub, 180) || "Not available",
+    maxWidth,
+    180,
   );
-  return truncateLines(rows.flatMap((item) => wrapLabeledValue(item.label, item.value, maxWidth, item.max)), maxLines);
+
+  const collaboratorLines = wrapLabeledValue(
+    "Collaborators:",
+    cleanText(row?.collaborators, 240) || "None",
+    maxWidth,
+    240,
+  );
+
+  return truncateLines(
+    [
+      ...descriptionLines,
+      ...hostLines,
+      ...collaboratorLines,
+    ],
+    maxLines,
+  );
+}
+
+function eventNameCellLines(row, width, maxLines) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const maxWidth = width - layout.padding * 2;
+
+  const lines = wrapPdfText(
+    displayText(row?.name, "Untitled event"),
+    maxWidth,
+    layout.bodySize,
+  ).map((line) => line || " ");
+
+  const grouped = groupBodFocusAreasForReport(row?.focusAreas);
+
+  if (!grouped.focusAreasText && !grouped.chaptersText) {
+    return truncateLines(lines, maxLines);
+  }
+
+  // Two blank lines after the event name.
+  lines.push(" ", " ");
+
+  if (grouped.focusAreasText) {
+    lines.push(
+      ...wrapLabeledValue(
+        "Focus Area:",
+        grouped.focusAreasText,
+        maxWidth,
+        1000,
+      ),
+    );
+  }
+
+  if (grouped.chaptersText) {
+    lines.push(
+      ...wrapLabeledValue(
+        "Chapter:",
+        grouped.chaptersText,
+        maxWidth,
+        1000,
+      ),
+    );
+  }
+
+  return truncateLines(lines, maxLines);
+}
+
+function meetingTypeCellLines(row, width, maxLines) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const maxWidth = width - layout.padding * 2;
+
+  const lines = wrapPdfText(
+    displayText(row?.type),
+    maxWidth,
+    layout.bodySize,
+  ).map((line) => line || " ");
+
+  const grouped = groupBodFocusAreasForReport(row?.focusAreas);
+
+  if (!grouped.focusAreasText && !grouped.chaptersText) {
+    return truncateLines(lines, maxLines);
+  }
+
+  lines.push(" ", " ");
+
+  if (grouped.focusAreasText) {
+    lines.push(
+      ...wrapLabeledValue(
+        "Focus Area:",
+        grouped.focusAreasText,
+        maxWidth,
+        1000,
+      ),
+    );
+  }
+
+  if (grouped.chaptersText) {
+    lines.push(
+      ...wrapLabeledValue(
+        "Chapter:",
+        grouped.chaptersText,
+        maxWidth,
+        1000,
+      ),
+    );
+  }
+
+  return truncateLines(lines, maxLines);
 }
 
 function rowCellLines(columns, row) {
-  return Object.fromEntries(columns.map((column) => [
+  return Object.fromEntries(columns.map((column) => {
+    if (column.key === "description") {
+      return [
+        column.key,
+        descriptionCellLines(row, column.width, column.maxLines || 8),
+      ];
+    }
+
+    if (column.key === "name") {
+      return [
+        column.key,
+        eventNameCellLines(row, column.width, column.maxLines || 12),
+      ];
+    }
+if (column.key === "type") {
+  return [
     column.key,
-    column.key === "description"
-      ? descriptionCellLines(row, column.width, column.maxLines || 8)
-      : cellLines(row?.[column.key], column.width, column.maxLines || 8),
-  ]));
+    meetingTypeCellLines(row, column.width, column.maxLines || 12),
+  ];
+}
+    return [
+      column.key,
+      cellLines(row?.[column.key], column.width, column.maxLines || 8),
+    ];
+  }));
 }
 
 function rowHeight(lines) {

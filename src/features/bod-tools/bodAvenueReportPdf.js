@@ -1,5 +1,5 @@
 import { getBodAvenueReportFilename, normalizeBodReportAppearance } from "./bodAvenueReportModel.js";
-import { formatBodFocusAreasForReport } from "./bodFocusAreas.js";
+import { groupBodFocusAreasForReport } from "./bodFocusAreas.js";
 import {
   A4_PDF_SIZE,
   normalizePdfText,
@@ -519,22 +519,87 @@ function wrapLabeledValue(label, value, maxWidth, size, fontFamily, max = 2500) 
 }
 
 function eventDescriptionBlockLines(event, maxWidth, size, fontFamily) {
-  const focusAreas = normalizedLine(event?.focusAreasText || formatBodFocusAreasForReport(event?.focusAreas), 1000);
-  const rows = [];
-  if (focusAreas) rows.push({ label: "Focus Area:", value: focusAreas, max: 1000 });
-  rows.push(
-    { label: "Description:", value: normalizedLine(event?.description || "Not available", 2500) || "Not available", max: 2500 },
-    { label: "Host:", value: normalizedLine(event?.hostClub, 180) || "Not available", max: 180 },
-    { label: "Collaborators:", value: normalizedLine(event?.collaborators, 240) || "None", max: 240 },
+  const description =
+    normalizedLine(event?.description || "Not available", 2500)
+    || "Not available";
+
+  return [
+    ...wrapText(description, maxWidth, size, fontFamily),
+    ...wrapLabeledValue(
+      "Host:",
+      normalizedLine(event?.hostClub, 180) || "Not available",
+      maxWidth,
+      size,
+      fontFamily,
+      180,
+    ),
+    ...wrapLabeledValue(
+      "Collaborators:",
+      normalizedLine(event?.collaborators, 240) || "None",
+      maxWidth,
+      size,
+      fontFamily,
+      240,
+    ),
+  ];
+}
+
+function eventNameBlockLines(event, maxWidth, size, fontFamily) {
+  const lines = wrapText(
+    event?.name || "Untitled event",
+    maxWidth,
+    size,
+    fontFamily,
   );
-  return rows.flatMap((row) => wrapLabeledValue(row.label, row.value, maxWidth, size, fontFamily, row.max));
+
+  const grouped = groupBodFocusAreasForReport(event?.focusAreas);
+
+  if (!grouped.focusAreasText && !grouped.chaptersText) {
+    return lines;
+  }
+
+  // Two blank lines between the event name and reporting classification.
+  lines.push("", "");
+
+  if (grouped.focusAreasText) {
+    lines.push(
+      ...wrapLabeledValue(
+        "Focus Area:",
+        grouped.focusAreasText,
+        maxWidth,
+        size,
+        fontFamily,
+        1000,
+      ),
+    );
+  }
+
+  if (grouped.chaptersText) {
+    lines.push(
+      ...wrapLabeledValue(
+        "Chapter:",
+        grouped.chaptersText,
+        maxWidth,
+        size,
+        fontFamily,
+        1000,
+      ),
+    );
+  }
+
+  return lines;
 }
 
 function eventCellLines(event, style) {
   const table = style.table;
   return {
     date: wrapText(event.dateLabel, BOD_AVENUE_REPORT_TABLE_COLUMNS[0].width - table.padding * 2, table.fontSize, style.fontFamily),
-    event: wrapText(event.name, BOD_AVENUE_REPORT_TABLE_COLUMNS[1].width - table.padding * 2, table.fontSize, style.fontFamily),
+event: eventNameBlockLines(
+  event,
+  BOD_AVENUE_REPORT_TABLE_COLUMNS[1].width - table.padding * 2,
+  table.fontSize,
+  style.fontFamily,
+),
     description: eventDescriptionBlockLines(event, BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize, style.fontFamily),
     expense: wrapText(formatExpenseAmount(event?.expenseTotal), BOD_AVENUE_REPORT_TABLE_COLUMNS[3].width - table.padding * 2, table.fontSize, style.fontFamily),
   };

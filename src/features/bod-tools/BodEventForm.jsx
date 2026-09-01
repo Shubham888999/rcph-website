@@ -556,7 +556,7 @@ if (!isMeetingPayload && completed.length) {
           {!isBodMeetingDraft ? (
           <>
           <fieldset className="bod-report-finance" aria-describedby={described("reportFinance")}>
-            <legend>Report finance</legend>
+            <legend>Additional Reporting</legend>
             <label className="bod-report-finance__toggle"><input type="checkbox" name="reportFinance" checked={draft.reportFinance.hasFinance} onChange={(event) => toggleReportFinance(event.target.checked)} /> Any income/expense incurred for this event?</label>
             <FocusAreaSelector
               draft={draft}

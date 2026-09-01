@@ -243,7 +243,7 @@ test("PDF expense cells use expense totals only and ignore income entries", () =
   assert.doesNotMatch(pdf, /Rs\. 6,500/);
 });
 
-test("PDF event descriptions render optional Focus Areas with bold labels", () => {
+test("PDF event rows render Rotary Focus Areas and Ascend Chapters separately with bold labels", () => {
   const model = report([
     makeEvent("Focus", "Focus project description", "2026-07-09", ["CMD"], {
       focusAreas: [
@@ -256,16 +256,25 @@ test("PDF event descriptions render optional Focus Areas with bold labels", () =
 
   for (const text of [
     "Focus Area:",
-    "Environment, Media",
-    "Description:",
+    "Environment",
+    "Chapter:",
+    "Media",
     "Focus project description",
     "Host:",
     "Rotaract Club of Pune Heritage",
     "Collaborators:",
     "Partner Club",
-  ]) assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  for (const label of ["Focus Area:", "Description:", "Host:", "Collaborators:"]) {
-    assert.match(pdf, new RegExp(`/F2 8 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
+  ]) {
+    assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  assert.doesNotMatch(pdf, /\(Description:\) Tj ET/);
+
+  for (const label of ["Focus Area:", "Chapter:", "Host:", "Collaborators:"]) {
+    assert.match(
+      pdf,
+      new RegExp(`/F2 8 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`),
+    );
   }
 });
 
@@ -280,17 +289,26 @@ test("PDF custom Other Focus Areas use custom report text and omit the literal O
   const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD));
 
   assert.match(pdf, /Focus Area:/);
-  assert.match(pdf, /District Grant Partnerships/);
+  assert.match(pdf, /\(District\) Tj ET/);
+  assert.match(pdf, /\(Grant\) Tj ET/);
+  assert.match(pdf, /\(Partnerships\) Tj ET/);
+  assert.doesNotMatch(pdf, /\(Chapter:\) Tj ET/);
   assert.doesNotMatch(pdf, /\(Other\) Tj ET/);
 });
 
-test("PDF description blocks omit Focus Area when none is selected but keep bold base labels", () => {
-  const pdf = decodePdf(buildBodAvenueReportPdfDocument(report([makeEvent("Plain")]), MOCK_LETTERHEAD));
+test("PDF rows without Focus Areas omit classification labels and the Description prefix", () => {
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(
+    report([makeEvent("Plain")]),
+    MOCK_LETTERHEAD,
+  ));
 
   assert.doesNotMatch(pdf, /\(Focus Area:\) Tj ET/);
-  for (const label of ["Description:", "Host:", "Collaborators:"]) {
-    assert.match(pdf, new RegExp(`/F2 8 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
-  }
+  assert.doesNotMatch(pdf, /\(Chapter:\) Tj ET/);
+  assert.doesNotMatch(pdf, /\(Description:\) Tj ET/);
+
+  assert.match(pdf, /\/F1 8 Tf [^\n]*\(Short description\) Tj ET/);
+  assert.match(pdf, /\/F2 8 Tf [^\n]*\(Host:\) Tj ET/);
+  assert.match(pdf, /\/F2 8 Tf [^\n]*\(Collaborators:\) Tj ET/);
 });
 
 test("long PDF rows with several Focus Areas paginate without throwing", () => {

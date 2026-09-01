@@ -58,7 +58,7 @@ export default function BodEventDetailsDialog({ event, access, uid, onNotice, on
         {event.collaborationNotes ? <section><h3>Collaboration notes</h3><p>{event.collaborationNotes}</p></section> : null}
         {showReportFinance ? (
           <section className="bod-report-finance-detail">
-            <h3>Report finance</h3>
+            <h3>Finance Reporting</h3>
             <p className="bod-report-finance-detail__hint">Avenue Report only. Treasury is not updated by these entries.</p>
             {reportFinanceEntries.length ? (
               <ul>
