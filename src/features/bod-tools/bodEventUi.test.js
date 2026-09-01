@@ -12,6 +12,8 @@ const page = readFileSync(new URL("../../pages/bod/BodToolsPage.jsx", import.met
 const service = readFileSync(new URL("./bodEventService.js", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../../styles/components/bod-tools.css", import.meta.url), "utf8");
 const publicEventModel = readFileSync(new URL("../events/eventModel.js", import.meta.url), "utf8");
+const focusAreas = readFileSync(new URL("./bodFocusAreas.js", import.meta.url), "utf8");
+const occurrences = (value, pattern) => value.match(pattern)?.length || 0;
 
 test("BOD event form keeps public and per-avenue descriptions separate", () => {
   assert.match(form, /buildAvenueDescriptionDraft/);
@@ -97,6 +99,30 @@ test("BOD event form exposes report-only finance rows without Treasury wiring", 
   assert.match(form, /removeReportFinanceEntry/);
   assert.match(form, /BOD_REPORT_FINANCE_MAX_ROWS/);
   assert.doesNotMatch(form, /treasuryService|adminCalls\.treasury|createTreasury|updateTreasury/i);
+});
+
+test("BOD event form exposes optional grouped Focus Areas for events and meetings", () => {
+  assert.match(form, /FocusAreaSelector/);
+  assert.equal(occurrences(form, /<FocusAreaSelector/g), 2);
+  assert.match(form, /Add a Focus Area/);
+  assert.match(form, /focusAreasEnabled/);
+  assert.match(form, /focusAreaQuery/);
+  assert.match(form, /Custom Focus Area/);
+  assert.match(form, /bod-focus-area__chips/);
+  assert.match(details, /Focus Area/);
+  assert.match(details, /formatBodFocusAreasForReport/);
+  assert.match(styles, /\.bod-focus-area__dropdown/);
+  assert.match(styles, /\.bod-focus-area__chip/);
+  for (const text of [
+    "Rotary Focus",
+    "Ascend Chapters",
+    "Other",
+    "Peacebuilding and conflict prevention",
+    "Environment",
+    "Harvesting Innovation",
+    "Blue Careers - Future jobs beneath the surface",
+    "A.I Tech",
+  ]) assert.match(focusAreas, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
 test("BOD details show avenue-specific report descriptions but rows keep the public summary", () => {

@@ -4,6 +4,13 @@ import { updateBodEvent } from "./bodEventService";
 import { uploadBodEventFile } from "./bodUploadService";
 import { getSafeBodUploadError } from "./bodUploadModel";
 import {
+  BOD_FOCUS_AREA_CATEGORY_OTHER,
+  BOD_FOCUS_AREA_CUSTOM_MAX_LENGTH,
+  BOD_FOCUS_AREA_GROUPS,
+  focusAreaKey,
+  normalizeBodFocusAreas,
+} from "./bodFocusAreas";
+import {
   AVENUE_REPORTING_LOCK_HELP_TEXT,
   BOD_AVENUE_OPTIONS,
   BOD_AVENUES,
@@ -44,6 +51,7 @@ function initialDraft(event, displayName, prefill = null) {
     : event?.avenues || [];
   const selectedAvenues = avenues.length ? avenues : (!event && prefillAvenues.length ? prefillAvenues : []);
   const isMeetingDraft = isBodMeetingAvenueSelection(selectedAvenues);
+  const focusAreas = normalizeBodFocusAreas(event?.focusAreas);
 
   const conductedBy = event
     ? event.conductedBy === "Unavailable"
@@ -68,6 +76,8 @@ function initialDraft(event, displayName, prefill = null) {
     hostClub: event?.hostClub || "Rotaract Club of Pune Heritage",
     collaborators: event?.collaborators?.length ? event.collaborators : [{ name: "" }],
     collaborationNotes: event?.collaborationNotes || "",
+    focusAreas,
+    focusAreasEnabled: focusAreas.length > 0,
     reportFinance: reportFinanceDraft(event),
     driveFolder: event?.driveFolder || "",
     reportingWindowId,
@@ -76,10 +86,121 @@ function initialDraft(event, displayName, prefill = null) {
   };
 }
 
+function focusAreaLabel(area) {
+  return area?.value || "Other";
+}
+
+function FocusAreaSelector({
+  draft,
+  error,
+  describedBy,
+  query,
+  onQuery,
+  onToggleEnabled,
+  onToggleKnown,
+  onToggleOther,
+  onUpdateOther,
+  onRemove,
+}) {
+  const selectedKeys = new Set(draft.focusAreas.map(focusAreaKey));
+  const otherArea = draft.focusAreas.find((area) => area.category === BOD_FOCUS_AREA_CATEGORY_OTHER);
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleGroups = BOD_FOCUS_AREA_GROUPS
+    .map((group) => ({
+      ...group,
+      options: group.options.filter((option) => !normalizedQuery || option.toLowerCase().includes(normalizedQuery) || group.label.toLowerCase().includes(normalizedQuery)),
+    }))
+    .filter((group) => group.options.length);
+
+  return (
+    <div className="bod-focus-area-control">
+      <label className="bod-report-finance__toggle bod-focus-area__toggle">
+        <input
+          type="checkbox"
+          name="focusAreas"
+          checked={draft.focusAreasEnabled}
+          aria-describedby={describedBy}
+          onChange={(event) => onToggleEnabled(event.target.checked)}
+        /> Add a Focus Area
+      </label>
+      {draft.focusAreasEnabled ? (
+        <div className="bod-focus-area__selector">
+          <details className="bod-focus-area__dropdown">
+            <summary>
+              <span>{draft.focusAreas.length ? `${draft.focusAreas.length} selected` : "Select Focus Areas"}</span>
+              <span aria-hidden="true">v</span>
+            </summary>
+            <div className="bod-focus-area__panel">
+              <label className="bod-focus-area__search">
+                <span className="sr-only">Search Focus Areas</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => onQuery(event.target.value)}
+                  placeholder="Search Focus Areas"
+                />
+              </label>
+              {visibleGroups.map((group) => (
+                <fieldset className="bod-focus-area__group" key={group.category}>
+                  <legend>{group.label}</legend>
+                  {group.options.map((option) => {
+                    const isOther = group.category === BOD_FOCUS_AREA_CATEGORY_OTHER;
+                    const selected = isOther
+                      ? Boolean(otherArea)
+                      : selectedKeys.has(focusAreaKey({ category: group.category, value: option }));
+                    return (
+                      <label key={`${group.category}-${option}`} className="bod-focus-area__option">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(event) => {
+                            if (isOther) onToggleOther(event.target.checked);
+                            else onToggleKnown(group.category, option, event.target.checked);
+                          }}
+                        /> {option}
+                      </label>
+                    );
+                  })}
+                </fieldset>
+              ))}
+            </div>
+          </details>
+          {draft.focusAreas.length ? (
+            <div className="bod-focus-area__chips" aria-label="Selected Focus Areas">
+              {draft.focusAreas.map((area) => (
+                <span className="bod-focus-area__chip" key={focusAreaKey(area)}>
+                  <span>{focusAreaLabel(area)}</span>
+                  <button type="button" onClick={() => onRemove(area)} aria-label={`Remove ${focusAreaLabel(area)}`}>x</button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {otherArea ? (
+            <label className="bod-focus-area__custom">
+              Custom Focus Area
+              <textarea
+                name="focusAreas"
+                value={otherArea.value}
+                onChange={(event) => onUpdateOther(event.target.value)}
+                maxLength={BOD_FOCUS_AREA_CUSTOM_MAX_LENGTH}
+                rows="2"
+                aria-invalid={Boolean(error)}
+                aria-describedby={describedBy}
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : null}
+      {error ? <span id="bod-focusAreas-error" className="bod-field-error">{error}</span> : null}
+    </div>
+  );
+}
+
 export default function BodEventForm({ event, displayName, prefill = null, busy, mutationError, lockedAvenueReportingLocks = [], onClose, onSubmit, onComplete }) {
   const seed = useMemo(() => initialDraft(event, displayName, prefill), [displayName, event, prefill]);
   const [draft, setDraft] = useState(seed);
   const [errors, setErrors] = useState({});
+  const [focusAreaQuery, setFocusAreaQuery] = useState("");
   const [uploadState, setUploadState] = useState({ files: [], selectionErrors: [] });
   const [uploadError, setUploadError] = useState("");
   const [working, setWorking] = useState(false);
@@ -145,6 +266,59 @@ export default function BodEventForm({ event, displayName, prefill = null, busy,
       avenueDescriptions: { ...(current.avenueDescriptions || {}), [avenue]: value },
     }));
     setErrors((current) => ({ ...current, avenueDescriptions: "" }));
+  }
+
+  function toggleFocusAreasEnabled(checked) {
+    setDraft((current) => ({
+      ...current,
+      focusAreasEnabled: checked,
+      focusAreas: checked ? current.focusAreas : [],
+    }));
+    if (!checked) setFocusAreaQuery("");
+    setErrors((current) => ({ ...current, focusAreas: "" }));
+  }
+
+  function toggleKnownFocusArea(category, value, checked) {
+    setDraft((current) => {
+      const key = focusAreaKey({ category, value });
+      const existing = current.focusAreas.filter((area) => focusAreaKey(area) !== key);
+      return {
+        ...current,
+        focusAreas: checked ? [...existing, { category, value }] : existing,
+      };
+    });
+    setErrors((current) => ({ ...current, focusAreas: "" }));
+  }
+
+  function toggleOtherFocusArea(checked) {
+    setDraft((current) => {
+      const withoutOther = current.focusAreas.filter((area) => area.category !== BOD_FOCUS_AREA_CATEGORY_OTHER);
+      return {
+        ...current,
+        focusAreas: checked ? [...withoutOther, { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "" }] : withoutOther,
+      };
+    });
+    setErrors((current) => ({ ...current, focusAreas: "" }));
+  }
+
+  function updateOtherFocusArea(value) {
+    setDraft((current) => {
+      const withoutOther = current.focusAreas.filter((area) => area.category !== BOD_FOCUS_AREA_CATEGORY_OTHER);
+      return {
+        ...current,
+        focusAreas: [...withoutOther, { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value }],
+      };
+    });
+    setErrors((current) => ({ ...current, focusAreas: "" }));
+  }
+
+  function removeFocusArea(area) {
+    const key = focusAreaKey(area);
+    setDraft((current) => ({
+      ...current,
+      focusAreas: current.focusAreas.filter((item) => focusAreaKey(item) !== key),
+    }));
+    setErrors((current) => ({ ...current, focusAreas: "" }));
   }
 
   function updateCollaborator(index, name) {
@@ -365,11 +539,37 @@ if (!isMeetingPayload && completed.length) {
               {errors.avenueDescriptions ? <span id="bod-avenueDescriptions-error" className="bod-field-error">{errors.avenueDescriptions}</span> : null}
             </fieldset>
           ) : null}
+          {isBodMeetingDraft ? (
+            <FocusAreaSelector
+              draft={draft}
+              error={errors.focusAreas}
+              describedBy={described("focusAreas")}
+              query={focusAreaQuery}
+              onQuery={setFocusAreaQuery}
+              onToggleEnabled={toggleFocusAreasEnabled}
+              onToggleKnown={toggleKnownFocusArea}
+              onToggleOther={toggleOtherFocusArea}
+              onUpdateOther={updateOtherFocusArea}
+              onRemove={removeFocusArea}
+            />
+          ) : null}
           {!isBodMeetingDraft ? (
           <>
           <fieldset className="bod-report-finance" aria-describedby={described("reportFinance")}>
             <legend>Report finance</legend>
             <label className="bod-report-finance__toggle"><input type="checkbox" name="reportFinance" checked={draft.reportFinance.hasFinance} onChange={(event) => toggleReportFinance(event.target.checked)} /> Any income/expense incurred for this event?</label>
+            <FocusAreaSelector
+              draft={draft}
+              error={errors.focusAreas}
+              describedBy={described("focusAreas")}
+              query={focusAreaQuery}
+              onQuery={setFocusAreaQuery}
+              onToggleEnabled={toggleFocusAreasEnabled}
+              onToggleKnown={toggleKnownFocusArea}
+              onToggleOther={toggleOtherFocusArea}
+              onUpdateOther={updateOtherFocusArea}
+              onRemove={removeFocusArea}
+            />
             <p className="bod-report-finance__hint">For Avenue Report generation only. This does not update Treasury.</p>
             {draft.reportFinance.hasFinance ? (
               <div className="bod-report-finance__rows">

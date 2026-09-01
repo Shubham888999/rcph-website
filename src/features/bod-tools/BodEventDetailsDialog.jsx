@@ -1,6 +1,7 @@
 import useAccessibleDialog from "./useAccessibleDialog";
 import MomSection from "../mom/MomSection";
 import { getBodMomTarget } from "../mom/momModel";
+import { formatBodFocusAreasForReport } from "./bodFocusAreas";
 import { getBodEventAttachments, getEventDescriptionForAvenue } from "./bodEventModel";
 
 const TYPE_LABELS = { clubEvent: "Club Event", bodMeeting: "BOD Meeting", districtEvent: "District Event", unknown: "Unknown type" };
@@ -38,6 +39,7 @@ export default function BodEventDetailsDialog({ event, access, uid, onNotice, on
   </dd>
 </div>
           <div><dt>Avenues</dt><dd>{event.avenues.join(", ") || "Unavailable"}</dd></div>
+          <div><dt>Focus Area</dt><dd>{formatBodFocusAreasForReport(event.focusAreas) || "None listed"}</dd></div>
           <div><dt>RCPH role</dt><dd>{ROLE_LABELS[event.rcphRole]}</dd></div>
           <div><dt>Host club</dt><dd>{event.hostClub}</dd></div>
           <div><dt>Collaborators</dt><dd>{event.collaborators.map((item) => item.name).join(", ") || "None listed"}</dd></div>

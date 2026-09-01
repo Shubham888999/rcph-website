@@ -12,6 +12,11 @@ import {
   buildBodSecretarialReportPdfPages,
   getBodSecretarialReportFilename,
 } from "./bodSecretarialReportPdf.js";
+import {
+  BOD_FOCUS_AREA_CATEGORY_ASCEND,
+  BOD_FOCUS_AREA_CATEGORY_OTHER,
+  BOD_FOCUS_AREA_CATEGORY_ROTARY,
+} from "./bodFocusAreas.js";
 
 const source = readFileSync(new URL("./bodSecretarialReportPdf.js", import.meta.url), "utf8");
 const decodePdf = (bytes) => new TextDecoder("latin1").decode(bytes);
@@ -189,6 +194,72 @@ test("secretarial PDF contains events table headers", () => {
   }
 });
 
+test("secretarial PDF description blocks render optional Focus Areas with bold labels", () => {
+  const model = report({
+    events: [
+      bodMeeting("focus-bod", {
+        description: "Board focus discussion",
+        focusAreas: [
+          { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Finance" },
+        ],
+      }),
+      clubEvent("focus-project", {
+        name: "Tree Plantation",
+        description: "Project focus description",
+        hostClub: "Rotaract Club of Pune Heritage",
+        collaborators: [{ name: "Partner Club" }],
+        focusAreas: [
+          { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+          { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Media" },
+        ],
+      }),
+    ],
+  });
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));
+
+  for (const text of [
+    "Focus Area:",
+    "Finance",
+    "Environment, Media",
+    "Description:",
+    "Board focus discussion",
+    "Project focus description",
+    "Host:",
+    "Rotaract Club of Pune Heritage",
+    "Collaborators:",
+    "Partner Club",
+  ]) assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const label of ["Focus Area:", "Description:", "Host:", "Collaborators:"]) {
+    assert.match(pdf, new RegExp(`/F2 9 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
+  }
+});
+
+test("secretarial PDF custom Other Focus Areas use custom report text only", () => {
+  const model = report({
+    events: [
+      clubEvent("custom-focus", {
+        focusAreas: [
+          { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+        ],
+      }),
+    ],
+  });
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));
+
+  assert.match(pdf, /Focus Area:/);
+  assert.match(pdf, /District Grant Partnerships/);
+  assert.doesNotMatch(pdf, /\(Other\) Tj ET/);
+});
+
+test("secretarial PDF omits Focus Area when none is selected but keeps bold base labels", () => {
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(report(), MOCK_LETTERHEAD, MOCK_FRAME));
+
+  assert.doesNotMatch(pdf, /\(Focus Area:\) Tj ET/);
+  for (const label of ["Description:", "Host:", "Collaborators:"]) {
+    assert.match(pdf, new RegExp(`/F2 9 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
+  }
+});
+
 test("multi-month reports create separate month pages", () => {
   const model = report({
     selectedMonths: ["2026-07", "2026-08"],
@@ -315,8 +386,17 @@ test("secretarial Letterhead table paginates long final sections with repeated h
 test("long descriptions do not throw during PDF generation", () => {
   const model = report({
     events: [
-      bodMeeting("long-bod", { description: "Long meeting detail ".repeat(1000) }),
-      clubEvent("long-project", { description: "Long project detail ".repeat(1000) }),
+      bodMeeting("long-bod", {
+        description: "Long meeting detail ".repeat(1000),
+        focusAreas: [{ category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Finance" }],
+      }),
+      clubEvent("long-project", {
+        description: "Long project detail ".repeat(1000),
+        focusAreas: [
+          { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+          { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+        ],
+      }),
     ],
   });
   assert.doesNotThrow(() => buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME));

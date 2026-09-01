@@ -1,4 +1,5 @@
 import { getBodAvenueReportFilename, normalizeBodReportAppearance } from "./bodAvenueReportModel.js";
+import { formatBodFocusAreasForReport } from "./bodFocusAreas.js";
 import {
   A4_PDF_SIZE,
   normalizePdfText,
@@ -486,13 +487,47 @@ function formatExpenseAmount(value) {
   }).format(amount)}`;
 }
 
-function eventDescriptionText(event) {
-  const lines = [normalizedLine(event?.description || "Not available", 2500) || "Not available"];
-  const host = normalizedLine(event?.hostClub, 180);
-  const collaborators = normalizedLine(event?.collaborators, 240);
-  if (host && host !== "Not available") lines.push(`Host: ${host}`);
-  if (collaborators && !["None", "Not available"].includes(collaborators)) lines.push(`Collaborators: ${collaborators}`);
-  return lines.join("\n");
+function richLine(segments) {
+  return { segments: segments.filter((segment) => segment.text) };
+}
+
+function isRichLine(line) {
+  return Boolean(line && typeof line === "object" && Array.isArray(line.segments));
+}
+
+function wrapLabeledValue(label, value, maxWidth, size, fontFamily, max = 2500) {
+  const labelText = normalizedLine(label, 40);
+  const valueText = normalizedLine(value || "Not available", max) || "Not available";
+  const gap = " ";
+  const labelWidth = approximateTextWidth(labelText + gap, size, true, fontFamily);
+  const firstLineWidth = maxWidth - labelWidth;
+  if (firstLineWidth <= size * 5) {
+    return [
+      richLine([{ text: labelText, bold: true }]),
+      ...wrapText(valueText, maxWidth, size, fontFamily).map((line) => richLine([{ text: line, bold: false }])),
+    ];
+  }
+  const valueLines = wrapText(valueText, firstLineWidth, size, fontFamily);
+  return [
+    richLine([
+      { text: labelText, bold: true },
+      { text: gap, bold: false },
+      { text: valueLines[0] || "", bold: false },
+    ]),
+    ...valueLines.slice(1).map((line) => richLine([{ text: line, bold: false }])),
+  ];
+}
+
+function eventDescriptionBlockLines(event, maxWidth, size, fontFamily) {
+  const focusAreas = normalizedLine(event?.focusAreasText || formatBodFocusAreasForReport(event?.focusAreas), 1000);
+  const rows = [];
+  if (focusAreas) rows.push({ label: "Focus Area:", value: focusAreas, max: 1000 });
+  rows.push(
+    { label: "Description:", value: normalizedLine(event?.description || "Not available", 2500) || "Not available", max: 2500 },
+    { label: "Host:", value: normalizedLine(event?.hostClub, 180) || "Not available", max: 180 },
+    { label: "Collaborators:", value: normalizedLine(event?.collaborators, 240) || "None", max: 240 },
+  );
+  return rows.flatMap((row) => wrapLabeledValue(row.label, row.value, maxWidth, size, fontFamily, row.max));
 }
 
 function eventCellLines(event, style) {
@@ -500,7 +535,7 @@ function eventCellLines(event, style) {
   return {
     date: wrapText(event.dateLabel, BOD_AVENUE_REPORT_TABLE_COLUMNS[0].width - table.padding * 2, table.fontSize, style.fontFamily),
     event: wrapText(event.name, BOD_AVENUE_REPORT_TABLE_COLUMNS[1].width - table.padding * 2, table.fontSize, style.fontFamily),
-    description: wrapText(eventDescriptionText(event), BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize, style.fontFamily),
+    description: eventDescriptionBlockLines(event, BOD_AVENUE_REPORT_TABLE_COLUMNS[2].width - table.padding * 2, table.fontSize, style.fontFamily),
     expense: wrapText(formatExpenseAmount(event?.expenseTotal), BOD_AVENUE_REPORT_TABLE_COLUMNS[3].width - table.padding * 2, table.fontSize, style.fontFamily),
   };
 }
@@ -527,13 +562,31 @@ function drawRow(commands, lines, top, shade, style, columns = BOD_AVENUE_REPORT
   if (shade) commands.push(pdfFillRectCommand({ x: safe.left, y: top - rowHeight, width: BOD_AVENUE_REPORT_CONTENT_WIDTH, height: rowHeight, gray: table.alternateRowGray }));
   let x = safe.left;
   columns.forEach((column) => {
-    lines[column.key].forEach((line, index) => commands.push(textCommand({
-      x: x + table.padding,
-      y: top - table.padding - table.fontSize - index * table.lineHeight,
-      text: line,
-      size: table.fontSize,
-      fontFamily: style.fontFamily,
-    })));
+    lines[column.key].forEach((line, index) => {
+      const y = top - table.padding - table.fontSize - index * table.lineHeight;
+      if (!isRichLine(line)) {
+        commands.push(textCommand({
+          x: x + table.padding,
+          y,
+          text: line,
+          size: table.fontSize,
+          fontFamily: style.fontFamily,
+        }));
+        return;
+      }
+      let segmentX = x + table.padding;
+      line.segments.forEach((segment) => {
+        commands.push(textCommand({
+          x: segmentX,
+          y,
+          text: segment.text,
+          size: table.fontSize,
+          bold: segment.bold,
+          fontFamily: style.fontFamily,
+        }));
+        segmentX += approximateTextWidth(segment.text, table.fontSize, segment.bold, style.fontFamily);
+      });
+    });
     commands.push(pdfLineCommand({ x1: x, y1: top, x2: x, y2: top - rowHeight, gray: table.borderGray }));
     x += column.width;
   });

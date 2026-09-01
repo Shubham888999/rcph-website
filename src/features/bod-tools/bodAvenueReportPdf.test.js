@@ -12,6 +12,11 @@ import {
   loadBodAvenueReportLetterheadPng,
   parseBodAvenueReportLetterheadPng,
 } from "./bodAvenueReportPdf.js";
+import {
+  BOD_FOCUS_AREA_CATEGORY_ASCEND,
+  BOD_FOCUS_AREA_CATEGORY_OTHER,
+  BOD_FOCUS_AREA_CATEGORY_ROTARY,
+} from "./bodFocusAreas.js";
 import { RESOLUTION_OFFICIAL_LETTERHEAD_URL } from "../resolutions/resolutionLetterhead.js";
 
 const MOCK_LETTERHEAD = Object.freeze({
@@ -236,6 +241,73 @@ test("PDF expense cells use expense totals only and ignore income entries", () =
   assert.match(pdf, /Total expense for July 2026/);
   assert.doesNotMatch(pdf, /Rs\. 5,000/);
   assert.doesNotMatch(pdf, /Rs\. 6,500/);
+});
+
+test("PDF event descriptions render optional Focus Areas with bold labels", () => {
+  const model = report([
+    makeEvent("Focus", "Focus project description", "2026-07-09", ["CMD"], {
+      focusAreas: [
+        { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+        { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Media" },
+      ],
+    }),
+  ]);
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD));
+
+  for (const text of [
+    "Focus Area:",
+    "Environment, Media",
+    "Description:",
+    "Focus project description",
+    "Host:",
+    "Rotaract Club of Pune Heritage",
+    "Collaborators:",
+    "Partner Club",
+  ]) assert.match(pdf, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const label of ["Focus Area:", "Description:", "Host:", "Collaborators:"]) {
+    assert.match(pdf, new RegExp(`/F2 8 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
+  }
+});
+
+test("PDF custom Other Focus Areas use custom report text and omit the literal Other label", () => {
+  const model = report([
+    makeEvent("Custom", "Custom focus project", "2026-07-09", ["CMD"], {
+      focusAreas: [
+        { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+      ],
+    }),
+  ]);
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD));
+
+  assert.match(pdf, /Focus Area:/);
+  assert.match(pdf, /District Grant Partnerships/);
+  assert.doesNotMatch(pdf, /\(Other\) Tj ET/);
+});
+
+test("PDF description blocks omit Focus Area when none is selected but keep bold base labels", () => {
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(report([makeEvent("Plain")]), MOCK_LETTERHEAD));
+
+  assert.doesNotMatch(pdf, /\(Focus Area:\) Tj ET/);
+  for (const label of ["Description:", "Host:", "Collaborators:"]) {
+    assert.match(pdf, new RegExp(`/F2 8 Tf [^\\n]*\\(${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`));
+  }
+});
+
+test("long PDF rows with several Focus Areas paginate without throwing", () => {
+  const model = report([
+    makeEvent("HugeFocus", "Huge focus detail ".repeat(1200), "2026-07-01", ["CMD"], {
+      focusAreas: [
+        { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+        { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Blue Careers - Future jobs beneath the surface" },
+        { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+      ],
+    }),
+  ]);
+  const pages = buildBodAvenueReportPdfPages(model);
+
+  assert.ok(pages.length > 1);
+  assert.doesNotThrow(() => buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD));
+  assert.equal(pages.flat().join("\n").includes("Focus Area:"), true);
 });
 
 test("ISD reports render Letterhead Exchanges after existing finance content", () => {

@@ -3,6 +3,7 @@ import {
   flattenLetterheadExchangeReportRows,
   normalizeLetterheadExchangeReportItems,
 } from "./bodAvenueReportModel.js";
+import { formatBodFocusAreasForReport, normalizeBodFocusAreas } from "./bodFocusAreas.js";
 
 export const BOD_SECRETARIAL_REPORT_TITLE = "Monthly Report RCPH RIY 26 - 27";
 
@@ -153,6 +154,14 @@ function avenueDescription(event, codes) {
   return "";
 }
 
+function safeCollaborators(event) {
+  const names = (Array.isArray(event?.collaborators) ? event.collaborators : [])
+    .map((item) => cleanText(typeof item === "string" ? item : item?.name, 180))
+    .filter(Boolean);
+  if (names.length) return unique(names).join(", ");
+  return event?.collaboratorsKnown === false ? "Not available" : "None";
+}
+
 function meetingDescription(event, avenueCodes) {
   return (
     cleanText(event?.description)
@@ -207,21 +216,31 @@ function isClubEvent(event) {
 
 function presentationMeeting(event, kind, avenueCodes) {
   const date = eventDate(event);
+  const focusAreas = normalizeBodFocusAreas(event?.focusAreas);
   return {
     kind,
     date,
     dateLabel: formatDateLabel(date),
+    hostClub: cleanText(event?.hostClub, 180) || "Not available",
+    collaborators: safeCollaborators(event),
+    focusAreas,
+    focusAreasText: formatBodFocusAreasForReport(focusAreas),
     description: meetingDescription(event, avenueCodes),
   };
 }
 
 function presentationProject(event, avenueCodes) {
   const date = eventDate(event);
+  const focusAreas = normalizeBodFocusAreas(event?.focusAreas);
   return {
     date,
     avenueLabel: avenueLabel(avenueCodes),
     dateLabel: formatDateLabel(date),
     name: eventName(event) || "Untitled event",
+    hostClub: cleanText(event?.hostClub, 180) || "Not available",
+    collaborators: safeCollaborators(event),
+    focusAreas,
+    focusAreasText: formatBodFocusAreasForReport(focusAreas),
     description: projectDescription(event, avenueCodes),
   };
 }
@@ -234,6 +253,10 @@ function numberedMeetings(meetings) {
       serial: index + 1,
       type: `${meeting.kind} - ${typeCounts[meeting.kind]}`,
       dateLabel: meeting.dateLabel,
+      hostClub: meeting.hostClub,
+      collaborators: meeting.collaborators,
+      focusAreas: meeting.focusAreas,
+      focusAreasText: meeting.focusAreasText,
       description: meeting.description,
     };
   });
@@ -245,6 +268,10 @@ function numberedProjects(events) {
     avenueLabel: event.avenueLabel,
     dateLabel: event.dateLabel,
     name: event.name,
+    hostClub: event.hostClub,
+    collaborators: event.collaborators,
+    focusAreas: event.focusAreas,
+    focusAreasText: event.focusAreasText,
     description: event.description,
   }));
 }

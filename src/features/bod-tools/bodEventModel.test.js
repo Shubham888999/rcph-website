@@ -23,6 +23,11 @@ import {
   safeExternalUrl,
   validateAvenueDescriptionCoverage,
 } from "./bodEventModel.js";
+import {
+  BOD_FOCUS_AREA_CATEGORY_ASCEND,
+  BOD_FOCUS_AREA_CATEGORY_OTHER,
+  BOD_FOCUS_AREA_CATEGORY_ROTARY,
+} from "./bodFocusAreas.js";
 
 const base = { name: " Project One ", date: "2026-07-05", type: "clubEvent", avenue: ["CMD"] };
 
@@ -31,8 +36,31 @@ test("club event normalizes without exposing unknown fields", () => {
   assert.equal(event.name, "Project One");
   assert.equal(event.recordKind, "clubEvent");
   assert.deepEqual(event.collaborators, [{ name: "Club A" }]);
+  assert.deepEqual(event.focusAreas, []);
   assert.deepEqual(event.reportFinance, { hasFinance: false, entries: [] });
   assert.equal(Object.hasOwn(event, "secret"), false);
+});
+
+test("club event normalizer preserves valid Focus Areas and strips invalid legacy values", () => {
+  const event = normalizeBodEvent("event-1", {
+    ...base,
+    focusAreas: [
+      { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+      { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Media" },
+      { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: " District Grant Partnerships " },
+    ],
+  });
+  const invalid = normalizeBodEvent("event-2", {
+    ...base,
+    focusAreas: [{ category: "unknown", value: "Nope" }],
+  });
+
+  assert.deepEqual(event.focusAreas, [
+    { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+    { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Media" },
+    { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+  ]);
+  assert.deepEqual(invalid.focusAreas, []);
 });
 
 test("report-only finance normalizes valid entries and strips unknown nested fields", () => {
@@ -289,6 +317,84 @@ test("BOD meeting avenue builds an internal meeting payload without service repo
   assert.deepEqual(payload.avenues, ["BOD"]);
   assert.equal(Object.hasOwn(payload, "avenueDescriptions"), false);
   assert.equal(Object.hasOwn(payload, "reportFinance"), false);
+  assert.deepEqual(payload.focusAreas, []);
+});
+
+test("payload builder persists optional Focus Areas for club events", () => {
+  const { payload, errors } = buildBodEventPayload({
+    name: "Test",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["CMD"],
+    description: "Desc",
+    avenueDescriptions: { CMD: "Desc" },
+    focusAreasEnabled: true,
+    focusAreas: [
+      { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+      { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+    ],
+  });
+
+  assert.deepEqual(errors, {});
+  assert.deepEqual(payload.focusAreas, [
+    { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+    { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+  ]);
+});
+
+test("BOD meeting payload carries optional Focus Areas", () => {
+  const { payload, errors } = buildBodEventPayload({
+    name: "BOD Meeting 1",
+    startDate: "2026-07-15",
+    avenues: [BOD_MEETING_AVENUE],
+    description: "Board planning",
+    focusAreasEnabled: true,
+    focusAreas: [
+      { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Finance" },
+    ],
+  }, "meeting-1");
+
+  assert.deepEqual(errors, {});
+  assert.equal(payload.type, "bodMeeting");
+  assert.deepEqual(payload.focusAreas, [
+    { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Finance" },
+  ]);
+});
+
+test("unchecked Focus Area toggle clears stale selections from payloads", () => {
+  const { payload, errors } = buildBodEventPayload({
+    name: "Test",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["CMD"],
+    description: "Desc",
+    avenueDescriptions: { CMD: "Desc" },
+    focusAreasEnabled: false,
+    focusAreas: [
+      { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+    ],
+  });
+
+  assert.deepEqual(errors, {});
+  assert.deepEqual(payload.focusAreas, []);
+});
+
+test("selected Other Focus Area requires a custom value", () => {
+  const result = buildBodEventPayload({
+    name: "Test",
+    conductedBy: "Member",
+    startDate: "2026-07-05",
+    avenues: ["CMD"],
+    description: "Desc",
+    avenueDescriptions: { CMD: "Desc" },
+    focusAreasEnabled: true,
+    focusAreas: [
+      { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "" },
+    ],
+  });
+
+  assert.equal(result.payload, null);
+  assert.match(result.errors.focusAreas, /required/i);
 });
 
 test("BOD meeting payload rejects mixed or unknown avenues", () => {

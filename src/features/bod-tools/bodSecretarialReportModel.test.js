@@ -5,6 +5,11 @@ import {
   BOD_SECRETARIAL_REPORT_TITLE,
   buildBodSecretarialReportModel,
 } from "./bodSecretarialReportModel.js";
+import {
+  BOD_FOCUS_AREA_CATEGORY_ASCEND,
+  BOD_FOCUS_AREA_CATEGORY_OTHER,
+  BOD_FOCUS_AREA_CATEGORY_ROTARY,
+} from "./bodFocusAreas.js";
 
 const source = readFileSync(new URL("./bodSecretarialReportModel.js", import.meta.url), "utf8");
 
@@ -124,6 +129,41 @@ test("classifies BOD meetings, GBM meetings, and normal projects with determinis
   assert.equal(report.overallProjects, 2);
   assert.equal(report.bodMeetingCount, 2);
   assert.equal(report.gbmMeetingCount, 2);
+});
+
+test("secretarial model carries Focus Area, host, and collaborator metadata without changing descriptions", () => {
+  const report = buildReport({
+    events: [
+      bodMeeting("bod-focus", {
+        hostClub: "RCPH Board",
+        collaborators: [{ name: "Treasury Team" }],
+        focusAreas: [{ category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Finance" }],
+      }),
+      clubEvent("project-focus", {
+        name: "Tree Plantation",
+        hostClub: "Rotaract Club of Pune Heritage",
+        collaborators: [{ name: "Partner Club" }],
+        focusAreas: [
+          { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+          { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+        ],
+      }),
+    ],
+  });
+
+  const july = report.months[0];
+  assert.equal(july.meetings[0].description, "BOD meeting notes");
+  assert.equal(july.meetings[0].hostClub, "RCPH Board");
+  assert.equal(july.meetings[0].collaborators, "Treasury Team");
+  assert.equal(july.meetings[0].focusAreasText, "Finance");
+  assert.equal(july.events[0].description, "Event description");
+  assert.equal(july.events[0].hostClub, "Rotaract Club of Pune Heritage");
+  assert.equal(july.events[0].collaborators, "Partner Club");
+  assert.deepEqual(july.events[0].focusAreas, [
+    { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+    { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+  ]);
+  assert.equal(july.events[0].focusAreasText, "Environment, District Grant Partnerships");
 });
 
 test("creates separate month sections for multiple selected months", () => {

@@ -1,5 +1,6 @@
 import { AVENUES } from "../calendar/avenues.js";
 import { getEventDescriptionForAvenue, normalizeBodReportFinance } from "./bodEventModel.js";
+import { formatBodFocusAreasForReport, normalizeBodFocusAreas } from "./bodFocusAreas.js";
 
 export const BOD_AVENUE_REPORT_LIMIT = 100;
 export const REPORTABLE_BOD_AVENUES = AVENUES;
@@ -380,6 +381,7 @@ function safeCollaborators(event) {
 
 function presentationEvent(event, avenueCode = "") {
   const finance = reportFinanceTotals(event);
+  const focusAreas = normalizeBodFocusAreas(event?.focusAreas);
   return {
     date: event.startDate,
     month: event.startDate.slice(0, 7),
@@ -389,6 +391,8 @@ function presentationEvent(event, avenueCode = "") {
     role: ROLE_LABELS[event.rcphRole] || "Not available",
     hostClub: cleanText(event.hostClub, 180) || "Not available",
     collaborators: safeCollaborators(event),
+    focusAreas,
+    focusAreasText: formatBodFocusAreasForReport(focusAreas),
     description: cleanText(getEventDescriptionForAvenue(event, avenueCode), 2500) || "Not available",
     avenues: normalizeBodReportAvenueCodes(event.avenues),
     financeEntries: finance.financeEntries,
@@ -400,6 +404,7 @@ function presentationEvent(event, avenueCode = "") {
 function presentationBodMeeting(event) {
   const date = reportItemDate(event);
   const finance = reportFinanceTotals(event);
+  const focusAreas = normalizeBodFocusAreas(event?.focusAreas);
   return {
     date,
     month: date.slice(0, 7),
@@ -409,6 +414,8 @@ function presentationBodMeeting(event) {
     role: "BOD Meeting",
     hostClub: "",
     collaborators: "None",
+    focusAreas,
+    focusAreasText: formatBodFocusAreasForReport(focusAreas),
     description: cleanText(event?.description || event?.desc || event?.summary || event?.notes, 2500) || "Not available",
     avenues: [],
     recordKind: "bodMeeting",

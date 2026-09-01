@@ -17,6 +17,7 @@ import {
   LETTERHEAD_EXCHANGE_TABLE_COLUMNS,
   buildLetterheadExchangeCellLines,
 } from "./letterhead-exchanges/letterheadExchangeReportPdf.js";
+import { formatBodFocusAreasForReport } from "./bodFocusAreas.js";
 
 export const BOD_SECRETARIAL_REPORT_LETTERHEAD_URL = BOD_AVENUE_REPORT_LETTERHEAD_URL;
 export const BOD_SECRETARIAL_REPORT_FRAME_URL = "/images/Report_Frame.png";
@@ -65,7 +66,7 @@ const MEETING_COLUMNS = Object.freeze([
   Object.freeze({ key: "serial", label: "Sr. No.", width: 46, maxLines: 1 }),
   Object.freeze({ key: "type", label: "Type", width: 78, maxLines: 2 }),
   Object.freeze({ key: "dateLabel", label: "Date", width: 78, maxLines: 1 }),
-  Object.freeze({ key: "description", label: "Description", width: 321, maxLines: 10 }),
+  Object.freeze({ key: "description", label: "Description", width: 321, maxLines: 18 }),
 ]);
 
 const EVENT_COLUMNS = Object.freeze([
@@ -73,7 +74,7 @@ const EVENT_COLUMNS = Object.freeze([
   Object.freeze({ key: "avenueLabel", label: "Avenue", width: 82, maxLines: 2 }),
   Object.freeze({ key: "dateLabel", label: "Date", width: 62, maxLines: 1 }),
   Object.freeze({ key: "name", label: "Name", width: 124, maxLines: 4 }),
-  Object.freeze({ key: "description", label: "Description", width: 209, maxLines: 10 }),
+  Object.freeze({ key: "description", label: "Description", width: 209, maxLines: 18 }),
 ]);
 
 function cleanText(value, max = 1200) {
@@ -163,8 +164,24 @@ function strokeRect(commands, x, top, width, height, gray = 0.45) {
 function truncateLines(lines, maxLines) {
   if (lines.length <= maxLines) return lines;
   const output = lines.slice(0, maxLines);
-  output[output.length - 1] = `${output[output.length - 1].replace(/\.*$/, "")}...`;
+  output[output.length - 1] = ellipsizeLine(output[output.length - 1]);
   return output;
+}
+
+function richLine(segments) {
+  return { segments: segments.filter((segment) => segment.text) };
+}
+
+function isRichLine(line) {
+  return Boolean(line && typeof line === "object" && Array.isArray(line.segments));
+}
+
+function ellipsizeLine(line) {
+  if (!isRichLine(line)) return `${String(line).replace(/\.*$/, "")}...`;
+  const segments = line.segments.map((segment) => ({ ...segment }));
+  const last = segments[segments.length - 1];
+  if (last) last.text = `${last.text.replace(/\.*$/, "")}...`;
+  return richLine(segments);
 }
 
 function cellLines(value, width, maxLines) {
@@ -174,10 +191,50 @@ function cellLines(value, width, maxLines) {
   return truncateLines(lines.length ? lines : [" "], maxLines);
 }
 
+function wrapLabeledValue(label, value, maxWidth, max = 2500) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const labelText = cleanText(label, 40);
+  const valueText = cleanText(value || "Not available", max) || "Not available";
+  const gap = " ";
+  const labelWidth = approximateTextWidth(labelText + gap, layout.bodySize, true);
+  const firstLineWidth = maxWidth - labelWidth;
+  if (firstLineWidth <= layout.bodySize * 5) {
+    return [
+      richLine([{ text: labelText, bold: true }]),
+      ...wrapPdfText(valueText, maxWidth, layout.bodySize).map((line) => richLine([{ text: line || " ", bold: false }])),
+    ];
+  }
+  const valueLines = wrapPdfText(valueText, firstLineWidth, layout.bodySize);
+  return [
+    richLine([
+      { text: labelText, bold: true },
+      { text: gap, bold: false },
+      { text: valueLines[0] || "", bold: false },
+    ]),
+    ...valueLines.slice(1).map((line) => richLine([{ text: line || " ", bold: false }])),
+  ];
+}
+
+function descriptionCellLines(row, width, maxLines) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const maxWidth = width - layout.padding * 2;
+  const focusAreas = cleanText(row?.focusAreasText || formatBodFocusAreasForReport(row?.focusAreas), 1000);
+  const rows = [];
+  if (focusAreas) rows.push({ label: "Focus Area:", value: focusAreas, max: 1000 });
+  rows.push(
+    { label: "Description:", value: displayText(row?.description), max: 2500 },
+    { label: "Host:", value: cleanText(row?.hostClub, 180) || "Not available", max: 180 },
+    { label: "Collaborators:", value: cleanText(row?.collaborators, 240) || "None", max: 240 },
+  );
+  return truncateLines(rows.flatMap((item) => wrapLabeledValue(item.label, item.value, maxWidth, item.max)), maxLines);
+}
+
 function rowCellLines(columns, row) {
   return Object.fromEntries(columns.map((column) => [
     column.key,
-    cellLines(row?.[column.key], column.width, column.maxLines || 8),
+    column.key === "description"
+      ? descriptionCellLines(row, column.width, column.maxLines || 8)
+      : cellLines(row?.[column.key], column.width, column.maxLines || 8),
   ]));
 }
 
@@ -225,7 +282,16 @@ function drawRow(commands, y, columns, lines, shaded) {
   let currentX = layout.margin;
   columns.forEach((column) => {
     lines[column.key].forEach((line, index) => {
-      text(commands, currentX + layout.padding, y - layout.padding - layout.bodySize - index * layout.lineHeight, line);
+      const lineY = y - layout.padding - layout.bodySize - index * layout.lineHeight;
+      if (!isRichLine(line)) {
+        text(commands, currentX + layout.padding, lineY, line);
+        return;
+      }
+      let segmentX = currentX + layout.padding;
+      line.segments.forEach((segment) => {
+        text(commands, segmentX, lineY, segment.text, { bold: segment.bold });
+        segmentX += approximateTextWidth(segment.text, layout.bodySize, segment.bold);
+      });
     });
     commands.push(pdfLineCommand({ x1: currentX, y1: y, x2: currentX, y2: y - height, gray: 0.72 }));
     currentX += column.width;

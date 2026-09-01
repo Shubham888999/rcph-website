@@ -1,4 +1,5 @@
 import { MOM_TARGET_TYPES, normalizeMomEmailHistory, normalizeMomMetadata } from "../mom/momModel.js";
+import { normalizeBodFocusAreas, validateAndNormalizeBodFocusAreas } from "./bodFocusAreas.js";
 
 const EVENT_KINDS = new Set(["clubEvent", "bodMeeting", "districtEvent"]);
 const RCPH_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
@@ -318,6 +319,14 @@ export function validateBodReportFinanceDraft(value) {
   return "";
 }
 
+function validateFocusAreaDraft(draft) {
+  const hasExplicitToggle = typeof draft?.focusAreasEnabled === "boolean";
+  const enabled = hasExplicitToggle
+    ? draft.focusAreasEnabled
+    : Array.isArray(draft?.focusAreas) && draft.focusAreas.length > 0;
+  return validateAndNormalizeBodFocusAreas(draft?.focusAreas, { enabled });
+}
+
 export function normalizeBodEvent(id, raw) {
   if (!raw || typeof raw !== "object") return null;
   const eventId = cleanString(id);
@@ -367,6 +376,7 @@ export function normalizeBodEvent(id, raw) {
     collaborators: normalizeCollaborators(raw.collaborators),
     collaboratorsKnown: Array.isArray(raw.collaborators),
     collaborationNotes: cleanString(raw.collaborationNotes),
+    focusAreas: normalizeBodFocusAreas(raw.focusAreas),
     reportFinance: normalizeBodReportFinance(raw.reportFinance),
     driveFolder: safeExternalUrl(raw.driveFolder),
     driveFolderId: cleanString(raw.driveFolderId),
@@ -415,6 +425,8 @@ export function validateBodEventDraft(draft, options = {}) {
   if (!isBodMeeting && endDate && !isValidDateOnly(endDate)) errors.endDate = "Enter a valid end date.";
   else if (!isBodMeeting && startDate && endDate && endDate < startDate) errors.endDate = "End date cannot be before start date.";
   if (!isValidEventTime(cleanString(draft?.time))) errors.time = "Enter a valid time in HH:MM format.";
+  const focusAreaResult = validateFocusAreaDraft(draft);
+  if (!focusAreaResult.ok) errors.focusAreas = focusAreaResult.error;
   if (!avenues.length) errors.avenues = "Select at least one avenue.";
   else if (avenues.includes(BOD_MEETING_AVENUE) && !isBodMeeting) {
     errors.avenues = "Board of Directors meetings cannot be combined with service avenues.";
@@ -442,6 +454,7 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
   const avenues = normalizeBodAvenues(draft.avenues).slice(0, 12);
   const description = cleanString(draft.description).slice(0, BOD_EVENT_DESCRIPTION_LIMIT);
   const reportingContext = reportingValidationContext(options, draft);
+  const focusAreas = validateFocusAreaDraft(draft).focusAreas;
   if (isBodMeetingAvenueSelection(avenues)) {
     const meetingDate = cleanString(draft.startDate);
     const payload = {
@@ -456,6 +469,7 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
       source: BOD_EVENT_SOURCE,
       type: "bodMeeting",
       visibility: "internal",
+      focusAreas,
     };
     if (eventId) payload.eventId = cleanString(eventId);
     if (reportingContext.reportingWindowId) payload.reportingWindowId = reportingContext.reportingWindowId;
@@ -484,6 +498,7 @@ export function buildBodEventPayload(draft, eventId = "", options = {}) {
     hostClub: cleanString(draft.hostClub, "Rotaract Club of Pune Heritage").replace(/\s+/g, " ").slice(0, 180),
     collaborators: normalizeCollaborators(draft.collaborators).slice(0, 30),
     collaborationNotes: cleanString(draft.collaborationNotes).slice(0, 1000),
+    focusAreas,
     reportFinance: normalizeBodReportFinance(draft.reportFinance),
     driveFolder: safeExternalUrl(draft.driveFolder),
   };
@@ -503,7 +518,8 @@ export function filterBodEvents(events, filters, currentUid = "") {
     if (filters?.mine && event.createdBy !== currentUid) return false;
     if (query) {
       const haystack = [event.name, event.description, event.conductedBy, event.hostClub,
-        ...event.collaborators.map((item) => item.name)].join(" ").toLowerCase();
+        ...event.collaborators.map((item) => item.name),
+        ...event.focusAreas.map((item) => item.value)].join(" ").toLowerCase();
       if (!haystack.includes(query)) return false;
     }
     return true;

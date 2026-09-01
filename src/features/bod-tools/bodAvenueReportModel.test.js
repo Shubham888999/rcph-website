@@ -19,6 +19,11 @@ import {
   normalizeBodReportMonths,
   toggleBodAvenueEvent,
 } from "./bodAvenueReportModel.js";
+import {
+  BOD_FOCUS_AREA_CATEGORY_ASCEND,
+  BOD_FOCUS_AREA_CATEGORY_OTHER,
+  BOD_FOCUS_AREA_CATEGORY_ROTARY,
+} from "./bodFocusAreas.js";
 
 const event = (id, overrides = {}) => ({
   id,
@@ -164,6 +169,42 @@ test("single month and avenue remain compatible with the Phase 1 report shape", 
   assert.equal(JSON.stringify(report).includes("hidden"), false);
   assert.equal(JSON.stringify(report).includes("private"), false);
   assert.equal(Object.hasOwn(report.events[0], "id"), false);
+  assert.deepEqual(report.events[0].focusAreas, []);
+  assert.equal(report.events[0].focusAreasText, "");
+});
+
+test("Avenue report model carries optional Focus Areas for events and BOD meetings", () => {
+  const report = buildBodAvenueReportModel({
+    month: "2026-07",
+    avenueCode: "CMD",
+    includeBodMeetings: true,
+    events: [
+      event("focus", {
+        focusAreas: [
+          { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+          { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+        ],
+      }),
+      meeting("meeting-focus", {
+        date: "2026-07-12",
+        focusAreas: [
+          { category: BOD_FOCUS_AREA_CATEGORY_ASCEND, value: "Finance" },
+        ],
+      }),
+    ],
+    selectedEventIds: ["focus", "meeting-focus"],
+  });
+
+  assert.deepEqual(report.events.map((row) => row.focusAreasText), [
+    "Environment, District Grant Partnerships",
+    "Finance",
+  ]);
+  assert.deepEqual(report.groups[0].events[0].focusAreas, [
+    { category: BOD_FOCUS_AREA_CATEGORY_ROTARY, value: "Environment" },
+    { category: BOD_FOCUS_AREA_CATEGORY_OTHER, value: "District Grant Partnerships" },
+  ]);
+  assert.equal(report.groups[0].events[0].focusAreasText, "Environment, District Grant Partnerships");
+  assert.equal(report.meetingGroups[0].events[0].focusAreasText, "Finance");
 });
 
 test("letterhead inclusion false leaves the existing report model unchanged", () => {
