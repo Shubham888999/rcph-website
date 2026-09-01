@@ -201,6 +201,73 @@ function isFineLinkedTreasury(data) {
         && validBodAvenueDescriptionValue(data.avenueDescriptions, 'GBM');
     }
 
+    function validBodFocusAreaValue(category, value) {
+      return (category == 'rotary'
+          && [value].hasOnly([
+            'Peacebuilding and conflict prevention',
+            'Disease prevention and treatment',
+            'Water, sanitation, and hygiene',
+            'Maternal and child health',
+            'Basic education and literacy',
+            'Community economic development',
+            'Environment',
+          ]))
+        || (category == 'ascend'
+          && [value].hasOnly([
+            'Harvesting Innovation',
+            'Media',
+            'Rescue Operation',
+            'Finance',
+            'Blue Careers - Future jobs beneath the surface',
+            'Product Lab',
+            'Hospitality',
+            'Renewable Energy',
+            'Art and Theatre',
+            'A.I Tech',
+          ]))
+        || (category == 'other' && value != 'Other');
+    }
+
+    function validBodFocusAreaEntry(area) {
+      return area is map
+        && area.keys().hasOnly(['category', 'value'])
+        && area.category is string
+        && area.value is string
+        && area.value.size() > 0
+        && area.value.size() <= 180
+        && validBodFocusAreaValue(area.category, area.value);
+    }
+
+    function validBodFocusAreaAt(areas, index) {
+      return areas.size() <= index || validBodFocusAreaEntry(areas[index]);
+    }
+
+    function validBodFocusAreas(data) {
+      return !data.keys().hasAny(['focusAreas'])
+        || (data.focusAreas is list
+          && data.focusAreas.size() <= 20
+          && validBodFocusAreaAt(data.focusAreas, 0)
+          && validBodFocusAreaAt(data.focusAreas, 1)
+          && validBodFocusAreaAt(data.focusAreas, 2)
+          && validBodFocusAreaAt(data.focusAreas, 3)
+          && validBodFocusAreaAt(data.focusAreas, 4)
+          && validBodFocusAreaAt(data.focusAreas, 5)
+          && validBodFocusAreaAt(data.focusAreas, 6)
+          && validBodFocusAreaAt(data.focusAreas, 7)
+          && validBodFocusAreaAt(data.focusAreas, 8)
+          && validBodFocusAreaAt(data.focusAreas, 9)
+          && validBodFocusAreaAt(data.focusAreas, 10)
+          && validBodFocusAreaAt(data.focusAreas, 11)
+          && validBodFocusAreaAt(data.focusAreas, 12)
+          && validBodFocusAreaAt(data.focusAreas, 13)
+          && validBodFocusAreaAt(data.focusAreas, 14)
+          && validBodFocusAreaAt(data.focusAreas, 15)
+          && validBodFocusAreaAt(data.focusAreas, 16)
+          && validBodFocusAreaAt(data.focusAreas, 17)
+          && validBodFocusAreaAt(data.focusAreas, 18)
+          && validBodFocusAreaAt(data.focusAreas, 19));
+    }
+
     function validMemberRid(data) {
       return !data.keys().hasAny(['rid'])
         || (data.rid is string
@@ -226,7 +293,8 @@ function isFineLinkedTreasury(data) {
         && data.avenues.size() > 0
         && data.avenues.size() <= 11
         && data.avenues.hasOnly(validBodAvenueCodes())
-        && validBodAvenueDescriptions(data);
+        && validBodAvenueDescriptions(data)
+        && validBodFocusAreas(data);
     }
 
     match /roles/{uid} {

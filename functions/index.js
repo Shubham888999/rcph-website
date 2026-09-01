@@ -3235,6 +3235,17 @@ function normalizeCollaborators(value) {
   return out.slice(0, 20);
 }
 
+function normalizeFocusAreasForPayload(raw = {}) {
+  try {
+    return bodEventSchema.normalizeBodFocusAreas(raw.focusAreas);
+  } catch (error) {
+    if (error instanceof bodEventSchema.BodEventSchemaError) {
+      throw new HttpsError('invalid-argument', error.message);
+    }
+    throw error;
+  }
+}
+
 function timestampCreatedAt(existing, now) {
   return existing.createdAt || now;
 }
@@ -3265,6 +3276,7 @@ function normalizeBodEventPayload(raw, options = {}) {
   const hasCollaborationFields = ['rcphRole', 'hostClub', 'collaborators', 'collaborationNotes']
     .some(field => Object.prototype.hasOwnProperty.call(raw || {}, field));
   const hasReportFinanceField = Object.prototype.hasOwnProperty.call(raw || {}, 'reportFinance');
+  const hasFocusAreasField = Object.prototype.hasOwnProperty.call(raw || {}, 'focusAreas');
   const name = normalizeText(raw.name, 180);
   const conductedBy = normalizeText(raw.conductedBy, 140);
   const date = normalizeText(raw.date || raw.eventStart, 20);
@@ -3310,6 +3322,7 @@ function normalizeBodEventPayload(raw, options = {}) {
   const hostClub = normalizeText(raw.hostClub, 180).replace(/\s+/g, ' ') || RCPH_CLUB_NAME;
   const collaborators = normalizeCollaborators(raw.collaborators);
   const collaborationNotes = normalizeText(raw.collaborationNotes, 1000);
+  const focusAreas = normalizeFocusAreasForPayload(raw);
 
   return {
     name,
@@ -3332,10 +3345,12 @@ function normalizeBodEventPayload(raw, options = {}) {
     hostClub,
     collaborators,
     collaborationNotes,
+    focusAreas,
     reportFinance,
     reportingWindowId,
     _hasCollaborationFields: hasCollaborationFields,
     _hasReportFinanceField: hasReportFinanceField,
+    _hasFocusAreasField: hasFocusAreasField,
   };
 }
 
@@ -3364,6 +3379,8 @@ function normalizeBodMeetingPayload(raw) {
   const time = normalizeText(raw.time || raw.eventTime, 20);
   const desc = normalizeText(raw.desc || raw.description, 1200);
   const reportingWindowId = validateEventDocId(raw.reportingWindowId || raw.reminderId);
+  const hasFocusAreasField = Object.prototype.hasOwnProperty.call(raw || {}, 'focusAreas');
+  const focusAreas = normalizeFocusAreasForPayload(raw);
   if (!name) throw new HttpsError('invalid-argument', 'Meeting name is required.');
   if (!date) throw new HttpsError('invalid-argument', 'Meeting date is required.');
   return {
@@ -3378,8 +3395,10 @@ function normalizeBodMeetingPayload(raw) {
     source: normalizeText(raw.source, 80) || 'adminBodAttendance',
     visibility: 'internal',
     reportingWindowId,
+    focusAreas,
     _hasTimeField: Object.prototype.hasOwnProperty.call(raw || {}, 'time')
       || Object.prototype.hasOwnProperty.call(raw || {}, 'eventTime'),
+    _hasFocusAreasField: hasFocusAreasField,
   };
 }
 
@@ -3901,6 +3920,18 @@ function normalizeStoredBodReportFinance(...values) {
   return bodEventSchema.normalizeBodReportFinance();
 }
 
+function normalizeStoredBodFocusAreas(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    try {
+      return bodEventSchema.normalizeBodFocusAreas(value);
+    } catch {
+      // Stored malformed Focus Areas should not block unrelated edits.
+    }
+  }
+  return [];
+}
+
 async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, preserveCreatedAt = true }) {
   const bodRef = db.collection('bodEvents').doc(eventId);
   const eventRef = db.collection('events').doc(eventId);
@@ -3929,6 +3960,9 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
   const reportFinance = payload._hasReportFinanceField || (!bodSnap.exists && !eventSnap.exists)
     ? (payload.reportFinance || bodEventSchema.normalizeBodReportFinance())
     : normalizeStoredBodReportFinance(existingBod.reportFinance, existingEvent.reportFinance);
+  const focusAreas = payload._hasFocusAreasField || (!bodSnap.exists && !eventSnap.exists)
+    ? (payload.focusAreas || [])
+    : normalizeStoredBodFocusAreas(existingBod.focusAreas, existingEvent.focusAreas);
   const reportingWindowId = payload.reportingWindowId || existingBod.reportingWindowId || existingEvent.reportingWindowId || '';
 
   const bodEventDoc = {
@@ -3959,6 +3993,7 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     hostClub,
     collaborators,
     collaborationNotes,
+    focusAreas,
     reportFinance,
     reportingWindowId,
     archived: false,
@@ -3986,6 +4021,7 @@ async function writeSyncedBodEvent({ eventId, payload, uid, userProfile, now, pr
     hostClub,
     collaborators,
     collaborationNotes,
+    focusAreas,
     reportingWindowId,
     conductedBy: payload.conductedBy,
     createdBy: existingEvent.createdBy || uid,
@@ -4049,6 +4085,9 @@ async function writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now
   const time = payload._hasTimeField
     ? (payload.time || '')
     : (existingMeeting.time || existingMeeting.eventTime || existingBodEvent.time || existingBodEvent.eventTime || '');
+  const focusAreas = payload._hasFocusAreasField || (!meetingSnap.exists && !bodEventSnap.exists)
+    ? (payload.focusAreas || [])
+    : normalizeStoredBodFocusAreas(existingMeeting.focusAreas, existingBodEvent.focusAreas);
 
   const batch = db.batch();
   batch.set(meetingRef, {
@@ -4061,6 +4100,7 @@ async function writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now
     source,
     visibility: 'internal',
     reportingWindowId,
+    focusAreas,
     archived: false,
     createdBy: existingMeeting.createdBy || uid,
     createdAt: timestampCreatedAt(existingMeeting, now),
@@ -4087,6 +4127,7 @@ async function writeBodMeetingSynced({ meetingId, payload, uid, userProfile, now
     syncedMeetingId: meetingId,
     bodMeetingId: meetingId,
     reportingWindowId,
+    focusAreas,
     archived: false,
     createdBy: existingBodEvent.createdBy || uid,
     createdByEmail: existingBodEvent.createdByEmail || userProfile.email,

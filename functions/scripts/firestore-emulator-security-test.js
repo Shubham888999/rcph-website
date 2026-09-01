@@ -128,6 +128,14 @@ function validBodEventPayload(overrides = {}) {
       avenues: allBodAvenues,
       avenue: allBodAvenues,
     })));
+    await assertSucceeds(setDoc(doc(bod, 'bodEvents', 'focus-areas'), validBodEventPayload({
+      name: 'Focus Area Event',
+      focusAreas: [
+        { category: 'rotary', value: 'Environment' },
+        { category: 'ascend', value: 'Media' },
+        { category: 'other', value: 'District Grant Partnerships' },
+      ],
+    })));
     await assertFails(setDoc(doc(bod, 'bodEvents', 'invalid-avenue'), validBodEventPayload({
       avenues: ['BAD'],
       avenue: ['BAD'],

@@ -9,6 +9,53 @@ const BOD_REPORT_FINANCE_TYPES = new Set(['income', 'expense']);
 const BOD_REPORT_FINANCE_DESCRIPTION_MAX = 240;
 const BOD_REPORT_FINANCE_MAX_AMOUNT = 1000000;
 const BOD_REPORT_FINANCE_MAX_ROWS = 20;
+const BOD_FOCUS_AREA_CATEGORY_ROTARY = 'rotary';
+const BOD_FOCUS_AREA_CATEGORY_ASCEND = 'ascend';
+const BOD_FOCUS_AREA_CATEGORY_OTHER = 'other';
+const BOD_FOCUS_AREA_CUSTOM_MAX_LENGTH = 180;
+const BOD_FOCUS_AREA_MAX_ITEMS = 20;
+const BOD_FOCUS_AREA_GROUPS = Object.freeze([
+  Object.freeze({
+    category: BOD_FOCUS_AREA_CATEGORY_ROTARY,
+    label: 'Rotary Focus',
+    options: Object.freeze([
+      'Peacebuilding and conflict prevention',
+      'Disease prevention and treatment',
+      'Water, sanitation, and hygiene',
+      'Maternal and child health',
+      'Basic education and literacy',
+      'Community economic development',
+      'Environment',
+    ]),
+  }),
+  Object.freeze({
+    category: BOD_FOCUS_AREA_CATEGORY_ASCEND,
+    label: 'Ascend Chapters',
+    options: Object.freeze([
+      'Harvesting Innovation',
+      'Media',
+      'Rescue Operation',
+      'Finance',
+      'Blue Careers - Future jobs beneath the surface',
+      'Product Lab',
+      'Hospitality',
+      'Renewable Energy',
+      'Art and Theatre',
+      'A.I Tech',
+    ]),
+  }),
+  Object.freeze({
+    category: BOD_FOCUS_AREA_CATEGORY_OTHER,
+    label: 'Other',
+    options: Object.freeze(['Other']),
+  }),
+]);
+const BOD_FOCUS_AREA_CATEGORY_SET = new Set(BOD_FOCUS_AREA_GROUPS.map(group => group.category));
+const BOD_FOCUS_AREA_OPTIONS_BY_CATEGORY = new Map(
+  BOD_FOCUS_AREA_GROUPS
+    .filter(group => group.category !== BOD_FOCUS_AREA_CATEGORY_OTHER)
+    .map(group => [group.category, new Set(group.options)]),
+);
 
 class BodEventSchemaError extends Error {
   constructor(message, details = {}) {
@@ -38,6 +85,57 @@ function normalizeText(value, max, fieldName, { required = false } = {}) {
   if (trimmed.length > max) throw new BodEventSchemaError(fieldName + ' must be ' + max + ' characters or fewer.', { fieldName, max });
   if (required && !trimmed) throw new BodEventSchemaError(fieldName + ' is required.', { fieldName });
   return trimmed;
+}
+
+function normalizeWhitespaceText(value, max, fieldName, options = {}) {
+  const trimmed = normalizeText(value, max, fieldName, options).replace(/\s+/g, ' ');
+  if (options.required === true && !trimmed) throw new BodEventSchemaError(fieldName + ' is required.', { fieldName });
+  return trimmed;
+}
+
+function pushUniqueFocusArea(output, seen, area) {
+  const key = area.category + '|' + area.value.toLowerCase();
+  if (seen.has(key)) return;
+  seen.add(key);
+  output.push(area);
+}
+
+function normalizeBodFocusAreas(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new BodEventSchemaError('focusAreas must be a list.', { fieldName: 'focusAreas' });
+  if (value.length > BOD_FOCUS_AREA_MAX_ITEMS) {
+    throw new BodEventSchemaError('Select no more than ' + BOD_FOCUS_AREA_MAX_ITEMS + ' Focus Areas.', {
+      fieldName: 'focusAreas',
+      maxItems: BOD_FOCUS_AREA_MAX_ITEMS,
+    });
+  }
+
+  const output = [];
+  const seen = new Set();
+  value.forEach((item, index) => {
+    const prefix = 'focusAreas.' + index;
+    if (!isPlainObject(item)) throw new BodEventSchemaError(prefix + ' must be a plain object.', { fieldName: prefix });
+    const category = normalizeText(item.category, 24, prefix + '.category', { required: true }).toLowerCase();
+    if (!BOD_FOCUS_AREA_CATEGORY_SET.has(category)) {
+      throw new BodEventSchemaError(prefix + '.category is not supported.', { fieldName: prefix + '.category' });
+    }
+
+    const focusValue = normalizeWhitespaceText(item.value, BOD_FOCUS_AREA_CUSTOM_MAX_LENGTH, prefix + '.value', { required: true });
+    if (category === BOD_FOCUS_AREA_CATEGORY_OTHER) {
+      if (focusValue.toLowerCase() === 'other') {
+        throw new BodEventSchemaError('Enter the custom Focus Area name instead of Other.', { fieldName: prefix + '.value' });
+      }
+      pushUniqueFocusArea(output, seen, { category, value: focusValue });
+      return;
+    }
+
+    if (!BOD_FOCUS_AREA_OPTIONS_BY_CATEGORY.get(category)?.has(focusValue)) {
+      throw new BodEventSchemaError(prefix + '.value is not a supported Focus Area.', { fieldName: prefix + '.value' });
+    }
+    pushUniqueFocusArea(output, seen, { category, value: focusValue });
+  });
+
+  return output;
 }
 
 function emptyBodReportFinance() {
@@ -217,6 +315,12 @@ module.exports = {
   BOD_AVENUE_CODES,
   BOD_EVENT_AVENUE_MAX,
   BOD_EVENT_DESCRIPTION_MAX,
+  BOD_FOCUS_AREA_CATEGORY_ASCEND,
+  BOD_FOCUS_AREA_CATEGORY_OTHER,
+  BOD_FOCUS_AREA_CATEGORY_ROTARY,
+  BOD_FOCUS_AREA_CUSTOM_MAX_LENGTH,
+  BOD_FOCUS_AREA_GROUPS,
+  BOD_FOCUS_AREA_MAX_ITEMS,
   BOD_REPORT_FINANCE_DESCRIPTION_MAX,
   BOD_REPORT_FINANCE_MAX_AMOUNT,
   BOD_REPORT_FINANCE_MAX_ROWS,
@@ -227,6 +331,7 @@ module.exports = {
   normalizeBodAvenues,
   normalizeBodEventAvenues,
   normalizeBodEventDescriptionFields,
+  normalizeBodFocusAreas,
   normalizeBodReportFinance,
   normalizeEventDescription,
   validateAvenueDescriptionCoverage,

@@ -28,6 +28,7 @@ test('BOD Tools submit route accepts only BOD meeting avenue before club event v
   const submitSource = callableSource('submitBodEvent');
 
   assert.match(indexSource, /function normalizeBodToolsMeetingPayload/);
+  assert.match(indexSource, /normalizeBodFocusAreas\(raw\.focusAreas\)/);
   assert.match(indexSource, /requestedType === 'bodMeeting' \|\| rawAvenues\.includes\('BOD'\)/);
   assert.match(indexSource, /Board of Directors meetings must use only the BOD avenue/);
   assert.match(submitSource, /const bodMeetingPayload = normalizeBodToolsMeetingPayload\(data\)/);
@@ -44,6 +45,7 @@ test('BOD Tools meeting sync keeps bodMeetings as canonical attendance identity'
   assert.match(writeSource, /db\.collection\('bodEvents'\)\.doc\(meetingId\)/);
   assert.match(writeSource, /syncedMeetingId: meetingId/);
   assert.match(writeSource, /bodMeetingId: meetingId/);
+  assert.match(writeSource, /focusAreas/);
   assert.match(writeSource, /avenues: payload\.avenues \|\| payload\.avenue/);
   assert.match(writeSource, /eventTime: time/);
   assert.match(saveSource, /initializeAttendanceFieldForCollection\('bodMembers', 'bodAttendance', meetingId, now\)/);

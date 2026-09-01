@@ -247,6 +247,8 @@ test('rules source replaces broad role and lock reads with approved-active autho
   assert.match(bodyOfFunction(rules, 'validBodAvenueCodes'), /'SPORTS'/);
   assert.match(bodyOfFunction(rules, 'validBodAvenueCodes'), /'FINANCE'/);
   assert.match(bodyOfFunction(rules, 'validBodEventWrite'), /data\.avenues\.size\(\) <= 11/);
+  assert.match(bodyOfFunction(rules, 'validBodEventWrite'), /validBodFocusAreas\(data\)/);
+  assert.match(bodyOfFunction(rules, 'validBodFocusAreaValue'), /Blue Careers - Future jobs beneath the surface/);
   assert.match(rules, /match \/roles\/\{uid\} \{\s*allow get: if signedIn\(\) && \(request\.auth\.uid == uid \|\| isAdmin\(\)\);\s*allow list: if isAdmin\(\);/);
   assert.match(rules, /match \/locks\/\{panelId\} \{\s*allow read: if canReadAttendanceLock\(panelId\) \|\| hasAdminPanelAuthority\(\);\s*allow create, update, delete: if hasLockTools\(\);/);
   assert.match(rules, /match \/letterheadExchanges\/\{exchangeId\} \{\s*allow read, write: if false;\s*\}/);

@@ -69,6 +69,17 @@ assert.deepEqual(schema.normalizeBodReportFinance({
   ],
 });
 
+assert.deepEqual(schema.normalizeBodFocusAreas(), []);
+assert.deepEqual(schema.normalizeBodFocusAreas([
+  { category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Environment' },
+  { category: schema.BOD_FOCUS_AREA_CATEGORY_ASCEND, value: 'Media' },
+  { category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: 'District Grant Partnerships' },
+]), [
+  { category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Environment' },
+  { category: schema.BOD_FOCUS_AREA_CATEGORY_ASCEND, value: 'Media' },
+  { category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: 'District Grant Partnerships' },
+]);
+
 for (const [label, payload] of [
   ['missing selected description', { avenues: ['CMD', 'PDD'], avenue: ['CMD', 'PDD'], avenueDescriptions: { CMD: 'Only CMD' } }],
   ['extra unselected description', { avenues: ['CMD'], avenue: ['CMD'], avenueDescriptions: { CMD: 'OK', PDD: 'Extra' } }],
@@ -101,6 +112,16 @@ for (const [label, finance] of [
   assert.throws(() => schema.normalizeBodReportFinance(finance), schema.BodEventSchemaError, label);
 }
 
+for (const [label, focusAreas] of [
+  ['malformed focus areas', 'Environment'],
+  ['unsupported focus category', [{ category: 'unknown', value: 'Environment' }]],
+  ['unsupported focus value', [{ category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Made up focus' }]],
+  ['blank custom focus', [{ category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: '' }]],
+  ['literal Other custom focus', [{ category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: 'Other' }]],
+]) {
+  assert.throws(() => schema.normalizeBodFocusAreas(focusAreas), schema.BodEventSchemaError, label);
+}
+
 const indexSource = fs.readFileSync(path.resolve(__dirname, '../index.js'), 'utf8');
 const writeStart = indexSource.indexOf('async function writeSyncedBodEvent');
 const writeEnd = indexSource.indexOf('async function writeBodMeetingSynced');
@@ -121,11 +142,16 @@ for (const text of [
   'avenues: payload.avenues || payload.avenue',
   'normalizeStoredBodReportFinance',
   'payload._hasReportFinanceField',
+  'normalizeStoredBodFocusAreas',
+  'payload._hasFocusAreasField',
 ]) assert.ok(writeHelper.includes(text), text);
 assert.ok(indexSource.includes('reportFinance = bodEventSchema.normalizeBodReportFinance(raw.reportFinance)'));
+assert.ok(indexSource.includes('return bodEventSchema.normalizeBodFocusAreas(raw.focusAreas)'));
 assert.equal(eventDocBlock.includes('avenueDescriptions'), false);
 assert.equal(eventDocBlock.includes('reportFinance'), false);
 assert.ok(bodEventDocBlock.includes('reportFinance'));
+assert.ok(bodEventDocBlock.includes('focusAreas'));
+assert.ok(eventDocBlock.includes('focusAreas'));
 assert.ok(eventDocBlock.includes('description: payload.description || payload.desc'));
 assert.ok(eventDocBlock.includes('avenues: payload.avenues || payload.avenue'));
 
@@ -146,5 +172,6 @@ assert.equal(/avenueDescriptions|forEach|for \(/.test(archiveCallable), false);
 const rulesSource = fs.readFileSync(path.resolve(__dirname, '../../firestore.rules'), 'utf8');
 assert.ok(rulesSource.includes('validBodEventWrite(request.resource.data)'));
 assert.ok(rulesSource.includes('validBodAvenueDescriptions(data)'));
+assert.ok(rulesSource.includes('validBodFocusAreas(data)'));
 
 console.log('BOD event schema verification passed.');

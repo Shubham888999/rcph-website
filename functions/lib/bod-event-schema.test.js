@@ -79,6 +79,47 @@ test('BOD schema accepts all normal reporting-window avenues', () => {
   assert.deepEqual(coverage.pendingAvenues, ['SPORTS', 'FINANCE']);
 });
 
+test('BOD Focus Areas normalize supported Rotary, Ascend, and custom values', () => {
+  assert.deepEqual(schema.normalizeBodFocusAreas(), []);
+  assert.deepEqual(schema.normalizeBodFocusAreas([
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: ' Environment ' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_ASCEND, value: 'Harvesting Innovation' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: ' District Grant Partnerships ' },
+  ]), [
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Environment' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_ASCEND, value: 'Harvesting Innovation' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: 'District Grant Partnerships' },
+  ]);
+});
+
+test('BOD Focus Areas reject malformed, unsupported, and literal Other values', () => {
+  for (const focusAreas of [
+    'Environment',
+    [{ category: 'unknown', value: 'Environment' }],
+    [{ category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Made up focus' }],
+    [{ category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: '' }],
+    [{ category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: 'Other' }],
+    Array.from({ length: schema.BOD_FOCUS_AREA_MAX_ITEMS + 1 }, () => ({
+      category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY,
+      value: 'Environment',
+    })),
+  ]) {
+    assert.throws(() => schema.normalizeBodFocusAreas(focusAreas), schema.BodEventSchemaError);
+  }
+});
+
+test('BOD Focus Areas deduplicate repeated values case-insensitively', () => {
+  assert.deepEqual(schema.normalizeBodFocusAreas([
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: 'District Grant Partnerships' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: ' district grant partnerships ' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Environment' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Environment' },
+  ]), [
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_OTHER, value: 'District Grant Partnerships' },
+    { category: schema.BOD_FOCUS_AREA_CATEGORY_ROTARY, value: 'Environment' },
+  ]);
+});
+
 test('allowed missing avenues do not relax extra selected avenues', () => {
   assert.throws(
     () => normalize({
