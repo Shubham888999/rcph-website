@@ -4,6 +4,7 @@ import { normalizeBodFocusAreas, validateAndNormalizeBodFocusAreas } from "./bod
 const EVENT_KINDS = new Set(["clubEvent", "bodMeeting", "districtEvent"]);
 const RCPH_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
 const REPORT_FINANCE_TYPES = new Set(["income", "expense"]);
+const REPORT_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 export const BOD_MEETING_AVENUE = "BOD";
 export const BOD_SERVICE_AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "CWD", "SPORTS", "FINANCE", "GBM"];
 export const BOD_AVENUES = [...BOD_SERVICE_AVENUES, BOD_MEETING_AVENUE];
@@ -44,6 +45,11 @@ function cleanLower(value, max = 120) {
 function safeReportingWindowId(value) {
   const id = cleanString(value).slice(0, 128);
   return id && !id.includes("/") ? id : "";
+}
+
+function safeDocumentId(value, max = 300) {
+  const id = cleanString(value).slice(0, max);
+  return id && !/[\\/]/.test(id) && !/[\x00-\x1F\x7F]/.test(id) ? id : "";
 }
 
 function safeLockIdSegment(value) {
@@ -258,6 +264,32 @@ export function getBodEventAttachments(event) {
   });
 }
 
+export function normalizeBodEventAttachment(fileId, raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const id = safeDocumentId(fileId || raw.id || raw.driveFileId);
+  if (!id) return null;
+  const mimeType = cleanLower(raw.mimeType, 120);
+  const storageProvider = cleanString(raw.storageProvider).slice(0, 80);
+  const source = cleanString(raw.source).slice(0, 80);
+  const sizeBytes = Number(raw.sizeBytes);
+  const fileUrl = safeExternalUrl(raw.fileUrl);
+  const isImage = REPORT_IMAGE_MIME_TYPES.has(mimeType);
+  const authoritative = storageProvider === "googleDrive" && source === "appsScriptFinalize";
+  return {
+    id,
+    fileName: cleanString(raw.fileName || raw.name, "Verified event file").slice(0, 180),
+    mimeType,
+    sizeBytes: Number.isSafeInteger(sizeBytes) && sizeBytes > 0 ? sizeBytes : 0,
+    fileUrl,
+    storageProvider,
+    source,
+    uploadedAt: timestampToIso(raw.uploadedAt || raw.createdAt),
+    verifiedAt: timestampToIso(raw.verifiedAt),
+    isImage,
+    reportImageEligible: Boolean(authoritative && isImage),
+  };
+}
+
 function timestampToIso(value) {
   try {
     const date = typeof value?.toDate === "function" ? value.toDate() : value instanceof Date ? value : null;
@@ -378,6 +410,7 @@ export function normalizeBodEvent(id, raw) {
     collaborationNotes: cleanString(raw.collaborationNotes),
     focusAreas: normalizeBodFocusAreas(raw.focusAreas),
     reportFinance: normalizeBodReportFinance(raw.reportFinance),
+    reportImageFileId: safeDocumentId(raw.reportImageFileId),
     driveFolder: safeExternalUrl(raw.driveFolder),
     driveFolderId: cleanString(raw.driveFolderId),
     previewLink: safeExternalUrl(raw.previewLink),

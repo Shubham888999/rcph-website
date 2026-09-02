@@ -19,6 +19,7 @@ import {
   normalizeAvenueDescriptions,
   normalizeAvenueReportingLock,
   normalizeBodEvent,
+  normalizeBodEventAttachment,
   normalizeBodReportFinance,
   safeExternalUrl,
   validateAvenueDescriptionCoverage,
@@ -112,6 +113,61 @@ test("BOD event normalizer preserves linked reporting window IDs", () => {
   });
 
   assert.equal(event.reportingWindowId, "window-1");
+});
+
+test("BOD event normalizer preserves only valid reportImageFileId values", () => {
+  assert.equal(normalizeBodEvent("event-1", { ...base, reportImageFileId: " file_ABC-123 " }).reportImageFileId, "file_ABC-123");
+  assert.equal(normalizeBodEvent("event-2", { ...base, reportImageFileId: "folder/file" }).reportImageFileId, "");
+  assert.equal(normalizeBodEvent("event-3", { ...base, reportImageFileId: null }).reportImageFileId, "");
+});
+
+test("authoritative attachment normalizer marks only finalized Drive images eligible", () => {
+  for (const mimeType of ["image/jpeg", "image/png", "image/webp"]) {
+    const attachment = normalizeBodEventAttachment("file-1", {
+      fileName: " Photo.JPG ",
+      mimeType,
+      sizeBytes: 1234,
+      storageProvider: "googleDrive",
+      source: "appsScriptFinalize",
+      fileUrl: "https://drive.google.com/file/d/file-1/view",
+      uploadedAt: new Date("2026-08-15T10:00:00.000Z"),
+      verifiedAt: new Date("2026-08-15T10:01:00.000Z"),
+    });
+    assert.equal(attachment.id, "file-1");
+    assert.equal(attachment.fileName, "Photo.JPG");
+    assert.equal(attachment.mimeType, mimeType);
+    assert.equal(attachment.isImage, true);
+    assert.equal(attachment.reportImageEligible, true);
+    assert.equal(attachment.fileUrl, "https://drive.google.com/file/d/file-1/view");
+    assert.equal(attachment.uploadedAt, "2026-08-15T10:00:00.000Z");
+    assert.equal(attachment.verifiedAt, "2026-08-15T10:01:00.000Z");
+  }
+
+  assert.equal(normalizeBodEventAttachment("file-pdf", {
+    fileName: "document.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 1234,
+    storageProvider: "googleDrive",
+    source: "appsScriptFinalize",
+  }).reportImageEligible, false);
+  assert.equal(normalizeBodEventAttachment("bad-source", {
+    mimeType: "image/jpeg",
+    sizeBytes: 1234,
+    storageProvider: "googleDrive",
+    source: "browser",
+  }).reportImageEligible, false);
+  assert.equal(normalizeBodEventAttachment("bad-provider", {
+    mimeType: "image/jpeg",
+    sizeBytes: 1234,
+    storageProvider: "publicUrl",
+    source: "appsScriptFinalize",
+  }).reportImageEligible, false);
+  assert.equal(normalizeBodEventAttachment("folder/file", {
+    mimeType: "image/jpeg",
+    sizeBytes: 1234,
+    storageProvider: "googleDrive",
+    source: "appsScriptFinalize",
+  }), null);
 });
 
 test("BOD meetings are editable while district events stay read-only", () => {

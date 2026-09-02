@@ -429,6 +429,10 @@ export default function BodToolsPage() {
           reload();
           refreshReportingQueue();
         }}
+        onReportImageChanged={(result) => {
+          if (!result?.eventId) return;
+          reload();
+        }}
         onClose={() => setDetails(null)}
       />
       {form ? <BodEventForm key={form.event?.id || form.prefill?.reportingWindowId || "create"} event={form.event || null} prefill={form.prefill || null} displayName={displayName} busy={busy} mutationError={mutationError} lockedAvenueReportingLocks={avenueReportingLocks.items} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}

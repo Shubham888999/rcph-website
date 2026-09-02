@@ -140,6 +140,35 @@ test("BOD details show report finance entries as Avenue Report-only data", () =>
   assert.match(details, /formatFinanceAmount/);
 });
 
+test("BOD event report image selector uses authoritative attachment docs only", () => {
+  assert.match(service, /export async function fetchBodEventAttachments\(eventId\)/);
+  assert.match(service, /collection\(db, "bodEvents", safeEventId, "attachments"\)/);
+  assert.match(service, /normalizeBodEventAttachment\(document\.id, document\.data\(\)\)/);
+  assert.match(service, /export async function setBodReportImage\(eventId, fileId = ""\)/);
+  assert.match(service, /httpsCallable\(functions, "setBodReportImage"\)/);
+  assert.doesNotMatch(service.slice(service.indexOf("export async function fetchBodEventAttachments")), /imageLinks|driveLinks|previewLink/);
+
+  assert.match(details, /No image in report/);
+  assert.match(details, /reportImageEligible \? \(/);
+  assert.match(details, /type="radio"/);
+  assert.match(details, /Save report image/);
+  assert.match(details, /draftReportImageFileId === savedReportImageFileId/);
+  assert.match(details, /Loading verified event files/);
+  assert.match(details, /Verified event files could not be loaded/);
+  assert.match(details, /not eligible for report image/);
+  assert.match(details, /The saved report image is no longer available as a verified event file/);
+  assert.match(details, /isClubEvent = event\?\.recordKind === "clubEvent"/);
+  assert.match(details, /isClubEvent \? \(/);
+  assert.match(details, /Legacy file links/);
+  assert.match(details, /Legacy presentation link only/);
+  assert.match(details, /onReportImageChanged\?\.\(result\)/);
+  assert.match(page, /onReportImageChanged=\{\(result\) => \{/);
+  assert.match(page, /reload\(\);/);
+
+  assert.doesNotMatch(details, /getDriveThumbnailUrl|thumbnailUrl|download|canvas|PDFDocument|jsPDF|pdfMake/i);
+  assert.doesNotMatch(service, /getDownloadURL|download|arrayBuffer|blob|canvas|PDFDocument|jsPDF|pdfMake/i);
+});
+
 test("BOD submissions render as a collapsible compact list without the card grid contract", () => {
   assert.match(page, /submissionsExpanded/);
   assert.match(page, /useState\(false\)/);

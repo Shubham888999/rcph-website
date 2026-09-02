@@ -4,7 +4,7 @@ import { auth, functions } from "../../app/firebase";
 import { db } from "../../app/firestore";
 import { createBodEventCache } from "./bodEventCache";
 import { registerBodCacheClear } from "./bodCacheRegistry";
-import { normalizeAvenueReportingLock, normalizeBodEvent } from "./bodEventModel";
+import { normalizeAvenueReportingLock, normalizeBodEvent, normalizeBodEventAttachment } from "./bodEventModel";
 import { normalizeBodReportingQueueResponse } from "./bodReportingQueueModel";
 
 const BOD_LOCK_STATE_POLL_MS = 30000;
@@ -48,6 +48,42 @@ export function clearBodEventCache(uid) {
   listCache.clear(uid);
 }
 registerBodCacheClear(clearBodEventCache);
+
+function safeDocumentId(value, label = "document") {
+  const id = typeof value === "string" ? value.trim().slice(0, 300) : "";
+  if (!id || /[\\/]/.test(id) || /[\x00-\x1F\x7F]/.test(id)) {
+    throw new Error(`Choose a valid ${label}.`);
+  }
+  return id;
+}
+
+function timestampValue(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.toDate === "function") return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "string") {
+    const millis = Date.parse(value);
+    return Number.isFinite(millis) ? millis : 0;
+  }
+  return 0;
+}
+
+function sortBodEventAttachments(a, b) {
+  const bTime = Math.max(timestampValue(b.verifiedAt), timestampValue(b.uploadedAt));
+  const aTime = Math.max(timestampValue(a.verifiedAt), timestampValue(a.uploadedAt));
+  return bTime - aTime || a.fileName.localeCompare(b.fileName) || a.id.localeCompare(b.id);
+}
+
+export async function fetchBodEventAttachments(eventId) {
+  requireCurrentUser();
+  const safeEventId = safeDocumentId(eventId, "event");
+  const snapshot = await getDocs(collection(db, "bodEvents", safeEventId, "attachments"));
+  return snapshot.docs
+    .map((document) => normalizeBodEventAttachment(document.id, document.data()))
+    .filter(Boolean)
+    .sort(sortBodEventAttachments);
+}
 
 function normalizeBodLockState(data) {
   const lock = data?.lock && typeof data.lock === "object" ? data.lock : {};
@@ -136,6 +172,22 @@ export function archiveBodEvent(eventId) {
 
 export function syncBodEventToAttendance(bodEventId) {
   return call("syncBodEventToAttendance", { bodEventId });
+}
+
+export async function setBodReportImage(eventId, fileId = "") {
+  requireCurrentUser();
+  const safeEventId = safeDocumentId(eventId, "event");
+  const result = await httpsCallable(functions, "setBodReportImage")({
+    eventId: safeEventId,
+    fileId: typeof fileId === "string" ? fileId.trim() : "",
+  });
+  const data = result?.data && typeof result.data === "object" ? result.data : {};
+  return {
+    ok: data.ok === true,
+    eventId: typeof data.eventId === "string" ? data.eventId : "",
+    reportImageFileId: typeof data.reportImageFileId === "string" ? data.reportImageFileId : "",
+    unchanged: data.unchanged === true,
+  };
 }
 
 export async function fetchReportingWindowPrefill(reportingWindowId) {
