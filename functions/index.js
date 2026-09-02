@@ -46,6 +46,7 @@ const {
   normalizeDocumentId: normalizeBodEventDocumentId,
   normalizeAuthoritativeBodUploadEvent,
 } = require('./lib/bod-event-attachments');
+const { createBodReportImageSelectionService } = require('./lib/bod-report-image-selection');
 const momFunctions = require('./lib/momFunctions');
 const reminderFunctions = require('./lib/reminderFunctions');
 const {
@@ -358,6 +359,11 @@ const bodEventAttachments = createBodEventAttachmentService({
   allowedMimeTypes: DRIVE_UPLOAD_ALLOWED_MIME_TYPES,
   maxBytes: BOD_UPLOAD_MAX_BYTES,
   logger: console,
+});
+const bodReportImageSelection = createBodReportImageSelectionService({
+  db,
+  admin,
+  HttpsError,
 });
 const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury', VISIT_UPLOAD_TYPE]);
 const PROSPECT_CRITERIA = PROSPECT_CRITERIA_V2;
@@ -8815,6 +8821,19 @@ exports.submitBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     prospectProgressSummary,
     reportingWorkflow,
   };
+});
+
+exports.setBodReportImage = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  await Promise.all([
+    assertBodAdminOrPresident(uid),
+    assertApprovedActiveCallableAccount(uid),
+  ]);
+  try {
+    return await bodReportImageSelection.setReportImage(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not update BOD report image.');
+  }
 });
 
 exports.getBodAvenueReportDirectors = onCall(CALLABLE_OPTIONS, async (request) => {
