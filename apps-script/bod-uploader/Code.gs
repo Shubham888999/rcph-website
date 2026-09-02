@@ -120,6 +120,15 @@ function doPost(e) {
     );
 
     const file = eventFolder.createFile(blob);
+    const finalization = safelyFinalizeBodEventUpload_({
+      bytes,
+      config,
+      approval,
+      file,
+      eventFolder,
+      mimeType,
+      sizeBytes: declaredSizeBytes
+    });
 
     return jsonResponse_({
       ok: true,
@@ -129,7 +138,18 @@ function doPost(e) {
       folderId: eventFolder.getId(),
       folderName: eventFolder.getName(),
       folderUrl: eventFolder.getUrl(),
-      uploadGroupId: approval.uploadGroupId
+      uploadGroupId: approval.uploadGroupId,
+      attachmentFinalized: finalization.ok,
+      ...(finalization.ok ? {
+        attachment: {
+          fileId: file.getId(),
+          mimeType,
+          sizeBytes: declaredSizeBytes
+        }
+      } : {
+        attachmentFinalizationWarning:
+          finalization.message
+      })
     });
 
   } catch (err) {
@@ -159,6 +179,9 @@ function getBodConfig_() {
   const sharedSecret =
     properties.getProperty('BACKEND_SHARED_SECRET');
 
+  const finalizeUrl =
+    properties.getProperty('BOD_UPLOAD_FINALIZE_URL') || '';
+
   if (
     !rootFolderId ||
     !validationUrl ||
@@ -172,6 +195,7 @@ function getBodConfig_() {
   return {
     rootFolderId,
     validationUrl,
+    finalizeUrl,
     sharedSecret
   };
 }
@@ -230,6 +254,157 @@ function validateTicket_(options) {
   }
 
   return body;
+}
+
+function safelyFinalizeBodEventUpload_(options) {
+  try {
+    const sha256 = sha256Hex_(options.bytes);
+
+    if (!options.config.finalizeUrl) {
+      return {
+        ok: false,
+        message:
+          'File uploaded, but report attachment verification is not configured.'
+      };
+    }
+
+    if (
+      !options.approval.eventId ||
+      !options.approval.finalizeId ||
+      !options.approval.finalizeProof
+    ) {
+      return {
+        ok: false,
+        message:
+          'File uploaded, but report attachment verification was unavailable.'
+      };
+    }
+
+    finalizeBodEventUpload_({
+      ...options,
+      sha256
+    });
+    return { ok: true };
+  } catch (err) {
+    console.warn(
+      'BOD attachment finalization failed:',
+      safeFinalizationMessage_(err)
+    );
+    return {
+      ok: false,
+      message:
+        'File uploaded, but report attachment verification could not be completed.'
+    };
+  }
+}
+
+function finalizeBodEventUpload_(options) {
+  const payload = {
+    finalizeId: requiredString_(
+      options.approval.finalizeId,
+      'finalizeId',
+      160
+    ),
+    finalizeProof: requiredString_(
+      options.approval.finalizeProof,
+      'finalizeProof',
+      240
+    ),
+    eventId: requiredString_(
+      options.approval.eventId,
+      'eventId',
+      128
+    ),
+    uploadGroupId: requiredString_(
+      options.approval.uploadGroupId,
+      'uploadGroupId',
+      100
+    ),
+    driveFileId: options.file.getId(),
+    fileName: options.file.getName(),
+    mimeType: requiredString_(
+      options.mimeType,
+      'mimeType',
+      120
+    ).toLowerCase(),
+    sizeBytes: positiveInteger_(
+      options.sizeBytes,
+      'sizeBytes'
+    ),
+    driveFolderId: options.eventFolder.getId(),
+    fileUrl: options.file.getUrl(),
+    sha256: requiredString_(
+      options.sha256,
+      'sha256',
+      64
+    )
+  };
+
+  const response = UrlFetchApp.fetch(
+    options.config.finalizeUrl,
+    {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'x-rcph-drive-secret':
+          options.config.sharedSecret
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    }
+  );
+
+  const status = response.getResponseCode();
+  let body = {};
+
+  try {
+    body = JSON.parse(
+      response.getContentText() || '{}'
+    );
+  } catch (err) {
+    throw new Error(
+      'Report attachment verification returned an invalid response.'
+    );
+  }
+
+  if (
+    status < 200 ||
+    status >= 300 ||
+    body.ok !== true
+  ) {
+    throw new Error(
+      'Report attachment verification was rejected.'
+    );
+  }
+
+  return {
+    ok: true,
+    unchanged: body.unchanged === true
+  };
+}
+
+function sha256Hex_(bytes) {
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    bytes
+  );
+
+  return digest.map(function(value) {
+    const unsigned = (value + 256) % 256;
+    return unsigned.toString(16).padStart(2, '0');
+  }).join('');
+}
+
+function safeFinalizationMessage_(err) {
+  const message = safeErrorMessage_(err);
+  const allowedMessages = [
+    'Report attachment verification returned an invalid response.',
+    'Report attachment verification was rejected.'
+  ];
+
+  return allowedMessages.includes(message)
+    ? message
+    : 'Report attachment verification could not be completed.';
 }
 
 function buildBodFolderName_(data) {
