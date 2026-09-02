@@ -402,6 +402,51 @@ test('valid finalization creates authoritative attachment without path-derived f
   assert.equal(group.driveFolderName, sessionDocument().expectedFolderName);
 });
 
+test('event legacy drive folder does not block a valid new upload group folder', async () => {
+  const { db, service } = testService({
+    event: {
+      driveFolderId: 'old-event-folder',
+    },
+  });
+
+  const result = await service.finalizeAppsScriptUpload(validPayload());
+  const attachment = db.read('bodEvents/event-1/attachments/file-1');
+  const event = db.read('bodEvents/event-1');
+  const group = db.read('driveUploadGroups/group-1');
+
+  assert.equal(result.ok, true);
+  assert.equal(attachment.driveFolderId, 'folder-1');
+  assert.equal(group.driveFolderId, 'folder-1');
+  assert.equal(event.driveFolderId, 'old-event-folder');
+});
+
+test('event folder relaxation keeps root folder group and metadata checks strict', async () => {
+  for (const [label, overrides, payload, code] of [
+    ['foreign root', { folder: { parents: ['other-root'] } }, {}, 'failed-precondition'],
+    ['wrong folder name', { folder: { name: 'wrong-name' } }, {}, 'failed-precondition'],
+    ['bound group folder mismatch', { group: { driveFolderId: 'different-folder' } }, {}, 'failed-precondition'],
+    ['wrong event', {}, { eventId: 'event-2' }, 'failed-precondition'],
+    ['wrong upload group', {}, { uploadGroupId: 'group-2' }, 'failed-precondition'],
+    ['wrong group user', { group: { uid: 'other-user' } }, {}, 'permission-denied'],
+    ['wrong file id', { file: { id: 'other-file' } }, {}, 'failed-precondition'],
+    ['wrong mime', { file: { mimeType: 'image/png' } }, {}, 'failed-precondition'],
+    ['wrong size', { file: { size: '9999' } }, {}, 'failed-precondition'],
+  ]) {
+    const { service } = testService({
+      event: {
+        driveFolderId: 'old-event-folder',
+      },
+      ...overrides,
+    });
+
+    await assert.rejects(
+      service.finalizeAppsScriptUpload(validPayload(payload)),
+      (err) => err.code === code,
+      label
+    );
+  }
+});
+
 test('exact retry is idempotent and does not re-read Drive', async () => {
   const { drive, service } = testService();
   await service.finalizeAppsScriptUpload(validPayload());

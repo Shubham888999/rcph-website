@@ -477,12 +477,8 @@ function createBodEventAttachmentService(options = {}) {
     if (!eventSnap.exists) throw makeError(HttpsError, 'not-found', 'BOD event not found.');
     const event = eventSnap.data() || {};
     const eventType = text(event.type || 'clubEvent', 40);
-    const eventDriveFolderId = extractDriveFolderId(event.driveFolderId || event.driveFolder);
     if (eventType !== 'clubEvent') {
       throw makeError(HttpsError, 'failed-precondition', 'BOD meetings cannot have event report attachments.');
-    }
-    if (eventDriveFolderId && eventDriveFolderId !== payload.driveFolderId) {
-      throw makeError(HttpsError, 'failed-precondition', 'BOD event folder does not match the verified upload folder.');
     }
 
     if (!groupSnap.exists) throw makeError(HttpsError, 'failed-precondition', 'BOD upload group is not valid.');
