@@ -38,6 +38,14 @@ const bodEventSchema = require('./lib/bod-event-schema');
 const bodReportingLinkRecovery = require('./lib/bod-reporting-link-recovery');
 const { createBodManagementService } = require('./lib/bod-management');
 const { createBodPhotoUploadService } = require('./lib/bod-photo-upload');
+const {
+  buildBodEventUploadFolderName,
+  createBodEventAttachmentService,
+  generateBodEventFinalizeProof,
+  hashBodEventFinalizeProof,
+  normalizeDocumentId: normalizeBodEventDocumentId,
+  normalizeAuthoritativeBodUploadEvent,
+} = require('./lib/bod-event-attachments');
 const momFunctions = require('./lib/momFunctions');
 const reminderFunctions = require('./lib/reminderFunctions');
 const {
@@ -330,6 +338,7 @@ const CANONICAL_ACCESS_ROLES = new Set([...ACTIVE_ROLES, DISTRICT_OFFICIAL_ROLE]
 const RCPH_CLUB_NAME = 'Rotaract Club of Pune Heritage';
 const DRIVE_UPLOAD_SHARED_SECRET = defineSecret('DRIVE_UPLOAD_SHARED_SECRET');
 const DRIVE_UPLOAD_TICKET_TTL_MS = 5 * 60 * 1000;
+const DRIVE_UPLOAD_FINALIZE_TTL_MS = 15 * 60 * 1000;
 const DRIVE_UPLOAD_TICKET_DELETE_GRACE_MS = 24 * 60 * 60 * 1000;
 const DRIVE_UPLOAD_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const BOD_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
@@ -340,6 +349,16 @@ const DRIVE_UPLOAD_ALLOWED_MIME_TYPES = new Set([
   'image/png',
   'image/webp',
 ]);
+const bodEventAttachments = createBodEventAttachmentService({
+  db,
+  admin,
+  HttpsError,
+  env: process.env,
+  secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
+  allowedMimeTypes: DRIVE_UPLOAD_ALLOWED_MIME_TYPES,
+  maxBytes: BOD_UPLOAD_MAX_BYTES,
+  logger: console,
+});
 const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury', VISIT_UPLOAD_TYPE]);
 const PROSPECT_CRITERIA = PROSPECT_CRITERIA_V2;
 const PROSPECT_GENDERS = new Set(['woman', 'man', 'non-binary', 'self-describe', 'prefer-not-to-say']);
@@ -2996,6 +3015,15 @@ function normalizeDriveUploadText(value, max, label, { required = false } = {}) 
   return cleaned;
 }
 
+async function loadAuthoritativeBodUploadEvent(eventId) {
+  const normalizedEventId = normalizeBodEventDocumentId(eventId, 'Event ID', HttpsError);
+  const eventSnap = await db.collection('bodEvents').doc(normalizedEventId).get();
+  if (!eventSnap.exists) {
+    throw new HttpsError('not-found', 'BOD event not found.');
+  }
+  return normalizeAuthoritativeBodUploadEvent(normalizedEventId, eventSnap.data() || {}, HttpsError);
+}
+
 function generateDriveUploadGroupId() {
   return crypto.randomBytes(16).toString('hex');
 }
@@ -3021,7 +3049,7 @@ function normalizeDriveUploadGroupId(value, { required = false } = {}) {
   return uploadGroupId;
 }
 
-function assertBodUploadGroupMatches(groupSnap, { uid, eventName, eventDate }) {
+function assertBodUploadGroupMatches(groupSnap, { uid, eventId, eventName, eventDate }) {
   if (!groupSnap?.exists) {
     throw new HttpsError('failed-precondition', 'Upload group is not valid for this event.');
   }
@@ -3030,9 +3058,14 @@ function assertBodUploadGroupMatches(groupSnap, { uid, eventName, eventDate }) {
   if (groupData.uid !== uid) {
     throw new HttpsError('permission-denied', 'Upload group is not valid for this user.');
   }
-  if (groupData.eventName !== eventName || groupData.eventDate !== eventDate) {
+  if (groupData.eventId) {
+    if (groupData.eventId !== eventId) {
+      throw new HttpsError('failed-precondition', 'Upload group is not valid for this event.');
+    }
+  } else if (groupData.eventName !== eventName || groupData.eventDate !== eventDate) {
     throw new HttpsError('failed-precondition', 'Upload group is not valid for this event.');
   }
+  return { shouldBackfillEventId: !!eventId && !groupData.eventId };
 }
 
 function validateDriveTransactionId(value) {
@@ -3128,12 +3161,16 @@ async function createDriveUploadTicketDoc({ uid, role, uploadType, limit, metada
     if (bodUploadGroup) {
       const groupTimestamp = admin.firestore.FieldValue.serverTimestamp();
       if (bodUploadGroup.supplied) {
-        assertBodUploadGroupMatches(uploadGroupSnap, bodUploadGroup);
-        tx.set(uploadGroupRef, { updatedAt: groupTimestamp }, { merge: true });
+        const groupMatch = assertBodUploadGroupMatches(uploadGroupSnap, bodUploadGroup);
+        tx.set(uploadGroupRef, {
+          ...(groupMatch.shouldBackfillEventId ? { eventId: bodUploadGroup.eventId } : {}),
+          updatedAt: groupTimestamp,
+        }, { merge: true });
       } else {
         tx.create(uploadGroupRef, {
           uploadGroupId: bodUploadGroup.uploadGroupId,
           uid,
+          eventId: bodUploadGroup.eventId,
           eventName: bodUploadGroup.eventName,
           eventDate: bodUploadGroup.eventDate,
           createdAt: groupTimestamp,
@@ -8180,10 +8217,14 @@ exports.createBodUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
   const fileName = normalizeUploadFileName(data.fileName);
   const mimeType = validateDriveUploadMimeType(data.mimeType);
   const sizeBytes = validateDriveUploadSizeBytes(data.sizeBytes, BOD_UPLOAD_MAX_BYTES);
-  const eventName = normalizeDriveUploadText(data.eventName, 180, 'Event name', { required: true });
-  const eventDate = normalizeDriveUploadText(data.eventDate, 20, 'Event date', { required: true });
+  const bodEvent = await loadAuthoritativeBodUploadEvent(data.eventId);
   const suppliedUploadGroupId = hasSuppliedDriveUploadGroupId(data.uploadGroupId);
   const uploadGroupId = normalizeDriveUploadGroupId(data.uploadGroupId);
+  const expectedFolderName = buildBodEventUploadFolderName({
+    eventDate: bodEvent.eventDate,
+    eventName: bodEvent.eventName,
+    uploadGroupId,
+  });
 
   const { ticket, expiresAtMillis } = await createDriveUploadTicketDoc({
     uid,
@@ -8194,22 +8235,32 @@ exports.createBodUploadTicket = onCall(CALLABLE_OPTIONS, async (request) => {
       fileName,
       mimeType,
       sizeBytes,
-      eventName,
-      eventDate,
+      eventId: bodEvent.eventId,
+      eventName: bodEvent.eventName,
+      eventDate: bodEvent.eventDate,
+      eventType: bodEvent.eventType,
+      eventStatus: bodEvent.status,
+      eventDriveFolderId: bodEvent.driveFolderId,
+      expectedFolderName,
       uploadGroupId,
     },
     bodUploadGroup: {
       supplied: suppliedUploadGroupId,
       uploadGroupId,
       uid,
-      eventName,
-      eventDate,
+      eventId: bodEvent.eventId,
+      eventName: bodEvent.eventName,
+      eventDate: bodEvent.eventDate,
     },
   });
 
   return {
     ticket,
     expiresAt: expiresAtMillis,
+    eventId: bodEvent.eventId,
+    eventName: bodEvent.eventName,
+    eventDate: bodEvent.eventDate,
+    eventType: bodEvent.eventType,
     uploadGroupId,
     fileName,
     mimeType,
@@ -8441,6 +8492,13 @@ exports.validateDriveUploadTicket = onRequest({
     const ticketHash = hashDriveUploadTicket(ticket);
     const ticketRef = db.collection('driveUploadTickets').doc(ticketHash);
     const nowMillis = Date.now();
+    const finalizeProof = uploadType === 'bod' ? generateBodEventFinalizeProof() : '';
+    const finalizeProofHash = finalizeProof ? hashBodEventFinalizeProof(finalizeProof) : '';
+    const finalizeExpiresAtMillis = nowMillis + DRIVE_UPLOAD_FINALIZE_TTL_MS;
+    const finalizeDeleteAtMillis = finalizeExpiresAtMillis + DRIVE_UPLOAD_TICKET_DELETE_GRACE_MS;
+    const finalizationRef = uploadType === 'bod'
+      ? db.collection('driveUploadFinalizations').doc()
+      : null;
 
     const response = await db.runTransaction(async (tx) => {
       const ticketSnap = await tx.get(ticketRef);
@@ -8466,13 +8524,18 @@ exports.validateDriveUploadTicket = onRequest({
         throw httpError(409, 'Upload ticket metadata mismatch.');
       }
 
+      const shouldCreateBodFinalization = uploadType === 'bod' && !!ticketData.eventId;
       tx.update(ticketRef, {
         used: true,
         usedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(shouldCreateBodFinalization ? {
+          finalizationId: finalizationRef.id,
+          finalizationStatus: 'pending',
+        } : {}),
       });
 
       if (uploadType === 'bod') {
-        return {
+        const bodResponse = {
           ok: true,
           uploadType: 'bod',
           safeFileName: ticketData.fileName,
@@ -8481,6 +8544,45 @@ exports.validateDriveUploadTicket = onRequest({
           eventDate: ticketData.eventDate,
           uploaderUid: ticketData.uid,
         };
+        if (shouldCreateBodFinalization) {
+          const expectedFolderName = ticketData.expectedFolderName || buildBodEventUploadFolderName({
+            eventDate: ticketData.eventDate,
+            eventName: ticketData.eventName,
+            uploadGroupId: ticketData.uploadGroupId,
+          });
+          tx.create(finalizationRef, {
+            uploadType: 'bod',
+            status: 'pending',
+            ticketHash,
+            uid: ticketData.uid,
+            role: ticketData.role || '',
+            eventId: ticketData.eventId,
+            eventName: ticketData.eventName,
+            eventDate: ticketData.eventDate,
+            eventType: ticketData.eventType || 'clubEvent',
+            eventStatus: ticketData.eventStatus || '',
+            eventDriveFolderId: ticketData.eventDriveFolderId || '',
+            uploadGroupId: ticketData.uploadGroupId,
+            fileName: ticketData.fileName,
+            mimeType: ticketData.mimeType,
+            sizeBytes: ticketData.sizeBytes,
+            expectedFolderName,
+            proofHash: finalizeProofHash,
+            expiresAt: admin.firestore.Timestamp.fromMillis(finalizeExpiresAtMillis),
+            deleteAt: admin.firestore.Timestamp.fromMillis(finalizeDeleteAtMillis),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: null,
+            finalizedAt: null,
+            driveFileId: '',
+            driveFolderId: '',
+            sha256: '',
+          });
+          bodResponse.eventId = ticketData.eventId;
+          bodResponse.finalizeId = finalizationRef.id;
+          bodResponse.finalizeProof = finalizeProof;
+          bodResponse.finalizeExpiresAt = finalizeExpiresAtMillis;
+        }
+        return bodResponse;
       }
 
       return {
@@ -8503,6 +8605,51 @@ exports.validateDriveUploadTicket = onRequest({
     return sendDriveUploadJson(res, status, {
       ok: false,
       error: status >= 500 ? 'internal' : 'upload-ticket-rejected',
+      message,
+    });
+  }
+});
+
+exports.finalizeBodEventUpload = onRequest({
+  region: 'us-central1',
+  secrets: [DRIVE_UPLOAD_SHARED_SECRET, ...RESOLUTION_DRIVE_SECRETS],
+  timeoutSeconds: 60,
+  memory: '256MiB',
+  maxInstances: 5,
+  concurrency: 20,
+}, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.set('Allow', 'POST');
+    return sendDriveUploadJson(res, 405, {
+      ok: false,
+      error: 'method-not-allowed',
+      message: 'POST required.',
+    });
+  }
+
+  if (!timingSafeSharedSecretMatches(req.get('x-rcph-drive-secret'), DRIVE_UPLOAD_SHARED_SECRET.value())) {
+    return sendDriveUploadJson(res, 403, {
+      ok: false,
+      error: 'permission-denied',
+      message: 'Forbidden.',
+    });
+  }
+
+  try {
+    const data = parseDriveUploadRequestBody(req);
+    const response = await bodEventAttachments.finalizeAppsScriptUpload(data);
+    return sendDriveUploadJson(res, 200, response);
+  } catch (err) {
+    const status = err?.httpStatus || err?.status || httpStatusFromHttpsError(err);
+    const message = status >= 500 ? 'BOD upload finalization failed.' : err.message;
+    console.warn('BOD upload finalization rejected.', {
+      status,
+      code: err?.code || '',
+      message,
+    });
+    return sendDriveUploadJson(res, status, {
+      ok: false,
+      error: status >= 500 ? 'internal' : 'bod-upload-finalization-rejected',
       message,
     });
   }

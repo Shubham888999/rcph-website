@@ -181,6 +181,10 @@ function isAdmin(identity) {
     || hasPresidentAuthority(identity);
 }
 
+function isApprovedBod(identity) {
+  return hasApprovedActiveRole(identity, 'bod') || isAdmin(identity);
+}
+
 function hasAdminPanelAuthority(identity) {
   return hasApprovedActiveRole(identity, 'admin')
     || hasApprovedActiveRole(identity, 'president')
@@ -222,6 +226,14 @@ function canAccessLetterheadExchangeDirectly() {
   return false;
 }
 
+function canReadBodEventAttachment(identity) {
+  return isApprovedBod(identity);
+}
+
+function canWriteBodEventAttachment() {
+  return false;
+}
+
 function canWriteAdminCollection(identity, collection, panelLocked = false) {
   if (['attendance', 'districtAttendance'].includes(collection)) {
     return (isAdmin(identity) || hasActiveSergeantAtArmsAssignment(identity)) && !panelLocked;
@@ -254,6 +266,7 @@ test('rules source replaces broad role and lock reads with approved-active autho
   assert.match(rules, /match \/letterheadExchanges\/\{exchangeId\} \{\s*allow read, write: if false;\s*\}/);
   assert.match(rules, /match \/letterheadExchangeImageUploadSessions\/\{sessionId\} \{\s*allow read, write: if false;\s*\}/);
   assert.match(rules, /match \/letterheadExchangeImageAccessSessions\/\{sessionId\} \{\s*allow read, write: if false;\s*\}/);
+  assert.match(rules, /match \/bodEvents\/\{eventId\} \{[\s\S]*match \/attachments\/\{fileId\} \{[\s\S]*allow read: if isApprovedBod\(\);[\s\S]*allow create, update, delete: if false;/);
     const saaBody = bodyOfFunction(
     rules,
     'hasActiveSaaAssignment',
@@ -312,6 +325,29 @@ test('Letterhead Exchanges collection is callable-only through direct Firestore 
     identities.saa,
   ]) {
     assert.equal(canAccessLetterheadExchangeDirectly(identity), false);
+  }
+});
+
+test('BOD event attachments are BOD Tools readable and callable-only for writes', () => {
+  for (const identity of [
+    identities.mainDirector,
+    identities.admin,
+    identities.president,
+    identities.cwd,
+  ]) {
+    assert.equal(canReadBodEventAttachment(identity), true);
+    assert.equal(canWriteBodEventAttachment(identity), false);
+  }
+
+  for (const identity of [
+    identities.unauthenticated,
+    identities.member,
+    identities.inactiveAdmin,
+    identities.rejectedAdmin,
+    identities.disabledAdmin,
+  ]) {
+    assert.equal(canReadBodEventAttachment(identity), false);
+    assert.equal(canWriteBodEventAttachment(identity), false);
   }
 });
 

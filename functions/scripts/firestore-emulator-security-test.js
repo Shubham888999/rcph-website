@@ -91,6 +91,17 @@ function validBodEventPayload(overrides = {}) {
       });
       await setDoc(doc(db, 'members', 'member-1'), { name: 'Member One', active: true });
       await setDoc(doc(db, 'bodEvents', 'bod-event-1'), validBodEventPayload());
+      await setDoc(doc(db, 'bodEvents', 'bod-event-1', 'attachments', 'file-1'), {
+        storageProvider: 'googleDrive',
+        fileName: 'poster.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1234,
+        driveFolderId: 'folder-1',
+        uploadGroupId: 'group-1',
+        uploadedByUid: 'bod',
+        source: 'appsScriptFinalize',
+        sha256: 'a'.repeat(64),
+      });
       await setDoc(doc(db, 'letterheadExchanges', 'exchange-1'), { exchangeDate: '2026-08-21', status: 'active' });
       await setDoc(doc(db, 'letterheadExchangeImageUploadSessions', 'session-1'), { exchangeId: 'exchange-1', status: 'pending' });
       await setDoc(doc(db, 'letterheadExchangeImageAccessSessions', 'access-1'), { exchangeId: 'exchange-1', status: 'active' });
@@ -117,6 +128,16 @@ function validBodEventPayload(overrides = {}) {
     await assertFails(setDoc(doc(saa, 'locks', 'attendance'), { locked: true }));
 
     await assertSucceeds(getDoc(doc(bod, 'bodEvents', 'bod-event-1')));
+    await assertSucceeds(getDoc(doc(bod, 'bodEvents', 'bod-event-1', 'attachments', 'file-1')));
+    await assertSucceeds(getDoc(doc(admin, 'bodEvents', 'bod-event-1', 'attachments', 'file-1')));
+    await assertFails(getDoc(doc(gbm, 'bodEvents', 'bod-event-1', 'attachments', 'file-1')));
+    await assertFails(setDoc(doc(bod, 'bodEvents', 'bod-event-1', 'attachments', 'file-2'), {
+      storageProvider: 'googleDrive',
+      fileName: 'new.jpg',
+    }));
+    await assertFails(setDoc(doc(admin, 'bodEvents', 'bod-event-1', 'attachments', 'file-1'), {
+      fileName: 'changed.jpg',
+    }, { merge: true }));
     await assertSucceeds(setDoc(doc(bod, 'bodEvents', 'bod-event-2'), validBodEventPayload({ name: 'BOD Event 2' })));
     await assertSucceeds(setDoc(doc(bod, 'bodEvents', 'new-avenues'), validBodEventPayload({
       name: 'New Avenue Event',

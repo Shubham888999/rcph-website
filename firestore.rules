@@ -444,6 +444,11 @@ function isFineLinkedTreasury(data) {
         && !panelLocked('bodEvents')
         && validBodEventWrite(request.resource.data);
       allow delete: if isApprovedBod() && !panelLocked('bodEvents');
+
+      match /attachments/{fileId} {
+        allow read: if isApprovedBod();
+        allow create, update, delete: if false;
+      }
     }
 
 match /fines/{fineId} {
