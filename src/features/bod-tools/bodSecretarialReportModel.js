@@ -21,6 +21,11 @@ function cleanOptional(value) {
   return cleanText(value, 180);
 }
 
+function safeReportEventId(value) {
+  const id = cleanText(value, 180);
+  return id && !/[\\/]/.test(id) && !/[\x00-\x1F\x7F]/.test(id) ? id : "";
+}
+
 function isPlainObject(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -203,7 +208,7 @@ function compareProjects(left, right) {
 }
 
 function baseRecordAllowed(event) {
-  return Boolean(event && typeof event === "object" && event.id && !isInactiveRecord(event) && eventDate(event));
+  return Boolean(event && typeof event === "object" && safeReportEventId(event.id) && !isInactiveRecord(event) && eventDate(event));
 }
 
 function isBodMeeting(event) {
@@ -233,6 +238,7 @@ function presentationProject(event, avenueCodes) {
   const date = eventDate(event);
   const focusAreas = normalizeBodFocusAreas(event?.focusAreas);
   return {
+    eventId: safeReportEventId(event.id),
     date,
     avenueLabel: avenueLabel(avenueCodes),
     dateLabel: formatDateLabel(date),
@@ -264,6 +270,7 @@ function numberedMeetings(meetings) {
 
 function numberedProjects(events) {
   return events.sort(compareProjects).map((event, index) => ({
+    eventId: event.eventId,
     serial: index + 1,
     avenueLabel: event.avenueLabel,
     dateLabel: event.dateLabel,

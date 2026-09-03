@@ -19,6 +19,7 @@ import {
 } from "./bodFocusAreas.js";
 import { RESOLUTION_OFFICIAL_LETTERHEAD_URL } from "../resolutions/resolutionLetterhead.js";
 
+const source = readFileSync(new URL("./bodAvenueReportPdf.js", import.meta.url), "utf8");
 const MOCK_LETTERHEAD = Object.freeze({
   bytes: new Uint8Array([0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01]),
   width: 1414,
@@ -30,6 +31,29 @@ const MOCK_LETTERHEAD = Object.freeze({
 
 const decodePdf = (bytes) => new TextDecoder("latin1").decode(bytes);
 const occurrences = (value, pattern) => value.match(pattern)?.length || 0;
+
+function bufferFromString(value) {
+  const prefix = new Uint8Array([0xff, 0xd8, 0xff, 0xdb]);
+  const body = new TextEncoder().encode(value);
+  const bytes = new Uint8Array(prefix.length + body.length);
+  bytes.set(prefix);
+  bytes.set(body, prefix.length);
+  return bytes.buffer;
+}
+
+function reportImage(eventId, overrides = {}) {
+  const arrayBuffer = overrides.arrayBuffer || bufferFromString(`RCPH-IMAGE-${eventId}`);
+  return {
+    eventId,
+    originalMimeType: "image/jpeg",
+    mimeType: "image/jpeg",
+    width: 1200,
+    height: 900,
+    sizeBytes: arrayBuffer.byteLength,
+    arrayBuffer,
+    ...overrides,
+  };
+}
 
 const makeEvent = (id, description = "Short description", startDate = "2026-07-05", avenues = ["CMD"], overrides = {}) => ({
   id,
@@ -128,6 +152,71 @@ test("finalized report produces an A4 portrait PDF with one shared full-page PNG
   assert.equal(occurrences(pdf, /\/XObject << \/BG 7 0 R >>/g), pages.length);
   assert.equal(occurrences(pdf, /\/BG Do/g), pages.length);
   assert.match(pdf, /595\.00 0 0 841\.58 0\.00 0\.21 cm/);
+});
+
+test("selected event image renders as a full-width block below the Avenue event row", () => {
+  const model = report([makeEvent("Photo")]);
+  const imagesByEventId = new Map([["Photo", reportImage("Photo")]]);
+  const pages = buildBodAvenueReportPdfPages(model, { imagesByEventId });
+  assert.equal(pages.length, 1);
+  const pageText = pages.flat().join("\n");
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD, { imagesByEventId }));
+
+  assert.ok(pageText.indexOf("Project Photo") < pageText.indexOf("/Im1 Do"));
+  assert.match(
+  pageText,
+  /306\.67 0 0 230\.00 144\.17 \d+\.\d{2} cm\n\/Im1 Do/
+  );
+  assert.match(pdf, /\/XObject << \/BG 7 0 R \/Im1 8 0 R >>/);
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 1);
+  assert.equal(occurrences(pdf, /\/Im1 Do/g), 1);
+  assert.equal(occurrences(pdf, /ÿØÿÛRCPH-IMAGE-Photo/g), 1);
+});
+
+test("Avenue report reuses one JPEG object for a repeated multi-avenue event", () => {
+  const model = report([makeEvent("Multi", "Shared", "2026-07-05", ["CMD", "PDD"])], {
+    selectedAvenueCodes: ["CMD", "PDD"],
+    selectedEventIds: ["Multi"],
+    directorsByAvenue: {
+      CMD: [{ name: "Director C", positionTitle: "Community Service Director" }],
+      PDD: [{ name: "Director P", positionTitle: "Professional Development Director" }],
+    },
+  });
+  const imagesByEventId = new Map([["Multi", reportImage("Multi")]]);
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD, { imagesByEventId }));
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 1);
+  assert.equal(occurrences(pdf, /\/Im1 Do/g), 2);
+  assert.equal(occurrences(pdf, /ÿØÿÛRCPH-IMAGE-Multi/g), 1);
+});
+
+test("different Avenue event images create distinct resources and totals remain after photos", () => {
+  const model = report([
+    makeEvent("One", "Short", "2026-07-05"),
+    makeEvent("Two", "Short", "2026-07-06"),
+  ]);
+  const imagesByEventId = new Map([
+    ["One", reportImage("One")],
+    ["Two", reportImage("Two")],
+  ]);
+  const pages = buildBodAvenueReportPdfPages(model, { imagesByEventId });
+  const pageText = pages.flat().join("\n");
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD, { imagesByEventId }));
+  assert.match(pdf, /\/Im1 8 0 R/);
+  assert.match(pdf, /\/Im2 9 0 R/);
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 2);
+  assert.ok(pageText.lastIndexOf("/Im2 Do") < pageText.indexOf("Total expense for July 2026"));
+});
+
+test("Avenue BOD meeting rows do not render report images", () => {
+  const model = report([makeMeeting("Board")], {
+    selectedAvenueCodes: [],
+    includeBodMeetings: true,
+    selectedEventIds: ["Board"],
+  });
+  const imagesByEventId = new Map([["Board", reportImage("Board")]]);
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD, { imagesByEventId }));
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 0);
+  assert.doesNotMatch(pdf, /\/Im1 Do/);
 });
 
 test("single-selection default PDF renders the MOM-style title, summary, table, footer, and default appearance", () => {
@@ -664,6 +753,11 @@ test("unselected events never enter the PDF and supported punctuation is normali
 test("empty, inconsistent, or unbranded report models cannot create PDFs", () => {
   assert.throws(() => buildBodAvenueReportPdfDocument({ eventCount: 0, events: [] }, MOCK_LETTERHEAD), /non-empty/i);
   assert.throws(() => buildBodAvenueReportPdfDocument(report([makeEvent("One")]), null), /letterhead PNG/i);
+});
+
+test("Avenue PDF module does not import secure report image retrieval or browser normalization", () => {
+  assert.doesNotMatch(source, /fetchBodReportImageBytes|downloadBodReportImage|normalizeBodReportImageForPdf|reportImageFileId|Firebase|Firestore|auth|Drive/i);
+  assert.doesNotMatch(source, /createImageBitmap|Canvas/i);
 });
 
 test("letterhead asset failures are logged without report data and return safe user copy", async () => {

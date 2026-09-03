@@ -20,6 +20,7 @@ import {
   getLetterheadExchangesForReport,
   getSafeLetterheadExchangeError,
 } from "./letterhead-exchanges/letterheadExchangeService";
+import { prepareBodReportImagesForPdf } from "./bodReportImagePreparation";
 
 const EMPTY_DIRECTOR_MAP = Object.freeze({});
 
@@ -55,6 +56,50 @@ function formatReportAmount(value) {
 
 function createPreview(options) {
   try { return buildBodAvenueReportModel(options); } catch { return null; }
+}
+
+function isAbortError(error) {
+  return error?.name === "AbortError";
+}
+
+function uniqueEventIds(values) {
+  const ids = [];
+  const seen = new Set();
+  for (const value of values || []) {
+    const id = typeof value === "string" ? value.trim() : "";
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function avenueReportEventIds(report) {
+  return uniqueEventIds((Array.isArray(report?.events) ? report.events : [])
+    .map((event) => event?.eventId));
+}
+
+function secretarialReportEventIds(report) {
+  return uniqueEventIds((Array.isArray(report?.months) ? report.months : [])
+    .flatMap((month) => Array.isArray(month?.events) ? month.events : [])
+    .map((event) => event?.eventId));
+}
+
+function reportImageWarningText(count) {
+  if (!count) return "";
+  return `${count} selected event image${count === 1 ? "" : "s"} could not be included.`;
+}
+
+async function prepareReportImagesSafely(options) {
+  try {
+    return await prepareBodReportImagesForPdf(options);
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return {
+      imagesByEventId: new Map(),
+      warnings: [{ code: "report-image-unavailable" }],
+    };
+  }
 }
 
 async function loadLetterheadExchangeReport(enabled, selectedMonths) {
@@ -218,10 +263,16 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
           letterheadExchanges: letterheadReport.exchanges,
           generatedAt: new Date(),
         });
+        const preparedImages = await prepareReportImagesSafely({
+          sourceEvents: events,
+          includedEventIds: secretarialReportEventIds(finalized),
+        });
         const { downloadBodSecretarialReportPdf } = await import("./bodSecretarialReportPdf.js");
-        await downloadBodSecretarialReportPdf(finalized);
-        setMessage(`${finalized.periodLabel} Secretarial Report PDF downloaded.`);
-        onNotice?.({ type: "success", message: "Secretarial report downloaded. No event records were changed." });
+        await downloadBodSecretarialReportPdf(finalized, { imagesByEventId: preparedImages.imagesByEventId });
+        const imageWarning = reportImageWarningText(preparedImages.warnings.length);
+        const message = `${finalized.periodLabel} Secretarial Report PDF downloaded.${imageWarning ? ` ${imageWarning}` : ""}`;
+        setMessage(message);
+        onNotice?.({ type: "success", message: imageWarning ? `Secretarial report downloaded. ${imageWarning}` : "Secretarial report downloaded. No event records were changed." });
       } catch (error) {
         setMessage(error?.message || "The report could not be generated. Please review the Secretarial Reporting fields and try again.");
         onNotice?.({ type: "error", message: error?.message || "The report could not be generated." });
@@ -247,10 +298,16 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
         letterheadExchanges: letterheadReport.exchanges,
         generatedAt: new Date(),
       });
+      const preparedImages = await prepareReportImagesSafely({
+        sourceEvents: events,
+        includedEventIds: avenueReportEventIds(finalized),
+      });
       const { downloadBodAvenueReportPdf } = await import("./bodAvenueReportPdf.js");
-      await downloadBodAvenueReportPdf(finalized);
-      setMessage(`${finalized.eventCount} report item${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.`);
-      onNotice?.({ type: "success", message: "Monthly avenue report downloaded. No event records were changed." });
+      await downloadBodAvenueReportPdf(finalized, { imagesByEventId: preparedImages.imagesByEventId });
+      const imageWarning = reportImageWarningText(preparedImages.warnings.length);
+      const message = `${finalized.eventCount} report item${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.${imageWarning ? ` ${imageWarning}` : ""}`;
+      setMessage(message);
+      onNotice?.({ type: "success", message: imageWarning ? `Monthly avenue report downloaded. ${imageWarning}` : "Monthly avenue report downloaded. No event records were changed." });
     } catch (error) {
       const safeMessage = error?.message || "The report could not be generated. Please review the selected events and try again.";
       setMessage(safeMessage);

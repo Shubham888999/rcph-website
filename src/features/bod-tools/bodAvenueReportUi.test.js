@@ -24,6 +24,11 @@ test("report UI exposes labeled filters, selection, preview, lazy PDF download, 
   assert.match(panel, /aria-live="polite"/);
   assert.match(panel, /await import\("\.\/bodAvenueReportPdf\.js"\)/);
   assert.match(panel, /await import\("\.\/bodSecretarialReportPdf\.js"\)/);
+  assert.match(panel, /prepareBodReportImagesForPdf/);
+  assert.match(panel, /avenueReportEventIds\(finalized\)/);
+  assert.match(panel, /secretarialReportEventIds\(finalized\)/);
+  assert.match(panel, /imagesByEventId: preparedImages\.imagesByEventId/);
+  assert.match(panel, /reportImageWarningText\(preparedImages\.warnings\.length\)/);
   assert.doesNotMatch(panel, /^import .*bodAvenueReportPdf/m);
   assert.doesNotMatch(panel, /^import .*bodSecretarialReportPdf/m);
   assert.doesNotMatch(panel, /Include BOD meetings/);
@@ -110,4 +115,14 @@ test("Letterhead Exchange report fetch is gated by mode-specific checkboxes and 
   assert.match(panel, /Unable to load Letterhead Exchanges for the selected reporting period\. Please try again\./);
   assert.doesNotMatch(panel, /collection\(db, "letterheadExchanges"\)/);
   assert.doesNotMatch(service, /letterheadExchanges/);
+});
+
+test("report image preparation is finalized-row driven and warning-safe", () => {
+  assert.match(panel, /function avenueReportEventIds\(report\)[\s\S]*report\.events[\s\S]*event\?\.eventId/);
+  assert.match(panel, /function secretarialReportEventIds\(report\)[\s\S]*report\?\.months[\s\S]*month\?\.events[\s\S]*event\?\.eventId/);
+  assert.doesNotMatch(panel, /includedEventIds:\s*selectedIds/);
+  assert.doesNotMatch(panel, /type: "warning"/);
+  assert.doesNotMatch(panel, /type: "error"[\s\S]{0,120}imageWarning/);
+  assert.match(panel, /selected event image\$\{count === 1 \? "" : "s"\} could not be included/);
+  assert.match(panel, /if \(isAbortError\(error\)\) throw error/);
 });

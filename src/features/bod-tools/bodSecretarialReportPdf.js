@@ -7,6 +7,12 @@ import {
   wrapPdfText,
 } from "../pdf/simplePdf.js";
 import {
+  buildJpegImageXObject,
+  fitJpegImageInBox,
+  jpegImageDrawCommand,
+  validatePreparedJpegImage,
+} from "../pdf/pdfJpegImage.js";
+import {
   BOD_AVENUE_REPORT_LAYOUT,
   BOD_AVENUE_REPORT_LETTERHEAD_URL,
   getBodAvenueReportLetterheadPng,
@@ -44,6 +50,12 @@ export const BOD_SECRETARIAL_REPORT_PDF_LAYOUT = Object.freeze({
   frameTitleSize: 17,
   frameStatSize: 14,
   frameStatLineGap: 29,
+});
+
+const BOD_SECRETARIAL_REPORT_PHOTO_BLOCK = Object.freeze({
+  horizontalPadding: 8,
+  verticalPadding: 8,
+  maxHeight: 240,
 });
 
 const CONTENT_WIDTH = A4_PDF_SIZE.width - BOD_SECRETARIAL_REPORT_PDF_LAYOUT.margin * 2;
@@ -369,6 +381,77 @@ function rowHeight(lines) {
   return Math.max(1, ...Object.values(lines).map((value) => value.length)) * layout.lineHeight + layout.padding * 2;
 }
 
+function normalizedReportImages(imagesByEventId) {
+  const source = imagesByEventId instanceof Map
+    ? imagesByEventId.entries()
+    : Object.entries(imagesByEventId || {});
+  const output = new Map();
+  let index = 1;
+  for (const [key, image] of source) {
+    try {
+      const validated = validatePreparedJpegImage(image);
+      if (validated.eventId !== key || output.has(validated.eventId)) continue;
+      output.set(validated.eventId, {
+        eventId: validated.eventId,
+        resourceName: `Im${index}`,
+        image,
+      });
+      index += 1;
+    } catch {
+      // Invalid prepared images are ignored so PDFs can still render without them.
+    }
+  }
+  return output;
+}
+
+function photoResourceForRow(options, row) {
+  return options?.reportImagesEnabled ? options?.imageResources?.get?.(row?.eventId) : null;
+}
+
+function photoDisplayBox(image) {
+  const photo = BOD_SECRETARIAL_REPORT_PHOTO_BLOCK;
+  return fitJpegImageInBox(image, {
+    x: 0,
+    y: 0,
+    width: CONTENT_WIDTH - photo.horizontalPadding * 2,
+    height: photo.maxHeight,
+  });
+}
+
+function photoBlockHeight(image) {
+  const display = photoDisplayBox(image);
+  return display.height + BOD_SECRETARIAL_REPORT_PHOTO_BLOCK.verticalPadding * 2;
+}
+
+function recordPageImageUse(options, pages, eventId) {
+  if (!options || !eventId) return;
+  const index = pages.length - 1;
+  if (!options.pageImageEventIds[index]) options.pageImageEventIds[index] = new Set();
+  options.pageImageEventIds[index].add(eventId);
+}
+
+function drawPhotoBlock(commands, top, resource, pages, options) {
+  const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
+  const photo = BOD_SECRETARIAL_REPORT_PHOTO_BLOCK;
+  const display = photoDisplayBox(resource.image);
+  const blockHeight = display.height + photo.verticalPadding * 2;
+  const blockBottom = top - blockHeight;
+  const imageBox = {
+    x: layout.margin + photo.horizontalPadding,
+    y: blockBottom + photo.verticalPadding,
+    width: CONTENT_WIDTH - photo.horizontalPadding * 2,
+    height: display.height,
+  };
+  const placement = fitJpegImageInBox(resource.image, imageBox);
+  commands.push(pdfFillRectCommand({ x: layout.margin, y: blockBottom, width: CONTENT_WIDTH, height: blockHeight, gray: 1 }));
+  commands.push(jpegImageDrawCommand(resource.resourceName, placement));
+  commands.push(pdfLineCommand({ x1: layout.margin, y1: top, x2: layout.margin, y2: blockBottom, gray: 0.72 }));
+  commands.push(pdfLineCommand({ x1: layout.margin + CONTENT_WIDTH, y1: top, x2: layout.margin + CONTENT_WIDTH, y2: blockBottom, gray: 0.72 }));
+  commands.push(pdfLineCommand({ x1: layout.margin, y1: blockBottom, x2: layout.margin + CONTENT_WIDTH, y2: blockBottom, gray: 0.72 }));
+  recordPageImageUse(options, pages, resource.eventId);
+  return blockBottom;
+}
+
 function drawTableHeader(commands, y, columns) {
   const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
   const x = layout.margin;
@@ -485,9 +568,45 @@ function commandsTableBorder(commands, y, height) {
   strokeRect(commands, layout.margin, y, CONTENT_WIDTH, height, 0.72);
 }
 
-function drawTable(state, month, sectionTitle, columns, rows, emptyText) {
+function drawTable(state, month, sectionTitle, columns, rows, emptyText, options = {}) {
   const layout = BOD_SECRETARIAL_REPORT_PDF_LAYOUT;
-  state = ensureSectionSpace(state, month, 58);
+
+  let requiredStartHeight = 58;
+
+  if (rows.length && options?.reportImagesEnabled) {
+    const firstLines = rowCellLines(columns, rows[0]);
+    const firstRowHeight = rowHeight(firstLines);
+    const firstPhoto = photoResourceForRow(options, rows[0]);
+    const firstPhotoHeight = firstPhoto
+      ? photoBlockHeight(firstPhoto.image)
+      : 0;
+
+    const freshRowCapacity =
+      layout.top
+      - 36
+      - 16
+      - layout.tableHeaderHeight
+      - layout.bottom;
+
+    if (
+      firstPhoto
+      && firstRowHeight + firstPhotoHeight <= freshRowCapacity
+    ) {
+      requiredStartHeight = Math.max(
+        requiredStartHeight,
+        16
+          + layout.tableHeaderHeight
+          + firstRowHeight
+          + firstPhotoHeight
+      );
+    }
+  }
+
+  state = ensureSectionSpace(
+    state,
+    month,
+    requiredStartHeight
+  );
   text(state.commands, layout.margin, state.y, sectionTitle, { size: layout.sectionSize, bold: true });
   state.y -= 16;
   state.y = drawTableHeader(state.commands, state.y, columns);
@@ -498,8 +617,21 @@ function drawTable(state, month, sectionTitle, columns, rows, emptyText) {
   rows.forEach((row, index) => {
     const lines = rowCellLines(columns, row);
     const height = rowHeight(lines);
+    const photoResource = photoResourceForRow(options, row);
+    const imageHeight = photoResource ? photoBlockHeight(photoResource.image) : 0;
+    const freshRowCapacity = layout.top - 36 - 16 - layout.tableHeaderHeight - layout.bottom;
+    if (photoResource && height + imageHeight <= freshRowCapacity) {
+      state = ensureRowSpace(state, month, sectionTitle, columns, height + imageHeight);
+      state.y = drawRow(state.commands, state.y, columns, lines, index % 2 === 1);
+      state.y = drawPhotoBlock(state.commands, state.y, photoResource, state.pages, options);
+      return;
+    }
     state = ensureRowSpace(state, month, sectionTitle, columns, height);
     state.y = drawRow(state.commands, state.y, columns, lines, index % 2 === 1);
+    if (photoResource) {
+      state = ensureRowSpace(state, month, sectionTitle, columns, imageHeight);
+      state.y = drawPhotoBlock(state.commands, state.y, photoResource, state.pages, options);
+    }
   });
   return { ...state, y: state.y - 18 };
 }
@@ -698,20 +830,31 @@ function validateReport(report) {
   if (!Array.isArray(report.months) || !report.months.length) throw new TypeError("At least one report month is required.");
 }
 
-export function buildBodSecretarialReportPdfPages(report, options = {}) {
+function buildBodSecretarialReportPdfLayout(report, options = {}) {
   validateReport(report);
+  const context = {
+    imageResources: normalizedReportImages(options.imagesByEventId),
+    pageImageEventIds: [],
+  };
   const pages = [summaryPage(report, options.frame)];
   let finalState = null;
   report.months.forEach((month) => {
     let state = monthPage(pages, month);
     state.pages = pages;
     state = drawTable(state, month, "1. Meetings", MEETING_COLUMNS, Array.isArray(month?.meetings) ? month.meetings : [], "No meetings recorded.");
-    state = drawTable(state, month, "2. Events", EVENT_COLUMNS, Array.isArray(month?.events) ? month.events : [], "No events recorded.");
+    state = drawTable(state, month, "2. Events", EVENT_COLUMNS, Array.isArray(month?.events) ? month.events : [], "No events recorded.", {
+      ...context,
+      reportImagesEnabled: true,
+    });
     finalState = state;
   });
   if (finalState) drawLetterheadExchangeSection(finalState, report);
   addPageNumbers(pages);
-  return pages;
+  return { pages, pageImageEventIds: context.pageImageEventIds, imageResources: context.imageResources };
+}
+
+export function buildBodSecretarialReportPdfPages(report, options = {}) {
+  return buildBodSecretarialReportPdfLayout(report, options).pages;
 }
 
 function ascii(value) {
@@ -777,13 +920,40 @@ function assemblePdf(objects) {
   return concatBytes(chunks);
 }
 
-export function buildBodSecretarialReportPdfDocument(report, letterhead, frame) {
+function usedImageResources(layout) {
+  const used = new Set((layout.pageImageEventIds || []).flatMap((set) => [...(set || [])]));
+  return [...layout.imageResources.values()].filter((resource) => used.has(resource.eventId));
+}
+
+function xObjectResources(baseResources, pageImageEventIds, resourceByEventId) {
+  const entries = [...baseResources];
+  for (const eventId of pageImageEventIds || []) {
+    const resource = resourceByEventId.get(eventId);
+    if (resource?.objectId) entries.push(`/${resource.resourceName} ${resource.objectId} 0 R`);
+  }
+  return entries.join(" ");
+}
+
+export function buildBodSecretarialReportPdfDocument(report, letterhead, frame, options = {}) {
   validateRgbImage(letterhead, "letterhead");
   validateRgbImage(frame, "frame");
-  const pages = buildBodSecretarialReportPdfPages(report, { frame });
-  const imageId = 5;
-  const frameImageId = 6;
-  const pageIds = pages.map((_, index) => 7 + index * 2);
+  const layout = buildBodSecretarialReportPdfLayout(report, { frame, imagesByEventId: options.imagesByEventId });
+  const pages = layout.pages;
+  const reportImages = usedImageResources(layout);
+  let nextObjectId = 5;
+  const imageId = nextObjectId;
+  nextObjectId += 1;
+  const frameImageId = nextObjectId;
+  nextObjectId += 1;
+  reportImages.forEach((resource) => {
+    resource.objectId = nextObjectId;
+    nextObjectId += 1;
+  });
+  const pageIds = pages.map(() => {
+    const id = nextObjectId;
+    nextObjectId += 2;
+    return id;
+  });
   const placement = imagePlacement(letterhead);
   const objects = [];
   objects[1] = ascii("<< /Type /Catalog /Pages 2 0 R >>");
@@ -792,6 +962,10 @@ export function buildBodSecretarialReportPdfDocument(report, letterhead, frame) 
   objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
   objects[imageId] = imageObject(letterhead);
   objects[frameImageId] = imageObject(frame);
+  reportImages.forEach((resource) => {
+    objects[resource.objectId] = buildJpegImageXObject(resource.image);
+  });
+  const resourceByEventId = new Map(reportImages.map((resource) => [resource.eventId, resource]));
   pages.forEach((page, index) => {
     const pageId = pageIds[index];
     const contentId = pageId + 1;
@@ -800,7 +974,8 @@ export function buildBodSecretarialReportPdfDocument(report, letterhead, frame) 
       ...page,
     ];
     const content = ascii(commands.join("\n"));
-    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /BG ${imageId} 0 R /FRAME ${frameImageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    const xObjects = xObjectResources([`/BG ${imageId} 0 R`, `/FRAME ${frameImageId} 0 R`], layout.pageImageEventIds[index], resourceByEventId);
+    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4_PDF_SIZE.width} ${A4_PDF_SIZE.height}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << ${xObjects} >> >> /Contents ${contentId} 0 R >>`);
     objects[contentId] = streamObject(content);
   });
   return assemblePdf(objects);
@@ -898,7 +1073,7 @@ export async function downloadBodSecretarialReportPdf(report, options = {}) {
   const loadLetterhead = options.loadLetterhead || getBodAvenueReportLetterheadPng;
   const loadFrame = options.loadFrame || loadBodSecretarialReportFrameImage;
   const [letterhead, frame] = await Promise.all([loadLetterhead(), loadFrame()]);
-  const pdf = buildBodSecretarialReportPdfDocument(report, letterhead, frame);
+  const pdf = buildBodSecretarialReportPdfDocument(report, letterhead, frame, { imagesByEventId: options.imagesByEventId });
   const documentRef = options.document || document;
   const urlApi = options.URL || URL;
   const setTimeoutRef = options.setTimeout || window.setTimeout;

@@ -92,6 +92,7 @@ test("reports exclude archived, deleted-like, malformed, BOD meeting, district, 
     event("inactive", { isActive: false }),
     event("meeting", { recordKind: "bodMeeting" }),
     event("district", { recordKind: "districtEvent" }),
+    event("bad/id"),
     event("malformed", { startDate: "July 2" }),
     event("none", { avenues: [] }),
   ], { month: "2026-07", avenueCode: "CMD" });
@@ -148,7 +149,7 @@ test("selection starts with every match and supports deselect, select all, and c
 });
 
 test("single month and avenue remain compatible with the Phase 1 report shape", () => {
-  const source = event("safe", { secret: "hidden", collaborators: [{ name: "Club A" }] });
+  const source = event("safe", { secret: "hidden", collaborators: [{ name: "Club A" }], reportImageFileId: "file-private" });
   const report = buildBodAvenueReportModel({
     month: "2026-07",
     avenueCode: "CMD",
@@ -169,6 +170,8 @@ test("single month and avenue remain compatible with the Phase 1 report shape", 
   assert.equal(JSON.stringify(report).includes("hidden"), false);
   assert.equal(JSON.stringify(report).includes("private"), false);
   assert.equal(Object.hasOwn(report.events[0], "id"), false);
+  assert.equal(report.events[0].eventId, "safe");
+  assert.equal(Object.hasOwn(report.events[0], "reportImageFileId"), false);
   assert.deepEqual(report.events[0].focusAreas, []);
   assert.equal(report.events[0].focusAreasText, "");
 });
@@ -441,6 +444,7 @@ test("combined reports group by avenue then month and count unique events once",
   assert.deepEqual(report.selectedAvenueCodes, ["CMD", "PDD"]);
   assert.deepEqual(report.groups.map((group) => `${group.avenueCode}:${group.month}`), ["CMD:2026-07", "CMD:2026-08", "PDD:2026-07", "PDD:2026-08"]);
   assert.deepEqual(report.groups.filter((group) => group.events.some((row) => row.name === "Event multi")).map((group) => group.avenueCode), ["CMD", "PDD"]);
+  assert.deepEqual(report.groups.filter((group) => group.events.some((row) => row.name === "Event multi")).map((group) => group.events.find((row) => row.name === "Event multi").eventId), ["multi", "multi"]);
   assert.equal(report.groups[0].directorText, "Director C (Community Service Director)");
   assert.deepEqual(report.avenueGroups.map((group) => `${group.avenueCode}:${group.months.map((month) => month.month).join("|")}`), ["CMD:2026-07|2026-08", "PDD:2026-07|2026-08"]);
   assert.deepEqual(report.avenueGroups[0].directorLines, ["Director C (Community Service Director)"]);
@@ -468,6 +472,7 @@ test("BOD meetings are excluded from reports unless explicitly included", () => 
   assert.equal(withMeetings.eventCount, 2);
   assert.equal(withMeetings.bodMeetingCount, 1);
   assert.equal(withMeetings.avenueGroups.at(-1).avenueLabel, "BOD Meetings");
+  assert.equal(Object.hasOwn(withMeetings.meetingGroups[0].events[0], "eventId"), false);
 });
 
 test("BOD meeting-only reports do not require a normal avenue", () => {
@@ -589,6 +594,7 @@ test("report model handles unknown collaborators, invalid selections, empty sele
   assert.throws(() => buildBodAvenueReportModel({ selectedMonths: [], avenueCode: "CMD", events: [unknown], selectedEventIds: ["unknown"] }), /month/i);
   assert.throws(() => buildBodAvenueReportModel({ month: "2026-07", selectedAvenueCodes: [], events: [unknown], selectedEventIds: ["unknown"] }), /avenue/i);
   assert.throws(() => buildBodAvenueReportModel({ month: "2026-07", avenueCode: "CMD", events: [unknown], selectedEventIds: [] }), /select/i);
+  assert.throws(() => buildBodAvenueReportModel({ month: "2026-07", avenueCode: "CMD", events: [event("bad/id")], selectedEventIds: ["bad/id"] }), /select/i);
   const many = Array.from({ length: BOD_AVENUE_REPORT_LIMIT + 1 }, (_, index) => event(`e-${index}`));
   assert.throws(() => buildBodAvenueReportModel({ month: "2026-07", avenueCode: "CMD", events: many, selectedEventIds: many.map((item) => item.id) }), /limited/i);
 });

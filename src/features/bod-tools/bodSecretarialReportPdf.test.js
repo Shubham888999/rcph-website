@@ -22,6 +22,29 @@ const source = readFileSync(new URL("./bodSecretarialReportPdf.js", import.meta.
 const decodePdf = (bytes) => new TextDecoder("latin1").decode(bytes);
 const occurrences = (value, pattern) => value.match(pattern)?.length || 0;
 
+function bufferFromString(value) {
+  const prefix = new Uint8Array([0xff, 0xd8, 0xff, 0xdb]);
+  const body = new TextEncoder().encode(value);
+  const bytes = new Uint8Array(prefix.length + body.length);
+  bytes.set(prefix);
+  bytes.set(body, prefix.length);
+  return bytes.buffer;
+}
+
+function reportImage(eventId, overrides = {}) {
+  const arrayBuffer = overrides.arrayBuffer || bufferFromString(`RCPH-SECRETARIAL-${eventId}`);
+  return {
+    eventId,
+    originalMimeType: "image/jpeg",
+    mimeType: "image/jpeg",
+    width: 1200,
+    height: 900,
+    sizeBytes: arrayBuffer.byteLength,
+    arrayBuffer,
+    ...overrides,
+  };
+}
+
 const MOCK_LETTERHEAD = Object.freeze({
   bytes: new Uint8Array([0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01]),
   width: 1414,
@@ -128,6 +151,69 @@ test("secretarial PDF uses the shared BOD Avenue Report letterhead asset and bac
   assert.equal(occurrences(pdf, /\/FRAME Do/g), 1);
   assert.match(pdf, /595\.00 0 0 841\.58 0\.00 0\.21 cm/);
   assert.match(pdf, /Page 1 of 2/);
+});
+
+test("secretarial event image renders only under the Events table", () => {
+  const model = report();
+  const imagesByEventId = new Map([
+    ["july-project", reportImage("july-project")],
+    ["july-bod", reportImage("july-bod")],
+    ["july-gbm", reportImage("july-gbm")],
+  ]);
+  const pages = buildBodSecretarialReportPdfPages(model, { frame: MOCK_FRAME, imagesByEventId });
+  const pagesWithEventsHeading = pages
+  .map((page, index) => ({
+    index,
+    text: page.join("\n"),
+  }))
+  .filter(({ text }) => text.includes("2. Events"));
+
+const pageWithImage = pagesWithEventsHeading.find(
+  ({ text }) => text.includes("/Im1 Do")
+);
+
+assert.ok(pageWithImage);
+
+for (const page of pagesWithEventsHeading) {
+  if (page.index === pageWithImage.index) continue;
+
+  assert.equal(
+    page.text.includes("Sr. No.")
+      && page.text.includes("2. Events"),
+    false,
+    "Events heading/table header must not be orphaned before an image event"
+  );
+}
+  const pageText = pages.flat().join("\n");
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME, { imagesByEventId }));
+  assert.ok(pageText.indexOf("2. Events") < pageText.indexOf("/Im1 Do"));
+  assert.match(pageText, /320\.00 0 0 240\.00 137\.50 \d+\.\d{2} cm\n\/Im1 Do/);
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 1);
+  assert.equal(occurrences(pdf, /\/Im1 Do/g), 1);
+  assert.equal(occurrences(pdf, /RCPH-SECRETARIAL-july-project/g), 1);
+  assert.doesNotMatch(pdf, /RCPH-SECRETARIAL-july-bod|RCPH-SECRETARIAL-july-gbm/);
+});
+
+test("secretarial event images preserve background and frame resources", () => {
+  const model = report({
+    events: [
+      bodMeeting("july-bod"),
+      clubEvent("july-gbm", { startDate: "2026-07-12", avenues: ["GBM"], name: "July GBM" }),
+      clubEvent("one", { name: "One" }),
+      clubEvent("two", { name: "Two", startDate: "2026-07-14" }),
+    ],
+  });
+  const imagesByEventId = new Map([
+    ["one", reportImage("one")],
+    ["two", reportImage("two")],
+  ]);
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME, { imagesByEventId }));
+  assert.match(pdf, /\/BG 5 0 R \/FRAME 6 0 R/);
+  assert.match(pdf, /\/Im1 7 0 R/);
+  assert.match(pdf, /\/Im2 8 0 R/);
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 2);
+  assert.equal(occurrences(pdf, /\/BG Do/g), buildBodSecretarialReportPdfPages(model, { frame: MOCK_FRAME, imagesByEventId }).length);
+  assert.equal(occurrences(pdf, /\/FRAME Do/g), 1);
 });
 
 test("secretarial page one uses the uploaded frame image with stacked centered stat lines", () => {
@@ -430,4 +516,8 @@ test("long descriptions do not throw during PDF generation", () => {
 test("secretarial PDF filename is period based and ends with pdf", () => {
   assert.equal(getBodSecretarialReportFilename(report()), "RCPH-Secretarial-Report-July-2026.pdf");
   assert.match(getBodSecretarialReportFilename(report()), /\.pdf$/);
+});
+
+test("Secretarial PDF module does not import secure report image retrieval or browser normalization", () => {
+  assert.doesNotMatch(source, /fetchBodReportImageBytes|downloadBodReportImage|normalizeBodReportImageForPdf|reportImageFileId|Firebase|Firestore|auth|Drive/i);
 });

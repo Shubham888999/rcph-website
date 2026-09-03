@@ -255,18 +255,37 @@ test("secretarial model normalizes Letterhead Exchanges only when explicitly inc
 test("skips invalid, inactive, archived, and removed records safely", () => {
   const report = buildReport({
     events: [
-      clubEvent("active"),
+      clubEvent("active", { reportImageFileId: "file-private" }),
       clubEvent("inactive", { isActive: false }),
       clubEvent("archived", { archived: true }),
       clubEvent("removed-gbm", { removed: true, avenues: ["GBM"] }),
       bodMeeting("deleted-bod", { deleted: true }),
       clubEvent("bad-date", { startDate: "July 5" }),
+      clubEvent("bad/id"),
       { id: "unknown", recordKind: "districtEvent", startDate: "2026-07-04", isActive: true },
     ],
   });
   assert.deepEqual(report.months[0].events.map((row) => row.name), ["Event active"]);
+  assert.equal(report.months[0].events[0].eventId, "active");
+  assert.equal(Object.hasOwn(report.months[0].events[0], "id"), false);
+  assert.equal(Object.hasOwn(report.months[0].events[0], "reportImageFileId"), false);
   assert.deepEqual(report.months[0].meetings, []);
   assert.equal(JSON.stringify(report).includes("districtEvent"), false);
+});
+
+test("secretarial event identity is retained only for project rows", () => {
+  const report = buildReport({
+    events: [
+      clubEvent("project-photo", { reportImageFileId: "file-private" }),
+      clubEvent("gbm-photo", { avenues: ["GBM"], reportImageFileId: "gbm-private" }),
+      bodMeeting("bod-photo", { reportImageFileId: "bod-private" }),
+      { id: "", name: "No ID", startDate: "2026-07-04", recordKind: "clubEvent", isActive: true, avenues: ["CMD"] },
+    ],
+  });
+  assert.deepEqual(report.months[0].events.map((row) => row.eventId), ["project-photo"]);
+  assert.equal(Object.hasOwn(report.months[0].events[0], "id"), false);
+  assert.equal(Object.hasOwn(report.months[0].events[0], "reportImageFileId"), false);
+  assert.deepEqual(report.months[0].meetings.map((row) => Object.hasOwn(row, "eventId")), [false, false]);
 });
 
 test("validates required inputs and generated timestamp", () => {

@@ -51,6 +51,11 @@ function cleanReportText(value, max = 2500) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max);
 }
 
+function safeReportEventId(value) {
+  const id = cleanText(value, 180);
+  return id && !/[\\/]/.test(id) && !/[\x00-\x1F\x7F]/.test(id) ? id : "";
+}
+
 function unique(values) {
   return [...new Set(values)];
 }
@@ -109,7 +114,7 @@ export function normalizeBodReportAppearance(value = {}) {
 
 function isReportableEvent(event) {
   return Boolean(
-    event?.id
+    safeReportEventId(event?.id)
     && event.recordKind === "clubEvent"
     && event.isActive === true
     && event.archived !== true
@@ -383,6 +388,7 @@ function presentationEvent(event, avenueCode = "") {
   const finance = reportFinanceTotals(event);
   const focusAreas = normalizeBodFocusAreas(event?.focusAreas);
   return {
+    eventId: safeReportEventId(event.id),
     date: event.startDate,
     month: event.startDate.slice(0, 7),
     monthLabel: formatBodReportMonth(event.startDate.slice(0, 7)),
