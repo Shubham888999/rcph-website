@@ -296,10 +296,27 @@ function createBodEventDriveMetadataService(options = {}) {
     return normalizeDriveFile(response.data);
   }
 
+  async function downloadFile(fileId) {
+    const response = await getDriveClient().files.get({
+      fileId: text(fileId, 300),
+      alt: 'media',
+      supportsAllDrives: true,
+    }, { responseType: 'arraybuffer' });
+    const data = response.data;
+    if (Buffer.isBuffer(data)) return data;
+    if (data instanceof ArrayBuffer) return Buffer.from(data);
+    if (ArrayBuffer.isView(data)) {
+      return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+    }
+    if (typeof data === 'string') return Buffer.from(data, 'binary');
+    return Buffer.from([]);
+  }
+
   return {
     rootFolderId: config.rootFolderId,
     getFileMetadata,
     getFolderMetadata,
+    downloadFile,
   };
 }
 

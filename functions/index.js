@@ -47,6 +47,10 @@ const {
   normalizeAuthoritativeBodUploadEvent,
 } = require('./lib/bod-event-attachments');
 const { createBodReportImageSelectionService } = require('./lib/bod-report-image-selection');
+const {
+  createBodReportImageAccessService,
+  createBodReportImageHttpHandler,
+} = require('./lib/bod-report-image-access');
 const momFunctions = require('./lib/momFunctions');
 const reminderFunctions = require('./lib/reminderFunctions');
 const {
@@ -152,6 +156,14 @@ const RESOLUTION_DRIVE_SECRETS = [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECR
 const RESOLUTION_PDF_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 300, memory: '1GiB', secrets: RESOLUTION_DRIVE_SECRETS };
 const BOD_PHOTO_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: RESOLUTION_DRIVE_SECRETS };
 const LETTERHEAD_EXCHANGE_IMAGE_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: RESOLUTION_DRIVE_SECRETS };
+const BOD_REPORT_IMAGE_HTTP_OPTIONS = {
+  region: 'us-central1',
+  timeoutSeconds: 120,
+  memory: '512MiB',
+  maxInstances: 5,
+  concurrency: 20,
+  secrets: RESOLUTION_DRIVE_SECRETS,
+};
 const ANNOUNCEMENT_ATTACHMENT_SECRETS = RESOLUTION_DRIVE_SECRETS;
 const ANNOUNCEMENT_ATTACHMENT_CALLABLE_OPTIONS = { ...CALLABLE_OPTIONS, timeoutSeconds: 120, memory: '512MiB', secrets: ANNOUNCEMENT_ATTACHMENT_SECRETS };
 const resolutionDrive = createResolutionDriveService({
@@ -364,6 +376,23 @@ const bodReportImageSelection = createBodReportImageSelectionService({
   db,
   admin,
   HttpsError,
+});
+const bodReportImageAccess = createBodReportImageAccessService({
+  db,
+  admin,
+  HttpsError,
+  env: process.env,
+  secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
+  maxBytes: BOD_UPLOAD_MAX_BYTES,
+  logger: console,
+});
+const downloadBodReportImageHandler = createBodReportImageHttpHandler({
+  admin,
+  imageAccess: bodReportImageAccess,
+  allowedOrigins: CALLABLE_OPTIONS.cors,
+  assertBodAdminOrPresident,
+  assertApprovedActiveCallableAccount,
+  logger: console,
 });
 const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury', VISIT_UPLOAD_TYPE]);
 const PROSPECT_CRITERIA = PROSPECT_CRITERIA_V2;
@@ -8835,6 +8864,11 @@ exports.setBodReportImage = onCall(CALLABLE_OPTIONS, async (request) => {
     throwCallableServiceError(err, 'Could not update BOD report image.');
   }
 });
+
+exports.downloadBodReportImage = onRequest(
+  BOD_REPORT_IMAGE_HTTP_OPTIONS,
+  (req, res) => downloadBodReportImageHandler(req, res)
+);
 
 exports.getBodAvenueReportDirectors = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
