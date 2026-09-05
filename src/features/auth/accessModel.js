@@ -181,6 +181,12 @@ const hasSergeantAtArmsPosition =
 
 const hasPresidentAuthority =
   canCarryProtectedAuthority && authority.hasPresidentAuthority === true;
+  const hasFullAdminAuthority = isApproved
+    && (
+      ["admin", "president"].includes(storedRole)
+      || hasPresidentAuthority
+      || hasSergeantAtArmsPosition
+    );
   const resolutionManager = canCarryProtectedAuthority && payload.resolutionManager === true;
   const trustedLockTools = canCarryProtectedAuthority && (
     payload.canAccessLockTools === true
@@ -226,16 +232,11 @@ hasPresidentAuthority,
     canAccessProspectDashboard,
     canAccessPersonalDashboard: canAccessMemberDashboard || canAccessProspectDashboard,
     canAccessBodTools: isApproved && ["bod", "admin", "president"].includes(storedRole),
-canAccessAdminTools: isApproved
-  && (
-    ["admin", "president"].includes(storedRole)
-    || hasPresidentAuthority
-    || hasSergeantAtArmsPosition
-  ),
-    canManageBodManagement: isApproved && ["admin", "president"].includes(storedRole),
+canAccessAdminTools: hasFullAdminAuthority,
+    canManageBodManagement: hasFullAdminAuthority,
     canAccessLockTools: isApproved
-      && (trustedLockTools || hasPresidentAuthority),
-    canAccessResolutionTools: isApproved && trustedResolutionTools,
+      && (trustedLockTools || hasFullAdminAuthority),
+    canAccessResolutionTools: isApproved && (trustedResolutionTools || hasFullAdminAuthority),
     canAccessSystemLogs: isApproved && trustedSystemLogs,
     canAccessVisitSubmissions: isApproved
       && (["admin", "president"].includes(storedRole)
@@ -307,7 +308,16 @@ export function getVisitDashboardEntry(access, visitTypeOrPath) {
 }
 
 export function canManageBodManagement(access) {
-  return Boolean(access?.isApproved === true && ["admin", "president"].includes(access.storedRole));
+  const canCarryAdminAuthority = ["bod", "admin", "president"].includes(access?.storedRole);
+  return Boolean(
+    access?.isApproved === true
+      && canCarryAdminAuthority
+      && (
+        ["admin", "president"].includes(access.storedRole)
+        || access.hasPresidentAuthority === true
+        || access.hasSergeantAtArmsPosition === true
+      )
+  );
 }
 
 export function canAccessDashboardPreview(access) {

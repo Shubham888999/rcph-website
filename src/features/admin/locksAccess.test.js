@@ -23,7 +23,7 @@ test("Locks mutations and denial copy use the normalized capability", () => {
   assert.match(moduleSource, /setAdminLock\(target\.key, target\.locked\)/);
   assert.match(serviceSource, /callable\("setAdminLock", payload\)/);
 });
-test("Sergeant Admin access still cannot expose Locks or Resolutions without focused flags", () => {
+test("Locks and Resolutions remain guarded by normalized capabilities", () => {
   assert.match(
     shell,
     /path !== "resolutions" \|\| access\.canAccessResolutionTools/

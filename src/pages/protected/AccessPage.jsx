@@ -192,9 +192,9 @@ async function dismissAccessAnnouncement(announcement) {
           </motion.p>
         ) : null}
 
-        {hub.hasDelegatedSergeantAuthority ? (
+        {hub.hasSergeantAdminAuthority ? (
           <motion.p className="access-hub__authority" variants={reduceMotion ? undefined : revealItem}>
-            Administrative access is available through your server-verified Sergeant-at-Arms assignment. Your approved role remains {hub.role}.
+            Administrative access is available through your active Sergeant-at-Arms assignment. Your approved role remains {hub.role}.
           </motion.p>
         ) : null}
 

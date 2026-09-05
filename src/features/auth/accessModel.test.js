@@ -87,8 +87,8 @@ test("approved Admin gets Admin access", () => {
   assert.equal(access.canManageBodManagement, true);
   assert.equal(canManageBodManagement(access), true);
   assert.equal(hasCapability(access, "bodManagement"), true);
-  assert.equal(approved("admin").canAccessLockTools, false);
-  assert.equal(approved("admin").canAccessResolutionTools, false);
+  assert.equal(access.canAccessLockTools, true);
+  assert.equal(access.canAccessResolutionTools, true);
 });
 
 test("approved District Official is recognized but receives no club dashboard capability", () => {
@@ -165,7 +165,7 @@ test("pending accounts cannot keep forged visit dashboard fields", () => {
   assert.deepEqual(access.visitDashboardEntries, []);
 });
 
-test("approved Admin receives Locks and Resolutions only from trusted capability flags", () => {
+test("approved Admin receives Locks and Resolutions through full Admin authority", () => {
   const access = approvedWithCapabilities("admin", {
     canAccessLockTools: true,
     canAccessResolutionTools: true,
@@ -195,9 +195,10 @@ test("President role label without canonical authority gets no President control
 test("BOD role with canonical active President authority gets President controls", () => {
   const access = approved("bod", { hasPresidentAuthority: true });
   assert.equal(access.canAccessAdminTools, true);
-  assert.equal(access.canManageBodManagement, false);
-  assert.equal(canManageBodManagement(access), false);
+  assert.equal(access.canManageBodManagement, true);
+  assert.equal(canManageBodManagement(access), true);
   assert.equal(access.canAccessLockTools, true);
+  assert.equal(access.canAccessResolutionTools, true);
   assert.equal(access.canAccessPresidentControls, true);
 });
 
@@ -208,9 +209,9 @@ test("Secretary receives only the dedicated resolution capability", () => {
   assert.equal(hasCapability(access, "resolutionTools"), true);
 });
 
-test("technical Admin and Website Director do not gain resolution authority", () => {
-  assert.equal(approved("admin").canAccessResolutionTools, false);
-  assert.equal(approved("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true }).canAccessResolutionTools, false);
+test("technical Admin and Website Director gain resolution authority through full Admin authority", () => {
+  assert.equal(approved("admin").canAccessResolutionTools, true);
+  assert.equal(approved("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true }).canAccessResolutionTools, true);
 });
 
 test("BOD with trusted Website Director authority gets delegated Admin access", () => {
@@ -220,8 +221,9 @@ test("BOD with trusted Website Director authority gets delegated Admin access", 
   });
   assert.equal(access.hasWebsiteDirectorPosition, true);
   assert.equal(access.canAccessAdminTools, true);
-  assert.equal(access.canManageBodManagement, false);
+  assert.equal(access.canManageBodManagement, true);
   assert.equal(access.canAccessPresidentControls, true);
+  assert.equal(access.canAccessResolutionTools, true);
   assert.equal(access.canAccessSystemLogs, false);
 });
 
@@ -410,19 +412,20 @@ test("callable failure fallback grants no access", () => {
   assert.equal(hasCapability(access, "memberDashboard"), false);
   assert.equal(hasCapability(access, "adminTools"), false);
 });
-test("BOD with trusted Sergeant-at-Arms authority gets delegated Admin access", () => {
+test("BOD with trusted Sergeant-at-Arms authority gets full Admin access", () => {
   const access = approved("bod", {
     hasSergeantAtArmsPosition: true,
   });
 
   assert.equal(access.hasSergeantAtArmsPosition, true);
   assert.equal(access.canAccessAdminTools, true);
-  assert.equal(access.canManageBodManagement, false);
+  assert.equal(access.canManageBodManagement, true);
   assert.equal(access.canAccessPresidentControls, false);
-  assert.equal(access.canAccessLockTools, false);
-  assert.equal(access.canAccessResolutionTools, false);
+  assert.equal(access.canAccessLockTools, true);
+  assert.equal(access.canAccessResolutionTools, true);
+  assert.equal(access.canAccessSystemLogs, false);
 });
-test("BOD with trusted Co-Sergeant-at-Arms authority gets delegated Admin access", () => {
+test("BOD with trusted Co-Sergeant-at-Arms authority gets full Admin access", () => {
   const access = normalizeTrustedAccess({
     ok: true,
     uid: "trusted-co-saa",
@@ -438,8 +441,10 @@ test("BOD with trusted Co-Sergeant-at-Arms authority gets delegated Admin access
   assert.deepEqual(access.positionKeys, ["co-saa"]);
   assert.equal(access.hasSergeantAtArmsPosition, true);
   assert.equal(access.canAccessAdminTools, true);
-  assert.equal(access.canManageBodManagement, false);
+  assert.equal(access.canManageBodManagement, true);
   assert.equal(access.canAccessPresidentControls, false);
+  assert.equal(access.canAccessLockTools, true);
+  assert.equal(access.canAccessResolutionTools, true);
 });
 test("plain saa position key without trusted authority does not grant Admin access", () => {
   const access = normalizeTrustedAccess({
@@ -471,11 +476,11 @@ test("pending Sergeant authority grants no Admin access", () => {
   assert.equal(access.canManageBodManagement, false);
 });
 
-test("BOD Management access is canonical Admin or President only", () => {
+test("BOD Management access follows full Admin authority", () => {
   assert.equal(canManageBodManagement(approved("admin")), true);
   assert.equal(canManageBodManagement(approved("president")), true);
-  assert.equal(canManageBodManagement(approved("bod", { hasSergeantAtArmsPosition: true })), false);
-  assert.equal(canManageBodManagement(approved("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true })), false);
+  assert.equal(canManageBodManagement(approved("bod", { hasSergeantAtArmsPosition: true })), true);
+  assert.equal(canManageBodManagement(approved("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true })), true);
   assert.equal(canManageBodManagement(approved("bod")), false);
   assert.equal(canManageBodManagement(approved("gbm")), false);
   assert.equal(canManageBodManagement({ isApproved: false, storedRole: "admin" }), false);

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import AdminShell from "../../features/admin/AdminShell";
 import BodManagementModule from "../../features/admin/bod-management/BodManagementModule";
 import { BodOperationsModule, ClubAttendanceModule, DistrictModule } from "../../features/admin/modules/AttendanceModules";
@@ -15,7 +15,6 @@ import { clearAdminCaches } from "../../features/admin/shared/adminService";
 import SystemLogsModule from "../../features/admin/system-logs/SystemLogsModule";
 import useAdminData from "../../features/admin/shared/useAdminData";
 import { canAccessDashboardPreview, canManageBodManagement } from "../../features/auth/accessModel";
-import { canAccessSergeantAdminSegment, isSergeantAdminDelegate } from "../../features/admin/shared/adminNavigation";
 import ClubVisitManagementModule from "../../features/admin/visit-management/ClubVisitManagementModule";
 import VisitSubmissionsModule from "../../features/admin/visit/VisitSubmissionsModule";
 import { clearBodEventCache } from "../../features/bod-tools/bodEventService";
@@ -37,18 +36,6 @@ const ADMIN_REQUIREMENTS = {
   reports: ["events"],
 };
 
-const SERGEANT_REQUIREMENTS = {
-  attendance: ["members", "events", "attendance"],
-  bod: ["bodMembers", "bodMeetings", "bodAttendance"],
-  district: ["members", "districtEvents", "districtAttendance"],
-};
-
-const SERGEANT_LOCK_REQUIREMENTS = {
-  attendance: ["attendance"],
-  bod: ["bodAttendance"],
-  district: ["attendance"],
-};
-
 export default function AdminPage() {
   const { access, user, signOut, refreshAccess } = useAuth(); const location = useLocation(); const [notice, setNotice] = useState(null); const uid = user?.uid || ""; const segment = location.pathname.replace(/^\/admin\/?/, "");
   const displayName = formatRotaractorName(access?.user?.name || user?.displayName || "RCPH Admin", access?.user || access?.storedRole);
@@ -57,18 +44,13 @@ export default function AdminPage() {
   const canAccessSystemLogs = access?.canAccessSystemLogs === true;
   const canAccessBodManagement = canManageBodManagement(access);
   const canPreviewDashboards = canAccessDashboardPreview(access);
-  const sergeantDelegate = isSergeantAdminDelegate(access);
-  const redirectSergeantHome = sergeantDelegate && segment === "";
-  const routeDenied = (sergeantDelegate && !canAccessSergeantAdminSegment(access, segment)) || (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools) || (segment === "logs" && !canAccessSystemLogs) || (segment === "dashboard-preview" && !canPreviewDashboards) || (segment === "bod-management" && !canAccessBodManagement);
-  const requirements = sergeantDelegate ? SERGEANT_REQUIREMENTS : ADMIN_REQUIREMENTS;
-  const requestedCollections = !routeDenied && !redirectSergeantHome ? (requirements[segment] || []) : [];
-  const requestedLocks = sergeantDelegate ? (!routeDenied && !redirectSergeantHome ? (SERGEANT_LOCK_REQUIREMENTS[segment] || []) : []) : undefined;
-  const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools && segment !== "dashboard-preview" && !routeDenied && !redirectSergeantHome), collections: requestedCollections, lockKeys: requestedLocks });
+  const routeDenied = (segment === "locks" && !canAccessLockTools) || (segment === "resolutions" && !canAccessResolutionTools) || (segment === "logs" && !canAccessSystemLogs) || (segment === "dashboard-preview" && !canPreviewDashboards) || (segment === "bod-management" && !canAccessBodManagement);
+  const requestedCollections = !routeDenied ? (ADMIN_REQUIREMENTS[segment] || []) : [];
+  const { data, locks, moduleState } = useAdminData({ uid, enabled: Boolean(uid && access?.canAccessAdminTools && segment !== "dashboard-preview" && !routeDenied), collections: requestedCollections });
   const state = moduleState(...requestedCollections);
   async function handleSignOut() { clearAdminCaches(uid); clearBodEventCache(uid); clearDashboardDataCache(uid); await signOut(); }
   let content;
-  if (redirectSergeantHome) content = <Navigate to="/admin/attendance" replace />;
-  else if (routeDenied) content = <AdminError message="You do not have access to this protected Admin module." />;
+  if (routeDenied) content = <AdminError message="You do not have access to this protected Admin module." />;
   else if (state.status === "loading") content = <AdminLoading />;
   else if (state.status === "error") content = <AdminError message={state.error} />;
   else if (segment === "") content = <CommandCenter data={data} access={access} uid={uid} onNotice={setNotice} />;

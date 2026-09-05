@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  canAccessSergeantAdminSegment,
+  ADMIN_NAV,
   getAdminNavigation,
   hasUnrestrictedAdminAccess,
-  isSergeantAdminDelegate,
-  SERGEANT_ADMIN_NAV_PATHS,
 } from "./adminNavigation.js";
 
 function access(overrides = {}) {
@@ -19,46 +17,37 @@ function access(overrides = {}) {
   };
 }
 
-test("Sergeant-at-Arms delegated Admin navigation is limited to attendance modules", () => {
-  const delegated = access({
+test("Sergeant-at-Arms Admin navigation uses the standard Admin module list", () => {
+  const sergeant = access({
     storedRole: "bod",
     canAccessAdminTools: true,
     hasSergeantAtArmsPosition: true,
   });
 
-  assert.equal(isSergeantAdminDelegate(delegated), true);
+  assert.equal(hasUnrestrictedAdminAccess(sergeant), true);
   assert.deepEqual(
-    getAdminNavigation(delegated).map(([path, label]) => [path, label]),
-    [
-      ["attendance", "Club Attendance"],
-      ["bod", "BOD Operations"],
-      ["district", "District"],
-    ],
+    getAdminNavigation(sergeant).map(([path, label]) => [path, label]),
+    ADMIN_NAV,
   );
-  assert.deepEqual(SERGEANT_ADMIN_NAV_PATHS, ["attendance", "bod", "district"]);
 });
 
-test("Sergeant-at-Arms delegated Admin direct routes reject non-delegated modules", () => {
-  const delegated = access({
+test("Sergeant-at-Arms Admin direct routes are not restricted by a special segment allowlist", () => {
+  const sergeant = access({
     storedRole: "bod",
     canAccessAdminTools: true,
     hasSergeantAtArmsPosition: true,
   });
 
-  assert.equal(canAccessSergeantAdminSegment(delegated, "attendance"), true);
-  assert.equal(canAccessSergeantAdminSegment(delegated, "bod"), true);
-  assert.equal(canAccessSergeantAdminSegment(delegated, "district"), true);
-  assert.equal(canAccessSergeantAdminSegment(delegated, "members"), false);
-  assert.equal(canAccessSergeantAdminSegment(delegated, "requests"), false);
-  assert.equal(canAccessSergeantAdminSegment(delegated, "treasury"), false);
-  assert.equal(canAccessSergeantAdminSegment(delegated, "logs"), false);
+  assert.equal(hasUnrestrictedAdminAccess(sergeant), true);
+  for (const segment of ["", "members", "requests", "treasury", "locks", "reports"]) {
+    assert.ok(getAdminNavigation(sergeant).some(([path]) => path === segment));
+  }
 });
 
 test("Admin and President retain unrestricted Admin navigation", () => {
   for (const storedRole of ["admin", "president"]) {
     const unrestricted = access({ storedRole, canAccessAdminTools: true });
     assert.equal(hasUnrestrictedAdminAccess(unrestricted), true);
-    assert.equal(isSergeantAdminDelegate(unrestricted), false);
     assert.ok(getAdminNavigation(unrestricted).some(([path]) => path === "requests"));
     assert.ok(getAdminNavigation(unrestricted).some(([path]) => path === "treasury"));
   }
@@ -73,6 +62,5 @@ test("President authority outranks an overlapping Sergeant assignment", () => {
   });
 
   assert.equal(hasUnrestrictedAdminAccess(unrestricted), true);
-  assert.equal(isSergeantAdminDelegate(unrestricted), false);
   assert.ok(getAdminNavigation(unrestricted).some(([path]) => path === "members"));
 });
