@@ -122,7 +122,7 @@ const PRESIDENT_ADMIN_FEATURES = freezeList([
     id: "attendance",
     title: "Attendance",
     purpose: "Attendance tools help authorized officers record and review club attendance for eligible events.",
-    whoUses: ["President", "Admin", "Sergeant-at-Arms when delegated"],
+    whoUses: ["President", "Admin", "Sergeant-at-Arms with approved authority"],
     canDo: ["Select an event", "Review eligible member rows", "Mark or audit attendance where allowed"],
     steps: ["Open Admin Tools.", "Choose Club Attendance.", "Select the relevant event or meeting.", "Review the attendance grid.", "Save changes only after checking the selected rows."],
     notes: ["Attendance edits are real operational actions in the live module.", "This guide only explains the workflow and does not mark attendance."],

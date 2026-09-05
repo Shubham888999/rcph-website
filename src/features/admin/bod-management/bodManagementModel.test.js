@@ -65,11 +65,11 @@ function access(role, extra = {}) {
   return { isApproved: true, storedRole: role, ...extra };
 }
 
-test("BOD Management access is canonical Admin or President only", () => {
+test("BOD Management access follows full Admin authority", () => {
   assert.equal(canManageBodManagement(access("admin")), true);
   assert.equal(canManageBodManagement(access("president")), true);
-  assert.equal(canManageBodManagement(access("bod", { hasSergeantAtArmsPosition: true, canAccessAdminTools: true })), false);
-  assert.equal(canManageBodManagement(access("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true, canAccessAdminTools: true })), false);
+  assert.equal(canManageBodManagement(access("bod", { hasSergeantAtArmsPosition: true, canAccessAdminTools: true })), true);
+  assert.equal(canManageBodManagement(access("bod", { hasWebsiteDirectorPosition: true, hasPresidentAuthority: true, canAccessAdminTools: true })), true);
   assert.equal(canManageBodManagement(access("bod")), false);
   assert.equal(canManageBodManagement(access("gbm")), false);
   assert.equal(canManageBodManagement({ isApproved: false, storedRole: "admin" }), false);

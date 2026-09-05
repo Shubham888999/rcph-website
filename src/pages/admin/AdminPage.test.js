@@ -5,32 +5,19 @@ import test from "node:test";
 const adminPage = readFileSync(new URL("./AdminPage.jsx", import.meta.url), "utf8");
 const dataHook = readFileSync(new URL("../../features/admin/shared/useAdminData.js", import.meta.url), "utf8");
 
-function constObjectBlock(source, name) {
-  const start = source.indexOf(`const ${name} = {`);
-  assert.notEqual(start, -1, `${name} is defined`);
-  const end = source.indexOf("};", start);
-  assert.notEqual(end, -1, `${name} is closed`);
-  return source.slice(start, end + 2);
-}
-
-test("Sergeant-at-Arms Admin bootstrap requests only delegated attendance data", () => {
-  const sergeantRequirements = constObjectBlock(adminPage, "SERGEANT_REQUIREMENTS");
-  assert.match(sergeantRequirements, /attendance: \["members", "events", "attendance"\]/);
-  assert.match(sergeantRequirements, /bod: \["bodMembers", "bodMeetings", "bodAttendance"\]/);
-  assert.match(sergeantRequirements, /district: \["members", "districtEvents", "districtAttendance"\]/);
-  assert.doesNotMatch(sergeantRequirements, /"users"/);
-  assert.doesNotMatch(sergeantRequirements, /"treasury"/);
-  assert.doesNotMatch(sergeantRequirements, /"fines"/);
+test("Admin bootstrap uses one standard collection and lock-loading path", () => {
+  assert.doesNotMatch(adminPage, /SERGEANT_REQUIREMENTS/);
+  assert.doesNotMatch(adminPage, /SERGEANT_LOCK_REQUIREMENTS/);
+  assert.doesNotMatch(adminPage, /isSergeantAdminDelegate|canAccessSergeantAdminSegment/);
   assert.match(adminPage, /collections: requestedCollections/);
-  assert.match(adminPage, /lockKeys: requestedLocks/);
+  assert.doesNotMatch(adminPage, /lockKeys: requestedLocks/);
 });
 
-test("Sergeant-at-Arms direct Admin routes are denied before loading data", () => {
-  assert.match(adminPage, /redirectSergeantHome = sergeantDelegate && segment === ""/);
-  assert.match(adminPage, /sergeantDelegate && !canAccessSergeantAdminSegment\(access, segment\)/);
-  assert.match(adminPage, /!routeDenied && !redirectSergeantHome \? \(requirements\[segment\] \|\| \[\]\) : \[\]/);
-  assert.match(adminPage, /enabled: Boolean\(uid && access\?\.canAccessAdminTools && segment !== "dashboard-preview" && !routeDenied && !redirectSergeantHome\)/);
-  assert.match(adminPage, /<Navigate to="\/admin\/attendance" replace \/>/);
+test("Admin direct routes rely on standard capability guards before loading data", () => {
+  assert.doesNotMatch(adminPage, /redirectSergeantHome|sergeantDelegate/);
+  assert.match(adminPage, /const requestedCollections = !routeDenied \? \(ADMIN_REQUIREMENTS\[segment\] \|\| \[\]\) : \[\]/);
+  assert.match(adminPage, /enabled: Boolean\(uid && access\?\.canAccessAdminTools && segment !== "dashboard-preview" && !routeDenied\)/);
+  assert.doesNotMatch(adminPage, /<Navigate to="\/admin\/attendance" replace \/>/);
 });
 
 test("Admin data hook supports scoped collections and locks", () => {

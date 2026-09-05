@@ -221,6 +221,21 @@ test("delegated Website Director authority keeps BOD role and exposes only trust
   assert.ok(model.capabilityLabels.includes("President Controls"));
 });
 
+test("Sergeant-at-Arms authority keeps BOD role and exposes Admin access", () => {
+  const sergeant = access("bod", {
+    canAccessAdminTools: true,
+    canAccessResolutionTools: true,
+    hasSergeantAtArmsPosition: true,
+    positionKeys: ["saa"],
+  });
+  const model = getAccessHubViewModel(sergeant);
+  assert.equal(sergeant.storedRole, "bod");
+  assert.equal(model.role, "Board of Directors");
+  assert.equal(model.hasSergeantAdminAuthority, true);
+  assert.ok(model.secondary.some(({ key }) => key === "admin"));
+  assert.ok(model.capabilityLabels.includes("Resolution Tools"));
+});
+
 test("Secretary resolution capability links only to the dedicated tool", () => {
   const model = getAccessHubViewModel(access("bod", { positionKeys: ["secretary"], canAccessResolutionTools: true }));
   assert.equal(model.secondary.find((item) => item.key === "resolutions")?.href, "/admin/resolutions");
