@@ -18,6 +18,7 @@ test('reminders rules use existing admin panel authority', () => {
 
 test('lock rules remain restricted while backend can create avenue locks with Admin SDK', () => {
   assert.match(rules, /match \/locks\/\{panelId\} \{/);
-  assert.match(rules, /allow read: if canReadAttendanceLock\(panelId\) \|\| hasAdminPanelAuthority\(\);/);
+  assert.match(rules, /allow read: if hasAdminPanelAuthority\(\);/);
   assert.match(rules, /allow create, update, delete: if hasLockTools\(\);/);
+  assert.doesNotMatch(rules, /canReadAttendanceLock|hasSergeantAttendanceCollectionAccess/);
 });

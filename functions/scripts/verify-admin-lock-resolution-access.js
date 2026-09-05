@@ -42,6 +42,7 @@ function bodyOfFunction(source, name) {
 
 const lockToolsBody = bodyOfFunction(functionsIndex, 'hasLockToolsAuthority');
 const resolutionToolsBody = bodyOfFunction(functionsIndex, 'hasResolutionToolsAuthority');
+const unrestrictedBody = bodyOfFunction(functionsIndex, 'hasUnrestrictedAdminAuthority');
 const getAccessBody = functionsIndex.slice(
   functionsIndex.indexOf('exports.getMyAccess = onCall'),
   functionsIndex.indexOf('exports.getProspectManagementData = onCall')
@@ -175,16 +176,15 @@ async function runSync(seed, options) {
 }
 
 assert.match(lockToolsBody, /isApprovedActiveUserRecord\(userData\)/, 'lock tools require approved active user data');
-assert.match(lockToolsBody, /authority\.role === 'admin'/, 'approved stored admin role grants lock tools');
-assert.match(lockToolsBody, /authority\.role === 'president'/, 'approved stored president role grants lock tools');
-assert.match(lockToolsBody, /hasPresidentAuthority === true/, 'delegated President authority still grants lock tools');
-assert.doesNotMatch(lockToolsBody, /hasSergeantAtArmsPosition/, 'SAA-only authority does not grant lock tools');
+assert.match(lockToolsBody, /hasUnrestrictedAdminAuthority\(authority\)/, 'lock tools use full Admin authority');
+assert.match(unrestrictedBody, /authority\.role === 'admin'/, 'approved stored admin role grants full Admin authority');
+assert.match(unrestrictedBody, /authority\.role === 'president'/, 'approved stored president role grants full Admin authority');
+assert.match(unrestrictedBody, /hasPresidentAuthority === true/, 'President authority still grants full Admin authority');
+assert.match(unrestrictedBody, /hasSergeantAtArmsPosition === true/, 'SAA authority grants full Admin authority');
 
 assert.match(resolutionToolsBody, /isApprovedActiveUserRecord\(userData\)/, 'resolution tools require approved active user data');
-assert.match(resolutionToolsBody, /role === 'admin'/, 'approved stored admin role grants resolution tools');
-assert.match(resolutionToolsBody, /role === 'president'/, 'approved stored president role grants resolution tools');
+assert.match(resolutionToolsBody, /hasUnrestrictedAdminAuthority\(authorityContext\)/, 'resolution tools use full Admin authority');
 assert.match(resolutionToolsBody, /resolutionManager === true/, 'existing resolution manager authority is preserved');
-assert.doesNotMatch(resolutionToolsBody, /hasSergeantAtArmsPosition/, 'SAA-only authority does not grant resolution tools');
 
 assert.match(getAccessBody, /canAccessLockTools/, 'getMyAccess emits canAccessLockTools');
 assert.match(getAccessBody, /canAccessResolutionTools/, 'getMyAccess emits canAccessResolutionTools');
@@ -204,8 +204,8 @@ assert.equal(canManageResolutions({ role: 'prospect', userActive: true, userAppr
 
 assert.match(rules, /function isApprovedActiveRecord\(data\)[\s\S]*data\.get\('status', ''\) == 'approved'[\s\S]*isActiveLifecycleRecord\(data\)/, 'rules centralize approved active lifecycle checks');
 assert.match(rules, /function hasApprovedActiveRole\(role\)[\s\S]*get\(userPath\(\)\)\.data\.role == role[\s\S]*isApprovedActiveRecord\(get\(rolePath\(\)\)\.data\)[\s\S]*isApprovedActiveRecord\(get\(userPath\(\)\)\.data\)/, 'rules require approved active user and role records for focused role checks');
-assert.match(rules, /function hasLockTools\(\)[\s\S]*hasApprovedActiveRole\('admin'\)[\s\S]*hasApprovedActiveRole\('president'\)[\s\S]*hasPresidentAuthority\(\)/, 'rules define lock tools without SAA');
-assert.doesNotMatch(bodyOfFunction(rules, 'hasLockTools'), /saa|Sergeant|hasSergeant/i, 'rules lock tools do not include SAA');
+assert.match(bodyOfFunction(rules, 'isAdmin'), /hasActiveSergeantAtArmsAssignment\(\)/, 'rules make active SAA part of Admin authority');
+assert.match(bodyOfFunction(rules, 'hasLockTools'), /isAdmin\(\)/, 'rules lock tools use Admin authority');
 assert.match(rules, /match \/locks\/\{panelId\}[\s\S]*allow create, update, delete: if hasLockTools\(\);/, 'direct lock writes use focused lock tools');
 assert.match(rules, /match \/resolutions\/\{resolutionId\}[\s\S]*allow read, write: if false;/, 'direct resolution writes remain callable-only');
 assert.match(rules, /match \/resolutionNumberIndex\/\{indexId\}[\s\S]*allow read, write: if false;/, 'resolution number index remains direct-client denied');

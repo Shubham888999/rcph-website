@@ -428,20 +428,14 @@ test('missing BOD board returns virtual Draft defaults', async () => {
   assert.equal(result.sections.leadershipBeyondClub.publicationStatus, 'draft');
 });
 
-test('BOD Management authority is limited to canonical admin and president roles', async () => {
+test('BOD Management authority follows full Admin authority', async () => {
   await testAdmin({ role: 'admin' }).service.assertBodManagementAuthority('admin-1');
   await testAdmin({ role: 'president' }).service.assertBodManagementAuthority('president-1');
+  await testAdmin({ role: 'bod', authority: { hasSergeantAtArmsPosition: true } })
+    .service.assertBodManagementAuthority('saa-1');
+  await testAdmin({ role: 'bod', authority: { hasPresidentAuthority: true, hasWebsiteDirectorPosition: true } })
+    .service.assertBodManagementAuthority('cwd-1');
 
-  await assert.rejects(
-    testAdmin({ role: 'bod', authority: { hasSergeantAtArmsPosition: true } })
-      .service.assertBodManagementAuthority('saa-1'),
-    (err) => err.code === 'permission-denied'
-  );
-  await assert.rejects(
-    testAdmin({ role: 'bod', authority: { hasPresidentAuthority: true, hasWebsiteDirectorPosition: true } })
-      .service.assertBodManagementAuthority('cwd-1'),
-    (err) => err.code === 'permission-denied'
-  );
   await assert.rejects(
     testAdmin({ role: 'bod' }).service.assertBodManagementAuthority('bod-1'),
     (err) => err.code === 'permission-denied'

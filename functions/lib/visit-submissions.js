@@ -26,6 +26,10 @@ const VISIT_ACCESS_ROLES = Object.freeze(['bod', 'admin', 'president']);
 const VISIT_ADMIN_ROLES = Object.freeze(['admin', 'president']);
 const VISIT_ACCESS_ROLE_SET = new Set(VISIT_ACCESS_ROLES);
 const VISIT_ADMIN_ROLE_SET = new Set(VISIT_ADMIN_ROLES);
+const VISIT_SERGEANT_POSITION_KEYS = new Set([
+  'saa',
+  'co-saa',
+]);
 const VISIT_ASSIGNMENT_BLOCKED_STATUS_VALUES = new Set([
   'inactive',
   'expired',
@@ -667,9 +671,21 @@ function resolveAccessContextFromRecords(uid, records, positionHelpers = default
   const folderPositionKeys = resolveVisitFolderPositionKeys(activeAssignmentPositionKeys, positionHelpers);
   const positionAuthority = positionHelpers.buildPresidentAuthority(userRole, activeAssignmentPositionKeys);
   const hasActiveWebsiteDirectorAssignment = activeAssignmentPositionKeys.includes(positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY);
-  const hasPresidentAuthority = positionAuthority.isPresidentRole
-    || (positionAuthority.hasWebsiteDirectorPosition && hasActiveWebsiteDirectorAssignment);
-  const isManager = VISIT_ADMIN_ROLE_SET.has(userRole) || hasPresidentAuthority;
+const hasPresidentAuthority = positionAuthority.isPresidentRole
+  || (
+    positionAuthority.hasWebsiteDirectorPosition
+    && hasActiveWebsiteDirectorAssignment
+  );
+
+const hasSergeantAtArmsAuthority =
+  activeAssignmentPositionKeys.some(
+    positionKey => VISIT_SERGEANT_POSITION_KEYS.has(positionKey)
+  );
+
+const isManager =
+  VISIT_ADMIN_ROLE_SET.has(userRole)
+  || hasPresidentAuthority
+  || hasSergeantAtArmsAuthority;
   const canAccessVisitSystem = isManager || (userRole === 'bod' && folderPositionKeys.length > 0);
 
   if (!canAccessVisitSystem) {
@@ -684,11 +700,14 @@ function resolveAccessContextFromRecords(uid, records, positionHelpers = default
     folderPositionKeys: folderPositionKeys.slice(),
     positionSource: activeAssignmentPositionKeys.length ? 'bodPositionAssignments.active' : null,
     positionWarnings: identityPositionResolution.warnings.slice(),
-    authority: {
-      isPresidentRole: positionAuthority.isPresidentRole,
-      hasWebsiteDirectorPosition: positionAuthority.hasWebsiteDirectorPosition && hasActiveWebsiteDirectorAssignment,
-      hasPresidentAuthority,
-    },
+authority: {
+  isPresidentRole: positionAuthority.isPresidentRole,
+  hasWebsiteDirectorPosition:
+    positionAuthority.hasWebsiteDirectorPosition
+    && hasActiveWebsiteDirectorAssignment,
+  hasSergeantAtArmsPosition: hasSergeantAtArmsAuthority,
+  hasPresidentAuthority,
+},
     isApproved: true,
     canAccessVisitSystem,
     canManageVisitSystem: isManager,

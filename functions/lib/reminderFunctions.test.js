@@ -310,3 +310,31 @@ test('partial reporting coverage remains non-terminal while downstream reminders
   assert.match(functionsSource, /snap\.exists \? \{\} : \{/);
   assert.match(functionsSource, /remindersSent: existing\.remindersSent/);
 });
+
+test('SAA reminder Admin authority uses trusted active assignments', () => {
+  assert.match(
+    functionsSource,
+    /const SERGEANT_AT_ARMS_POSITION_KEYS = new Set\(\[\s*'saa',\s*'co-saa',?\s*\]\)/
+  );
+
+  assert.match(
+    functionsSource,
+    /positionHelpers\.isActivePositionAssignment\(\s*uid,\s*positionKey,\s*assignment/
+  );
+
+  assert.match(
+    functionsSource,
+    /trustedActivePositionKeys:\s*assignmentKeys\.slice\(\)/
+  );
+
+  assert.match(
+    functionsSource,
+    /normalizePositionKeys\(\s*access\.trustedActivePositionKeys\s*\)\.some\(key => SERGEANT_AT_ARMS_POSITION_KEYS\.has\(key\)\)/
+  );
+
+  // A stale users.positionKeys value alone must not make SAA an Admin.
+  assert.doesNotMatch(
+    functionsSource,
+    /ADMIN_PANEL_POSITION_KEYS = new Set\(\[[^\]]*saa/
+  );
+});

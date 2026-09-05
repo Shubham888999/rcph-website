@@ -2133,12 +2133,10 @@ let hasSergeantAtArmsPosition = false;
 if (
   canHoldSergeantAtArmsAuthority
   && isApprovedActiveUserRecord(userData)
-  && positionKeysAreWellFormed
-  && SERGEANT_AT_ARMS_POSITION_KEYS.some(positionKey => metadata.positionKeys.includes(positionKey))
 ) {
   hasSergeantAtArmsPosition = await hasActiveAnyPositionAssignment(
     uid,
-    SERGEANT_AT_ARMS_POSITION_KEYS.filter(positionKey => metadata.positionKeys.includes(positionKey)),
+    SERGEANT_AT_ARMS_POSITION_KEYS,
     preloaded
   );
 }
@@ -2161,6 +2159,7 @@ function hasUnrestrictedAdminAuthority(authority) {
       authority.role === 'admin'
       || authority.role === 'president'
       || authority.authority?.hasPresidentAuthority === true
+      || authority.authority?.hasSergeantAtArmsPosition === true
     )
   );
 }
@@ -2176,21 +2175,16 @@ function rolePositionSyncAuthority(authority) {
 function hasLockToolsAuthority(authority, userData) {
   return Boolean(
     isApprovedActiveUserRecord(userData)
-    && authority?.role
-    && (
-      authority.role === 'admin'
-      || authority.role === 'president'
-      || authority.authority?.hasPresidentAuthority === true
-    )
+    && hasUnrestrictedAdminAuthority(authority)
   );
 }
 
-function hasResolutionToolsAuthority({ role, userData, resolutionManager }) {
+function hasResolutionToolsAuthority({ authority, role, userData, resolutionManager }) {
+  const authorityContext = authority || { role, authority: {} };
   return Boolean(
     isApprovedActiveUserRecord(userData)
     && (
-      role === 'admin'
-      || role === 'president'
+      hasUnrestrictedAdminAuthority(authorityContext)
       || resolutionManager === true
     )
   );
@@ -2248,48 +2242,127 @@ async function assertLetterheadExchangeAccess(uid) {
 
 function isActiveResolutionPositionAssignment(uid, snap, positionKey) {
   if (!snap?.exists) return false;
-  const data = snap.data() || {};
-  return data.active === true && data.uid === uid && data.positionKey === positionKey;
+
+  return positionHelpers.isActivePositionAssignment(
+    uid,
+    positionKey,
+    snap.data() || {}
+  );
 }
 
 async function getResolutionManagerContext(uid) {
-  const [active, account, secretaryAssignment, presidentAssignment] = await Promise.all([
+  const [
+    active,
+    account,
+    secretaryAssignment,
+    presidentAssignment,
+  ] = await Promise.all([
     getActiveRole(uid),
     assertApprovedActiveCallableAccount(uid),
     db.collection('bodPositionAssignments').doc(`secretary_${uid}`).get(),
     db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
   ]);
-  const role = active?.role || '';
-  const secretary = isActiveResolutionPositionAssignment(uid, secretaryAssignment, 'secretary');
-  const presidentPosition = isActiveResolutionPositionAssignment(uid, presidentAssignment, 'president');
-  const allowed = resolutionModel.canManageResolutions({
-    role,
-    userActive: account.userData.active !== false,
-    userApproved: String(account.userData.status || '').toLowerCase() === 'approved',
-    secretaryAssignmentActive: secretary || presidentPosition,
+
+  const authority = await getAuthorityContext(uid, {
+    activeRole: active,
   });
-  if (!allowed) throw new HttpsError('permission-denied', 'Resolution tools access required.');
+
+  const role = active?.role || authority.role || '';
+
+  const secretary = isActiveResolutionPositionAssignment(
+    uid,
+    secretaryAssignment,
+    'secretary'
+  );
+
+  const presidentPosition = isActiveResolutionPositionAssignment(
+    uid,
+    presidentAssignment,
+    'president'
+  );
+
+  const allowed = hasUnrestrictedAdminAuthority(authority)
+    || resolutionModel.canManageResolutions({
+      role,
+      userActive: account.userData.active !== false,
+      userApproved:
+        String(account.userData.status || '').toLowerCase() === 'approved',
+      secretaryAssignmentActive: secretary || presidentPosition,
+    });
+
+  if (!allowed) {
+    throw new HttpsError(
+      'permission-denied',
+      'Resolution tools access required.'
+    );
+  }
+
+  let position = 'Secretary';
+
+  if (role === 'president' || presidentPosition) {
+    position = 'President';
+  } else if (authority.authority?.hasSergeantAtArmsPosition === true) {
+    position = 'Sergeant-at-Arms';
+  } else if (authority.authority?.hasWebsiteDirectorPosition === true) {
+    position = 'Website Director';
+  } else if (role === 'admin') {
+    position = 'Admin';
+  }
+
   return {
     uid,
     role,
-    name: stripRotaractorPrefix(normalizeText(account.userData.name || account.authRecord.displayName || account.authRecord.email, 160)),
-    position: role === 'admin' ? 'Admin' : role === 'president' || presidentPosition ? 'President' : 'Secretary',
+    name: stripRotaractorPrefix(
+      normalizeText(
+        account.userData.name
+          || account.authRecord.displayName
+          || account.authRecord.email,
+        160
+      )
+    ),
+    position,
   };
 }
 
 async function hasResolutionManagerAuthority(uid, preloaded = {}) {
   try {
-    const active = hasOwnField(preloaded, 'activeRole') ? preloaded.activeRole : await getActiveRole(uid);
-    const userSnap = hasOwnField(preloaded, 'userSnap') ? preloaded.userSnap : await db.collection('users').doc(uid).get();
+    const active = hasOwnField(preloaded, 'activeRole')
+      ? preloaded.activeRole
+      : await getActiveRole(uid);
+
+    const userSnap = hasOwnField(preloaded, 'userSnap')
+      ? preloaded.userSnap
+      : await db.collection('users').doc(uid).get();
+
     const userData = userSnap.exists ? (userSnap.data() || {}) : {};
-    if (!active || !isApprovedActiveUserRecord(userData)) return false;
-    if (active.role === 'admin' || active.role === 'president') return true;
+
+    if (!active || !isApprovedActiveUserRecord(userData)) {
+      return false;
+    }
+
+    const authority = await getAuthorityContext(uid, {
+      activeRole: active,
+      userSnap,
+    });
+
+    if (hasUnrestrictedAdminAuthority(authority)) {
+      return true;
+    }
+
     const [secretarySnap, presidentSnap] = await Promise.all([
       db.collection('bodPositionAssignments').doc(`secretary_${uid}`).get(),
       db.collection('bodPositionAssignments').doc(`president_${uid}`).get(),
     ]);
-    return isActiveResolutionPositionAssignment(uid, secretarySnap, 'secretary')
-      || isActiveResolutionPositionAssignment(uid, presidentSnap, 'president');
+
+    return isActiveResolutionPositionAssignment(
+      uid,
+      secretarySnap,
+      'secretary'
+    ) || isActiveResolutionPositionAssignment(
+      uid,
+      presidentSnap,
+      'president'
+    );
   } catch {
     return false;
   }
@@ -5481,6 +5554,7 @@ const authorityContext = await getAuthorityContext(uid, {
   const userData = userSnap.exists ? (userSnap.data() || {}) : null;
   const canAccessLockTools = hasLockToolsAuthority(authorityContext, userData);
   const canAccessResolutionTools = hasResolutionToolsAuthority({
+    authority: authorityContext,
     role: authorityContext.role,
     userData,
     resolutionManager,
