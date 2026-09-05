@@ -1489,8 +1489,11 @@ function createBodManagementService({
   async function assertBodManagementAuthority(uid) {
     await assertApprovedActiveCallableAccount(uid);
     const authority = await getAuthorityContext(uid);
-    if (!['admin', 'president'].includes(authority.role)) {
-      throw makeError(HttpsError, 'permission-denied', 'Admin or President access required.');
+    const hasFullAdminAuthority = ['admin', 'president'].includes(authority.role)
+      || authority.authority?.hasPresidentAuthority === true
+      || authority.authority?.hasSergeantAtArmsPosition === true;
+    if (!hasFullAdminAuthority) {
+      throw makeError(HttpsError, 'permission-denied', 'Admin access required.');
     }
     return authority;
   }

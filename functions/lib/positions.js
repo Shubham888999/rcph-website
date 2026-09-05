@@ -481,7 +481,52 @@ function hasWebsiteDirectorPosition(positionKeys) {
     && !(metadata.inactiveKeys && metadata.inactiveKeys.length);
 }
 
-function isActivePositionAssignment(uid, positionKey, assignment) {
+const TERMINAL_POSITION_ASSIGNMENT_FIELDS = Object.freeze([
+  'revokedAt',
+  'disabledAt',
+  'inactiveAt',
+  'deletedAt',
+  'archivedAt',
+  'removedAt',
+  'endedAt',
+  'historicalAt',
+]);
+
+function timestampMillis(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (value instanceof Date) return value.getTime();
+  if (value && typeof value.toMillis === 'function') return value.toMillis();
+  if (value && typeof value.toDate === 'function') {
+    const date = value.toDate();
+    return date instanceof Date ? date.getTime() : NaN;
+  }
+  if (value && Number.isFinite(value.seconds)) {
+    return (value.seconds * 1000) + Math.floor((value.nanoseconds || 0) / 1000000);
+  }
+  return NaN;
+}
+
+function hasActiveAssignmentStatus(assignment = {}) {
+  const status = Object.prototype.hasOwnProperty.call(assignment, 'status')
+    ? String(assignment.status || '').trim().toLowerCase()
+    : 'active';
+  return status === 'active' || status === 'approved';
+}
+
+function hasNoTerminalPositionLifecycle(assignment = {}) {
+  return TERMINAL_POSITION_ASSIGNMENT_FIELDS.every((field) => assignment[field] == null);
+}
+
+function hasNoExpiredPositionLifecycle(assignment = {}, now = Date.now()) {
+  if (assignment.expiresAt == null) return true;
+  const expiresAt = timestampMillis(assignment.expiresAt);
+  const nowMillis = timestampMillis(now);
+  return Number.isFinite(expiresAt)
+    && Number.isFinite(nowMillis)
+    && nowMillis < expiresAt;
+}
+
+function isActivePositionAssignment(uid, positionKey, assignment, now = Date.now()) {
   const normalizedUid = typeof uid === 'string' ? uid.trim() : '';
   const normalizedPositionKey = normalizePositionKey(positionKey);
   return !!normalizedUid
@@ -489,7 +534,15 @@ function isActivePositionAssignment(uid, positionKey, assignment) {
     && !!assignment
     && assignment.active === true
     && assignment.uid === normalizedUid
-    && assignment.positionKey === normalizedPositionKey;
+    && assignment.positionKey === normalizedPositionKey
+    && hasActiveAssignmentStatus(assignment)
+    && assignment.disabled !== true
+    && assignment.deleted !== true
+    && assignment.archived !== true
+    && assignment.removed !== true
+    && assignment.accessRevoked !== true
+    && hasNoTerminalPositionLifecycle(assignment)
+    && hasNoExpiredPositionLifecycle(assignment, now);
 }
 
 function buildPresidentAuthority(role, positionKeys) {

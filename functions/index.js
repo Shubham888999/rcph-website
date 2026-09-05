@@ -2133,12 +2133,10 @@ let hasSergeantAtArmsPosition = false;
 if (
   canHoldSergeantAtArmsAuthority
   && isApprovedActiveUserRecord(userData)
-  && positionKeysAreWellFormed
-  && SERGEANT_AT_ARMS_POSITION_KEYS.some(positionKey => metadata.positionKeys.includes(positionKey))
 ) {
   hasSergeantAtArmsPosition = await hasActiveAnyPositionAssignment(
     uid,
-    SERGEANT_AT_ARMS_POSITION_KEYS.filter(positionKey => metadata.positionKeys.includes(positionKey)),
+    SERGEANT_AT_ARMS_POSITION_KEYS,
     preloaded
   );
 }
@@ -2161,6 +2159,7 @@ function hasUnrestrictedAdminAuthority(authority) {
       authority.role === 'admin'
       || authority.role === 'president'
       || authority.authority?.hasPresidentAuthority === true
+      || authority.authority?.hasSergeantAtArmsPosition === true
     )
   );
 }
@@ -2176,21 +2175,16 @@ function rolePositionSyncAuthority(authority) {
 function hasLockToolsAuthority(authority, userData) {
   return Boolean(
     isApprovedActiveUserRecord(userData)
-    && authority?.role
-    && (
-      authority.role === 'admin'
-      || authority.role === 'president'
-      || authority.authority?.hasPresidentAuthority === true
-    )
+    && hasUnrestrictedAdminAuthority(authority)
   );
 }
 
-function hasResolutionToolsAuthority({ role, userData, resolutionManager }) {
+function hasResolutionToolsAuthority({ authority, role, userData, resolutionManager }) {
+  const authorityContext = authority || { role, authority: {} };
   return Boolean(
     isApprovedActiveUserRecord(userData)
     && (
-      role === 'admin'
-      || role === 'president'
+      hasUnrestrictedAdminAuthority(authorityContext)
       || resolutionManager === true
     )
   );
@@ -5481,6 +5475,7 @@ const authorityContext = await getAuthorityContext(uid, {
   const userData = userSnap.exists ? (userSnap.data() || {}) : null;
   const canAccessLockTools = hasLockToolsAuthority(authorityContext, userData);
   const canAccessResolutionTools = hasResolutionToolsAuthority({
+    authority: authorityContext,
     role: authorityContext.role,
     userData,
     resolutionManager,
