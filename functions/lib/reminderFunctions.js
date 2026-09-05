@@ -104,7 +104,10 @@ const CALLABLE_OPTIONS = {
 const ROLE_COLLECTIONS = ['roles', 'userRoles', 'access'];
 const ACTIVE_ACCOUNT_ROLES = new Set(['prospect', 'gbm', 'bod', 'admin', 'president', 'secretary', 'saa', 'sergeant']);
 const ADMIN_PANEL_POSITION_KEYS = new Set(['cwd', 'co-cwd']);
-
+const SERGEANT_AT_ARMS_POSITION_KEYS = new Set([
+  'saa',
+  'co-saa',
+]);
 function chunkArray(items, size) {
   const chunks = [];
   for (let index = 0; index < items.length; index += size) {
@@ -150,13 +153,33 @@ function canonicalPositionKeys(...sources) {
 }
 
 async function activePositionKeysForUid(uid) {
-  const snap = await db.collection('bodPositionAssignments').where('uid', '==', uid).get().catch(() => null);
+  const snap = await db
+    .collection('bodPositionAssignments')
+    .where('uid', '==', uid)
+    .get()
+    .catch(() => null);
+
   if (!snap) return [];
+
   return snap.docs
     .map(doc => doc.data() || {})
-    .filter(assignment => assignment.active === true)
-    .map(assignment => positionHelpers.normalizePositionKey(assignment.positionKey))
-    .filter(Boolean);
+    .map(assignment => ({
+      assignment,
+      positionKey: positionHelpers.normalizePositionKey(
+        assignment.positionKey
+      ),
+    }))
+    .filter(({ assignment, positionKey }) =>
+      Boolean(
+        positionKey
+        && positionHelpers.isActivePositionAssignment(
+          uid,
+          positionKey,
+          assignment
+        )
+      )
+    )
+    .map(({ positionKey }) => positionKey);
 }
 
 async function resolveReminderAccess(uid, token = {}) {
@@ -173,16 +196,41 @@ async function resolveReminderAccess(uid, token = {}) {
   const mergedPositionKeys = canonicalPositionKeys(user.positionKeys, role.positionKeys, user.clubPosition, role.clubPosition, user.position, role.position, assignmentKeys);
   const mergedUser = { ...user, positionKeys: mergedPositionKeys };
   const mergedRole = { ...role, positionKeys: mergedPositionKeys };
-  return normalizeMomAccess({ uid, user: mergedUser, role: mergedRole, token });
+  const access = normalizeMomAccess({
+  uid,
+  user: mergedUser,
+  role: mergedRole,
+  token,
+});
+
+return {
+  ...access,
+  trustedActivePositionKeys: assignmentKeys.slice(),
+};
 }
 
 function hasAdminPanelAuthority(access = {}) {
   if (access.isApproved !== true) return false;
-  if (['admin', 'president'].includes(access.storedRole)) return true;
-  if (access.hasPresidentAuthority === true) return true;
-  return normalizePositionKeys(access.positionKeys).some(key => ADMIN_PANEL_POSITION_KEYS.has(key));
-}
 
+  if (['admin', 'president'].includes(access.storedRole)) {
+    return true;
+  }
+
+  if (access.hasPresidentAuthority === true) {
+    return true;
+  }
+
+  if (
+    normalizePositionKeys(
+      access.trustedActivePositionKeys
+    ).some(key => SERGEANT_AT_ARMS_POSITION_KEYS.has(key))
+  ) {
+    return true;
+  }
+
+  return normalizePositionKeys(access.positionKeys)
+    .some(key => ADMIN_PANEL_POSITION_KEYS.has(key));
+}
 function hasBodToolsReportingAccess(access = {}) {
   return access.isApproved === true
     && (['bod', 'admin', 'president'].includes(access.storedRole) || access.hasPresidentAuthority === true);
