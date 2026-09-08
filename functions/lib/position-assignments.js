@@ -359,7 +359,11 @@ function makeAssignmentPayload(positionKey, snap, context) {
   const existing = snap?.exists ? (snap.data() || {}) : {};
   const assignmentId = assignmentIdFor(positionKey, context.targetUid);
   const isNew = !snap?.exists;
-  const wasInactive = snap?.exists && existing.active === false;
+  const wasInactive = snap?.exists && !context.positionHelpers.isActivePositionAssignment(
+    context.targetUid,
+    positionKey,
+    existing
+  );
   const isRemoved = context.plan.removedPositionKeys.includes(positionKey);
   const isAdded = context.plan.addedPositionKeys.includes(positionKey);
   const nextOccupancy = context.plan.nextOccupancies[positionKey] || {};
@@ -387,6 +391,20 @@ function makeAssignmentPayload(positionKey, snap, context) {
   const payload = {
     ...base,
     active: true,
+    status: 'active',
+    disabled: false,
+    deleted: false,
+    archived: false,
+    removed: false,
+    accessRevoked: false,
+    revokedAt: null,
+    disabledAt: null,
+    inactiveAt: null,
+    deletedAt: null,
+    archivedAt: null,
+    removedAt: null,
+    historicalAt: null,
+    expiresAt: null,
     jointAssignmentConfirmed: confirmedJoint ? true : existing.jointAssignmentConfirmed === true,
     jointAssignmentConfirmedBy: confirmedJoint
       ? context.actorUid
@@ -403,6 +421,7 @@ function makeAssignmentPayload(positionKey, snap, context) {
     endedBy: null,
     endedAt: null,
     endReason: null,
+    removalReason: null,
     assignmentRevision: Number(existing.assignmentRevision || 0) + (isNew || wasInactive || isAdded ? 1 : 0),
   };
 

@@ -20,10 +20,13 @@ const {
   validateMomEmailRequest,
 } = require("./momCore");
 
-test("MOM backend permissions allow upload only for admin, president, and secretary", () => {
+test("MOM backend permissions allow full Admin authority and secretary", () => {
   assert.equal(canUploadMomAccess({ isApproved: true, storedRole: "admin", positionKeys: [] }), true);
   assert.equal(canUploadMomAccess({ isApproved: true, storedRole: "president", positionKeys: [] }), true);
   assert.equal(canUploadMomAccess({ isApproved: true, storedRole: "bod", positionKeys: ["secretary"] }), true);
+  assert.equal(canUploadMomAccess({ isApproved: true, storedRole: "bod", trustedActivePositionKeys: ["saa"] }), true);
+  assert.equal(canUploadMomAccess({ isApproved: true, storedRole: "bod", trustedActivePositionKeys: ["co-saa"] }), true);
+  assert.equal(canUploadMomAccess({ isApproved: true, storedRole: "bod", positionKeys: ["saa"] }), false);
   assert.equal(canUploadMomAccess({ isApproved: true, storedRole: "bod", positionKeys: ["cmd"] }), false);
   assert.equal(canUploadMomAccess({ isApproved: false, storedRole: "admin", positionKeys: ["secretary"] }), false);
 });

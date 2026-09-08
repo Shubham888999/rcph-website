@@ -42,6 +42,11 @@ test('MOM BOD recipient group scans active BOD position assignments', () => {
   assert.match(functionsSource, /momRecipientMatchesGroups\(\{ role: 'gbm', positionKeys: \[positionKey\] \}, groups\)/);
 });
 
+test('MOM Admin authority uses lifecycle-validated position assignments', () => {
+  assert.match(functionsSource, /positionHelpers\.isActivePositionAssignment\(uid, positionKey, assignment\)/);
+  assert.match(functionsSource, /trustedActivePositionKeys: assignmentKeys\.slice\(\)/);
+});
+
 test('MOM email recipient resolver carries the prospect opt-in through backend filtering', () => {
   assert.match(functionsSource, /const includeProspects = emailRequest\?\.includeProspects === true/);
   assert.match(functionsSource, /momRecipientMatchesGroups\(recipient, recipientGroups, \{ includeProspects \}\)/);
