@@ -189,6 +189,11 @@ function hasSecretaryPosition(access) {
     .some((key) => SECRETARY_POSITION_KEYS.has(key));
 }
 
+function hasTrustedSergeantPosition(access) {
+  return normalizePositionKeys(access?.trustedActivePositionKeys)
+    .some((key) => SERGEANT_POSITION_KEYS.has(key));
+}
+
 function hasBodPosition(access) {
   return normalizePositionKeys(access?.positionKeys)
     .some((key) => BOD_POSITION_KEYS.has(key));
@@ -199,6 +204,7 @@ function canUploadMomAccess(access) {
   return access.storedRole === "admin"
     || access.storedRole === "president"
     || access.hasPresidentAuthority === true
+    || hasTrustedSergeantPosition(access)
     || hasSecretaryPosition(access);
 }
 
@@ -461,6 +467,7 @@ module.exports = {
   normalizePositionKeys,
   normalizeMomAccess,
   hasSecretaryPosition,
+  hasTrustedSergeantPosition,
   hasBodPosition,
   canUploadMomAccess,
   canViewMomAccess,

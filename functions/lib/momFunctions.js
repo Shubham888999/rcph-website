@@ -39,6 +39,7 @@ const {
 } = require('./momCore');
 const { writeSystemLogSafely } = require('./system-logs');
 const reminderFunctions = require('./reminderFunctions');
+const positionHelpers = require('./positions');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -199,9 +200,15 @@ async function activePositionKeysForUid(uid) {
   if (!snap) return [];
   return snap.docs
     .map(doc => doc.data() || {})
-    .filter(assignment => assignment.active === true)
-    .map(assignment => cleanText(assignment.positionKey, 80))
-    .filter(Boolean);
+    .map(assignment => ({
+      assignment,
+      positionKey: positionHelpers.normalizePositionKey(assignment.positionKey),
+    }))
+    .filter(({ assignment, positionKey }) => Boolean(
+      positionKey
+      && positionHelpers.isActivePositionAssignment(uid, positionKey, assignment)
+    ))
+    .map(({ positionKey }) => positionKey);
 }
 
 async function resolveMomAccess(uid, token = {}) {
@@ -217,7 +224,10 @@ async function resolveMomAccess(uid, token = {}) {
   const role = roleSnap?.exists ? roleSnap.data() || {} : user;
   const mergedUser = { ...user, positionKeys: [...(Array.isArray(user.positionKeys) ? user.positionKeys : []), ...assignmentKeys] };
   const mergedRole = { ...role, positionKeys: [...(Array.isArray(role.positionKeys) ? role.positionKeys : []), ...assignmentKeys] };
-  return normalizeMomAccess({ uid, user: mergedUser, role: mergedRole, token });
+  return {
+    ...normalizeMomAccess({ uid, user: mergedUser, role: mergedRole, token }),
+    trustedActivePositionKeys: assignmentKeys.slice(),
+  };
 }
 
 async function requireCallableAccess(request, mode) {

@@ -271,6 +271,33 @@ async function runRolePositionRegressions() {
   assert.equal(outcome.result.role, 'admin', 'Secretary plus lower position remains admin');
   assert.deepEqual(outcome.result.addedPositionKeys, ['rrro']);
 
+  const retainedSaa = accountSeed('target', 'bod', ['saa'], { user: { status: 'approved' } });
+  Object.assign(retainedSaa.bodPositionAssignments.saa_target, {
+    status: 'removed',
+    removed: true,
+    accessRevoked: true,
+    removedAt: 'REMOVED_AT',
+    deletedAt: 'DELETED_AT',
+    expiresAt: 'EXPIRED_AT',
+    assignmentRevision: 2,
+  });
+  outcome = await runSync(retainedSaa, {
+    operationSource: 'roleMaintenance',
+    role: 'bod',
+    positionKeys: ['saa'],
+  });
+  assert.equal(outcome.ok, true, 'saving a retained SAA assignment repairs stale lifecycle blockers');
+  const repairedSaa = outcome.state.bodPositionAssignments.saa_target;
+  assert.equal(positionHelpers.isActivePositionAssignment('target', 'saa', repairedSaa), true);
+  assert.equal(repairedSaa.status, 'active');
+  assert.equal(repairedSaa.removedAt, null);
+  assert.equal(repairedSaa.deletedAt, null);
+  assert.equal(repairedSaa.expiresAt, null);
+  assert.equal(repairedSaa.removed, false);
+  assert.equal(repairedSaa.accessRevoked, false);
+  assert.equal(repairedSaa.assignmentRevision, 3);
+  assert.equal(repairedSaa.reactivatedAt, 'SERVER_TIMESTAMP');
+
   outcome = await runSync(accountSeed('target', 'bod', ['secretary'], { user: { status: 'approved' } }), {
     operationSource: 'roleMaintenance',
     role: 'bod',
