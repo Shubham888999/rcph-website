@@ -75,6 +75,8 @@ const POSITION_PRESETS = Object.freeze([
   ['pro', 'PRO'],
   ['dei', 'DEI'],
   ['wrwc', 'WRWC'],
+  ['pid', 'Public Image Director'],
+  ['mdo', 'Membership Development Officer'],
   ['custom', 'Custom'],
 ].map(([key, label]) => Object.freeze({ key, label })));
 const POSITION_PRESET_MAP = new Map(POSITION_PRESETS.map((preset) => [preset.key, preset.label]));

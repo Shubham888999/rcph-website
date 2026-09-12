@@ -226,6 +226,28 @@ const RAW_POSITION_CATALOG = [
     aliases: ['SAA', 'Sergeant', 'Sergeant-at-Arms', 'Sergeant at Arms'],
     active: true,
   },
+  {
+    key: 'pid',
+    displayTitle: 'Public Image Director',
+    avenueCode: 'PID',
+    group: 'bod',
+    sortOrder: 33,
+    effectiveRole: 'bod',
+    bodRoster: true,
+    aliases: ['PID', 'Public Image Director', 'Public Image', 'Public Image Officer'],
+    active: true,
+  },
+  {
+    key: 'mdo',
+    displayTitle: 'Membership Development Officer',
+    avenueCode: 'MDO',
+    group: 'bod',
+    sortOrder: 34,
+    effectiveRole: 'bod',
+    bodRoster: true,
+    aliases: ['MDO', 'Membership Development Officer', 'Membership Development', 'Membership Development Director'],
+    active: true,
+  },
   { key: 'co-president', displayTitle: 'Co-President', avenueCode: 'CPRES', group: 'co-admin', sortOrder: 50, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-President', 'Co President'], active: true },
   { key: 'co-vice-president', displayTitle: 'Co-Vice President', avenueCode: 'CVP', group: 'co-admin', sortOrder: 51, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-Vice President', 'Co Vice President', 'Co-Vice-President'], active: true },
   { key: 'co-secretary', displayTitle: 'Co-Secretary', avenueCode: 'CSEC', group: 'co-admin', sortOrder: 52, effectiveRole: 'admin', bodRoster: true, aliases: ['Co-Secretary', 'Co Secretary', 'Co Club Secretary'], active: true },
@@ -244,6 +266,8 @@ const RAW_POSITION_CATALOG = [
   { key: 'co-wrwc', displayTitle: 'Co-World Rotaract Week Chairperson', avenueCode: 'CWRWC', group: 'co-bod', sortOrder: 80, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-World Rotaract Week Chairperson', 'Co World Rotaract Week Chair'], active: true },
   { key: 'co-wr', displayTitle: "Co-Women's Representative", avenueCode: 'CWR', group: 'co-bod', sortOrder: 81, effectiveRole: 'bod', bodRoster: true, aliases: ["Co-Women's Representative", 'Co Womens Representative', 'Co Women Representative'], active: true },
   { key: 'co-saa', displayTitle: 'Co-Sergeant-at-Arms', avenueCode: 'CSAA', group: 'co-bod', sortOrder: 82, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Sergeant-at-Arms', 'Co Sergeant at Arms'], active: true },
+  { key: 'co-pid', displayTitle: 'Co-Public Image Director', avenueCode: 'CPID', group: 'co-bod', sortOrder: 83, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Public Image Director', 'Co Public Image Director', 'Co Public Image', 'Co-PID'], active: true },
+  { key: 'co-mdo', displayTitle: 'Co-Membership Development Officer', avenueCode: 'CMDO', group: 'co-bod', sortOrder: 84, effectiveRole: 'bod', bodRoster: true, aliases: ['Co-Membership Development Officer', 'Co Membership Development Officer', 'Co Membership Development', 'Co-MDO'], active: true },
 ];
 
 const POSITION_GROUPS = Object.freeze({

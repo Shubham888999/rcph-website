@@ -30,12 +30,12 @@ function assertEqual(actual, expected, message) {
   assert.strictEqual(actual, expected, message);
 }
 
-assertEqual(POSITION_KEYS.length, 38, 'catalog should contain 38 positions');
+assertEqual(POSITION_KEYS.length, 42, 'catalog should contain 42 positions');
 assertEqual(new Set(POSITION_KEYS).size, POSITION_KEYS.length, 'catalog keys should be unique');
 assertDeepEqual(ADMIN_POSITION_KEYS, ['president', 'immediate-past-president', 'vice-president', 'secretary', 'joint-secretary', 'treasurer', 'club-advisor'], 'admin position group should be explicit');
-assertDeepEqual(BOD_POSITION_KEYS, ['csd', 'cmd', 'isd', 'pdd', 'rrro', 'pro', 'dei', 'editor', 'cwd', 'sports-representative', 'wrwc', 'wr', 'saa'], 'bod position group should be explicit');
+assertDeepEqual(BOD_POSITION_KEYS, ['csd', 'cmd', 'isd', 'pdd', 'rrro', 'pro', 'dei', 'editor', 'cwd', 'sports-representative', 'wrwc', 'wr', 'saa', 'pid', 'mdo'], 'bod position group should be explicit');
 assertDeepEqual(CO_ADMIN_POSITION_KEYS, ['co-president', 'co-vice-president', 'co-secretary', 'co-treasurer', 'co-club-advisor'], 'co-admin position group should be explicit');
-assertDeepEqual(CO_BOD_POSITION_KEYS, ['co-csd', 'co-cmd', 'co-isd', 'co-pdd', 'co-rrro', 'co-pro', 'co-dei', 'co-editor', 'co-cwd', 'co-sports-representative', 'co-wrwc', 'co-wr', 'co-saa'], 'co-bod position group should be explicit');
+assertDeepEqual(CO_BOD_POSITION_KEYS, ['co-csd', 'co-cmd', 'co-isd', 'co-pdd', 'co-rrro', 'co-pro', 'co-dei', 'co-editor', 'co-cwd', 'co-sports-representative', 'co-wrwc', 'co-wr', 'co-saa', 'co-pid', 'co-mdo'], 'co-bod position group should be explicit');
 
 const sortOrders = POSITION_KEYS.map((key) => POSITION_CATALOG[key].sortOrder);
 assertEqual(new Set(sortOrders).size, sortOrders.length, 'sort orders should be unique');

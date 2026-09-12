@@ -32,7 +32,9 @@
     Object.freeze({ key: 'sports-representative', displayTitle: 'Sports Representative', avenueCode: 'SPORTS', group: 'officers-representatives', sortOrder: 16, active: true }),
     Object.freeze({ key: 'wrwc', displayTitle: 'World Rotaract Week Chairperson', avenueCode: 'WRWC', group: 'officers-representatives', sortOrder: 17, active: true }),
     Object.freeze({ key: 'wr', displayTitle: "Women's Representative", avenueCode: 'WR', group: 'officers-representatives', sortOrder: 18, active: true }),
-    Object.freeze({ key: 'saa', displayTitle: 'Sergeant-at-Arms', avenueCode: 'SAA', group: 'officers-representatives', sortOrder: 19, active: true })
+    Object.freeze({ key: 'saa', displayTitle: 'Sergeant-at-Arms', avenueCode: 'SAA', group: 'officers-representatives', sortOrder: 19, active: true }),
+    Object.freeze({ key: 'pid', displayTitle: 'Public Image Director', avenueCode: 'PID', group: 'officers-representatives', sortOrder: 20, active: true }),
+    Object.freeze({ key: 'mdo', displayTitle: 'Membership Development Officer', avenueCode: 'MDO', group: 'officers-representatives', sortOrder: 21, active: true })
   ]);
 
   const ROLE_LABELS = Object.freeze({
@@ -101,7 +103,15 @@
     'women representative': 'wr',
     'saa': 'saa',
     'sergeant-at-arms': 'saa',
-    'sergeant at arms': 'saa'
+    'sergeant at arms': 'saa',
+    'pid': 'pid',
+    'public image director': 'pid',
+    'public image': 'pid',
+    'public image officer': 'pid',
+    'mdo': 'mdo',
+    'membership development officer': 'mdo',
+    'membership development': 'mdo',
+    'membership development director': 'mdo'
   });
 
   function normalizeText(value) {

@@ -36,7 +36,7 @@ async function initializedEnv() {
   const env = createEnv();
   const result = await env.service.initializeStructure('president-uid');
   assert.strictEqual(result.createdConfigCount, 3);
-  assert.strictEqual(result.createdPositionCount, 114);
+  assert.strictEqual(result.createdPositionCount, 126);
   return env;
 }
 
@@ -96,7 +96,7 @@ function assertVisitRuleDenyBlock(rules, collection) {
 (async () => {
   assert.strictEqual(visit.VISIT_TYPE_KEYS.length, 3, 'exactly three canonical visit types exist');
   assert.deepStrictEqual(visit.VISIT_TYPE_KEYS, ['clubAssembly', 'dzrVisit', 'drrVisit']);
-  assert.strictEqual(positionHelpers.POSITION_KEYS.length, 38, 'exactly 38 canonical positions are used');
+  assert.strictEqual(positionHelpers.POSITION_KEYS.length, 42, 'exactly 42 canonical positions are used');
 
   const uninitialized = createEnv();
   const uninitializedPresidentDashboard = await uninitialized.service.getDashboard('president-uid');
@@ -123,7 +123,7 @@ function assertVisitRuleDenyBlock(rules, collection) {
 
   const first = await initializedEnv();
   assert.strictEqual(Object.keys(first.adapter.store.visitSubmissionConfig).length, 3);
-  assert.strictEqual(Object.keys(first.adapter.store.visitSubmissionPositions).length, 114);
+  assert.strictEqual(Object.keys(first.adapter.store.visitSubmissionPositions).length, 126);
 
   first.adapter.store.visitSubmissionConfig.clubAssembly.description = 'Custom assembly instructions';
   first.adapter.store.visitSubmissionPositions.clubAssembly_secretary.locked = true;
@@ -164,9 +164,9 @@ await rejectsWithCode(
   assert.strictEqual(presidentDashboard.visits[0].activeSubmissionCount, 3, 'President manager-wide count works');
 
   const adminFolders = await first.service.getFolders('admin-uid', 'clubAssembly');
-  assert.strictEqual(adminFolders.folders.length, 38, 'Admin sees all folders');
+  assert.strictEqual(adminFolders.folders.length, 42, 'Admin sees all folders');
   const presidentFolders = await first.service.getFolders('president-uid', 'clubAssembly');
-  assert.strictEqual(presidentFolders.folders.length, 38, 'President sees all folders');
+  assert.strictEqual(presidentFolders.folders.length, 42, 'President sees all folders');
 
   const bodDashboard = await first.service.getDashboard('bod-secretary');
   assert.strictEqual(bodDashboard.access.role, 'bod', 'approved BOD with canonical positions resolves');
@@ -196,6 +196,8 @@ await rejectsWithCode(
     'cwd',
     'sports-representative',
     'treasurer',
+    'pid',
+    'mdo',
   ].forEach((mainKey) => {
     const coKey = `co-${mainKey}`;
     assert.strictEqual(visit.mainPositionKeyForCoPosition(coKey, positionHelpers), mainKey, `${coKey} maps to ${mainKey}`);
