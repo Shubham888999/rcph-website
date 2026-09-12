@@ -40,17 +40,16 @@ export default function AboutMessages() {
 
           <div className="about-leadership">
             <div>
-              <h3>Rtr. Aneesh Ladkat</h3>
+              <h3>Rtr. Nupura Danait</h3>
               <p>President</p>
             </div>
             <div>
-              <h3>Rtr. Avani Joshi</h3>
+              <h3>Rtr. Harshal Nikam</h3>
               <p>Club Service Director</p>
             </div>
           </div>
 
           <address className="about-contact-links">
-            <a href="tel:+919175935956">+91 91759 35956</a>
             <a href="mailto:rcpuneheritage3131@gmail.com">
               rcpuneheritage3131@gmail.com
             </a>
