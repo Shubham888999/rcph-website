@@ -21,6 +21,16 @@ const INACTIVE_EVENT_STATUSES = new Set([
   'inactive',
   'removed',
 ]);
+const TERMINAL_EVENT_LIFECYCLE_FIELDS = Object.freeze([
+  'archivedAt',
+  'deletedAt',
+  'disabledAt',
+  'endedAt',
+  'historicalAt',
+  'inactiveAt',
+  'removedAt',
+  'revokedAt',
+]);
 
 const FINALIZATION_REASON_BY_MESSAGE = new Map([
   ['BOD upload finalization is not pending.', 'finalization-not-pending'],
@@ -221,16 +231,12 @@ function normalizeAuthoritativeBodUploadEvent(eventId, raw = {}, HttpsError) {
   const eventDate = text(raw.date || raw.eventStart, 20);
   const eventType = text(raw.type || 'clubEvent', 40);
   const status = cleanLower(raw.status, 40);
-  const terminalFieldPresent = [
-    'archivedAt',
-    'deletedAt',
-    'disabledAt',
-    'endedAt',
-    'historicalAt',
-    'inactiveAt',
-    'removedAt',
-    'revokedAt',
-  ].some(field => Object.prototype.hasOwnProperty.call(raw || {}, field));
+  // Compare values, not key presence. A cleared lifecycle field is routinely
+  // written as an explicit null, and treating that as terminal marks a live
+  // event dead. Matches isActivePositionAssignment in lib/positions.js and the
+  // data.get('endedAt', null) == null form used in firestore.rules.
+  const terminalFieldPresent = TERMINAL_EVENT_LIFECYCLE_FIELDS
+    .some(field => (raw || {})[field] != null);
 
   if (!eventName) throw makeError(HttpsError, 'failed-precondition', 'BOD event name is missing.');
   if (!eventDate) throw makeError(HttpsError, 'failed-precondition', 'BOD event date is missing.');
@@ -275,6 +281,23 @@ function serverTimestamp(admin) {
   return admin?.firestore?.FieldValue?.serverTimestamp
     ? admin.firestore.FieldValue.serverTimestamp()
     : new Date().toISOString();
+}
+
+/**
+ * A failed Drive lookup surfaces to the client as folder-invalid / file-invalid
+ * regardless of cause, so a credential, quota or sharing problem is
+ * indistinguishable from a genuinely bad ID. Record the real reason server-side
+ * — status and error name only, never the message, which can echo request
+ * content — so the Functions log says which of those it actually was.
+ */
+function logDriveLookupFailure(kind, error, logger = console) {
+  const status = Number(error?.code ?? error?.status ?? error?.response?.status);
+  logger?.warn?.('BOD upload Drive lookup failed.', {
+    kind,
+    status: Number.isFinite(status) ? status : 0,
+    errorName: text(error?.name, 60) || 'Error',
+    reason: text(error?.errors?.[0]?.reason || error?.response?.data?.error?.status, 80),
+  });
 }
 
 function getSecretValue(options, name) {
@@ -536,12 +559,14 @@ function createBodEventAttachmentService(options = {}) {
     let rawFile;
     try {
       rawFolder = await drive.getFolderMetadata(payload.driveFolderId);
-    } catch {
+    } catch (err) {
+      logDriveLookupFailure('folder', err);
       throw makeError(HttpsError, 'failed-precondition', 'BOD upload folder is not valid.');
     }
     try {
       rawFile = await drive.getFileMetadata(payload.driveFileId);
-    } catch {
+    } catch (err) {
+      logDriveLookupFailure('file', err);
       throw makeError(HttpsError, 'failed-precondition', 'BOD upload file is not valid.');
     }
     const folder = normalizeDriveFile(rawFolder);
