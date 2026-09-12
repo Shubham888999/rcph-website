@@ -514,20 +514,28 @@ function sha256Hex_(bytes) {
   }).join('');
 }
 
+// Must stay byte-identical to buildBodEventUploadFolderName in
+// functions/lib/bod-event-attachments.js. The folder is created here and the
+// name is then compared against the backend's expectation during
+// finalization, so any drift surfaces as folder-name-mismatch on a file that
+// uploaded perfectly well.
 function buildBodFolderName_(data) {
   const eventDate = sanitizeFolderPart_(
-    data.eventDate || 'undated',
-    30
+    data.eventDate,
+    30,
+    'undated'
   );
 
   const eventName = sanitizeFolderPart_(
-    data.eventName || 'event',
-    100
+    data.eventName,
+    100,
+    'event'
   );
 
   const uploadGroupId = sanitizeFolderPart_(
     data.uploadGroupId,
-    100
+    100,
+    'group'
   );
 
   return (
@@ -653,11 +661,15 @@ function sanitizeFileName_(value) {
   return cleaned;
 }
 
+// Mirrors sanitizeBodFolderPart in functions/lib/bod-event-attachments.js.
+// The trailing trim matters: slicing at maxLength can leave a space at the
+// cut, which the backend removes and this side previously kept.
 function sanitizeFolderPart_(
   value,
-  maxLength
+  maxLength,
+  fallback
 ) {
-  return (
+  const cleaned = (
     String(value || '')
       .trim()
       .replace(
@@ -666,9 +678,11 @@ function sanitizeFolderPart_(
       )
       .replace(/\s+/g, ' ')
       .replace(/^-+|-+$/g, '')
-      .slice(0, maxLength) ||
-    'untitled'
+      .slice(0, maxLength)
+      .trim()
   );
+
+  return cleaned || fallback || 'untitled';
 }
 
 function safeErrorMessage_(err) {
