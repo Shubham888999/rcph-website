@@ -281,6 +281,8 @@ export function normalizeBodEventAttachment(fileId, raw) {
     mimeType,
     sizeBytes: Number.isSafeInteger(sizeBytes) && sizeBytes > 0 ? sizeBytes : 0,
     fileUrl,
+    uploadGroupId: safeDocumentId(raw.uploadGroupId, 100),
+    driveFolderId: safeDocumentId(raw.driveFolderId, 300),
     storageProvider,
     source,
     uploadedAt: timestampToIso(raw.uploadedAt || raw.createdAt),

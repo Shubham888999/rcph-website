@@ -6,7 +6,9 @@ import {
   addBodUploadFiles,
   buildBodUploadTicketPayload,
   getBodUploadFinalizationFailureMessage,
+  buildConfirmedBodUpload,
   getSafeBodUploadError,
+  matchVerifiedBodUploadAttachment,
   normalizeBodUploadResponse,
   validateBodUploadEndpoint,
   validateBodUploadFile,
@@ -145,4 +147,70 @@ test("missing or invalid finalization results never normalize as verified", () =
 test("upload errors expose only approved user-safe messages", () => {
   assert.match(getSafeBodUploadError({ code: "functions/permission-denied", message: "raw server details" }), /permission/i);
   assert.equal(getSafeBodUploadError({ code: "functions/internal", message: "secret stack" }), "The file could not be uploaded. Please retry.");
+});
+
+function storedAttachment(overrides = {}) {
+  return {
+    id: "drive-file-1",
+    fileName: "poster.png",
+    mimeType: "image/png",
+    sizeBytes: 1200,
+    fileUrl: "https://drive.google.com/file/d/drive-file-1/view?usp=drivesdk",
+    uploadGroupId: "g1",
+    driveFolderId: "folder-1",
+    storageProvider: "googleDrive",
+    source: "appsScriptFinalize",
+    ...overrides,
+  };
+}
+
+const confirmExpectation = {
+  uploadGroupId: "g1",
+  fileName: "poster.png",
+  mimeType: "image/png",
+  sizeBytes: 1200,
+};
+
+test("firestore confirmation matches the attachment written for this upload", () => {
+  const match = matchVerifiedBodUploadAttachment(
+    [storedAttachment({ id: "other", uploadGroupId: "g2" }), storedAttachment()],
+    confirmExpectation,
+  );
+  assert.equal(match?.id, "drive-file-1");
+});
+
+test("firestore confirmation rejects attachments that are not ours or not backend-verified", () => {
+  const rejected = [
+    { label: "wrong group", value: storedAttachment({ uploadGroupId: "g2" }) },
+    { label: "wrong name", value: storedAttachment({ fileName: "other.png" }) },
+    { label: "wrong size", value: storedAttachment({ sizeBytes: 1201 }) },
+    { label: "wrong mime", value: storedAttachment({ mimeType: "image/jpeg" }) },
+    { label: "untrusted source", value: storedAttachment({ source: "manual" }) },
+    { label: "untrusted provider", value: storedAttachment({ storageProvider: "s3" }) },
+    { label: "non-drive url", value: storedAttachment({ fileUrl: "https://evil.example.com/x" }) },
+  ];
+  for (const { label, value } of rejected) {
+    assert.equal(matchVerifiedBodUploadAttachment([value], confirmExpectation), null, label);
+  }
+  assert.equal(matchVerifiedBodUploadAttachment([storedAttachment()], { ...confirmExpectation, uploadGroupId: "" }), null);
+  assert.equal(matchVerifiedBodUploadAttachment(null, confirmExpectation), null);
+});
+
+test("confirmed uploads present the same verified shape as a readable response", () => {
+  const confirmed = buildConfirmedBodUpload(storedAttachment(), "event-1", "g1");
+  assert.equal(confirmed.attachmentFinalized, true);
+  assert.equal(confirmed.attachmentFinalizationCode, "verified");
+  assert.equal(confirmed.confirmedVia, "firestore");
+  assert.equal(confirmed.fileId, "drive-file-1");
+  assert.equal(confirmed.uploadGroupId, "g1");
+  assert.equal(confirmed.folderUrl, "https://drive.google.com/drive/folders/folder-1");
+  assert.equal(confirmed.attachment.attachmentPath, "bodEvents/event-1/attachments/drive-file-1");
+  assert.equal(confirmed.attachment.verified, true);
+  assert.equal(confirmed.attachmentFinalization.driveFileId, "drive-file-1");
+});
+
+test("confirmed uploads require a usable attachment id and event id", () => {
+  assert.equal(buildConfirmedBodUpload(storedAttachment({ id: "" }), "event-1", "g1"), null);
+  assert.equal(buildConfirmedBodUpload(storedAttachment(), "", "g1"), null);
+  assert.equal(buildConfirmedBodUpload(null, "event-1", "g1"), null);
 });
