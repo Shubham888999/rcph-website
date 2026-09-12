@@ -28,6 +28,8 @@ export const POSITION_CATALOG = Object.freeze([
   ["wrwc", "World Rotaract Week Chairperson", "WRWC", "bod", 30, "bod", true, ["World Rotaract Week Chair"]],
   ["wr", "Women's Representative", "WR", "bod", 31, "bod", true, ["Womens Representative", "Women Representative"]],
   ["saa", "Sergeant-at-Arms", "SAA", "bod", 32, "bod", true, ["Sergeant", "Sergeant at Arms"]],
+  ["pid", "Public Image Director", "PID", "bod", 33, "bod", true, ["Public Image", "Public Image Officer"]],
+  ["mdo", "Membership Development Officer", "MDO", "bod", 34, "bod", true, ["Membership Development", "Membership Development Director"]],
   ["co-president", "Co-President", "CPRES", "co-admin", 50, "admin", true, ["Co President"]],
   ["co-vice-president", "Co-Vice President", "CVP", "co-admin", 51, "admin", true, ["Co Vice President", "Co-Vice-President"]],
   ["co-secretary", "Co-Secretary", "CSEC", "co-admin", 52, "admin", true, ["Co Secretary", "Co Club Secretary"]],
@@ -46,6 +48,8 @@ export const POSITION_CATALOG = Object.freeze([
   ["co-wrwc", "Co-World Rotaract Week Chairperson", "CWRWC", "co-bod", 80, "bod", true, ["Co World Rotaract Week Chair"]],
   ["co-wr", "Co-Women's Representative", "CWR", "co-bod", 81, "bod", true, ["Co Womens Representative", "Co Women Representative"]],
   ["co-saa", "Co-Sergeant-at-Arms", "CSAA", "co-bod", 82, "bod", true, ["Co Sergeant at Arms"]],
+  ["co-pid", "Co-Public Image Director", "CPID", "co-bod", 83, "bod", true, ["Co Public Image Director", "Co Public Image", "Co-PID"]],
+  ["co-mdo", "Co-Membership Development Officer", "CMDO", "co-bod", 84, "bod", true, ["Co Membership Development Officer", "Co Membership Development", "Co-MDO"]],
 ].map(([key, displayTitle, avenueCode, group, sortOrder, effectiveRole, bodRoster, aliases]) => Object.freeze({
   key,
   displayTitle,
