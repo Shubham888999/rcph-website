@@ -74,6 +74,8 @@ const BOD_POSITION_KEYS = new Set([
   "wrwc",
   "wr",
   "saa",
+  "pid",
+  "mdo",
   "co-president",
   "co-vice-president",
   "co-secretary",
@@ -92,6 +94,8 @@ const BOD_POSITION_KEYS = new Set([
   "co-wrwc",
   "co-wr",
   "co-saa",
+  "co-pid",
+  "co-mdo",
 ]);
 
 function cleanText(value, max = 300) {
