@@ -7,7 +7,8 @@ const STATUS_LABELS = {
   authorizing: "Requesting authorization",
   uploading: "Uploading",
   processing: "Processing in Drive",
-  uploaded: "Uploaded",
+  verified: "Verified attachment",
+  "verification-failed": "Drive uploaded; verification failed",
   failed: "Failed",
 };
 
@@ -30,7 +31,7 @@ export default function BodEventFileUploader({ items, disabled, onChange }) {
   function retry(localId) {
     onChange({
       files: files.map((item) => item.localId === localId
-        ? { ...item, status: "ready", error: "" }
+        ? { ...item, status: "ready", error: "", partialUpload: null }
         : item),
       selectionErrors: [],
     });
@@ -53,8 +54,8 @@ export default function BodEventFileUploader({ items, disabled, onChange }) {
             <li key={item.localId}>
               <div><strong>{item.fileName}</strong><span>{formatBodUploadSize(item.sizeBytes)}</span>{item.error ? <small>{item.error}</small> : null}</div>
               <span className={`bod-upload__status is-${item.status}`}>{STATUS_LABELS[item.status] || item.status}</span>
-              {item.status === "failed" ? <button type="button" disabled={disabled} onClick={() => retry(item.localId)}>Retry</button> : null}
-              {["ready", "failed"].includes(item.status) ? <button type="button" disabled={disabled} onClick={() => remove(item.localId)}>Remove</button> : null}
+              {["failed", "verification-failed"].includes(item.status) ? <button type="button" disabled={disabled} onClick={() => retry(item.localId)}>Retry</button> : null}
+              {["ready", "failed", "verification-failed"].includes(item.status) ? <button type="button" disabled={disabled} onClick={() => remove(item.localId)}>Remove</button> : null}
             </li>
           ))}
         </ul>

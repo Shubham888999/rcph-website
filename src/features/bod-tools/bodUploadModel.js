@@ -14,6 +14,73 @@ const EXTENSIONS_BY_MIME = Object.freeze({
   "image/webp": ["webp"],
 });
 
+const BOD_FINALIZATION_REASON_CODES = new Set([
+  "attachment-conflict",
+  "event-date-missing",
+  "event-inactive",
+  "event-name-missing",
+  "event-not-club-event",
+  "event-not-found",
+  "file-folder-mismatch",
+  "file-invalid",
+  "file-mime-mismatch",
+  "file-name-mismatch",
+  "file-size-mismatch",
+  "finalization-authorization-incomplete",
+  "finalization-conflict",
+  "finalization-expired",
+  "finalization-failed-precondition",
+  "finalization-internal-error",
+  "finalization-metadata-mismatch",
+  "finalization-not-configured",
+  "finalization-not-found",
+  "finalization-not-pending",
+  "finalization-permission-denied",
+  "finalization-rejected",
+  "finalization-replay-mismatch",
+  "finalization-response-invalid",
+  "finalization-response-mismatch",
+  "finalization-result-missing",
+  "folder-invalid",
+  "folder-name-mismatch",
+  "folder-outside-approved-root",
+  "invalid-finalization-request",
+  "invalid-finalize-proof",
+  "storage-not-configured",
+  "upload-group-event-mismatch",
+  "upload-group-folder-mismatch",
+  "upload-group-invalid",
+  "upload-group-user-mismatch",
+  "verified",
+]);
+
+function text(value, max = 700) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function safeDocumentId(value, max = 300) {
+  const id = text(value, max);
+  const hasControlCharacter = [...id].some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+  return id && !/[\\/]/.test(id) && !hasControlCharacter ? id : "";
+}
+
+function isDriveUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "drive.google.com";
+  } catch {
+    return false;
+  }
+}
+
+function safeFinalizationReasonCode(value, fallback = "finalization-rejected") {
+  const code = text(value, 80).toLowerCase();
+  return BOD_FINALIZATION_REASON_CODES.has(code) ? code : fallback;
+}
+
 export function validateBodUploadEndpoint(value) {
   try {
     const url = new URL(typeof value === "string" ? value.trim() : "");
@@ -97,6 +164,7 @@ export function getSafeBodUploadError(error) {
     "Upload service is not configured.",
     "The selected file could not be read.",
     "Upload authorization was incomplete.",
+    "Save the event before uploading files.",
     "The upload service did not accept the file.",
     "The upload service returned incomplete Drive metadata.",
   ];
@@ -106,10 +174,10 @@ export function getSafeBodUploadError(error) {
 }
 
 export function buildBodUploadTicketPayload(item, event) {
+  const eventId = safeDocumentId(event?.eventId, 128);
+  if (!eventId) throw new Error("Save the event before uploading files.");
   return {
-    eventId: event.eventId,
-    eventName: event.name,
-    eventDate: event.eventDate,
+    eventId,
     fileName: item.fileName,
     mimeType: item.mimeType,
     sizeBytes: item.sizeBytes,
@@ -118,9 +186,41 @@ export function buildBodUploadTicketPayload(item, event) {
       : {}),
   };
 }
-export function normalizeBodUploadResponse(raw, fallbackGroupId = "") {
+
+function normalizeFinalizedAttachment(raw, expected) {
+  if (!raw || typeof raw !== "object") return null;
+  const attachment = {
+    fileId: safeDocumentId(raw.fileId, 300),
+    fileName: text(raw.fileName, 180),
+    fileUrl: text(raw.fileUrl),
+    mimeType: text(raw.mimeType, 120).toLowerCase(),
+    sizeBytes: Number(raw.sizeBytes),
+    eventId: safeDocumentId(raw.eventId, 128),
+    uploadGroupId: safeDocumentId(raw.uploadGroupId, 100),
+    attachmentPath: text(raw.attachmentPath),
+    storageProvider: text(raw.storageProvider, 80),
+    source: text(raw.source, 80),
+    verified: raw.verified === true,
+  };
+  const expectedPath = `bodEvents/${expected.eventId}/attachments/${expected.fileId}`;
+  if (
+    attachment.fileId !== expected.fileId
+    || attachment.fileName !== expected.fileName
+    || attachment.eventId !== expected.eventId
+    || attachment.uploadGroupId !== expected.uploadGroupId
+    || attachment.attachmentPath !== expectedPath
+    || attachment.mimeType !== expected.mimeType
+    || attachment.sizeBytes !== expected.sizeBytes
+    || !isDriveUrl(attachment.fileUrl)
+    || attachment.storageProvider !== "googleDrive"
+    || attachment.source !== "appsScriptFinalize"
+    || !attachment.verified
+  ) return null;
+  return attachment;
+}
+
+export function normalizeBodUploadResponse(raw, fallbackGroupId = "", expected = {}) {
   if (!raw || raw.ok !== true) throw new Error("The upload service did not accept the file.");
-  const text = (value, max = 700) => typeof value === "string" ? value.trim().slice(0, max) : "";
   const fileId = text(raw.fileId, 180);
   const fileName = text(raw.fileName, 180);
   const fileUrl = text(raw.fileUrl);
@@ -128,11 +228,69 @@ export function normalizeBodUploadResponse(raw, fallbackGroupId = "") {
   const folderName = text(raw.folderName, 180);
   const folderUrl = text(raw.folderUrl);
   const uploadGroupId = text(raw.uploadGroupId || fallbackGroupId, 100);
-  const isDriveUrl = (value) => {
-    try { const url = new URL(value); return url.protocol === "https:" && url.hostname === "drive.google.com"; } catch { return false; }
-  };
   if (!fileId || !fileName || !uploadGroupId || !isDriveUrl(fileUrl) || !isDriveUrl(folderUrl)) {
     throw new Error("The upload service returned incomplete Drive metadata.");
   }
-  return { fileId, fileName, fileUrl, folderId, folderName, folderUrl, uploadGroupId };
+  const eventId = safeDocumentId(expected.eventId, 128);
+  const expectedFileName = text(expected.fileName, 180);
+  const expectedMimeType = text(expected.mimeType, 120).toLowerCase();
+  const expectedSizeBytes = Number(expected.sizeBytes);
+  if (
+    !eventId
+    || (expectedFileName && fileName !== expectedFileName)
+    || !BOD_UPLOAD_ALLOWED_MIME_TYPES.includes(expectedMimeType)
+    || !Number.isSafeInteger(expectedSizeBytes)
+    || expectedSizeBytes <= 0
+  ) {
+    throw new Error("The upload service returned incomplete Drive metadata.");
+  }
+  const finalizationRaw = raw.attachmentFinalization && typeof raw.attachmentFinalization === "object"
+    ? raw.attachmentFinalization
+    : {};
+  const attachment = normalizeFinalizedAttachment(raw.attachment, {
+    fileId,
+    fileName,
+    eventId,
+    uploadGroupId,
+    mimeType: expectedMimeType,
+    sizeBytes: expectedSizeBytes,
+  });
+  const claimedFinalized = raw.attachmentFinalized === true;
+  const attachmentFinalized = claimedFinalized && Boolean(attachment);
+  const attachmentFinalizationCode = attachmentFinalized
+    ? "verified"
+    : claimedFinalized
+      ? "finalization-response-invalid"
+      : safeFinalizationReasonCode(
+        raw.attachmentFinalizationCode,
+        raw.attachmentFinalized === false ? "finalization-rejected" : "finalization-result-missing",
+      );
+  return {
+    fileId,
+    fileName,
+    fileUrl,
+    folderId,
+    folderName,
+    folderUrl,
+    uploadGroupId,
+    attachmentFinalized,
+    attachmentFinalizationCode,
+    attachmentFinalizationWarning: text(raw.attachmentFinalizationWarning, 300),
+    attachment,
+    attachmentFinalization: attachmentFinalized ? {
+      unchanged: finalizationRaw.unchanged === true,
+      eventId: safeDocumentId(finalizationRaw.eventId, 128),
+      uploadGroupId: safeDocumentId(finalizationRaw.uploadGroupId, 100),
+      driveFileId: safeDocumentId(finalizationRaw.driveFileId, 300),
+      attachmentPath: text(finalizationRaw.attachmentPath),
+    } : null,
+  };
+}
+
+export function getBodUploadFinalizationFailureMessage(upload) {
+  const reasonCode = safeFinalizationReasonCode(
+    upload?.attachmentFinalizationCode,
+    "finalization-rejected",
+  );
+  return `Drive upload succeeded, but report attachment verification failed (${reasonCode}). The file was not added as a report image; retry the upload after the verification service is corrected.`;
 }

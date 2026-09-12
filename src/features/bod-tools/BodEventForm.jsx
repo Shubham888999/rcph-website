@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import BodEventFileUploader from "./BodEventFileUploader";
 import { updateBodEvent } from "./bodEventService";
 import { uploadBodEventFile } from "./bodUploadService";
-import { getSafeBodUploadError } from "./bodUploadModel";
+import {
+  getBodUploadFinalizationFailureMessage,
+  getSafeBodUploadError,
+} from "./bodUploadModel";
 import {
   BOD_FOCUS_AREA_CATEGORY_OTHER,
   BOD_FOCUS_AREA_CUSTOM_MAX_LENGTH,
@@ -386,27 +389,37 @@ export default function BodEventForm({ event, displayName, prefill = null, busy,
       let uploadGroupId = uploadState.files.find((item) => item.uploaded)?.uploaded?.uploadGroupId || "";
       const completed = uploadState.files.filter((item) => item.uploaded).map((item) => item.uploaded);
       let failures = 0;
+      let verificationFailures = 0;
       if (!isMeetingPayload) {
         for (const item of uploadState.files) {
           if (item.uploaded) continue;
           try {
-const uploaded = await uploadBodEventFile(
-  item,
-  {
-    eventId,
-    name: result.payload.name,
-    eventDate: result.payload.startDate || result.payload.date,
-    uploadGroupId,
-  },
-  (status) =>
-    updateUploadFile(item.localId, {
-      status,
-      error: "",
-    }),
-);
+            const uploaded = await uploadBodEventFile(
+              item,
+              {
+                eventId,
+                name: result.payload.name,
+                eventDate: result.payload.startDate || result.payload.date,
+                uploadGroupId,
+              },
+              (status) =>
+                updateUploadFile(item.localId, {
+                  status,
+                  error: "",
+                }),
+            );
+            if (uploaded.attachmentFinalized !== true) {
+              verificationFailures += 1;
+              updateUploadFile(item.localId, {
+                status: "verification-failed",
+                partialUpload: uploaded,
+                error: getBodUploadFinalizationFailureMessage(uploaded),
+              });
+              continue;
+            }
             uploadGroupId = uploaded.uploadGroupId;
             completed.push(uploaded);
-            updateUploadFile(item.localId, { status: "uploaded", uploaded, file: null, error: "" });
+            updateUploadFile(item.localId, { status: "verified", uploaded, partialUpload: null, file: null, error: "" });
           } catch (error) {
             failures += 1;
             updateUploadFile(item.localId, { status: "failed", error: getSafeBodUploadError(error) });
@@ -414,57 +427,36 @@ const uploaded = await uploadBodEventFile(
         }
       }
 
-if (!isMeetingPayload && completed.length) {
-  const existingImageLinks = Array.isArray(event?.imageLinks)
-    ? event.imageLinks
-    : [];
+      if (!isMeetingPayload && completed.length && !draft.driveFolder) {
+        const driveFolder = completed.find((item) => item.folderUrl)?.folderUrl || "";
 
-  const existingDriveLinks = Array.isArray(event?.driveLinks)
-    ? event.driveLinks
-    : [];
+        if (driveFolder) {
+          const attachmentUpdate = await updateBodEvent({
+            ...result.payload,
+            eventId,
+            driveFolder,
+          });
 
-  const uploadedImageUrls = completed
-    .filter((item) => item.mimeType?.startsWith("image/"))
-    .map((item) => item.fileUrl);
+          if (attachmentUpdate?.ok !== true) {
+            throw new Error("Uploaded file metadata could not be saved.");
+          }
 
-  const uploadedDriveUrls = completed.map((item) => item.fileUrl);
+          setDraft((current) => ({
+            ...current,
+            driveFolder,
+          }));
+        }
+      }
 
-  const driveFolder =
-    completed.find((item) => item.folderUrl)?.folderUrl ||
-    draft.driveFolder;
-
-  const attachmentUpdate = await updateBodEvent({
-    ...result.payload,
-    eventId,
-    imageLinks: [
-      ...new Set([
-        ...existingImageLinks,
-        ...uploadedImageUrls,
-      ]),
-    ],
-    driveLinks: [
-      ...new Set([
-        ...existingDriveLinks,
-        ...uploadedDriveUrls,
-      ]),
-    ],
-    driveFolder,
-  });
-
-  if (attachmentUpdate?.ok !== true) {
-    throw new Error("Uploaded file metadata could not be saved.");
-  }
-
-  if (driveFolder) {
-    setDraft((current) => ({
-      ...current,
-      driveFolder,
-    }));
-  }
-}
-
-      if (failures) {
-        setUploadError(`The event was saved, but ${failures} file${failures === 1 ? "" : "s"} failed to upload. Retry failed files without reselecting successful uploads.`);
+      if (verificationFailures || failures) {
+        const messages = [];
+        if (verificationFailures) {
+          messages.push(`${verificationFailures} file${verificationFailures === 1 ? "" : "s"} reached Drive but failed report attachment verification`);
+        }
+        if (failures) {
+          messages.push(`${failures} file${failures === 1 ? "" : "s"} failed to upload`);
+        }
+        setUploadError(`The event was saved, but ${messages.join(" and ")}. Unverified files were not added as report images. Retry the failed files; verified files do not need to be reselected.`);
         return;
       }
       onComplete(saved);

@@ -5,6 +5,7 @@ import {
   BOD_UPLOAD_MAX_FILES,
   addBodUploadFiles,
   buildBodUploadTicketPayload,
+  getBodUploadFinalizationFailureMessage,
   getSafeBodUploadError,
   normalizeBodUploadResponse,
   validateBodUploadEndpoint,
@@ -47,14 +48,98 @@ test("Apps Script endpoint accepts only a production HTTPS exec URL", () => {
 
 test("ticket payload is event-bound and includes no file bytes", () => {
   const payload = buildBodUploadTicketPayload({ fileName: "a.pdf", mimeType: "application/pdf", sizeBytes: 42 }, { eventId: "event-1", name: "Event", eventDate: "2026-07-02", uploadGroupId: "group-1" });
-  assert.deepEqual(payload, { eventId: "event-1", eventName: "Event", eventDate: "2026-07-02", uploadGroupId: "group-1", fileName: "a.pdf", mimeType: "application/pdf", sizeBytes: 42 });
+  assert.deepEqual(payload, { eventId: "event-1", uploadGroupId: "group-1", fileName: "a.pdf", mimeType: "application/pdf", sizeBytes: 42 });
   assert.equal("base64" in payload, false);
+  assert.throws(
+    () => buildBodUploadTicketPayload({ fileName: "a.pdf", mimeType: "application/pdf", sizeBytes: 42 }, {}),
+    /Save the event before uploading files/
+  );
 });
 
-test("Apps Script response normalization requires complete Drive metadata", () => {
-  const normalized = normalizeBodUploadResponse({ ok: true, fileId: "f1", fileName: "a.pdf", fileUrl: "https://drive.google.com/file/d/f1/view", folderId: "d1", folderName: "Event", folderUrl: "https://drive.google.com/drive/folders/d1", uploadGroupId: "g1" });
+function verifiedResponse(overrides = {}) {
+  return {
+    ok: true,
+    fileId: "f1",
+    fileName: "a.png",
+    fileUrl: "https://drive.google.com/file/d/f1/view",
+    folderId: "d1",
+    folderName: "Event",
+    folderUrl: "https://drive.google.com/drive/folders/d1",
+    uploadGroupId: "g1",
+    attachmentFinalized: true,
+    attachmentFinalizationCode: "verified",
+    attachmentFinalization: {
+      ok: true,
+      unchanged: false,
+      eventId: "event-1",
+      uploadGroupId: "g1",
+      driveFileId: "f1",
+      attachmentPath: "bodEvents/event-1/attachments/f1",
+    },
+    attachment: {
+      fileId: "f1",
+      fileName: "a.png",
+      fileUrl: "https://drive.google.com/file/d/f1/view",
+      mimeType: "image/png",
+      sizeBytes: 42,
+      eventId: "event-1",
+      uploadGroupId: "g1",
+      attachmentPath: "bodEvents/event-1/attachments/f1",
+      storageProvider: "googleDrive",
+      source: "appsScriptFinalize",
+      verified: true,
+    },
+    ...overrides,
+  };
+}
+
+const expectedUpload = {
+  eventId: "event-1",
+  fileName: "a.png",
+  mimeType: "image/png",
+  sizeBytes: 42,
+};
+
+test("Apps Script response normalization requires complete Drive and verified attachment metadata", () => {
+  const normalized = normalizeBodUploadResponse(verifiedResponse(), "g1", expectedUpload);
   assert.equal(normalized.fileId, "f1");
-  assert.throws(() => normalizeBodUploadResponse({ ok: true, fileId: "f1", fileName: "a.pdf", fileUrl: "https://evil.example/f", folderUrl: "https://drive.google.com/drive/folders/d1", uploadGroupId: "g1" }), /incomplete/i);
+  assert.equal(normalized.attachmentFinalized, true);
+  assert.equal(normalized.attachment.eventId, "event-1");
+  assert.throws(() => normalizeBodUploadResponse({ ...verifiedResponse(), fileUrl: "https://evil.example/f" }, "g1", expectedUpload), /incomplete/i);
+});
+
+test("Drive success with attachmentFinalized false is a visible partial failure", () => {
+  const normalized = normalizeBodUploadResponse(verifiedResponse({
+    attachmentFinalized: false,
+    attachmentFinalizationCode: "folder-name-mismatch",
+    attachmentFinalizationWarning: "File uploaded, but report attachment verification could not be completed (folder-name-mismatch).",
+    attachment: undefined,
+    attachmentFinalization: undefined,
+  }), "g1", expectedUpload);
+  assert.equal(normalized.attachmentFinalized, false);
+  assert.equal(normalized.attachment, null);
+  assert.equal(normalized.attachmentFinalizationCode, "folder-name-mismatch");
+  assert.match(normalized.attachmentFinalizationWarning, /could not be completed/);
+  assert.match(getBodUploadFinalizationFailureMessage(normalized), /Drive upload succeeded/);
+  assert.match(getBodUploadFinalizationFailureMessage(normalized), /folder-name-mismatch/);
+});
+
+test("missing or invalid finalization results never normalize as verified", () => {
+  const missing = normalizeBodUploadResponse({
+    ...verifiedResponse(),
+    attachmentFinalized: undefined,
+    attachmentFinalizationCode: undefined,
+    attachment: undefined,
+  }, "g1", expectedUpload);
+  assert.equal(missing.attachmentFinalized, false);
+  assert.equal(missing.attachmentFinalizationCode, "finalization-result-missing");
+
+  const mismatched = normalizeBodUploadResponse({
+    ...verifiedResponse(),
+    attachment: { ...verifiedResponse().attachment, eventId: "event-2" },
+  }, "g1", expectedUpload);
+  assert.equal(mismatched.attachmentFinalized, false);
+  assert.equal(mismatched.attachmentFinalizationCode, "finalization-response-invalid");
 });
 
 test("upload errors expose only approved user-safe messages", () => {
