@@ -98,6 +98,8 @@ function doPost(e) {
       );
     }
 
+    assertFinalizationReady_(config, approval);
+
     const rootFolder = DriveApp.getFolderById(
       config.rootFolderId
     );
@@ -140,12 +142,11 @@ function doPost(e) {
       folderUrl: eventFolder.getUrl(),
       uploadGroupId: approval.uploadGroupId,
       attachmentFinalized: finalization.ok,
+      attachmentFinalizationCode:
+        finalization.ok ? 'verified' : finalization.reasonCode,
       ...(finalization.ok ? {
-        attachment: {
-          fileId: file.getId(),
-          mimeType,
-          sizeBytes: declaredSizeBytes
-        }
+        attachmentFinalization: finalization.result,
+        attachment: finalization.result.attachment
       } : {
         attachmentFinalizationWarning:
           finalization.message
@@ -158,12 +159,43 @@ function doPost(e) {
       safeErrorMessage_(err)
     );
 
-    return jsonResponse_({
+    const response = {
       ok: false,
       error: 'upload-failed',
       message: safePublicError_(err)
-    });
+    };
+    if (err && err.finalizationReasonCode) {
+      response.reasonCode = safeFinalizationReasonCode_(
+        err.finalizationReasonCode
+      );
+    }
+    return jsonResponse_(response);
   }
+}
+
+function assertFinalizationReady_(config, approval) {
+  let reasonCode = '';
+  let message = '';
+
+  if (!config.finalizeUrl) {
+    reasonCode = 'finalization-not-configured';
+    message = 'Report attachment verification is not configured.';
+  } else if (
+    !approval.eventId ||
+    !approval.finalizeId ||
+    !approval.finalizeProof
+  ) {
+    reasonCode = 'finalization-authorization-incomplete';
+    message = 'Upload authorization could not verify a report attachment.';
+  }
+
+  if (!reasonCode) return;
+
+  console.warn(
+    'BOD attachment finalization skipped.',
+    JSON.stringify({ reasonCode })
+  );
+  throw finalizationError_(reasonCode, message);
 }
 
 function getBodConfig_() {
@@ -263,6 +295,7 @@ function safelyFinalizeBodEventUpload_(options) {
     if (!options.config.finalizeUrl) {
       return {
         ok: false,
+        reasonCode: 'finalization-not-configured',
         message:
           'File uploaded, but report attachment verification is not configured.'
       };
@@ -275,25 +308,30 @@ function safelyFinalizeBodEventUpload_(options) {
     ) {
       return {
         ok: false,
+        reasonCode: 'finalization-authorization-incomplete',
         message:
           'File uploaded, but report attachment verification was unavailable.'
       };
     }
 
-    finalizeBodEventUpload_({
+    const result = finalizeBodEventUpload_({
       ...options,
       sha256
     });
-    return { ok: true };
+    return { ok: true, result };
   } catch (err) {
+    const reasonCode = safeFinalizationReasonCode_(
+      err && err.finalizationReasonCode
+    );
     console.warn(
-      'BOD attachment finalization failed:',
-      safeFinalizationMessage_(err)
+      'BOD attachment finalization failed.',
+      JSON.stringify({ reasonCode })
     );
     return {
       ok: false,
+      reasonCode,
       message:
-        'File uploaded, but report attachment verification could not be completed.'
+        `File uploaded, but report attachment verification could not be completed (${reasonCode}).`
     };
   }
 }
@@ -372,15 +410,96 @@ function finalizeBodEventUpload_(options) {
     status >= 300 ||
     body.ok !== true
   ) {
-    throw new Error(
+    throw finalizationError_(
+      safeFinalizationReasonCode_(body.reasonCode),
       'Report attachment verification was rejected.'
+    );
+  }
+
+  const eventId = requiredString_(body.eventId, 'verified eventId', 128);
+  const verifiedUploadGroupId = requiredString_(body.uploadGroupId, 'verified uploadGroupId', 100);
+  const driveFileId = requiredString_(body.driveFileId, 'verified driveFileId', 300);
+  const attachmentPath = requiredString_(body.attachmentPath, 'attachmentPath', 700);
+
+  if (
+    eventId !== payload.eventId ||
+    verifiedUploadGroupId !== payload.uploadGroupId ||
+    driveFileId !== payload.driveFileId ||
+    attachmentPath !== `bodEvents/${eventId}/attachments/${driveFileId}`
+  ) {
+    throw finalizationError_(
+      'finalization-response-mismatch',
+      'Report attachment verification returned mismatched metadata.'
     );
   }
 
   return {
     ok: true,
-    unchanged: body.unchanged === true
+    unchanged: body.unchanged === true,
+    eventId,
+    uploadGroupId: verifiedUploadGroupId,
+    driveFileId,
+    attachmentPath,
+    attachment: {
+      fileId: driveFileId,
+      fileName: options.file.getName(),
+      fileUrl: options.file.getUrl(),
+      mimeType: payload.mimeType,
+      sizeBytes: payload.sizeBytes,
+      eventId,
+      uploadGroupId: verifiedUploadGroupId,
+      attachmentPath,
+      storageProvider: 'googleDrive',
+      source: 'appsScriptFinalize',
+      verified: true
+    }
   };
+}
+
+function finalizationError_(reasonCode, message) {
+  const error = new Error(message);
+  error.finalizationReasonCode = safeFinalizationReasonCode_(reasonCode);
+  return error;
+}
+
+function safeFinalizationReasonCode_(value) {
+  const code = String(value || '').trim().toLowerCase();
+  const allowed = new Set([
+    'attachment-conflict',
+    'event-date-missing',
+    'event-inactive',
+    'event-name-missing',
+    'event-not-club-event',
+    'event-not-found',
+    'file-folder-mismatch',
+    'file-invalid',
+    'file-mime-mismatch',
+    'file-name-mismatch',
+    'file-size-mismatch',
+    'finalization-authorization-incomplete',
+    'finalization-conflict',
+    'finalization-expired',
+    'finalization-failed-precondition',
+    'finalization-internal-error',
+    'finalization-metadata-mismatch',
+    'finalization-not-configured',
+    'finalization-not-found',
+    'finalization-not-pending',
+    'finalization-permission-denied',
+    'finalization-replay-mismatch',
+    'finalization-response-mismatch',
+    'folder-invalid',
+    'folder-name-mismatch',
+    'folder-outside-approved-root',
+    'invalid-finalization-request',
+    'invalid-finalize-proof',
+    'storage-not-configured',
+    'upload-group-event-mismatch',
+    'upload-group-folder-mismatch',
+    'upload-group-invalid',
+    'upload-group-user-mismatch'
+  ]);
+  return allowed.has(code) ? code : 'finalization-rejected';
 }
 
 function sha256Hex_(bytes) {
@@ -393,18 +512,6 @@ function sha256Hex_(bytes) {
     const unsigned = (value + 256) % 256;
     return unsigned.toString(16).padStart(2, '0');
   }).join('');
-}
-
-function safeFinalizationMessage_(err) {
-  const message = safeErrorMessage_(err);
-  const allowedMessages = [
-    'Report attachment verification returned an invalid response.',
-    'Report attachment verification was rejected.'
-  ];
-
-  return allowedMessages.includes(message)
-    ? message
-    : 'Report attachment verification could not be completed.';
 }
 
 function buildBodFolderName_(data) {
@@ -584,7 +691,9 @@ function safePublicError_(err) {
     'This upload authorization was already used.',
     'This upload authorization has expired.',
     'Upload authorization was rejected.',
-    'Approved upload metadata does not match.'
+    'Approved upload metadata does not match.',
+    'Report attachment verification is not configured.',
+    'Upload authorization could not verify a report attachment.'
   ];
 
   return allowedMessages.includes(

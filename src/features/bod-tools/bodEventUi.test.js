@@ -91,7 +91,7 @@ test("BOD event form includes a Board of Directors meeting path", () => {
 
 test("BOD event form exposes report-only finance rows without Treasury wiring", () => {
   assert.match(form, /Any income\/expense incurred for this event\?/);
-  assert.match(form, /Report finance/);
+  assert.match(form, /Additional Reporting/);
   assert.match(form, /For Avenue Report generation only\. This does not update Treasury\./);
   assert.match(form, /<option value="income">Income<\/option>/);
   assert.match(form, /<option value="expense">Expense<\/option>/);
@@ -167,6 +167,19 @@ test("BOD event report image selector uses authoritative attachment docs only", 
 
   assert.doesNotMatch(details, /getDriveThumbnailUrl|thumbnailUrl|download|canvas|PDFDocument|jsPDF|pdfMake/i);
   assert.doesNotMatch(service, /getDownloadURL|download|arrayBuffer|blob|canvas|PDFDocument|jsPDF|pdfMake/i);
+});
+
+test("BOD uploads wait for a saved event and surface Drive-only partial failures", () => {
+  const savedIdIndex = form.indexOf("setSavedEventId(eventId)");
+  const uploadIndex = form.indexOf("uploadBodEventFile(");
+  assert.ok(savedIdIndex > 0);
+  assert.ok(uploadIndex > savedIdIndex);
+  assert.match(form, /eventId,\s*name: result\.payload\.name/);
+  assert.match(form, /uploaded\.attachmentFinalized !== true/);
+  assert.match(form, /status: "verification-failed"/);
+  assert.match(form, /Drive but failed report attachment verification/);
+  assert.match(form, /Unverified files were not added as report images/);
+  assert.doesNotMatch(form, /imageLinks|driveLinks/);
 });
 
 test("BOD submissions render as a collapsible compact list without the card grid contract", () => {

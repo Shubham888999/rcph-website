@@ -26,7 +26,14 @@ export async function uploadBodEventFile(item, event, onStatus) {
     buildBodUploadTicketPayload(item, event),
   );
   const approved = ticketResult?.data || {};
-  if (!approved.ticket || !approved.uploadGroupId) {
+  if (
+    !approved.ticket
+    || !approved.uploadGroupId
+    || approved.eventId !== event.eventId
+    || approved.fileName !== item.fileName
+    || approved.mimeType !== item.mimeType
+    || approved.sizeBytes !== item.sizeBytes
+  ) {
     throw new Error("Upload authorization was incomplete.");
   }
 
@@ -49,13 +56,19 @@ export async function uploadBodEventFile(item, event, onStatus) {
   onStatus?.("processing");
   const json = await response.json().catch(() => null);
   const normalized = normalizeBodUploadResponse(
-  json,
-  approved.uploadGroupId,
-);
+    json,
+    approved.uploadGroupId,
+    {
+      eventId: approved.eventId,
+      fileName: approved.fileName,
+      mimeType: approved.mimeType,
+      sizeBytes: approved.sizeBytes,
+    },
+  );
 
-return {
-  ...normalized,
-  mimeType: item.mimeType,
-  sizeBytes: item.sizeBytes,
-};
+  return {
+    ...normalized,
+    mimeType: item.mimeType,
+    sizeBytes: item.sizeBytes,
+  };
 }

@@ -50,18 +50,17 @@ Required for uploads:
 ```text
 BOD_ROOT_FOLDER_ID
 TICKET_VALIDATION_URL
+BOD_UPLOAD_FINALIZE_URL
 BACKEND_SHARED_SECRET
 ```
 
-Optional for Phase 2 attachment finalization:
-
-```text
-BOD_UPLOAD_FINALIZE_URL
-```
-
-If `BOD_UPLOAD_FINALIZE_URL` is not configured, Drive uploads still succeed and the response reports `attachmentFinalized: false`.
+The script refuses to create a Drive file when ticket validation does not return
+an event-bound `eventId`, `finalizeId`, and `finalizeProof`, or when the
+finalization endpoint is not configured.
 
 If finalization fails after the Drive file is created, the script does not delete or invalidate the uploaded file. It returns the normal upload result plus a safe finalization warning.
+The response includes `attachmentFinalized`, `attachmentFinalizationCode`, and,
+on success, the actual finalization result and verified attachment metadata.
 
 ## Current Production Action
 
