@@ -27,15 +27,6 @@ function getGdriveImageUrl(url) {
   return url;
 }
 
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result); // This is the base64 string
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
-  });
-}
-
 // bodlogin.js — upload-free (stores Drive folder/link only)
 const auth = firebase.auth();
 const db   = firebase.firestore();
@@ -44,18 +35,10 @@ const submitBodEventFn = functionsClient.httpsCallable('submitBodEvent');
 const syncBodEventFn = functionsClient.httpsCallable('syncBodEventToAttendance');
 const updateBodEventFn = functionsClient.httpsCallable('updateBodEvent');
 const archiveBodEventFn = functionsClient.httpsCallable('archiveBodEvent');
-const createBodUploadTicketFn = functionsClient.httpsCallable('createBodUploadTicket');
 const getBodToolsLockStateFn = functionsClient.httpsCallable('getBodToolsLockState');
 
-const BOD_UPLOAD_WEB_APP_URL =
-  'https://script.google.com/macros/s/AKfycby1iqbZHj2LJFz3FZzE7XkjGMZ1Tqi6Y-rCJmH1ZWs5bXBFRGrb--bkNfFh_D7dS0UfKw/exec';
-const BOD_UPLOAD_ALLOWED_MIME_TYPES = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp'
-]);
-const BOD_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+const LEGACY_BOD_UPLOAD_DISABLED_MESSAGE =
+  'File uploads are no longer available in this legacy manager. Use /bod-tools so every upload is bound to a saved event and verified for reports.';
 const imageUploader = document.getElementById('imageUploader');
 const loader = document.getElementById('loader');
 const loaderText = document.getElementById('loaderText');
@@ -413,21 +396,10 @@ function renderSelection(files) {
   });
 }
 
-function validateBodUploadFile(file) {
-  if (!file) throw new Error('Choose a file to upload.');
-  if (!BOD_UPLOAD_ALLOWED_MIME_TYPES.has(file.type)) {
-    throw new Error(`${file.name} is not an allowed upload type. Use PDF, JPG, PNG, or WebP.`);
-  }
-  if (!Number.isFinite(file.size) || file.size <= 0) {
-    throw new Error(`${file.name} is empty or could not be read.`);
-  }
-  if (file.size > BOD_UPLOAD_MAX_BYTES) {
-    throw new Error(`${file.name} is larger than the 15 MB limit.`);
-  }
-}
-
 function validateBodUploadFiles(files) {
-  Array.from(files || []).forEach(validateBodUploadFile);
+  if (Array.from(files || []).length) {
+    throw new Error(LEGACY_BOD_UPLOAD_DISABLED_MESSAGE);
+  }
 }
 
 function normalizeManualBodDriveFolder(value) {
@@ -459,67 +431,15 @@ function normalizeManualBodDriveFolder(value) {
   };
 }
 
-async function uploadBodFileWithTicket(file, { eventName, eventDate, uploadGroupId }) {
-  validateBodUploadFile(file);
-  const base64 = await readFileAsBase64(file);
-  const ticketResult = await createBodUploadTicketFn({
-    fileName: file.name,
-    mimeType: file.type,
-    sizeBytes: file.size,
-    eventName,
-    eventDate,
-    ...(uploadGroupId ? { uploadGroupId } : {})
-  });
-  const approved = ticketResult?.data || {};
-  if (!approved.ticket || !approved.uploadGroupId) {
-    throw new Error('Upload ticket response was incomplete.');
-  }
-
-  const response = await fetch(BOD_UPLOAD_WEB_APP_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: 'uploadBodFile',
-      ticket: approved.ticket,
-      uploadGroupId: approved.uploadGroupId,
-      fileName: approved.fileName,
-      mimeType: approved.mimeType,
-      sizeBytes: approved.sizeBytes,
-      base64
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`File upload failed with status ${response.status}.`);
-  }
-
-  const json = await response.json();
-  if (!json.ok) {
-    throw new Error(json.message || 'File upload failed.');
-  }
-  if (!json.fileUrl) {
-    throw new Error('File upload did not return a Drive file URL.');
-  }
-
-  return {
-    ...json,
-    uploadGroupId: json.uploadGroupId || approved.uploadGroupId
-  };
-}
-
 // Fire when the user picks files
 if (imageUploader) {
-  imageUploader.accept = 'application/pdf,image/jpeg,image/png,image/webp';
+  imageUploader.disabled = true;
+  imageUploader.title = LEGACY_BOD_UPLOAD_DISABLED_MESSAGE;
   imageUploader.addEventListener('change', () => {
-    const files = imageUploader.files || [];
-    try {
-      validateBodUploadFiles(files);
-      setStatus('');
-    } catch (err) {
-      toast(err.message || 'Invalid file selected.', 3000);
-      setStatus(err.message || 'Invalid file selected.', 'error');
-    }
-    renderSelection(files);
+    imageUploader.value = '';
+    renderSelection([]);
+    toast(LEGACY_BOD_UPLOAD_DISABLED_MESSAGE, 5000);
+    setStatus(LEGACY_BOD_UPLOAD_DISABLED_MESSAGE, 'error');
   });
 }
 
@@ -752,27 +672,8 @@ if (form) {
     try {
       // --- 2. Upload files through one-use backend tickets ---
       const uploadedFileUrls = [];
-      let uploadGroupId = '';
       let uploadedFolderId = '';
       let uploadedFolderUrl = '';
-      if (files.length > 0) {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          if (loaderText) loaderText.textContent = `Uploading files... ${i + 1} of ${files.length}`;
-          setStatus(`Uploading files... ${i + 1} of ${files.length}`);
-
-          const uploadResult = await uploadBodFileWithTicket(file, {
-            eventName: name,
-            eventDate: eventStart,
-            uploadGroupId
-          });
-
-          uploadGroupId = uploadResult.uploadGroupId || uploadGroupId;
-          if (uploadResult.fileUrl) uploadedFileUrls.push(uploadResult.fileUrl);
-          uploadedFolderId = uploadResult.folderId || uploadedFolderId;
-          uploadedFolderUrl = uploadResult.folderUrl || uploadedFolderUrl;
-        }
-      }
 
       // --- 3. Save through Cloud Functions and sync attendance ---
       if (loaderText) loaderText.textContent = 'Syncing attendance...';

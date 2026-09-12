@@ -121,21 +121,21 @@
 
   <section class="bod-form-section">
     <div class="section-head">
-      <h3>Images</h3>
+      <h3>Images (use the current BOD Tools)</h3>
     </div>
     <div class="input-group"> <label for="imageUploader" class="file-upload-label">
-        Browse Files...
+        Uploads moved to /bod-tools
       </label>
       
-      <input id="imageUploader" type="file" multiple accept="image/png, image/jpeg, image/gif, image/webp" />
+      <input id="imageUploader" type="file" multiple accept="image/png, image/jpeg, image/webp" disabled />
       
       <span id="file-upload-names">No files selected</span> </div>
       <span id="selectedCountPill" class="pill" hidden>0 selected</span>
       <div id="selectedThumbs" class="thumbs" hidden></div>
-    <small class="note">Upload one or more images. The first image will be used as the preview.</small>
+    <small class="note">This legacy manager cannot create event-bound upload tickets. Use /bod-tools for verified event files and report-image selection.</small>
   </section>
 
-<section class="bod-form-section"> <div class="section-head"> <h3>Existing Google Drive Folder <span class="note">(optional)</span></h3> </div> <label> <span>Drive folder URL</span> <input id="driveFolder" type="url" inputmode="url" autocomplete="off" placeholder="https://drive.google.com/drive/folders/..." /> </label> <small class="note"> Use this only when event files already exist in a Google Drive folder. Leave it blank when uploading files above. </small> <div id="drivePreview" class="drive-preview" hidden> <span class="btn btn-outline"> Folder ID: <code id="driveIdOut"></code> </span> <a id="driveOpenOut" class="btn btn-outline" href="#" target="_blank" rel="noopener" > Open folder </a> </div> </section>
+<section class="bod-form-section"> <div class="section-head"> <h3>Existing Google Drive Folder <span class="note">(optional)</span></h3> </div> <label> <span>Drive folder URL</span> <input id="driveFolder" type="url" inputmode="url" autocomplete="off" placeholder="https://drive.google.com/drive/folders/..." /> </label> <small class="note">This field preserves a legacy presentation link only. It does not create a verified report attachment.</small> <div id="drivePreview" class="drive-preview" hidden> <span class="btn btn-outline"> Folder ID: <code id="driveIdOut"></code> </span> <a id="driveOpenOut" class="btn btn-outline" href="#" target="_blank" rel="noopener" > Open folder </a> </div> </section>
   
   <section class="bod-form-section">
     <div class="section-head">

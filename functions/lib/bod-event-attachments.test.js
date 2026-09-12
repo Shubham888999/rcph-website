@@ -9,6 +9,7 @@ const {
   buildBodEventUploadFolderName,
   createBodEventAttachmentService,
   hashBodEventFinalizeProof,
+  getBodEventFinalizationReasonCode,
   normalizeDocumentId,
   normalizeAuthoritativeBodUploadEvent,
 } = require('./bod-event-attachments');
@@ -379,6 +380,19 @@ test('valid finalization creates authoritative attachment without path-derived f
     uploadGroupId: 'group-1',
     driveFileId: 'file-1',
     attachmentPath: 'bodEvents/event-1/attachments/file-1',
+    attachment: {
+      fileId: 'file-1',
+      fileName: 'poster.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: 1234,
+      fileUrl: 'https://drive.google.com/file/d/file-1/view',
+      eventId: 'event-1',
+      uploadGroupId: 'group-1',
+      attachmentPath: 'bodEvents/event-1/attachments/file-1',
+      storageProvider: 'googleDrive',
+      source: 'appsScriptFinalize',
+      verified: true,
+    },
   });
   assert.deepEqual(drive.calls, [['folder', 'folder-1'], ['file', 'file-1']]);
   assert.equal(attachment.storageProvider, BOD_EVENT_ATTACHMENT_STORAGE_PROVIDER);
@@ -418,6 +432,16 @@ test('event legacy drive folder does not block a valid new upload group folder',
   assert.equal(attachment.driveFolderId, 'folder-1');
   assert.equal(group.driveFolderId, 'folder-1');
   assert.equal(event.driveFolderId, 'old-event-folder');
+});
+
+test('event archived after ticket creation is rejected before attachment creation', async () => {
+  const { db, service } = testService({ event: { archived: true } });
+  await assert.rejects(
+    service.finalizeAppsScriptUpload(validPayload()),
+    (err) => err.code === 'failed-precondition'
+      && getBodEventFinalizationReasonCode(err) === 'event-inactive'
+  );
+  assert.equal(db.read('bodEvents/event-1/attachments/file-1'), undefined);
 });
 
 test('event folder relaxation keeps root folder group and metadata checks strict', async () => {
@@ -631,7 +655,7 @@ test('same group requires the verified folder and replay cannot switch files', a
   assert.equal(finalized.drive.calls.length, 0);
 });
 
-test('index wiring keeps ticket validation backward compatible and finalization server-only', () => {
+test('index wiring requires event-bound tickets and keeps finalization server-only', () => {
   const indexSource = readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
   const createTicket = indexSource.slice(
     indexSource.indexOf('exports.createBodUploadTicket'),
@@ -669,13 +693,40 @@ test('index wiring keeps ticket validation backward compatible and finalization 
   assert.match(validateTicket, /safeFileName: ticketData\.fileName/);
   assert.match(validateTicket, /eventName: ticketData\.eventName/);
   assert.match(validateTicket, /eventDate: ticketData\.eventDate/);
-  assert.match(validateTicket, /uploadType === 'bod' && !!ticketData\.eventId/);
+  assert.match(validateTicket, /normalizeBodEventDocumentId\(ticketData\.eventId, 'Event ID', HttpsError\)/);
+  assert.match(validateTicket, /shouldCreateBodFinalization = uploadType === 'bod'/);
   assert.match(validateTicket, /proofHash: finalizeProofHash/);
   assert.match(validateTicket, /bodResponse\.finalizeProof = finalizeProof/);
   assert.doesNotMatch(validateTicket, /finalizeProof:/);
   assert.match(authoritativeEventLoader, /normalizeBodEventDocumentId\(eventId, 'Event ID', HttpsError\)/);
   assert.match(finalizeEndpoint, /timingSafeSharedSecretMatches\(req\.get\('x-rcph-drive-secret'\), DRIVE_UPLOAD_SHARED_SECRET\.value\(\)\)/);
   assert.match(finalizeEndpoint, /bodEventAttachments\.finalizeAppsScriptUpload\(data\)/);
+  assert.match(finalizeEndpoint, /reasonCode/);
+});
+
+test('legacy static manager cannot request event-less upload tickets', () => {
+  const legacySource = readFileSync(path.join(__dirname, '..', '..', 'BOD Event manager', 'bodlogin.js'), 'utf8');
+  const legacyHtml = readFileSync(path.join(__dirname, '..', '..', 'BOD Event manager', 'bodlogin.html'), 'utf8');
+  assert.doesNotMatch(legacySource, /httpsCallable\(['"]createBodUploadTicket['"]\)/);
+  assert.doesNotMatch(legacySource, /uploadBodFileWithTicket|BOD_UPLOAD_WEB_APP_URL/);
+  assert.match(legacySource, /LEGACY_BOD_UPLOAD_DISABLED_MESSAGE/);
+  assert.match(legacyHtml, /id="imageUploader"[^>]*disabled/);
+  assert.match(legacyHtml, /Use \/bod-tools for verified event files/);
+});
+
+test('finalization diagnostics expose stable non-secret reason codes', () => {
+  assert.equal(
+    getBodEventFinalizationReasonCode(new TestHttpsError('failed-precondition', 'BOD upload folder is outside the approved root.')),
+    'folder-outside-approved-root'
+  );
+  assert.equal(
+    getBodEventFinalizationReasonCode(new TestHttpsError('permission-denied', 'Invalid finalize proof.')),
+    'invalid-finalize-proof'
+  );
+  assert.equal(
+    getBodEventFinalizationReasonCode(new Error('contains a ticket or proof value')),
+    'finalization-internal-error'
+  );
 });
 
 test('attachment schema omits parent-path and document-id authorities', () => {

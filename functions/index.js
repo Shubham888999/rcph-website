@@ -42,6 +42,7 @@ const {
   buildBodEventUploadFolderName,
   createBodEventAttachmentService,
   generateBodEventFinalizeProof,
+  getBodEventFinalizationReasonCode,
   hashBodEventFinalizeProof,
   normalizeDocumentId: normalizeBodEventDocumentId,
   normalizeAuthoritativeBodUploadEvent,
@@ -8633,7 +8634,10 @@ exports.validateDriveUploadTicket = onRequest({
         throw httpError(409, 'Upload ticket metadata mismatch.');
       }
 
-      const shouldCreateBodFinalization = uploadType === 'bod' && !!ticketData.eventId;
+      const bodEventId = uploadType === 'bod'
+        ? normalizeBodEventDocumentId(ticketData.eventId, 'Event ID', HttpsError)
+        : '';
+      const shouldCreateBodFinalization = uploadType === 'bod';
       tx.update(ticketRef, {
         used: true,
         usedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -8665,7 +8669,7 @@ exports.validateDriveUploadTicket = onRequest({
             ticketHash,
             uid: ticketData.uid,
             role: ticketData.role || '',
-            eventId: ticketData.eventId,
+            eventId: bodEventId,
             eventName: ticketData.eventName,
             eventDate: ticketData.eventDate,
             eventType: ticketData.eventType || 'clubEvent',
@@ -8686,7 +8690,7 @@ exports.validateDriveUploadTicket = onRequest({
             driveFolderId: '',
             sha256: '',
           });
-          bodResponse.eventId = ticketData.eventId;
+          bodResponse.eventId = bodEventId;
           bodResponse.finalizeId = finalizationRef.id;
           bodResponse.finalizeProof = finalizeProof;
           bodResponse.finalizeExpiresAt = finalizeExpiresAtMillis;
@@ -8751,14 +8755,16 @@ exports.finalizeBodEventUpload = onRequest({
   } catch (err) {
     const status = err?.httpStatus || err?.status || httpStatusFromHttpsError(err);
     const message = status >= 500 ? 'BOD upload finalization failed.' : err.message;
+    const reasonCode = getBodEventFinalizationReasonCode(err);
     console.warn('BOD upload finalization rejected.', {
       status,
       code: err?.code || '',
-      message,
+      reasonCode,
     });
     return sendDriveUploadJson(res, status, {
       ok: false,
       error: status >= 500 ? 'internal' : 'bod-upload-finalization-rejected',
+      reasonCode,
       message,
     });
   }
