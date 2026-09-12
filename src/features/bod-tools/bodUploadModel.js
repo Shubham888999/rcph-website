@@ -287,6 +287,80 @@ export function normalizeBodUploadResponse(raw, fallbackGroupId = "", expected =
   };
 }
 
+/**
+ * Match a backend-written attachment record against the upload we just sent.
+ *
+ * `bodEvents/<eventId>/attachments/<driveFileId>` is written only by
+ * finalizeBodEventUpload; Firestore rules deny all client writes to it. It is
+ * therefore a stronger success signal than the Apps Script response, which
+ * reaches the browser through a POST -> 302 -> GET redirect that can be lost.
+ */
+export function matchVerifiedBodUploadAttachment(attachments, expected = {}) {
+  const uploadGroupId = safeDocumentId(expected.uploadGroupId, 100);
+  const fileName = text(expected.fileName, 180);
+  const mimeType = text(expected.mimeType, 120).toLowerCase();
+  const sizeBytes = Number(expected.sizeBytes);
+  if (
+    !uploadGroupId
+    || !fileName
+    || !BOD_UPLOAD_ALLOWED_MIME_TYPES.includes(mimeType)
+    || !Number.isSafeInteger(sizeBytes)
+    || sizeBytes <= 0
+  ) return null;
+  const list = Array.isArray(attachments) ? attachments : [];
+  return list.find((item) => item
+    && item.uploadGroupId === uploadGroupId
+    && item.fileName === fileName
+    && item.mimeType === mimeType
+    && Number(item.sizeBytes) === sizeBytes
+    && item.storageProvider === "googleDrive"
+    && item.source === "appsScriptFinalize"
+    && isDriveUrl(item.fileUrl)) || null;
+}
+
+/** Shape a confirmed attachment like a successful normalizeBodUploadResponse result. */
+export function buildConfirmedBodUpload(attachment, eventId, fallbackGroupId = "") {
+  const id = safeDocumentId(attachment?.id, 300);
+  const confirmedEventId = safeDocumentId(eventId, 128);
+  if (!id || !confirmedEventId) return null;
+  const uploadGroupId = safeDocumentId(attachment.uploadGroupId || fallbackGroupId, 100);
+  const folderId = safeDocumentId(attachment.driveFolderId, 300);
+  const attachmentPath = `bodEvents/${confirmedEventId}/attachments/${id}`;
+  return {
+    fileId: id,
+    fileName: attachment.fileName,
+    fileUrl: attachment.fileUrl,
+    folderId,
+    folderName: "",
+    folderUrl: folderId ? `https://drive.google.com/drive/folders/${folderId}` : "",
+    uploadGroupId,
+    attachmentFinalized: true,
+    attachmentFinalizationCode: "verified",
+    attachmentFinalizationWarning: "",
+    confirmedVia: "firestore",
+    attachment: {
+      fileId: id,
+      fileName: attachment.fileName,
+      fileUrl: attachment.fileUrl,
+      mimeType: attachment.mimeType,
+      sizeBytes: Number(attachment.sizeBytes),
+      eventId: confirmedEventId,
+      uploadGroupId,
+      attachmentPath,
+      storageProvider: "googleDrive",
+      source: "appsScriptFinalize",
+      verified: true,
+    },
+    attachmentFinalization: {
+      unchanged: false,
+      eventId: confirmedEventId,
+      uploadGroupId,
+      driveFileId: id,
+      attachmentPath,
+    },
+  };
+}
+
 export function getBodUploadFinalizationFailureMessage(upload) {
   const reasonCode = safeFinalizationReasonCode(
     upload?.attachmentFinalizationCode,
