@@ -743,3 +743,98 @@ test('attachment schema omits parent-path and document-id authorities', () => {
   assert.doesNotMatch(attachmentBlock, /\bdriveFolderUrl\b/);
   assert.doesNotMatch(attachmentBlock, /\bthumbnailUrl\b/);
 });
+
+test('cleared lifecycle fields written as null keep an event active for uploads', () => {
+  // Regression: the terminal-field check previously tested key presence, so an
+  // event carrying endedAt: null was rejected as inactive. This is the same
+  // defect that was fixed once in the position lifecycle validator.
+  const cleared = {
+    name: 'Concord',
+    date: '2026-09-06',
+    type: 'clubEvent',
+    status: 'synced',
+    archivedAt: null,
+    deletedAt: null,
+    disabledAt: null,
+    endedAt: null,
+    historicalAt: null,
+    inactiveAt: null,
+    removedAt: null,
+    revokedAt: null,
+  };
+
+  const event = normalizeAuthoritativeBodUploadEvent('event-1', cleared, TestHttpsError);
+  assert.equal(event.eventId, 'event-1');
+  assert.equal(event.eventName, 'Concord');
+
+  for (const field of [
+    'archivedAt',
+    'deletedAt',
+    'disabledAt',
+    'endedAt',
+    'historicalAt',
+    'inactiveAt',
+    'removedAt',
+    'revokedAt',
+  ]) {
+    assert.throws(
+      () => normalizeAuthoritativeBodUploadEvent(
+        'event-1',
+        { ...cleared, [field]: '2026-09-10T00:00:00.000Z' },
+        TestHttpsError
+      ),
+      (err) => err.code === 'failed-precondition',
+      `${field} carrying a real timestamp must still terminate the event`
+    );
+  }
+});
+
+test('Drive lookup failures are recorded with cause and without request content', () => {
+  const source = readFileSync(path.join(__dirname, 'bod-event-attachments.js'), 'utf8');
+  const block = source.slice(
+    source.indexOf('function logDriveLookupFailure'),
+    source.indexOf('function getSecretValue')
+  );
+
+  assert.match(block, /logger\?\.warn\?\.\(/);
+  assert.match(block, /status/);
+  assert.match(block, /errorName/);
+  // The Drive client echoes request detail into error.message, so it must not
+  // reach the log; the client-facing message stays generic either way.
+  assert.doesNotMatch(block, /error\?\.message/);
+
+  const verifyBlock = source.slice(
+    source.indexOf('async function verifyDriveMetadata'),
+    source.indexOf('function assertEventAndGroup')
+  );
+  assert.match(verifyBlock, /logDriveLookupFailure\('folder', err\)/);
+  assert.match(verifyBlock, /logDriveLookupFailure\('file', err\)/);
+});
+
+test('upload folder names match the Apps Script builder exactly', () => {
+  // The identical table is asserted against buildBodFolderName_ in the React
+  // repo (src/features/bod-tools/bodUploaderAppsScript.test.js). Apps Script
+  // creates the folder and this side verifies its name during finalization, so
+  // any drift rejects a file that uploaded correctly. Keep both tables in step.
+  const fixtures = [
+    ['ordinary event',
+      { eventDate: '2026-09-06', eventName: 'Concord', uploadGroupId: 'abc123' },
+      '2026-09-06_Concord_abc123'],
+    ['name that sanitizes away falls back to event',
+      { eventDate: '2026-09-06', eventName: '###', uploadGroupId: 'abc123' },
+      '2026-09-06_event_abc123'],
+    ['missing upload group falls back to group',
+      { eventDate: '2026-09-06', eventName: 'Concord', uploadGroupId: '' },
+      '2026-09-06_Concord_group'],
+    ['missing date falls back to undated',
+      { eventDate: '', eventName: 'Concord', uploadGroupId: 'abc123' },
+      'undated_Concord_abc123'],
+    ['a space landing on the length cut is trimmed away',
+      { eventDate: '2026-09-06', eventName: `${'a'.repeat(99)} tail`, uploadGroupId: 'abc123' },
+      `2026-09-06_${'a'.repeat(99)}_abc123`],
+  ];
+
+  for (const [label, input, expected] of fixtures) {
+    assert.equal(buildBodEventUploadFolderName(input), expected, label);
+  }
+});
