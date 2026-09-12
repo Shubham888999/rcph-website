@@ -51,6 +51,8 @@ const BOD_POSITION_KEYS = new Set([
   "wrwc",
   "wr",
   "saa",
+  "pid",
+  "mdo",
   "co-president",
   "co-vice-president",
   "co-secretary",
@@ -69,6 +71,8 @@ const BOD_POSITION_KEYS = new Set([
   "co-wrwc",
   "co-wr",
   "co-saa",
+  "co-pid",
+  "co-mdo",
 ]);
 function text(value, max = 300) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";

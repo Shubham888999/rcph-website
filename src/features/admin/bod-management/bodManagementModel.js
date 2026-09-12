@@ -61,6 +61,8 @@ export const DEFAULT_BOD_POSITION_PRESETS = Object.freeze([
   { key: "pro", label: "PRO" },
   { key: "dei", label: "DEI" },
   { key: "wrwc", label: "WRWC" },
+  { key: "pid", label: "Public Image Director" },
+  { key: "mdo", label: "Membership Development Officer" },
   { key: "custom", label: "Custom" },
 ]);
 

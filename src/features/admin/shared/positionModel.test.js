@@ -4,10 +4,22 @@ import { POSITION_CATALOG, POSITION_GROUPS } from "./positionCatalog.js";
 import { applyPositionRole, buildJointConfirmationPayload, deriveEffectiveRole, effectiveRoleForPosition, extractJointPositionConflict, filterPositionCatalog, groupedPositionOptions, hasResolutionVoterPosition, initializePositionSelection, isResolutionVoterPosition, normalizePositionSelection, validatePositionRole } from "./positionModel.js";
 
 test("canonical options retain deterministic server catalog order", () => {
-  assert.equal(POSITION_CATALOG.length, 38);
+  assert.equal(POSITION_CATALOG.length, 42);
   assert.deepEqual(POSITION_CATALOG.slice(0, 3).map((item) => item.key), ["president", "immediate-past-president", "vice-president"]);
-  assert.equal(POSITION_CATALOG.at(-1).key, "co-saa");
+  assert.equal(POSITION_CATALOG.at(-1).key, "co-mdo");
   assert.deepEqual(POSITION_GROUPS.map((group) => group.label), ["Admin Positions", "BOD Positions", "Co-Admin Positions", "Co-BOD Positions"]);
+});
+
+test("Public Image and Membership Development positions resolve without colliding with PRO", () => {
+  assert.deepEqual(filterPositionCatalog("Public Image").map((item) => item.key), ["pid", "co-pid"]);
+  assert.deepEqual(filterPositionCatalog("Public Relations").map((item) => item.key), ["pro", "co-pro"]);
+  assert.deepEqual(filterPositionCatalog("Membership Development").map((item) => item.key), ["mdo", "co-mdo"]);
+  assert.deepEqual(normalizePositionSelection(["PID", "MDO", "Co-PID"]).selectedKeys, ["pid", "mdo", "co-pid"]);
+  for (const key of ["pid", "mdo", "co-pid", "co-mdo"]) {
+    const position = POSITION_CATALOG.find((item) => item.key === key);
+    assert.equal(position?.effectiveRole, "bod");
+    assert.equal(position?.bodRoster, true);
+  }
 });
 
 test("multiple selections are canonical, deduplicated, and ordered", () => {
