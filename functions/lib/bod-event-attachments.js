@@ -22,6 +22,34 @@ const INACTIVE_EVENT_STATUSES = new Set([
   'removed',
 ]);
 
+const FINALIZATION_REASON_BY_MESSAGE = new Map([
+  ['BOD upload finalization is not pending.', 'finalization-not-pending'],
+  ['Invalid finalize proof.', 'invalid-finalize-proof'],
+  ['BOD upload finalization metadata mismatch.', 'finalization-metadata-mismatch'],
+  ['BOD upload finalization expired.', 'finalization-expired'],
+  ['BOD upload finalization was already used for a different file.', 'finalization-replay-mismatch'],
+  ['BOD upload folder is not valid.', 'folder-invalid'],
+  ['BOD upload folder is outside the approved root.', 'folder-outside-approved-root'],
+  ['BOD upload folder name does not match the approved event.', 'folder-name-mismatch'],
+  ['BOD upload file is not valid.', 'file-invalid'],
+  ['BOD upload file name does not match the approved ticket.', 'file-name-mismatch'],
+  ['BOD upload file type does not match the approved ticket.', 'file-mime-mismatch'],
+  ['BOD upload file size does not match the approved ticket.', 'file-size-mismatch'],
+  ['BOD upload file is outside the verified event folder.', 'file-folder-mismatch'],
+  ['BOD event not found.', 'event-not-found'],
+  ['BOD event name is missing.', 'event-name-missing'],
+  ['BOD event date is missing.', 'event-date-missing'],
+  ['BOD meetings cannot have event report attachments.', 'event-not-club-event'],
+  ['BOD event is not active for new uploads.', 'event-inactive'],
+  ['BOD upload group is not valid.', 'upload-group-invalid'],
+  ['BOD upload group is not valid for this user.', 'upload-group-user-mismatch'],
+  ['BOD upload group is bound to a different event.', 'upload-group-event-mismatch'],
+  ['BOD upload group is not valid for this event.', 'upload-group-event-mismatch'],
+  ['BOD upload group folder does not match this file.', 'upload-group-folder-mismatch'],
+  ['BOD attachment already exists for a different upload.', 'attachment-conflict'],
+  ['BOD event upload storage is not configured.', 'storage-not-configured'],
+]);
+
 function makeError(HttpsError, code, message, details) {
   return new HttpsError(code, message, details);
 }
@@ -32,6 +60,23 @@ function text(value, max = 500) {
 
 function cleanLower(value, max = 120) {
   return text(value, max).toLowerCase();
+}
+
+function getBodEventFinalizationReasonCode(error) {
+  const message = text(error?.message, 300);
+  if (FINALIZATION_REASON_BY_MESSAGE.has(message)) {
+    return FINALIZATION_REASON_BY_MESSAGE.get(message);
+  }
+  const code = cleanLower(error?.code, 80);
+  const fallbackByCode = {
+    'invalid-argument': 'invalid-finalization-request',
+    'permission-denied': 'finalization-permission-denied',
+    'not-found': 'finalization-not-found',
+    'already-exists': 'finalization-conflict',
+    'failed-precondition': 'finalization-failed-precondition',
+    'deadline-exceeded': 'finalization-expired',
+  };
+  return fallbackByCode[code] || 'finalization-internal-error';
 }
 
 function hasControlCharacter(value) {
@@ -347,6 +392,22 @@ function attachmentMatchesRequest(attachment, session, payload) {
     && attachment.sha256 === payload.sha256;
 }
 
+function shapeFinalizedAttachment(session, payload, fileUrl, attachmentPath) {
+  return {
+    fileId: payload.driveFileId,
+    fileName: session.fileName,
+    mimeType: session.mimeType,
+    sizeBytes: Number(session.sizeBytes),
+    fileUrl: normalizeOptionalDriveUrl(fileUrl),
+    eventId: session.eventId,
+    uploadGroupId: session.uploadGroupId,
+    attachmentPath,
+    storageProvider: BOD_EVENT_ATTACHMENT_STORAGE_PROVIDER,
+    source: BOD_EVENT_ATTACHMENT_SOURCE,
+    verified: true,
+  };
+}
+
 function normalizeFinalizationPayload(data = {}, HttpsError, options = {}) {
   const allowedMimeTypes = new Set(options.allowedMimeTypes || DEFAULT_ALLOWED_MIME_TYPES);
   return {
@@ -493,10 +554,7 @@ function createBodEventAttachmentService(options = {}) {
   function assertEventAndGroup(eventSnap, groupSnap, session, payload) {
     if (!eventSnap.exists) throw makeError(HttpsError, 'not-found', 'BOD event not found.');
     const event = eventSnap.data() || {};
-    const eventType = text(event.type || 'clubEvent', 40);
-    if (eventType !== 'clubEvent') {
-      throw makeError(HttpsError, 'failed-precondition', 'BOD meetings cannot have event report attachments.');
-    }
+    normalizeAuthoritativeBodUploadEvent(session.eventId, event, HttpsError);
 
     if (!groupSnap.exists) throw makeError(HttpsError, 'failed-precondition', 'BOD upload group is not valid.');
     const group = groupSnap.data() || {};
@@ -523,13 +581,20 @@ function createBodEventAttachmentService(options = {}) {
 
     const preflight = await loadApprovedPendingSession(payload);
     if (preflight.finalized) {
+      const attachmentPath = attachmentRef(payload).path;
       return {
         ok: true,
         unchanged: true,
         eventId: payload.eventId,
         uploadGroupId: payload.uploadGroupId,
         driveFileId: payload.driveFileId,
-        attachmentPath: attachmentRef(payload).path,
+        attachmentPath,
+        attachment: shapeFinalizedAttachment(
+          preflight.session,
+          payload,
+          preflight.session.fileUrl || payload.fileUrl,
+          attachmentPath
+        ),
       };
     }
 
@@ -543,13 +608,20 @@ function createBodEventAttachmentService(options = {}) {
 
       if (session.status === 'finalized') {
         assertFinalizedSessionRetry(session, payload, HttpsError);
+        const existingAttachmentPath = attachmentRef(payload).path;
         return {
           ok: true,
           unchanged: true,
           eventId: payload.eventId,
           uploadGroupId: payload.uploadGroupId,
           driveFileId: payload.driveFileId,
-          attachmentPath: attachmentRef(payload).path,
+          attachmentPath: existingAttachmentPath,
+          attachment: shapeFinalizedAttachment(
+            session,
+            payload,
+            session.fileUrl || verifiedFileUrl,
+            existingAttachmentPath
+          ),
         };
       }
 
@@ -617,6 +689,12 @@ function createBodEventAttachmentService(options = {}) {
         uploadGroupId: session.uploadGroupId,
         driveFileId: payload.driveFileId,
         attachmentPath: attachmentDocumentRef.path,
+        attachment: shapeFinalizedAttachment(
+          session,
+          payload,
+          verifiedFileUrl,
+          attachmentDocumentRef.path
+        ),
       };
     });
   }
@@ -637,6 +715,7 @@ module.exports = {
   createBodEventAttachmentService,
   createBodEventDriveMetadataService,
   generateBodEventFinalizeProof,
+  getBodEventFinalizationReasonCode,
   getBodEventUploadDriveConfig,
   hashBodEventFinalizeProof,
   normalizeDocumentId,
