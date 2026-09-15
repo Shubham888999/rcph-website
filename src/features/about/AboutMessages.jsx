@@ -40,12 +40,8 @@ export default function AboutMessages() {
 
           <div className="about-leadership">
             <div>
-              <h3>Rtr. Nupura Danait</h3>
-              <p>President</p>
-            </div>
-            <div>
-              <h3>Rtr. Harshal Nikam</h3>
-              <p>Club Service Director</p>
+              <h3>Rtr. Anish Joglekar</h3>
+              <p>Membership Development Officer</p>
             </div>
           </div>
 
