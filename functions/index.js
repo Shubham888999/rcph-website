@@ -3801,11 +3801,11 @@ function withRecoveredReportingWindowId(data = {}, reportingWindow = null) {
   };
 }
 
-async function requireReportingWindowForBodPayload(payload, loadedReportingWindow = null) {
+async function requireReportingWindowForBodPayload(payload, loadedReportingWindow = null, options = {}) {
   const reportingWindowId = validateEventDocId(payload.reportingWindowId);
   if (!reportingWindowId) return null;
   const reportingWindow = loadedReportingWindow || await loadReportingWindowForBodPayloadId(reportingWindowId);
-  assertReportingWindowMatchesBodPayload(payload, reportingWindow);
+  assertReportingWindowMatchesBodPayload(payload, reportingWindow, options);
   return reportingWindow;
 }
 
@@ -3837,12 +3837,12 @@ function assertCompletedReportingWindowCoveragePreserved(payload, reportingWindo
   bodReportingLinkRecovery.assertCompletedReportingWindowCoveragePreserved({ payload, reportingWindow, HttpsError });
 }
 
-function assertReportingWindowMatchesBodPayload(payload, reportingWindow) {
+function assertReportingWindowMatchesBodPayload(payload, reportingWindow, options = {}) {
   if (!reportingWindow) return;
   if (payload.date !== reportingWindow.conductedDate) {
     throw new HttpsError('invalid-argument', 'Event date must match the reporting window conducted date.');
   }
-  if (reportingNameSimilarity(payload.name, reportingWindow.targetName) < 1) {
+  if (!options.allowNameChange && reportingNameSimilarity(payload.name, reportingWindow.targetName) < 1) {
     throw new HttpsError('invalid-argument', 'Event name must match the reporting window event name.');
   }
   if (!bodPayloadIncludesReportingWindowAvenue(payload, reportingWindow)) {
@@ -9193,15 +9193,26 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
     allowedMissingAvenues: allowedMissingAvenuesForReportingWindow(reportingWindow),
   });
   await assertBodEventAvenuesUnlocked(payload.avenues);
-  await requireReportingWindowForBodPayload(payload, reportingWindow);
+  const canRenameLinkedEvent = hasUnrestrictedAdminAuthority(authority);
+  await requireReportingWindowForBodPayload(payload, reportingWindow, { allowNameChange: canRenameLinkedEvent });
+  const previousReportingWindowName = reportingWindow?.targetName || '';
+  const renamedLinkedEvent = Boolean(reportingWindow)
+    && canRenameLinkedEvent
+    && reportingNameSimilarity(payload.name, previousReportingWindowName) < 1;
   const userProfile = await getCallableUserProfile(uid, request);
   const now = admin.firestore.FieldValue.serverTimestamp();
 
   const { bodEventDoc } = await writeSyncedBodEvent({ eventId, payload, uid, userProfile, now });
+  if (renamedLinkedEvent) {
+    await db.collection('reminders').doc(reportingWindow.id).update({
+      targetName: payload.name,
+      eventName: payload.name,
+    });
+  }
   let reportingWorkflow = null;
   if (reportingWindow) {
     reportingWorkflow = await reminderFunctions.linkReportingWindowToTarget({
-      reportingWindow,
+      reportingWindow: renamedLinkedEvent ? { ...reportingWindow, targetName: payload.name } : reportingWindow,
       targetType: 'club_event',
       targetId: eventId,
       bodEventId: eventId,
@@ -9243,6 +9254,8 @@ exports.updateBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
       visibility: payload.visibility,
       reportingWindowId: payload.reportingWindowId,
       reportingWorkflowLinked: reportingWorkflow?.ok === true,
+      reportingWindowRenamed: renamedLinkedEvent,
+      previousReportingWindowName: renamedLinkedEvent ? previousReportingWindowName : '',
     },
   });
 
