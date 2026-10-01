@@ -800,8 +800,9 @@ export function MembersModule({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [positionFilter, setPositionFilter] = useState("all");
-  const [sort, setSort] = useState("nameAsc");
+  const [sort, setSort] = useState("hierarchy");
   const [issueFilter, setIssueFilter] = useState("");
+  const [includeProspects, setIncludeProspects] = useState(false);
   const [viewMode, setViewMode] = useState("detailed");
   const [membersOpen, setMembersOpen] = useState(() => {
   if (typeof window === "undefined") return true;
@@ -813,8 +814,8 @@ const [openMemberActionId, setOpenMemberActionId] = useState("");
 
   const model = useMemo(() => getMemberOperationsModel(
     { members, users, attendance, events, fines },
-    { search, status: statusFilter, position: positionFilter, sort, issue: issueFilter },
-  ), [members, users, attendance, events, fines, search, statusFilter, positionFilter, sort, issueFilter]);
+    { search, status: statusFilter, position: positionFilter, sort, issue: issueFilter, includeProspects },
+  ), [members, users, attendance, events, fines, search, statusFilter, positionFilter, sort, issueFilter, includeProspects]);
 
   const selectedMember = model.rows.find((member) => member.id === selectedId)
     || null;
@@ -952,8 +953,9 @@ duesPaid: linked?.duesPaid === true,
     setSearch("");
     setStatusFilter("all");
     setPositionFilter("all");
-    setSort("nameAsc");
+    setSort("hierarchy");
     setIssueFilter("");
+    setIncludeProspects(false);
   }
 
   function applyAttention(item) {
@@ -1046,10 +1048,18 @@ duesPaid: linked?.duesPaid === true,
         <label>
           <span>Sort</span>
           <select value={sort} onChange={(event) => setSort(event.target.value)}>
+            <option value="hierarchy">Position order</option>
             <option value="nameAsc">Name A-Z</option>
             <option value="nameDesc">Name Z-A</option>
             <option value="activeFirst">Active first</option>
             <option value="incompleteFirst">Incomplete records first</option>
+          </select>
+        </label>
+        <label>
+          <span>Prospects</span>
+          <select value={includeProspects ? "include" : "exclude"} onChange={(event) => setIncludeProspects(event.target.value === "include")}>
+            <option value="exclude">Hide prospects</option>
+            <option value="include">Include prospects</option>
           </select>
         </label>
 

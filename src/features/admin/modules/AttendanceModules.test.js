@@ -112,7 +112,7 @@ test("Club Attendance defaults to excluding prospects from percentage summaries"
 });
 
 test("Club Attendance exposes the prospect percentage opt-in checkbox", () => {
-  assert.match(source, /Include prospects in club attendance percentage/);
+  assert.match(source, /^\s*Include prospects\s*$/m);
   assert.match(source, /collectionName === "attendance"/);
   assert.match(source, /includeProspects: includeProspectsInSummary/);
 });

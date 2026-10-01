@@ -1,3 +1,5 @@
+import { compareByHierarchy, hierarchySortKey, resolvePositionKeys } from "../shared/positionHierarchy.js";
+
 function text(value, max = 5000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
@@ -228,6 +230,12 @@ const clubPosition = effectiveRole.toLowerCase() === "gbm"
   : rosterClubPosition || linkedClubPosition;
 const positionLabel = clubPosition || memberRole || trustedRole;
 const roleOrPositionLabel = trustedRole || memberRole || clubPosition;
+const isProspect = [trustedRole, memberRole, text(member.memberType, 30)]
+  .some((value) => value.toLowerCase() === "prospect");
+const positionKeys = resolvePositionKeys({
+  positionKeys: linkedAccount?.positionKeys,
+  positionText: clubPosition || text(member.position, 180),
+});
 
     return {
       ...member,
@@ -244,6 +252,9 @@ const roleOrPositionLabel = trustedRole || memberRole || clubPosition;
       clubPosition,
       positionLabel,
       roleOrPositionLabel,
+      isProspect,
+      positionKeys,
+      hierarchySortKey: hierarchySortKey({ positionKeys, isProspect }),
       linkedAccount,
       possibleNameMatches,
       accountLinked: Boolean(linkedAccount),
@@ -329,11 +340,13 @@ export function filterAndSortMemberRows(rows, {
   search = "",
   status = "all",
   position = "all",
-  sort = "nameAsc",
+  sort = "hierarchy",
   issue = "",
+  includeProspects = false,
 } = {}) {
   const query = normalizeKey(search);
   const filtered = rows.filter((row) => {
+    if (!includeProspects && row.isProspect) return false;
     const haystack = normalizeKey(`${row.name} ${row.email} ${row.normalizedProfileRid} ${row.normalizedRid} ${row.positionLabel} ${row.roleOrPositionLabel}`);
     if (query && !haystack.includes(query)) return false;
     if (status === "active" && row.active === false) return false;
@@ -343,6 +356,7 @@ export function filterAndSortMemberRows(rows, {
   });
 
   return [...filtered].sort((a, b) => {
+    if (sort === "hierarchy") return compareByHierarchy(a, b);
     if (sort === "nameDesc") return b.normalizedName.localeCompare(a.normalizedName);
     if (sort === "activeFirst") return Number(b.active !== false) - Number(a.active !== false) || a.normalizedName.localeCompare(b.normalizedName);
     if (sort === "incompleteFirst") return a.completeness.score - b.completeness.score || a.normalizedName.localeCompare(b.normalizedName);
@@ -352,31 +366,32 @@ export function filterAndSortMemberRows(rows, {
 
 export function getMemberOperationsModel(input = {}, controls = {}) {
   const rows = buildMemberOperationsRows(input);
-  const attentionItems = getMemberAttentionItems(rows);
+  const scopedRows = controls.includeProspects === true ? rows : rows.filter((row) => !row.isProspect);
+  const attentionItems = getMemberAttentionItems(scopedRows);
   const filteredRows = filterAndSortMemberRows(rows, controls);
-  const activeMembers = rows.filter((row) => row.active !== false).length;
-  const linkedCount = rows.filter((row) => row.accountLinked).length;
-  const withFineRecords = rows.filter((row) => row.fineSummary.count > 0).length;
-  const noAttendanceResponses = rows.filter((row) => row.attendanceSummary.recorded === 0).length;
+  const activeMembers = scopedRows.filter((row) => row.active !== false).length;
+  const linkedCount = scopedRows.filter((row) => row.accountLinked).length;
+  const withFineRecords = scopedRows.filter((row) => row.fineSummary.count > 0).length;
+  const noAttendanceResponses = scopedRows.filter((row) => row.attendanceSummary.recorded === 0).length;
 
   return {
     rows,
     filteredRows,
     attentionItems,
     metrics: {
-      total: rows.length,
+      total: scopedRows.length,
       active: activeMembers,
-      inactive: rows.length - activeMembers,
-      activePercent: rows.length ? Math.round((activeMembers / rows.length) * 100) : 0,
-      linkedPercent: rows.length ? Math.round((linkedCount / rows.length) * 100) : 0,
-      missingEmail: rows.filter((row) => !row.normalizedEmail).length,
-      missingRid: rows.filter((row) => !row.normalizedProfileRid).length,
-      missingPosition: rows.filter((row) => !row.roleOrPositionLabel).length,
-      duplicateRid: rows.filter((row) => row.duplicateRid).length,
-      accountEmailMismatch: rows.filter((row) => row.accountEmailMismatch).length,
+      inactive: scopedRows.length - activeMembers,
+      activePercent: scopedRows.length ? Math.round((activeMembers / scopedRows.length) * 100) : 0,
+      linkedPercent: scopedRows.length ? Math.round((linkedCount / scopedRows.length) * 100) : 0,
+      missingEmail: scopedRows.filter((row) => !row.normalizedEmail).length,
+      missingRid: scopedRows.filter((row) => !row.normalizedProfileRid).length,
+      missingPosition: scopedRows.filter((row) => !row.roleOrPositionLabel).length,
+      duplicateRid: scopedRows.filter((row) => row.duplicateRid).length,
+      accountEmailMismatch: scopedRows.filter((row) => row.accountEmailMismatch).length,
       withFineRecords,
       noAttendanceResponses,
     },
-    positionOptions: [...new Set(rows.map((row) => row.positionLabel || row.roleOrPositionLabel).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    positionOptions: [...new Set(scopedRows.map((row) => row.positionLabel || row.roleOrPositionLabel).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
   };
 }
