@@ -1,5 +1,6 @@
 import { stripRotaractorPrefix } from "../../../utils/memberName.js";
 import { MOM_TARGET_TYPES, normalizeMomEmailHistory, normalizeMomMetadata } from "../../mom/momModel.js";
+import { compareByHierarchy, hierarchySortKey, resolvePositionKeys } from "./positionHierarchy.js";
 
 export const DISTRICT_OFFICIAL_ROLE = "districtOfficial";
 export const ADMIN_ROLES = ["prospect", "gbm", "bod", "admin", DISTRICT_OFFICIAL_ROLE, "president"];
@@ -325,6 +326,14 @@ export function buildAttendanceParticipantGroups({
   const uidIndex = new Map();
   const emailIndex = new Map();
   const idIndex = new Map();
+  const linkedUsersById = new Map();
+  const linkedUsersByEmail = new Map();
+  (Array.isArray(users) ? users : []).forEach((user) => {
+    const linkedId = text(user?.id, 128);
+    const linkedEmail = text(user?.email, 320).toLowerCase();
+    if (linkedId && !linkedUsersById.has(linkedId)) linkedUsersById.set(linkedId, user);
+    if (linkedEmail && !linkedUsersByEmail.has(linkedEmail)) linkedUsersByEmail.set(linkedEmail, user);
+  });
 
   function remember(participant, aliasIds = []) {
     const ids = [
@@ -365,6 +374,17 @@ export function buildAttendanceParticipantGroups({
     const role = attendanceParticipantRole(participant, participant.roleFallback || "");
     const removed = isRemovedProfileRecord(participant);
 
+    const linkedUser = linkedUsersById.get(userId)
+      || linkedUsersById.get(id)
+      || (email ? linkedUsersByEmail.get(email) : null)
+      || null;
+    const positionKeys = resolvePositionKeys({
+      positionKeys: [
+        ...(Array.isArray(linkedUser?.positionKeys) ? linkedUser.positionKeys : []),
+        ...(Array.isArray(participant.positionKeys) ? participant.positionKeys : []),
+      ],
+      positionText: participant.position || participant.clubPosition || linkedUser?.clubPosition || "",
+    });
     const normalized = {
       id,
       userId,
@@ -374,6 +394,8 @@ export function buildAttendanceParticipantGroups({
       role,
       memberType: text(participant.memberType, 30).toLowerCase(),
       position: text(participant.position || participant.clubPosition, 180),
+      positionKeys,
+      hierarchySortKey: hierarchySortKey({ positionKeys, isProspect: role === "prospect" }),
       active: participant.active !== false && !removed,
       removed,
       removedAt: removalDateText(participant),
@@ -436,7 +458,7 @@ export function buildAttendanceParticipantGroups({
   const sortByName = (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 
   return {
-    activeParticipants: [...activeParticipants].sort(sortByName),
+    activeParticipants: [...activeParticipants].sort(compareByHierarchy),
     removedParticipants: [...removedParticipants].sort(sortByName),
   };
 }

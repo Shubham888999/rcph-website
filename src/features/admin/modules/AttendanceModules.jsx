@@ -344,7 +344,7 @@ function AttendanceGrid({
                 onIncludeProspectsInSummaryChange?.(event.target.checked)
               }
             />
-            Include prospects in club attendance percentage
+            Include prospects
           </label>
         ) : null}
 
@@ -980,7 +980,7 @@ const pendingRecords =
 </section>
     
     <AttendanceExportPanel panelKey="club" members={attendanceParticipants} events={events} attendance={data.attendance} onNotice={onNotice} />
-<AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} includeProspectsInSummary={includeProspectsInClubAttendance} onIncludeProspectsInSummaryChange={setIncludeProspectsInClubAttendance} />    <MailDraftTool members={attendanceParticipants} title="GBM" />
+<AttendanceGrid members={clubAttendanceParticipantsForStats} removedMembers={removedAttendanceParticipants} events={events} attendance={data.attendance} collectionName="attendance" locked={locked} uid={uid} onNotice={onNotice} includeProspectsInSummary={includeProspectsInClubAttendance} onIncludeProspectsInSummaryChange={setIncludeProspectsInClubAttendance} />    <MailDraftTool members={attendanceParticipants} title="GBM" />
     {canManageEvents && editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}><ClubEventForm initial={editing} busy={busy} submitLabel="Save event" onSave={(payload) => run("update-event", () => adminCalls.updateClubEvent({ ...payload, eventId: editing.id }), "Club event updated.").then((result) => { if (result) setEditing(null); })} /></AdminDialog> : null}
     {canManageEvents && archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This soft-archives club event records and preserves attendance history.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-event", () => adminCalls.archiveClubEvent(archive.id), "Club event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;
@@ -994,6 +994,7 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
     removedParticipants: removedBodMembers,
   } = buildAttendanceParticipantGroups({
     members: data.bodMembers,
+    users: data.users,
     attendance: data.bodAttendance,
     includeUsers: false,
     memberRoleFallback: "bod",
