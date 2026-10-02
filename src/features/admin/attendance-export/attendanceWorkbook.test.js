@@ -1,43 +1,102 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import ExcelJS from "exceljs";
-import { createAttendanceExportReport } from "./attendanceExportModel.js";
+import { buildMonthlyAttendanceExport } from "./attendanceExportModel.js";
 import { attendanceExportFileName, buildAttendanceWorkbook } from "./attendanceWorkbook.js";
 
-function fixture() {
-  return createAttendanceExportReport("club", {
-    members: [
-      { id: "member-secret-1", name: "Asha Member", role: "gbm", email: "private@example.com" },
-      { id: "member-secret-2", name: "Ravi Director", position: "Secretary" },
-    ],
-    events: [
-      { id: "event-secret-1", name: "Club Assembly", date: "2026-01-10", avenue: ["GBM"] },
-      { id: "event-secret-2", name: "Community Project", date: "2026-02-20", avenue: ["CSD"] },
-    ],
-    attendance: {
-      "member-secret-1": { "event-secret-1": true, "event-secret-2": false },
-      "member-secret-2": { "event-secret-1": "NA" },
-    },
-    selectedEventIds: ["event-secret-1", "event-secret-2"],
+const events = [
+  { id: "event-secret-1", name: "GBM", date: "2026-07-07", avenue: ["GBM"] },
+  { id: "event-secret-2", name: "Drive", date: "2026-08-02", avenue: ["CSD"] },
+  { id: "event-secret-3", name: "Talk", date: "2026-08-09", avenue: ["PDD"] },
+  { id: "event-secret-4", name: "Visit", date: "2026-08-16", avenue: ["ISD"] },
+  { id: "event-secret-5", name: "Walk", date: "2026-08-23", avenue: ["CMD"] },
+  { id: "event-secret-6", name: "Quiz", date: "2026-08-30", avenue: ["GBM"] },
+];
+const members = [
+  { id: "member-secret-1", name: "Asha Member", role: "gbm", email: "private@example.com", positionKeys: [], hierarchySortKey: 1000 },
+  { id: "member-secret-2", name: "Ravi President", role: "president", positionKeys: ["president"], hierarchySortKey: 0 },
+];
+const attendance = {
+  "member-secret-1": {
+    "event-secret-2": true, "event-secret-3": true, "event-secret-4": true, "event-secret-5": false, "event-secret-6": "NA",
+  },
+};
+
+function report(monthKeys, selectedEventIds = events.map((event) => event.id), options = {}) {
+  return buildMonthlyAttendanceExport({
+    panelKey: "club",
+    primary: { members, events, attendance },
+    monthKeys,
+    selectedEventIds,
+    ...options,
   });
 }
 
-test("shared workbook contains overview, detail, and matrix sheets", () => {
-  const workbook = buildAttendanceWorkbook(ExcelJS, fixture(), new Date("2026-03-01T12:00:00Z"));
-  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["Overview", "Attendance", "Matrix"]);
-  assert.equal(workbook.getWorksheet("Attendance").getCell("A5").value instanceof Date, true);
-  assert.equal(workbook.getWorksheet("Attendance").getCell("F5").value, "Present");
-  assert.match(workbook.getWorksheet("Matrix").getCell("E5").value.formula, /COUNTIF/);
-  assert.equal(workbook.getWorksheet("Matrix").getCell("H5").numFmt, "0.0%");
+function findRow(sheet, label) {
+  let found = null;
+  sheet.eachRow((row) => { if (row.getCell(1).value === label) found = row; });
+  return found;
+}
+
+test("workbook has one sheet per month in chronological order and no overview sheet", () => {
+  const workbook = buildAttendanceWorkbook(ExcelJS, report(["2026-08", "2026-07"]));
+  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["Jul 2026", "Aug 2026", "All Months"]);
+  assert.equal(workbook.getWorksheet("Overview"), undefined);
+  assert.equal(workbook.getWorksheet("Attendance"), undefined);
+});
+
+test("All Months sheet is only added for two or more months", () => {
+  const workbook = buildAttendanceWorkbook(ExcelJS, report(["2026-08"]));
+  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["Aug 2026"]);
+});
+
+test("month sheet has the club title row, PERC formula results and mark fills", () => {
+  const workbook = buildAttendanceWorkbook(ExcelJS, report(["2026-08"]));
+  const sheet = workbook.getWorksheet("Aug 2026");
+  assert.equal(sheet.getCell("A1").value, "Club ID: 213166   |   Month: August 2026   |   Zone: 4");
+  assert.deepEqual(sheet.getRow(2).values.slice(1), ["Name", "2 Aug 2026\nDrive", "9 Aug 2026\nTalk", "16 Aug 2026\nVisit", "23 Aug 2026\nWalk", "30 Aug 2026\nQuiz", "PERC"]);
+
+  const asha = findRow(sheet, "Rtr. Asha Member");
+  assert.deepEqual(asha.values.slice(2, 7), ["P", "P", "P", "A", "N/A"]);
+  const perc = asha.getCell(7).value;
+  assert.match(perc.formula, /COUNTIF\(B\d+:F\d+,"P"\)/);
+  assert.equal(perc.result, 75);
+  assert.equal(asha.getCell(5).fill.fgColor.argb, "F8D7DA");
+
+  const ravi = findRow(sheet, "Rtr. Ravi President");
+  assert.equal(ravi.number, 3);
+  assert.equal(ravi.getCell(7).value.result, "N/A");
+});
+
+test("BOD section shows a note when the month has no meetings", () => {
+  const workbook = buildAttendanceWorkbook(ExcelJS, report(["2026-07"], undefined, {
+    includeBod: true,
+    bod: { members: [{ id: "b-1", name: "Riya", role: "bod", positionKeys: ["saa"], hierarchySortKey: 32 }], events: [], attendance: {} },
+  }));
+  const sheet = workbook.getWorksheet("Jul 2026");
+  const notes = [];
+  sheet.eachRow((row) => notes.push(String(row.getCell(1).value)));
+  assert.ok(notes.includes("BODs"));
+  assert.ok(notes.includes("No BOD meetings recorded for July 2026."));
+});
+
+test("All Months sheet carries per-month and overall PERC columns", () => {
+  const workbook = buildAttendanceWorkbook(ExcelJS, report(["2026-07", "2026-08"]));
+  const sheet = workbook.getWorksheet("All Months");
+  assert.equal(sheet.getCell("A1").value, "Club ID: 213166   |   Months: July 2026 – August 2026   |   Zone: 4");
+  const labels = sheet.getRow(3).values.slice(1);
+  assert.deepEqual(labels.slice(-3), ["Jul 2026", "Aug 2026", "Overall"]);
+  const asha = findRow(sheet, "Rtr. Asha Member");
+  const overall = asha.getCell(labels.length).value;
+  assert.equal(overall.result, 75);
 });
 
 test("workbook round-trips as valid XLSX without hidden identifiers or email", async () => {
-  const workbook = buildAttendanceWorkbook(ExcelJS, fixture());
+  const workbook = buildAttendanceWorkbook(ExcelJS, report(["2026-07", "2026-08"]));
   const buffer = await workbook.xlsx.writeBuffer();
-  assert.ok(buffer.byteLength > 5000);
   const reopened = new ExcelJS.Workbook();
   await reopened.xlsx.load(buffer);
-  assert.deepEqual(reopened.worksheets.map((sheet) => sheet.name), ["Overview", "Attendance", "Matrix"]);
+  assert.deepEqual(reopened.worksheets.map((sheet) => sheet.name), ["Jul 2026", "Aug 2026", "All Months"]);
   const visible = reopened.worksheets.flatMap((sheet) => {
     const values = [];
     sheet.eachRow((row) => row.eachCell((cell) => values.push(String(cell.text || ""))));
@@ -47,34 +106,13 @@ test("workbook round-trips as valid XLSX without hidden identifiers or email", a
   assert.match(visible, /Asha Member/);
 });
 
-test("club workbook overview uses aggregate rows while detail keeps prospects", () => {
-  const report = createAttendanceExportReport("club", {
-    members: [
-      { id: "member-1", name: "Asha Member", role: "gbm" },
-      { id: "prospect-1", name: "Prospect One", role: "prospect" },
-    ],
-    events: [
-      { id: "event-1", name: "Club Assembly", date: "2026-01-10", avenue: ["GBM"] },
-    ],
-    attendance: {
-      "member-1": { "event-1": true },
-      "prospect-1": { "event-1": false },
-    },
-    selectedEventIds: ["event-1"],
-  });
-
-  const workbook = buildAttendanceWorkbook(ExcelJS, report, new Date("2026-03-01T12:00:00Z"));
-  const overview = workbook.getWorksheet("Overview");
-  const detail = workbook.getWorksheet("Attendance");
-
-  assert.equal(report.rows.length, 2);
-  assert.equal(report.aggregateRows.length, 1);
-  assert.equal(overview.getCell("D3").value, 1);
-  assert.equal(overview.getCell("D5").value, 1);
-  assert.equal(overview.getCell("G8").value, 1);
-  assert.equal(detail.getCell("D6").value, "Prospect One");
+test("empty reports are rejected", () => {
+  assert.throws(() => buildAttendanceWorkbook(ExcelJS, report(["2026-08"], [])), /Select at least one event to export\./);
 });
 
-test("filename is deterministic and scoped to panel and selected dates", () => {
-  assert.equal(attendanceExportFileName(fixture()), "RCPH_club_attendance_2026-01-10_to_2026-02-20.xlsx");
+test("filename names the panel and month range", () => {
+  assert.equal(attendanceExportFileName(report(["2026-08"])), "RCPH_Attendance_Aug_2026.xlsx");
+  assert.equal(attendanceExportFileName(report(["2026-07", "2026-08"])), "RCPH_Attendance_Jul_2026-Aug_2026.xlsx");
+  assert.equal(attendanceExportFileName({ ...report(["2026-08"]), panelKey: "bod" }), "RCPH_BOD_Attendance_Aug_2026.xlsx");
+  assert.equal(attendanceExportFileName({ ...report(["2026-08"]), panelKey: "district" }), "RCPH_District_Attendance_Aug_2026.xlsx");
 });
