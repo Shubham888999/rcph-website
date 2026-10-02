@@ -8,6 +8,24 @@ function normalizeKey(value) {
   return text(value, 320).toLowerCase().replace(/\s+/g, " ");
 }
 
+export function isRemovedMemberRecord(member) {
+  const status = text(member?.status, 60).toLowerCase();
+  const removalStatus = text(member?.removalStatus, 60).toLowerCase();
+  return status === "removed"
+    || removalStatus === "removed"
+    || member?.accessRevoked === true
+    || Boolean(member?.removedAt);
+}
+
+function removalDateText(value) {
+  let date = null;
+  if (value && typeof value.toDate === "function") date = value.toDate();
+  else if (value instanceof Date) date = value;
+  else if (typeof value === "string" && value.trim()) date = new Date(value);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
 export function normalizeMemberEmail(value) {
   return text(value, 320).toLowerCase();
 }
@@ -193,6 +211,7 @@ export function buildMemberOperationsRows({
   const ridCounts = new Map();
 
   members.forEach((member) => {
+    if (isRemovedMemberRecord(member)) return;
     const name = normalizeMemberName(member.name);
     const email = normalizeMemberEmail(member.email);
     const rid = normalizeMemberRid(member.rid);
@@ -265,6 +284,8 @@ const positionKeys = resolvePositionKeys({
       duplicateName: Boolean(name && nameCounts.get(name) > 1),
       duplicateEmail: Boolean(email && emailCounts.get(email) > 1),
       duplicateRid: Boolean(rosterRid && ridCounts.get(rosterRid) > 1),
+      isRemoved: isRemovedMemberRecord(member),
+      removedOn: removalDateText(member.removedAt),
     };
   });
 }
@@ -365,7 +386,10 @@ export function filterAndSortMemberRows(rows, {
 }
 
 export function getMemberOperationsModel(input = {}, controls = {}) {
-  const rows = buildMemberOperationsRows(input);
+  const allRows = buildMemberOperationsRows(input);
+  const removedRows = allRows.filter((row) => row.isRemoved)
+    .sort((a, b) => String(b.removedOn).localeCompare(String(a.removedOn)) || a.normalizedName.localeCompare(b.normalizedName));
+  const rows = allRows.filter((row) => !row.isRemoved);
   const scopedRows = controls.includeProspects === true ? rows : rows.filter((row) => !row.isProspect);
   const attentionItems = getMemberAttentionItems(scopedRows);
   const filteredRows = filterAndSortMemberRows(rows, controls);
@@ -377,6 +401,7 @@ export function getMemberOperationsModel(input = {}, controls = {}) {
   return {
     rows,
     filteredRows,
+    removedRows,
     attentionItems,
     metrics: {
       total: scopedRows.length,

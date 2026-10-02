@@ -134,3 +134,11 @@ test("Admin profile editor receives the dues-paid state", () => {
     /duesPaid: linked\?\.duesPaid === true/,
   );
 });
+
+test("Members module offers a confirmed permanent delete for removed profiles", () => {
+  assert.match(source, /const PERMANENT_DELETE_CONFIRM_TEXT = "DELETE PERMANENTLY";/);
+  assert.match(source, /adminCalls\.permanentlyDeleteProfile\(/);
+  assert.match(source, /Delete permanently/);
+  assert.match(source, /model\.removedRows\.length > 0/);
+  assert.match(source, /disabled=\{busy \|\| deleteFlow\.confirmationText !== PERMANENT_DELETE_CONFIRM_TEXT\}/);
+});

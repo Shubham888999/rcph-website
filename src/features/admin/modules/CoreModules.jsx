@@ -652,6 +652,7 @@ function linkedProfileUidForMember(member) {
   return member?.linkedAccount?.id || "";
 }
 const REMOVE_PROFILE_CONFIRM_TEXT = "REMOVE PROFILE";
+const PERMANENT_DELETE_CONFIRM_TEXT = "DELETE PERMANENTLY";
 const MEMBER_GENDER_LABELS = {
   woman: "Woman",
   man: "Man",
@@ -796,6 +797,7 @@ export function MembersModule({
   const [profileEditor, setProfileEditor] = useState(null);
   const [historyTarget, setHistoryTarget] = useState(null);
   const [removeFlow, setRemoveFlow] = useState(null);
+  const [deleteFlow, setDeleteFlow] = useState(null);
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -947,6 +949,21 @@ duesPaid: linked?.duesPaid === true,
       if (selectedId === removeFlow.member.id) setSelectedId("");
       setRemoveFlow(null);
     }
+  }
+
+  async function confirmPermanentDelete() {
+    if (!deleteFlow?.member) return;
+
+    const result = await run(
+      "permanent-delete-profile",
+      () => adminCalls.permanentlyDeleteProfile({
+        ...profileRemovalPayloadForMember(deleteFlow.member),
+        confirmationText: deleteFlow.confirmationText,
+      }),
+      "Profile permanently deleted.",
+    );
+
+    if (result) setDeleteFlow(null);
   }
 
   function clearFilters() {
@@ -1228,6 +1245,38 @@ duesPaid: linked?.duesPaid === true,
         </dl>
       </section>
 
+      {model.removedRows.length > 0 ? (
+        <details className="removed-attendance-section">
+          <summary>
+            <span className="removed-attendance-section__heading">
+              <span className="admin-kicker">Removed profiles</span>
+              <strong>Removed members</strong>
+              <small>Not counted in member totals. History is kept until a profile is permanently deleted.</small>
+            </span>
+            <span className="removed-attendance-section__count">{model.removedRows.length}</span>
+          </summary>
+
+          {model.removedRows.map((member) => (
+            <article className="member-ops-row" key={member.id}>
+              <div className="member-ops-row__initials" aria-hidden="true">{member.initials}</div>
+              <div className="member-ops-row__main">
+                <h4>{formatRotaractorName(member.name, true)}</h4>
+                <p>{member.email || "No email in records"}</p>
+              </div>
+              <div className="member-ops-row__facts">
+                <span>{member.removedOn ? `Removed ${member.removedOn}` : "Removed"}</span>
+                {member.removalReason ? <span>Reason: {member.removalReason}</span> : null}
+              </div>
+              <div className="admin-actions">
+                <button type="button" className="danger" onClick={() => setDeleteFlow({ member, confirmationText: "" })} disabled={busy}>
+                  Delete permanently
+                </button>
+              </div>
+            </article>
+          ))}
+        </details>
+      ) : null}
+
       {addOpen ? (
         <AdminDialog title="Add member" busy={busy} onClose={() => setAddOpen(false)}>
           <form className="admin-form" onSubmit={add}>
@@ -1352,6 +1401,63 @@ duesPaid: linked?.duesPaid === true,
                 </button>
               </div>
             )}
+          </div>
+        </AdminDialog>
+      ) : null}
+
+      {deleteFlow ? (
+        <AdminDialog
+          title={`Permanently delete ${formatRotaractorName(deleteFlow.member.name, true)}?`}
+          busy={busy}
+          onClose={() => setDeleteFlow(null)}
+        >
+          <div className="profile-removal-dialog">
+            <p>
+              This permanently deletes the member record, login account (if any),
+              user and role records, Prospect progress, and all club, BOD and district
+              attendance rows for this person. They will no longer appear in any
+              attendance export, including past months. This cannot be undone.
+            </p>
+            <p>
+              Kept: fine and treasury records (financial history), events,
+              resolutions, and an audit log entry for this deletion.
+            </p>
+
+            <form
+              className="admin-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                confirmPermanentDelete();
+              }}
+            >
+              <label>
+                Type {PERMANENT_DELETE_CONFIRM_TEXT} to confirm
+                <input
+                  value={deleteFlow.confirmationText}
+                  onChange={(event) =>
+                    setDeleteFlow((current) =>
+                      current ? { ...current, confirmationText: event.target.value } : current
+                    )
+                  }
+                  placeholder={PERMANENT_DELETE_CONFIRM_TEXT}
+                  autoComplete="off"
+                />
+              </label>
+
+              <div className="admin-actions">
+                <button type="button" onClick={() => setDeleteFlow(null)} disabled={busy}>
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="danger"
+                  disabled={busy || deleteFlow.confirmationText !== PERMANENT_DELETE_CONFIRM_TEXT}
+                >
+                  Delete permanently
+                </button>
+              </div>
+            </form>
           </div>
         </AdminDialog>
       ) : null}
