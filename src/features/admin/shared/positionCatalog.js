@@ -27,7 +27,7 @@ export const POSITION_CATALOG = Object.freeze([
   ["sports-representative", "Sports Representative", "SPORTS", "bod", 29, "bod", true, ["Club Sports Representative", "Sports Director"]],
   ["wrwc", "World Rotaract Week Chairperson", "WRWC", "bod", 30, "bod", true, ["World Rotaract Week Chair"]],
   ["wr", "Women's Representative", "WR", "bod", 31, "bod", true, ["Womens Representative", "Women Representative"]],
-  ["saa", "Sergeant-at-Arms", "SAA", "bod", 32, "bod", true, ["Sergeant", "Sergeant at Arms"]],
+  ["saa", "Sergeant-at-Arms", "SAA", "admin", 32, "admin", true, ["Sergeant", "Sergeant at Arms"]],
   ["pid", "Public Image Director", "PID", "bod", 33, "bod", true, ["Public Image", "Public Image Officer"]],
   ["mdo", "Membership Development Officer", "MDO", "bod", 34, "bod", true, ["Membership Development", "Membership Development Director"]],
   ["co-president", "Co-President", "CPRES", "co-admin", 50, "admin", true, ["Co President"]],
@@ -47,7 +47,7 @@ export const POSITION_CATALOG = Object.freeze([
   ["co-sports-representative", "Co-Sports Representative", "CSPORTS", "co-bod", 79, "bod", true, ["Co Club Sports Representative", "Co Sports Director"]],
   ["co-wrwc", "Co-World Rotaract Week Chairperson", "CWRWC", "co-bod", 80, "bod", true, ["Co World Rotaract Week Chair"]],
   ["co-wr", "Co-Women's Representative", "CWR", "co-bod", 81, "bod", true, ["Co Womens Representative", "Co Women Representative"]],
-  ["co-saa", "Co-Sergeant-at-Arms", "CSAA", "co-bod", 82, "bod", true, ["Co Sergeant at Arms"]],
+  ["co-saa", "Co-Sergeant-at-Arms", "CSAA", "co-admin", 82, "admin", true, ["Co Sergeant at Arms"]],
   ["co-pid", "Co-Public Image Director", "CPID", "co-bod", 83, "bod", true, ["Co Public Image Director", "Co Public Image", "Co-PID"]],
   ["co-mdo", "Co-Membership Development Officer", "CMDO", "co-bod", 84, "bod", true, ["Co Membership Development Officer", "Co Membership Development", "Co-MDO"]],
 ].map(([key, displayTitle, avenueCode, group, sortOrder, effectiveRole, bodRoster, aliases]) => Object.freeze({

@@ -5,8 +5,8 @@ import test from "node:test";
 const rules = readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8");
 const firebaseConfig = readFileSync(new URL("../../firebase.json", import.meta.url), "utf8");
 
-test("firebase config points at the local Firestore ruleset", () => {
-  assert.match(firebaseConfig, /"firestore"\s*:\s*\{[\s\S]*"rules"\s*:\s*"firestore\.rules"/);
+test("firebase config never deploys Firestore rules from the frontend folder", () => {
+  assert.doesNotMatch(firebaseConfig, /"firestore"\s*:/);
 });
 
 test("users cannot self-approve or directly edit lifecycle and role fields", () => {
