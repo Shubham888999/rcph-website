@@ -572,7 +572,7 @@ test("mixed club event and BOD meeting PDFs keep meetings after normal avenue se
     makeEvent("Club", "Club event summary", "2026-07-05", ["CMD"]),
     makeMeeting("Review", "Board reviewed service pipeline", "2026-07-06"),
   ], { selectedAvenueCodes: ["CMD"], includeBodMeetings: true });
-  const pageText = buildBodAvenueReportPdfPages(model)[0].join("\n");
+  const pageText = buildBodAvenueReportPdfPages(model).flat().join("\n");
   assert.match(pageText, /BOD Monthly Report/);
   assert.match(pageText, /Community Service Avenue/);
   assert.match(pageText, /BOD Meetings - July 2026/);
@@ -605,7 +605,7 @@ test("same-page report groups render month totals before the next avenue section
     selectedAvenueCodes: ["CMD", "PDD"],
     directorsByAvenue: { CMD: [], PDD: [] },
   }));
-  const pageText = pages[0].join("\n");
+  const pageText = pages.flat().join("\n");
   assert.ok(pageText.indexOf("Total expense for July 2026") < pageText.indexOf("Professional Development Avenue"));
   assert.ok(pageText.includes("Director name: Not available"));
   assert.match(pageText, /Description/);
@@ -769,4 +769,93 @@ test("letterhead asset failures are logged without report data and return safe u
   assert.equal(logs.length, 1);
   assert.equal(JSON.stringify(logs).includes("Project"), false);
   assert.equal(JSON.stringify(logs).includes(BOD_AVENUE_REPORT_LETTERHEAD_URL), true);
+});
+
+const PAGE_CHROME_LEADING = 2;
+const pageContent = (page) => page.slice(PAGE_CHROME_LEADING, -1);
+const firstContentText = (page) => pageContent(page).find((command) => / Tj ET$/.test(command)) || "";
+const monthHeadingPattern = (text, font = "F2") => new RegExp(`/${font} 13 Tf [^\\n]*\\(${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\) Tj ET`);
+const pageIndexOf = (pages, pattern) => pages.findIndex((page) => page.some((command) => pattern.test(command)));
+
+test("month headings are bold 13pt and use the larger line height", () => {
+  assert.equal(BOD_AVENUE_REPORT_LAYOUT.group.monthHeadingSize, 13);
+  assert.equal(BOD_AVENUE_REPORT_LAYOUT.group.monthHeadingLineHeight, 20);
+  const helvetica = decodePdf(buildBodAvenueReportPdfDocument(report([makeEvent("One")]), MOCK_LETTERHEAD));
+  assert.match(helvetica, monthHeadingPattern("July 2026", "F2"));
+  const times = decodePdf(buildBodAvenueReportPdfDocument(report([makeEvent("One")], { appearance: { fontFamily: "times" } }), MOCK_LETTERHEAD));
+  assert.match(times, monthHeadingPattern("July 2026", "F4"));
+});
+
+test("single month, single avenue reports still show the month heading on page 1", () => {
+  const pages = buildBodAvenueReportPdfPages(report([makeEvent("One")]));
+  assert.equal(pages.length, 1);
+  assert.ok(pages[0].some((command) => monthHeadingPattern("July 2026").test(command)));
+});
+
+test("each month after the first starts on a fresh page", () => {
+  const pages = buildBodAvenueReportPdfPages(report([
+    makeEvent("July", "Short", "2026-07-05"),
+    makeEvent("August", "Short", "2026-08-05"),
+  ], { selectedMonths: ["2026-07", "2026-08"] }));
+  const july = monthHeadingPattern("July 2026");
+  const august = monthHeadingPattern("August 2026");
+  assert.equal(pageIndexOf(pages, july), 0);
+  const augustPage = pageIndexOf(pages, august);
+  assert.ok(augustPage > 0);
+  assert.match(firstContentText(pages[augustPage]), august);
+  assert.ok(pages.every((page) => !(page.some((command) => july.test(command)) && page.some((command) => august.test(command)))));
+});
+
+test("two avenues across two months give four month blocks, each after the first on its own page", () => {
+  const pages = buildBodAvenueReportPdfPages(report([
+    makeEvent("CmdJul", "Short", "2026-07-05", ["CMD"]),
+    makeEvent("CmdAug", "Short", "2026-08-05", ["CMD"]),
+    makeEvent("PddJul", "Short", "2026-07-06", ["PDD"]),
+    makeEvent("PddAug", "Short", "2026-08-06", ["PDD"]),
+  ], {
+    selectedMonths: ["2026-07", "2026-08"],
+    selectedAvenueCodes: ["CMD", "PDD"],
+    directorsByAvenue: { CMD: [], PDD: [] },
+  }));
+  const headings = pages.flatMap((page, index) => page
+    .filter((command) => /\/F2 13 Tf /.test(command))
+    .map((command) => ({ index, text: command.match(/\((.*)\) Tj ET$/)[1] })));
+  assert.deepEqual(headings.map((heading) => heading.text), [
+    "July 2026",
+    "Community Service Avenue - August 2026",
+    "July 2026",
+    "Professional Development Avenue - August 2026",
+  ]);
+  assert.equal(headings[0].index, 0);
+  assert.deepEqual(headings.slice(1).map((heading) => heading.index), [1, 2, 3]);
+  assert.match(firstContentText(pages[1]), /\(Community Service Avenue - August 2026\) Tj ET$/);
+  assert.match(firstContentText(pages[2]), /\(Professional Development Avenue\) Tj ET$/);
+  assert.match(firstContentText(pages[3]), /\(Professional Development Avenue - August 2026\) Tj ET$/);
+});
+
+test("BOD meeting months also start on fresh pages", () => {
+  const pages = buildBodAvenueReportPdfPages(report([
+    makeEvent("Club", "Short", "2026-07-05", ["CMD"]),
+    makeMeeting("July", "Short", "2026-07-06"),
+    makeMeeting("August", "Short", "2026-08-06"),
+  ], { selectedMonths: ["2026-07", "2026-08"], selectedAvenueCodes: ["CMD"], includeBodMeetings: true }));
+  const julyMeetings = pageIndexOf(pages, monthHeadingPattern("BOD Meetings - July 2026"));
+  const augustMeetings = pageIndexOf(pages, monthHeadingPattern("BOD Meetings - August 2026"));
+  assert.ok(julyMeetings > 0);
+  assert.ok(augustMeetings > julyMeetings);
+  assert.match(firstContentText(pages[julyMeetings]), monthHeadingPattern("BOD Meetings - July 2026"));
+  assert.match(firstContentText(pages[augustMeetings]), monthHeadingPattern("BOD Meetings - August 2026"));
+});
+
+test("month totals stay with their month and the grand total follows without a forced page break", () => {
+  const pages = buildBodAvenueReportPdfPages(report([
+    makeEvent("July", "Short", "2026-07-05"),
+    makeEvent("August", "Short", "2026-08-05"),
+  ], { selectedMonths: ["2026-07", "2026-08"] }));
+  const julyRow = pageIndexOf(pages, /\(Project July\) Tj ET/);
+  const augustRow = pageIndexOf(pages, /\(Project August\) Tj ET/);
+  assert.equal(pageIndexOf(pages, /\(Total expense for July 2026\) Tj ET/), julyRow);
+  assert.equal(pageIndexOf(pages, /\(Total expense for August 2026\) Tj ET/), augustRow);
+  assert.equal(pageIndexOf(pages, /\(Grand total expense\) Tj ET/), augustRow);
+  assert.equal(pages.length, augustRow + 1);
 });

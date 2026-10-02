@@ -59,8 +59,8 @@ export const BOD_AVENUE_REPORT_LAYOUT = Object.freeze({
     directorSize: 7.6,
     directorLineHeight: 9.5,
     headingToTableGap: 5,
-    monthHeadingSize: 8.8,
-    monthHeadingLineHeight: 11.4,
+    monthHeadingSize: 13,
+    monthHeadingLineHeight: 20,
   }),
   total: Object.freeze({
     height: 21,
@@ -952,11 +952,13 @@ function monthHeadingHeight(show) {
   return show ? BOD_AVENUE_REPORT_LAYOUT.group.monthHeadingLineHeight : 0;
 }
 
-function drawMonthHeading(commands, y, month, style, section = {}) {
+function drawMonthHeading(commands, y, month, style, section = {}, options = {}) {
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
   const layout = BOD_AVENUE_REPORT_LAYOUT.group;
-  const text = section.sectionType === "bodMeetings" ? `${section.avenueLabel || "BOD Meetings"} - ${month.monthLabel}` : month.monthLabel;
-  commands.push(textCommand({ x: safe.left, y, text, size: layout.monthHeadingSize, bold: true, gray: 0.08, fontFamily: style.fontFamily }));
+  const text = section.sectionType === "bodMeetings"
+    ? `${section.avenueLabel || "BOD Meetings"} - ${month.monthLabel}`
+    : options.withAvenueLabel === true ? `${section.avenueLabel} - ${month.monthLabel}` : month.monthLabel;
+  commands.push(textCommand({ x: safe.left, y: y - layout.monthHeadingSize, text, size: layout.monthHeadingSize, bold: true, gray: 0.08, fontFamily: style.fontFamily }));
   return y - layout.monthHeadingLineHeight;
 }
 
@@ -1063,7 +1065,7 @@ function drawLetterheadExchangeSection(pages, commands, y, report, style) {
 function drawReportContent(pages, report, startY, style, context) {
   let commands = pages.at(-1);
   let y = startY;
-  let completedMonth = false;
+  let firstBlock = true;
   const sections = reportSections(report);
   const showAvenueHeading = sections.some((section) => section.sectionType !== "bodMeetings")
     && (sections.length > 1 || selectedAvenueCodes(report).length > 1);
@@ -1071,35 +1073,31 @@ function drawReportContent(pages, report, startY, style, context) {
 
   for (const section of sections) {
     const isMeetingSection = section.sectionType === "bodMeetings";
-    if (showAvenueHeading && !isMeetingSection) {
-      const firstMonth = section.months[0];
-      const firstRow = firstMonth?.events?.[0] ? eventCellLines(firstMonth.events[0], style) : null;
-      const firstPhoto = firstMonth?.events?.[0] ? photoResourceForEvent(context, firstMonth.events[0]) : null;
-      const firstRowHeight = firstRow
-        ? rowHeightForLines(firstRow, style) + (firstPhoto ? photoBlockHeight(firstPhoto.image, BOD_AVENUE_REPORT_CONTENT_WIDTH) : 0)
-        : style.table.lineHeight + style.table.padding * 2;
-      const intro = sectionHeadingModel(section, style);
-      const samePageGap = completedMonth ? BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable : 0;
-      ({ commands, y } = ensureSpace(pages, commands, y - samePageGap, intro.height + monthHeadingHeight(true) + style.table.headerHeight + firstRowHeight));
-      y = drawSectionHeading(commands, y, section, style);
-    }
+    const withSectionHeading = showAvenueHeading && !isMeetingSection;
 
-    for (const month of section.months) {
-      const showMonthHeading = isMeetingSection || showAvenueHeading || section.months.length > 1 || (report?.selectedMonths || []).length > 1;
+    section.months.forEach((month, monthIndex) => {
+      const isSectionFirstMonth = monthIndex === 0;
+      const showMonthHeading = true;
       const firstRow = month.events[0] ? eventCellLines(month.events[0], style) : null;
       const firstPhoto = month.events[0] ? photoResourceForEvent(context, month.events[0]) : null;
       const firstRowHeight = firstRow
         ? rowHeightForLines(firstRow, style) + (firstPhoto ? photoBlockHeight(firstPhoto.image, BOD_AVENUE_REPORT_CONTENT_WIDTH) : 0)
         : style.table.lineHeight + style.table.padding * 2;
-      const samePageGap = completedMonth && (!showAvenueHeading || isMeetingSection) ? BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable : 0;
-      ({ commands, y } = ensureSpace(pages, commands, y - samePageGap, monthHeadingHeight(showMonthHeading) + style.table.headerHeight + firstRowHeight));
-      if (showMonthHeading) y = drawMonthHeading(commands, y, month, style, section);
+      // Every month block after the first starts on a fresh page.
+      if (!firstBlock) ({ commands, y } = createBlankPage(pages));
+      if (isSectionFirstMonth && withSectionHeading) {
+        const intro = sectionHeadingModel(section, style);
+        ({ commands, y } = ensureSpace(pages, commands, y, intro.height + monthHeadingHeight(showMonthHeading) + style.table.headerHeight + firstRowHeight));
+        y = drawSectionHeading(commands, y, section, style);
+      }
+      ({ commands, y } = ensureSpace(pages, commands, y, monthHeadingHeight(showMonthHeading) + style.table.headerHeight + firstRowHeight));
+      y = drawMonthHeading(commands, y, month, style, section, { withAvenueLabel: withSectionHeading && !isSectionFirstMonth });
       y = drawTableHeader(commands, y, style);
       y = drawEventRows(pages, month.events, y, style, context);
       commands = pages.at(-1);
       ({ commands, y } = drawMonthTotal(pages, commands, y, month, style));
-      completedMonth = true;
-    }
+      firstBlock = false;
+    });
   }
 
   if (showGrandTotal) ({ commands, y } = drawGrandTotal(pages, commands, y, report, style));
