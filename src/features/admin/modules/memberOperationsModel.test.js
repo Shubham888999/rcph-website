@@ -5,6 +5,7 @@ import {
   filterAndSortMemberRows,
   getMemberAttentionItems,
   getMemberOperationsModel,
+  isRemovedMemberRecord,
 } from "./memberOperationsModel.js";
 
 const members = [
@@ -387,4 +388,55 @@ test("member operations displays demoted GBM accounts as Members when position d
   assert.equal(row.trustedRole, "gbm");
   assert.equal(row.clubPosition, "Member");
   assert.equal(row.positionLabel, "Member");
+});
+
+const removalFixtureMembers = [
+  { id: "a1", name: "Active One", email: "active1@example.com", rid: "RID-TWIN", position: "Secretary", active: true },
+  { id: "i1", name: "Inactive Only", email: "inactive@example.com", rid: "RID-200", active: false },
+  { id: "r1", name: "Removed Older", email: "older@example.com", rid: "RID-TWIN", active: false, status: "removed", removedAt: "2026-08-01T10:00:00.000Z", removalReason: "Left club" },
+  { id: "r2", name: "Removed Newer", email: "", active: false, accessRevoked: true, removedAt: { toDate: () => new Date("2026-09-15T10:00:00.000Z") } },
+  { id: "r3", name: "Removed Undated", email: "undated@example.com", active: false, removalStatus: "removed" },
+];
+
+test("isRemovedMemberRecord recognises removal markers but not plain inactive records", () => {
+  assert.equal(isRemovedMemberRecord({ status: "removed" }), true);
+  assert.equal(isRemovedMemberRecord({ removalStatus: "removed" }), true);
+  assert.equal(isRemovedMemberRecord({ accessRevoked: true }), true);
+  assert.equal(isRemovedMemberRecord({ removedAt: "2026-09-01" }), true);
+  assert.equal(isRemovedMemberRecord({ active: false }), false);
+  assert.equal(isRemovedMemberRecord(null), false);
+});
+
+test("removed members are excluded from rows, metrics and attention items and listed newest first", () => {
+  const model = getMemberOperationsModel({ members: removalFixtureMembers, users: [] });
+
+  assert.deepEqual(model.rows.map((row) => row.id).sort(), ["a1", "i1"]);
+  assert.equal(model.metrics.total, 2);
+  assert.equal(model.metrics.missingEmail, 0);
+  assert.deepEqual(model.removedRows.map((row) => row.id), ["r2", "r1", "r3"]);
+  assert.deepEqual(model.removedRows.map((row) => row.removedOn), ["2026-09-15", "2026-08-01", ""]);
+  assert.equal(model.removedRows[1].removalReason, "Left club");
+  const attentionKeys = model.attentionItems.map((item) => item.key);
+  assert.equal(attentionKeys.includes("missingEmail"), false);
+  assert.equal(attentionKeys.includes("duplicateRid"), false);
+  assert.equal(model.filteredRows.some((row) => row.isRemoved), false);
+  assert.equal(model.positionOptions.includes("Removed"), false);
+});
+
+test("a removed record no longer flags its active twin as a duplicate RID", () => {
+  const model = getMemberOperationsModel({ members: removalFixtureMembers, users: [] });
+  const twin = model.rows.find((row) => row.id === "a1");
+
+  assert.equal(twin.duplicateRid, false);
+});
+
+test("plain inactive records without removal markers stay in rows as Inactive", () => {
+  const model = getMemberOperationsModel({ members: removalFixtureMembers, users: [] });
+  const inactive = model.rows.find((row) => row.id === "i1");
+
+  assert.ok(inactive);
+  assert.equal(inactive.isRemoved, false);
+  assert.equal(inactive.active, false);
+  assert.equal(model.metrics.inactive, 1);
+  assert.deepEqual(model.attentionItems.find((item) => item.key === "inactive")?.count, 1);
 });
