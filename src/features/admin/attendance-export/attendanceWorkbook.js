@@ -1,5 +1,3 @@
-import { parseAttendanceDate } from "./attendanceExportModel.js";
-
 const COLORS = Object.freeze({
   ink: "2A1720",
   wine: "6B1839",
@@ -13,6 +11,11 @@ const COLORS = Object.freeze({
   white: "FFFFFF",
 });
 
+const NAME_COLUMN_WIDTH = 38;
+const EVENT_COLUMN_WIDTH = 13;
+const PERC_COLUMN_WIDTH = 9;
+const FOOTER = "Rotaract Club of Pune Heritage · Attendance export";
+
 function excelColumn(index) {
   let value = index;
   let result = "";
@@ -24,176 +27,292 @@ function excelColumn(index) {
   return result;
 }
 
-function statusFill(status) {
-  return status === "Present" ? COLORS.present : status === "Absent" ? COLORS.absent : COLORS.na;
+function solid(argb) {
+  return { type: "pattern", pattern: "solid", fgColor: { argb } };
 }
 
-function styleTitle(sheet, title, subtitle, endColumn) {
-  sheet.mergeCells(1, 1, 1, endColumn);
-  const titleCell = sheet.getCell(1, 1);
-  titleCell.value = title;
-  titleCell.font = { name: "Aptos Display", size: 18, bold: true, color: { argb: COLORS.white } };
-  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.wine } };
-  titleCell.alignment = { vertical: "middle", horizontal: "left" };
-  sheet.getRow(1).height = 30;
-  sheet.mergeCells(2, 1, 2, endColumn);
-  const subtitleCell = sheet.getCell(2, 1);
-  subtitleCell.value = subtitle;
-  subtitleCell.font = { name: "Aptos", size: 10, italic: true, color: { argb: COLORS.ink } };
-  subtitleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.cream } };
-  subtitleCell.alignment = { wrapText: true };
-  sheet.getRow(2).height = 26;
+function thinBorder(bottomColor = COLORS.border) {
+  const side = { style: "thin", color: { argb: COLORS.border } };
+  return { top: side, left: side, right: side, bottom: { style: "thin", color: { argb: bottomColor } } };
 }
 
-function styleHeader(row) {
-  row.eachCell((cell) => {
-    cell.font = { name: "Aptos", bold: true, color: { argb: COLORS.white } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.ink } };
-    cell.alignment = { vertical: "middle", wrapText: true };
-    cell.border = { bottom: { style: "thin", color: { argb: COLORS.gold } } };
+function markFill(mark) {
+  return mark === "A" ? COLORS.absent : mark === "N/A" ? COLORS.na : COLORS.white;
+}
+
+function percFormula(range) {
+  return `IF(COUNTIF(${range},"P")+COUNTIF(${range},"A")=0,"N/A",ROUND(COUNTIF(${range},"P")/(COUNTIF(${range},"P")+COUNTIF(${range},"A"))*100,1))`;
+}
+
+function percResult(marks) {
+  const present = marks.filter((mark) => mark === "P").length;
+  const absent = marks.filter((mark) => mark === "A").length;
+  return present + absent === 0 ? "N/A" : Math.round((present / (present + absent)) * 1000) / 10;
+}
+
+function rowRange(rowNumber, firstColumn, lastColumn) {
+  return `${excelColumn(firstColumn)}${rowNumber}:${excelColumn(lastColumn)}${rowNumber}`;
+}
+
+function writeTitleRow(sheet, text, endColumn) {
+  sheet.mergeCells(1, 1, 1, Math.max(endColumn, 2));
+  const cell = sheet.getCell(1, 1);
+  cell.value = text;
+  cell.font = { name: "Aptos", size: 14, bold: true, color: { argb: COLORS.white } };
+  cell.fill = solid(COLORS.wine);
+  cell.alignment = { vertical: "middle", horizontal: "center" };
+  sheet.getRow(1).height = 26;
+}
+
+function writeSectionTitle(sheet, rowNumber, title) {
+  const cell = sheet.getCell(rowNumber, 1);
+  cell.value = title;
+  cell.font = { name: "Aptos", size: 13, bold: true, color: { argb: COLORS.wine } };
+}
+
+function styleHeaderCell(cell, column) {
+  cell.font = { name: "Aptos", size: 10, bold: true, color: { argb: COLORS.white } };
+  cell.fill = solid(COLORS.ink);
+  cell.alignment = { vertical: "middle", horizontal: column === 1 ? "left" : "center", wrapText: true };
+  cell.border = thinBorder(COLORS.gold);
+}
+
+function writeHeaderRow(sheet, rowNumber, values) {
+  values.forEach((value, index) => {
+    const cell = sheet.getCell(rowNumber, index + 1);
+    cell.value = value;
+    styleHeaderCell(cell, index + 1);
   });
-  row.height = 24;
+  sheet.getRow(rowNumber).height = 48;
 }
 
-function applyStatusStyles(sheet, columnNumber, startRow, endRow) {
-  for (let rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
-    const cell = sheet.getCell(rowNumber, columnNumber);
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: statusFill(cell.value) } };
+function writeNote(sheet, rowNumber, text) {
+  const cell = sheet.getCell(rowNumber, 1);
+  cell.value = text;
+  cell.font = { name: "Aptos", size: 10, italic: true, color: { argb: COLORS.ink } };
+}
+
+function writeNameCell(sheet, rowNumber, label) {
+  const cell = sheet.getCell(rowNumber, 1);
+  cell.value = label;
+  cell.font = { name: "Aptos", size: 10 };
+  cell.fill = solid(COLORS.pale);
+  cell.alignment = { vertical: "middle", horizontal: "left" };
+  cell.border = thinBorder();
+}
+
+function writeMarkCell(sheet, rowNumber, column, mark) {
+  const cell = sheet.getCell(rowNumber, column);
+  cell.value = mark;
+  cell.font = { name: "Aptos", size: 10 };
+  cell.fill = solid(markFill(mark));
+  cell.alignment = { vertical: "middle", horizontal: "center" };
+  cell.border = thinBorder();
+}
+
+function writePercCell(sheet, rowNumber, column, range, marks) {
+  const cell = sheet.getCell(rowNumber, column);
+  cell.value = { formula: percFormula(range), result: percResult(marks) };
+  cell.numFmt = "General";
+  cell.font = { name: "Aptos", size: 10, bold: true };
+  cell.fill = solid(COLORS.cream);
+  cell.alignment = { vertical: "middle", horizontal: "center" };
+  cell.border = thinBorder();
+}
+
+function emptySectionNote(section, periodLabel) {
+  return `No ${section.title ? "BOD meetings" : "events"} recorded for ${periodLabel}.`;
+}
+
+function setColumnWidths(sheet, eventColumns, percColumns, lastColumn) {
+  sheet.getColumn(1).width = NAME_COLUMN_WIDTH;
+  for (let column = 2; column <= lastColumn; column += 1) {
+    sheet.getColumn(column).width = eventColumns.has(column) ? EVENT_COLUMN_WIDTH : percColumns.has(column) ? PERC_COLUMN_WIDTH : EVENT_COLUMN_WIDTH;
   }
 }
 
+function finishSheet(sheet) {
+  sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+  sheet.headerFooter.oddFooter = FOOTER;
+}
+
+function createSheet(workbook, name) {
+  return workbook.addWorksheet(name, { views: [{ showGridLines: false }] });
+}
+
+function freezeAt(sheet, headerRow) {
+  sheet.views = [{ state: "frozen", xSplit: 1, ySplit: headerRow, showGridLines: false }];
+}
+
+function buildMonthSheet(workbook, report, month) {
+  const sheet = createSheet(workbook, month.shortLabel);
+  const lastColumn = Math.max(2, ...month.sections.map((section) => section.events.length + 2));
+  writeTitleRow(sheet, `Club ID: ${report.info.clubId}   |   Month: ${month.label}   |   Zone: ${report.info.zone}`, lastColumn);
+
+  const eventColumns = new Set();
+  const percColumns = new Set();
+  let rowNumber = 2;
+  let firstHeaderRow = 0;
+  for (const section of month.sections) {
+    if (section.title) {
+      rowNumber += 1;
+      writeSectionTitle(sheet, rowNumber, section.title);
+      rowNumber += 1;
+    }
+    const percColumn = section.events.length + 2;
+    writeHeaderRow(sheet, rowNumber, [section.headerLabel, ...section.events.map((event) => event.label), "PERC"]);
+    if (!firstHeaderRow) firstHeaderRow = rowNumber;
+    section.events.forEach((_, index) => eventColumns.add(index + 2));
+    percColumns.add(percColumn);
+    rowNumber += 1;
+
+    if (!section.events.length) {
+      writeNote(sheet, rowNumber, emptySectionNote(section, month.label));
+      rowNumber += 1;
+      continue;
+    }
+
+    for (const row of section.rows) {
+      writeNameCell(sheet, rowNumber, row.label);
+      row.marks.forEach((mark, index) => writeMarkCell(sheet, rowNumber, index + 2, mark));
+      writePercCell(sheet, rowNumber, percColumn, rowRange(rowNumber, 2, percColumn - 1), row.marks);
+      rowNumber += 1;
+    }
+  }
+
+  setColumnWidths(sheet, eventColumns, percColumns, lastColumn);
+  freezeAt(sheet, firstHeaderRow || 2);
+  finishSheet(sheet);
+}
+
+function buildAllMonthsSheet(workbook, report) {
+  const sheet = createSheet(workbook, "All Months");
+  const first = report.months[0];
+  const last = report.months.at(-1);
+  const periodLabel = `${first.label} – ${last.label}`;
+  const sectionCount = Math.max(...report.months.map((month) => month.sections.length));
+
+  const layouts = [];
+  for (let index = 0; index < sectionCount; index += 1) {
+    const parts = report.months
+      .map((month) => ({ month, section: month.sections[index] }))
+      .filter((part) => part.section);
+    const template = parts[0].section;
+    const withEvents = parts.filter((part) => part.section.events.length);
+    const eventCount = withEvents.reduce((total, part) => total + part.section.events.length, 0);
+    layouts.push({ template, withEvents, eventCount, lastColumn: eventCount ? 1 + eventCount + withEvents.length + 1 : 2 });
+  }
+  const lastColumn = Math.max(2, ...layouts.map((layout) => layout.lastColumn));
+  writeTitleRow(sheet, `Club ID: ${report.info.clubId}   |   Months: ${periodLabel}   |   Zone: ${report.info.zone}`, lastColumn);
+
+  const eventColumns = new Set();
+  const percColumns = new Set();
+  let rowNumber = 2;
+  let firstHeaderRow = 0;
+  for (const layout of layouts) {
+    const { template, withEvents, eventCount } = layout;
+    if (template.title) {
+      rowNumber += 1;
+      writeSectionTitle(sheet, rowNumber, template.title);
+      rowNumber += 1;
+    }
+
+    if (!eventCount) {
+      writeNote(sheet, rowNumber, emptySectionNote(template, periodLabel));
+      rowNumber += 1;
+      continue;
+    }
+
+    const bandRow = rowNumber;
+    const labelRow = rowNumber + 1;
+    sheet.mergeCells(bandRow, 1, labelRow, 1);
+    const nameHeader = sheet.getCell(bandRow, 1);
+    nameHeader.value = template.headerLabel;
+    styleHeaderCell(nameHeader, 1);
+    styleHeaderCell(sheet.getCell(labelRow, 1), 1);
+
+    let column = 2;
+    const monthRanges = [];
+    for (const { month, section } of withEvents) {
+      const start = column;
+      const end = column + section.events.length - 1;
+      if (end > start) sheet.mergeCells(bandRow, start, bandRow, end);
+      const band = sheet.getCell(bandRow, start);
+      band.value = month.shortLabel;
+      for (let bandColumn = start; bandColumn <= end; bandColumn += 1) styleHeaderCell(sheet.getCell(bandRow, bandColumn), bandColumn);
+      section.events.forEach((event, index) => {
+        const cell = sheet.getCell(labelRow, start + index);
+        cell.value = event.label;
+        styleHeaderCell(cell, start + index);
+        eventColumns.add(start + index);
+      });
+      monthRanges.push({ month, section, start, end });
+      column = end + 1;
+    }
+    const lastEventColumn = column - 1;
+    const percStart = column;
+    const percEnd = percStart + withEvents.length;
+    sheet.mergeCells(bandRow, percStart, bandRow, percEnd);
+    sheet.getCell(bandRow, percStart).value = "PERC";
+    for (let percColumn = percStart; percColumn <= percEnd; percColumn += 1) {
+      styleHeaderCell(sheet.getCell(bandRow, percColumn), percColumn);
+      percColumns.add(percColumn);
+    }
+    monthRanges.forEach(({ month }, index) => {
+      const cell = sheet.getCell(labelRow, percStart + index);
+      cell.value = month.shortLabel;
+      styleHeaderCell(cell, percStart + index);
+    });
+    const overallHeader = sheet.getCell(labelRow, percEnd);
+    overallHeader.value = "Overall";
+    styleHeaderCell(overallHeader, percEnd);
+    sheet.getRow(bandRow).height = 22;
+    sheet.getRow(labelRow).height = 48;
+    if (!firstHeaderRow) firstHeaderRow = labelRow;
+    rowNumber = labelRow + 1;
+
+    for (const rosterRow of template.rows) {
+      writeNameCell(sheet, rowNumber, rosterRow.label);
+      const allMarks = [];
+      monthRanges.forEach(({ section, start, end }, index) => {
+        const marks = section.rows.find((row) => row.id === rosterRow.id)?.marks || section.events.map(() => "N/A");
+        marks.forEach((mark, offset) => writeMarkCell(sheet, rowNumber, start + offset, mark));
+        writePercCell(sheet, rowNumber, percStart + index, rowRange(rowNumber, start, end), marks);
+        allMarks.push(...marks);
+      });
+      writePercCell(sheet, rowNumber, percEnd, rowRange(rowNumber, 2, lastEventColumn), allMarks);
+      rowNumber += 1;
+    }
+  }
+
+  setColumnWidths(sheet, eventColumns, percColumns, lastColumn);
+  freezeAt(sheet, firstHeaderRow || 2);
+  finishSheet(sheet);
+}
+
 export function buildAttendanceWorkbook(ExcelJS, report, generatedAt = new Date()) {
-  if (!report?.events?.length) throw new Error("Select at least one event to export.");
+  if (!report?.months?.length) throw new Error("Select at least one event to export.");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Rotaract Club of Pune Heritage";
-  workbook.subject = report.panel.title;
+  workbook.subject = "Attendance export";
   workbook.created = generatedAt;
   workbook.modified = generatedAt;
   workbook.calcProperties.fullCalcOnLoad = true;
 
-  const aggregateRows = Array.isArray(report.aggregateRows)
-    ? report.aggregateRows
-    : report.rows;
-  const aggregateMembers = Array.isArray(report.aggregateMembers)
-    ? report.aggregateMembers
-    : report.members;
-  const totals = aggregateRows.reduce((result, row) => {
-    result[row.status] = (result[row.status] || 0) + 1;
-    return result;
-  }, {});
-  const present = totals.Present || 0;
-  const absent = totals.Absent || 0;
-  const na = totals["Not applicable"] || 0;
-  const counted = present + absent;
-
-  const overview = workbook.addWorksheet("Overview", { views: [{ state: "frozen", ySplit: 7 }] });
-  overview.properties.defaultRowHeight = 18;
-  overview.showGridLines = false;
-  overview.columns = [
-    { width: 14 }, { width: 34 }, { width: 24 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 16 },
-  ];
-  styleTitle(overview, report.panel.title, "Generated from the official RCPH Website", 7);
-  const summary = [
-    ["Events selected", report.events.length, "Counted roster rows", aggregateMembers.length],
-    ["Present", present, "Absent", absent],
-    ["Not applicable", na, "Attendance rate", counted ? present / counted : 0],
-  ];
-  summary.forEach((values) => overview.addRow(values));
-  overview.getCell("D5").numFmt = "0.0%";
-  for (let rowNumber = 3; rowNumber <= 5; rowNumber += 1) {
-    overview.getCell(rowNumber, 1).font = { bold: true, color: { argb: COLORS.wine } };
-    overview.getCell(rowNumber, 3).font = { bold: true, color: { argb: COLORS.wine } };
-  }
-  overview.addRow([]);
-  const overviewHeader = overview.addRow(["Date", "Event", report.panel.categoryLabel, "Present", "Absent", "N/A", "Attendance rate"]);
-  styleHeader(overviewHeader);
-  for (const event of report.events) {
-    const eventRows = aggregateRows.filter((row) => row.eventId === event.id);
-    const eventPresent = eventRows.filter((row) => row.status === "Present").length;
-    const eventAbsent = eventRows.filter((row) => row.status === "Absent").length;
-    const eventNa = eventRows.length - eventPresent - eventAbsent;
-    const row = overview.addRow([
-      parseAttendanceDate(event.date), event.name, event.category, eventPresent, eventAbsent, eventNa,
-      eventPresent + eventAbsent ? eventPresent / (eventPresent + eventAbsent) : 0,
-    ]);
-    row.getCell(1).numFmt = "yyyy-mm-dd";
-    row.getCell(7).numFmt = "0.0%";
-  }
-  overview.autoFilter = { from: { row: overviewHeader.number, column: 1 }, to: { row: overviewHeader.number, column: 7 } };
-
-  const detail = workbook.addWorksheet("Attendance", { views: [{ state: "frozen", ySplit: 4 }] });
-  detail.showGridLines = false;
-  detail.columns = [
-    { width: 14 }, { width: 34 }, { width: 22 }, { width: 28 }, { width: 24 }, { width: 18 },
-  ];
-  styleTitle(detail, `${report.panel.title} · Detail`, `${report.events.length} selected event${report.events.length === 1 ? "" : "s"}; ${report.rows.length} attendance rows.`, 6);
-  detail.addRow([]);
-  const detailHeader = detail.addRow(["Event date", "Event", report.panel.categoryLabel, "Member", "Role / position", "Attendance status"]);
-  styleHeader(detailHeader);
-  for (const source of report.rows) {
-    const row = detail.addRow([
-      parseAttendanceDate(source.eventDate), source.eventName, source.category, source.memberName, source.roleOrPosition, source.status,
-    ]);
-    row.getCell(1).numFmt = "yyyy-mm-dd";
-  }
-  detail.autoFilter = { from: { row: detailHeader.number, column: 1 }, to: { row: detailHeader.number, column: 6 } };
-  applyStatusStyles(detail, 6, detailHeader.number + 1, detail.rowCount);
-
-  const matrixEventStart = 3;
-  const matrixEventEnd = matrixEventStart + report.events.length - 1;
-  const totalsStart = matrixEventEnd + 1;
-  const matrixColumnCount = totalsStart + 3;
-  const matrix = workbook.addWorksheet("Matrix", { views: [{ state: "frozen", xSplit: 2, ySplit: 4 }] });
-  matrix.showGridLines = false;
-  styleTitle(matrix, `${report.panel.title} · Matrix`, "Attendance status by member and selected event. Attendance rate excludes N/A.", matrixColumnCount);
-  matrix.addRow([]);
-  const matrixHeader = matrix.addRow([
-    "Member", "Role / position",
-    ...report.events.map((event) => `${event.name} (${event.date})`),
-    "Present", "Absent", "N/A", "Attendance rate",
-  ]);
-  styleHeader(matrixHeader);
-  matrix.getColumn(1).width = 28;
-  matrix.getColumn(2).width = 24;
-  for (let column = matrixEventStart; column <= matrixEventEnd; column += 1) matrix.getColumn(column).width = 18;
-  for (let column = totalsStart; column <= matrixColumnCount; column += 1) matrix.getColumn(column).width = 14;
-  for (const member of report.members) {
-    const statuses = report.events.map((event) => report.rows.find((row) => row.memberId === member.id && row.eventId === event.id)?.status || "Not applicable");
-    const presentCount = statuses.filter((status) => status === "Present").length;
-    const absentCount = statuses.filter((status) => status === "Absent").length;
-    const naCount = statuses.length - presentCount - absentCount;
-    const row = matrix.addRow([member.name, member.roleOrPosition, ...statuses]);
-    const rowNumber = row.number;
-    const range = `${excelColumn(matrixEventStart)}${rowNumber}:${excelColumn(matrixEventEnd)}${rowNumber}`;
-    row.getCell(totalsStart).value = { formula: `COUNTIF(${range},"Present")`, result: presentCount };
-    row.getCell(totalsStart + 1).value = { formula: `COUNTIF(${range},"Absent")`, result: absentCount };
-    row.getCell(totalsStart + 2).value = { formula: `COUNTIF(${range},"Not applicable")`, result: naCount };
-    row.getCell(totalsStart + 3).value = {
-      formula: `IF(SUM(${excelColumn(totalsStart)}${rowNumber}:${excelColumn(totalsStart + 1)}${rowNumber})=0,0,${excelColumn(totalsStart)}${rowNumber}/SUM(${excelColumn(totalsStart)}${rowNumber}:${excelColumn(totalsStart + 1)}${rowNumber}))`,
-      result: presentCount + absentCount ? presentCount / (presentCount + absentCount) : 0,
-    };
-    row.getCell(totalsStart + 3).numFmt = "0.0%";
-    for (let column = matrixEventStart; column <= matrixEventEnd; column += 1) {
-      row.getCell(column).fill = { type: "pattern", pattern: "solid", fgColor: { argb: statusFill(row.getCell(column).value) } };
-    }
-  }
-  matrix.autoFilter = { from: { row: matrixHeader.number, column: 1 }, to: { row: matrixHeader.number, column: matrixColumnCount } };
-
-  for (const sheet of workbook.worksheets) {
-    sheet.eachRow((row) => row.eachCell((cell) => {
-      cell.font = { name: cell.font?.name || "Aptos", size: cell.font?.size || 10, ...cell.font };
-      cell.alignment = { vertical: "middle", ...cell.alignment };
-    }));
-    sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
-    sheet.headerFooter.oddFooter = "Rotaract Club of Pune Heritage · Attendance export";
-  }
+  for (const month of report.months) buildMonthSheet(workbook, report, month);
+  if (report.months.length >= 2) buildAllMonthsSheet(workbook, report);
   return workbook;
 }
 
 export function attendanceExportFileName(report) {
-  const dates = report.events.map((event) => event.date).sort();
-  const scope = dates.length === 1 ? dates[0] : `${dates[0]}_to_${dates.at(-1)}`;
-  return `RCPH_${report.panel.key}_attendance_${scope}.xlsx`;
+  const prefix = report?.panelKey === "bod"
+    ? "RCPH_BOD_Attendance"
+    : report?.panelKey === "district" ? "RCPH_District_Attendance" : "RCPH_Attendance";
+  const months = Array.isArray(report?.months) ? report.months : [];
+  const part = (month) => String(month?.shortLabel || "").replace(/\s+/g, "_");
+  if (!months.length) return `${prefix}.xlsx`;
+  if (months.length === 1) return `${prefix}_${part(months[0])}.xlsx`;
+  return `${prefix}_${part(months[0])}-${part(months.at(-1))}.xlsx`;
 }
 
 export async function downloadAttendanceWorkbook(report) {

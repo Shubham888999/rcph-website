@@ -27,7 +27,7 @@ const ADMIN_REQUIREMENTS = {
   "": ["members", "events", "attendance", "fines", "treasury", "users"],
   requests: ["users"],
   members: ["members", "users", "events", "attendance", "fines"],
-  attendance: ["members", "users", "events", "attendance"],
+  attendance: ["members", "users", "events", "attendance", "bodMembers", "bodMeetings", "bodAttendance"],
   bod: ["bodMembers", "bodMeetings", "bodAttendance"],
   district: ["members", "users", "districtEvents", "districtAttendance"],
   reminders: ["events", "bodMeetings", "districtEvents", "reminders"],
