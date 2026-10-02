@@ -3,6 +3,12 @@
 const ADMIN_MAINTENANCE_AUDIT_COLLECTION = 'adminMaintenanceAudit';
 const REMOVE_PROFILE_CONFIRM_TEXT = 'REMOVE PROFILE';
 const PROFILE_REMOVAL_AUDIT_ACTION = 'profile_removed';
+const PERMANENT_DELETE_CONFIRM_TEXT = 'DELETE PERMANENTLY';
+const PROFILE_PERMANENT_DELETE_AUDIT_ACTION = 'profile_permanently_deleted';
+const PERMANENT_DELETE_PRESERVED_COLLECTIONS = Object.freeze([
+  'fines', 'treasury', 'events', 'bodEvents', 'bodMeetings', 'districtEvents',
+  'resolutions', 'announcements', 'reminderEmailHistory', 'adminMaintenanceAudit', 'systemLogs',
+]);
 const DEFAULT_AUTH_ACTION = 'disable';
 const SUPPORTED_AUTH_ACTIONS = new Set(['disable', 'none']);
 const PROTECTED_ROLES = new Set(['admin', 'president']);
@@ -173,7 +179,7 @@ function collectCandidateUid(values, targetSet) {
   });
 }
 
-function collectCandidateUidFromDocs(docs, targetSet) {
+function collectCandidateUidFromDocs(docs, targetSet, { includeDocIds = true } = {}) {
   docs.forEach((snapshot) => {
     const data = snapshotData(snapshot);
     if (!data) return;
@@ -181,7 +187,7 @@ function collectCandidateUidFromDocs(docs, targetSet) {
       data.uid,
       data.userId,
       data.authUid,
-      snapshot.id,
+      includeDocIds ? snapshot.id : null,
     ], targetSet);
   });
 }
@@ -321,13 +327,19 @@ async function loadIdentityPreview({
   const allInitialMemberDocs = dedupeSnapshots(directMemberSnaps.concat(emailMemberDocs, memberByUidDocs));
   const allInitialBodDocs = dedupeSnapshots(directBodMemberSnaps.concat(emailBodDocs, bodByUidDocs));
 
+  // A users doc ID is its uid. Member and BOD member doc IDs are not UIDs, so only
+  // their linked uid fields count, and their doc IDs are a roster-only fallback.
   collectCandidateUidFromDocs(emailUserDocs, candidateUids);
-  collectCandidateUidFromDocs(allInitialMemberDocs, candidateUids);
-  collectCandidateUidFromDocs(allInitialBodDocs, candidateUids);
+  collectCandidateUidFromDocs(allInitialMemberDocs, candidateUids, { includeDocIds: false });
+  collectCandidateUidFromDocs(allInitialBodDocs, candidateUids, { includeDocIds: false });
 
   if (directUserSnap?.exists) collectCandidateUid([directUserSnap.id], candidateUids);
   if (directRoleSnap?.exists) collectCandidateUid([directRoleSnap.id], candidateUids);
   if (directProgressSnap?.exists) collectCandidateUid([directProgressSnap.id], candidateUids);
+
+  if (!candidateUids.size) {
+    collectCandidateUid(allInitialMemberDocs.concat(allInitialBodDocs).map(snapshot => snapshot.id), candidateUids);
+  }
 
   const resolvedUids = Array.from(candidateUids);
   const ambiguous = resolvedUids.length > 1;
@@ -644,12 +656,14 @@ async function applyProfileRemoval({
     });
   }
 
-  addSetOperation(operations, db.collection('roles').doc(targetUid), buildRoleRemovalPayload({
-    actorUid,
-    now,
-    reason,
-    role: targetRole,
-  }));
+  if (affected.roleDoc) {
+    addSetOperation(operations, db.collection('roles').doc(targetUid), buildRoleRemovalPayload({
+      actorUid,
+      now,
+      reason,
+      role: targetRole,
+    }));
+  }
 
   if (affected.prospectProgressDoc?.path) {
     addSetOperation(operations, db.doc(affected.prospectProgressDoc.path), {
@@ -756,6 +770,41 @@ async function applyProfileRemoval({
     affected: buildAuditAffectedSummary(preview),
   };
 }
+function summaryIsRemoved(summary) {
+  return Boolean(summary) && (summary.status === 'removed' || summary.deleted === true);
+}
+
+async function collectPermanentDeletePaths({ db, preview }) {
+  const affected = preview.affected || {};
+  const targetUid = safeDocId(preview.target?.uid);
+  const ids = Array.from(new Set([
+    targetUid,
+    ...(affected.memberDocs || []).map(doc => safeDocId(doc.id)),
+    ...(affected.bodMemberDocs || []).map(doc => safeDocId(doc.id)),
+  ].filter(Boolean)));
+  const paths = new Set();
+  const add = (path) => { if (path) paths.add(path); };
+
+  add(affected.userDoc?.path);
+  add(affected.prospectProgressDoc?.path);
+  (affected.memberDocs || []).forEach(doc => add(doc.path));
+  (affected.bodMemberDocs || []).forEach(doc => add(doc.path));
+
+  for (const id of ids) {
+    for (const collectionName of ['roles', 'attendance', 'bodAttendance', 'districtAttendance']) {
+      const snap = await db.collection(collectionName).doc(id).get();
+      if (snap.exists) add(snap.ref.path);
+    }
+  }
+
+  if (targetUid) {
+    (await querySafe(db, 'announcementDeliveries', 'uid', targetUid)).forEach(snap => add(snap.ref.path));
+    (await querySafe(db, 'bodPositionAssignments', 'uid', targetUid)).forEach(snap => add(snap.ref.path));
+  }
+
+  return Array.from(paths);
+}
+
 function createProfileRemovalService({
   db,
   admin,
@@ -874,9 +923,96 @@ function createProfileRemovalService({
       throw new HttpsError('internal', error?.message || 'Profile removal failed.');
     }
   }
+  async function permanentlyDeleteRemovedProfile({ actorUid, data }) {
+    const safeActorUid = safeDocId(actorUid);
+    if (!safeActorUid) {
+      throw new HttpsError('unauthenticated', 'Sign in required.');
+    }
+
+    await assertApprovedActiveCallableAccount(safeActorUid);
+    await assertAdminOrPresidentAuthority(safeActorUid);
+
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new HttpsError('invalid-argument', 'Delete request must be an object.');
+    }
+
+    const allowedFields = new Set(['targetUid', 'uid', 'memberId', 'bodMemberId', 'email', 'profileType', 'confirmationText']);
+    Object.keys(data).forEach((key) => {
+      if (!allowedFields.has(key)) {
+        throw new HttpsError('invalid-argument', `Unsupported delete field: ${key}`);
+      }
+    });
+
+    if (cleanText(data.confirmationText, 80) !== PERMANENT_DELETE_CONFIRM_TEXT) {
+      throw new HttpsError('failed-precondition', `Type "${PERMANENT_DELETE_CONFIRM_TEXT}" to confirm.`);
+    }
+
+    const preview = await previewRemovePersonProfile({
+      actorUid: safeActorUid,
+      data: targetLookupPayload(data),
+    });
+
+    if (!previewHasAnyAffectedIdentity(preview)) {
+      throw new HttpsError('not-found', 'No matching profile/account was found.');
+    }
+
+    if (preview.protections?.blocked === true) {
+      throw new HttpsError('failed-precondition', 'This profile is protected and cannot be deleted.', {
+        reasons: preview.protections.reasons || [],
+      });
+    }
+
+    const affected = preview.affected || {};
+    const records = [affected.userDoc, ...(affected.memberDocs || []), ...(affected.bodMemberDocs || [])].filter(Boolean);
+    if (!records.length || !records.every(summaryIsRemoved)) {
+      throw new HttpsError('failed-precondition', 'Only removed profiles can be permanently deleted. Remove the profile first.');
+    }
+    if ((affected.activeBodAssignments || []).length) {
+      throw new HttpsError('failed-precondition', 'This profile still holds an active BOD position.');
+    }
+
+    const targetUid = safeDocId(preview.target?.uid);
+    const paths = await collectPermanentDeletePaths({ db, preview });
+
+    let authDeleted = false;
+    let authMissing = true;
+    if (targetUid && affected.authUser?.exists === true) {
+      try {
+        await admin.auth().deleteUser(targetUid);
+        authDeleted = true;
+        authMissing = false;
+      } catch (error) {
+        if (error?.code !== 'auth/user-not-found') {
+          throw new HttpsError('unavailable', 'The login account could not be deleted. Nothing else was changed.');
+        }
+      }
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const operations = paths.map(path => batch => batch.delete(db.doc(path)));
+    const auditRef = db.collection(ADMIN_MAINTENANCE_AUDIT_COLLECTION).doc();
+    operations.push(batch => batch.set(auditRef, {
+      action: PROFILE_PERMANENT_DELETE_AUDIT_ACTION,
+      actorUid: safeActorUid,
+      targetUid,
+      targetName: cleanText(preview.target?.name, 180),
+      targetEmail: normalizeEmail(preview.target?.email),
+      targetProfileType: cleanText(preview.target?.profileType, 80),
+      deletedPaths: paths,
+      deletedCount: paths.length,
+      authDeleted,
+      authMissing,
+      preservedCollections: PERMANENT_DELETE_PRESERVED_COLLECTIONS.slice(),
+      createdAt: now,
+    }));
+    await commitFirestoreOperations(db, operations);
+
+    return { ok: true, targetUid, authDeleted, authMissing, deletedPaths: paths, auditPath: auditRef.path };
+  }
   return {
     previewRemovePersonProfile,
     removePersonProfile,
+    permanentlyDeleteRemovedProfile,
   };
 }
 
@@ -890,5 +1026,6 @@ module.exports = {
     buildProtectionReport,
     buildAuditAffectedSummary,
     normalizeAuthAction,
+    summaryIsRemoved,
   },
 };
