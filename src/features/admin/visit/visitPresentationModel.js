@@ -2,13 +2,13 @@ import { POSITION_CATALOG } from "../shared/positionCatalog.js";
 
 const POSITION_BY_KEY = new Map(POSITION_CATALOG.map((position) => [position.key, position]));
 
-const OFFICER_KEYS = new Set([
-  "editor",
-  "sports-representative",
-  "wrwc",
-  "wr",
-  "saa",
+const AVENUE_DIRECTOR_ORDER = Object.freeze([
+  "csd", "co-csd",
+  "cmd", "co-cmd",
+  "isd", "co-isd",
+  "pdd", "co-pdd",
 ]);
+const AVENUE_DIRECTOR_KEYS = new Set(AVENUE_DIRECTOR_ORDER);
 
 const GROUP_DETAILS = Object.freeze({
   core: Object.freeze({
@@ -66,10 +66,10 @@ export function getVisitFolderGroup(folder = {}) {
   const positionKey = clean(folder.positionKey, 80);
   const catalog = POSITION_BY_KEY.get(positionKey);
   if (!catalog) return GROUP_DETAILS.other;
+  if (AVENUE_DIRECTOR_KEYS.has(catalog.key)) return GROUP_DETAILS.avenues;
   if (catalog.group === "co-admin" || catalog.group === "co-bod") return GROUP_DETAILS.co;
   if (catalog.group === "admin") return GROUP_DETAILS.core;
-  if (OFFICER_KEYS.has(catalog.key)) return GROUP_DETAILS.officers;
-  if (catalog.group === "bod") return GROUP_DETAILS.avenues;
+  if (catalog.group === "bod") return GROUP_DETAILS.officers;
   return GROUP_DETAILS.other;
 }
 
@@ -84,7 +84,9 @@ export function getVisitFolderPresentation(folder = {}) {
     groupDescription: group.description,
     groupRank: group.rank,
     positionKey,
-    sortOrder: Number.isFinite(Number(catalog?.sortOrder)) ? Number(catalog.sortOrder) : 1000,
+    sortOrder: AVENUE_DIRECTOR_KEYS.has(positionKey)
+      ? AVENUE_DIRECTOR_ORDER.indexOf(positionKey)
+      : Number.isFinite(Number(catalog?.sortOrder)) ? Number(catalog.sortOrder) : 1000,
     title: clean(folder.positionTitle, 180) || catalog?.displayTitle || titleFromKey(positionKey) || "Visit folder",
   };
 }

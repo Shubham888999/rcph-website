@@ -31,11 +31,29 @@ test("visit folder grouping separates board, avenue, officer, co-position, and f
     "Core Board",
     "Avenue Directors",
     "Directors and Officers",
-    "Co-Positions",
     "Other Authorized Folders",
   ]);
+  assert.deepEqual(groups[1].folders.map((folder) => folder.positionKey), ["csd", "co-csd"]);
   assert.equal(groups.at(-1).folders[0].positionKey, "custom-folder");
   assert.equal(getVisitFolderCode(groups.at(-1).folders[0]), "CUSTOM");
+});
+
+test("visit folder sections pair avenue directors with their co-directors and move other BOD roles to officers", () => {
+  const keys = [
+    "pdd", "co-isd", "csd", "co-pdd", "cmd", "co-csd", "isd", "co-cmd",
+    "rrro", "pro", "dei", "editor", "cwd", "sports-representative", "wrwc", "wr", "pid", "mdo",
+    "saa", "co-rrro", "co-president",
+  ];
+  const groups = groupVisitFolders(keys.map((positionKey) => ({ positionKey })));
+  const byLabel = new Map(groups.map((group) => [group.label, group.folders.map((folder) => folder.positionKey)]));
+
+  assert.deepEqual(byLabel.get("Avenue Directors"), ["csd", "co-csd", "cmd", "co-cmd", "isd", "co-isd", "pdd", "co-pdd"]);
+  assert.deepEqual(
+    [...byLabel.get("Directors and Officers")].sort(),
+    ["cwd", "dei", "editor", "mdo", "pid", "pro", "rrro", "sports-representative", "wr", "wrwc"],
+  );
+  assert.deepEqual(byLabel.get("Core Board"), ["saa"]);
+  assert.deepEqual([...byLabel.get("Co-Positions")].sort(), ["co-president", "co-rrro"]);
 });
 
 test("visit availability and chips reflect only existing frontend folder fields", () => {
