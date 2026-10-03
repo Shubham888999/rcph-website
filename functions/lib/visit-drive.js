@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { Readable } = require('stream');
 const Busboy = require('@fastify/busboy');
 const { google } = require('googleapis');
+const { makeVisitSubmissionError } = require('./visit-submissions');
 
 const VISIT_HTTP_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 const VISIT_UPLOAD_ALLOWED_ORIGINS = Object.freeze([
@@ -29,6 +30,11 @@ const VISIT_DRIVE_AUTH_MODES = Object.freeze(['shared-drive', 'oauth']);
 const VISIT_FOLDER_LOCK_TTL_MS = 90 * 1000;
 const VISIT_FOLDER_LOCK_RETRY_MS = 100;
 const VISIT_FOLDER_LOCK_RETRY_COUNT = 3;
+const VISIT_CATEGORY_FOLDER_NAMES = Object.freeze({
+  inward: 'Inward',
+  outward: 'Outward',
+});
+const VISIT_FOLDER_BUSY_MESSAGE = 'This folder is busy. Please try again in a moment.';
 
 function createHttpUploadError(status, message, details) {
   const err = new Error(message);
@@ -453,14 +459,54 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
     rootFolderId,
     validation.positionTitle
   );
+  const targetFolderId = await ensureCategoryFolder({
+    positionFolderId: positionFolder.id,
+    category: safeText(validation.documentCategory, 20),
+  }, resolvedConfig);
 
   return {
     rootFolderId,
     visitType: validation.visitType,
     positionFolderId: positionFolder.id,
     positionFolderName: positionFolder.name,
+    targetFolderId,
   };
 }
+
+  async function ensureCategoryFolder({ positionFolderId, category }, config = null) {
+    const parentId = safeText(positionFolderId, 300);
+    if (!parentId) {
+      throw createHttpUploadError(500, 'Visit position folder is missing.');
+    }
+    if (!category) return parentId;
+    const folderName = VISIT_CATEGORY_FOLDER_NAMES[category];
+    if (!folderName) {
+      throw makeVisitSubmissionError('invalid-argument', 'Document category must be inward, outward, or empty.');
+    }
+    getDriveClient(config);
+    const categoryFolder = await getOrCreateUniqueFolder(parentId, folderName);
+    return categoryFolder.id;
+  }
+
+  async function moveFileToFolder({ fileId, targetFolderId }, config = null) {
+    const client = getDriveClient(config);
+    const current = await client.files.get({
+      fileId,
+      fields: 'id,parents',
+      supportsAllDrives: true,
+    });
+    const parents = Array.isArray(current.data?.parents) ? current.data.parents : [];
+    const removeParents = parents.filter(parentId => parentId !== targetFolderId);
+    const request = {
+      fileId,
+      addParents: targetFolderId,
+      fields: 'id,parents',
+      supportsAllDrives: true,
+    };
+    if (removeParents.length) request.removeParents = removeParents.join(',');
+    await client.files.update(request);
+    return targetFolderId;
+  }
 
   async function uploadFile({ folderId, fileName, mimeType, buffer }) {
     const response = await getDriveClient().files.create({
@@ -485,6 +531,8 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
 
   return {
     ensureVisitFolderHierarchy,
+    ensureCategoryFolder,
+    moveFileToFolder,
     uploadFile,
   };
 }
@@ -655,7 +703,7 @@ folderLock = await folderLockManager.acquireLock({
 });
       const folder = await driveService.ensureVisitFolderHierarchy(validation, driveConfig);
       driveFile = await driveService.uploadFile({
-        folderId: folder.positionFolderId,
+        folderId: folder.targetFolderId || folder.positionFolderId,
         fileName: validation.sanitizedOriginalFileName,
         mimeType: metadata.mimeType,
         buffer: parsedFile.buffer,
@@ -667,7 +715,8 @@ folderLock = await folderLockManager.acquireLock({
         clientFileId: metadata.clientFileId,
         uploadProof: validation.uploadProof,
         driveFileId: driveFile.driveFileId,
-        driveFolderId: folder.positionFolderId,
+        driveFolderId: folder.targetFolderId || folder.positionFolderId,
+        positionFolderId: folder.positionFolderId,
         driveFileUrl: driveFile.driveFileUrl,
         fileName: metadata.fileName,
         finalFileName: validation.sanitizedOriginalFileName,
@@ -719,6 +768,68 @@ folderLock = await folderLockManager.acquireLock({
   };
 }
 
+function isFolderLockBusyError(err) {
+  return Number(err?.status) === 409 || Number(err?.httpStatus) === 409;
+}
+
+function createVisitCategoryMoveHandler(options = {}) {
+  const visitService = options.visitService;
+  if (!visitService) throw new Error('visitService is required.');
+  const driveService = options.driveService || createVisitDriveService(options);
+  const folderLockManager = options.folderLockManager || createNoopFolderLockManager();
+  const configProvider = options.getDriveConfig || (() => getVisitDriveConfig(options.env || process.env));
+  const logger = options.logger || console;
+
+  return async function moveVisitSubmissionCategory(uid, data = {}) {
+    const plan = await visitService.prepareCategoryMove(uid, {
+      submissionId: data.submissionId,
+      documentCategory: data.documentCategory,
+    });
+    if (plan?.noop) return { ok: true, noop: true };
+
+    const driveConfig = configProvider();
+    const rootFolderId = getRootFolderIdForVisit(driveConfig, plan.visitType);
+    let folderLock;
+    try {
+      folderLock = await folderLockManager.acquireLock({
+        rootFolderId,
+        visitType: plan.visitType,
+        positionKey: plan.positionKey,
+      });
+    } catch (err) {
+      if (isFolderLockBusyError(err)) throw makeVisitSubmissionError('failed-precondition', VISIT_FOLDER_BUSY_MESSAGE);
+      throw err;
+    }
+
+    let targetFolderId;
+    try {
+      targetFolderId = await driveService.ensureCategoryFolder({
+        positionFolderId: plan.positionFolderId,
+        category: plan.targetCategory,
+      }, driveConfig);
+      await driveService.moveFileToFolder({ fileId: plan.driveFileId, targetFolderId }, driveConfig);
+    } finally {
+      try {
+        await folderLock.release();
+      } catch (releaseErr) {
+        logger.warn('Visit category move folder lock release failed', {
+          lockId: folderLock.lockId || null,
+          code: releaseErr?.code || releaseErr?.httpsCode || 'internal',
+        });
+      }
+    }
+
+    await visitService.commitCategoryMove(uid, {
+      submissionId: plan.submissionId,
+      targetCategory: plan.targetCategory,
+      driveFileId: plan.driveFileId,
+      driveFolderId: targetFolderId,
+      positionFolderId: plan.positionFolderId,
+    });
+    return { ok: true, documentCategory: plan.targetCategory };
+  };
+}
+
 module.exports = {
   VISIT_HTTP_UPLOAD_MAX_BYTES,
   VISIT_UPLOAD_ALLOWED_ORIGINS,
@@ -738,5 +849,8 @@ module.exports = {
   buildVisitFolderLockId,
   createNoopFolderLockManager,
   createFirestoreFolderLockManager,
+  createVisitCategoryMoveHandler,
+  VISIT_CATEGORY_FOLDER_NAMES,
+  VISIT_FOLDER_BUSY_MESSAGE,
   createVisitHttpUploadHandler,
 };
