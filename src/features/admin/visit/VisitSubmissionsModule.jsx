@@ -149,6 +149,7 @@ function VisitDashboardWorkspace({ data, access, openVisit, busy, mutate, setDia
             <h3 id="visit-maintenance-title">Workspace tools</h3>
           </div>
           <div className="visit-card-actions">
+            <button disabled={busy} onClick={() => mutate("initialize", visitCalls.initialize, "Folders synced with positions. Any missing folders were created.", load)}>Sync folders with positions</button>
             <button disabled={busy} onClick={() => mutate("cleanup", visitCalls.cleanup, "Expired sessions cleaned.")}>Clean expired sessions</button>
             <button onClick={() => setDialog({ type: "moderation" })}>Moderation</button>
           </div>

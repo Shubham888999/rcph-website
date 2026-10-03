@@ -114,3 +114,13 @@ test("folder directory offers an All, Open, and Has files filter with collapsibl
   assert.match(moduleSource, /summarizeVisitFolderGroup\(group\.folders/);
   assert.match(moduleSource, /No folders match this filter\./);
 });
+
+test("maintenance panel can resync visit folders with positions", () => {
+  const start = moduleSource.indexOf('<h3 id="visit-maintenance-title">Workspace tools</h3>');
+  const panel = moduleSource.slice(start, moduleSource.indexOf("</section>", start));
+  assert.ok(start >= 0);
+  assert.match(panel, /mutate\("initialize", visitCalls\.initialize, "Folders synced with positions\. Any missing folders were created\.", load\)/);
+  assert.match(panel, />Sync folders with positions<\/button>/);
+  assert.ok(panel.indexOf("Sync folders with positions") < panel.indexOf("Clean expired sessions"));
+  assert.match(moduleSource, />Initialize structure<\/button>/);
+});
