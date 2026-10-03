@@ -624,7 +624,7 @@ function FolderDetailWorkspaceView({
         <div className="visit-section-heading">
           <div>
             <p className="visit-eyebrow">Document library</p>
-            <h3 id="visit-active-files">Supporting files</h3>
+            <h3 id="visit-active-files">{folder.supportsDocumentCategories ? "Documents" : "Supporting files"}</h3>
           </div>
           <span>{folder.activeFileCount} / {folder.maxActiveFiles} active files</span>
         </div>
