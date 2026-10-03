@@ -14,19 +14,19 @@ const GROUP_DETAILS = Object.freeze({
   core: Object.freeze({
     key: "core",
     label: "Core Board",
-    description: "Executive office and club administration folders.",
+    description: "Core Committee and Administration folders.",
     rank: 10,
   }),
   avenues: Object.freeze({
     key: "avenues",
     label: "Avenue Directors",
-    description: "Director folders for avenue reporting and visit evidence.",
+    description: "Avenue Directors folders.",
     rank: 20,
   }),
   officers: Object.freeze({
     key: "officers",
-    label: "Representatives / Officers",
-    description: "Representative and officer folders in the visit file room.",
+    label: "Directors and Officers",
+    description: "Directors and Officers folders.",
     rank: 30,
   }),
   co: Object.freeze({

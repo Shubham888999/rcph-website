@@ -30,7 +30,7 @@ test("visit folder grouping separates board, avenue, officer, co-position, and f
   assert.deepEqual(groups.map((group) => group.label), [
     "Core Board",
     "Avenue Directors",
-    "Representatives / Officers",
+    "Directors and Officers",
     "Co-Positions",
     "Other Authorized Folders",
   ]);
