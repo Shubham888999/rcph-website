@@ -30,10 +30,9 @@ test("Club Visits renders the executive filing-room workspace components", () =>
     "VisitFoldersWorkspace",
     "VisitFolderCard",
     "Your visit folder",
-    "Open folder",
   ]) assert.match(moduleSource, new RegExp(copy));
   assert.match(presentationSource, /Core Board/);
-  assert.match(moduleSource, /groupVisitFolders\(folders\)/);
+  assert.match(moduleSource, /groupVisitFolders\(filteredFolders\)/);
   assert.match(moduleSource, /singleLimitedFolder/);
 });
 
@@ -92,4 +91,36 @@ test("details keep file links when thumbnails fail and preserve optional folder 
 
 test("BOD Club Visits direct URL has its own capability guard", () => {
   assert.match(routerSource, /capability="visitSubmissions"[\s\S]*path: "\/admin\/visit-submissions"/);
+});
+
+test("visit folder cards are compact tiles with a settings menu and no CTA, chips, or tab", () => {
+  const start = moduleSource.indexOf("function VisitFolderCard(");
+  const cardSource = moduleSource.slice(start, moduleSource.indexOf("function VisitFoldersWorkspace(", start));
+  assert.ok(start >= 0 && cardSource.length > 0);
+  assert.doesNotMatch(cardSource, /Open folder/);
+  assert.doesNotMatch(cardSource, /visit-folder-card__(cta|chips|meta|tab|settings)/);
+  assert.doesNotMatch(cardSource, /getVisitFolderChips/);
+  assert.match(cardSource, /className="visit-folder-card__menu"/);
+  assert.match(cardSource, /aria-label=\{`Open \$\{presentation\.title\} folder`\}/);
+  assert.match(cardSource, /visit-folder-card__status is-\$\{availability\.key\}/);
+  assert.match(cardSource, /visit-folder-card__count/);
+});
+
+test("folder directory offers an All, Open, and Has files filter with collapsible groups", () => {
+  assert.match(moduleSource, /className="visit-folder-filter"/);
+  assert.match(moduleSource, /aria-pressed=\{folderFilter === key\}/);
+  for (const label of ['"All"', '"Open"', '"Has files"']) assert.match(moduleSource, new RegExp(label));
+  assert.match(moduleSource, /<details className="visit-folder-group" open/);
+  assert.match(moduleSource, /summarizeVisitFolderGroup\(group\.folders/);
+  assert.match(moduleSource, /No folders match this filter\./);
+});
+
+test("maintenance panel can resync visit folders with positions", () => {
+  const start = moduleSource.indexOf('<h3 id="visit-maintenance-title">Workspace tools</h3>');
+  const panel = moduleSource.slice(start, moduleSource.indexOf("</section>", start));
+  assert.ok(start >= 0);
+  assert.match(panel, /mutate\("initialize", visitCalls\.initialize, "Folders synced with positions\. Any missing folders were created\.", load\)/);
+  assert.match(panel, />Sync folders with positions<\/button>/);
+  assert.ok(panel.indexOf("Sync folders with positions") < panel.indexOf("Clean expired sessions"));
+  assert.match(moduleSource, />Initialize structure<\/button>/);
 });

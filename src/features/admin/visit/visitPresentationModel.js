@@ -2,31 +2,31 @@ import { POSITION_CATALOG } from "../shared/positionCatalog.js";
 
 const POSITION_BY_KEY = new Map(POSITION_CATALOG.map((position) => [position.key, position]));
 
-const OFFICER_KEYS = new Set([
-  "editor",
-  "sports-representative",
-  "wrwc",
-  "wr",
-  "saa",
+const AVENUE_DIRECTOR_ORDER = Object.freeze([
+  "csd", "co-csd",
+  "cmd", "co-cmd",
+  "isd", "co-isd",
+  "pdd", "co-pdd",
 ]);
+const AVENUE_DIRECTOR_KEYS = new Set(AVENUE_DIRECTOR_ORDER);
 
 const GROUP_DETAILS = Object.freeze({
   core: Object.freeze({
     key: "core",
     label: "Core Board",
-    description: "Executive office and club administration folders.",
+    description: "Core Committee and Administration folders.",
     rank: 10,
   }),
   avenues: Object.freeze({
     key: "avenues",
     label: "Avenue Directors",
-    description: "Director folders for avenue reporting and visit evidence.",
+    description: "Avenue Directors folders.",
     rank: 20,
   }),
   officers: Object.freeze({
     key: "officers",
-    label: "Representatives / Officers",
-    description: "Representative and officer folders in the visit file room.",
+    label: "Directors and Officers",
+    description: "Directors and Officers folders.",
     rank: 30,
   }),
   co: Object.freeze({
@@ -66,10 +66,10 @@ export function getVisitFolderGroup(folder = {}) {
   const positionKey = clean(folder.positionKey, 80);
   const catalog = POSITION_BY_KEY.get(positionKey);
   if (!catalog) return GROUP_DETAILS.other;
+  if (AVENUE_DIRECTOR_KEYS.has(catalog.key)) return GROUP_DETAILS.avenues;
   if (catalog.group === "co-admin" || catalog.group === "co-bod") return GROUP_DETAILS.co;
   if (catalog.group === "admin") return GROUP_DETAILS.core;
-  if (OFFICER_KEYS.has(catalog.key)) return GROUP_DETAILS.officers;
-  if (catalog.group === "bod") return GROUP_DETAILS.avenues;
+  if (catalog.group === "bod") return GROUP_DETAILS.officers;
   return GROUP_DETAILS.other;
 }
 
@@ -84,7 +84,9 @@ export function getVisitFolderPresentation(folder = {}) {
     groupDescription: group.description,
     groupRank: group.rank,
     positionKey,
-    sortOrder: Number.isFinite(Number(catalog?.sortOrder)) ? Number(catalog.sortOrder) : 1000,
+    sortOrder: AVENUE_DIRECTOR_KEYS.has(positionKey)
+      ? AVENUE_DIRECTOR_ORDER.indexOf(positionKey)
+      : Number.isFinite(Number(catalog?.sortOrder)) ? Number(catalog.sortOrder) : 1000,
     title: clean(folder.positionTitle, 180) || catalog?.displayTitle || titleFromKey(positionKey) || "Visit folder",
   };
 }
@@ -125,6 +127,22 @@ export function getVisitAvailability(folder = {}, visit = {}) {
     return { key: "closed", label: "Closed", detail: "Submissions closed" };
   }
   return { key: "open", label: "Open", detail: "Ready for documents" };
+}
+
+export function summarizeVisitFolderGroup(folders = [], visit = {}) {
+  const list = Array.isArray(folders) ? folders : [];
+  return {
+    total: list.length,
+    open: list.filter((folder) => getVisitAvailability(folder, visit).key === "open").length,
+    files: list.reduce((sum, folder) => sum + Math.max(0, Number(folder.activeFileCount) || 0), 0),
+  };
+}
+
+export function filterVisitFolders(folders = [], filter = "all", visit = {}) {
+  const list = Array.isArray(folders) ? folders : [];
+  if (filter === "open") return list.filter((folder) => getVisitAvailability(folder, visit).key === "open");
+  if (filter === "files") return list.filter((folder) => (Number(folder.activeFileCount) || 0) > 0);
+  return list;
 }
 
 export function getVisitStatus(visit = {}) {

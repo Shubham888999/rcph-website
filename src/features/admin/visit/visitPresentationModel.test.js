@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  filterVisitFolders,
   getVisitAvailability,
   getVisitFileKind,
   getVisitFolderChips,
   getVisitFolderCode,
   getVisitFolderPresentation,
   groupVisitFolders,
+  summarizeVisitFolderGroup,
 } from "./visitPresentationModel.js";
 
 test("visit folder presentation uses the canonical position catalog without changing keys", () => {
@@ -28,12 +30,30 @@ test("visit folder grouping separates board, avenue, officer, co-position, and f
   assert.deepEqual(groups.map((group) => group.label), [
     "Core Board",
     "Avenue Directors",
-    "Representatives / Officers",
-    "Co-Positions",
+    "Directors and Officers",
     "Other Authorized Folders",
   ]);
+  assert.deepEqual(groups[1].folders.map((folder) => folder.positionKey), ["csd", "co-csd"]);
   assert.equal(groups.at(-1).folders[0].positionKey, "custom-folder");
   assert.equal(getVisitFolderCode(groups.at(-1).folders[0]), "CUSTOM");
+});
+
+test("visit folder sections pair avenue directors with their co-directors and move other BOD roles to officers", () => {
+  const keys = [
+    "pdd", "co-isd", "csd", "co-pdd", "cmd", "co-csd", "isd", "co-cmd",
+    "rrro", "pro", "dei", "editor", "cwd", "sports-representative", "wrwc", "wr", "pid", "mdo",
+    "saa", "co-rrro", "co-president",
+  ];
+  const groups = groupVisitFolders(keys.map((positionKey) => ({ positionKey })));
+  const byLabel = new Map(groups.map((group) => [group.label, group.folders.map((folder) => folder.positionKey)]));
+
+  assert.deepEqual(byLabel.get("Avenue Directors"), ["csd", "co-csd", "cmd", "co-cmd", "isd", "co-isd", "pdd", "co-pdd"]);
+  assert.deepEqual(
+    [...byLabel.get("Directors and Officers")].sort(),
+    ["cwd", "dei", "editor", "mdo", "pid", "pro", "rrro", "sports-representative", "wr", "wrwc"],
+  );
+  assert.deepEqual(byLabel.get("Core Board"), ["saa"]);
+  assert.deepEqual([...byLabel.get("Co-Positions")].sort(), ["co-president", "co-rrro"]);
 });
 
 test("visit availability and chips reflect only existing frontend folder fields", () => {
@@ -50,4 +70,28 @@ test("visit file kind labels common document types for restrained badges", () =>
   assert.equal(getVisitFileKind({ mimeType: "application/pdf" }).code, "PDF");
   assert.equal(getVisitFileKind({ fileName: "sheet.csv" }).key, "spreadsheet");
   assert.equal(getVisitFileKind({ fileName: "photo.webp" }).key, "image");
+});
+
+const grid = [
+  { positionKey: "president", activeFileCount: 3, submissionOpen: true },
+  { positionKey: "secretary", activeFileCount: 0, submissionOpen: true },
+  { positionKey: "treasurer", activeFileCount: 2, locked: true },
+  { positionKey: "csd", activeFileCount: 0, submissionOpen: false },
+  { positionKey: "cmd", activeFileCount: "4", enabled: false },
+];
+
+test("summarizeVisitFolderGroup counts folders, open folders, and active files", () => {
+  assert.deepEqual(summarizeVisitFolderGroup(grid, { submissionOpen: true }), { total: 5, open: 2, files: 9 });
+  assert.deepEqual(summarizeVisitFolderGroup(grid, { submissionOpen: false }), { total: 5, open: 0, files: 9 });
+  assert.deepEqual(summarizeVisitFolderGroup([], {}), { total: 0, open: 0, files: 0 });
+  assert.deepEqual(summarizeVisitFolderGroup(undefined), { total: 0, open: 0, files: 0 });
+});
+
+test("filterVisitFolders keeps all, open, or folders with files", () => {
+  const keys = (folders) => folders.map((folder) => folder.positionKey);
+  assert.deepEqual(keys(filterVisitFolders(grid, "all", {})), ["president", "secretary", "treasurer", "csd", "cmd"]);
+  assert.deepEqual(keys(filterVisitFolders(grid, "open", {})), ["president", "secretary"]);
+  assert.deepEqual(keys(filterVisitFolders(grid, "open", { submissionOpen: false })), []);
+  assert.deepEqual(keys(filterVisitFolders(grid, "files", {})), ["president", "treasurer", "cmd"]);
+  assert.deepEqual(keys(filterVisitFolders(grid, "unknown", {})), keys(grid));
 });
