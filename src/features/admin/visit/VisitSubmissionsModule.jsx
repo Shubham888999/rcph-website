@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminDialog from "../shared/AdminDialog";
 import AdminModuleHeader from "../AdminModuleHeader";
-import { AdminError, AdminLoading } from "../shared/AdminStates";
+import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
 import { normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
@@ -9,13 +9,14 @@ import VisitSubmissionFiles, { VisitFileTypeBadge } from "./VisitSubmissionFiles
 import {
   getFolderSummaryItems,
   getVisitAvailability,
+  filterVisitFolders,
   getVisitFileKind,
-  getVisitFolderChips,
   getVisitFolderCode,
   getVisitFolderPresentation,
   getVisitStatus,
   getVisitSummaryItems,
   groupVisitFolders,
+  summarizeVisitFolderGroup,
 } from "./visitPresentationModel.js";
 import {
   addBulkVisitFiles,
@@ -160,7 +161,6 @@ function VisitDashboardWorkspace({ data, access, openVisit, busy, mutate, setDia
 function VisitFolderCard({ folder, visit, openFolder, setDialog, canManageWorkspace, featured = false }) {
   const presentation = getVisitFolderPresentation(folder);
   const availability = getVisitAvailability(folder, visit);
-  const chips = getVisitFolderChips(folder, visit);
   const canManageFolder = canManageWorkspace || folder.canManage;
   return (
     <article className={`visit-folder-card${featured ? " visit-folder-card--featured" : ""}`}>
@@ -169,21 +169,21 @@ function VisitFolderCard({ folder, visit, openFolder, setDialog, canManageWorksp
         className="visit-folder-card__open"
         disabled={!folder.canOpen}
         onClick={() => openFolder(folder.visitType, folder.positionKey)}
+        aria-label={`Open ${presentation.title} folder`}
       >
-        <span className="visit-folder-card__tab">{presentation.code}</span>
+        <span className="visit-folder-card__top">
+          <span className="visit-folder-card__code">{presentation.code}</span>
+          <span className="visit-folder-card__count">{folder.activeFileCount} / {folder.maxActiveFiles}</span>
+        </span>
         <span className="visit-folder-card__title">{presentation.title}</span>
-        <span className="visit-folder-card__chips">
-          {chips.map((chip) => <VisitStatusBadge statusKey={chip.key} key={chip.key}>{chip.label}</VisitStatusBadge>)}
+        <span className={`visit-folder-card__status is-${availability.key}`}>
+          <i aria-hidden="true"></i>{availability.label}
+          {folder.primaryPresentationSubmissionId ? " · Main presentation" : ""}
         </span>
-        <span className="visit-folder-card__meta">
-          <span>{folder.activeFileCount} / {folder.maxActiveFiles} active files</span>
-          {availability.detail ? <span>{availability.detail}</span> : null}
-        </span>
-        <span className="visit-folder-card__cta">Open folder <span aria-hidden="true">-&gt;</span></span>
       </button>
       {canManageFolder ? (
-        <button type="button" className="visit-folder-card__settings" aria-label={`Settings for ${presentation.title}`} onClick={() => setDialog({ type: "folder-settings", folder })}>
-          Settings
+        <button type="button" className="visit-folder-card__menu" aria-label={`Settings for ${presentation.title}`} onClick={() => setDialog({ type: "folder-settings", folder })}>
+          ⋯
         </button>
       ) : null}
     </article>
@@ -194,7 +194,10 @@ function VisitFoldersWorkspace({ data, openFolder, setDialog }) {
   const folders = data.folders || [];
   const canManageWorkspace = data.access?.canManage === true;
   const singleLimitedFolder = !canManageWorkspace && folders.length === 1;
-  const groupedFolders = groupVisitFolders(folders);
+  const [folderFilter, setFolderFilter] = useState("all");
+  const filteredFolders = filterVisitFolders(folders, folderFilter, data.visit || {});
+  const groupedFolders = groupVisitFolders(filteredFolders);
+  const folderFilters = [["all", "All"], ["open", "Open"], ["files", "Has files"]];
   return (
     <div className="visit-workspace">
       <section className="visit-workspace-hero visit-workspace-hero--compact" aria-labelledby="visit-folders-title">
@@ -211,25 +214,48 @@ function VisitFoldersWorkspace({ data, openFolder, setDialog }) {
           <VisitFolderCard folder={folders[0]} visit={data.visit} openFolder={openFolder} setDialog={setDialog} canManageWorkspace={canManageWorkspace} featured />
         </section>
       ) : canManageWorkspace ? (
-        <div className="visit-folder-directory">
-          {groupedFolders.map((group) => (
-            <section className="visit-folder-group" aria-labelledby={`visit-folder-group-${group.key}`} key={group.key}>
-              <header className="visit-folder-group__header">
-                <div>
-                  <p className="visit-eyebrow">Folder section</p>
-                  <h3 id={`visit-folder-group-${group.key}`}>{group.label}</h3>
-                  <p>{group.description}</p>
-                </div>
-                <span>{group.folders.length} folder{group.folders.length === 1 ? "" : "s"}</span>
-              </header>
-              <div className="visit-folder-grid">
-                {group.folders.map((folder) => (
-                  <VisitFolderCard folder={folder} visit={data.visit} openFolder={openFolder} setDialog={setDialog} canManageWorkspace={canManageWorkspace} key={folder.positionKey} />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+        <>
+          <div className="visit-folder-filter" role="group" aria-label="Filter folders">
+            {folderFilters.map(([key, label]) => (
+              <button
+                type="button"
+                key={key}
+                className={folderFilter === key ? "is-active" : ""}
+                aria-pressed={folderFilter === key}
+                onClick={() => setFolderFilter(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {groupedFolders.length ? (
+            <div className="visit-folder-directory">
+              {groupedFolders.map((group) => {
+                const summary = summarizeVisitFolderGroup(group.folders, data.visit || {});
+                return (
+                  <details className="visit-folder-group" open key={group.key}>
+                    <summary className="visit-folder-group__header">
+                      <div>
+                        <h3 id={`visit-folder-group-${group.key}`}>{group.label}</h3>
+                        <p>{group.description}</p>
+                      </div>
+                      <span>
+                        {summary.total} folder{summary.total === 1 ? "" : "s"} · {summary.open} open · {summary.files} file{summary.files === 1 ? "" : "s"}
+                      </span>
+                    </summary>
+                    <div className="visit-folder-grid">
+                      {group.folders.map((folder) => (
+                        <VisitFolderCard folder={folder} visit={data.visit} openFolder={openFolder} setDialog={setDialog} canManageWorkspace={canManageWorkspace} key={folder.positionKey} />
+                      ))}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          ) : (
+            <AdminEmpty message="No folders match this filter." />
+          )}
+        </>
       ) : (
         <section className="visit-folder-group" aria-labelledby="visit-authorized-folders-title">
           <header className="visit-folder-group__header">

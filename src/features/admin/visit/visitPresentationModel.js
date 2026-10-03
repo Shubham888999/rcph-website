@@ -127,6 +127,22 @@ export function getVisitAvailability(folder = {}, visit = {}) {
   return { key: "open", label: "Open", detail: "Ready for documents" };
 }
 
+export function summarizeVisitFolderGroup(folders = [], visit = {}) {
+  const list = Array.isArray(folders) ? folders : [];
+  return {
+    total: list.length,
+    open: list.filter((folder) => getVisitAvailability(folder, visit).key === "open").length,
+    files: list.reduce((sum, folder) => sum + Math.max(0, Number(folder.activeFileCount) || 0), 0),
+  };
+}
+
+export function filterVisitFolders(folders = [], filter = "all", visit = {}) {
+  const list = Array.isArray(folders) ? folders : [];
+  if (filter === "open") return list.filter((folder) => getVisitAvailability(folder, visit).key === "open");
+  if (filter === "files") return list.filter((folder) => (Number(folder.activeFileCount) || 0) > 0);
+  return list;
+}
+
 export function getVisitStatus(visit = {}) {
   if (visit.enabled === false) return { key: "disabled", label: "Disabled" };
   if (visit.submissionOpen === false) return { key: "closed", label: "Submissions closed" };

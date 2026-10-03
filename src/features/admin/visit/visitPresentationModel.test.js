@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  filterVisitFolders,
   getVisitAvailability,
   getVisitFileKind,
   getVisitFolderChips,
   getVisitFolderCode,
   getVisitFolderPresentation,
   groupVisitFolders,
+  summarizeVisitFolderGroup,
 } from "./visitPresentationModel.js";
 
 test("visit folder presentation uses the canonical position catalog without changing keys", () => {
@@ -50,4 +52,28 @@ test("visit file kind labels common document types for restrained badges", () =>
   assert.equal(getVisitFileKind({ mimeType: "application/pdf" }).code, "PDF");
   assert.equal(getVisitFileKind({ fileName: "sheet.csv" }).key, "spreadsheet");
   assert.equal(getVisitFileKind({ fileName: "photo.webp" }).key, "image");
+});
+
+const grid = [
+  { positionKey: "president", activeFileCount: 3, submissionOpen: true },
+  { positionKey: "secretary", activeFileCount: 0, submissionOpen: true },
+  { positionKey: "treasurer", activeFileCount: 2, locked: true },
+  { positionKey: "csd", activeFileCount: 0, submissionOpen: false },
+  { positionKey: "cmd", activeFileCount: "4", enabled: false },
+];
+
+test("summarizeVisitFolderGroup counts folders, open folders, and active files", () => {
+  assert.deepEqual(summarizeVisitFolderGroup(grid, { submissionOpen: true }), { total: 5, open: 2, files: 9 });
+  assert.deepEqual(summarizeVisitFolderGroup(grid, { submissionOpen: false }), { total: 5, open: 0, files: 9 });
+  assert.deepEqual(summarizeVisitFolderGroup([], {}), { total: 0, open: 0, files: 0 });
+  assert.deepEqual(summarizeVisitFolderGroup(undefined), { total: 0, open: 0, files: 0 });
+});
+
+test("filterVisitFolders keeps all, open, or folders with files", () => {
+  const keys = (folders) => folders.map((folder) => folder.positionKey);
+  assert.deepEqual(keys(filterVisitFolders(grid, "all", {})), ["president", "secretary", "treasurer", "csd", "cmd"]);
+  assert.deepEqual(keys(filterVisitFolders(grid, "open", {})), ["president", "secretary"]);
+  assert.deepEqual(keys(filterVisitFolders(grid, "open", { submissionOpen: false })), []);
+  assert.deepEqual(keys(filterVisitFolders(grid, "files", {})), ["president", "treasurer", "cmd"]);
+  assert.deepEqual(keys(filterVisitFolders(grid, "unknown", {})), keys(grid));
 });
