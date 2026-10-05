@@ -24,3 +24,13 @@ test("club attendance export receives the BOD roster, meetings and attendance", 
   assert.match(attendanceModules, /const \{ activeParticipants: bodExportMembers \} = buildAttendanceParticipantGroups\(/);
   assert.match(attendanceModules, /bod=\{\{ members: bodExportMembers, events: data\.bodMeetings\.filter\(\(item\) => !item\.archived\), attendance: data\.bodAttendance \}\}/);
 });
+
+test("Include fines shows only for the club panel, checked by default, and feeds the export", () => {
+  assert.match(panel, /const \[includeFines, setIncludeFines\] = useState\(true\);/);
+  assert.match(panel, /const finesAvailable = panelKey === "club" && Array\.isArray\(fines\);/);
+  assert.match(panel, /\{finesAvailable \? \(\s*<label className="attendance-export__option">[\s\S]*?Include fines/);
+  assert.match(panel, /includeFines: finesAvailable \? includeFines : false,/);
+  assert.match(panel, /fines: finesAvailable \? fines : \[\],/);
+  assert.match(attendanceModules, /AttendanceExportPanel panelKey="club"[^\n]*fines=\{data\.fines\}/);
+  assert.doesNotMatch(attendanceModules, /AttendanceExportPanel panelKey="(bod|district)"[^\n]*fines=/);
+});

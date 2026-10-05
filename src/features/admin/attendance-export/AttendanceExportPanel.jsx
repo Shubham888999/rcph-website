@@ -24,12 +24,13 @@ function plural(count, word) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-export default function AttendanceExportPanel({ panelKey, members, events, attendance, onNotice, bod }) {
+export default function AttendanceExportPanel({ panelKey, members, events, attendance, onNotice, bod, fines }) {
   const panel = ATTENDANCE_EXPORT_PANELS[panelKey];
   const [open, setOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState(() => new Set());
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [includeBod, setIncludeBod] = useState(true);
+  const [includeFines, setIncludeFines] = useState(true);
   const [includeProspects, setIncludeProspects] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
@@ -37,6 +38,7 @@ export default function AttendanceExportPanel({ panelKey, members, events, atten
   const monthEvents = useMemo(() => eventsInMonths(events, selectedMonths), [events, selectedMonths]);
   const selectedEvents = monthEvents.filter((event) => selectedIds.has(event.id));
   const bodAvailable = Boolean(bod) && Array.isArray(bod.members) && bod.members.length > 0;
+  const finesAvailable = panelKey === "club" && Array.isArray(fines);
 
   function openDialog() {
     setSelectedMonths(new Set(months.length ? [months[0].key] : []));
@@ -72,6 +74,8 @@ export default function AttendanceExportPanel({ panelKey, members, events, atten
         selectedEventIds: selectedEvents.map((event) => event.id),
         includeProspects,
         includeBod: bodAvailable ? includeBod : false,
+        includeFines: finesAvailable ? includeFines : false,
+        fines: finesAvailable ? fines : [],
       });
       await downloadAttendanceWorkbook(report);
       const exportedCount = report.months.reduce((total, month) => total + month.sections[0].events.length, 0);
@@ -116,6 +120,16 @@ export default function AttendanceExportPanel({ panelKey, members, events, atten
               onChange={(event) => setIncludeBod(event.target.checked)}
             />
             {bodAvailable ? "Include BOD attendance" : "BOD attendance unavailable"}
+          </label>
+        ) : null}
+        {finesAvailable ? (
+          <label className="attendance-export__option">
+            <input
+              type="checkbox"
+              checked={includeFines}
+              onChange={(event) => setIncludeFines(event.target.checked)}
+            />
+            Include fines
           </label>
         ) : null}
         {panelKey === "club" || panelKey === "district" ? (

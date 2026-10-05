@@ -63,6 +63,7 @@ import {
   validateTreasuryDraft,
 } from "../treasury/treasuryModel";
 import { formatRotaractorName } from "../../../utils/memberName";
+import FinesExportPanel from "../fines-export/FinesExportPanel";
 
 export function FinesModule({
   fines,
@@ -163,6 +164,7 @@ if (
     <>
       <AdminModuleHeader title="Sergeant-at-Arms: Fines" />
       <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>{locked ? "Fines are locked or lock status is unavailable." : `${fines.length} records - ${formatInr(total)}`}</div>
+      <FinesExportPanel fines={fines} onNotice={onNotice} />
       <section className="admin-panel">
         <form className="admin-form admin-form--inline" onSubmit={submit}>
           <label>Member<select value={draft.memberId} onChange={(e) => setDraft({ ...draft, memberId: e.target.value })} required><option value="">Choose member</option>{members.map((m) => <option key={m.id} value={m.id}>{formatRotaractorName(m.name, true)}</option>)}</select></label>
