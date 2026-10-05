@@ -60,8 +60,10 @@ assert(
 );
 
 const dashboardStatsBody = functionsIndex.slice(functionsIndex.indexOf('exports.getMyDashboardStats'));
+const dashboardStatsFunction = dashboardStatsBody.slice(0, dashboardStatsBody.indexOf('\nexports.', 1));
 assert(
-  dashboardStatsBody.includes('const clubRanking = await getPublicDashboardClubRanking();'),
+  countMatches(dashboardStatsFunction, /getPublicDashboardClubRanking\(\)/g) === 1
+    && /const \[clubRanking, [^\]]*\] = await Promise\.all\(\[\s*getPublicDashboardClubRanking\(\),/.test(dashboardStatsFunction),
   'getMyDashboardStats should read clubRanking once'
 );
 assert(

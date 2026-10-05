@@ -43,9 +43,22 @@ test('preview callable is exported from index', () => {
   assert.match(indexSource, /profileRemoval\.removePersonProfile/);
 });
 
+function sourceBetween(source, startMarker, endMarker) {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  assert.ok(start > -1 && end > start, `Could not locate ${startMarker}.`);
+  return source.slice(start, end);
+}
+
 test('profile removal mutation avoids hard deletes and disables Auth after Firestore cleanup', () => {
-  assert.doesNotMatch(profileRemovalSource, /deleteUser\s*\(/);
-  assert.doesNotMatch(profileRemovalSource, /\.delete\s*\(/);
+  // Hard deletes are allowed only in permanentlyDeleteRemovedProfile (added in e768c43), never in removePersonProfile.
+  const removeBody = sourceBetween(profileRemovalSource, 'async function removePersonProfile(', 'async function permanentlyDeleteRemovedProfile(');
+  const permanentDeleteBody = sourceBetween(profileRemovalSource, 'async function permanentlyDeleteRemovedProfile(', '\n  return {');
+  assert.doesNotMatch(removeBody, /deleteUser\s*\(/);
+  assert.doesNotMatch(removeBody, /\.delete\s*\(/);
+  const sourceOutsidePermanentDelete = profileRemovalSource.replace(permanentDeleteBody, '');
+  assert.doesNotMatch(sourceOutsidePermanentDelete, /deleteUser\s*\(/);
+  assert.doesNotMatch(sourceOutsidePermanentDelete, /\.delete\s*\(/);
 
   assert.match(profileRemovalSource, /buildRemovedPayload/);
   assert.match(profileRemovalSource, /status: 'removed'/);
@@ -62,6 +75,28 @@ test('profile removal mutation avoids hard deletes and disables Auth after Fires
     firestoreCommitIndex < authDisableIndex,
     'Firestore cleanup and audit must happen before Auth disable.'
   );
+});
+
+test('permanent delete is limited to already-removed profiles and confirmed Admin/President requests', () => {
+  const body = sourceBetween(profileRemovalSource, 'async function permanentlyDeleteRemovedProfile(', '\n  return {');
+  const firstHardDelete = Math.min(body.indexOf('deleteUser('), body.indexOf('.delete('));
+  const guards = [
+    'await assertApprovedActiveCallableAccount(safeActorUid);',
+    'await assertAdminOrPresidentAuthority(safeActorUid);',
+    '!== PERMANENT_DELETE_CONFIRM_TEXT',
+    "preview.protections?.blocked === true",
+    '!records.every(summaryIsRemoved)',
+    "'Only removed profiles can be permanently deleted. Remove the profile first.'",
+    '(affected.activeBodAssignments || []).length',
+  ];
+  assert.ok(firstHardDelete > -1, 'permanent delete should hard-delete the login and documents');
+  for (const guard of guards) {
+    const index = body.indexOf(guard);
+    assert.ok(index > -1, `missing permanent-delete guard: ${guard}`);
+    assert.ok(index < firstHardDelete, `guard must run before any hard delete: ${guard}`);
+  }
+  assert.match(body, /action: PROFILE_PERMANENT_DELETE_AUDIT_ACTION/);
+  assert.match(body, /preservedCollections: PERMANENT_DELETE_PRESERVED_COLLECTIONS\.slice\(\)/);
 });
 
 test('protection report blocks self, admin, president authority, CWD, and SAA', () => {

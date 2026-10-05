@@ -2,11 +2,11 @@
 
 ## Overview
 
-This repository contains the public Rotaract Club of Pune Heritage website and the Firebase-backed club management platform. It includes Firebase Hosting, Firebase Authentication, Firestore, Firebase Functions, the admin panel, BOD Event Manager, Access Hub, Member and Prospect dashboards, the Club Visits / Visit Submission system, and Google Drive upload integration.
+This repository contains the public Rotaract Club of Pune Heritage website and the Firebase-backed club management platform. It includes Firebase Authentication, Firestore, Firebase Functions, the admin panel, BOD Event Manager, Access Hub, Member and Prospect dashboards, the Club Visits / Visit Submission system, and Google Drive upload integration. The live website is the React app on the `react-migration` branch, which is the only source Firebase Hosting deploys from; the static HTML pages in this branch are no longer deployed.
 
 ## Main Production Areas
 
-- Root public HTML pages: production website and internal page entry points.
+- Root public HTML pages: legacy static website and internal page entry points (no longer deployed; kept pending a cleanup decision).
 - `admin/`: admin panel modules and supporting files.
 - `BOD Event manager/`: BOD event management pages and scripts.
 - `js/`: shared and page-specific browser JavaScript.
@@ -19,9 +19,9 @@ This repository contains the public Rotaract Club of Pune Heritage website and t
 ## Firebase Architecture
 
 - Firebase project: `rcph-admin`.
-- Firebase Hosting currently serves from the repository root with `"public": "."`.
+- Firebase Hosting deploys only from the `react-migration` branch (the React frontend). This branch's `firebase.json` has no `hosting` block, so it cannot deploy Hosting.
 - Firebase Functions use Node.js 22.
-- Firestore rules and indexes are deployed separately from the static Hosting files.
+- Backend deploys from this branch are Functions and Firestore rules/indexes only.
 - Environment files, OAuth credentials, API secrets, folder IDs, tokens, and local configuration must remain ignored and local.
 
 ## Visit Submission Architecture
@@ -59,9 +59,12 @@ Run targeted checks after changing any related frontend, Functions, Firestore, V
 
 ## Deployment Safety
 
-`git push` does not necessarily deploy Firebase Hosting unless an external automation exists. Firebase deployment should be deliberate, with Hosting, Functions, Firestore rules, and Firestore indexes deployed with explicit scope when appropriate.
+`git push` does not necessarily deploy anything unless an external automation exists. Firebase deployment should be deliberate and explicitly scoped.
 
-Environment files, generated reports, archives, and documentation are excluded from Firebase Hosting by the current ignore plan and must not be treated as public runtime assets.
+- From this branch: deploy only Functions and Firestore rules/indexes (for example `firebase deploy --only functions`, `firebase deploy --only firestore:rules,firestore:indexes`).
+- Hosting: deploy only from the `react-migration` frontend. This branch's `firebase.json` intentionally has no `hosting` block.
+
+Environment files, generated reports, archives, and documentation must not be treated as public runtime assets.
 
 ### Private assets
 
