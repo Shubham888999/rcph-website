@@ -58,6 +58,7 @@ export function normalizeFolder(value) {
     canOpen: value.canOpen === true,
     canUpload: value.canUpload === true,
     canManage: value.canManage === true,
+    supportsDocumentCategories: value.supportsDocumentCategories === true,
   };
 }
 
@@ -75,6 +76,21 @@ export function normalizeFolders(values, visitType = "") {
   }
   return folders;
 }
+const VISIT_DOCUMENT_CATEGORY_KEYS = Object.freeze(["inward", "outward"]);
+
+// Library groups in display order; "" is the uncategorised Supporting files group.
+export const VISIT_DOCUMENT_CATEGORIES = Object.freeze([
+  Object.freeze({ key: "inward", label: "Inward", moveLabel: "Move to Inward", emptyNote: "No inward documents yet." }),
+  Object.freeze({ key: "outward", label: "Outward", moveLabel: "Move to Outward", emptyNote: "No outward documents yet." }),
+  Object.freeze({ key: "", label: "Supporting files", moveLabel: "Move to Supporting files", emptyNote: "No supporting files yet." }),
+]);
+
+export const VISIT_UPLOAD_CATEGORY_CHOICES = Object.freeze([
+  Object.freeze({ key: "", label: "None" }),
+  Object.freeze({ key: "inward", label: "Inward" }),
+  Object.freeze({ key: "outward", label: "Outward" }),
+]);
+
 export function normalizeSubmission(value) {
   if (!value || !text(value.submissionId || value.id, 128)) return null;
   return {
@@ -93,7 +109,17 @@ export function normalizeSubmission(value) {
     canRemove: value.canRemove === true,
     isPrimaryPresentation: value.isPrimaryPresentation === true,
     canSetPrimaryPresentation: value.canSetPrimaryPresentation === true,
+    documentCategory: VISIT_DOCUMENT_CATEGORY_KEYS.includes(value.documentCategory) ? value.documentCategory : "",
+    canMove: value.canMove === true,
   };
+}
+
+export function groupVisitSubmissionsByCategory(submissions = []) {
+  const list = Array.isArray(submissions) ? submissions : [];
+  return VISIT_DOCUMENT_CATEGORIES.map((category) => ({
+    ...category,
+    items: list.filter((item) => (item.documentCategory || "") === category.key),
+  }));
 }
 export function validateVisitFile(file, folder) {
   return validateVisitUploadFile(file, folder?.maxFileSizeBytes);

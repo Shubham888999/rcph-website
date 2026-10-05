@@ -4,6 +4,7 @@ import {
   getVisitThumbnailUrl,
 } from "./visitUploadModel";
 import { getVisitFileKind } from "./visitPresentationModel.js";
+import { VISIT_DOCUMENT_CATEGORIES } from "./visitModel.js";
 
 function VisitThumbnail({ submission }) {
   const [failed, setFailed] = useState(false);
@@ -32,12 +33,17 @@ function VisitActionMenu({
   onReplace,
   onWithdraw,
   onRemove,
+  onMove,
 }) {
+  const moveTargets = item.canMove
+    ? VISIT_DOCUMENT_CATEGORIES.filter((category) => category.key !== (item.documentCategory || ""))
+    : [];
   const hasActions = (
     item.folderUrl
     || item.canReplace
     || item.canWithdraw
     || item.canRemove
+    || moveTargets.length > 0
     || (canManagePrimaryPresentation && item.canSetPrimaryPresentation)
     || (canManagePrimaryPresentation && isPrimary)
   );
@@ -71,6 +77,9 @@ function VisitActionMenu({
           </button>
         ) : null}
         {item.folderUrl ? <a href={item.folderUrl} target="_blank" rel="noopener noreferrer">Open Drive folder</a> : null}
+        {moveTargets.map((category) => (
+          <button type="button" key={category.key || "supporting"} onClick={() => onMove?.(item, category.key)}>{category.moveLabel}</button>
+        ))}
         {item.canReplace ? <button type="button" onClick={() => onReplace(item)}>Replace</button> : null}
         {item.canWithdraw ? <button type="button" onClick={() => onWithdraw(item)}>Withdraw</button> : null}
         {item.canRemove ? <button type="button" className="danger" onClick={() => onRemove(item)}>Remove</button> : null}
@@ -91,6 +100,7 @@ export default function VisitSubmissionFiles({
   onReplace,
   onWithdraw,
   onRemove,
+  onMove,
 }) {
   if (!submissions.length) {
     return (
@@ -133,6 +143,7 @@ export default function VisitSubmissionFiles({
                 onReplace={onReplace}
                 onWithdraw={onWithdraw}
                 onRemove={onRemove}
+                onMove={onMove}
               />
             </div>
           </li>

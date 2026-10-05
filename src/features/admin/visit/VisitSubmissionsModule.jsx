@@ -4,7 +4,7 @@ import AdminModuleHeader from "../AdminModuleHeader";
 import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
-import { normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
+import { groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES } from "./visitModel";
 import VisitSubmissionFiles, { VisitFileTypeBadge } from "./VisitSubmissionFiles";
 import {
   getFolderSummaryItems,
@@ -207,7 +207,11 @@ function VisitFoldersWorkspace({ data, openFolder, setDialog }) {
           <h3 id="visit-folders-title">{data.visit?.displayTitle}</h3>
           <p>{data.visit?.instructions || data.visit?.description || "Authorized document folders for this visit."}</p>
         </div>
-        <VisitSummaryList items={getVisitSummaryItems(data.visit || {})} />
+        <VisitSummaryList items={getVisitSummaryItems({
+          ...data.visit,
+          accessiblePositionCount: folders.length,
+          activeSubmissionCount: folders.reduce((sum, folder) => sum + (Number(folder.activeFileCount) || 0), 0),
+        })} />
       </section>
 
       {singleLimitedFolder ? (
@@ -299,7 +303,7 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
       folder,
       () => `react-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     );
-    setQueue(result.queue);
+    setQueue(result.queue.map((item) => ({ documentCategory: "", ...item })));
     const notices = [];
     if (result.duplicateCount) notices.push(`${result.duplicateCount} duplicate file${result.duplicateCount === 1 ? " was" : "s were"} skipped.`);
     if (result.overflowCount) notices.push(`${result.overflowCount} file${result.overflowCount === 1 ? " exceeds" : "s exceed"} the selection limit.`);
@@ -367,6 +371,7 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
             fileName: item.file.name,
             mimeType: item.file.type,
             sizeBytes: item.file.size,
+            ...(folder.supportsDocumentCategories ? { documentCategory: item.documentCategory || "" } : {}),
           })),
         });
       } catch (error) {
@@ -486,6 +491,28 @@ function FolderDetailWorkspaceView({
   ));
   const canManageFolder = data.access.canManage === true;
   const focusUploadInput = () => uploadInputRef.current?.click();
+  const moveCategory = (item, documentCategory) => mutate(
+    "move-category",
+    () => visitCalls.moveCategory(item.submissionId, documentCategory),
+    "Document moved.",
+    reload,
+  );
+  const renderFiles = (submissions) => (
+    <VisitSubmissionFiles
+      submissions={submissions}
+      canManagePrimaryPresentation={canManageFolder}
+      canUpload={folder.canUpload}
+      onUploadRequest={focusUploadInput}
+      primaryPresentationSubmissionId={folder.primaryPresentationSubmissionId}
+      primarySelectionBusy={primarySelectionBusy}
+      onSetPrimaryPresentation={(item) => updatePrimaryPresentation(item.submissionId, item.submissionId, "Main presentation selected.")}
+      onClearPrimaryPresentation={() => updatePrimaryPresentation("", "__clear__", "Main presentation selection cleared.")}
+      onReplace={(item) => setDialog({ type: "replace", item, folder })}
+      onWithdraw={(item) => setDialog({ type: "withdraw", item })}
+      onRemove={(item) => setDialog({ type: "remove", item })}
+      onMove={moveCategory}
+    />
+  );
   return (
     <div className="visit-workspace visit-folder-workspace">
       <section className="visit-workspace-hero visit-folder-masthead" aria-labelledby="visit-folder-title">
@@ -560,6 +587,25 @@ function FolderDetailWorkspaceView({
                     <strong>{item.file.name}</strong>
                     <span>{getVisitFileKind(item.file).label} - {formatVisitFileSize(item.file.size)}</span>
                     <span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span>
+                    {folder.supportsDocumentCategories ? (
+                      <fieldset className="visit-category-choice" disabled={uploading || item.status === "Uploaded" || Boolean(item.completionProof)}>
+                        <legend>Document type</legend>
+                        {VISIT_UPLOAD_CATEGORY_CHOICES.map((choice) => (
+                          <label key={choice.key || "none"}>
+                            <input
+                              type="radio"
+                              name={`visit-category-${item.clientFileId}`}
+                              value={choice.key}
+                              checked={(item.documentCategory || "") === choice.key}
+                              onChange={() => setQueue((current) => current.map((entry) => (
+                                entry.clientFileId === item.clientFileId ? { ...entry, documentCategory: choice.key } : entry
+                              )))}
+                            />
+                            {choice.label}
+                          </label>
+                        ))}
+                      </fieldset>
+                    ) : null}
                   </div>
                   {!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}
                 </li>
@@ -578,23 +624,26 @@ function FolderDetailWorkspaceView({
         <div className="visit-section-heading">
           <div>
             <p className="visit-eyebrow">Document library</p>
-            <h3 id="visit-active-files">Supporting files</h3>
+            <h3 id="visit-active-files">{folder.supportsDocumentCategories ? "Documents" : "Supporting files"}</h3>
           </div>
           <span>{folder.activeFileCount} / {folder.maxActiveFiles} active files</span>
         </div>
-        <VisitSubmissionFiles
-          submissions={data.submissions}
-          canManagePrimaryPresentation={canManageFolder}
-          canUpload={folder.canUpload}
-          onUploadRequest={focusUploadInput}
-          primaryPresentationSubmissionId={folder.primaryPresentationSubmissionId}
-          primarySelectionBusy={primarySelectionBusy}
-          onSetPrimaryPresentation={(item) => updatePrimaryPresentation(item.submissionId, item.submissionId, "Main presentation selected.")}
-          onClearPrimaryPresentation={() => updatePrimaryPresentation("", "__clear__", "Main presentation selection cleared.")}
-          onReplace={(item) => setDialog({ type: "replace", item, folder })}
-          onWithdraw={(item) => setDialog({ type: "withdraw", item })}
-          onRemove={(item) => setDialog({ type: "remove", item })}
-        />
+        {folder.supportsDocumentCategories ? (
+          <div className="visit-category-groups">
+            {groupVisitSubmissionsByCategory(data.submissions).map((group) => {
+              const groupId = `visit-category-group-${group.key || "supporting"}`;
+              return (
+                <section className="visit-category-group" aria-labelledby={groupId} key={group.key || "supporting"}>
+                  <h4 className="visit-category-group__title" id={groupId}>
+                    {group.label}
+                    <span className="visit-category-group__count">{group.items.length}</span>
+                  </h4>
+                  {group.items.length ? renderFiles(group.items) : <p className="visit-category-group__empty">{group.emptyNote}</p>}
+                </section>
+              );
+            })}
+          </div>
+        ) : renderFiles(data.submissions)}
       </section>
     </div>
   );

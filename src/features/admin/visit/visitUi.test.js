@@ -124,3 +124,28 @@ test("maintenance panel can resync visit folders with positions", () => {
   assert.ok(panel.indexOf("Sync folders with positions") < panel.indexOf("Clean expired sessions"));
   assert.match(moduleSource, />Initialize structure<\/button>/);
 });
+
+test("upload sessions send document categories only for folders that support them", () => {
+  assert.match(moduleSource, /\.\.\.\(folder\.supportsDocumentCategories \? \{ documentCategory: item\.documentCategory \|\| "" \} : \{\}\)/);
+  assert.match(moduleSource, /setQueue\(result\.queue\.map\(\(item\) => \(\{ documentCategory: "", \.\.\.item \}\)\)\)/);
+  assert.match(moduleSource, /className="visit-category-choice" disabled=\{uploading \|\| item\.status === "Uploaded" \|\| Boolean\(item\.completionProof\)\}/);
+  assert.match(moduleSource, /VISIT_UPLOAD_CATEGORY_CHOICES\.map/);
+});
+
+test("secretary document library renders category groups and wires the move action", () => {
+  assert.match(moduleSource, /folder\.supportsDocumentCategories \? \(\s*<div className="visit-category-groups">/);
+  assert.match(moduleSource, /groupVisitSubmissionsByCategory\(data\.submissions\)\.map/);
+  assert.match(moduleSource, /group\.items\.length \? renderFiles\(group\.items\) : <p className="visit-category-group__empty">\{group\.emptyNote\}<\/p>/);
+  assert.match(moduleSource, /\) : renderFiles\(data\.submissions\)\}/);
+  assert.match(moduleSource, /mutate\(\s*"move-category",\s*\(\) => visitCalls\.moveCategory\(item\.submissionId, documentCategory\),\s*"Document moved\.",\s*reload,\s*\)/);
+});
+
+test("document action menu offers moves to the other two categories", () => {
+  assert.match(detailsSource, /VISIT_DOCUMENT_CATEGORIES\.filter\(\(category\) => category\.key !== \(item\.documentCategory \|\| ""\)\)/);
+  assert.match(detailsSource, /onClick=\{\(\) => onMove\?\.\(item, category\.key\)\}>\{category\.moveLabel\}<\/button>/);
+  assert.match(detailsSource, /item\.canMove/);
+});
+
+test("visit folder summary shows real folder and file counts", () => {
+  assert.match(moduleSource, /getVisitSummaryItems\(\{\s*\.\.\.data\.visit,\s*accessiblePositionCount: folders\.length,\s*activeSubmissionCount: folders\.reduce\(\(sum, folder\) => sum \+ \(Number\(folder\.activeFileCount\) \|\| 0\), 0\),/);
+});
