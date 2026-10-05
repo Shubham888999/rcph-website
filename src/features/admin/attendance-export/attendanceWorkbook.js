@@ -1,4 +1,4 @@
-const COLORS = Object.freeze({
+export const COLORS = Object.freeze({
   ink: "2A1720",
   wine: "6B1839",
   gold: "E5C268",
@@ -27,11 +27,11 @@ function excelColumn(index) {
   return result;
 }
 
-function solid(argb) {
+export function solid(argb) {
   return { type: "pattern", pattern: "solid", fgColor: { argb } };
 }
 
-function thinBorder(bottomColor = COLORS.border) {
+export function thinBorder(bottomColor = COLORS.border) {
   const side = { style: "thin", color: { argb: COLORS.border } };
   return { top: side, left: side, right: side, bottom: { style: "thin", color: { argb: bottomColor } } };
 }
@@ -54,7 +54,7 @@ function rowRange(rowNumber, firstColumn, lastColumn) {
   return `${excelColumn(firstColumn)}${rowNumber}:${excelColumn(lastColumn)}${rowNumber}`;
 }
 
-function writeTitleRow(sheet, text, endColumn) {
+export function writeTitleRow(sheet, text, endColumn) {
   sheet.mergeCells(1, 1, 1, Math.max(endColumn, 2));
   const cell = sheet.getCell(1, 1);
   cell.value = text;
@@ -64,20 +64,20 @@ function writeTitleRow(sheet, text, endColumn) {
   sheet.getRow(1).height = 26;
 }
 
-function writeSectionTitle(sheet, rowNumber, title) {
+export function writeSectionTitle(sheet, rowNumber, title) {
   const cell = sheet.getCell(rowNumber, 1);
   cell.value = title;
   cell.font = { name: "Aptos", size: 13, bold: true, color: { argb: COLORS.wine } };
 }
 
-function styleHeaderCell(cell, column) {
+export function styleHeaderCell(cell, column) {
   cell.font = { name: "Aptos", size: 10, bold: true, color: { argb: COLORS.white } };
   cell.fill = solid(COLORS.ink);
   cell.alignment = { vertical: "middle", horizontal: column === 1 ? "left" : "center", wrapText: true };
   cell.border = thinBorder(COLORS.gold);
 }
 
-function writeHeaderRow(sheet, rowNumber, values) {
+export function writeHeaderRow(sheet, rowNumber, values) {
   values.forEach((value, index) => {
     const cell = sheet.getCell(rowNumber, index + 1);
     cell.value = value;
@@ -86,13 +86,13 @@ function writeHeaderRow(sheet, rowNumber, values) {
   sheet.getRow(rowNumber).height = 48;
 }
 
-function writeNote(sheet, rowNumber, text) {
+export function writeNote(sheet, rowNumber, text) {
   const cell = sheet.getCell(rowNumber, 1);
   cell.value = text;
   cell.font = { name: "Aptos", size: 10, italic: true, color: { argb: COLORS.ink } };
 }
 
-function writeNameCell(sheet, rowNumber, label) {
+export function writeNameCell(sheet, rowNumber, label) {
   const cell = sheet.getCell(rowNumber, 1);
   cell.value = label;
   cell.font = { name: "Aptos", size: 10 };
@@ -120,6 +120,66 @@ function writePercCell(sheet, rowNumber, column, range, marks) {
   cell.border = thinBorder();
 }
 
+export const FINE_HEADERS = Object.freeze(["Name", "Date", "Reason", "Event", "Amount (Rs)"]);
+const FINE_MIN_COLUMN_WIDTH = 13;
+const AMOUNT_FORMAT = "#,##0";
+
+function writeFineCell(sheet, rowNumber, column, value, options = {}) {
+  const cell = sheet.getCell(rowNumber, column);
+  cell.value = value;
+  cell.font = { name: "Aptos", size: 10, bold: options.bold === true };
+  cell.fill = solid(column === 1 ? COLORS.pale : options.fill || COLORS.white);
+  cell.alignment = { vertical: "middle", horizontal: column === 1 ? "left" : options.horizontal || "left", wrapText: true };
+  cell.border = thinBorder();
+  if (options.numFmt) cell.numFmt = options.numFmt;
+  return cell;
+}
+
+export function writeTotalRow(sheet, rowNumber, values) {
+  values.forEach((value, index) => {
+    const isFormula = value && typeof value === "object";
+    writeFineCell(sheet, rowNumber, index + 1, value, {
+      bold: true,
+      fill: COLORS.cream,
+      horizontal: isFormula ? "right" : "left",
+      numFmt: isFormula ? AMOUNT_FORMAT : undefined,
+    });
+  });
+}
+
+export function writeFineRows(sheet, headerRow, rows, total) {
+  writeHeaderRow(sheet, headerRow, FINE_HEADERS);
+  sheet.getRow(headerRow).height = 22;
+  let rowNumber = headerRow + 1;
+  for (const row of rows) {
+    writeFineCell(sheet, rowNumber, 1, row.name);
+    writeFineCell(sheet, rowNumber, 2, row.date, { horizontal: "center" });
+    writeFineCell(sheet, rowNumber, 3, row.reason);
+    writeFineCell(sheet, rowNumber, 4, row.event);
+    writeFineCell(sheet, rowNumber, 5, row.amount, { horizontal: "right", numFmt: AMOUNT_FORMAT });
+    rowNumber += 1;
+  }
+  writeTotalRow(sheet, rowNumber, ["Total", "", "", "", { formula: `SUM(E${headerRow + 1}:E${rowNumber - 1})`, result: total }]);
+  return rowNumber + 1;
+}
+
+export function writeFinesTable(sheet, startRow, { title, rows, total, emptyText }) {
+  const titleRow = startRow + 2;
+  writeSectionTitle(sheet, titleRow, title);
+  if (!rows?.length) {
+    writeNote(sheet, titleRow + 1, emptyText);
+    return titleRow + 2;
+  }
+  return writeFineRows(sheet, titleRow + 1, rows, total);
+}
+
+export function widenFineColumns(sheet) {
+  for (let column = 2; column <= FINE_HEADERS.length; column += 1) {
+    const current = sheet.getColumn(column).width || 0;
+    sheet.getColumn(column).width = Math.max(current, FINE_MIN_COLUMN_WIDTH);
+  }
+}
+
 function emptySectionNote(section, periodLabel) {
   return `No ${section.title ? "BOD meetings" : "events"} recorded for ${periodLabel}.`;
 }
@@ -131,12 +191,12 @@ function setColumnWidths(sheet, eventColumns, percColumns, lastColumn) {
   }
 }
 
-function finishSheet(sheet) {
+export function finishSheet(sheet) {
   sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
   sheet.headerFooter.oddFooter = FOOTER;
 }
 
-function createSheet(workbook, name) {
+export function createSheet(workbook, name) {
   return workbook.addWorksheet(name, { views: [{ showGridLines: false }] });
 }
 
@@ -180,7 +240,12 @@ function buildMonthSheet(workbook, report, month) {
     }
   }
 
+  if (month.fines) {
+    writeFinesTable(sheet, rowNumber - 1, { title: "Fines", ...month.fines, emptyText: `No fines recorded for ${month.label}.` });
+  }
+
   setColumnWidths(sheet, eventColumns, percColumns, lastColumn);
+  if (month.fines) widenFineColumns(sheet);
   freezeAt(sheet, firstHeaderRow || 2);
   finishSheet(sheet);
 }
@@ -285,7 +350,12 @@ function buildAllMonthsSheet(workbook, report) {
     }
   }
 
+  if (report.allFines) {
+    writeFinesTable(sheet, rowNumber - 1, { title: "Fines", ...report.allFines, emptyText: `No fines recorded for ${periodLabel}.` });
+  }
+
   setColumnWidths(sheet, eventColumns, percColumns, lastColumn);
+  if (report.allFines) widenFineColumns(sheet);
   freezeAt(sheet, firstHeaderRow || 2);
   finishSheet(sheet);
 }

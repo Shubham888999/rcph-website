@@ -5,6 +5,7 @@ import {
 } from "../shared/adminModel.js";
 import { compareByHierarchy, hierarchySortKey, POSITION_HIERARCHY } from "../shared/positionHierarchy.js";
 import { formatRotaractorName } from "../../../utils/memberName.js";
+import { buildFineRows, fineRowsTotal, finesInMonths } from "../fines-export/finesExportModel.js";
 
 export const ATTENDANCE_EXPORT_PANELS = Object.freeze({
   club: Object.freeze({
@@ -303,6 +304,11 @@ function buildSection({ title, headerLabel, events, roster, attendance }) {
   };
 }
 
+function fineSection(fines, monthKeys) {
+  const rows = buildFineRows(finesInMonths(fines, monthKeys));
+  return { rows, total: fineRowsTotal(rows) };
+}
+
 export function buildMonthlyAttendanceExport({
   panelKey,
   primary,
@@ -311,6 +317,8 @@ export function buildMonthlyAttendanceExport({
   selectedEventIds,
   includeProspects = false,
   includeBod = false,
+  includeFines = false,
+  fines = [],
 }) {
   if (!ATTENDANCE_EXPORT_PANELS[panelKey]) throw new TypeError("Unknown attendance export panel.");
   const selectedIds = new Set(selectedEventIds || []);
@@ -347,8 +355,12 @@ export function buildMonthlyAttendanceExport({
         attendance: bod.attendance,
       }));
     }
-    months.push({ key, label: attendanceMonthLabel(key), shortLabel: attendanceMonthShort(key), sections });
+    const month = { key, label: attendanceMonthLabel(key), shortLabel: attendanceMonthShort(key), sections };
+    if (includeFines) month.fines = fineSection(fines, [key]);
+    months.push(month);
   }
 
-  return { panelKey, info: CLUB_EXPORT_INFO, months };
+  const report = { panelKey, info: CLUB_EXPORT_INFO, months };
+  if (includeFines) report.allFines = fineSection(fines, months.map((month) => month.key));
+  return report;
 }
