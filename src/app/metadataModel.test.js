@@ -37,7 +37,7 @@ test("auth, protected, nested Admin, visit dashboards, and unknown routes are no
     assert.equal(metadata.structuredData, null);
   }
   assert.equal(getRouteMetadata("/visits/club-assembly").title, "Club Assembly Dashboard | RCPH");
-  assert.equal(getRouteMetadata("/missing").title, "Page Not Found | RCPH");
+  assert.equal(getRouteMetadata("/missing").title, "Page not found | Rotaract Club of Pune Heritage");
 });
 
 test("internal public routes receive canonical breadcrumb schema", () => {

@@ -30,11 +30,11 @@ export default function EventsPage() {
         emptyMessage="Recent public events will appear here after they are added to the RCPH calendar."
         reload={reload}
       />
-{/* Temporarily hidden until event reports are ready */}
-{/* <EventStories /> */}
+      {/* Temporarily hidden until event reports are ready */}
+      {/* <EventStories /> */}
 
-<EventAvenues />
-<EventsCallToAction />
+      <EventAvenues />
+      <EventsCallToAction />
     </main>
   );
 }

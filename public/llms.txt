@@ -13,5 +13,7 @@ Official public website for Rotaract Club of Pune Heritage, a community-based Ro
 - Board of Directors: https://rcph3131.org/bod
 - FAQ: https://rcph3131.org/faq
 - Contact: https://rcph3131.org/contact
+- Terms and Conditions: https://rcph3131.org/terms
+- Privacy Notice: https://rcph3131.org/privacy
 
 Authentication, dashboards, BOD tools, and Admin routes are private and should not be crawled or summarized.

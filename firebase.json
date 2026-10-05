@@ -38,6 +38,14 @@
         "source": "/index.html",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
+      {
+        "source": "/images/**",
+        "headers": [{ "key": "Cache-Control", "value": "public,max-age=86400" }]
+      },
+      {
+        "source": "/media/**",
+        "headers": [{ "key": "Cache-Control", "value": "public,max-age=86400" }]
+      },
       { "source": "/login", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
       { "source": "/signup", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
       { "source": "/forgot-password", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },

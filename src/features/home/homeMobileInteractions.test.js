@@ -6,7 +6,7 @@ import homeGalleryItems from "./homeGalleryData.js";
 test("featured projects keep two expandable cards and the projects CTA", async () => {
   const source = await readFile(new URL("./FeaturedProjects.jsx", import.meta.url), "utf8");
 
-  assert.match(source, /projects\.slice\(0,\s*2\)/);
+  assert.match(source, /projects\.filter\(\(p\) => p\.featured\)\.slice\(0,\s*2\)/);
   assert.match(source, /aria-expanded=\{isExpanded\}/);
   assert.match(source, /handleProjectKeyDown/);
   assert.match(source, /home-project-card__toggle/);

@@ -48,7 +48,7 @@ export default function MonthlyHighlight() {
         variants={reduceMotion ? undefined : headingReveal}
       >
         <p className="home-kicker">
-          Highlight of the Month · June 2026
+          Year in Recognition · RIY 2025–26
         </p>
 
         <h2 id="monthly-highlight-title">Au Revoir</h2>
