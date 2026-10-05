@@ -1,5 +1,8 @@
-export const RESOLUTION_LETTERHEAD_URL = "/images/resolution_letterhead.png";
-export const RESOLUTION_OFFICIAL_LETTERHEAD_URL = "/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png";
+import { PROTECTED_BRAND_ASSETS, fetchProtectedBrandAsset } from "../shared/protectedBrandAssets.js";
+
+// Asset keys for the getProtectedBrandAsset callable (names kept from when these were public URLs).
+export const RESOLUTION_LETTERHEAD_URL = PROTECTED_BRAND_ASSETS.resolutionLetterhead;
+export const RESOLUTION_OFFICIAL_LETTERHEAD_URL = PROTECTED_BRAND_ASSETS.officialLetterhead;
 export const RESOLUTION_LETTERHEAD_JPEG_QUALITY = 0.97;
 
 const USER_MESSAGE = "The Resolution letterhead could not be loaded. Please try again.";
@@ -97,7 +100,7 @@ export async function loadResolutionOfficialLetterheadJpeg(options = {}) {
 }
 
 async function loadResolutionLetterheadJpegFromUrl(assetUrl, options = {}) {
-  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const fetchImpl = options.fetchImpl || fetchProtectedBrandAsset;
   const converter = options.convertBlob || convertResolutionLetterheadBlobToJpeg;
   const logger = options.logger || console;
   const cache = options.cache || "force-cache";
@@ -125,6 +128,6 @@ export function getResolutionLetterheadJpeg() {
   return cachedLetterheadPromise;
 }
 
-export function getResolutionOfficialLetterheadJpeg() {
-  return loadResolutionOfficialLetterheadJpeg();
+export function getResolutionOfficialLetterheadJpeg(options = {}) {
+  return loadResolutionOfficialLetterheadJpeg(options);
 }

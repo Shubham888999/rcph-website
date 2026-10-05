@@ -13,6 +13,7 @@ import {
   validatePreparedJpegImage,
 } from "../pdf/pdfJpegImage.js";
 import { RESOLUTION_OFFICIAL_LETTERHEAD_URL } from "../resolutions/resolutionLetterhead.js";
+import { fetchProtectedBrandAsset } from "../shared/protectedBrandAssets.js";
 import {
   LETTERHEAD_EXCHANGE_EMPTY_MESSAGE,
   LETTERHEAD_EXCHANGE_SECTION_TITLE,
@@ -189,7 +190,7 @@ export function parseBodAvenueReportLetterheadPng(value) {
 }
 
 export async function loadBodAvenueReportLetterheadPng(options = {}) {
-  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const fetchImpl = options.fetchImpl || fetchProtectedBrandAsset;
   const parser = options.parsePng || parseBodAvenueReportLetterheadPng;
   const logger = options.logger || console;
   const cache = options.cache || "no-store";

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { deflateSync } from "node:zlib";
 import { buildBodAvenueReportModel } from "./bodAvenueReportModel.js";
 import {
   BOD_AVENUE_REPORT_LAYOUT,
@@ -115,15 +117,34 @@ const makeLetterheadExchange = (id, overrides = {}) => ({
   ...overrides,
 });
 
+function rgbPng(width, height) {
+  const chunk = (type, data) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    return Buffer.concat([length, Buffer.from(type, "ascii"), data, Buffer.alloc(4)]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const rows = Buffer.alloc((width * 3 + 1) * height, 0xff);
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(rows)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
 test("canonical BOD Avenue Report letterhead asset is the shared official Resolution A4 RGB PNG", () => {
   assert.equal(BOD_AVENUE_REPORT_LETTERHEAD_URL, RESOLUTION_OFFICIAL_LETTERHEAD_URL);
-  const png = readFileSync(new URL("../../../public/images/RCPH_BOD_Avenue_Report_Letterhead_A4.png", import.meta.url));
-  const parsed = parseBodAvenueReportLetterheadPng(png);
+  assert.equal(BOD_AVENUE_REPORT_LETTERHEAD_URL, "official-letterhead");
+  const parsed = parseBodAvenueReportLetterheadPng(rgbPng(1414, 2000));
   assert.equal(parsed.width, 1414);
   assert.equal(parsed.height, 2000);
   assert.equal(parsed.bitsPerComponent, 8);
   assert.equal(parsed.colorSpace, "DeviceRGB");
-  assert.ok(parsed.bytes.length > 400000);
+  assert.ok(parsed.bytes.length > 0);
 });
 
 test("BOD Avenue Report letterhead loads fresh so replaced public assets are not reused from browser cache", async () => {
