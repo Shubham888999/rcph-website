@@ -8,7 +8,7 @@
 
 ## Operational Documentation
 
-- `docs/hosting-ignore-review.md`: Firebase Hosting surface review and ignore-list planning.
+- `docs/hosting-ignore-review.md`: historical Firebase Hosting surface review for the old static site. Hosting no longer deploys from this branch; it deploys only from the `react-migration` frontend, and backend deploys are Functions and Firestore rules/indexes only.
 - `docs/generated-artifact-cleanup-plan.md`: generated report and artifact cleanup plan.
 - `docs/documentation-consolidation-plan.md`: documentation grouping and consolidation plan.
 
@@ -16,7 +16,7 @@
 
 - `docs/repository-organization-audit.md`: current repository organization audit.
 - `docs/repository-audit-unique-findings-review.md`: review of findings carried forward from the older audit package.
-- `docs/phase-2b-hosting-protection-report.md`: Hosting ignore protection and historical cleanup-report archive report.
+- `docs/phase-2b-hosting-protection-report.md`: historical Hosting ignore protection and cleanup-report archive report (the Hosting config it describes has since been removed from this branch).
 - `docs/phase-2c-generated-artifact-cleanup-report.md`: generated report cleanup report.
 - `docs/phase-2d-documentation-consolidation-report.md`: documentation consolidation report.
 
