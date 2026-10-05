@@ -219,8 +219,8 @@ test("secretarial event images preserve background and frame resources", () => {
 test("secretarial page one uses the uploaded frame image with stacked centered stat lines", () => {
   const pages = buildBodSecretarialReportPdfPages(report(), { frame: MOCK_FRAME });
   const firstPage = pages[0].join("\n");
-  assert.equal(BOD_SECRETARIAL_REPORT_FRAME_URL, "/images/Report_Frame.png");
-  assert.match(source, /Report_Frame\.png/);
+  assert.equal(BOD_SECRETARIAL_REPORT_FRAME_URL, "report-frame");
+  assert.match(source, /PROTECTED_BRAND_ASSETS\.reportFrame/);
   assert.match(firstPage, /\/FRAME Do/);
   for (const text of [
     "Monthly Report RCPH RIY 26 - 27",

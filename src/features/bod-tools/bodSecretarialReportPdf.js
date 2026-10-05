@@ -24,9 +24,10 @@ import {
   buildLetterheadExchangeCellLines,
 } from "./letterhead-exchanges/letterheadExchangeReportPdf.js";
 import { groupBodFocusAreasForReport } from "./bodFocusAreas.js";
+import { PROTECTED_BRAND_ASSETS, fetchProtectedBrandAsset } from "../shared/protectedBrandAssets.js";
 
 export const BOD_SECRETARIAL_REPORT_LETTERHEAD_URL = BOD_AVENUE_REPORT_LETTERHEAD_URL;
-export const BOD_SECRETARIAL_REPORT_FRAME_URL = "/images/Report_Frame.png";
+export const BOD_SECRETARIAL_REPORT_FRAME_URL = PROTECTED_BRAND_ASSETS.reportFrame;
 
 const encoder = new TextEncoder();
 const SAFE_AREA = BOD_AVENUE_REPORT_LAYOUT.safeArea;
@@ -1044,7 +1045,7 @@ export async function convertSecretarialReportFrameBlobToImage(blob, options = {
 }
 
 export async function loadBodSecretarialReportFrameImage(options = {}) {
-  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const fetchImpl = options.fetchImpl || fetchProtectedBrandAsset;
   const converter = options.convertBlob || convertSecretarialReportFrameBlobToImage;
   const logger = options.logger || console;
   try {
