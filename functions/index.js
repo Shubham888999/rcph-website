@@ -17,6 +17,7 @@ const {
 } = require('./lib/visit-dashboards');
 const {
   createFirestoreFolderLockManager,
+  createVisitCategoryMoveHandler,
   createVisitHttpUploadHandler,
 } = require('./lib/visit-drive');
 const {
@@ -119,6 +120,16 @@ const visitFolderLockManager = createFirestoreFolderLockManager({
   admin,
 });
 const uploadVisitSubmissionFileHandler = createVisitHttpUploadHandler({
+  visitService: visitSubmissions,
+  folderLockManager: visitFolderLockManager,
+  secrets: {
+    VISIT_DRIVE_CLIENT_ID,
+    VISIT_DRIVE_CLIENT_SECRET,
+    VISIT_DRIVE_REFRESH_TOKEN,
+  },
+  logger: console,
+});
+const moveVisitSubmissionCategoryHandler = createVisitCategoryMoveHandler({
   visitService: visitSubmissions,
   folderLockManager: visitFolderLockManager,
   secrets: {
@@ -5527,6 +5538,18 @@ exports.uploadVisitSubmissionFile = onRequest({
     VISIT_DRIVE_REFRESH_TOKEN,
   ],
 }, uploadVisitSubmissionFileHandler);
+
+exports.moveVisitSubmissionCategory = onCall({
+  ...CALLABLE_OPTIONS,
+  secrets: [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN],
+}, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await moveVisitSubmissionCategoryHandler(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit document move failed.');
+  }
+});
 
 exports.getMyAccess = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
