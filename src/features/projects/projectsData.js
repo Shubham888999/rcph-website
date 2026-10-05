@@ -3,9 +3,19 @@ export const projects = [
     title: "Project EduReach 2.0",
     avenue: "Community Service and Rotary Rotaract Relations",
     image: "/images/edureach_2.0.jpeg",
-    alt: "Project EduReach education support initiative by Rotaract Club of Pune Heritage",
+    alt: "RCPH members presenting exclusive learning coupons with access to chapter explanations, question banks, and practice papers",
     description:
       "On the occasion of India’s 80th Independence Day, the Rotaract Club of Pune Heritage successfully completed Project EduReach 2.0. Conducted in collaboration with the Interact Club of Chandrakant Darode Secondary School, the initiative empowered SSC students by providing exclusive learning coupons with access to chapter explanations, question banks, and practice papers. This milestone reflects the club’s dedication to education, service, and nation‑building.",
+    featured: true,
+  },
+  {
+    title: "Mega Tree Plantation Drive",
+    avenue: "Community Service",
+    image: "/images/MTPD.jpg",
+    alt: "Participants planting trees during the Mega Tree Plantation Drive",
+    description:
+      "Rotary district 3131, in collaboration with Rotaract Club of pune heritage members and army officers, conducted a tree plantation drive at Dehu to promote environmental sustainability. The joint effort of Rotarians and defense personnel highlighted the spirit of service, discipline, and community partnership.",
+    featured: true,
   },
     {
     title: "Omnivorous Potluck",
@@ -26,7 +36,7 @@ export const projects = [
     {
     title: "Cheers to Chapters",
     avenue: "Club Service",
-    image: "/images/Cheers to Chapters.png",
+    image: "/images/cheers-to-chapters.webp",
     alt: "Cheers to Chapters event by Rotaract Club of Pune Heritage",
     description:
       "Celebration organized to mark the successes of the past year while warmly welcoming our new members. Filled with exciting games, interactive activities, and a delicious biryani dinner, the event created the perfect opportunity for members to bond, build friendships, and enjoy quality time together. It concluded on a joyful note, leaving everyone with cherished memories, stronger connections, and renewed enthusiasm for the journey ahead.",

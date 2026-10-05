@@ -143,7 +143,7 @@ export function getRouteMetadata(pathname) {
   }
   const adminPath = path === "/admin" || path.startsWith("/admin/");
   return {
-    title: adminPath ? "Admin | RCPH" : PRIVATE_TITLES[path] || "Page Not Found | RCPH",
+    title: adminPath ? "Admin | RCPH" : PRIVATE_TITLES[path] || "Page not found | Rotaract Club of Pune Heritage",
     description: "Protected or account-related area of the Rotaract Club of Pune Heritage website.",
     canonical: canonicalUrl(path),
     robots: "noindex, nofollow",
