@@ -63,6 +63,10 @@ Run targeted checks after changing any related frontend, Functions, Firestore, V
 
 Environment files, generated reports, archives, and documentation are excluded from Firebase Hosting by the current ignore plan and must not be treated as public runtime assets.
 
+### Private assets
+
+The letterhead and report-frame images (`functions/assets/RCPH_BOD_Avenue_Report_Letterhead_A4.png`, `functions/assets/resolution_letterhead.png`, `functions/assets/Report_Frame.png`) are gitignored and are served only to approved BOD, Admin, and President accounts through the `getProtectedBrandAsset` callable. The master copy lives in `C:\Personal\Z folder\RCPH_private_assets\`. Before any Functions deploy, copy them into `functions/assets/` if needed and run `npm --prefix functions run check:private-assets` (it exits non-zero and lists any missing file).
+
 ## Documentation
 
 - Current Visit Submission implementation: `docs/visit-submissions/`

@@ -35,6 +35,7 @@ const bodAvenueReport = require('./lib/bod-avenue-report');
 const bodSecretarialReport = require('./lib/bod-secretarial-report');
 const { createLetterheadExchangeService } = require('./lib/letterhead-exchanges');
 const { createLetterheadExchangeImageService } = require('./lib/letterhead-exchange-images');
+const protectedBrandAssets = require('./lib/protected-brand-assets');
 const bodEventSchema = require('./lib/bod-event-schema');
 const bodReportingLinkRecovery = require('./lib/bod-reporting-link-recovery');
 const { createBodManagementService } = require('./lib/bod-management');
@@ -9095,6 +9096,16 @@ exports.getLetterheadExchangeImageAccess = onCall(CALLABLE_OPTIONS, async (reque
   } catch (err) {
     throwCallableServiceError(err, 'Could not open Letterhead Exchange image.');
   }
+});
+
+exports.getProtectedBrandAsset = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  await assertLetterheadExchangeAccess(uid);
+  const asset = request.data?.asset;
+  if (!protectedBrandAssets.isProtectedBrandAssetKey(asset)) {
+    throw new HttpsError('invalid-argument', 'Unknown brand asset.');
+  }
+  return protectedBrandAssets.getAsset(asset);
 });
 
 exports.uploadLetterheadExchangeImage = onRequest(

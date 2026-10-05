@@ -88,3 +88,8 @@ reports/riy-clean-slate-executions/
 # Operating-system files
 .DS_Store
 Thumbs.db
+
+# Private brand assets (master copy: C:\Personal\Z folder\RCPH_private_assets\)
+functions/assets/RCPH_BOD_Avenue_Report_Letterhead_A4.png
+functions/assets/resolution_letterhead.png
+functions/assets/Report_Frame.png
