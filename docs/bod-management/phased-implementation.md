@@ -54,7 +54,7 @@ Files likely affected:
 
 - `functions/index.js`
 - possible `functions/lib/bod-management.js`
-- `firestore.rules`
+- `firestore.rules` in the backend repo (`main` branch); the frontend has no Firestore rules
 - `src/pages/admin/AdminPage.jsx`
 - `src/features/admin/shared/adminNavigation.js`
 - `src/features/admin/bod-management/*`
@@ -143,7 +143,7 @@ Files likely affected:
 - `src/styles/components/admin.css`
 - `functions/index.js`
 - possible `functions/lib/bod-management.js`
-- `firestore.rules`
+- `firestore.rules` in the backend repo (`main` branch); the frontend has no Firestore rules
 
 Backend work:
 
