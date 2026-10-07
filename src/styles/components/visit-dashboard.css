@@ -72,43 +72,49 @@
   font-weight: 850;
 }
 
-.visit-dashboard-officials {
-  max-width: 52rem;
+.visit-dashboard-visiting-panel {
+  max-width: 60rem;
   margin: 1.05rem 0 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.28rem 0.5rem;
-  align-items: baseline;
-  color: var(--internal-text-muted);
+  gap: 0.6rem 0;
   list-style: none;
 }
 
-.visit-dashboard-officials::before {
-  content: "District officials";
-  color: var(--internal-accent-secondary);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.visit-dashboard-visiting-panel li {
+  min-width: 0;
+  padding: 0 1.1rem;
+  display: grid;
+  gap: 0.12rem;
+  border-left: 1px solid var(--internal-border);
 }
 
-.visit-dashboard-officials li {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
+.visit-dashboard-visiting-panel li:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.visit-dashboard-visiting-panel strong {
   color: var(--internal-accent-soft);
-  background: transparent;
-  font-size: clamp(0.9rem, 1.4vw, 1rem);
+  font-size: clamp(0.92rem, 1.4vw, 1.02rem);
   font-weight: 850;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.visit-dashboard-officials li + li::before {
-  margin-right: 0.5rem;
-  color: rgba(255, 255, 255, 0.32);
-  content: "/";
+.visit-dashboard-visiting-panel span {
+  color: var(--internal-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.visit-dashboard-asof {
+  margin: 0.35rem 0 0;
+  color: var(--internal-text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .visit-dashboard-masthead__actions {
@@ -166,180 +172,6 @@
   border-bottom-color: var(--internal-accent);
   background: transparent;
 }
-.visit-dashboard-summary {
-  display: grid;
-  gap: 1rem;
-}
-
-.visit-dashboard-stat-rail {
-  margin: 0;
-  padding: 1.1rem 0;
-  display: grid;
-  border-block: 1px solid var(--internal-border);
-}
-
-.visit-dashboard-stat-rail--overview {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.visit-dashboard-stat-rail > div {
-  min-width: 0;
-  padding: 0.78rem clamp(0.75rem, 1.55vw, 1.15rem);
-  border-right: 1px solid var(--internal-border);
-}
-
-.visit-dashboard-stat-rail > div:first-child {
-  padding-left: 0;
-}
-
-.visit-dashboard-stat-rail > div:last-child {
-  border-right: 0;
-}
-
-.visit-dashboard-stat-rail dt,
-.visit-dashboard-finance-line dt {
-  color: var(--internal-text-muted);
-  font-size: 0.7rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.visit-dashboard-stat-rail dd,
-.visit-dashboard-finance-line dd {
-  margin: 0.45rem 0 0;
-  color: var(--internal-accent-soft);
-  font-weight: 900;
-  line-height: 1.05;
-  font-feature-settings: "tnum";
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.visit-dashboard-stat-rail dd {
-  font-size: clamp(1.3rem, 2.35vw, 2rem);
-}
-
-.visit-dashboard-finance-strip {
-  display: grid;
-  grid-template-columns: minmax(12rem, 0.32fr) minmax(0, 1fr);
-  gap: clamp(1rem, 3vw, 2rem);
-  align-items: center;
-  padding: 0.9rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-}
-
-.visit-dashboard-finance-strip__heading {
-  min-width: 0;
-}
-
-.visit-dashboard-finance-strip__heading h2 {
-  margin: 0;
-  color: var(--internal-text);
-  font-size: clamp(1.2rem, 2.2vw, 1.8rem);
-  line-height: 1;
-}
-
-.visit-dashboard-finance-line {
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(0.85rem, 2.2vw, 1.6rem);
-  align-items: end;
-}
-
-.visit-dashboard-finance-line > div {
-  min-width: 0;
-  padding: 0.25rem 0 0.25rem clamp(0.75rem, 1.8vw, 1.15rem);
-  border-left: 1px solid rgba(255, 255, 255, 0.09);
-}
-
-.visit-dashboard-finance-line dd {
-  font-size: clamp(1.7rem, 3vw, 2.65rem);
-  letter-spacing: -0.035em;
-}
-
-.visit-dashboard-finance-line .is-income dd {
-  color: var(--internal-accent-secondary);
-}
-
-.visit-dashboard-finance-line .is-expense dd {
-  color: var(--internal-status-danger);
-}
-
-.visit-dashboard-summary-row {
-  display: grid;
-  grid-template-columns: minmax(10rem, 0.28fr) minmax(0, 1fr);
-  gap: 1rem;
-  align-items: stretch;
-}
-
-.visit-dashboard-events-card,
-.visit-dashboard-financial-card {
-  margin: 0;
-  padding: clamp(1rem, 2.5vw, 1.35rem);
-  border: 1px solid rgba(229, 194, 104, 0.16);
-  border-radius: 1rem;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
-}
-
-.visit-dashboard-events-card {
-  display: grid;
-  align-items: center;
-}
-
-.visit-dashboard-events-card dd {
-  font-size: clamp(2rem, 4vw, 3.1rem);
-}
-
-.visit-dashboard-financial-card {
-  display: grid;
-  gap: 1rem;
-}
-
-.visit-dashboard-financial-card__heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.visit-dashboard-financial-card__heading h2 {
-  margin: 0;
-  color: var(--internal-text);
-  font-size: clamp(1.35rem, 2.6vw, 2.2rem);
-  line-height: 1;
-}
-
-.visit-dashboard-finance-grid {
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.visit-dashboard-finance-grid > div {
-  min-width: 0;
-  padding: 0.95rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 0.85rem;
-  background: rgba(0, 0, 0, 0.12);
-}
-
-.visit-dashboard-finance-grid dd {
-  font-size: clamp(1.65rem, 3.2vw, 2.65rem);
-  letter-spacing: -0.03em;
-}
-
-.visit-dashboard-finance-grid .is-income dd {
-  color: var(--internal-accent-secondary);
-}
-
-.visit-dashboard-finance-grid .is-expense dd {
-  color: var(--internal-status-danger);
-}
-
 .visit-dashboard-avenue-section {
   display: grid;
   grid-template-columns: minmax(12rem, 0.28fr) minmax(0, 1fr);
@@ -359,8 +191,8 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
-  gap: 0 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1.5rem;
   list-style: none;
 }
 
@@ -427,12 +259,31 @@
 .visit-dashboard-avenue-disclosure summary {
   min-height: 2.15rem;
   padding: 0.32rem 0;
-  display: flex;
-  gap: 0.55rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(3rem, 1fr) auto;
+  gap: 0.75rem;
   align-items: center;
-  justify-content: space-between;
   cursor: pointer;
   list-style: none;
+}
+
+.visit-dashboard-avenue-disclosure summary:focus-visible {
+  outline: 2px solid var(--internal-accent);
+  outline-offset: 2px;
+}
+
+.visit-dashboard-avenue-bar {
+  height: 0.38rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.visit-dashboard-avenue-bar span {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: var(--internal-accent-secondary);
 }
 
 .visit-dashboard-avenue-disclosure summary::-webkit-details-marker {
@@ -490,16 +341,10 @@
 .visit-dashboard-avenue-empty {
   margin: 0.25rem 0 0.65rem;
 }
-.visit-dashboard-freshness {
-  margin: -1.4rem 0 0;
-  color: var(--internal-text-muted);
-  font-size: 0.82rem;
-  text-align: right;
-}
-
+.visit-dashboard-glance,
 .visit-dashboard-documents,
 .visit-dashboard-attendance,
-.visit-dashboard-fines,
+.visit-dashboard-records,
 .visit-dashboard-treasury {
   padding-top: clamp(1.2rem, 3vw, 2rem);
   border-top: 1px solid var(--internal-border);
@@ -1194,7 +1039,7 @@ a.visit-dashboard-document-action:hover {
   z-index: 30;
 }
 
-.visit-dashboard-attendance-percent-heading {
+.visit-dashboard-attendance-table thead th.visit-dashboard-attendance-percent-heading {
   z-index: 120;
 }
 
@@ -1209,7 +1054,7 @@ a.visit-dashboard-document-action:hover {
   z-index: 30;
 }
 
-.visit-dashboard-attendance-name-heading {
+.visit-dashboard-attendance-table thead th.visit-dashboard-attendance-name-heading {
   z-index: 120;
 }
 .visit-dashboard-attendance-role-heading,
@@ -1224,7 +1069,7 @@ a.visit-dashboard-document-action:hover {
   z-index: 30;
 }
 
-.visit-dashboard-attendance-role-heading {
+.visit-dashboard-attendance-table thead th.visit-dashboard-attendance-role-heading {
   z-index: 120;
 }
 .visit-dashboard-attendance-name {
@@ -1325,96 +1170,237 @@ a.visit-dashboard-document-action:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.visit-dashboard-fines {
-  display: grid;
-  gap: 1rem;
+/* Quick section links */
+.visit-dashboard-section-links {
+  margin-top: -0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
 }
 
-.visit-dashboard-fines-summary {
-  margin: 0;
-  padding: 0.9rem 0;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(7.5rem, 1fr));
-  border-block: 1px solid rgba(255, 255, 255, 0.09);
-}
-
-.visit-dashboard-fines-summary div {
-  min-width: 0;
-  padding: 0.45rem 0.8rem;
-  border-right: 1px solid var(--internal-border);
-}
-
-.visit-dashboard-fines-summary div:first-child {
-  padding-left: 0;
-}
-
-.visit-dashboard-fines-summary div:last-child {
-  border-right: 0;
-}
-
-.visit-dashboard-fines-summary dt {
+.visit-dashboard-section-links a {
   color: var(--internal-text-muted);
-  font-size: 0.72rem;
-  font-weight: 850;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.visit-dashboard-section-links a:hover,
+.visit-dashboard-section-links a:focus-visible {
+  color: var(--internal-accent-soft);
+  border-bottom-color: var(--internal-accent-soft);
+}
+
+.visit-dashboard-glance:focus,
+.visit-dashboard-avenue-section:focus,
+.visit-dashboard-documents:focus,
+.visit-dashboard-treasury:focus {
+  outline: none;
+}
+
+/* Club at a glance */
+.visit-dashboard-glance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+  background: var(--internal-border);
+}
+
+.visit-dashboard-glance-tile {
+  min-width: 0;
+  padding: 1.1rem 1.2rem 1.15rem;
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  background: var(--internal-surface);
+}
+
+.visit-dashboard-glance-tile h3 {
+  margin: 0;
+  color: var(--internal-text-muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.visit-dashboard-fines-summary dd {
-  margin: 0.35rem 0 0;
-  color: var(--internal-accent-soft);
-  font-size: clamp(1.1rem, 2vw, 1.6rem);
+.visit-dashboard-glance-value {
+  margin: 0;
+  color: var(--internal-text);
+  font-size: clamp(2rem, 4vw, 2.8rem);
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  word-break: keep-all;
 }
 
-.visit-dashboard-fines-summary .is-paid dd {
+.visit-dashboard-glance-value.is-positive {
   color: var(--internal-accent-secondary);
 }
 
-.visit-dashboard-fines-summary .is-pending dd {
+.visit-dashboard-glance-value.is-negative {
   color: var(--internal-status-danger);
 }
 
-.visit-dashboard-fines-table-wrap {
-  max-width: 100%;
-  overflow-x: auto;
+.visit-dashboard-glance-bar {
+  height: 0.4rem;
+  display: flex;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
 }
 
-.visit-dashboard-fines-table {
+.visit-dashboard-glance-bar span {
+  height: 100%;
+  display: block;
+}
+
+.visit-dashboard-glance-bar .is-male,
+.visit-dashboard-glance-bar .is-progress,
+.visit-dashboard-glance-bar .is-income {
+  background: var(--internal-accent-secondary);
+}
+
+.visit-dashboard-glance-bar .is-female {
+  background: var(--internal-accent);
+}
+
+.visit-dashboard-glance-bar .is-other {
+  background: var(--internal-text-muted);
+}
+
+.visit-dashboard-glance-bar .is-expense {
+  background: var(--internal-status-danger);
+}
+
+.visit-dashboard-glance-columns {
+  height: 2.2rem;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 0.7rem);
+  gap: 0.3rem;
+  align-items: end;
+}
+
+.visit-dashboard-glance-columns span {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.visit-dashboard-glance-columns i {
   width: 100%;
-  min-width: 820px;
-  border-collapse: collapse;
-  table-layout: fixed;
+  display: block;
+  border-radius: 2px 2px 0 0;
+  background: var(--internal-accent-secondary);
+  opacity: 0.85;
 }
 
-.visit-dashboard-fines-col-member {
-  width: 14rem;
+.visit-dashboard-glance-line {
+  margin: 0;
+  color: var(--internal-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
 
-.visit-dashboard-fines-col-reason {
-  width: auto;
+/* Collapsible record sections (letterhead exchanges, fines) */
+.visit-dashboard-records > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1rem;
+  cursor: pointer;
+  list-style: none;
 }
 
-.visit-dashboard-fines-col-amount {
-  width: 9rem;
+.visit-dashboard-records > summary::-webkit-details-marker {
+  display: none;
 }
 
-.visit-dashboard-fines-col-status {
-  width: 8rem;
+.visit-dashboard-records > summary:focus-visible {
+  outline: 2px solid var(--internal-accent);
+  outline-offset: 4px;
 }
 
-.visit-dashboard-fines-col-date {
-  width: 8.5rem;
+.visit-dashboard-records > summary h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  line-height: 1;
 }
 
-.visit-dashboard-fines-col-notes {
-  width: 13rem;
+.visit-dashboard-records-chevron {
+  width: 0.55rem;
+  height: 0.55rem;
+  align-self: center;
+  border-right: 2px solid var(--internal-accent-soft);
+  border-bottom: 2px solid var(--internal-accent-soft);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
 }
 
-.visit-dashboard-fines-table caption {
+.visit-dashboard-records[open] .visit-dashboard-records-chevron {
+  transform: rotate(45deg);
+}
+
+.visit-dashboard-records-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  color: var(--internal-text-muted);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.visit-dashboard-records-meta .is-collected {
+  color: var(--internal-accent-secondary);
+}
+
+.visit-dashboard-records-toggle {
+  margin-left: auto;
+  color: var(--internal-accent-soft);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-records > .visit-dashboard-ledger-wrap,
+.visit-dashboard-records > .visit-dashboard-empty-state {
+  margin-top: 1rem;
+}
+
+/* Compact ledger tables (letterhead, fines, treasury) */
+.visit-dashboard-ledger-wrap {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+}
+
+.visit-dashboard-ledger-wrap--tall {
+  max-height: min(70vh, 40rem);
+}
+
+.visit-dashboard-ledger-wrap:focus-visible {
+  outline: 2px solid var(--internal-accent);
+  outline-offset: 2px;
+}
+
+.visit-dashboard-ledger-table {
+  width: 100%;
+  min-width: 46rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.visit-dashboard-ledger-table caption {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1425,256 +1411,112 @@ a.visit-dashboard-document-action:hover {
   border: 0;
 }
 
-.visit-dashboard-fines-table th,
-.visit-dashboard-fines-table td {
-  padding: 0.8rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+.visit-dashboard-ledger-table th,
+.visit-dashboard-ledger-table td {
+  height: 2.25rem;
+  padding: 0.35rem 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--internal-text-muted);
+  font-weight: 400;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
-.visit-dashboard-fines-table thead th {
+.visit-dashboard-ledger-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   color: var(--internal-accent-soft);
-  font-size: 0.78rem;
+  background: var(--internal-surface);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 var(--internal-border);
 }
 
-.visit-dashboard-fines-table tbody th {
+.visit-dashboard-ledger-table tbody tr:nth-child(even) td,
+.visit-dashboard-ledger-table tbody tr:nth-child(even) th {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.visit-dashboard-ledger-table tbody th {
   color: var(--internal-text);
 }
 
-.visit-dashboard-fines-table strong,
-.visit-dashboard-fines-table small {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.visit-dashboard-fines-table small {
-  margin-top: 0.28rem;
-  color: var(--internal-text-muted);
-  font-size: 0.78rem;
+.visit-dashboard-ledger-table tbody th strong {
   font-weight: 700;
-  line-height: 1.45;
 }
 
-.visit-dashboard-fines-amount {
-  color: var(--internal-accent-soft) !important;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.visit-dashboard-fines-status {
-  min-height: 1.65rem;
-  padding: 0.22rem 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--internal-radius-control);
+.visit-dashboard-ledger-table small {
+  display: block;
+  margin-top: 0.1rem;
   color: var(--internal-text-muted);
-  background: rgba(255, 255, 255, 0.035);
   font-size: 0.78rem;
-  font-weight: 850;
+  font-weight: 400;
+}
+
+.visit-dashboard-ledger-table .is-date {
   white-space: nowrap;
+}
+
+.visit-dashboard-ledger-table .is-number {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.visit-dashboard-ledger-table tfoot th,
+.visit-dashboard-ledger-table tfoot td {
+  border-top: 1px solid var(--internal-border);
+  border-bottom: 0;
+  color: var(--internal-text);
+  background: var(--internal-surface-raised);
+  font-weight: 800;
 }
 
 .visit-dashboard-fines-status.is-paid {
-  border-color: rgba(96, 195, 196, 0.34);
   color: var(--internal-accent-secondary);
-  background: rgba(96, 195, 196, 0.08);
 }
 
 .visit-dashboard-fines-status.is-pending {
-  border-color: rgba(255, 130, 154, 0.34);
-  color: var(--internal-status-danger);
-  background: rgba(153, 40, 87, 0.12);
-}
-
-.visit-dashboard-fines-status.is-waived,
-.visit-dashboard-fines-status.is-unknown {
-  border-color: rgba(229, 194, 104, 0.34);
   color: var(--internal-accent-soft);
-  background: rgba(229, 194, 104, 0.07);
 }
 
-.visit-dashboard-fines-notes {
-  line-height: 1.45;
-}
-
-.visit-dashboard-fines-empty {
-  color: var(--internal-text-muted);
-  font-weight: 850;
-}
-
-.visit-dashboard-treasury {
-  display: grid;
-  gap: 1rem;
-}
-
-.visit-dashboard-treasury-summary {
-  margin: 0;
-  padding: 0.9rem 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(8rem, 1fr));
-  border-block: 1px solid rgba(255, 255, 255, 0.09);
-}
-
-.visit-dashboard-treasury-summary div {
-  min-width: 0;
-  padding: 0.45rem 1rem;
-  border-right: 1px solid var(--internal-border);
-}
-
-.visit-dashboard-treasury-summary div:first-child {
-  padding-left: 0;
-}
-
-.visit-dashboard-treasury-summary div:last-child {
-  border-right: 0;
-}
-
-.visit-dashboard-treasury-summary dt {
-  color: var(--internal-text-muted);
+.visit-dashboard-ledger-month th {
+  height: 1.9rem;
+  color: var(--internal-accent) !important;
+  background: rgba(229, 194, 104, 0.06) !important;
   font-size: 0.72rem;
-  font-weight: 850;
-  text-transform: uppercase;
+  font-weight: 900 !important;
+  letter-spacing: 0.1em;
 }
 
-.visit-dashboard-treasury-summary dd {
-  margin: 0.35rem 0 0;
-  color: var(--internal-accent-soft);
-  font-size: clamp(1.2rem, 2.4vw, 1.85rem);
-  font-weight: 900;
-  line-height: 1.05;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: normal;
-  white-space: nowrap;
-  word-break: keep-all;
+.visit-dashboard-ledger-particulars span {
+  margin-left: 0.5rem;
+  color: var(--internal-text-muted);
+  font-weight: 400;
 }
 
-.visit-dashboard-treasury-summary .is-income dd {
+.visit-dashboard-ledger-table .is-receipt {
   color: var(--internal-accent-secondary);
 }
 
-.visit-dashboard-treasury-summary .is-expense dd {
+.visit-dashboard-ledger-table .is-payment {
   color: var(--internal-status-danger);
 }
 
-.visit-dashboard-treasury-table-wrap {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.visit-dashboard-treasury-table {
-  width: 100%;
-  min-width: 740px;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.visit-dashboard-treasury-col-date {
-  width: 8.5rem;
-}
-
-.visit-dashboard-treasury-col-title {
-  width: auto;
-}
-
-.visit-dashboard-treasury-col-type {
-  width: 7.5rem;
-}
-
-.visit-dashboard-treasury-col-amount {
-  width: 9rem;
-}
-
-.visit-dashboard-treasury-col-bill {
-  width: 8rem;
-}
-
-.visit-dashboard-treasury-table caption {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.visit-dashboard-treasury-table th,
-.visit-dashboard-treasury-table td {
-  padding: 0.85rem 0.8rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--internal-text-muted);
-  text-align: left;
-  vertical-align: top;
-}
-
-.visit-dashboard-treasury-table thead th {
-  color: var(--internal-accent-soft);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-}
-
-.visit-dashboard-treasury-table tbody th {
-  min-width: 16rem;
+.visit-dashboard-ledger-table .is-balance {
   color: var(--internal-text);
 }
 
-.visit-dashboard-treasury-table strong,
-.visit-dashboard-treasury-table small {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.visit-dashboard-treasury-table small {
-  margin-top: 0.28rem;
-  color: var(--internal-text-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.visit-dashboard-treasury-type {
-  min-height: 1.65rem;
-  padding: 0.22rem 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--internal-radius-control);
-  color: var(--internal-text-muted);
-  background: rgba(255, 255, 255, 0.035);
-  font-size: 0.78rem;
-  font-weight: 850;
-  white-space: nowrap;
-}
-
-.visit-dashboard-treasury-type.is-income {
-  border-color: rgba(96, 195, 196, 0.34);
-  color: var(--internal-accent-secondary);
-  background: rgba(96, 195, 196, 0.08);
-}
-
-.visit-dashboard-treasury-type.is-expense {
-  border-color: rgba(255, 130, 154, 0.34);
+.visit-dashboard-ledger-table .is-balance.is-negative {
   color: var(--internal-status-danger);
-  background: rgba(153, 40, 87, 0.12);
 }
 
-.visit-dashboard-treasury-amount {
-  color: var(--internal-accent-soft);
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.visit-dashboard-treasury-amount.is-income {
-  color: var(--internal-accent-secondary);
-}
-
-.visit-dashboard-treasury-amount.is-expense {
-  color: var(--internal-status-danger);
+.visit-dashboard-treasury-table .visit-dashboard-bill-link {
+  min-height: 1.5rem;
+  padding: 0.1rem 0.45rem;
 }
 
 .visit-dashboard-bill-cell {
@@ -1863,35 +1705,6 @@ a.visit-dashboard-document-action:hover {
     font-size: clamp(2rem, 11vw, 3.4rem);
   }
 
- .visit-dashboard-stat-rail--overview {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-  .visit-dashboard-stat-rail > div,
-  .visit-dashboard-stat-rail > div:first-child {
-    padding: 0.85rem;
-    border-right: 1px solid var(--internal-border);
-    border-bottom: 1px solid var(--internal-border);
-  }
-
-.visit-dashboard-finance-strip,
-.visit-dashboard-finance-line {
-  grid-template-columns: 1fr;
-}
-
-.visit-dashboard-finance-strip__heading {
-  display: grid;
-  align-items: start;
-}
-
-.visit-dashboard-finance-line dd {
-  font-size: clamp(1.75rem, 9vw, 2.45rem);
-}
-  .visit-dashboard-freshness {
-    margin-top: -0.75rem;
-    text-align: left;
-  }
-
   .visit-dashboard-folder-panel summary,
   .visit-dashboard-attendance > summary {
     grid-template-columns: 1fr;
@@ -1911,32 +1724,30 @@ a.visit-dashboard-document-action:hover {
     display: none;
   }
 
-  .visit-dashboard-document-list dl,
   .visit-dashboard-attendance-summary,
-  .visit-dashboard-fines-summary,
-  .visit-dashboard-treasury-summary {
+  .visit-dashboard-document-list dl {
     grid-template-columns: 1fr;
+  }
+
+  .visit-dashboard-visiting-panel li {
+    padding: 0 0.8rem;
+  }
+
+  .visit-dashboard-asof {
+    text-align: left;
+  }
+
+  .visit-dashboard-ledger-particulars span {
+    display: block;
+    margin-left: 0;
+  }
+
+  .visit-dashboard-records-toggle {
+    margin-left: 0;
   }
 
   .visit-dashboard-document-preview-frame {
     min-height: 24rem;
-  }
-
-  .visit-dashboard-treasury-summary div,
-  .visit-dashboard-fines-summary div,
-  .visit-dashboard-treasury-summary div:first-child {
-    padding: 0.75rem 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--internal-border);
-  }
-
-  .visit-dashboard-fines-summary div:first-child {
-    padding-left: 0;
-  }
-
-  .visit-dashboard-treasury-summary div:last-child,
-  .visit-dashboard-fines-summary div:last-child {
-    border-bottom: 0;
   }
 
   .visit-dashboard-attendance-panel {

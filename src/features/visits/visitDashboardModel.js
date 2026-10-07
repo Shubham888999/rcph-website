@@ -288,7 +288,7 @@ function normalizeOfficialDisplayNames(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
   return value.flatMap((name) => {
-    const clean = text(name, 120);
+    const clean = text(name, 160);
     const key = clean.toLowerCase();
     if (!clean || seen.has(key)) return [];
     seen.add(key);
@@ -995,6 +995,220 @@ function normalizeFines(raw) {
   };
 }
 
+const MAX_LETTERHEAD_EXCHANGES = 100;
+const MAX_LETTERHEAD_PARTICIPANTS = 20;
+
+function normalizeLetterheadExchange(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const exchangeId = safeId(raw.exchangeId, 128);
+  const exchangeDate = dateOnly(raw.exchangeDate);
+  if (!exchangeId || !exchangeDate) return null;
+  const externalParticipants = (Array.isArray(raw.externalParticipants) ? raw.externalParticipants : [])
+    .flatMap((row) => {
+      const clubName = text(row?.clubName, 150);
+      const rotaractorName = text(row?.rotaractorName, 120);
+      return clubName || rotaractorName ? [{ clubName, rotaractorName, position: text(row?.position, 120) }] : [];
+    })
+    .slice(0, MAX_LETTERHEAD_PARTICIPANTS);
+  const rcphRepresentatives = (Array.isArray(raw.rcphRepresentatives) ? raw.rcphRepresentatives : [])
+    .map((name) => text(name, 160))
+    .filter(Boolean)
+    .slice(0, MAX_LETTERHEAD_PARTICIPANTS);
+  const eventName = text(raw.associatedEvent?.name, 180);
+  return {
+    exchangeId,
+    exchangeDate,
+    externalParticipants,
+    rcphRepresentatives,
+    associatedEvent: eventName ? { name: eventName, date: dateOnly(raw.associatedEvent?.date) } : null,
+    imageCount: count(raw.imageCount),
+  };
+}
+
+export function normalizeLetterheadExchanges(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .map(normalizeLetterheadExchange)
+    .filter((row) => row && !seen.has(row.exchangeId) && seen.add(row.exchangeId))
+    .sort((left, right) => right.exchangeDate.localeCompare(left.exchangeDate))
+    .slice(0, MAX_LETTERHEAD_EXCHANGES);
+}
+
+// Uses the backend summary (it counts beyond the 100-row cap) and falls back
+// to counting the rows that arrived.
+export function summarizeLetterheadExchanges(rows, rawSummary) {
+  const list = Array.isArray(rows) ? rows : [];
+  const clubs = new Set();
+  list.forEach((row) => row.externalParticipants.forEach((participant) => {
+    const key = participant.clubName.toLowerCase();
+    if (key) clubs.add(key);
+  }));
+  const summary = rawSummary && typeof rawSummary === "object" && !Array.isArray(rawSummary) ? rawSummary : {};
+  return {
+    count: Math.max(count(summary.count), list.length),
+    clubCount: Math.max(count(summary.clubCount), clubs.size),
+  };
+}
+
+function normalizeLetterheadSection(source) {
+  if (!Array.isArray(source.letterheadExchanges)) return null;
+  const rows = normalizeLetterheadExchanges(source.letterheadExchanges);
+  return { rows, summary: summarizeLetterheadExchanges(rows, source.letterheadExchangeSummary) };
+}
+
+// "Rtr. Asha Kulkarni | District Zonal Representative" -> { name, role }.
+export function parseOfficialDisplayName(value) {
+  const line = text(value, 160);
+  const divider = line.indexOf("|");
+  if (divider < 0) return { name: line, role: "" };
+  return { name: line.slice(0, divider).trim(), role: line.slice(divider + 1).trim() };
+}
+
+export function finesHasNotes(rows) {
+  return (Array.isArray(rows) ? rows : []).some((row) => text(row?.notes, 500));
+}
+
+function toPaise(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number * 100) : 0;
+}
+
+const LEDGER_MONTHS = Object.freeze(["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]);
+
+// Oldest first, running balance from 0 (receipts - payments), month groups.
+export function buildTreasuryLedger(rows) {
+  const ordered = (Array.isArray(rows) ? rows : [])
+    .filter((row) => row && dateOnly(row.date))
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => (
+      left.row.date.localeCompare(right.row.date)
+      || String(left.row.title || "").localeCompare(String(right.row.title || ""))
+      || String(left.row.transactionId || "").localeCompare(String(right.row.transactionId || ""))
+      || left.index - right.index
+    ))
+    .map((entry) => entry.row);
+  let balance = 0;
+  let receipts = 0;
+  let payments = 0;
+  const groups = [];
+  ordered.forEach((row) => {
+    const amount = toPaise(row.amount);
+    const receipt = row.type === "income" ? amount : 0;
+    const payment = row.type === "expense" ? amount : 0;
+    receipts += receipt;
+    payments += payment;
+    balance += receipt - payment;
+    const monthKey = row.date.slice(0, 7);
+    let group = groups[groups.length - 1];
+    if (!group || group.monthKey !== monthKey) {
+      const [year, month] = monthKey.split("-").map(Number);
+      group = {
+        monthKey,
+        label: `${LEDGER_MONTHS[month - 1]} ${year}`,
+        rows: [],
+      };
+      groups.push(group);
+    }
+    group.rows.push({
+      ...row,
+      receipt: receipt ? receipt / 100 : null,
+      payment: payment ? payment / 100 : null,
+      balance: balance / 100,
+    });
+  });
+  return {
+    groups,
+    entryCount: ordered.length,
+    totals: { receipts: receipts / 100, payments: payments / 100, closing: balance / 100 },
+  };
+}
+
+const LEDGER_AMOUNT_FORMATTER = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export function formatVisitLedgerAmount(value) {
+  return LEDGER_AMOUNT_FORMATTER.format(toPaise(value) / 100);
+}
+
+function plural(value, singular, pluralLabel = `${singular}s`) {
+  return `${value} ${value === 1 ? singular : pluralLabel}`;
+}
+
+function percentShare(part, total) {
+  return total > 0 ? Math.round((part / total) * 1000) / 10 : 0;
+}
+
+export function buildGlanceStats({ stats, attendance, treasury } = {}) {
+  const source = stats || normalizeStats(null);
+  const male = count(source.maleMembers);
+  const female = count(source.femaleMembers);
+  const other = count(source.otherGenderMembers);
+  const genderTotal = male + female + other;
+  const memberSegments = [
+    { key: "male", label: "Male", value: male, share: percentShare(male, genderTotal) },
+    { key: "female", label: "Female", value: female, share: percentShare(female, genderTotal) },
+  ];
+  if (other > 0) memberSegments.push({ key: "other", label: "Other", value: other, share: percentShare(other, genderTotal) });
+
+  const avenueRows = (Array.isArray(source.avenueEventCounts) ? source.avenueEventCounts : [])
+    .filter((row) => row.avenueCode !== "GBM" && count(row.count) > 0)
+    .sort((left, right) => right.count - left.count || left.avenueCode.localeCompare(right.avenueCode));
+  const maxAvenueCount = avenueRows.length ? avenueRows[0].count : 0;
+
+  const clubView = attendance?.club;
+  const clubSummary = clubView?.summary || {};
+  const hasClubAttendance = Boolean(clubView?.columns?.length);
+  const clubRate = hasClubAttendance ? nullablePercentage(clubSummary.averageAttendanceRate) : null;
+
+  const ledger = buildTreasuryLedger(treasury?.rows);
+  const flowTotal = ledger.totals.receipts + ledger.totals.payments;
+
+  return {
+    members: {
+      total: count(source.totalMembers),
+      segments: memberSegments,
+      line: [
+        `${male} male`,
+        `${female} female`,
+        ...(other > 0 ? [`${other} other`] : []),
+        `ratio ${source.maleFemaleRatio || "N/A"}`,
+      ].join(" · "),
+    },
+    events: {
+      total: count(source.totalEvents),
+      bars: avenueRows.slice(0, 6).map((row) => ({
+        avenueCode: row.avenueCode,
+        avenueName: row.avenueName,
+        count: row.count,
+        share: percentShare(row.count, maxAvenueCount),
+      })),
+      line: avenueRows.length
+        ? `across ${plural(avenueRows.length, "avenue")} · most active: ${avenueRows[0].avenueName || avenueRows[0].avenueCode}`
+        : "No avenue-wise events yet",
+    },
+    attendance: {
+      hasData: hasClubAttendance && clubRate !== null,
+      rate: clubRate ?? 0,
+      label: hasClubAttendance && clubRate !== null ? attendanceRateLabel(clubRate) : "—",
+      line: hasClubAttendance
+        ? `average across ${plural(count(clubSummary.totalEvents), "club event")} · ${plural(count(clubSummary.totalPeople), "member")}`
+        : "No club attendance recorded yet",
+    },
+    treasury: {
+      net: ledger.totals.closing,
+      negative: ledger.totals.closing < 0,
+      income: ledger.totals.receipts,
+      expense: ledger.totals.payments,
+      entryCount: ledger.entryCount,
+      segments: [
+        { key: "income", label: "In", value: ledger.totals.receipts, share: percentShare(ledger.totals.receipts, flowTotal) },
+        { key: "expense", label: "Out", value: ledger.totals.payments, share: percentShare(ledger.totals.payments, flowTotal) },
+      ],
+      line: `In ${formatVisitDashboardMoney(ledger.totals.receipts)} · Out ${formatVisitDashboardMoney(ledger.totals.payments)} · ${plural(ledger.entryCount, "entry", "entries")}`,
+    },
+  };
+}
+
 export function visitTypeFromSlug(slug) {
   return VISIT_TYPE_BY_SLUG[text(slug, 80)] || "";
 }
@@ -1054,6 +1268,7 @@ export function normalizeVisitDashboardData(raw, fallbackVisitType = "") {
     attendance: normalizeAttendance(source.attendance),
     fines: normalizeFines(source.fines),
     treasury: normalizeTreasury(source.treasury),
+    letterhead: normalizeLetterheadSection(source),
     generatedAt: normalizeGeneratedAt(source.generatedAt),
   };
 }
