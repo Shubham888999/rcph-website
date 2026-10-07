@@ -1287,6 +1287,62 @@ districtByDefault.attendance.club.columns.map(column => ({
     rows: [],
   });
   assertNoSensitivePayload(empty);
+  assert.equal(empty.documentPanels.every(panel => Array.isArray(panel.holders) && panel.holders.length === 0), true, 'vacant panels expose holders: []');
+
+  const holderAssignments = {
+    'president_holder-president': { uid: 'holder-president', positionKey: 'president', active: true, status: 'active' },
+    'secretary_holder-secretary-a': { uid: 'holder-secretary-a', positionKey: 'secretary', active: true, status: 'active' },
+    'secretary_holder-secretary-b': { uid: 'holder-secretary-b', positionKey: 'secretary', active: true, status: 'active' },
+    'treasurer_holder-president': { uid: 'holder-president', positionKey: 'treasurer', active: true, status: 'active' },
+    'csd_holder-ended': { uid: 'holder-ended', positionKey: 'csd', active: true, endedAt: '2026-01-01T00:00:00Z' },
+    'cmd_holder-removed': { uid: 'holder-removed', positionKey: 'cmd', active: true, status: 'active' },
+    'isd_holder-inactive': { uid: 'holder-inactive', positionKey: 'isd', active: false },
+  };
+  const holderUsers = {
+    'holder-president': { name: 'Presiding Person', email: 'holder-president@example.test', status: 'approved', active: true },
+    'holder-secretary-a': { name: 'Zed Secretary', email: 'holder-a@example.test', status: 'approved', active: true },
+    'holder-secretary-b': { name: '', email: 'holder-b@example.test', status: 'approved', active: true },
+    'holder-ended': { name: 'Ended Person', status: 'approved', active: true },
+    'holder-removed': { name: 'Removed Person', status: 'removed', removed: true, active: false },
+    'holder-inactive': { name: 'Inactive Person', status: 'approved', active: true },
+  };
+  const holderDashboard = await createService({
+    visitDashboardConfig: {
+      clubAssembly: visibleConfig('clubAssembly', {
+        visiblePositionKeys: ['president', 'secretary', 'treasurer', 'csd', 'cmd', 'isd'],
+        allowDistrictOfficials: true,
+      }),
+    },
+    users: holderUsers,
+    extra: { bodPositionAssignments: holderAssignments },
+  }).getDashboardData(approvedContext());
+  const holderNames = Object.fromEntries(holderDashboard.documentPanels.map(panel => [
+    panel.positionKey,
+    panel.holders.map(holder => holder.displayName),
+  ]));
+  assert.deepEqual(holderNames, {
+    president: ['Rtr. Presiding Person'],
+    secretary: ['Rtr. Member', 'Rtr. Zed Secretary'],
+    treasurer: ['Rtr. Presiding Person'],
+    csd: [],
+    cmd: [],
+    isd: [],
+  }, 'panels expose current holders only, sorted by name, with fallback name');
+  const presidentHolder = holderDashboard.documentPanels.find(panel => panel.positionKey === 'president').holders[0];
+  const treasurerHolder = holderDashboard.documentPanels.find(panel => panel.positionKey === 'treasurer').holders[0];
+  assert.deepEqual(Object.keys(presidentHolder).sort(), ['displayName', 'personKey']);
+  assert.match(presidentHolder.personKey, /^[0-9a-f]{16}$/);
+  assert.equal(presidentHolder.personKey, treasurerHolder.personKey, 'same person shares one personKey across panels');
+  const holderJson = JSON.stringify(holderDashboard.documentPanels);
+  Object.keys(holderUsers).forEach(uid => assert.equal(holderJson.includes(uid), false, `${uid} leaked`));
+  assert.equal(holderJson.includes('@example.test'), false, 'holder emails are not exposed');
+
+  const panelOnly = dashboards.buildDocumentPanels({
+    config: visibleConfig('clubAssembly', { visiblePositionKeys: ['president'] }),
+    positionDocs: [],
+    submissionDocs: [],
+  });
+  assert.deepEqual(panelOnly[0].holders, [], 'buildDocumentPanels defaults to no holders');
 
   console.log('Visit Dashboard data verification passed.');
 })().catch((err) => {

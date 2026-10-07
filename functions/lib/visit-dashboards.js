@@ -1,6 +1,7 @@
 'use strict';
 
 const defaultPositionHelpers = require('./positions');
+const positionHolders = require('./position-holders');
 
 const VISIT_TYPES = Object.freeze({
   clubAssembly: Object.freeze({
@@ -1062,7 +1063,7 @@ function shapeDocumentFile(doc) {
   };
 }
 
-function buildDocumentPanels({ config, positionDocs, submissionDocs, positionHelpers = defaultPositionHelpers }) {
+function buildDocumentPanels({ config, positionDocs, submissionDocs, holdersByPosition = null, positionHelpers = defaultPositionHelpers }) {
   const visiblePositionKeys = Array.isArray(config?.visiblePositionKeys) ? config.visiblePositionKeys.slice() : [];
   if (!visiblePositionKeys.length) return [];
 
@@ -1113,6 +1114,7 @@ function buildDocumentPanels({ config, positionDocs, submissionDocs, positionHel
       openUrl: folder?.openUrl || '',
       primaryPresentation: selectedPrimary || null,
       files,
+      holders: positionHolders.holdersForPosition(holdersByPosition, positionKey),
     };
   });
 }
@@ -1423,6 +1425,10 @@ function createFirestoreVisitDashboardAdapter(db, admin) {
       const snap = await db.collection(collection).get();
       return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
     },
+    async queryActivePositionAssignments() {
+      const snap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
+      return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    },
     async queryActiveSubmissionsForPositions(visitType, positionKeys) {
       const uniqueKeys = Array.from(new Set((Array.isArray(positionKeys) ? positionKeys : []).filter(Boolean)));
       if (!uniqueKeys.length) return [];
@@ -1482,6 +1488,12 @@ function createMemoryVisitDashboardAdapter(initialData) {
     async listDocs(collection) {
       const docs = store[collection] || {};
       return Object.keys(docs).map(id => ({ id, data: clone(docs[id]) }));
+    },
+    async queryActivePositionAssignments() {
+      const docs = store.bodPositionAssignments || {};
+      return Object.keys(docs)
+        .filter(id => docs[id]?.active === true)
+        .map(id => ({ id, data: clone(docs[id]) }));
     },
     async queryActiveSubmissionsForPositions(visitType, positionKeys) {
       const allowed = new Set((Array.isArray(positionKeys) ? positionKeys : []).filter(Boolean));
@@ -1582,6 +1594,7 @@ function createVisitDashboardService(options = {}) {
       bodAttendance,
       districtEvents,
       districtAttendance,
+      activeAssignments,
     ] = await Promise.all([
       adapter.listDocs('members'),
       adapter.listDocs('users'),
@@ -1596,6 +1609,7 @@ function createVisitDashboardService(options = {}) {
       adapter.listDocs('bodAttendance'),
       adapter.listDocs('districtEvents'),
       adapter.listDocs('districtAttendance'),
+      visiblePositionKeys.length ? adapter.queryActivePositionAssignments() : Promise.resolve([]),
     ]);
     const visitName = normalizeText(config.visitName, 120) || visitNameForType(visitType);
     return {
@@ -1616,6 +1630,12 @@ function createVisitDashboardService(options = {}) {
         config,
         positionDocs: visitPositionDocs,
         submissionDocs,
+        holdersByPosition: positionHolders.buildActivePositionHolders({
+          assignments: activeAssignments,
+          users,
+          bodMembers,
+          positionHelpers,
+        }),
         positionHelpers,
       }),
       attendance: buildVisitDashboardAttendance({

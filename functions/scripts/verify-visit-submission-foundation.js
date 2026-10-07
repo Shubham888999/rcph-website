@@ -167,6 +167,23 @@ await rejectsWithCode(
   assert.strictEqual(adminFolders.folders.length, 42, 'Admin sees all folders');
   const presidentFolders = await first.service.getFolders('president-uid', 'clubAssembly');
   assert.strictEqual(presidentFolders.folders.length, 42, 'President sees all folders');
+  const adminHolderNames = Object.fromEntries(adminFolders.folders.map(folder => [
+    folder.positionKey,
+    folder.holders.map(holder => holder.displayName),
+  ]));
+  assert.deepStrictEqual(adminHolderNames.secretary, ['Rtr. Multi Position User', 'Rtr. Secretary User'], 'joint folder lists both holders');
+  assert.deepStrictEqual(adminHolderNames.csd, ['Rtr. Editor CSD User', 'Rtr. Main CSD User']);
+  assert.deepStrictEqual(adminHolderNames['co-csd'], ['Rtr. Co CSD User'], 'inactive co-CSD assignment is not a holder');
+  assert.deepStrictEqual(adminHolderNames.treasurer, [], 'vacant folder has no holders');
+  const multiSecretary = adminFolders.folders.find(folder => folder.positionKey === 'secretary').holders
+    .find(holder => holder.displayName === 'Rtr. Multi Position User');
+  const multiEditor = adminFolders.folders.find(folder => folder.positionKey === 'editor').holders
+    .find(holder => holder.displayName === 'Rtr. Multi Position User');
+  assert.strictEqual(multiSecretary.personKey, multiEditor.personKey, 'multi-position holder shares one personKey');
+  assert.ok(adminFolders.folders.every(folder => Array.isArray(folder.holders)
+    && folder.holders.every(holder => Object.keys(holder).sort().join(',') === 'displayName,personKey'
+      && /^[0-9a-f]{16}$/.test(holder.personKey))), 'holders expose only personKey and displayName');
+  assert.ok(!JSON.stringify(adminFolders.folders).includes('bod-multi'), 'holder uids are not exposed');
 
   const bodDashboard = await first.service.getDashboard('bod-secretary');
   assert.strictEqual(bodDashboard.access.role, 'bod', 'approved BOD with canonical positions resolves');
@@ -181,6 +198,11 @@ await rejectsWithCode(
   assert.strictEqual(multiPositionDashboard.visits[0].activeSubmissionCount, 2, 'multi-position BOD counts assigned positions only');
   const multiPositionFolders = await first.service.getFolders('bod-multi', 'clubAssembly');
   assert.deepStrictEqual(multiPositionFolders.folders.map(folder => folder.positionKey), ['secretary', 'editor']);
+  assert.deepStrictEqual(
+    multiPositionFolders.folders.find(folder => folder.positionKey === 'secretary').holders.map(holder => holder.displayName),
+    ['Rtr. Multi Position User', 'Rtr. Secretary User'],
+    'limited folder view carries the same holders'
+  );
 
   assert.deepStrictEqual(visit.resolveVisitFolderPositionKeys(['csd'], positionHelpers), ['csd'], 'main director resolves only main folder');
   assert.deepStrictEqual(visit.resolveVisitFolderPositionKeys(['co-csd'], positionHelpers), ['csd', 'co-csd'], 'co-director resolves main and co folders');
