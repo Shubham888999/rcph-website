@@ -242,6 +242,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       canPreview: true,
       previewUrl: "https://drive.google.com/file/d/private-drive-file/preview",
     }],
+    holders: [],
   }]);
   assert.equal(getVisitDocumentPanelActionLabel(normalized.documentPanels[0]), "Open folder");
   assert.equal("folderId" in normalized.documentPanels[0], false);
@@ -754,8 +755,10 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /Selected folders/);
   assert.match(pageSource, /No document folders have been selected for this visit yet\./);
   assert.match(pageSource, /No visible documents uploaded for this folder yet\./);
-  assert.match(pageSource, /Open the selected Google Drive folders shared by the club admin\./);
-  assert.match(pageSource, /Click on any tab to view the files for that Avenue\./);
+  assert.match(pageSource, /Documents are grouped by director\. Open a name to see each role&apos;s folder\./);
+  assert.match(pageSource, /groupDocumentPanelsByPerson\(panels\)/);
+  assert.match(pageSource, /getVisitDocumentBlockAriaLabel\(block\)/);
+  assert.match(pageSource, /visit-dashboard-vacant-tag/);
   assert.doesNotMatch(pageSource, /open=\{index === 0\}/);
   assert.match(pageSource, /Attendance Records/);
   assert.match(pageSource, /import AttendanceMark/);

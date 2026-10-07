@@ -657,6 +657,117 @@
   content: "•";
 }
 
+.visit-dashboard-person-section {
+  min-width: 0;
+  display: grid;
+  gap: 0;
+}
+
+.visit-dashboard-person-section + .visit-dashboard-person-section {
+  margin-top: 1.1rem;
+}
+
+.visit-dashboard-person-section-title {
+  margin: 0.85rem 0 0.2rem;
+  color: var(--internal-text-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-folder-title.visit-dashboard-person-heading {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.3rem;
+}
+
+.visit-dashboard-person-block summary:focus-visible {
+  outline: 2px solid var(--internal-accent);
+  outline-offset: 2px;
+}
+
+.visit-dashboard-role-chips {
+  min-width: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.visit-dashboard-role-chip {
+  max-width: 100%;
+  padding: 0.12rem 0.5rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: var(--internal-text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.visit-dashboard-role-chip b {
+  color: var(--internal-accent-secondary);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.visit-dashboard-role-chip > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visit-dashboard-vacant-tag {
+  padding: 0.1rem 0.5rem;
+  border: 1px dashed rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  color: var(--internal-text-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-person-roles {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.35rem 0 0.85rem;
+}
+
+.visit-dashboard-person-role {
+  min-width: 0;
+  padding-left: 0.85rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.visit-dashboard-person-role-heading {
+  margin: 0 0 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.visit-dashboard-person-role-heading small {
+  color: var(--internal-text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-person-role .visit-dashboard-empty-state--compact {
+  margin-top: 0;
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}
+
 .visit-dashboard-folder-action {
   min-height: 0;
   padding: 0;
@@ -1808,6 +1919,10 @@ a.visit-dashboard-document-action:hover {
   .visit-dashboard-folder-actions,
   .visit-dashboard-attendance > summary b {
     justify-self: start;
+  }
+
+  .visit-dashboard-role-chip > span:last-child {
+    white-space: normal;
   }
 
   .visit-dashboard-document-list dl,

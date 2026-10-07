@@ -5173,6 +5173,66 @@
   background: var(--internal-surface-raised);
 }
 
+.visit-folder-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+}
+
+.visit-folder-unassigned-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--internal-text-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.visit-folder-unassigned-toggle input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--internal-accent);
+}
+
+.visit-readiness {
+  margin-top: 0.5rem;
+  color: var(--internal-accent-soft);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.visit-folder-card__holders {
+  overflow: hidden;
+  color: var(--internal-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visit-folder-card__holders.is-vacant,
+.visit-bulk-upload__folder .is-vacant {
+  color: var(--internal-text-muted);
+  font-style: italic;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.visit-folder-card__tag {
+  margin-left: 0.15rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--internal-border);
+  border-radius: 999px;
+  color: var(--internal-text-muted);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .visit-folder-group > summary.visit-folder-group__header {
   align-items: center;
   cursor: pointer;
