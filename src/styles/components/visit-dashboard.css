@@ -657,29 +657,11 @@
   content: "•";
 }
 
-.visit-dashboard-person-section {
-  min-width: 0;
-  display: grid;
-  gap: 0;
-}
-
-.visit-dashboard-person-section + .visit-dashboard-person-section {
-  margin-top: 1.1rem;
-}
-
-.visit-dashboard-person-section-title {
-  margin: 0.85rem 0 0.2rem;
-  color: var(--internal-text-muted);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
 .visit-dashboard-folder-title.visit-dashboard-person-heading {
   flex-wrap: wrap;
   align-items: center;
-  row-gap: 0.3rem;
+  row-gap: 0.2rem;
+  column-gap: 0;
 }
 
 .visit-dashboard-person-block summary:focus-visible {
@@ -687,50 +669,49 @@
   outline-offset: 2px;
 }
 
-.visit-dashboard-role-chips {
+.visit-dashboard-person-vacant {
+  color: var(--internal-text-muted);
+  font-weight: 700;
+  font-style: italic;
+}
+
+.visit-dashboard-role-inline-list {
   min-width: 0;
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  align-items: center;
+  row-gap: 0.2rem;
 }
 
-.visit-dashboard-role-chip {
-  max-width: 100%;
-  padding: 0.12rem 0.5rem;
+.visit-dashboard-role-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 1em;
+  margin: 0 0.7rem;
+  background: var(--internal-border);
+}
+
+.visit-dashboard-role-inline {
+  min-width: 0;
   display: inline-flex;
   align-items: baseline;
-  gap: 0.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  color: var(--internal-text-muted);
-  background: rgba(255, 255, 255, 0.03);
+  gap: 0.4rem;
+}
+
+.visit-dashboard-role-code {
+  flex: 0 0 auto;
+  color: var(--internal-accent-secondary);
   font-size: 0.74rem;
   font-weight: 700;
-  line-height: 1.35;
-}
-
-.visit-dashboard-role-chip b {
-  color: var(--internal-accent-secondary);
-  font-weight: 900;
-  letter-spacing: 0.04em;
-}
-
-.visit-dashboard-role-chip > span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visit-dashboard-vacant-tag {
-  padding: 0.1rem 0.5rem;
-  border: 1px dashed rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
-  color: var(--internal-text-muted);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.visit-dashboard-role-title {
+  min-width: 0;
+  color: var(--internal-text-muted);
+  font-size: 0.86rem;
+  font-weight: 400;
 }
 
 .visit-dashboard-person-roles {
@@ -1921,8 +1902,13 @@ a.visit-dashboard-document-action:hover {
     justify-self: start;
   }
 
-  .visit-dashboard-role-chip > span:last-child {
-    white-space: normal;
+  .visit-dashboard-folder-title.visit-dashboard-person-heading > strong,
+  .visit-dashboard-person-vacant {
+    flex: 1 0 100%;
+  }
+
+  .visit-dashboard-role-inline-list > .visit-dashboard-role-divider:first-child {
+    display: none;
   }
 
   .visit-dashboard-document-list dl,

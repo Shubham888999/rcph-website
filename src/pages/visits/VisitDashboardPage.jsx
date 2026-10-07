@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAuth from "../../hooks/useAuth";
@@ -10,13 +10,12 @@ import {
   formatVisitDashboardDate,
   formatVisitDashboardFileSize,
   formatVisitDashboardMoney,
-  formatVisitDocumentBlockCounts,
+  formatVisitDocumentBlockFileCount,
   getVisitDocumentBlockAriaLabel,
   getVisitDocumentPanelActionLabel,
   getVisitAttendanceEventsForAvenue,
   getVisitDashboardErrorMessage,
   groupDocumentPanelsByPerson,
-  groupVisitDocumentBlocksBySection,
   normalizeVisitDashboardData,
   resolveVisitDocumentRoleCode,
   validVisitAttendanceTab,
@@ -292,16 +291,15 @@ function DocumentPanelBody({ panel, showEmptyFolderLink = false }) {
   );
 }
 
-function DocumentRoleChip({ panel }) {
+function DocumentRoleLabel({ panel }) {
   const folderCode = resolveVisitDocumentRoleCode(
     panel,
     formatVisitAttendanceRoleCode(panel.positionTitle || panel.positionKey || panel.avenueCode),
   );
   return (
-    <span className="visit-dashboard-role-chip" title={panel.folderLabel}>
-      {folderCode ? <b>{folderCode}</b> : null}
-      {folderCode ? <span aria-hidden="true">·</span> : null}
-      <span>{panel.positionTitle}</span>
+    <span className="visit-dashboard-role-inline" title={panel.folderLabel}>
+      {folderCode ? <span className="visit-dashboard-role-code">{folderCode}</span> : null}
+      <span className="visit-dashboard-role-title">{panel.positionTitle}</span>
     </span>
   );
 }
@@ -313,17 +311,22 @@ function DocumentBlock({ block }) {
       <summary aria-label={getVisitDocumentBlockAriaLabel(block)} title={block.title}>
         <span className="visit-dashboard-folder-title visit-dashboard-person-heading">
           {block.vacant ? (
-            <span className="visit-dashboard-vacant-tag">Vacant</span>
+            <span className="visit-dashboard-person-vacant">Vacant</span>
           ) : (
             <strong>{block.title}</strong>
           )}
-          <span className="visit-dashboard-role-chips">
-            {block.panels.map((panel) => <DocumentRoleChip panel={panel} key={panel.positionKey} />)}
+          <span className="visit-dashboard-role-inline-list">
+            {block.panels.map((panel) => (
+              <Fragment key={panel.positionKey}>
+                <span className="visit-dashboard-role-divider" aria-hidden="true" />
+                <DocumentRoleLabel panel={panel} />
+              </Fragment>
+            ))}
           </span>
         </span>
 
         <span className="visit-dashboard-folder-actions">
-          <span className="visit-dashboard-folder-count">{formatVisitDocumentBlockCounts(block)}</span>
+          <span className="visit-dashboard-folder-count">{formatVisitDocumentBlockFileCount(block)}</span>
         </span>
       </summary>
 
@@ -336,7 +339,7 @@ function DocumentBlock({ block }) {
               key={panel.positionKey}
             >
               <h3 className="visit-dashboard-person-role-heading" id={`visit-dashboard-role-${block.blockKey}-${panel.positionKey}`}>
-                <DocumentRoleChip panel={panel} />
+                <DocumentRoleLabel panel={panel} />
                 <small>{panel.fileCount} {panel.fileCount === 1 ? "file" : "files"}</small>
               </h3>
               <DocumentPanelBody panel={panel} showEmptyFolderLink />
@@ -352,7 +355,7 @@ function DocumentBlock({ block }) {
 
 function DocumentPanels({ panels }) {
   const hasPanels = panels.length > 0;
-  const sections = groupVisitDocumentBlocksBySection(groupDocumentPanelsByPerson(panels));
+  const blocks = groupDocumentPanelsByPerson(panels);
 
   return (
     <section className="visit-dashboard-documents" aria-labelledby="visit-dashboard-documents-title">
@@ -367,27 +370,13 @@ function DocumentPanels({ panels }) {
         <div className="visit-dashboard-empty-state">
           <strong>No document folders have been selected for this visit yet.</strong>
         </div>
-      ) : !sections.length ? (
+      ) : !blocks.length ? (
         <div className="visit-dashboard-empty-state">
           <strong>No role holders or documents to show for the selected folders yet.</strong>
         </div>
       ) : (
         <div className="visit-dashboard-folder-directory">
-          <p className="visit-dashboard-documents-note">
-            Documents are grouped by director. Open a name to see each role&apos;s folder.
-          </p>
-          {sections.map((section) => (
-            <section
-              className="visit-dashboard-person-section"
-              aria-labelledby={`visit-dashboard-section-${section.key}`}
-              key={section.key}
-            >
-              <h3 className="visit-dashboard-person-section-title" id={`visit-dashboard-section-${section.key}`}>
-                {section.label}
-              </h3>
-              {section.blocks.map((block) => <DocumentBlock block={block} key={block.blockKey} />)}
-            </section>
-          ))}
+          {blocks.map((block) => <DocumentBlock block={block} key={block.blockKey} />)}
         </div>
       )}
     </section>

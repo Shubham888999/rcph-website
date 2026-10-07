@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  formatVisitDocumentBlockCounts,
+  formatVisitDocumentBlockFileCount,
   getVisitDocumentBlockAriaLabel,
   groupDocumentPanelsByPerson,
   groupVisitDocumentBlocksBySection,
@@ -172,16 +172,22 @@ test("dashboard and admin folders page share one folder order", () => {
   assert.deepEqual(dashboardOrder, adminOrder, "with one block per folder the dashboard matches the admin page exactly");
 });
 
-test("count and aria labels use correct singulars", () => {
-  assert.equal(formatVisitDocumentBlockCounts({ roleCount: 1, fileCount: 1 }), "1 role · 1 file");
-  assert.equal(formatVisitDocumentBlockCounts({ roleCount: 2, fileCount: 0 }), "2 roles · 0 files");
+test("file count and aria labels use correct singulars", () => {
+  assert.equal(formatVisitDocumentBlockFileCount({ roleCount: 1, fileCount: 1 }), "1 file");
+  assert.equal(formatVisitDocumentBlockFileCount({ roleCount: 2, fileCount: 0 }), "0 files");
+  assert.equal(formatVisitDocumentBlockFileCount({ roleCount: 2, fileCount: 3 }), "3 files");
+  const yashali = groupDocumentPanelsByPerson(realWorldPanels).find((block) => block.title === "Rtr. Yashali Shirodkar");
   assert.equal(
-    getVisitDocumentBlockAriaLabel({ title: "Rtr. Tanishka Patekar", roleCount: 2, fileCount: 2 }),
-    "Rtr. Tanishka Patekar — 2 roles, 2 files",
+    getVisitDocumentBlockAriaLabel(yashali),
+    "Rtr. Yashali Shirodkar — Co-International Service Director, Public Relations Officer — 3 files",
   );
   assert.equal(
-    getVisitDocumentBlockAriaLabel({ title: "Editor", vacant: true, roleCount: 1, fileCount: 1 }),
-    "Editor (vacant) — 1 role, 1 file",
+    getVisitDocumentBlockAriaLabel({ title: "Rtr. Harshal Nikam", fileCount: 1, panels: [{ positionTitle: "Club Service Director" }] }),
+    "Rtr. Harshal Nikam — Club Service Director — 1 file",
+  );
+  assert.equal(
+    getVisitDocumentBlockAriaLabel({ title: "Editor", vacant: true, fileCount: 2, panels: [{ positionTitle: "Editor" }] }),
+    "Vacant — Editor — 2 files",
   );
 });
 

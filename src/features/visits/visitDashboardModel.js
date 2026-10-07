@@ -674,17 +674,19 @@ export function resolveVisitDocumentRoleCode(panel, roleCode) {
   return avenueCode && avenueCode.toLowerCase() !== title ? avenueCode : "";
 }
 
-export function formatVisitDocumentBlockCounts(block) {
-  const roles = Math.max(0, Number(block?.roleCount) || 0);
+export function formatVisitDocumentBlockFileCount(block) {
   const files = Math.max(0, Number(block?.fileCount) || 0);
-  return `${roles} ${roles === 1 ? "role" : "roles"} · ${files} ${files === 1 ? "file" : "files"}`;
+  return `${files} ${files === 1 ? "file" : "files"}`;
 }
 
+// "Rtr. Name — Role title, Role title — 2 files"; vacant blocks read "Vacant".
 export function getVisitDocumentBlockAriaLabel(block) {
-  const roles = Math.max(0, Number(block?.roleCount) || 0);
-  const files = Math.max(0, Number(block?.fileCount) || 0);
-  const name = block?.vacant ? `${block.title} (vacant)` : block?.title || "Role holder";
-  return `${name} — ${roles} ${roles === 1 ? "role" : "roles"}, ${files} ${files === 1 ? "file" : "files"}`;
+  const name = block?.vacant ? "Vacant" : block?.title || "Role holder";
+  const roles = (Array.isArray(block?.panels) ? block.panels : [])
+    .map((panel) => panel?.positionTitle || panel?.positionKey)
+    .filter(Boolean)
+    .join(", ");
+  return [name, roles, formatVisitDocumentBlockFileCount(block)].filter(Boolean).join(" — ");
 }
 
 function normalizeAttendanceStatus(value) {
