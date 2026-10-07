@@ -2,6 +2,12 @@ import {
   VISIT_DASHBOARD_PATHS,
   VISIT_DASHBOARD_TYPES,
 } from "../auth/accessModel.js";
+import {
+  compareVisitFolderOrder,
+  getVisitFolderGroupRank,
+  getVisitFolderPresentation,
+} from "../admin/visit/visitPresentationModel.js";
+import { joinVisitHolderNames, normalizeVisitHolders } from "./visitHolderModel.js";
 
 const VISIT_DASHBOARD_NAMES = Object.freeze({
   clubAssembly: "Club Assembly",
@@ -586,8 +592,101 @@ function normalizeDocumentPanels(value) {
       openUrl,
       primaryPresentation,
       files,
+      holders: normalizeVisitHolders(panel.holders),
     }];
   });
+}
+
+// Groups document panels into one block per role holder, computed at read
+// time. Panels follow the admin folders page order (compareVisitFolderOrder),
+// which also picks each block's primary role; a shared (2+ holder) panel forms
+// its own block so no panel is ever shown twice.
+export function groupDocumentPanelsByPerson(panels) {
+  const blocks = new Map();
+  const orderedPanels = (Array.isArray(panels) ? panels : [])
+    .filter((panel) => panel?.positionKey)
+    .map((panel, index) => ({ panel, index }))
+    .sort((left, right) => compareVisitFolderOrder(left.panel, right.panel) || left.index - right.index)
+    .map((entry) => entry.panel);
+  orderedPanels.forEach((panel, order) => {
+    const holders = Array.isArray(panel.holders) ? panel.holders : [];
+    const fileCount = Math.max(0, Number(panel.fileCount) || 0);
+    let blockKey;
+    let seed;
+    if (holders.length === 1) {
+      blockKey = `person:${holders[0].personKey}`;
+      seed = { title: holders[0].displayName, holderNames: [holders[0].displayName], vacant: false };
+    } else if (holders.length > 1) {
+      blockKey = `shared:${panel.positionKey}`;
+      seed = { title: joinVisitHolderNames(holders), holderNames: holders.map((holder) => holder.displayName), vacant: false };
+    } else if (fileCount > 0) {
+      blockKey = `vacant:${panel.positionKey}`;
+      seed = { title: panel.positionTitle || panel.positionKey, holderNames: [], vacant: true };
+    } else {
+      return;
+    }
+    const block = blocks.get(blockKey) || { blockKey, ...seed, order, entries: [] };
+    block.entries.push({ order, panel });
+    blocks.set(blockKey, block);
+  });
+
+  return [...blocks.values()]
+    .map((block) => {
+      const ordered = block.entries.sort((left, right) => left.order - right.order).map((entry) => entry.panel);
+      const section = getVisitFolderPresentation(ordered[0]);
+      return {
+        order: block.entries[0].order,
+        block: {
+          blockKey: block.blockKey,
+          title: block.title,
+          holderNames: block.holderNames,
+          vacant: block.vacant,
+          panels: ordered,
+          roleCount: ordered.length,
+          fileCount: ordered.reduce((sum, panel) => sum + Math.max(0, Number(panel.fileCount) || 0), 0),
+          sectionKey: section.groupKey,
+          sectionLabel: section.groupLabel,
+        },
+      };
+    })
+    .sort((left, right) => left.order - right.order)
+    .map((entry) => entry.block);
+}
+
+// Section headings in the fixed admin group order; blocks keep their order.
+export function groupVisitDocumentBlocksBySection(blocks) {
+  const sections = new Map();
+  (Array.isArray(blocks) ? blocks : []).forEach((block) => {
+    const section = sections.get(block.sectionKey) || { key: block.sectionKey, label: block.sectionLabel, blocks: [] };
+    section.blocks.push(block);
+    sections.set(block.sectionKey, section);
+  });
+  return [...sections.values()]
+    .sort((left, right) => getVisitFolderGroupRank(left.key) - getVisitFolderGroupRank(right.key));
+}
+
+// Short code for a role chip; skipped when it would only repeat the title.
+export function resolveVisitDocumentRoleCode(panel, roleCode) {
+  const title = text(panel?.positionTitle, 180).toLowerCase();
+  const code = text(roleCode, 40);
+  if (code && code.toLowerCase() !== title) return code;
+  const avenueCode = text(panel?.avenueCode, 40);
+  return avenueCode && avenueCode.toLowerCase() !== title ? avenueCode : "";
+}
+
+export function formatVisitDocumentBlockFileCount(block) {
+  const files = Math.max(0, Number(block?.fileCount) || 0);
+  return `${files} ${files === 1 ? "file" : "files"}`;
+}
+
+// "Rtr. Name — Role title, Role title — 2 files"; vacant blocks read "Vacant".
+export function getVisitDocumentBlockAriaLabel(block) {
+  const name = block?.vacant ? "Vacant" : block?.title || "Role holder";
+  const roles = (Array.isArray(block?.panels) ? block.panels : [])
+    .map((panel) => panel?.positionTitle || panel?.positionKey)
+    .filter(Boolean)
+    .join(", ");
+  return [name, roles, formatVisitDocumentBlockFileCount(block)].filter(Boolean).join(" — ");
 }
 
 function normalizeAttendanceStatus(value) {

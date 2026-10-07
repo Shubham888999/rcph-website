@@ -1,4 +1,5 @@
 import { POSITION_CATALOG } from "../shared/positionCatalog.js";
+import { joinVisitHolderNames } from "../../visits/visitHolderModel.js";
 
 const POSITION_BY_KEY = new Map(POSITION_CATALOG.map((position) => [position.key, position]));
 
@@ -91,6 +92,23 @@ export function getVisitFolderPresentation(folder = {}) {
   };
 }
 
+export function getVisitFolderGroupRank(groupKey) {
+  return Object.values(GROUP_DETAILS).find((group) => group.key === groupKey)?.rank ?? GROUP_DETAILS.other.rank;
+}
+
+// The one folder order shared by the admin folders page and the district
+// dashboard: group rank (Core Board, Avenue Directors, Directors and Officers,
+// Co-Positions), then AVENUE_DIRECTOR_ORDER / catalog sortOrder, then title.
+export function compareVisitFolderOrder(left = {}, right = {}) {
+  const a = left.presentation || getVisitFolderPresentation(left);
+  const b = right.presentation || getVisitFolderPresentation(right);
+  return a.groupRank - b.groupRank
+    || a.groupLabel.localeCompare(b.groupLabel)
+    || a.sortOrder - b.sortOrder
+    || a.title.localeCompare(b.title)
+    || a.positionKey.localeCompare(b.positionKey);
+}
+
 export function groupVisitFolders(folders = []) {
   const groups = new Map();
   for (const folder of Array.isArray(folders) ? folders : []) {
@@ -108,10 +126,7 @@ export function groupVisitFolders(folders = []) {
   return [...groups.values()]
     .map((group) => ({
       ...group,
-      folders: group.folders.sort((left, right) => (
-        left.presentation.sortOrder - right.presentation.sortOrder
-        || left.presentation.title.localeCompare(right.presentation.title)
-      )),
+      folders: group.folders.sort(compareVisitFolderOrder),
     }))
     .sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label));
 }
@@ -197,4 +212,71 @@ export function getVisitFileKind(value = {}) {
   if (mimeType.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/.test(fileName)) return { key: "image", label: "Image", code: "IMG" };
   if (mimeType.startsWith("text/") || fileName.endsWith(".txt")) return { key: "text", label: "Text", code: "TXT" };
   return { key: "other", label: "Drive file", code: "DOC" };
+}
+
+export const VISIT_SHOW_UNASSIGNED_STORAGE_KEY = "rcph.visitFolders.showUnassigned";
+
+function folderHolders(folder = {}) {
+  return Array.isArray(folder.holders) ? folder.holders.filter((holder) => clean(holder?.displayName, 120)) : [];
+}
+
+function folderFileCount(folder = {}) {
+  return Math.max(0, Number(folder.activeFileCount) || 0);
+}
+
+export function isVisitFolderAssigned(folder = {}) {
+  return folderHolders(folder).length > 0;
+}
+
+export function getVisitFolderHolderLabel(folder = {}) {
+  const holders = folderHolders(folder);
+  return {
+    vacant: holders.length === 0,
+    label: holders.length ? joinVisitHolderNames(holders) : "Vacant",
+    showNoFilesTag: holders.length > 0 && folderFileCount(folder) === 0,
+  };
+}
+
+export function filterVisitFoldersByAssignment(folders = [], showUnassigned = false) {
+  const list = Array.isArray(folders) ? folders : [];
+  return showUnassigned ? list : list.filter(isVisitFolderAssigned);
+}
+
+export function summarizeUnassignedVisitFolders(folders = []) {
+  const vacant = (Array.isArray(folders) ? folders : []).filter((folder) => !isVisitFolderAssigned(folder));
+  return {
+    total: vacant.length,
+    withFiles: vacant.filter((folder) => folderFileCount(folder) > 0).length,
+  };
+}
+
+export function getShowUnassignedLabel(folders = []) {
+  const summary = summarizeUnassignedVisitFolders(folders);
+  return `Show unassigned folders (${summary.total})${summary.withFiles ? ` · ${summary.withFiles} with files` : ""}`;
+}
+
+export function getVisitReadiness(folders = []) {
+  const assigned = (Array.isArray(folders) ? folders : []).filter(isVisitFolderAssigned);
+  const withDocuments = assigned.filter((folder) => folderFileCount(folder) > 0).length;
+  return {
+    assigned: assigned.length,
+    withDocuments,
+    label: `${withDocuments} of ${assigned.length} active role${assigned.length === 1 ? "" : "s"} ${assigned.length === 1 ? "has" : "have"} documents`,
+  };
+}
+
+export function readShowUnassignedPreference(storage) {
+  try {
+    return storage?.getItem(VISIT_SHOW_UNASSIGNED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeShowUnassignedPreference(storage, value) {
+  try {
+    storage?.setItem(VISIT_SHOW_UNASSIGNED_STORAGE_KEY, value ? "1" : "0");
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data); the toggle still works for this view.
+  }
 }

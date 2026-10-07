@@ -657,6 +657,98 @@
   content: "•";
 }
 
+.visit-dashboard-folder-title.visit-dashboard-person-heading {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.2rem;
+  column-gap: 0;
+}
+
+.visit-dashboard-person-block summary:focus-visible {
+  outline: 2px solid var(--internal-accent);
+  outline-offset: 2px;
+}
+
+.visit-dashboard-person-vacant {
+  color: var(--internal-text-muted);
+  font-weight: 700;
+  font-style: italic;
+}
+
+.visit-dashboard-role-inline-list {
+  min-width: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.2rem;
+}
+
+.visit-dashboard-role-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 1em;
+  margin: 0 0.7rem;
+  background: var(--internal-border);
+}
+
+.visit-dashboard-role-inline {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.visit-dashboard-role-code {
+  flex: 0 0 auto;
+  color: var(--internal-accent-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-role-title {
+  min-width: 0;
+  color: var(--internal-text-muted);
+  font-size: 0.86rem;
+  font-weight: 400;
+}
+
+.visit-dashboard-person-roles {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.35rem 0 0.85rem;
+}
+
+.visit-dashboard-person-role {
+  min-width: 0;
+  padding-left: 0.85rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.visit-dashboard-person-role-heading {
+  margin: 0 0 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.visit-dashboard-person-role-heading small {
+  color: var(--internal-text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.visit-dashboard-person-role .visit-dashboard-empty-state--compact {
+  margin-top: 0;
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}
+
 .visit-dashboard-folder-action {
   min-height: 0;
   padding: 0;
@@ -1808,6 +1900,15 @@ a.visit-dashboard-document-action:hover {
   .visit-dashboard-folder-actions,
   .visit-dashboard-attendance > summary b {
     justify-self: start;
+  }
+
+  .visit-dashboard-folder-title.visit-dashboard-person-heading > strong,
+  .visit-dashboard-person-vacant {
+    flex: 1 0 100%;
+  }
+
+  .visit-dashboard-role-inline-list > .visit-dashboard-role-divider:first-child {
+    display: none;
   }
 
   .visit-dashboard-document-list dl,

@@ -242,6 +242,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       canPreview: true,
       previewUrl: "https://drive.google.com/file/d/private-drive-file/preview",
     }],
+    holders: [],
   }]);
   assert.equal(getVisitDocumentPanelActionLabel(normalized.documentPanels[0]), "Open folder");
   assert.equal("folderId" in normalized.documentPanels[0], false);
@@ -754,8 +755,18 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /Selected folders/);
   assert.match(pageSource, /No document folders have been selected for this visit yet\./);
   assert.match(pageSource, /No visible documents uploaded for this folder yet\./);
-  assert.match(pageSource, /Open the selected Google Drive folders shared by the club admin\./);
-  assert.match(pageSource, /Click on any tab to view the files for that Avenue\./);
+  assert.doesNotMatch(pageSource, /Documents are grouped by director/);
+  assert.doesNotMatch(pageSource, /visit-dashboard-documents-note/);
+  assert.match(pageSource, /groupDocumentPanelsByPerson\(panels\)/);
+  assert.doesNotMatch(pageSource, /groupVisitDocumentBlocksBySection|section\.label|visit-dashboard-person-section/);
+  assert.match(pageSource, /getVisitDocumentBlockAriaLabel\(block\)/);
+  assert.match(pageSource, /formatVisitDocumentBlockFileCount\(block\)/);
+  assert.match(pageSource, /visit-dashboard-person-vacant/);
+  assert.match(pageSource, /visit-dashboard-role-divider" aria-hidden="true"/);
+  assert.match(pageSource, /visit-dashboard-role-code/);
+  assert.match(pageSource, /visit-dashboard-role-title/);
+  assert.doesNotMatch(pageSource, /visit-dashboard-role-chip|visit-dashboard-vacant-tag/);
+  assert.doesNotMatch(visitCssSource, /visit-dashboard-role-chip|visit-dashboard-vacant-tag|visit-dashboard-person-section/);
   assert.doesNotMatch(pageSource, /open=\{index === 0\}/);
   assert.match(pageSource, /Attendance Records/);
   assert.match(pageSource, /import AttendanceMark/);
