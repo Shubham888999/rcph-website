@@ -5,18 +5,24 @@ import useAuth from "../../hooks/useAuth";
 import {
   VISIT_ATTENDANCE_TABS,
   attendanceStatusLabel,
+  buildGlanceStats,
+  buildTreasuryLedger,
+  finesHasNotes,
   formatVisitAttendanceName,
   formatVisitAttendanceRoleCode,
   formatVisitDashboardDate,
+  formatVisitDashboardDateTime,
   formatVisitDashboardFileSize,
   formatVisitDashboardMoney,
   formatVisitDocumentBlockFileCount,
+  formatVisitLedgerAmount,
   getVisitDocumentBlockAriaLabel,
   getVisitDocumentPanelActionLabel,
   getVisitAttendanceEventsForAvenue,
   getVisitDashboardErrorMessage,
   groupDocumentPanelsByPerson,
   normalizeVisitDashboardData,
+  parseOfficialDisplayName,
   resolveVisitDocumentRoleCode,
   validVisitAttendanceTab,
   visitTypeFromSlug,
@@ -61,51 +67,152 @@ function VisitDashboardError({ title, onRetry }) {
   );
 }
 
-function StatRail({ stats }) {
-const memberValues = [
-  { label: "Total events", value: stats.totalEvents },
-  { label: "Total members", value: stats.totalMembers },
-  { label: "Male", value: stats.maleMembers },
-  { label: "Female", value: stats.femaleMembers },
-  { label: "Other", value: stats.otherGenderMembers },
-  { label: "Male/Female ratio", value: stats.maleFemaleRatio },
-];
+const SECTION_LINKS = Object.freeze([
+  { id: "visit-dashboard-overview", label: "Overview" },
+  { id: "visit-dashboard-avenues", label: "Avenues" },
+  { id: "visit-dashboard-documents", label: "BOD documents" },
+  { id: "visit-dashboard-attendance", label: "Attendance" },
+  { id: "visit-dashboard-letterhead", label: "Letterhead exchanges", letterhead: true },
+  { id: "visit-dashboard-fines", label: "Fines" },
+  { id: "visit-dashboard-treasury", label: "Treasury ledger" },
+]);
 
-  const financeValues = [
-    { label: "Income", value: formatVisitDashboardMoney(stats.treasuryIncome), tone: "income" },
-    { label: "Expense", value: formatVisitDashboardMoney(stats.treasuryExpense), tone: "expense" },
-    { label: "Net", value: formatVisitDashboardMoney(stats.treasuryNet), tone: stats.treasuryNet < 0 ? "expense" : "income" },
-  ];
+function prefersReducedMotion() {
+  try {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  } catch {
+    return false;
+  }
+}
 
+function openAndScrollToSection(id) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  if (target.tagName === "DETAILS") target.open = true;
+  target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+  const focusTarget = target.tagName === "DETAILS" ? target.querySelector("summary") : target;
+  focusTarget?.focus?.({ preventScroll: true });
+}
+
+function VisitingPanel({ names }) {
+  if (!names.length) return null;
   return (
-    <section className="visit-dashboard-summary" aria-label="Visit dashboard summary">
-      <dl className="visit-dashboard-stat-rail visit-dashboard-stat-rail--overview">
-        {memberValues.map((item) => (
-          <div key={item.label}>
-            <dt>{item.label}</dt>
-            <dd>{item.value}</dd>
-          </div>
-        ))}
-      </dl>
+    <ul className="visit-dashboard-visiting-panel" aria-label="Visiting panel">
+      {names.map((line) => {
+        const official = parseOfficialDisplayName(line);
+        return (
+          <li key={line}>
+            <strong>{official.name}</strong>
+            {official.role ? <span>{official.role}</span> : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
-      <section className="visit-dashboard-finance-strip" aria-labelledby="visit-dashboard-financial-title">
-        <div className="visit-dashboard-finance-strip__heading">
-          <p className="visit-dashboard-eyebrow">Treasury</p>
-          <h2 id="visit-dashboard-financial-title">Financial summary</h2>
+function SectionLinks({ showLetterhead }) {
+  return (
+    <nav className="visit-dashboard-section-links" aria-label="Dashboard sections">
+      {SECTION_LINKS.filter((link) => showLetterhead || !link.letterhead).map((link) => (
+        <a
+          href={`#${link.id}`}
+          key={link.id}
+          onClick={(event) => {
+            event.preventDefault();
+            openAndScrollToSection(link.id);
+          }}
+        >
+          {link.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+function GlanceBar({ segments, label }) {
+  return (
+    <div className="visit-dashboard-glance-bar" role="img" aria-label={label}>
+      {segments.map((segment) => (
+        <span className={`is-${segment.key}`} key={segment.key} style={{ width: `${segment.share}%` }} />
+      ))}
+    </div>
+  );
+}
+
+function ClubAtAGlance({ glance }) {
+  const { members, events, attendance, treasury } = glance;
+  return (
+    <section
+      className="visit-dashboard-glance"
+      id="visit-dashboard-overview"
+      tabIndex={-1}
+      aria-labelledby="visit-dashboard-glance-title"
+    >
+      <header className="visit-dashboard-section-heading">
+        <div>
+          <p className="visit-dashboard-eyebrow">Overview</p>
+          <h2 id="visit-dashboard-glance-title">Club at a glance</h2>
         </div>
+      </header>
 
-        <dl className="visit-dashboard-finance-line">
-          {financeValues.map((item) => (
-            <div key={item.label} className={`is-${item.tone}`}>
-              <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
+      <div className="visit-dashboard-glance-grid">
+        <article className="visit-dashboard-glance-tile">
+          <h3>Members</h3>
+          <p className="visit-dashboard-glance-value">{members.total}</p>
+          <GlanceBar
+            segments={members.segments}
+            label={`Members by gender: ${members.segments.map((segment) => `${segment.value} ${segment.label.toLowerCase()}`).join(", ")}`}
+          />
+          <p className="visit-dashboard-glance-line">{members.line}</p>
+        </article>
+
+        <article className="visit-dashboard-glance-tile">
+          <h3>Events held</h3>
+          <p className="visit-dashboard-glance-value">{events.total}</p>
+          {events.bars.length ? (
+            <div
+              className="visit-dashboard-glance-columns"
+              role="img"
+              aria-label={`Events by avenue: ${events.bars.map((bar) => `${bar.avenueCode} ${bar.count}`).join(", ")}`}
+            >
+              {events.bars.map((bar) => (
+                <span key={bar.avenueCode} title={`${bar.avenueName || bar.avenueCode}: ${bar.count}`}>
+                  <i style={{ height: `${Math.max(bar.share, 8)}%` }} />
+                </span>
+              ))}
             </div>
-          ))}
-        </dl>
-      </section>
+          ) : null}
+          <p className="visit-dashboard-glance-line">{events.line}</p>
+        </article>
+
+        <article className="visit-dashboard-glance-tile">
+          <h3>Club attendance</h3>
+          <p className="visit-dashboard-glance-value">{attendance.label}</p>
+          {attendance.hasData ? (
+            <div className="visit-dashboard-glance-bar" role="img" aria-label={`Average club attendance ${attendance.label}`}>
+              <span className="is-progress" style={{ width: `${attendance.rate}%` }} />
+            </div>
+          ) : null}
+          <p className="visit-dashboard-glance-line">{attendance.line}</p>
+        </article>
+
+        <article className="visit-dashboard-glance-tile">
+          <h3>Treasury balance</h3>
+          <p className={`visit-dashboard-glance-value ${treasury.negative ? "is-negative" : "is-positive"}`}>
+            {formatVisitDashboardMoney(treasury.net)}
+          </p>
+          <GlanceBar
+            segments={treasury.segments}
+            label={`Income ${formatVisitDashboardMoney(treasury.income)}, expense ${formatVisitDashboardMoney(treasury.expense)}`}
+          />
+          <p className="visit-dashboard-glance-line">{treasury.line}</p>
+        </article>
+      </div>
     </section>
   );
 }
+
 function AvenueCounts({ rows, attendance }) {
   const activeAvenueRows = rows
     .filter((row) => (
@@ -117,9 +224,15 @@ function AvenueCounts({ rows, attendance }) {
       events: getVisitAttendanceEventsForAvenue(attendance, row),
     }))
     .filter((row) => row.events.length > 0);
+  const maxEventCount = Math.max(1, ...activeAvenueRows.map((row) => row.events.length));
 
   return (
-    <section className="visit-dashboard-avenue-section" aria-labelledby="visit-dashboard-avenues-title">
+    <section
+      className="visit-dashboard-avenue-section"
+      id="visit-dashboard-avenues"
+      tabIndex={-1}
+      aria-labelledby="visit-dashboard-avenues-title"
+    >
       <header>
         <p className="visit-dashboard-eyebrow">Club activity</p>
         <h2 id="visit-dashboard-avenues-title">Avenue-wise events</h2>
@@ -138,6 +251,10 @@ function AvenueCounts({ rows, attendance }) {
                     <span className="visit-dashboard-avenue-chip__label">
                       <strong>{row.avenueName}</strong>
                       <small>{row.avenueCode}</small>
+                    </span>
+
+                    <span className="visit-dashboard-avenue-bar" aria-hidden="true">
+                      <span style={{ width: `${Math.round((eventCount / maxEventCount) * 100)}%` }} />
                     </span>
 
                     <span className="visit-dashboard-avenue-count-wrap">
@@ -358,7 +475,12 @@ function DocumentPanels({ panels }) {
   const blocks = groupDocumentPanelsByPerson(panels);
 
   return (
-    <section className="visit-dashboard-documents" aria-labelledby="visit-dashboard-documents-title">
+    <section
+      className="visit-dashboard-documents"
+      id="visit-dashboard-documents"
+      tabIndex={-1}
+      aria-labelledby="visit-dashboard-documents-title"
+    >
       <header className="visit-dashboard-section-heading">
         <div>
           <p className="visit-dashboard-eyebrow">Selected folders</p>
@@ -504,7 +626,7 @@ function AttendanceRecords({ attendance }) {
   const currentTab = validVisitAttendanceTab(activeTab);
 
   return (
-    <details className="visit-dashboard-attendance" aria-labelledby="visit-dashboard-attendance-title">
+    <details className="visit-dashboard-attendance" id="visit-dashboard-attendance" aria-labelledby="visit-dashboard-attendance-title">
       <summary>
         <span>
           <p className="visit-dashboard-eyebrow">Read-only</p>
@@ -580,60 +702,120 @@ function fineStatusLabel(status) {
   return labels[status] || labels.unknown;
 }
 
-function FinesRecords({ fines }) {
-  const summaryValues = [
-    { label: "Total fines", value: fines.summary.totalFines },
-    { label: "Paid", value: fines.summary.paidFines, tone: "paid" },
-    { label: "Pending / Unpaid", value: fines.summary.pendingFines, tone: "pending" },
-    { label: "Total amount", value: formatVisitDashboardMoney(fines.summary.totalAmount), money: true },
-    { label: "Collected amount", value: formatVisitDashboardMoney(fines.summary.collectedAmount), tone: "paid", money: true },
-    { label: "Pending amount", value: formatVisitDashboardMoney(fines.summary.pendingAmount), tone: "pending", money: true },
-  ];
+function rupees(value) {
+  return `₹${formatVisitLedgerAmount(value)}`;
+}
 
+function RecordsDisclosure({ id, className, titleId, title, meta, children }) {
+  const [open, setOpen] = useState(false);
   return (
-    <section className="visit-dashboard-fines" aria-labelledby="visit-dashboard-fines-title">
-      <header className="visit-dashboard-section-heading">
-        <div>
-          <p className="visit-dashboard-eyebrow">Read-only</p>
-          <h2 id="visit-dashboard-fines-title">Fines Records</h2>
-        </div>
-      </header>
+    <details
+      className={`visit-dashboard-records ${className}`}
+      id={id}
+      aria-labelledby={titleId}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        <span className="visit-dashboard-records-chevron" aria-hidden="true" />
+        <h2 id={titleId}>{title}</h2>
+        <span className="visit-dashboard-records-meta">{meta}</span>
+        <span className="visit-dashboard-records-toggle">{open ? "Hide records" : "Show records"}</span>
+      </summary>
+      {children}
+    </details>
+  );
+}
 
-      <dl className="visit-dashboard-fines-summary">
-        {summaryValues.map((item) => {
-          const className = [
-            item.tone ? `is-${item.tone}` : "",
-            item.money ? "is-money" : "",
-          ].filter(Boolean).join(" ");
-          return (
-            <div className={className} key={item.label}>
-              <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
-            </div>
-          );
-        })}
-      </dl>
-
-      {fines.rows.length ? (
-        <div className="visit-dashboard-fines-table-wrap">
-          <table className="visit-dashboard-fines-table">
-            <caption>Read-only fines register</caption>
-            <colgroup>
-              <col className="visit-dashboard-fines-col-member" />
-              <col className="visit-dashboard-fines-col-reason" />
-              <col className="visit-dashboard-fines-col-amount" />
-              <col className="visit-dashboard-fines-col-status" />
-              <col className="visit-dashboard-fines-col-date" />
-              <col className="visit-dashboard-fines-col-notes" />
-            </colgroup>
+function LetterheadExchanges({ letterhead }) {
+  const { rows, summary } = letterhead;
+  return (
+    <RecordsDisclosure
+      id="visit-dashboard-letterhead"
+      className="visit-dashboard-letterhead"
+      titleId="visit-dashboard-letterhead-title"
+      title="Letterhead exchanges"
+      meta={(
+        <>
+          <span>{summary.count} {summary.count === 1 ? "exchange" : "exchanges"}</span>
+          <span>{summary.clubCount} {summary.clubCount === 1 ? "club" : "clubs"}</span>
+        </>
+      )}
+    >
+      {rows.length ? (
+        <div className="visit-dashboard-ledger-wrap" tabIndex={0} aria-label="Letterhead exchanges table">
+          <table className="visit-dashboard-ledger-table visit-dashboard-letterhead-table">
+            <caption>Read-only letterhead exchanges</caption>
             <thead>
               <tr>
-                <th scope="col">Member</th>
-                <th scope="col">Reason / Title</th>
-                <th scope="col">Amount</th>
-                <th scope="col">Status</th>
                 <th scope="col">Date</th>
-                <th scope="col">Notes</th>
+                <th scope="col">Exchanged with</th>
+                <th scope="col">RCPH representatives</th>
+                <th scope="col">Event</th>
+                <th scope="col" className="is-number">Photos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const clubs = [...new Set(row.externalParticipants.map((participant) => participant.clubName).filter(Boolean))];
+                return (
+                  <tr key={row.exchangeId}>
+                    <td className="is-date">{formatVisitDashboardDate(row.exchangeDate)}</td>
+                    <th scope="row">
+                      <strong>{clubs.join(", ") || "—"}</strong>
+                      {row.externalParticipants.map((participant, index) => (
+                        <small key={`${participant.rotaractorName}-${index}`}>
+                          {[formatVisitAttendanceName(participant.rotaractorName), participant.position].filter(Boolean).join(" · ")}
+                        </small>
+                      ))}
+                    </th>
+                    <td>{row.rcphRepresentatives.join(", ") || "—"}</td>
+                    <td>{row.associatedEvent?.name || "—"}</td>
+                    <td className="is-number">{row.imageCount}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="visit-dashboard-empty-state">
+          <strong>No letterhead exchanges recorded yet.</strong>
+        </div>
+      )}
+    </RecordsDisclosure>
+  );
+}
+
+function FinesRecords({ fines }) {
+  const showNotes = finesHasNotes(fines.rows);
+  const columnCount = showNotes ? 7 : 6;
+  return (
+    <RecordsDisclosure
+      id="visit-dashboard-fines"
+      className="visit-dashboard-fines"
+      titleId="visit-dashboard-fines-title"
+      title="Fines"
+      meta={(
+        <>
+          <span>{fines.summary.totalFines} {fines.summary.totalFines === 1 ? "fine" : "fines"}</span>
+          <span className="is-collected">{formatVisitDashboardMoney(fines.summary.collectedAmount)} collected</span>
+          <span>{formatVisitDashboardMoney(fines.summary.pendingAmount)} pending</span>
+        </>
+      )}
+    >
+      {fines.rows.length ? (
+        <div className="visit-dashboard-ledger-wrap" tabIndex={0} aria-label="Fines table">
+          <table className="visit-dashboard-ledger-table visit-dashboard-fines-table">
+            <caption>Read-only fines register</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Member</th>
+                <th scope="col">Reason</th>
+                <th scope="col">Event</th>
+                <th scope="col" className="is-number">Amount</th>
+                <th scope="col">Status</th>
+                {showNotes ? <th scope="col">Notes</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -643,27 +825,24 @@ function FinesRecords({ fines }) {
                   : "unknown";
                 return (
                   <tr key={fine.fineKey}>
+                    <td className="is-date">{formatVisitDashboardDate(fine.date) || fine.date}</td>
                     <th scope="row">{formatVisitAttendanceName(fine.memberName)}</th>
-                    <td>
-                      <strong>{fine.reason}</strong>
-                      {fine.title && fine.title !== fine.reason ? <small>{fine.title}</small> : null}
-                    </td>
-                    <td className="visit-dashboard-fines-amount">
-                      {formatVisitDashboardMoney(fine.amount)}
-                    </td>
-                    <td>
-                      <span className={`visit-dashboard-fines-status is-${statusClass}`}>
-                        {fineStatusLabel(statusClass)}
-                      </span>
-                    </td>
-                    <td>{formatVisitDashboardDate(fine.date) || fine.date}</td>
-                    <td className="visit-dashboard-fines-notes">
-                      {fine.notes ? fine.notes : <span className="visit-dashboard-fines-empty" aria-label="No notes available">&mdash;</span>}
-                    </td>
+                    <td>{fine.reason}</td>
+                    <td>{fine.title && fine.title !== fine.reason ? fine.title : "—"}</td>
+                    <td className="is-number">{rupees(fine.amount)}</td>
+                    <td className={`visit-dashboard-fines-status is-${statusClass}`}>{fineStatusLabel(statusClass)}</td>
+                    {showNotes ? <td className="visit-dashboard-fines-notes">{fine.notes || "—"}</td> : null}
                   </tr>
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row" colSpan={4}>Total · {fines.summary.totalFines} {fines.summary.totalFines === 1 ? "fine" : "fines"}</th>
+                <td className="is-number">{rupees(fines.summary.totalAmount)}</td>
+                <td colSpan={columnCount - 5} />
+              </tr>
+            </tfoot>
           </table>
         </div>
       ) : (
@@ -671,98 +850,83 @@ function FinesRecords({ fines }) {
           <strong>No fines have been recorded yet.</strong>
         </div>
       )}
-    </section>
+    </RecordsDisclosure>
   );
 }
 
-function TreasuryRecords({ treasury }) {
-  const summaryValues = [
-    { label: "Income", value: formatVisitDashboardMoney(treasury.summary.income), tone: "income", money: true },
-    { label: "Expense", value: formatVisitDashboardMoney(treasury.summary.expense), tone: "expense", money: true },
-    { label: "Net", value: formatVisitDashboardMoney(treasury.summary.net), tone: treasury.summary.net < 0 ? "expense" : "income", money: true },
-    { label: "Transactions", value: treasury.summary.transactionCount },
-  ];
-
+function TreasuryLedger({ treasury }) {
+  const ledger = buildTreasuryLedger(treasury.rows);
   return (
-    <section className="visit-dashboard-treasury" aria-labelledby="visit-dashboard-treasury-title">
+    <section
+      className="visit-dashboard-treasury"
+      id="visit-dashboard-treasury"
+      tabIndex={-1}
+      aria-labelledby="visit-dashboard-treasury-title"
+    >
       <header className="visit-dashboard-section-heading">
         <div>
           <p className="visit-dashboard-eyebrow">Read-only</p>
-          <h2 id="visit-dashboard-treasury-title">Treasury Records</h2>
+          <h2 id="visit-dashboard-treasury-title">Treasury ledger</h2>
         </div>
+        <p>Oldest first · running balance · {ledger.entryCount} {ledger.entryCount === 1 ? "entry" : "entries"}</p>
       </header>
 
-      <dl className="visit-dashboard-treasury-summary">
-        {summaryValues.map((item) => {
-          const className = [
-            item.tone ? `is-${item.tone}` : "",
-            item.money ? "is-money" : "",
-          ].filter(Boolean).join(" ");
-          return (
-            <div className={className} key={item.label}>
-              <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
-            </div>
-          );
-        })}
-      </dl>
-
-      {treasury.rows.length ? (
-        <div className="visit-dashboard-treasury-table-wrap">
-          <table className="visit-dashboard-treasury-table">
-            <caption>Read-only treasury transaction register</caption>
-            <colgroup>
-              <col className="visit-dashboard-treasury-col-date" />
-              <col className="visit-dashboard-treasury-col-title" />
-              <col className="visit-dashboard-treasury-col-type" />
-              <col className="visit-dashboard-treasury-col-amount" />
-              <col className="visit-dashboard-treasury-col-bill" />
-            </colgroup>
+      {ledger.entryCount ? (
+        <div className="visit-dashboard-ledger-wrap visit-dashboard-ledger-wrap--tall" tabIndex={0} aria-label="Treasury ledger table">
+          <table className="visit-dashboard-ledger-table visit-dashboard-treasury-table">
+            <caption>Read-only treasury ledger with running balance</caption>
             <thead>
               <tr>
                 <th scope="col">Date</th>
-                <th scope="col">Title / Description</th>
-                <th scope="col">Type</th>
-                <th scope="col">Amount</th>
+                <th scope="col">Particulars</th>
                 <th scope="col">Bill</th>
+                <th scope="col" className="is-number">Receipts (₹)</th>
+                <th scope="col" className="is-number">Payments (₹)</th>
+                <th scope="col" className="is-number">Balance (₹)</th>
               </tr>
             </thead>
-            <tbody>
-              {treasury.rows.map((row) => {
-                const typeClass = ["income", "expense", "unknown"].includes(row.type) ? row.type : "unknown";
-                return (
+            {ledger.groups.map((group) => (
+              <tbody key={group.monthKey}>
+                <tr className="visit-dashboard-ledger-month">
+                  <th scope="colgroup" colSpan={6}>{group.label}</th>
+                </tr>
+                {group.rows.map((row) => (
                   <tr key={row.transactionId}>
-                    <td>{formatVisitDashboardDate(row.date) || row.date}</td>
-                    <th scope="row">
+                    <td className="is-date">{formatVisitDashboardDate(row.date) || row.date}</td>
+                    <th scope="row" className="visit-dashboard-ledger-particulars">
                       <strong>{row.title}</strong>
-                      {row.description ? <small>{row.description}</small> : null}
+                      {row.description && row.description !== row.title ? <span>{row.description}</span> : null}
                     </th>
-                    <td>
-                      <span className={`visit-dashboard-treasury-type is-${typeClass}`}>
-                        {typeClass === "income" ? "Income" : typeClass === "expense" ? "Expense" : "Unknown"}
-                      </span>
-                    </td>
-                    <td className={`visit-dashboard-treasury-amount is-${typeClass}`}>
-                      {formatVisitDashboardMoney(row.amount)}
-                    </td>
                     <td className="visit-dashboard-bill-cell">
                       {row.billCanOpen && row.billOpenUrl ? (
                         <a
                           className="visit-dashboard-bill-link"
                           href={row.billOpenUrl}
+                          aria-label={`View bill for ${row.title}`}
                           rel="noopener noreferrer"
                           target="_blank"
                         >
-                          View bill
+                          View
                         </a>
                       ) : (
                         <span className="visit-dashboard-bill-empty" aria-label="No bill available">&mdash;</span>
                       )}
                     </td>
+                    <td className="is-number is-receipt">{row.receipt === null ? "" : formatVisitLedgerAmount(row.receipt)}</td>
+                    <td className="is-number is-payment">{row.payment === null ? "" : formatVisitLedgerAmount(row.payment)}</td>
+                    <td className={`is-number is-balance${row.balance < 0 ? " is-negative" : ""}`}>{formatVisitLedgerAmount(row.balance)}</td>
                   </tr>
-                );
-              })}
-            </tbody>
+                ))}
+              </tbody>
+            ))}
+            <tfoot>
+              <tr>
+                <th scope="row" colSpan={3}>Totals · closing balance</th>
+                <td className="is-number is-receipt">{formatVisitLedgerAmount(ledger.totals.receipts)}</td>
+                <td className="is-number is-payment">{formatVisitLedgerAmount(ledger.totals.payments)}</td>
+                <td className={`is-number is-balance${ledger.totals.closing < 0 ? " is-negative" : ""}`}>{formatVisitLedgerAmount(ledger.totals.closing)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       ) : (
@@ -813,10 +977,9 @@ export default function VisitDashboardPage() {
   }, [loadDashboard]);
 
   const data = loadState.data || fallbackData;
-  const { visit, stats, documentPanels, attendance, fines, treasury } = data;
-  const officialNames = visit.officialDisplayNames.length
-    ? visit.officialDisplayNames
-    : ["District Officials"];
+  const { visit, stats, documentPanels, attendance, fines, treasury, letterhead } = data;
+  const glance = buildGlanceStats({ stats, attendance, treasury });
+  const dataAsOf = formatVisitDashboardDateTime(data.generatedAt);
 
   if (loadState.status === LOAD_STATUS.loading && !loadState.data) {
     return <VisitDashboardLoading title={visit.title} />;
@@ -834,21 +997,20 @@ export default function VisitDashboardPage() {
             <p className="visit-dashboard-eyebrow">Visit dashboard</p>
             <h1 id="visit-dashboard-title">{visit.title}</h1>
             <p className="visit-dashboard-intro">Welcome District Officials</p>
-            <ul className="visit-dashboard-officials" aria-label="District official names">
-              {officialNames.map((name) => (
-                <li key={name}>{name}</li>
-              ))}
-            </ul>
+            <VisitingPanel names={visit.officialDisplayNames} />
           </div>
           <div className="visit-dashboard-masthead__actions">
-  <a className="visit-dashboard-action-link" href="/access">
-    Access page
-  </a>
-  <span className="visit-dashboard-readonly">Read-only</span>
-</div>
+            <a className="visit-dashboard-action-link" href="/access">
+              Access page
+            </a>
+            <span className="visit-dashboard-readonly">Read-only</span>
+            {dataAsOf ? <p className="visit-dashboard-asof">Data as of {dataAsOf}</p> : null}
+          </div>
         </header>
 
-        <StatRail stats={stats} />
+        <SectionLinks showLetterhead={Boolean(letterhead)} />
+
+        <ClubAtAGlance glance={glance} />
 
         <AvenueCounts rows={stats.avenueEventCounts} attendance={attendance} />
 
@@ -856,19 +1018,11 @@ export default function VisitDashboardPage() {
 
         <AttendanceRecords attendance={attendance} />
 
+        {letterhead ? <LetterheadExchanges letterhead={letterhead} /> : null}
+
         <FinesRecords fines={fines} />
 
-        <TreasuryRecords treasury={treasury} />
-
-        {data.generatedAt ? (
-          <p className="visit-dashboard-freshness">
-            Updated {new Intl.DateTimeFormat("en-IN", {
-              dateStyle: "medium",
-              timeStyle: "short",
-              timeZone: "Asia/Kolkata",
-            }).format(new Date(data.generatedAt))}
-          </p>
-        ) : null}
+        <TreasuryLedger treasury={treasury} />
       </div>
     </main>
   );

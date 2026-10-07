@@ -808,47 +808,65 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /No members are available for this attendance view\./);
   assert.match(pageSource, /className="visit-dashboard-attendance"/);
   assert.doesNotMatch(pageSource, /<details className="visit-dashboard-attendance"[^>]* open/);
-  assert.match(pageSource, /Fines Records/);
-  assert.match(pageSource, /id="visit-dashboard-fines-title"/);
-  assert.match(pageSource, /visit-dashboard-fines-summary/);
+  assert.match(pageSource, /title="Fines"/);
+  assert.match(pageSource, /titleId="visit-dashboard-fines-title"/);
   assert.match(pageSource, /visit-dashboard-fines-table/);
-  assert.match(pageSource, /Total fines/);
-  assert.match(pageSource, /Pending \/ Unpaid/);
-  assert.match(pageSource, /Collected amount/);
-  assert.match(pageSource, /Reason \/ Title/);
+  assert.match(pageSource, /finesHasNotes\(fines\.rows\)/);
+  assert.match(pageSource, /\{showNotes \? <th scope="col">Notes<\/th> : null\}/);
+  assert.match(pageSource, /collected<\/span>/);
+  assert.match(pageSource, /pending<\/span>/);
+  assert.match(pageSource, /Total · \{fines\.summary\.totalFines\}/);
   assert.match(pageSource, /fineStatusLabel/);
   assert.match(pageSource, /No fines have been recorded yet\./);
   assert.match(pageSource, /<FinesRecords fines=\{fines\} \/>/);
+  assert.match(pageSource, /\{open \? "Hide records" : "Show records"\}/);
+  assert.doesNotMatch(pageSource, /<details[^>]*className=\{`visit-dashboard-records[^>]* open/);
   assert.ok(
-    pageSource.indexOf("<AttendanceRecords attendance={attendance} />") < pageSource.indexOf("<FinesRecords fines={fines} />"),
-    "Fines section renders after Attendance Records",
+    pageSource.indexOf("<AttendanceRecords attendance={attendance} />") < pageSource.indexOf("<LetterheadExchanges letterhead={letterhead} />"),
+    "Letterhead exchanges render after Attendance Records",
   );
   assert.ok(
-    pageSource.indexOf("<FinesRecords fines={fines} />") < pageSource.indexOf("<TreasuryRecords treasury={treasury} />"),
-    "Fines section renders before Treasury Records",
+    pageSource.indexOf("<LetterheadExchanges letterhead={letterhead} />") < pageSource.indexOf("<FinesRecords fines={fines} />"),
+    "Letterhead exchanges render before Fines",
   );
-  assert.match(pageSource, /Treasury Records/);
+  assert.ok(
+    pageSource.indexOf("<FinesRecords fines={fines} />") < pageSource.indexOf("<TreasuryLedger treasury={treasury} />"),
+    "Fines section renders before the Treasury ledger",
+  );
+  assert.match(pageSource, /\{letterhead \? <LetterheadExchanges letterhead=\{letterhead\} \/> : null\}/);
+  assert.match(pageSource, /No letterhead exchanges recorded yet\./);
+  assert.match(pageSource, /Treasury ledger/);
+  assert.match(pageSource, /Oldest first · running balance/);
   assert.match(pageSource, /id="visit-dashboard-treasury-title"/);
   assert.match(pageSource, /href="\/access"/);
 assert.match(pageSource, /Access page/);
 assert.match(pageSource, /visit-dashboard-masthead__actions/);
-  assert.match(pageSource, /visit-dashboard-treasury-summary/);
   assert.match(pageSource, /visit-dashboard-treasury-table/);
-  assert.match(pageSource, /Title \/ Description/);
+  assert.match(pageSource, /buildTreasuryLedger\(treasury\.rows\)/);
+  assert.match(pageSource, /Receipts \(₹\)/);
+  assert.match(pageSource, /Payments \(₹\)/);
+  assert.match(pageSource, /Balance \(₹\)/);
+  assert.match(pageSource, /visit-dashboard-ledger-month/);
   assert.match(pageSource, /<th scope="col">Bill<\/th>/);
   assert.match(pageSource, /View bill/);
   assert.match(pageSource, /className="visit-dashboard-bill-link"/);
   assert.match(pageSource, /href=\{row\.billOpenUrl\}/);
   assert.match(pageSource, /visit-dashboard-bill-empty/);
   const treasurySource = pageSource.slice(
-    pageSource.indexOf("function TreasuryRecords"),
+    pageSource.indexOf("function TreasuryLedger"),
     pageSource.indexOf("export default function VisitDashboardPage"),
   );
   assert.doesNotMatch(treasurySource, /Category \/ Avenue/);
   assert.doesNotMatch(treasurySource, /<th scope="col">Notes<\/th>/);
   assert.match(pageSource, /No treasury records are available yet\./);
-  assert.match(pageSource, /totalMembers|Total members/);
-  assert.match(pageSource, /treasuryIncome|Income/);
+  assert.match(pageSource, /Club at a glance/);
+  assert.match(pageSource, /buildGlanceStats\(\{ stats, attendance, treasury \}\)/);
+  assert.doesNotMatch(pageSource, /StatRail|Financial summary|visit-dashboard-stat-rail|visit-dashboard-officials/);
+  assert.match(pageSource, /<VisitingPanel names=\{visit\.officialDisplayNames\} \/>/);
+  assert.match(pageSource, /parseOfficialDisplayName\(line\)/);
+  assert.match(pageSource, /Data as of \{dataAsOf\}/);
+  assert.match(pageSource, /prefers-reduced-motion: reduce/);
+  assert.match(pageSource, /if \(target\.tagName === "DETAILS"\) target\.open = true;/);
   assert.doesNotMatch(
     pageSource,
     /adminService|getVisitDashboardConfigs|getVisitDashboardFolderOptions|addTreasury|updateTreasury|deleteTreasury|setTreasuryById|newTreasuryId|treasuryTicket|uploadTreasuryBill|buildTreasuryPayload|addFine|updateFine|deleteFine|setFine|fineTicket|fineId|memberId|uploadBytes|getDownloadURL|firebase\/storage|drive\.google|driveFolderId|folderId|fileUrl|billDriveFileId|billUrl|primaryPresentationSubmissionId|createdBy|updatedBy|deletedBy|archivedBy|audit|canEdit|canDelete|>Upload<|>Edit<|>Delete<|>Finalize<|>Archive<|>Save<|>Mark<|>Bulk<|>Export<|"Upload"|"Edit"|"Delete"|"Finalize"|"Archive"|"Save"|"Mark"|"Bulk"|"Export"/i,
@@ -861,10 +879,11 @@ assert.doesNotMatch(pageSource, /<dt>By<\/dt>/);
 });
 
 test("visit dashboard CSS keeps metrics readable and compact sections gridded", () => {
-  assert.match(visitCssSource, /\.visit-dashboard-stat-rail dd \{[\s\S]*white-space: nowrap/);
-  assert.match(visitCssSource, /\.visit-dashboard-stat-rail dd \{[\s\S]*word-break: keep-all/);
-  assert.match(visitCssSource, /\.visit-dashboard-treasury-summary dd \{[\s\S]*white-space: nowrap/);
-  assert.match(visitCssSource, /\.visit-dashboard-avenue-list \{[\s\S]*repeat\(auto-fit, minmax\(min\(15rem, 100%\), 1fr\)\)/);
+  assert.doesNotMatch(visitCssSource, /visit-dashboard-stat-rail|visit-dashboard-finance-|visit-dashboard-treasury-summary|visit-dashboard-fines-summary/);
+  assert.match(visitCssSource, /\.visit-dashboard-glance-grid \{[\s\S]*repeat\(auto-fit, minmax\(min\(260px, 100%\), 1fr\)\)/);
+  assert.match(visitCssSource, /\.visit-dashboard-glance-value \{[\s\S]*font-variant-numeric: tabular-nums/);
+  assert.match(visitCssSource, /\.visit-dashboard-avenue-list \{[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(visitCssSource, /@media \(max-width: 720px\) \{[\s\S]*\.visit-dashboard-avenue-list \{\s*grid-template-columns: 1fr/);
   assert.match(visitCssSource, /\.visit-dashboard-avenue-list li \{[\s\S]*border-bottom:/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-avenue-list li \{[^}]*border-radius/);
   assert.match(visitCssSource, /\.visit-dashboard-folder-directory \{[\s\S]*grid-template-columns: 1fr/);
@@ -879,7 +898,6 @@ assert.match(visitCssSource, /\.visit-dashboard-folder-actions \{[\s\S]*inline-f
   assert.match(visitCssSource, /\.visit-dashboard-document-preview-frame \{[\s\S]*min-height: min\(62vh, 38rem\)/);
   assert.match(visitCssSource, /\.visit-dashboard-document-action \{/);
   assert.match(visitCssSource, /\.visit-dashboard-document-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto/);
-  assert.match(visitCssSource, /\.visit-dashboard-treasury-col-bill \{[\s\S]*width: 8rem/);
   assert.match(visitCssSource, /\.visit-dashboard-bill-link \{/);
   assert.match(visitCssSource, /\.visit-dashboard-bill-empty \{/);
   assert.match(visitCssSource, /\.visit-dashboard-shell \{[\s\S]*width: min\(1480px, 100%\)/);
@@ -892,7 +910,7 @@ assert.match(visitCssSource, /\.visit-dashboard-folder-actions \{[\s\S]*inline-f
   assert.match(visitCssSource, /\.visit-dashboard-attendance-table-shell \{[\s\S]*max-width: 100%/);
   assert.doesNotMatch(visitCssSource, /100vw|overflow-x: clip/);
   assert.doesNotMatch(visitCssSource, /margin-left: calc\(50% - 50vw/);
-  assert.match(visitCssSource, /\.visit-dashboard-attendance-table-wrap \{[\s\S]*overflow-x: auto/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-table-wrap \{[^}]*overflow-x: scroll/);
   assert.doesNotMatch(visitCssSource, /visit-dashboard-attendance-scroll-inner|visit-dashboard-attendance-scroll-spacer/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-summary \{[\s\S]*repeat\(5, minmax\(8rem, 1fr\)\)/);
   assert.match(visitCssSource, /@media \(max-width: 40rem\) \{[\s\S]*\.visit-dashboard-attendance-summary,[\s\S]*grid-template-columns: 1fr/);
@@ -908,9 +926,8 @@ assert.match(visitCssSource, /\.visit-dashboard-folder-actions \{[\s\S]*inline-f
   assert.match(visitCssSource, /\.visit-dashboard-attendance-role-heading,\s*\.visit-dashboard-attendance-role \{[\s\S]*box-shadow:/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-status \{[\s\S]*justify-content: center/);
   assert.match(visitCssSource, /\.visit-dashboard-attendance-percent \{[\s\S]*text-align: center/);
-  assert.match(visitCssSource, /\.visit-dashboard-fines \{[\s\S]*display: grid/);
-  assert.match(visitCssSource, /\.visit-dashboard-fines-summary \{[\s\S]*repeat\(6, minmax\(7\.5rem, 1fr\)\)/);
-  assert.match(visitCssSource, /\.visit-dashboard-fines-table-wrap \{[\s\S]*overflow-x: auto/);
+  assert.match(visitCssSource, /\.visit-dashboard-ledger-wrap \{[\s\S]*overflow: auto/);
+  assert.match(visitCssSource, /\.visit-dashboard-ledger-table thead th \{[\s\S]*position: sticky/);
   assert.match(visitCssSource, /\.visit-dashboard-fines-status\.is-paid \{/);
   assert.match(visitCssSource, /\.visit-dashboard-fines-status\.is-pending \{/);
 assert.match(visitCssSource, /\.visit-dashboard-masthead__actions \{/);
@@ -920,4 +937,26 @@ assert.match(visitCssSource, /\.visit-dashboard-avenue-disclosure\[open\] \.visi
 assert.match(visitCssSource, /\.visit-dashboard-avenue-event-list \{/);
 assert.match(visitCssSource, /\.visit-dashboard-document-list li \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto/);
 
+});
+
+function zIndexFor(selectorPattern) {
+  const match = visitCssSource.match(new RegExp(`${selectorPattern}\\s*\\{[^}]*z-index:\\s*(\\d+)`));
+  return match ? Number(match[1]) : null;
+}
+
+test("attendance sticky layering keeps frozen columns above scrolling cells", () => {
+  const frozenHeaders = ["percent", "name", "role"].map((key) => zIndexFor(
+    `\\.visit-dashboard-attendance-table thead th\\.visit-dashboard-attendance-${key}-heading`,
+  ));
+  const stickyHeader = zIndexFor("\\.visit-dashboard-attendance-table thead th");
+  const frozenBody = ["percent", "name", "role"].map((key) => zIndexFor(`\\.visit-dashboard-attendance-${key}`));
+  const markCell = zIndexFor("\\.visit-dashboard-attendance-mark-cell");
+  frozenHeaders.forEach((value) => assert.ok(value > stickyHeader, `frozen header ${value} above sticky header ${stickyHeader}`));
+  frozenBody.forEach((value) => {
+    assert.ok(stickyHeader > value, `sticky header ${stickyHeader} above frozen body ${value}`);
+    assert.ok(value > markCell, `frozen body ${value} above scrolling cells ${markCell}`);
+  });
+  // The frozen-header rules must out-rank `thead th` by specificity, not just by number.
+  assert.doesNotMatch(visitCssSource, /\n\.visit-dashboard-attendance-(?:percent|name|role)-heading \{\s*z-index/);
+  assert.match(visitCssSource, /\.visit-dashboard-attendance-table thead th \{[\s\S]*background: var\(--internal-surface\)/);
 });
