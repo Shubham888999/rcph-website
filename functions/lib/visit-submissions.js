@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const defaultPositionHelpers = require('./positions');
+const positionHolders = require('./position-holders');
 
 const VISIT_TYPES = Object.freeze({
   clubAssembly: Object.freeze({
@@ -986,7 +987,7 @@ function shapeSubmission(submission, access, options = {}) {
   };
 }
 
-function buildFolderResponse(config, folder, access) {
+function buildFolderResponse(config, folder, access, holdersByPosition = null) {
   const authorized = access.canManageVisitSystem || folderAccessPositionKeys(access).includes(folder.positionKey);
   const canUpload = Boolean(
     authorized
@@ -1015,6 +1016,7 @@ function buildFolderResponse(config, folder, access) {
     canUpload,
     canManage: access.canManageVisitSystem === true,
     supportsDocumentCategories: supportsDocumentCategories(folder.positionKey),
+    holders: positionHolders.holdersForPosition(holdersByPosition, folder.positionKey),
   };
 }
 
@@ -1100,6 +1102,16 @@ function createFirestoreVisitSubmissionAdapter(db, admin) {
         .where('uid', '==', uid)
         .get();
       return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    },
+    async queryActivePositionAssignments() {
+      const snap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
+      return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    },
+    async getDocsByIds(collection, ids) {
+      const uniqueIds = Array.from(new Set((Array.isArray(ids) ? ids : []).filter(Boolean)));
+      if (!uniqueIds.length) return new Map();
+      const snaps = await db.getAll(...uniqueIds.map(id => db.collection(collection).doc(id)));
+      return new Map(snaps.map(snap => [snap.id, snap.exists ? (snap.data() || {}) : null]));
     },
     async querySubmissions(filters) {
       let query = db.collection('visitSubmissions');
@@ -1248,6 +1260,16 @@ function createMemoryVisitSubmissionAdapter(initialData) {
       return Object.keys(docs)
         .filter(id => docs[id]?.uid === uid)
         .map(id => ({ id, data: clone(docs[id]) }));
+    },
+    async queryActivePositionAssignments() {
+      const docs = store.bodPositionAssignments || {};
+      return Object.keys(docs)
+        .filter(id => docs[id]?.active === true)
+        .map(id => ({ id, data: clone(docs[id]) }));
+    },
+    async getDocsByIds(collection, ids) {
+      const docs = store[collection] || {};
+      return new Map((Array.isArray(ids) ? ids : []).map(id => [id, docs[id] ? clone(docs[id]) : null]));
     },
     async querySubmissions(filters) {
       const docs = store.visitSubmissions || {};
@@ -1494,7 +1516,10 @@ function createVisitSubmissionService(options) {
     const access = await resolveAccessContext(uid);
     const visitType = normalizeVisitType(visitTypeInput);
     const config = await loadVisitConfig(visitType);
-    const folders = await Promise.all(accessiblePositionKeys(access).map(key => loadFolder(visitType, key)));
+    const [folders, holdersByPosition] = await Promise.all([
+      Promise.all(accessiblePositionKeys(access).map(key => loadFolder(visitType, key))),
+      positionHolders.getActivePositionHolders(adapter, { positionHelpers, now: nowMillis(clock) }),
+    ]);
     return {
       access: {
         role: access.role,
@@ -1511,7 +1536,7 @@ function createVisitSubmissionService(options) {
         submissionDeadline: config.submissionDeadline || null,
         instructions: config.instructions || '',
       },
-      folders: folders.map(folder => buildFolderResponse(config, folder, access)),
+      folders: folders.map(folder => buildFolderResponse(config, folder, access, holdersByPosition)),
     };
   }
 
