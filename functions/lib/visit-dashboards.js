@@ -2,6 +2,8 @@
 
 const defaultPositionHelpers = require('./positions');
 const positionHolders = require('./position-holders');
+const letterheadExchanges = require('./letterhead-exchanges');
+const { formatRotaractorName } = require('./member-name');
 
 const VISIT_TYPES = Object.freeze({
   clubAssembly: Object.freeze({
@@ -1386,6 +1388,58 @@ function shapeFolderOption(raw, fallbackId = '', options = {}) {
   return option;
 }
 
+const MAX_DASHBOARD_LETTERHEAD_EXCHANGES = 100;
+
+// Rotary year (RIY) runs 1 July - 30 June; dates are IST calendar days.
+function currentRotaryYearRange(nowValue = new Date()) {
+  const today = letterheadExchanges.istDateString(nowValue);
+  const year = Number(today.slice(0, 4));
+  const startYear = Number(today.slice(5, 7)) >= 7 ? year : year - 1;
+  return { start: `${startYear}-07-01`, end: `${startYear + 1}-06-30` };
+}
+
+function shapeDashboardLetterheadExchange(doc) {
+  const exchange = letterheadExchanges.normalizeStoredExchange(doc?.id, doc?.data || {});
+  const exchangeId = normalizeSafeId(exchange.id, 128);
+  const exchangeDate = dateOnly(exchange.exchangeDate);
+  if (!exchangeId || !exchangeDate || exchange.status !== 'active') return null;
+  return {
+    exchangeId,
+    exchangeDate,
+    externalParticipants: exchange.externalParticipants.map(row => ({
+      clubName: row.clubName,
+      rotaractorName: row.rotaractorName,
+      position: row.position,
+    })),
+    rcphRepresentatives: exchange.rcphRepresentatives
+      .map(row => formatRotaractorName(row.name, true))
+      .filter(Boolean),
+    associatedEvent: exchange.associatedEvent && (exchange.associatedEvent.name || exchange.associatedEvent.label)
+      ? {
+        name: exchange.associatedEvent.name || exchange.associatedEvent.label,
+        date: dateOnly(exchange.associatedEvent.date) || '',
+      }
+      : null,
+    imageCount: Math.max(0, Number(exchange.imageCount) || 0),
+  };
+}
+
+function buildVisitDashboardLetterheadExchanges(docs, range) {
+  const rows = (Array.isArray(docs) ? docs : [])
+    .map(shapeDashboardLetterheadExchange)
+    .filter(row => row && (!range || (row.exchangeDate >= range.start && row.exchangeDate <= range.end)))
+    .sort((a, b) => b.exchangeDate.localeCompare(a.exchangeDate) || a.exchangeId.localeCompare(b.exchangeId));
+  const clubs = new Set();
+  rows.forEach(row => row.externalParticipants.forEach((participant) => {
+    const key = normalizeText(participant.clubName, 150).toLowerCase();
+    if (key) clubs.add(key);
+  }));
+  return {
+    letterheadExchanges: rows.slice(0, MAX_DASHBOARD_LETTERHEAD_EXCHANGES),
+    letterheadExchangeSummary: { count: rows.length, clubCount: clubs.size },
+  };
+}
+
 function safeDiff(oldData, updates) {
   return Object.keys(updates).reduce((diff, field) => {
     const oldValue = oldData ? oldData[field] : undefined;
@@ -1427,6 +1481,12 @@ function createFirestoreVisitDashboardAdapter(db, admin) {
     },
     async queryActivePositionAssignments() {
       const snap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
+      return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    },
+    async queryLetterheadExchangesSince(startDate) {
+      const snap = await db.collection(letterheadExchanges.LETTERHEAD_EXCHANGES_COLLECTION)
+        .where('exchangeDate', '>=', startDate)
+        .get();
       return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
     },
     async queryActiveSubmissionsForPositions(visitType, positionKeys) {
@@ -1495,6 +1555,12 @@ function createMemoryVisitDashboardAdapter(initialData) {
         .filter(id => docs[id]?.active === true)
         .map(id => ({ id, data: clone(docs[id]) }));
     },
+    async queryLetterheadExchangesSince(startDate) {
+      const docs = store.letterheadExchanges || {};
+      return Object.keys(docs)
+        .filter(id => String(docs[id]?.exchangeDate || '') >= startDate)
+        .map(id => ({ id, data: clone(docs[id]) }));
+    },
     async queryActiveSubmissionsForPositions(visitType, positionKeys) {
       const allowed = new Set((Array.isArray(positionKeys) ? positionKeys : []).filter(Boolean));
       if (!allowed.size) return [];
@@ -1515,6 +1581,7 @@ function createVisitDashboardService(options = {}) {
   const adapter = options.adapter || createFirestoreVisitDashboardAdapter(options.db, options.admin);
   const positionHelpers = options.positionHelpers || defaultPositionHelpers;
   const assertAdmin = typeof options.assertAdmin === 'function' ? options.assertAdmin : async () => ({ role: 'admin' });
+  const now = typeof options.now === 'function' ? options.now : () => new Date();
 
   async function loadConfig(visitTypeInput) {
     const visitType = normalizeVisitType(visitTypeInput);
@@ -1580,6 +1647,7 @@ function createVisitDashboardService(options = {}) {
       throw makeVisitDashboardError('permission-denied', 'Visit dashboard access required.');
     }
     const visiblePositionKeys = config.visiblePositionKeys.slice();
+    const rotaryYear = currentRotaryYearRange(now());
     const [
       members,
       users,
@@ -1595,6 +1663,7 @@ function createVisitDashboardService(options = {}) {
       districtEvents,
       districtAttendance,
       activeAssignments,
+      letterheadExchangeDocs,
     ] = await Promise.all([
       adapter.listDocs('members'),
       adapter.listDocs('users'),
@@ -1610,6 +1679,7 @@ function createVisitDashboardService(options = {}) {
       adapter.listDocs('districtEvents'),
       adapter.listDocs('districtAttendance'),
       visiblePositionKeys.length ? adapter.queryActivePositionAssignments() : Promise.resolve([]),
+      adapter.queryLetterheadExchangesSince(rotaryYear.start),
     ]);
     const visitName = normalizeText(config.visitName, 120) || visitNameForType(visitType);
     return {
@@ -1650,6 +1720,7 @@ function createVisitDashboardService(options = {}) {
       }),
       fines: buildVisitDashboardFines(fines),
       treasury: buildVisitDashboardTreasury(treasury),
+      ...buildVisitDashboardLetterheadExchanges(letterheadExchangeDocs, rotaryYear),
       generatedAt: new Date().toISOString(),
     };
   }
@@ -1732,6 +1803,7 @@ module.exports = {
   buildVisitDashboardAttendance,
   buildDocumentPanels,
   buildVisitDashboardFines,
+  buildVisitDashboardLetterheadExchanges,
   buildVisitDashboardTreasury,
   buildVisitDashboardStats,
   buildVisitDashboardDefaultConfig,
@@ -1739,6 +1811,7 @@ module.exports = {
   createFirestoreVisitDashboardAdapter,
   createMemoryVisitDashboardAdapter,
   createVisitDashboardService,
+  currentRotaryYearRange,
   isPrimaryPresentationDocument,
   makeVisitDashboardError,
 normalizeOfficialDisplayNames,
