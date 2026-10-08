@@ -131,6 +131,21 @@ class FakeDb {
     this._store.set(path, clone(data));
   }
 
+  async runTransaction(callback) {
+    const writes = [];
+    const tx = {
+      get: ref => Promise.resolve(new FakeSnapshot(ref.id, this.read(ref.path))),
+      update: (ref, data) => writes.push({ path: ref.path, data: clone(data) }),
+    };
+    const result = await callback(tx);
+    writes.forEach(({ path, data }) => {
+      if (!this._store.has(path)) throw new Error(`Missing document for update: ${path}`);
+      this.write(path, { ...this.read(path), ...data });
+    });
+    this.transactionWrites = (this.transactionWrites || 0) + writes.length;
+    return result;
+  }
+
   collectionDocs(collectionPath) {
     const prefix = `${collectionPath}/`;
     return Array.from(this._store.keys())
@@ -531,9 +546,205 @@ test('report exchange normalization exposes no image or Drive internals', () => 
     driveFolderId: 'folder',
     driveFolderName: 'folder name',
   }));
-  assert.deepEqual(Object.keys(normalized).sort(), ['associatedEvent', 'exchangeDate', 'exchangeMonth', 'externalParticipants', 'id', 'other', 'rcphRepresentatives']);
+  assert.deepEqual(Object.keys(normalized).sort(), ['associatedEvent', 'exchangeDate', 'exchangeMonth', 'externalParticipants', 'id', 'imageCount', 'other', 'rcphRepresentatives', 'reportImage']);
+  assert.equal(normalized.imageCount, 1);
+  assert.equal(normalized.reportImage, null);
   assert.equal(JSON.stringify(normalized).includes('drive'), false);
-  assert.equal(JSON.stringify(normalized).includes('image'), false);
+  assert.equal(JSON.stringify(normalized).includes('scan.jpg'), false);
+});
+
+function imageRow(imageId, overrides = {}) {
+  return {
+    imageId,
+    uploadSessionId: imageId,
+    storageProvider: 'googleDrive',
+    driveFileId: `drive-${imageId}`,
+    fileName: `${imageId}.jpg`,
+    mimeType: 'image/jpeg',
+    sizeBytes: 100,
+    sha256: 'hash',
+    uploadedAt: '2026-08-21T12:00:00.000Z',
+    uploadedByUid: 'uploader-uid',
+    uploadedByName: 'Uploader',
+    ...overrides,
+  };
+}
+
+test('report payload includes only an active, allowed report image with safe fields', () => {
+  const removed = { removedAt: '2026-08-22T00:00:00.000Z', removedByUid: 'remover', removedByName: 'Remover' };
+  const selected = normalizeReportExchange('exchange-1', storedExchange({
+    images: [imageRow('img-1'), imageRow('img-2', { mimeType: 'image/png', fileName: 'img-2.png' })],
+    reportImageId: 'img-2',
+  }));
+  assert.deepEqual(selected.reportImage, { imageId: 'img-2', fileName: 'img-2.png', mimeType: 'image/png' });
+  assert.equal(selected.imageCount, 2);
+
+  const removedSelection = normalizeReportExchange('exchange-1', storedExchange({
+    images: [imageRow('img-1', removed), imageRow('img-2')],
+    reportImageId: 'img-1',
+  }));
+  assert.equal(removedSelection.reportImage, null);
+  assert.equal(removedSelection.imageCount, 1);
+
+  const badMime = normalizeReportExchange('exchange-1', storedExchange({
+    images: [imageRow('img-1', { mimeType: 'application/pdf' })],
+    reportImageId: 'img-1',
+  }));
+  assert.equal(badMime.reportImage, null);
+  assert.equal(normalizeReportExchange('exchange-1', storedExchange({ images: [imageRow('img-1')] })).reportImage, null);
+});
+
+test('list returns active images only, active imageCount, reportImageId, and last-edited name without uid', async () => {
+  const db = new FakeDb({
+    [`${LETTERHEAD_EXCHANGES_COLLECTION}/edited`]: storedExchange({
+      images: [
+        imageRow('img-1', { removedAt: '2026-08-22T00:00:00.000Z', removedByUid: 'remover', removedByName: 'Remover' }),
+        imageRow('img-2'),
+        imageRow('img-3'),
+      ],
+      imageCount: 2,
+      reportImageId: 'img-3',
+      lastEditedAt: '2026-10-08T06:00:00.000Z',
+      lastEditedByUid: 'editor-uid',
+      lastEditedByName: 'Editor Person',
+    }),
+  });
+  const { service } = makeService({ db });
+  const [exchange] = (await service.list('viewer-uid')).exchanges;
+  assert.deepEqual(exchange.images.map(image => image.imageId), ['img-2', 'img-3']);
+  assert.equal(exchange.imageCount, 2);
+  assert.equal(exchange.reportImageId, 'img-3');
+  assert.equal(exchange.lastEditedAt, '2026-10-08T06:00:00.000Z');
+  assert.equal(exchange.lastEditedByName, 'Editor Person');
+  const json = JSON.stringify(exchange);
+  assert.equal(json.includes('editor-uid'), false);
+  assert.equal(json.includes('removed'), false);
+  assert.equal(json.includes('driveFileId'), false);
+});
+
+function editableDb(overrides = {}) {
+  return new FakeDb({
+    ...seedForOptions(),
+    [`${LETTERHEAD_EXCHANGES_COLLECTION}/edit-me`]: storedExchange({
+      images: [imageRow('img-1')],
+      imageCount: 1,
+      reportImageId: 'img-1',
+      driveFolderId: 'private-folder',
+      driveFolderName: '2026-08-21 - Partner - edit-me',
+      createdByRole: 'bod',
+      ...overrides,
+    }),
+  });
+}
+
+function updatePayload(overrides = {}) {
+  return { exchangeId: 'edit-me', ...validPayload(), ...overrides };
+}
+
+test('update requires the same BOD access as create and validates exchange ids', async () => {
+  await assert.rejects(() => makeService({ db: editableDb() }).service.update('', updatePayload()), { code: 'unauthenticated' });
+  await assert.rejects(() => makeService({ db: editableDb(), role: '' }).service.update('plain-user', updatePayload()), { code: 'permission-denied' });
+  await assert.rejects(() => makeService({ db: editableDb(), approved: false }).service.update('inactive', updatePayload()), { code: 'permission-denied' });
+
+  const { service } = makeService({ db: editableDb() });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ exchangeId: '' })), { code: 'invalid-argument' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ exchangeId: 'bad/id' })), { code: 'invalid-argument' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ exchangeId: 'missing' })), { code: 'not-found' });
+  await assert.rejects(() => makeService({ db: editableDb({ status: 'archived' }) }).service.update('editor-uid', updatePayload()), { code: 'failed-precondition' });
+});
+
+test('update applies the create validation rules', async () => {
+  const { service, db } = makeService({ db: editableDb() });
+  const before = db.read(`${LETTERHEAD_EXCHANGES_COLLECTION}/edit-me`);
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ exchangeDate: '2026-02-30' })), { code: 'invalid-argument' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ externalParticipants: [] })), { code: 'invalid-argument' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ rcphMemberIds: [] })), { code: 'invalid-argument' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ images: [] })), { code: 'invalid-argument' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ reportImageId: 'x' })), { code: 'invalid-argument' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ rcphMemberIds: ['a', 'inactive'] })), { code: 'failed-precondition' });
+  await assert.rejects(() => service.update('editor-uid', updatePayload({ associatedEvent: { source: 'events', id: 'future-1' } })), { code: 'failed-precondition' });
+  assert.deepEqual(db.read(`${LETTERHEAD_EXCHANGES_COLLECTION}/edit-me`), before);
+});
+
+test('update edits details, recomputes exchangeMonth, keeps images, report photo, creator, and Drive folder', async () => {
+  const { service, db, logs } = makeService({ db: editableDb() });
+  const result = await service.update('editor-uid', updatePayload({
+    exchangeDate: '2026-07-30',
+    externalParticipants: [
+      { clubName: 'Rotaract Club A', rotaractorName: 'Person A', position: '', rotaractDistrictId: '' },
+      { clubName: 'Rotaract Club B', rotaractorName: 'Person B', position: 'Secretary', rotaractDistrictId: '3132' },
+    ],
+    rcphMemberIds: ['a', 'z'],
+    associatedEvent: null,
+    other: 'Edited note',
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(result.unchanged, false);
+  assert.equal(result.exchange.exchangeDate, '2026-07-30');
+  assert.equal(result.exchange.exchangeMonth, '2026-07');
+  assert.equal(result.exchange.lastEditedByName, 'Creator Person');
+  assert.equal(result.exchange.reportImageId, 'img-1');
+
+  const stored = db.read(`${LETTERHEAD_EXCHANGES_COLLECTION}/edit-me`);
+  assert.equal(stored.exchangeMonth, '2026-07');
+  assert.deepEqual(stored.rcphMemberIds, ['a', 'z']);
+  assert.deepEqual(stored.rcphRepresentatives.map(row => row.name), ['Asha Member', 'Zara Member']);
+  assert.equal(stored.associatedEvent, null);
+  assert.equal(stored.other, 'Edited note');
+  assert.equal(stored.lastEditedByUid, 'editor-uid');
+  assert.equal(stored.lastEditedByName, 'Creator Person');
+  assert.ok(stored.lastEditedAt);
+  assert.equal(stored.updatedByUid, 'editor-uid');
+  assert.equal(stored.createdByUid, 'creator');
+  assert.equal(stored.createdByName, 'Creator Person');
+  assert.equal(stored.createdAt, '2026-08-21T12:00:00.000Z');
+  assert.deepEqual(stored.images.map(image => image.imageId), ['img-1']);
+  assert.equal(stored.imageCount, 1);
+  assert.equal(stored.reportImageId, 'img-1');
+  assert.equal(stored.driveFolderId, 'private-folder');
+  assert.equal(stored.driveFolderName, '2026-08-21 - Partner - edit-me');
+
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].action, 'updated');
+  assert.equal(logs[0].exchange.id, 'edit-me');
+  assert.deepEqual(logs[0].metadata, {
+    changedFields: ['exchangeDate', 'externalParticipants', 'rcphMemberIds', 'other'],
+    before: { exchangeDate: '2026-08-21', externalParticipantCount: 1, rcphRepresentativeCount: 1, otherLength: 0 },
+    after: { exchangeDate: '2026-07-30', externalParticipantCount: 2, rcphRepresentativeCount: 2, otherLength: 11 },
+  });
+});
+
+test('update with no changes writes nothing and logs nothing', async () => {
+  const { service, db, logs } = makeService({ db: editableDb() });
+  const result = await service.update('editor-uid', updatePayload({ associatedEvent: null, other: '' }));
+  assert.equal(result.ok, true);
+  assert.equal(result.unchanged, true);
+  assert.equal(db.transactionWrites || 0, 0);
+  assert.equal(logs.length, 0);
+});
+
+test('update keeps stored snapshots for existing representatives and an unchanged associated event', async () => {
+  const archivedEvent = { source: 'events', id: 'archived-event', type: 'clubEvent', name: 'Old Event', date: '2026-08-01', endDate: '2026-08-01', avenues: ['ISD'], label: 'Old Event - ISD - 01 Aug 2026' };
+  const { service, db } = makeService({
+    db: editableDb({
+      rcphRepresentatives: [{ memberId: 'inactive', userId: 'u-x', name: 'Former Member', role: 'bod', position: 'ISD', activeAtCreation: true }],
+      rcphMemberIds: ['inactive'],
+      associatedEvent: archivedEvent,
+    }),
+  });
+  const result = await service.update('editor-uid', updatePayload({
+    rcphMemberIds: ['inactive', 'a'],
+    associatedEvent: { source: 'events', id: 'archived-event' },
+    other: 'Kept history',
+  }));
+  assert.equal(result.unchanged, false);
+  const stored = db.read(`${LETTERHEAD_EXCHANGES_COLLECTION}/edit-me`);
+  assert.deepEqual(stored.rcphRepresentatives.map(row => row.name), ['Former Member', 'Asha Member']);
+  assert.equal(stored.associatedEvent.name, 'Old Event');
+  await assert.rejects(
+    () => service.update('editor-uid', updatePayload({ associatedEvent: { source: 'events', id: 'other-archived' } })),
+    { code: 'failed-precondition' }
+  );
 });
 
 test('form options callable response shape is minimal and sorted', async () => {

@@ -20,7 +20,12 @@ function exchange(overrides = {}) {
     ],
     rcphMemberIds: ['member-secret-1', 'member-secret-2'],
     associatedEvent: { source: 'events', id: 'event-secret', name: 'Installation', date: '2026-08-14', label: 'Installation (14 Aug)' },
-    images: [{ imageId: 'img-1', fileName: 'a.jpg', uploadedByUid: 'uid-secret-1' }],
+    images: [
+      { imageId: 'img-1', fileName: 'a.jpg', uploadedByUid: 'uid-secret-1' },
+      { imageId: 'img-2', fileName: 'b.jpg', uploadedByUid: 'uid-secret-1' },
+      { imageId: 'img-3', fileName: 'c.jpg', uploadedByUid: 'uid-secret-1' },
+      { imageId: 'img-removed', fileName: 'd.jpg', uploadedByUid: 'uid-secret-1', removedAt: '2026-08-15T00:00:00.000Z' },
+    ],
     imageCount: 3,
     other: 'private note',
     createdByUid: 'uid-secret-1',
@@ -43,7 +48,7 @@ test('dashboard exchanges expose only safe fields, newest first, scoped to the R
     { id: 'lhx-b', data: exchange({ exchangeDate: '2026-09-02', externalParticipants: [
       { clubName: 'ROTARACT CLUB OF PUNE CENTRAL', rotaractorName: 'Dev Rao', position: '' },
       { clubName: 'Rotaract Club of Nashik', rotaractorName: 'Mira Joshi', position: 'Secretary' },
-    ], associatedEvent: null, imageCount: 0 }) },
+    ], associatedEvent: null, images: [], imageCount: 0 }) },
     { id: 'lhx-old', data: exchange({ exchangeDate: '2026-06-30' }) },
     { id: 'lhx-next-riy', data: exchange({ exchangeDate: '2027-07-01' }) },
     { id: 'lhx-archived', data: exchange({ status: 'archived' }) },

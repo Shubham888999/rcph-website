@@ -1013,3 +1013,200 @@ test('protected image access uses short-lived proof links and streams verified b
     { code: 'not-found' }
   );
 });
+
+async function uploadedServicesWith(exchangeOverrides = {}) {
+  let parser;
+  const services = createServices({
+    db: initializedDb(exchangeOverrides),
+    parseMultipartUpload: (...args) => parser(...args),
+  });
+  const bytes = createJpegBytes();
+  const session = await createSession(services.service, { fileName: 'letterhead.jpg', mimeType: 'image/jpeg', sizeBytes: bytes.length });
+  const upload = await uploadImage({
+    service: services.service,
+    setParser: nextParser => {
+      parser = nextParser;
+    },
+    session,
+    bytes,
+  });
+  assert.equal(upload.statusCode, 200);
+  return { ...services, bytes, session, sessionId: session.sessions[0].sessionId };
+}
+
+function storedExchangeRecord(db) {
+  return db.read(`${LETTERHEAD_EXCHANGES_COLLECTION}/${EXCHANGE_ID}`);
+}
+
+const REMOVED = Object.freeze({ removedAt: '2026-08-20T13:00:00.000Z', removedByUid: 'remover-uid', removedByName: 'Remover' });
+
+test('report photo and remove callables allow BOD, admin, and president only and validate ids', async () => {
+  const images = [storedImage(1), storedImage(2)];
+  for (const method of ['setReportImage', 'removeImage']) {
+    await assert.rejects(
+      () => createServices({ db: initializedDb({ images }) }).service[method]('', { exchangeId: EXCHANGE_ID, imageId: 'existing-1' }),
+      { code: 'unauthenticated' }
+    );
+    for (const denied of [{ role: 'gbm' }, { approved: false }]) {
+      await assert.rejects(
+        () => createServices({ db: initializedDb({ images }), ...denied }).service[method](UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-1' }),
+        { code: 'permission-denied' }
+      );
+    }
+    const { service } = createServices({ db: initializedDb({ images }) });
+    await assert.rejects(() => service[method](UID, { exchangeId: 'bad/id', imageId: 'existing-1' }), { code: 'invalid-argument' });
+    await assert.rejects(() => service[method](UID, { exchangeId: 'missing-exchange', imageId: 'existing-1' }), { code: 'not-found' });
+    await assert.rejects(() => service[method](UID, { exchangeId: EXCHANGE_ID, imageId: 'bad id!' }), { code: 'invalid-argument' });
+    await assert.rejects(() => service[method](UID, { exchangeId: EXCHANGE_ID, imageId: 'missing-image' }), { code: 'not-found' });
+    await assert.rejects(() => service[method](UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-1', extra: true }), { code: 'invalid-argument' });
+  }
+  for (const role of ['bod', 'admin', 'president']) {
+    const result = await createServices({ db: initializedDb({ images }), role }).service.setReportImage(`${role}-uid`, { exchangeId: EXCHANGE_ID, imageId: 'existing-2' });
+    assert.equal(result.exchange.reportImageId, 'existing-2');
+  }
+  await assert.rejects(
+    () => createServices({ db: initializedDb({ images, status: 'archived' }) }).service.setReportImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-1' }),
+    { code: 'failed-precondition' }
+  );
+});
+
+test('setReportImage selects and clears an active image, rejects removed or non-image files, and logs changes only', async () => {
+  const images = [
+    storedImage(1),
+    storedImage(2, { mimeType: 'image/png', fileName: 'existing-2.png' }),
+    storedImage(3, REMOVED),
+    storedImage(4, { mimeType: 'application/pdf', fileName: 'existing-4.pdf' }),
+  ];
+  const { db, logs, service } = createServices({ db: initializedDb({ images }) });
+
+  const selected = await service.setReportImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-2' });
+  assert.equal(selected.unchanged, false);
+  assert.equal(selected.exchange.reportImageId, 'existing-2');
+  assert.equal(storedExchangeRecord(db).reportImageId, 'existing-2');
+  assert.equal(storedExchangeRecord(db).updatedByUid, UID);
+
+  const repeat = await service.setReportImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-2' });
+  assert.equal(repeat.unchanged, true);
+
+  await assert.rejects(() => service.setReportImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-3' }), { code: 'not-found' });
+  await assert.rejects(() => service.setReportImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-4' }), { code: 'failed-precondition' });
+  await assert.rejects(() => service.setReportImage(UID, { exchangeId: EXCHANGE_ID, imageId: 42 }), { code: 'invalid-argument' });
+  assert.equal(storedExchangeRecord(db).reportImageId, 'existing-2');
+
+  const cleared = await service.setReportImage(UID, { exchangeId: EXCHANGE_ID, imageId: '' });
+  assert.equal(cleared.exchange.reportImageId, '');
+  assert.equal(storedExchangeRecord(db).reportImageId, '');
+  assert.equal((await service.setReportImage(UID, { exchangeId: EXCHANGE_ID })).unchanged, true);
+
+  assert.deepEqual(logs.map(log => log.action), ['report_image_selected', 'report_image_cleared']);
+  assert.deepEqual(logs[0].metadata, { hadReportImage: false, hasReportImage: true, imageCount: 3 });
+  assert.equal(JSON.stringify(logs).includes('drive-existing'), false);
+});
+
+test('removeImage soft-removes without touching Drive, clears the report photo, and auto-selects a single remaining image', async () => {
+  const drive = new FakeDrive();
+  const images = [storedImage(1), storedImage(2), storedImage(3)];
+  const { db, logs, service } = createServices({ db: initializedDb({ images, reportImageId: 'existing-1' }), drive });
+
+  const first = await service.removeImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-1' });
+  assert.equal(first.unchanged, false);
+  assert.equal(first.exchange.imageCount, 2);
+  assert.deepEqual(first.exchange.images.map(image => image.imageId), ['existing-2', 'existing-3']);
+  assert.equal(first.exchange.reportImageId, '');
+  let stored = storedExchangeRecord(db);
+  assert.equal(stored.images.length, 3, 'removed metadata stays on the exchange');
+  assert.equal(stored.images[0].driveFileId, 'drive-existing-1');
+  assert.ok(stored.images[0].removedAt);
+  assert.equal(stored.images[0].removedByUid, UID);
+  assert.equal(stored.images[0].removedByName, 'Image Uploader');
+  assert.equal(stored.imageCount, 2);
+  assert.equal(stored.reportImageId, '');
+
+  const second = await service.removeImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-2' });
+  assert.equal(second.exchange.imageCount, 1);
+  assert.equal(second.exchange.reportImageId, 'existing-3', 'single remaining image is auto-selected');
+
+  const repeat = await service.removeImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-1' });
+  assert.equal(repeat.unchanged, true);
+
+  const last = await service.removeImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-3' });
+  assert.equal(last.exchange.imageCount, 0);
+  assert.equal(last.exchange.reportImageId, '');
+  stored = storedExchangeRecord(db);
+  assert.equal(stored.images.length, 3);
+  assert.equal(stored.imageCount, 0);
+
+  assert.deepEqual(logs.map(log => log.action), ['image_removed', 'image_removed', 'image_removed']);
+  assert.deepEqual(logs[0].metadata, { newImageCount: 2, reportImageCleared: true, reportImageAutoSelected: false });
+  assert.deepEqual(logs[1].metadata, { newImageCount: 1, reportImageCleared: false, reportImageAutoSelected: true });
+  assert.equal(drive.uploadCalls.length + drive.downloadCalls.length + drive.ensureCalls.length, 0);
+});
+
+test('removeImage keeps an existing report photo when another image is removed', async () => {
+  const { db, service } = createServices({ db: initializedDb({ images: [storedImage(1), storedImage(2), storedImage(3)], reportImageId: 'existing-3' }) });
+  const result = await service.removeImage(UID, { exchangeId: EXCHANGE_ID, imageId: 'existing-1' });
+  assert.equal(result.exchange.reportImageId, 'existing-3');
+  assert.equal(storedExchangeRecord(db).reportImageId, 'existing-3');
+});
+
+test('image limit counts active images only', async () => {
+  const tenWithOneRemoved = Array.from({ length: IMAGE_MAX_COUNT }, (_, index) => storedImage(index + 1, index === 0 ? REMOVED : {}));
+  const allowed = await createServices({ db: initializedDb({ images: tenWithOneRemoved }) }).service.createUploadSession(UID, {
+    exchangeId: EXCHANGE_ID,
+    files: [fileInput()],
+  });
+  assert.equal(allowed.sessions.length, 1);
+  await assert.rejects(
+    () => createServices({ db: initializedDb({ images: tenWithOneRemoved }) }).service.createUploadSession(UID, {
+      exchangeId: EXCHANGE_ID,
+      files: [fileInput({ fileName: 'a.jpg' }), fileInput({ fileName: 'b.jpg' })],
+    }),
+    { code: 'resource-exhausted' }
+  );
+
+  const { service, sessionId } = await uploadedServicesWith({ images: Array.from({ length: IMAGE_MAX_COUNT - 1 }, (_, index) => storedImage(index + 1)) });
+  const finalized = await service.finalizeUpload(UID, { exchangeId: EXCHANGE_ID, sessionId });
+  assert.equal(finalized.exchange.imageCount, IMAGE_MAX_COUNT);
+});
+
+test('finalize auto-selects the report photo only when it leaves exactly one active image and none is selected', async () => {
+  const first = await uploadedServicesWith();
+  const firstResult = await first.service.finalizeUpload(UID, { exchangeId: EXCHANGE_ID, sessionId: first.sessionId });
+  assert.equal(firstResult.exchange.reportImageId, first.sessionId);
+  assert.equal(firstResult.reportImageAutoSelected, true);
+  assert.equal(storedExchangeRecord(first.db).reportImageId, first.sessionId);
+  assert.equal(first.logs.at(-1).metadata.reportImageAutoSelected, true);
+
+  const afterRemoval = await uploadedServicesWith({ images: [storedImage(1, REMOVED)] });
+  const afterRemovalResult = await afterRemoval.service.finalizeUpload(UID, { exchangeId: EXCHANGE_ID, sessionId: afterRemoval.sessionId });
+  assert.equal(afterRemovalResult.exchange.reportImageId, afterRemoval.sessionId);
+
+  const second = await uploadedServicesWith({ images: [storedImage(1)] });
+  const secondResult = await second.service.finalizeUpload(UID, { exchangeId: EXCHANGE_ID, sessionId: second.sessionId });
+  assert.equal(secondResult.exchange.imageCount, 2);
+  assert.equal(secondResult.exchange.reportImageId, '');
+  assert.equal(secondResult.reportImageAutoSelected, false);
+
+  const kept = await uploadedServicesWith({ images: [storedImage(1)], reportImageId: 'existing-1' });
+  const keptResult = await kept.service.finalizeUpload(UID, { exchangeId: EXCHANGE_ID, sessionId: kept.sessionId });
+  assert.equal(keptResult.exchange.reportImageId, 'existing-1');
+});
+
+test('removed images cannot be opened and previously issued access links stop working', async () => {
+  const { service, sessionId } = await uploadedServicesWith();
+  await service.finalizeUpload(UID, { exchangeId: EXCHANGE_ID, sessionId });
+  const access = await service.getImageAccess(UID, { exchangeId: EXCHANGE_ID, imageId: sessionId });
+
+  const download = async () => {
+    const response = fakeResponse();
+    await service.downloadImageHttp({ method: 'GET', query: { accessId: access.accessId, proof: access.proof }, headers: {}, get: () => '' }, response);
+    return response;
+  };
+  assert.equal((await download()).statusCode, 200);
+
+  await service.removeImage(UID, { exchangeId: EXCHANGE_ID, imageId: sessionId });
+  const afterRemoval = await download();
+  assert.equal(afterRemoval.statusCode, 404);
+  assert.equal(Buffer.isBuffer(afterRemoval.payload), false);
+  await assert.rejects(() => service.getImageAccess(UID, { exchangeId: EXCHANGE_ID, imageId: sessionId }), { code: 'not-found' });
+});

@@ -32,6 +32,7 @@ const REPORT_MONTH_PATTERN = /^\d{4}-\d{2}$/;
 
 const EVENT_SOURCES = Object.freeze(['events', 'bodMeetings', 'districtEvents', 'bodEvents']);
 const EVENT_SOURCE_SET = new Set(EVENT_SOURCES);
+const REPORT_IMAGE_MIME_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp']);
 
 function makeError(HttpsError, code, message, details) {
   return new HttpsError(code, message, details);
@@ -555,7 +556,39 @@ function normalizeStoredImage(row = {}) {
   };
 }
 
+// Soft-removed images keep their Drive file and metadata but carry removedAt; every
+// app and report reader works with the active images only.
+function isActiveStoredImage(row) {
+  return Boolean(row && typeof row === 'object' && !row.removedAt);
+}
+
+function storedImageId(row = {}) {
+  return safeText(row?.imageId || row?.uploadSessionId, DOCUMENT_ID_MAX);
+}
+
+function activeStoredImages(data = {}) {
+  return Array.isArray(data.images) ? data.images.filter(isActiveStoredImage) : [];
+}
+
+function activeImageCount(data = {}) {
+  if (Array.isArray(data.images)) return activeStoredImages(data).length;
+  return Number.isSafeInteger(data.imageCount) && data.imageCount >= 0 ? data.imageCount : 0;
+}
+
+function isReportEligibleImage(row) {
+  return isActiveStoredImage(row)
+    && Boolean(storedImageId(row))
+    && REPORT_IMAGE_MIME_TYPES.includes(safeText(row.mimeType, 120).toLowerCase());
+}
+
+function activeReportImage(data = {}) {
+  const reportImageId = safeText(data.reportImageId, DOCUMENT_ID_MAX);
+  if (!reportImageId) return null;
+  return activeStoredImages(data).find(row => storedImageId(row) === reportImageId && isReportEligibleImage(row)) || null;
+}
+
 function normalizeStoredExchange(id, data = {}) {
+  const reportImage = activeReportImage(data);
   return {
     id: safeText(id, DOCUMENT_ID_MAX),
     schemaVersion: Number(data.schemaVersion) || SCHEMA_VERSION,
@@ -587,8 +620,9 @@ function normalizeStoredExchange(id, data = {}) {
       label: safeText(data.associatedEvent.label, EVENT_LABEL_MAX),
     } : null,
     other: safeText(data.other, OTHER_MAX),
-    images: Array.isArray(data.images) ? data.images.map(normalizeStoredImage).filter(image => image.imageId && image.fileName) : [],
-    imageCount: Number.isSafeInteger(data.imageCount) && data.imageCount >= 0 ? data.imageCount : (Array.isArray(data.images) ? data.images.length : 0),
+    images: activeStoredImages(data).map(normalizeStoredImage).filter(image => image.imageId && image.fileName),
+    imageCount: activeImageCount(data),
+    reportImageId: reportImage ? storedImageId(reportImage) : '',
     driveFolderName: safeText(data.driveFolderName, 220),
     status: safeText(data.status, 40) || 'active',
     createdAt: timestampToIso(data.createdAt),
@@ -598,6 +632,8 @@ function normalizeStoredExchange(id, data = {}) {
     updatedAt: timestampToIso(data.updatedAt),
     updatedByUid: safeText(data.updatedByUid, DOCUMENT_ID_MAX),
     updatedByName: safeText(data.updatedByName, MEMBER_NAME_MAX),
+    lastEditedAt: timestampToIso(data.lastEditedAt),
+    lastEditedByName: safeText(data.lastEditedByName, MEMBER_NAME_MAX),
   };
 }
 
@@ -697,7 +733,100 @@ function normalizeReportExchange(id, data = {}) {
       date: exchange.associatedEvent.date,
     } : null,
     other: exchange.other,
+    imageCount: exchange.imageCount,
+    reportImage: reportImageForReport(data),
   };
+}
+
+function reportImageForReport(data = {}) {
+  const image = activeReportImage(data);
+  if (!image) return null;
+  const normalized = normalizeStoredImage(image);
+  return normalized.imageId && normalized.fileName
+    ? { imageId: normalized.imageId, fileName: normalized.fileName, mimeType: normalized.mimeType }
+    : null;
+}
+
+function normalizeUpdatePayload(input, HttpsError) {
+  const data = assertPlainObject(input, 'Letterhead Exchange update', HttpsError);
+  const { exchangeId, ...fields } = data;
+  return {
+    exchangeId: normalizeDocumentId(exchangeId, 'exchangeId', HttpsError),
+    ...normalizeCreatePayload(fields, HttpsError),
+  };
+}
+
+function storedEventKey(event) {
+  return event && typeof event === 'object' && event.source && event.id ? `${event.source}:${event.id}` : '';
+}
+
+// Representatives already recorded on the exchange keep their historical snapshot, so an
+// exchange stays editable after a representative leaves the club; new IDs must be eligible.
+async function resolveEditedMemberSnapshots(db, memberIds, storedRepresentatives, HttpsError) {
+  const storedById = new Map((Array.isArray(storedRepresentatives) ? storedRepresentatives : [])
+    .filter(row => row && safeText(row.memberId, DOCUMENT_ID_MAX))
+    .map(row => [safeText(row.memberId, DOCUMENT_ID_MAX), row]));
+  const newIds = memberIds.filter(memberId => !storedById.has(memberId));
+  const resolved = new Map((await resolveMemberSnapshots(db, newIds, HttpsError)).map(row => [row.memberId, row]));
+  return memberIds.map(memberId => storedById.get(memberId) || resolved.get(memberId));
+}
+
+// An unchanged associated event keeps its stored snapshot (it may have been archived since);
+// a changed one goes through the same eligibility check as create.
+async function resolveEditedAssociatedEvent(db, associatedEventRef, storedEvent, HttpsError, now) {
+  if (!associatedEventRef) return null;
+  if (storedEventKey(storedEvent) === eventKey(associatedEventRef)) return storedEvent;
+  return resolveAssociatedEvent(db, associatedEventRef, HttpsError, now);
+}
+
+function participantKey(rows) {
+  return JSON.stringify((Array.isArray(rows) ? rows : []).map(row => [
+    row?.clubName || '',
+    row?.rotaractorName || '',
+    row?.position || '',
+    row?.rotaractDistrictId || '',
+  ]));
+}
+
+function editSummary(data = {}) {
+  return {
+    exchangeDate: safeText(data.exchangeDate, 20),
+    externalParticipantCount: Array.isArray(data.externalParticipants) ? data.externalParticipants.length : 0,
+    rcphRepresentativeCount: Array.isArray(data.rcphMemberIds) ? data.rcphMemberIds.length : 0,
+    associatedEvent: storedEventKey(data.associatedEvent) ? 'linked' : 'none',
+    otherLength: safeText(data.other, OTHER_MAX).length,
+  };
+}
+
+const EDIT_SUMMARY_FIELDS = Object.freeze({
+  exchangeDate: ['exchangeDate'],
+  externalParticipants: ['externalParticipantCount'],
+  rcphMemberIds: ['rcphRepresentativeCount'],
+  associatedEvent: ['associatedEvent'],
+  other: ['otherLength'],
+});
+
+function changedExchangeFields(before = {}, after = {}) {
+  const changed = [];
+  if (safeText(before.exchangeDate, 20) !== after.exchangeDate) changed.push('exchangeDate');
+  if (participantKey(before.externalParticipants) !== participantKey(after.externalParticipants)) changed.push('externalParticipants');
+  if (JSON.stringify(arrayText(before.rcphMemberIds, MAX_RCPH_REPRESENTATIVES, DOCUMENT_ID_MAX)) !== JSON.stringify(after.rcphMemberIds)) changed.push('rcphMemberIds');
+  if (storedEventKey(before.associatedEvent) !== storedEventKey(after.associatedEvent)) changed.push('associatedEvent');
+  if (safeText(before.other, OTHER_MAX) !== after.other) changed.push('other');
+  return changed;
+}
+
+function compactEditDiff(changedFields, before, after) {
+  const beforeSummary = editSummary(before);
+  const afterSummary = editSummary(after);
+  const diff = { before: {}, after: {} };
+  changedFields.forEach((field) => {
+    (EDIT_SUMMARY_FIELDS[field] || []).forEach((key) => {
+      diff.before[key] = beforeSummary[key];
+      diff.after[key] = afterSummary[key];
+    });
+  });
+  return diff;
 }
 
 function createLetterheadExchangeService(options = {}) {
@@ -793,6 +922,86 @@ function createLetterheadExchangeService(options = {}) {
     };
   }
 
+  async function update(uid, input = {}, context = {}) {
+    const access = await requireBodToolsAccess(uid, assertBodToolsAccess, HttpsError);
+    const normalized = normalizeUpdatePayload(input, HttpsError);
+    const ref = db.collection(LETTERHEAD_EXCHANGES_COLLECTION).doc(normalized.exchangeId);
+    const initialSnap = await ref.get();
+    if (!initialSnap?.exists) throw makeError(HttpsError, 'not-found', 'Letterhead Exchange was not found.');
+    const initial = initialSnap.data() || {};
+    if ((safeText(initial.status, 40) || 'active') !== 'active') {
+      throw makeError(HttpsError, 'failed-precondition', 'Letterhead Exchange is not active.');
+    }
+    const [rcphRepresentatives, associatedEvent, actorRaw] = await Promise.all([
+      resolveEditedMemberSnapshots(db, normalized.rcphMemberIds, initial.rcphRepresentatives, HttpsError),
+      resolveEditedAssociatedEvent(db, normalized.associatedEventRef, initial.associatedEvent, HttpsError, now()),
+      typeof getActorProfile === 'function' ? getActorProfile(uid, context.request) : Promise.resolve({}),
+    ]);
+    const actor = normalizeActorProfile(uid, access.role, actorRaw);
+    const timestamp = firestoreTimestamp(admin);
+    const returnIso = timestampToIso(now());
+    const edited = {
+      exchangeDate: normalized.exchangeDate,
+      exchangeMonth: normalized.exchangeMonth,
+      externalParticipants: normalized.externalParticipants,
+      rcphRepresentatives,
+      rcphMemberIds: rcphRepresentatives.map(rep => rep.memberId),
+      associatedEvent,
+      other: normalized.other,
+    };
+
+    let result;
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap?.exists) throw makeError(HttpsError, 'not-found', 'Letterhead Exchange was not found.');
+      const current = snap.data() || {};
+      if ((safeText(current.status, 40) || 'active') !== 'active') {
+        throw makeError(HttpsError, 'failed-precondition', 'Letterhead Exchange is not active.');
+      }
+      const changedFields = changedExchangeFields(current, edited);
+      if (!changedFields.length) {
+        result = { changedFields, current, patch: null };
+        return;
+      }
+      const patch = {
+        ...edited,
+        lastEditedAt: timestamp,
+        lastEditedByUid: uid,
+        lastEditedByName: actor.name,
+        updatedAt: timestamp,
+        updatedByUid: uid,
+        updatedByName: actor.name,
+      };
+      tx.update(ref, patch);
+      result = { changedFields, current, patch };
+    });
+
+    if (!result.patch) {
+      return { ok: true, unchanged: true, exchange: normalizeStoredExchange(ref.id, result.current) };
+    }
+    const exchange = normalizeStoredExchange(ref.id, {
+      ...result.current,
+      ...result.patch,
+      lastEditedAt: returnIso,
+      updatedAt: returnIso,
+    });
+    if (typeof writeLog === 'function') {
+      await writeLog({
+        uid,
+        request: context.request,
+        authority: access,
+        actor,
+        exchange,
+        action: 'updated',
+        metadata: {
+          changedFields: result.changedFields,
+          ...compactEditDiff(result.changedFields, result.current, edited),
+        },
+      });
+    }
+    return { ok: true, unchanged: false, exchange };
+  }
+
   async function list(uid, input = {}) {
     await requireBodToolsAccess(uid, assertBodToolsAccess, HttpsError);
     const limit = validateListInput(input, HttpsError);
@@ -845,6 +1054,7 @@ function createLetterheadExchangeService(options = {}) {
   return {
     formOptions,
     create,
+    update,
     list,
     forReport,
   };
@@ -859,7 +1069,13 @@ module.exports = {
   MAX_EXTERNAL_PARTICIPANTS,
   MAX_RCPH_REPRESENTATIVES,
   ROTARACT_DISTRICT_ID_MAX,
+  REPORT_IMAGE_MIME_TYPES,
+  isActiveStoredImage,
+  activeStoredImages,
+  activeReportImage,
+  isReportEligibleImage,
   normalizeCreatePayload,
+  normalizeUpdatePayload,
   validateReportInput,
   loadMemberOptions,
   loadEventOptions,

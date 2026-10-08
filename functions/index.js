@@ -236,22 +236,29 @@ const letterheadExchanges = createLetterheadExchangeService({
   HttpsError,
   assertBodToolsAccess: assertLetterheadExchangeAccess,
   getActorProfile: getCallableUserProfile,
-  writeLog: ({ uid, request, authority, exchange, metadata }) => writeSystemMutationLog({
+  writeLog: ({ uid, request, authority, exchange, action = 'created', metadata }) => writeSystemMutationLog({
     uid,
     request,
     authority,
     category: 'letterhead_exchange',
-    action: 'created',
+    action,
     status: 'success',
     targetType: 'letterhead_exchange',
     targetId: exchange.id,
     targetLabel: `Letterhead Exchange ${exchange.exchangeDate}`,
     targetAudience: 'BOD Tools',
-    details: 'Letterhead Exchange record created.',
-    source: 'createLetterheadExchange',
+    details: action === 'updated' ? 'Letterhead Exchange record edited.' : 'Letterhead Exchange record created.',
+    source: action === 'updated' ? 'updateLetterheadExchange' : 'createLetterheadExchange',
     relatedDocPath: `letterheadExchanges/${exchange.id}`,
     metadata,
   }),
+});
+const LETTERHEAD_EXCHANGE_IMAGE_LOG_ACTIONS = Object.freeze({
+  image_upload_session_created: { details: 'Letterhead Exchange image upload session created.', source: 'createLetterheadExchangeImageUploadSession' },
+  image_uploaded: { details: 'Letterhead Exchange image uploaded.', source: 'finalizeLetterheadExchangeImageUpload' },
+  report_image_selected: { details: 'Letterhead Exchange report photo selected.', source: 'setLetterheadExchangeReportImage' },
+  report_image_cleared: { details: 'Letterhead Exchange report photo cleared.', source: 'setLetterheadExchangeReportImage' },
+  image_removed: { details: 'Letterhead Exchange image removed (Drive file kept).', source: 'removeLetterheadExchangeImage' },
 });
 const letterheadExchangeImages = createLetterheadExchangeImageService({
   db,
@@ -274,12 +281,8 @@ const letterheadExchangeImages = createLetterheadExchangeImageService({
     targetId: exchangeId,
     targetLabel: `Letterhead Exchange ${exchangeId}`,
     targetAudience: 'BOD Tools',
-    details: action === 'image_upload_session_created'
-      ? 'Letterhead Exchange image upload session created.'
-      : 'Letterhead Exchange image uploaded.',
-    source: action === 'image_upload_session_created'
-      ? 'createLetterheadExchangeImageUploadSession'
-      : 'finalizeLetterheadExchangeImageUpload',
+    details: (LETTERHEAD_EXCHANGE_IMAGE_LOG_ACTIONS[action] || LETTERHEAD_EXCHANGE_IMAGE_LOG_ACTIONS.image_uploaded).details,
+    source: (LETTERHEAD_EXCHANGE_IMAGE_LOG_ACTIONS[action] || LETTERHEAD_EXCHANGE_IMAGE_LOG_ACTIONS.image_uploaded).source,
     relatedDocPath: `letterheadExchanges/${exchangeId}`,
     metadata,
   }),
@@ -9053,6 +9056,15 @@ exports.createLetterheadExchange = onCall(CALLABLE_OPTIONS, async (request) => {
   }
 });
 
+exports.updateLetterheadExchange = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchanges.update(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not update Letterhead Exchange.');
+  }
+});
+
 exports.listLetterheadExchanges = onCall(CALLABLE_OPTIONS, async (request) => {
   const uid = requireAuth(request);
   try {
@@ -9095,6 +9107,24 @@ exports.getLetterheadExchangeImageAccess = onCall(CALLABLE_OPTIONS, async (reque
     return await letterheadExchangeImages.getImageAccess(uid, request.data || {}, { request });
   } catch (err) {
     throwCallableServiceError(err, 'Could not open Letterhead Exchange image.');
+  }
+});
+
+exports.setLetterheadExchangeReportImage = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchangeImages.setReportImage(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not update the Letterhead Exchange report photo.');
+  }
+});
+
+exports.removeLetterheadExchangeImage = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  try {
+    return await letterheadExchangeImages.removeImage(uid, request.data || {}, { request });
+  } catch (err) {
+    throwCallableServiceError(err, 'Could not remove the Letterhead Exchange image.');
   }
 });
 
