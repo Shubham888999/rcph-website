@@ -1,14 +1,20 @@
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../../app/firebase";
 import {
+  LETTERHEAD_ALLOWED_IMAGE_MIME_TYPES,
+  LETTERHEAD_IMAGE_MAX_BYTES,
   buildProtectedImageUrl,
+  letterheadReportImageKey,
   normalizeCreateExchangeResponse,
   normalizeFinalizeImageResponse,
   normalizeFormOptionsResponse,
   normalizeImageAccessResponse,
   normalizeImageSessionResponse,
   normalizeListExchangeResponse,
+  normalizeRemoveImageResponse,
+  normalizeReportImageChangeResponse,
   normalizeReportLetterheadExchangeResponse,
+  normalizeUpdateExchangeResponse,
   normalizeUploadHttpResponse,
   validateLetterheadImageFile,
 } from "./letterheadExchangeModel";
@@ -57,6 +63,24 @@ export async function fetchLetterheadExchangeFormOptions() {
 
 export async function createLetterheadExchange(payload) {
   return normalizeCreateExchangeResponse(await callable("createLetterheadExchange", payload));
+}
+
+export async function updateLetterheadExchange(payload) {
+  return normalizeUpdateExchangeResponse(await callable("updateLetterheadExchange", payload));
+}
+
+export async function setLetterheadExchangeReportImage(exchangeId, imageId = "") {
+  return normalizeReportImageChangeResponse(await callable("setLetterheadExchangeReportImage", {
+    exchangeId,
+    imageId,
+  }));
+}
+
+export async function removeLetterheadExchangeImage(exchangeId, imageId) {
+  return normalizeRemoveImageResponse(await callable("removeLetterheadExchangeImage", {
+    exchangeId,
+    imageId,
+  }));
 }
 
 export async function listLetterheadExchanges(payload = {}) {
@@ -181,6 +205,33 @@ export async function uploadLetterheadExchangeImages(exchangeId, files, { onFile
     successCount,
     failureCount,
   };
+}
+
+export async function getLetterheadImagePreviewUrl(exchangeId, imageId) {
+  const access = await getLetterheadExchangeImageAccess(exchangeId, imageId);
+  const url = buildProtectedImageUrl(access);
+  if (!url) throw new Error("Image access response was incomplete.");
+  return url;
+}
+
+// Report photos use the same short-lived protected access link as "Open"; the bytes are
+// returned in the shape the shared JPEG preparation pipeline expects (eventId = block key).
+export async function fetchLetterheadReportImageBytes(exchangeId, reportImage, options = {}) {
+  const key = letterheadReportImageKey(exchangeId);
+  if (!key || !reportImage?.imageId) throw new Error("Unable to open this image.");
+  const getAccess = options.getAccess || getLetterheadExchangeImageAccess;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  if (typeof fetchImpl !== "function") throw new Error("Unable to open this image.");
+  const url = buildProtectedImageUrl(await getAccess(exchangeId, reportImage.imageId));
+  if (!url) throw new Error("Image access response was incomplete.");
+  const response = await fetchImpl(url, { method: "GET", cache: "no-store", signal: options.signal });
+  if (!response?.ok) throw new Error("Unable to open this image.");
+  const mimeType = String(response.headers?.get?.("Content-Type") || "").split(";")[0].trim().toLowerCase();
+  if (!LETTERHEAD_ALLOWED_IMAGE_MIME_TYPES.includes(mimeType)) throw new Error("Unable to open this image.");
+  const arrayBuffer = await response.arrayBuffer();
+  const sizeBytes = Number(arrayBuffer?.byteLength || 0);
+  if (!sizeBytes || sizeBytes > LETTERHEAD_IMAGE_MAX_BYTES) throw new Error("Unable to open this image.");
+  return { eventId: key, mimeType, sizeBytes, arrayBuffer };
 }
 
 export async function openProtectedLetterheadImage(exchangeId, image, opener = globalThis.window) {

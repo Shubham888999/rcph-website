@@ -487,7 +487,8 @@ test("ISD reports render Letterhead Exchanges after existing finance content", (
   ]);
   assert.equal(BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS.reduce((sum, column) => sum + column.width, 0), 523);
   assert.doesNotMatch(text, /Associated Event \/ Remarks/);
-  assert.doesNotMatch(text, /Project Across Borders/);
+  // v2.12.0: the exchange block header names the linked event; the remarks column stays out.
+  assert.match(text, /12 Jul 2026 \\225 Rotaract Club A, Rotaract Club B \\225 Event: Project Across Borders/);
   assert.doesNotMatch(text, /Remarks: Exchange during/);
   assert.ok(text.indexOf("Total expense for July 2026") < text.indexOf("LETTERHEAD EXCHANGES"));
 });

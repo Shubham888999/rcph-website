@@ -1004,6 +1004,93 @@ function letterheadRowsForReport(report) {
     : [];
 }
 
+function letterheadBlocksForReport(report) {
+  if (report?.includeLetterheadExchanges !== true) return [];
+  if (Array.isArray(report?.letterheadExchangeBlocks)) {
+    return report.letterheadExchangeBlocks.filter((block) => Array.isArray(block?.rows) && block.rows.length);
+  }
+  // Older report models only carry flat rows: group them by exchange without photos.
+  const blocks = new Map();
+  letterheadRowsForReport(report).forEach((row) => {
+    const key = row?.exchangeId || `${row?.date}-${blocks.size}`;
+    if (!blocks.has(key)) blocks.set(key, { heading: row?.dateLabel || row?.date || "", rows: [], reportImageKey: "" });
+    blocks.get(key).rows.push(row);
+  });
+  return [...blocks.values()];
+}
+
+// Headings use "·" between parts; the PDF fonts only carry the WinAnsi bullet, so the
+// separator is protected through wrapping and drawn as "•".
+const LETTERHEAD_HEADING_SEPARATOR_TOKEN = "~RCPHSEP~";
+
+function letterheadBlockHeadingLines(block, style) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const heading = String(block?.heading || "").replace(/\s*[·•]\s*/g, ` ${LETTERHEAD_HEADING_SEPARATOR_TOKEN} `);
+  return wrapText(heading, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.headingSize, style.fontFamily, true)
+    .map((line) => line.replaceAll(LETTERHEAD_HEADING_SEPARATOR_TOKEN, "•"));
+}
+
+function letterheadBlockHeadingHeight(lines) {
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  return lines.length * layout.headingLineHeight + layout.headingToTableGap;
+}
+
+function letterheadBlockPhoto(block, context) {
+  return block?.reportImageKey ? context?.imageResources?.get?.(block.reportImageKey) || null : null;
+}
+
+function letterheadBlockLeadHeight(block, style, context) {
+  const headingHeight = letterheadBlockHeadingHeight(letterheadBlockHeadingLines(block, style));
+  const firstRow = block?.rows?.[0] ? rowHeightForLines(letterheadCellLines(block.rows[0], style), style) : 0;
+  const photo = letterheadBlockPhoto(block, context);
+  const photoHeight = photo && block.rows.length === 1 ? photoBlockHeight(photo.image, BOD_AVENUE_REPORT_CONTENT_WIDTH) : 0;
+  return headingHeight + style.table.headerHeight + firstRow + photoHeight;
+}
+
+function drawLetterheadBlock(pages, startY, block, style, context) {
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  const layout = BOD_AVENUE_REPORT_LAYOUT.group;
+  const table = style.table;
+  let commands = pages.at(-1);
+  let y = startY;
+  const headingLines = letterheadBlockHeadingLines(block, style);
+  const headingHeight = letterheadBlockHeadingHeight(headingLines);
+  const rowHeights = block.rows.map((row) => rowHeightForLines(letterheadCellLines(row, style), style));
+  const textHeight = headingHeight + table.headerHeight + rowHeights.reduce((sum, height) => sum + height, 0);
+  const photoResource = letterheadBlockPhoto(block, context);
+  const photoHeight = photoResource ? photoBlockHeight(photoResource.image, BOD_AVENUE_REPORT_CONTENT_WIDTH) : 0;
+  const freshPageCapacity = safe.top - safe.bottom;
+  // Keep the whole block (heading, rows, photo) together when it fits on one page; otherwise
+  // keep heading + rows together; otherwise at least heading + column header + first row.
+  if (textHeight + photoHeight <= freshPageCapacity) {
+    if (y - textHeight - photoHeight < safe.bottom) ({ commands, y } = createBlankPage(pages));
+  } else if (textHeight <= freshPageCapacity) {
+    if (y - textHeight < safe.bottom) ({ commands, y } = createBlankPage(pages));
+  } else if (y - (headingHeight + table.headerHeight + (rowHeights[0] || 0)) < safe.bottom) {
+    ({ commands, y } = createBlankPage(pages));
+  }
+  addTextLines(commands, headingLines, safe.left, y, {
+    size: layout.headingSize,
+    lineHeight: layout.headingLineHeight,
+    bold: true,
+    gray: 0.08,
+    fontFamily: style.fontFamily,
+  });
+  y -= headingHeight;
+  y = drawTableHeader(commands, y, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS);
+  y = drawLetterheadRows(pages, block.rows, y, style);
+  commands = pages.at(-1);
+  if (photoResource) {
+    // Same rule as event photos: a photo is never split; it moves to the next page whole.
+    if (y - photoHeight < safe.bottom) {
+      ({ commands, y } = createBlankPage(pages));
+      commands.push(pdfLineCommand({ x1: safe.left, y1: y, x2: safe.right, y2: y, gray: table.borderGray }));
+    }
+    y = drawPhotoBlock(commands, y, style, photoResource, pages, context);
+  }
+  return y;
+}
+
 function letterheadHeadingModel(style) {
   const layout = BOD_AVENUE_REPORT_LAYOUT.group;
   const headingLines = wrapText(LETTERHEAD_EXCHANGE_SECTION_TITLE, BOD_AVENUE_REPORT_CONTENT_WIDTH, layout.headingSize, style.fontFamily, true);
@@ -1043,23 +1130,24 @@ function drawNoLetterheadMessage(commands, y, style) {
   return y - height - BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable;
 }
 
-function drawLetterheadExchangeSection(pages, commands, y, report, style) {
+function drawLetterheadExchangeSection(pages, commands, y, report, style, context) {
   if (report?.includeLetterheadExchanges !== true) return { commands, y };
-  const rows = letterheadRowsForReport(report);
+  const blocks = letterheadBlocksForReport(report);
   const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
   const table = style.table;
   const heading = letterheadHeadingModel(style);
   const gap = BOD_AVENUE_REPORT_LAYOUT.group.groupGapAfterTable;
-  const firstRowHeight = rows[0] ? rowHeightForLines(letterheadCellLines(rows[0], style), style) : table.lineHeight + table.padding * 2;
-  const required = heading.height + (rows.length ? table.headerHeight + firstRowHeight : firstRowHeight);
+  const emptyMessageHeight = table.lineHeight + table.padding * 2;
+  const required = heading.height + (blocks.length ? letterheadBlockLeadHeight(blocks[0], style, context) : emptyMessageHeight);
   ({ commands, y } = ensureSpace(pages, commands, y - gap, required));
   y = drawLetterheadHeading(commands, y, style);
-  if (!rows.length) {
-    if (y - firstRowHeight < safe.bottom) ({ commands, y } = createBlankPage(pages));
+  if (!blocks.length) {
+    if (y - emptyMessageHeight < safe.bottom) ({ commands, y } = createBlankPage(pages));
     return { commands, y: drawNoLetterheadMessage(commands, y, style) };
   }
-  y = drawTableHeader(commands, y, style, BOD_LETTERHEAD_EXCHANGE_TABLE_COLUMNS);
-  y = drawLetterheadRows(pages, rows, y, style);
+  blocks.forEach((block, index) => {
+    y = drawLetterheadBlock(pages, index ? y - gap * 2 : y, block, style, context);
+  });
   return { commands: pages.at(-1), y };
 }
 
@@ -1102,7 +1190,7 @@ function drawReportContent(pages, report, startY, style, context) {
   }
 
   if (showGrandTotal) ({ commands, y } = drawGrandTotal(pages, commands, y, report, style));
-  drawLetterheadExchangeSection(pages, commands, y, report, style);
+  drawLetterheadExchangeSection(pages, commands, y, report, style, context);
 }
 
 function addPageChrome(pages, report) {

@@ -3,8 +3,9 @@ import {
   buildClubSummary,
   buildRepresentativeSummary,
   formatExchangeDate,
+  formatLastEditedLabel,
   formatLetterheadFileSize,
-  imageCountLabel,
+  letterheadPhotoBadge,
 } from "./letterheadExchangeModel";
 import {
   getSafeLetterheadExchangeError,
@@ -16,7 +17,7 @@ function eventLabel(event) {
   return event.label || event.name || `${event.source}:${event.id}`;
 }
 
-export default function LetterheadExchangeHistory({ status, error, exchanges, onRetry }) {
+export default function LetterheadExchangeHistory({ status, error, exchanges, onRetry, onManage }) {
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [openingImageId, setOpeningImageId] = useState("");
   const [openError, setOpenError] = useState("");
@@ -68,23 +69,38 @@ export default function LetterheadExchangeHistory({ status, error, exchanges, on
           {exchanges.map((exchange) => {
             const expanded = expandedIds.has(exchange.id);
             const panelId = `letterhead-history-${exchange.id}`;
+            const badge = letterheadPhotoBadge(exchange);
+            const lastEdited = formatLastEditedLabel(exchange);
             return (
               <article className="letterhead-history-card" key={exchange.id}>
-                <button
-                  type="button"
-                  className="letterhead-history-card__summary"
-                  aria-expanded={expanded}
-                  aria-controls={panelId}
-                  onClick={() => toggle(exchange.id)}
-                >
-                  <span>
-                    <strong>{formatExchangeDate(exchange.exchangeDate)}</strong>
-                    <small>{buildClubSummary(exchange)}</small>
-                  </span>
-                  <span>{buildRepresentativeSummary(exchange)}</span>
-                  <span>{eventLabel(exchange.associatedEvent)}</span>
-                  <span>{imageCountLabel(exchange.imageCount)}</span>
-                </button>
+                <div className="letterhead-history-card__header">
+                  <button
+                    type="button"
+                    className="letterhead-history-card__summary"
+                    aria-expanded={expanded}
+                    aria-controls={panelId}
+                    onClick={() => toggle(exchange.id)}
+                  >
+                    <span>
+                      <strong>{formatExchangeDate(exchange.exchangeDate)}</strong>
+                      <small>{buildClubSummary(exchange)}</small>
+                    </span>
+                    <span>{buildRepresentativeSummary(exchange)}</span>
+                    <span>{eventLabel(exchange.associatedEvent)}</span>
+                    <span className={`letterhead-photo-badge is-${badge.tone}`}>{badge.text}</span>
+                  </button>
+                  {onManage ? (
+                    <button
+                      type="button"
+                      className="letterhead-history-card__manage"
+                      onClick={() => onManage(exchange)}
+                      aria-label={`Manage Letterhead Exchange of ${formatExchangeDate(exchange.exchangeDate)} with ${buildClubSummary(exchange)}`}
+                    >
+                      Manage
+                    </button>
+                  ) : null}
+                </div>
+                {lastEdited ? <p className="letterhead-history-card__edited">{lastEdited}</p> : null}
 
                 {expanded ? (
                   <div id={panelId} className="letterhead-history-card__details">
@@ -126,7 +142,10 @@ export default function LetterheadExchangeHistory({ status, error, exchanges, on
                               <li key={image.imageId}>
                                 <span>
                                   <strong>{image.fileName}</strong>
-                                  <small>{formatLetterheadFileSize(image.sizeBytes)} / {image.mimeType}</small>
+                                  <small>
+                                    {formatLetterheadFileSize(image.sizeBytes)} / {image.mimeType}
+                                    {exchange.reportImageId === image.imageId ? " / Report photo" : ""}
+                                  </small>
                                 </span>
                                 <button
                                   type="button"
