@@ -387,6 +387,7 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
   font-weight: 650;
 }
 .bod-avenue-report__letterhead-toggle--secretarial { grid-column: 1 / -1; margin-left: 0; }
+.bod-avenue-report__letterhead-toggle--event-photos { margin-left: 0; }
 .bod-avenue-report__mode { display: grid; gap: .7rem; margin-top: .8rem; padding-top: .75rem; border-top: 1px solid var(--internal-border); }
 .bod-avenue-report__mode-toggle { display: flex !important; align-items: center; gap: .45rem; color: var(--internal-text); }
 .bod-avenue-report__secretarial-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }

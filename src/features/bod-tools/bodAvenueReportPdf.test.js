@@ -228,6 +228,20 @@ test("different Avenue event images create distinct resources and totals remain 
   assert.ok(pageText.lastIndexOf("/Im2 Do") < pageText.indexOf("Total expense for July 2026"));
 });
 
+test("Avenue event with a report image renders its normal block without a photo when the image map is empty", () => {
+  const model = report([makeEvent("Photo", "Short description", "2026-07-05", ["CMD"], { reportImageFileId: "drive-file-photo" })]);
+  const withPhotos = buildBodAvenueReportPdfPages(model, { imagesByEventId: new Map([["Photo", reportImage("Photo")]]) }).flat().join("\n");
+  const pageText = buildBodAvenueReportPdfPages(model, { imagesByEventId: new Map() }).flat().join("\n");
+  const pdf = decodePdf(buildBodAvenueReportPdfDocument(model, MOCK_LETTERHEAD, { imagesByEventId: new Map() }));
+  assert.match(withPhotos, /\/Im1 Do/);
+  assert.match(pageText, /Project Photo/);
+  assert.match(pageText, /Short description/);
+  assert.match(pageText, /Total expense for July 2026/);
+  assert.doesNotMatch(pageText, /\/Im\d+ Do/);
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 0);
+  assert.match(pdf, /\/XObject << \/BG 7 0 R >>/);
+});
+
 test("Avenue BOD meeting rows do not render report images", () => {
   const model = report([makeMeeting("Board")], {
     selectedAvenueCodes: [],

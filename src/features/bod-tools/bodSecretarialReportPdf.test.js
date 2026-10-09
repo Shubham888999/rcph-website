@@ -194,6 +194,26 @@ for (const page of pagesWithEventsHeading) {
   assert.doesNotMatch(pdf, /RCPH-SECRETARIAL-july-bod|RCPH-SECRETARIAL-july-gbm/);
 });
 
+test("secretarial event with a report image renders without a photo when the image map is empty", () => {
+  const model = report({
+    events: [
+      bodMeeting("july-bod"),
+      clubEvent("july-gbm", { startDate: "2026-07-12", avenues: ["GBM"], name: "July GBM" }),
+      clubEvent("july-project", { name: "Service Project", reportImageFileId: "drive-file-project" }),
+    ],
+  });
+  const withPhotos = buildBodSecretarialReportPdfPages(model, { frame: MOCK_FRAME, imagesByEventId: new Map([["july-project", reportImage("july-project")]]) }).flat().join("\n");
+  const pageText = buildBodSecretarialReportPdfPages(model, { frame: MOCK_FRAME, imagesByEventId: new Map() }).flat().join("\n");
+  const pdf = decodePdf(buildBodSecretarialReportPdfDocument(model, MOCK_LETTERHEAD, MOCK_FRAME, { imagesByEventId: new Map() }));
+  assert.match(withPhotos, /\/Im1 Do/);
+  assert.match(pageText, /2\. Events/);
+  assert.match(pageText, /Service Project/);
+  assert.doesNotMatch(pageText, /\/Im\d+ Do/);
+  assert.equal(occurrences(pdf, /\/Filter \/DCTDecode/g), 0);
+  assert.doesNotMatch(pdf, /RCPH-SECRETARIAL-july-project/);
+  assert.match(pdf, /\/XObject << \/BG 5 0 R \/FRAME 6 0 R >>/);
+});
+
 test("secretarial event images preserve background and frame resources", () => {
   const model = report({
     events: [

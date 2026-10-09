@@ -385,6 +385,15 @@ export function buildLetterheadExchangeReportBlocks(exchanges, options = {}) {
   }));
 }
 
+// Event photos and Letterhead Exchange photos are independent export options.
+// The Secretarial Report never renders Letterhead Exchange photos.
+export function resolveReportImageOptions({ includeEventPhotos = true, includeLetterheadPhotos = false, mode = "avenue" } = {}) {
+  return {
+    prepareEventImages: includeEventPhotos === true,
+    prepareLetterheadImages: mode === "avenue" && includeLetterheadPhotos === true,
+  };
+}
+
 export function createBodAvenueSelection(events) {
   return new Set((Array.isArray(events) ? events : []).map((event) => event?.id).filter(Boolean));
 }
