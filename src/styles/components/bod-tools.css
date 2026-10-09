@@ -2316,3 +2316,292 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
     white-space: normal;
   }
 }
+
+/* Letterhead Exchanges: photo badge, last-edited line, Manage dialog, report photo notice */
+.letterhead-history-card__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.letterhead-history-card__manage {
+  min-height: 2.4rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--internal-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--internal-text);
+  background: var(--internal-surface-raised);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.letterhead-history-card__summary > span.letterhead-photo-badge.is-warning {
+  border-left-color: var(--internal-accent-soft);
+  color: var(--internal-accent-soft);
+  background: rgba(244, 180, 58, 0.07);
+}
+
+.letterhead-history-card__summary > span.letterhead-photo-badge.is-muted {
+  border-left-color: var(--internal-border-strong);
+  color: var(--internal-text-muted);
+  background: transparent;
+}
+
+.letterhead-history-card__edited {
+  margin: -0.45rem 0 0.6rem;
+  color: var(--internal-text-muted);
+  font-size: 0.8rem;
+}
+
+.letterhead-manage-dialog {
+  width: min(960px, 100%);
+}
+
+.letterhead-manage-dialog__subtitle {
+  margin: 0 0 0.9rem;
+  color: var(--internal-text-muted);
+}
+
+.letterhead-manage-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--internal-border);
+}
+
+.letterhead-manage-tabs button {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.95rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--internal-text-muted);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.letterhead-manage-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--internal-accent-secondary);
+  color: var(--internal-text);
+}
+
+.letterhead-manage-dialog .letterhead-record {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.letterhead-photos {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.letterhead-photos__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.letterhead-photo-card {
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--internal-border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.letterhead-photo-card.is-selected {
+  border-color: rgba(96, 195, 196, 0.7);
+  background: rgba(96, 195, 196, 0.08);
+}
+
+.letterhead-photo-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  color: var(--internal-text-muted);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.letterhead-photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.letterhead-photo-card strong,
+.letterhead-photo-card small {
+  overflow-wrap: anywhere;
+}
+
+.letterhead-photo-card small {
+  color: var(--internal-text-muted);
+  font-size: 0.78rem;
+}
+
+.bod-dialog .letterhead-photo-card label,
+.letterhead-photo-card label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--internal-text);
+  font-weight: 750;
+}
+
+.bod-dialog .letterhead-photo-card input[type="radio"],
+.bod-dialog .letterhead-report-choice input[type="radio"] {
+  width: auto;
+  min-height: auto;
+  accent-color: var(--internal-accent-secondary);
+}
+
+.letterhead-photo-card__actions,
+.letterhead-photos__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.letterhead-photo-card__actions button,
+.letterhead-photos__actions button,
+.letterhead-confirm button,
+.letterhead-report-choice button {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--internal-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--internal-text);
+  background: var(--internal-surface-raised);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.letterhead-photo-card__actions .is-danger,
+.letterhead-confirm .is-danger {
+  border-color: rgba(255, 171, 182, 0.5);
+  color: #ffabb6;
+}
+
+.letterhead-confirm {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border-left: 3px solid #ffabb6;
+  background: rgba(255, 171, 182, 0.06);
+}
+
+.letterhead-confirm p {
+  margin: 0;
+}
+
+.letterhead-confirm div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.letterhead-photos__status {
+  margin: 0;
+  color: var(--internal-text-muted);
+  font-size: 0.86rem;
+}
+
+.letterhead-photos__status.is-success {
+  color: var(--internal-status-success);
+}
+
+.letterhead-photos__status.is-error {
+  color: #ffabb6;
+}
+
+.letterhead-photos__add {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--internal-border);
+}
+
+.letterhead-photos__add h4,
+.letterhead-report-choice h4 {
+  margin: 0;
+}
+
+.letterhead-report-choice {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border-left: 3px solid var(--internal-accent-secondary);
+  background: rgba(96, 195, 196, 0.055);
+}
+
+.letterhead-report-choice fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.letterhead-report-choice legend {
+  margin-bottom: 0.4rem;
+  color: var(--internal-text-muted);
+  font-size: 0.82rem;
+}
+
+.letterhead-report-choice .letterhead-photos__grid label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bod-avenue-report__letterhead-toggle--photos {
+  margin-left: 2.6rem;
+}
+
+.bod-avenue-report__letterhead-notice {
+  padding: 0.75rem 0.85rem;
+  border-left: 3px solid var(--internal-accent-soft);
+  color: var(--internal-text);
+  background: rgba(244, 180, 58, 0.07);
+  font-size: 0.88rem;
+}
+
+.bod-avenue-report__letterhead-notice p {
+  margin: 0 0 0.35rem;
+}
+
+.bod-avenue-report__letterhead-notice ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.2rem;
+  color: var(--internal-text-muted);
+}
+
+@media (max-width: 680px) {
+  .letterhead-history-card__header {
+    grid-template-columns: 1fr;
+  }
+
+  .letterhead-history-card__manage,
+  .letterhead-photo-card__actions button,
+  .letterhead-photos__actions button {
+    width: 100%;
+  }
+
+  .bod-avenue-report__letterhead-toggle--photos {
+    margin-left: 1.55rem;
+  }
+}

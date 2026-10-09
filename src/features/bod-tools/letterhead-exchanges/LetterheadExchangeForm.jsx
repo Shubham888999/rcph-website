@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import LetterheadExchangeImageUploader from "./LetterheadExchangeImageUploader";
+import LetterheadReportPhotoChoice from "./LetterheadReportPhotoChoice";
 import {
   LETTERHEAD_PARTICIPANT_LIMIT,
   LETTERHEAD_OTHER_LIMIT,
   addParticipantRow,
   buildCreateLetterheadExchangePayload,
+  buildEditDraftFromExchange,
+  buildUpdateLetterheadExchangePayload,
   createLetterheadExchangeDraft,
   eventKey,
   removeParticipantRow,
@@ -13,14 +16,32 @@ import {
 import {
   createLetterheadExchange,
   getSafeLetterheadExchangeError,
+  updateLetterheadExchange,
   uploadLetterheadExchangeImages,
 } from "./letterheadExchangeService";
 
 const EMPTY_IMAGE_STATE = Object.freeze({ files: [], selectionErrors: [] });
 
+// Images uploaded for a new exchange (earlier attempts + this run) and the report photo the
+// server auto-selected on the first finalize, if any.
+function collectUploadedImages(previousItems, uploadResult) {
+  const images = (previousItems || []).map((item) => item.image).filter((image) => image?.imageId);
+  let reportImageId = "";
+  for (const result of uploadResult?.results || []) {
+    if (result.ok && result.finalized?.image?.imageId) images.push(result.finalized.image);
+    if (result.finalized?.exchange?.reportImageId) reportImageId = result.finalized.exchange.reportImageId;
+  }
+  const seen = new Set();
+  return {
+    images: images.filter((image) => !seen.has(image.imageId) && seen.add(image.imageId)),
+    reportImageId,
+  };
+}
+
 function statusText(status, imageState) {
   const uploaded = imageState.files.filter((item) => item.status === "uploaded").length;
   const failed = imageState.files.filter((item) => item.status === "failed").length;
+  if (status === "saving_changes") return "Saving changes...";
   if (status === "creating_exchange") return "Saving Letterhead Exchange...";
   if (status === "uploading_images") return `Uploading images... ${uploaded} uploaded`;
   if (status === "success") return uploaded ? `Letterhead Exchange recorded successfully. ${uploaded} image${uploaded === 1 ? "" : "s"} uploaded.` : "Letterhead Exchange recorded successfully.";
@@ -32,8 +53,19 @@ function fieldError(errors, index, field) {
   return errors.participants?.[index]?.[field] || "";
 }
 
-export default function LetterheadExchangeForm({ members, events, optionsStatus, onSaved }) {
-  const [draft, setDraft] = useState(() => createLetterheadExchangeDraft());
+export default function LetterheadExchangeForm({
+  members,
+  events,
+  optionsStatus,
+  onSaved,
+  mode = "create",
+  exchange = null,
+  idPrefix = "letterhead",
+  onCancel,
+}) {
+  const isEdit = mode === "edit" && Boolean(exchange?.id);
+  const [draft, setDraft] = useState(() => (isEdit ? buildEditDraftFromExchange(exchange) : createLetterheadExchangeDraft()));
+  const [reportChoice, setReportChoice] = useState(null);
   const [errors, setErrors] = useState({});
   const [imageState, setImageState] = useState(EMPTY_IMAGE_STATE);
   const [memberQuery, setMemberQuery] = useState("");
@@ -49,7 +81,7 @@ export default function LetterheadExchangeForm({ members, events, optionsStatus,
   const pendingParticipantFocusRef = useRef("");
   const formRef = useRef(null);
   const memberDropdownRef = useRef(null);
-  const busy = ["creating_exchange", "uploading_images"].includes(submission.status);
+  const busy = ["creating_exchange", "uploading_images", "saving_changes"].includes(submission.status);
 const selectedMemberIds = useMemo(() => new Set(draft.rcphMemberIds), [draft.rcphMemberIds]);
 
 const filteredMembers = useMemo(() => {
@@ -86,17 +118,19 @@ useEffect(() => {
 
   function handleKeyDown(event) {
     if (event.key === "Escape") {
+      // Captured first so Escape closes only the dropdown when the form sits in a dialog.
+      event.stopPropagation();
       setMemberDropdownOpen(false);
       setMemberQuery("");
     }
   }
 
   document.addEventListener("mousedown", handlePointerDown);
-  document.addEventListener("keydown", handleKeyDown);
+  document.addEventListener("keydown", handleKeyDown, true);
 
   return () => {
     document.removeEventListener("mousedown", handlePointerDown);
-    document.removeEventListener("keydown", handleKeyDown);
+    document.removeEventListener("keydown", handleKeyDown, true);
   };
 }, [memberDropdownOpen]);
   function updateDraft(key, value) {
@@ -164,15 +198,61 @@ function resetForm() {
     return result;
   }
 
+  function focusFirstInvalid() {
+    const firstInvalid = formRef.current?.querySelector("[aria-invalid='true']");
+    firstInvalid?.focus?.();
+  }
+
+  // After uploads for a new exchange: 1 photo is auto-selected by the server; 2+ prompt a choice.
+  function reportPhotoFollowUp(exchangeId, uploaded) {
+    if (uploaded.images.length >= 2) {
+      setReportChoice({ exchangeId, images: uploaded.images, selectedImageId: uploaded.reportImageId });
+      return "";
+    }
+    return uploaded.images.length === 1 ? ` Report photo: ${uploaded.images[0].fileName} (auto-selected).` : "";
+  }
+
+  async function saveEdits() {
+    const result = buildUpdateLetterheadExchangePayload(exchange.id, draft, events);
+    if (!result.payload) {
+      setErrors(result.errors);
+      setSubmission({ status: "validating", message: "Review the highlighted fields.", exchangeId: "", exchange: null });
+      focusFirstInvalid();
+      return;
+    }
+    setErrors({});
+    setSubmission({ status: "saving_changes", message: "", exchangeId: "", exchange: null });
+    try {
+      const saved = await updateLetterheadExchange(result.payload);
+      setSubmission({
+        status: "success",
+        message: saved.unchanged ? "No changes to save." : "Changes saved.",
+        exchangeId: "",
+        exchange: null,
+      });
+      if (!saved.unchanged) onSaved?.(saved.exchange);
+    } catch (error) {
+      setSubmission({
+        status: "error",
+        message: getSafeLetterheadExchangeError(error, "Unable to save changes to this Letterhead Exchange."),
+        exchangeId: "",
+        exchange: null,
+      });
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (busy) return;
+    if (isEdit) {
+      await saveEdits();
+      return;
+    }
     const result = buildCreateLetterheadExchangePayload(draft, events);
     if (!result.payload) {
       setErrors(result.errors);
       setSubmission({ status: "validating", message: "Review the highlighted fields.", exchangeId: "", exchange: null });
-      const firstInvalid = formRef.current?.querySelector("[aria-invalid='true']");
-      firstInvalid?.focus?.();
+      focusFirstInvalid();
       return;
     }
     setErrors({});
@@ -199,16 +279,18 @@ function resetForm() {
 
     const requestedImages = draft.uploadImages ? imageState.files.filter((item) => item.status !== "uploaded") : [];
     let uploadedCount = 0;
+    let photoNote = "";
     if (draft.uploadImages && requestedImages.length) {
       const uploaded = await uploadImagesForExchange(exchangeId, requestedImages);
       uploadedCount = uploaded.successCount || 0;
       if (!uploaded.ok) return;
+      photoNote = reportPhotoFollowUp(exchangeId, collectUploadedImages(imageState.files.filter((item) => item.status === "uploaded"), uploaded));
     }
 
     setSubmission({
       status: "success",
       message: uploadedCount
-        ? `Letterhead Exchange recorded successfully. ${uploadedCount} image${uploadedCount === 1 ? "" : "s"} uploaded.`
+        ? `Letterhead Exchange recorded successfully. ${uploadedCount} image${uploadedCount === 1 ? "" : "s"} uploaded.${photoNote}`
         : "Letterhead Exchange recorded successfully.",
       exchangeId: "",
       exchange: null,
@@ -223,9 +305,13 @@ function resetForm() {
     if (!failedFiles.length) return;
     const uploaded = await uploadImagesForExchange(submission.exchangeId, failedFiles);
     if (!uploaded.ok) return;
+    const photoNote = reportPhotoFollowUp(
+      submission.exchangeId,
+      collectUploadedImages(imageState.files.filter((item) => item.status === "uploaded"), uploaded),
+    );
     setSubmission({
       status: "success",
-      message: "Letterhead Exchange recorded successfully. Failed images were retried and uploaded.",
+      message: `Letterhead Exchange recorded successfully. Failed images were retried and uploaded.${photoNote}`,
       exchangeId: "",
       exchange: null,
     });
@@ -237,10 +323,10 @@ function resetForm() {
   const liveMessage = submission.message || statusText(submission.status, imageState);
 
   return (
-    <section className="letterhead-record" aria-labelledby="letterhead-record-title">
+    <section className="letterhead-record" aria-labelledby={`${idPrefix}-record-title`}>
       <div className="letterhead-subsection-heading">
-        <p className="bod-tools-kicker">Record</p>
-        <h3 id="letterhead-record-title">Record a Letterhead Exchange</h3>
+        <p className="bod-tools-kicker">{isEdit ? "Details" : "Record"}</p>
+        <h3 id={`${idPrefix}-record-title`}>{isEdit ? "Edit exchange details" : "Record a Letterhead Exchange"}</h3>
       </div>
 
       <form ref={formRef} className="letterhead-form" onSubmit={handleSubmit} noValidate>
@@ -248,14 +334,14 @@ function resetForm() {
           <legend>External Club / Rotaractor</legend>
           {draft.externalParticipants.map((row, index) => (
             <div className="letterhead-participant-row" key={row.rowId}>
-              <label htmlFor={`letterhead-club-${row.rowId}`}>
+              <label htmlFor={`${idPrefix}-club-${row.rowId}`}>
                 Club Name *
                 <input
                   ref={(node) => {
                     if (node) participantRefs.current.set(row.rowId, node);
                     else participantRefs.current.delete(row.rowId);
                   }}
-                  id={`letterhead-club-${row.rowId}`}
+                  id={`${idPrefix}-club-${row.rowId}`}
                   name="clubName"
                   value={row.clubName}
                   maxLength="150"
@@ -264,10 +350,10 @@ function resetForm() {
                 />
                 {fieldError(errors, index, "clubName") ? <span className="bod-field-error">{fieldError(errors, index, "clubName")}</span> : null}
               </label>
-              <label htmlFor={`letterhead-rotaractor-${row.rowId}`}>
+              <label htmlFor={`${idPrefix}-rotaractor-${row.rowId}`}>
                 Rotaractor Name *
                 <input
-                  id={`letterhead-rotaractor-${row.rowId}`}
+                  id={`${idPrefix}-rotaractor-${row.rowId}`}
                   name="rotaractorName"
                   value={row.rotaractorName}
                   maxLength="120"
@@ -276,10 +362,10 @@ function resetForm() {
                 />
                 {fieldError(errors, index, "rotaractorName") ? <span className="bod-field-error">{fieldError(errors, index, "rotaractorName")}</span> : null}
               </label>
-              <label htmlFor={`letterhead-position-${row.rowId}`}>
+              <label htmlFor={`${idPrefix}-position-${row.rowId}`}>
                 Position
                 <input
-                  id={`letterhead-position-${row.rowId}`}
+                  id={`${idPrefix}-position-${row.rowId}`}
                   value={row.position}
                   maxLength="120"
                   onChange={(change) => updateParticipant(row.rowId, "position", change.target.value)}
@@ -287,10 +373,10 @@ function resetForm() {
                 />
                 {fieldError(errors, index, "position") ? <span className="bod-field-error">{fieldError(errors, index, "position")}</span> : null}
               </label>
-              <label htmlFor={`letterhead-rid-${row.rowId}`}>
+              <label htmlFor={`${idPrefix}-rid-${row.rowId}`}>
                 Rotaract District ID (RID)
                 <input
-                  id={`letterhead-rid-${row.rowId}`}
+                  id={`${idPrefix}-rid-${row.rowId}`}
                   value={row.rotaractDistrictId}
                   maxLength="20"
                   placeholder="e.g. 3131"
@@ -350,7 +436,7 @@ function resetForm() {
       disabled={busy || optionsUnavailable}
       aria-expanded={memberDropdownOpen}
       aria-haspopup="listbox"
-      aria-controls="letterhead-member-options"
+      aria-controls={`${idPrefix}-member-options`}
     >
       <span>
         {draft.rcphMemberIds.length
@@ -372,11 +458,11 @@ function resetForm() {
       <div className="letterhead-member-dropdown__panel">
         <label
           className="letterhead-member-dropdown__search"
-          htmlFor="letterhead-member-search"
+          htmlFor={`${idPrefix}-member-search`}
         >
           <span className="sr-only">Search RCPH representatives</span>
           <input
-            id="letterhead-member-search"
+            id={`${idPrefix}-member-search`}
             type="search"
             value={memberQuery}
             onChange={(change) => setMemberQuery(change.target.value)}
@@ -387,7 +473,7 @@ function resetForm() {
         </label>
 
         <div
-          id="letterhead-member-options"
+          id={`${idPrefix}-member-options`}
           className="letterhead-member-dropdown__options"
           role="listbox"
           aria-label="RCPH representatives"
@@ -482,10 +568,10 @@ function resetForm() {
 </fieldset>
 
         <div className="letterhead-form-grid">
-          <label htmlFor="letterhead-exchange-date">
+          <label htmlFor={`${idPrefix}-exchange-date`}>
             Exchange Date *
             <input
-              id="letterhead-exchange-date"
+              id={`${idPrefix}-exchange-date`}
               type="date"
               name="exchangeDate"
               value={draft.exchangeDate}
@@ -494,10 +580,10 @@ function resetForm() {
             />
             {errors.exchangeDate ? <span className="bod-field-error">{errors.exchangeDate}</span> : null}
           </label>
-          <label htmlFor="letterhead-associated-event">
+          <label htmlFor={`${idPrefix}-associated-event`}>
             Associated Event
             <select
-              id="letterhead-associated-event"
+              id={`${idPrefix}-associated-event`}
               value={draft.associatedEventKey}
               onChange={(change) => updateDraft("associatedEventKey", change.target.value)}
               disabled={busy || optionsUnavailable}
@@ -514,10 +600,10 @@ function resetForm() {
           </label>
         </div>
 
-        <label htmlFor="letterhead-other">
+        <label htmlFor={`${idPrefix}-other`}>
           Other Event
           <textarea
-            id="letterhead-other"
+            id={`${idPrefix}-other`}
             value={draft.other}
             rows="3"
             maxLength={LETTERHEAD_OTHER_LIMIT}
@@ -528,18 +614,21 @@ function resetForm() {
           {errors.other ? <span className="bod-field-error">{errors.other}</span> : null}
         </label>
 
-        <label className="letterhead-upload-toggle" htmlFor="letterhead-upload-images">
-          <input
-            id="letterhead-upload-images"
-            type="checkbox"
-            checked={draft.uploadImages}
-            disabled={busy}
-            onChange={(change) => updateDraft("uploadImages", change.target.checked)}
-          />
-          Upload Images
-        </label>
+        {/* Photos of an existing exchange are managed in the Manage dialog's Photos tab. */}
+        {!isEdit ? (
+          <label className="letterhead-upload-toggle" htmlFor={`${idPrefix}-upload-images`}>
+            <input
+              id={`${idPrefix}-upload-images`}
+              type="checkbox"
+              checked={draft.uploadImages}
+              disabled={busy}
+              onChange={(change) => updateDraft("uploadImages", change.target.checked)}
+            />
+            Upload Images
+          </label>
+        ) : null}
 
-        {draft.uploadImages ? (
+        {!isEdit && draft.uploadImages ? (
           <LetterheadExchangeImageUploader
             files={imageState.files}
             errors={imageState.selectionErrors}
@@ -564,11 +653,32 @@ function resetForm() {
               Retry failed uploads
             </button>
           ) : null}
+          {isEdit && onCancel ? (
+            <button type="button" onClick={onCancel} disabled={busy}>Close</button>
+          ) : null}
           <button type="submit" className="bod-button--primary" disabled={busy || optionsUnavailable} aria-busy={busy}>
-            {busy ? "Saving..." : submission.exchangeId ? "Finish image uploads" : "Save Letterhead Exchange"}
+            {busy ? "Saving..." : isEdit ? "Save changes" : submission.exchangeId ? "Finish image uploads" : "Save Letterhead Exchange"}
           </button>
         </div>
       </form>
+
+      {reportChoice ? (
+        <LetterheadReportPhotoChoice
+          key={reportChoice.exchangeId}
+          exchangeId={reportChoice.exchangeId}
+          images={reportChoice.images}
+          selectedImageId={reportChoice.selectedImageId}
+          onDone={({ saved }) => {
+            setReportChoice(null);
+            setSubmission((current) => ({
+              ...current,
+              status: "success",
+              message: saved ? "Report photo saved." : "Report photo choice skipped. You can choose it later from Manage.",
+            }));
+            if (saved) onSaved?.(null);
+          }}
+        />
+      ) : null}
     </section>
   );
 }

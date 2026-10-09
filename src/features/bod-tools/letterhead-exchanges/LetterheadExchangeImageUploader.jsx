@@ -14,11 +14,18 @@ function statusLabel(status) {
   }[status] || "Waiting";
 }
 
-export default function LetterheadExchangeImageUploader({ files, errors = [], disabled, onChange }) {
+export default function LetterheadExchangeImageUploader({
+  files,
+  errors = [],
+  disabled,
+  onChange,
+  inputId = "letterhead-image-files",
+  maxFiles = LETTERHEAD_IMAGE_MAX_FILES,
+}) {
   function selectFiles(event) {
     const selected = Array.from(event.target.files || []);
     if (!selected.length) return;
-    const result = addLetterheadImageFiles(files, selected);
+    const result = addLetterheadImageFiles(files, selected, maxFiles);
     onChange({ files: result.items, selectionErrors: result.errors });
     event.target.value = "";
   }
@@ -33,16 +40,16 @@ export default function LetterheadExchangeImageUploader({ files, errors = [], di
   return (
     <div className="letterhead-upload">
       <p className="letterhead-upload__help">
-        Select up to {LETTERHEAD_IMAGE_MAX_FILES} JPG, PNG, or WebP images. Each image must be 15 MB or smaller.
+        Select up to {maxFiles} JPG, PNG, or WebP image{maxFiles === 1 ? "" : "s"}. Each image must be 15 MB or smaller.
       </p>
-      <label className="letterhead-upload__picker" htmlFor="letterhead-image-files">
+      <label className="letterhead-upload__picker" htmlFor={inputId}>
         Choose images
         <input
-          id="letterhead-image-files"
+          id={inputId}
           type="file"
           accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
           multiple
-          disabled={disabled || files.length >= LETTERHEAD_IMAGE_MAX_FILES}
+          disabled={disabled || files.length >= maxFiles}
           onChange={selectFiles}
         />
       </label>

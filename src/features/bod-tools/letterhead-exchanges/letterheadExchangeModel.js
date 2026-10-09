@@ -237,13 +237,16 @@ export function validateLetterheadImageFile(file) {
   return "";
 }
 
-export function addLetterheadImageFiles(current = [], selected = []) {
+export function addLetterheadImageFiles(current = [], selected = [], maxFiles = LETTERHEAD_IMAGE_MAX_FILES) {
   const items = Array.isArray(current) ? [...current] : [];
   const errors = [];
   const keys = new Set(items.map((item) => item.fileKey));
+  const limit = Math.max(0, Math.min(LETTERHEAD_IMAGE_MAX_FILES, Number.isSafeInteger(maxFiles) ? maxFiles : LETTERHEAD_IMAGE_MAX_FILES));
   for (const file of Array.from(selected || [])) {
-    if (items.length >= LETTERHEAD_IMAGE_MAX_FILES) {
-      errors.push(`You can upload up to ${LETTERHEAD_IMAGE_MAX_FILES} images per exchange.`);
+    if (items.length >= limit) {
+      errors.push(limit === LETTERHEAD_IMAGE_MAX_FILES
+        ? `You can upload up to ${LETTERHEAD_IMAGE_MAX_FILES} images per exchange.`
+        : `This exchange has room for ${limit} more image${limit === 1 ? "" : "s"} (${LETTERHEAD_IMAGE_MAX_FILES} maximum).`);
       break;
     }
     const error = validateLetterheadImageFile(file);
@@ -308,9 +311,8 @@ export function normalizeLetterheadExchange(raw = {}) {
       }))
       .filter((row) => row.memberId && row.name)
     : [];
-  const images = Array.isArray(raw.images)
-    ? raw.images.map(normalizeLetterheadImage).filter((image) => image.imageId && image.fileName)
-    : [];
+  const images = activeLetterheadImages(raw);
+  const reportImageId = text(raw.reportImageId, 160);
   const associatedEvent = raw.associatedEvent && typeof raw.associatedEvent === "object"
     ? {
       source: text(raw.associatedEvent.source, 40),
@@ -333,7 +335,10 @@ export function normalizeLetterheadExchange(raw = {}) {
     associatedEvent,
     other: text(raw.other, LETTERHEAD_OTHER_LIMIT),
     images,
-    imageCount: Number.isSafeInteger(raw.imageCount) && raw.imageCount >= 0 ? raw.imageCount : images.length,
+    imageCount: Array.isArray(raw.images)
+      ? images.length
+      : (Number.isSafeInteger(raw.imageCount) && raw.imageCount >= 0 ? raw.imageCount : 0),
+    reportImageId: images.some((image) => image.imageId === reportImageId) ? reportImageId : "",
     driveFolderName: text(raw.driveFolderName, 220),
     status: text(raw.status, 40) || "active",
     createdAt: text(raw.createdAt, 40),
@@ -341,7 +346,141 @@ export function normalizeLetterheadExchange(raw = {}) {
     createdByRole: text(raw.createdByRole, 80),
     updatedAt: text(raw.updatedAt, 40),
     updatedByName: text(raw.updatedByName, 160),
+    lastEditedAt: text(raw.lastEditedAt, 40),
+    lastEditedByName: text(raw.lastEditedByName, 160),
   };
+}
+
+// Soft-removed images (removedAt set) never reach the UI or reports.
+export function activeLetterheadImages(exchange = {}) {
+  return Array.isArray(exchange?.images)
+    ? exchange.images
+      .filter((image) => image && typeof image === "object" && !image.removedAt)
+      .map(normalizeLetterheadImage)
+      .filter((image) => image.imageId && image.fileName)
+    : [];
+}
+
+export function isLetterheadReportPhotoEligible(image = {}) {
+  return Boolean(text(image?.imageId, 160)) && LETTERHEAD_ALLOWED_IMAGE_MIME_TYPES.includes(lowerText(image?.mimeType, 120));
+}
+
+export function remainingLetterheadImageSlots(exchange = {}) {
+  return Math.max(0, LETTERHEAD_IMAGE_MAX_FILES - activeLetterheadImages(exchange).length);
+}
+
+export function letterheadPhotoBadge(exchange = {}) {
+  const count = activeLetterheadImages(exchange).length;
+  const reportImageId = text(exchange?.reportImageId, 160);
+  const hasReportPhoto = Boolean(reportImageId) && activeLetterheadImages(exchange).some((image) => image.imageId === reportImageId);
+  if (!count) return { text: "No photos", tone: "muted", count, hasReportPhoto: false };
+  const photos = `${count} photo${count === 1 ? "" : "s"}`;
+  return hasReportPhoto
+    ? { text: `${photos} · Report photo ✓`, tone: "ready", count, hasReportPhoto }
+    : { text: `${photos} · No report photo`, tone: "warning", count, hasReportPhoto };
+}
+
+function withRtrPrefix(name) {
+  const clean = text(name, 160).replace(/^Rtr\.?\s*/i, "");
+  return clean ? `Rtr. ${clean}` : "";
+}
+
+export function formatLetterheadDayDate(value = "") {
+  const millis = Date.parse(value);
+  if (!text(value) || !Number.isFinite(millis)) return "";
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
+    .format(new Date(millis));
+}
+
+export function formatLastEditedLabel(exchange = {}) {
+  const name = withRtrPrefix(exchange?.lastEditedByName);
+  const date = formatLetterheadDayDate(exchange?.lastEditedAt);
+  if (!name && !date) return "";
+  return `Last edited${name ? ` by ${name}` : ""}${date ? ` on ${date}` : ""}`;
+}
+
+export function buildEditDraftFromExchange(exchange = {}) {
+  const participants = Array.isArray(exchange?.externalParticipants) ? exchange.externalParticipants : [];
+  const associatedEvent = exchange?.associatedEvent;
+  return {
+    externalParticipants: participants.length
+      ? participants.map((row, index) => normalizeExternalParticipant({ ...row, rowId: `edit-participant-${index + 1}` }))
+      : [createParticipantRow("edit-participant-1")],
+    rcphMemberIds: uniqueStrings(exchange?.rcphMemberIds?.length
+      ? exchange.rcphMemberIds
+      : (exchange?.rcphRepresentatives || []).map((row) => row?.memberId)),
+    exchangeDate: text(exchange?.exchangeDate, 20),
+    associatedEventKey: associatedEvent?.source && associatedEvent?.id ? eventKey(associatedEvent) : "",
+    other: String(exchange?.other ?? ""),
+    uploadImages: false,
+  };
+}
+
+// Representatives and the associated event already on an exchange stay selectable while
+// editing even when they are no longer offered for new exchanges (the server keeps them).
+export function mergeEditMemberOptions(members = [], exchange = {}) {
+  const options = normalizeMemberOptions(members);
+  const known = new Set(options.map((member) => member.id));
+  const stored = (Array.isArray(exchange?.rcphRepresentatives) ? exchange.rcphRepresentatives : [])
+    .map((row) => ({ id: text(row?.memberId, 160), name: text(row?.name, 160), role: text(row?.role, 80), position: text(row?.position, 140) }))
+    .filter((row) => row.id && row.name && !known.has(row.id));
+  return normalizeMemberOptions([...options, ...stored]);
+}
+
+export function mergeEditEventOptions(events = [], exchange = {}) {
+  const options = normalizeEventOptions(events);
+  const stored = normalizeEventOptions(exchange?.associatedEvent ? [exchange.associatedEvent] : []);
+  if (!stored.length || options.some((event) => eventKey(event) === eventKey(stored[0]))) return options;
+  return [stored[0], ...options];
+}
+
+export function buildUpdateLetterheadExchangePayload(exchangeId = "", draft = {}, events = []) {
+  const id = text(exchangeId, 160);
+  const result = buildCreateLetterheadExchangePayload(draft, events);
+  if (!result.payload) return result;
+  if (!id) return { payload: null, errors: { exchangeId: "The Letterhead Exchange could not be identified." } };
+  return { payload: { exchangeId: id, ...result.payload }, errors: {} };
+}
+
+export function normalizeUpdateExchangeResponse(raw = {}) {
+  const exchange = normalizeLetterheadExchange(raw?.exchange);
+  if (raw?.ok !== true || !exchange) throw new Error("Letterhead Exchange response was incomplete.");
+  return { ok: true, unchanged: raw.unchanged === true, exchange };
+}
+
+export const normalizeReportImageChangeResponse = normalizeUpdateExchangeResponse;
+export const normalizeRemoveImageResponse = normalizeUpdateExchangeResponse;
+
+export function formatLetterheadBlockDate(value = "") {
+  if (!dateLooksValid(value)) return value || "Date unavailable";
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+export function buildLetterheadExchangeHeading(exchange = {}, separator = " · ") {
+  const clubs = uniqueExternalClubNames(exchange);
+  const eventName = text(exchange?.associatedEvent?.name || exchange?.associatedEvent?.label, 180);
+  return [
+    formatLetterheadBlockDate(text(exchange?.exchangeDate, 20)),
+    clubs.length ? clubs.join(", ") : "No club recorded",
+    eventName ? `Event: ${eventName}` : "",
+  ].filter(Boolean).join(separator);
+}
+
+export const LETTERHEAD_REPORT_IMAGE_KEY_PREFIX = "letterhead:";
+
+export function letterheadReportImageKey(exchangeId = "") {
+  const id = text(exchangeId, 160);
+  return id && !/[\\/]/.test(id) ? `${LETTERHEAD_REPORT_IMAGE_KEY_PREFIX}${id}` : "";
+}
+
+export function letterheadExchangesMissingReportPhoto(exchanges = []) {
+  return (Array.isArray(exchanges) ? exchanges : [])
+    .filter((exchange) => exchange?.id && Number(exchange.imageCount) > 0 && !exchange.reportImage)
+    .slice()
+    .sort((left, right) => String(left.exchangeDate).localeCompare(String(right.exchangeDate)) || String(left.id).localeCompare(String(right.id)))
+    .map((exchange) => ({ exchangeId: exchange.id, label: buildLetterheadExchangeHeading({ ...exchange, associatedEvent: null }) }));
 }
 
 export function normalizeCreateExchangeResponse(raw = {}) {
@@ -386,7 +525,19 @@ export function normalizeReportLetterheadExchange(raw = {}) {
     rcphRepresentatives,
     associatedEvent,
     other: text(raw.other, LETTERHEAD_OTHER_LIMIT),
+    imageCount: Number.isSafeInteger(raw.imageCount) && raw.imageCount >= 0 ? raw.imageCount : 0,
+    reportImage: normalizeReportImageRef(raw.reportImage),
   };
+}
+
+function normalizeReportImageRef(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const image = {
+    imageId: text(raw.imageId, 160),
+    fileName: text(raw.fileName, 180),
+    mimeType: lowerText(raw.mimeType, 120),
+  };
+  return image.imageId && isLetterheadReportPhotoEligible(image) ? image : null;
 }
 
 export function normalizeReportLetterheadExchangeResponse(raw = {}) {

@@ -1,6 +1,7 @@
 import { AVENUES } from "../calendar/avenues.js";
 import { getEventDescriptionForAvenue, normalizeBodReportFinance } from "./bodEventModel.js";
 import { formatBodFocusAreasForReport, normalizeBodFocusAreas } from "./bodFocusAreas.js";
+import { buildLetterheadExchangeHeading, letterheadReportImageKey } from "./letterhead-exchanges/letterheadExchangeModel.js";
 
 export const BOD_AVENUE_REPORT_LIMIT = 100;
 export const REPORTABLE_BOD_AVENUES = AVENUES;
@@ -321,6 +322,10 @@ export function normalizeLetterheadExchangeReportItems(value) {
       rcphRepresentatives: normalizeReportRepresentatives(row?.rcphRepresentatives),
       associatedEvent: normalizeReportAssociatedEvent(row?.associatedEvent),
       other: cleanReportText(row?.other, 2000),
+      imageCount: Math.max(0, Number.isSafeInteger(row?.imageCount) ? row.imageCount : 0),
+      reportImage: row?.reportImage && cleanReportText(row.reportImage.imageId, 160)
+        ? { imageId: cleanReportText(row.reportImage.imageId, 160), fileName: cleanReportText(row.reportImage.fileName, 180), mimeType: cleanReportText(row.reportImage.mimeType, 120) }
+        : null,
     }))
     .filter((row) => row.id && isValidReportMonth(row.exchangeMonth) && /^\d{4}-\d{2}-\d{2}$/.test(row.exchangeDate) && row.externalParticipants.length)
     .sort((left, right) => (
@@ -363,6 +368,21 @@ export function flattenLetterheadExchangeReportRows(exchanges) {
       };
     })
   );
+}
+
+// Avenue report layout: one block per exchange (heading, its participant rows, then its
+// report photo), ordered by exchangeDate ascending like the flat rows.
+export function buildLetterheadExchangeReportBlocks(exchanges, options = {}) {
+  const includePhotos = options.includePhotos !== false;
+  return normalizeLetterheadExchangeReportItems(exchanges).map((exchange) => ({
+    exchangeId: exchange.id,
+    exchangeDate: exchange.exchangeDate,
+    heading: buildLetterheadExchangeHeading(exchange),
+    rows: flattenLetterheadExchangeReportRows([exchange]),
+    imageCount: exchange.imageCount,
+    reportImage: exchange.reportImage,
+    reportImageKey: includePhotos && exchange.reportImage ? letterheadReportImageKey(exchange.id) : "",
+  }));
 }
 
 export function createBodAvenueSelection(events) {
@@ -662,8 +682,12 @@ export function buildBodAvenueReportModel(options = {}) {
   };
   if (includeLetterheadExchanges) {
     report.includeLetterheadExchanges = true;
+    report.includeLetterheadExchangePhotos = options.includeLetterheadExchangePhotos !== false;
     report.letterheadExchanges = letterheadExchanges;
     report.letterheadExchangeRows = letterheadExchangeRows;
+    report.letterheadExchangeBlocks = buildLetterheadExchangeReportBlocks(letterheadExchanges, {
+      includePhotos: report.includeLetterheadExchangePhotos,
+    });
   }
   return report;
 }

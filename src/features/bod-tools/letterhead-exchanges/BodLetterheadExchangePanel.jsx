@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import LetterheadExchangeForm from "./LetterheadExchangeForm";
 import LetterheadExchangeHistory from "./LetterheadExchangeHistory";
+import LetterheadExchangeManageDialog from "./LetterheadExchangeManageDialog";
 import {
   fetchLetterheadExchangeFormOptions,
   getSafeLetterheadExchangeError,
@@ -10,6 +11,7 @@ import {
 export default function BodLetterheadExchangePanel() {
   const [optionsState, setOptionsState] = useState({ status: "idle", members: [], events: [], error: "" });
   const [historyState, setHistoryState] = useState({ status: "idle", exchanges: [], error: "" });
+  const [managingId, setManagingId] = useState("");
   const versionRef = useRef(0);
 
   const loadOptions = useCallback(async () => {
@@ -29,12 +31,13 @@ export default function BodLetterheadExchangePanel() {
     }
   }, []);
 
-  const loadHistory = useCallback(async () => {
-    setHistoryState((current) => ({ ...current, status: "loading", error: "" }));
+  const loadHistory = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setHistoryState((current) => ({ ...current, status: "loading", error: "" }));
     try {
       const payload = await listLetterheadExchanges();
       setHistoryState({ status: "success", exchanges: payload.exchanges, error: "" });
     } catch (error) {
+      if (silent) return;
       setHistoryState((current) => ({
         ...current,
         status: "error",
@@ -51,6 +54,20 @@ export default function BodLetterheadExchangePanel() {
   async function handleSaved() {
     await loadHistory();
   }
+
+  // Manage dialog changes: apply the returned record right away, then refresh quietly so the
+  // open dialog is never unmounted by a loading state.
+  async function handleManagedChange(updated) {
+    if (updated?.id) {
+      setHistoryState((current) => ({
+        ...current,
+        exchanges: current.exchanges.map((item) => (item.id === updated.id ? updated : item)),
+      }));
+    }
+    await loadHistory({ silent: true });
+  }
+
+  const managedExchange = managingId ? historyState.exchanges.find((item) => item.id === managingId) || null : null;
 
   return (
     <section className="bod-letterhead-exchanges" aria-labelledby="bod-letterhead-exchanges-title">
@@ -86,8 +103,21 @@ export default function BodLetterheadExchangePanel() {
           error={historyState.error}
           exchanges={historyState.exchanges}
           onRetry={loadHistory}
+          onManage={(exchange) => setManagingId(exchange.id)}
         />
       </div>
+
+      {managedExchange ? (
+        <LetterheadExchangeManageDialog
+          key={managedExchange.id}
+          exchange={managedExchange}
+          members={optionsState.members}
+          events={optionsState.events}
+          optionsStatus={optionsState.status}
+          onClose={() => setManagingId("")}
+          onChanged={handleManagedChange}
+        />
+      ) : null}
     </section>
   );
 }

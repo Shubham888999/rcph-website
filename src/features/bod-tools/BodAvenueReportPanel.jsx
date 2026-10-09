@@ -17,10 +17,13 @@ import {
 import { buildBodSecretarialReportModel } from "./bodSecretarialReportModel";
 import { fetchBodAvenueReportDirectors, fetchBodSecretarialReportMetrics } from "./bodEventService";
 import {
+  fetchLetterheadReportImageBytes,
   getLetterheadExchangesForReport,
   getSafeLetterheadExchangeError,
 } from "./letterhead-exchanges/letterheadExchangeService";
 import { prepareBodReportImagesForPdf } from "./bodReportImagePreparation";
+import { buildLetterheadExchangeHeading, letterheadExchangesMissingReportPhoto } from "./letterhead-exchanges/letterheadExchangeModel";
+import { prepareLetterheadReportImagesForPdf } from "./letterhead-exchanges/letterheadReportImagePreparation";
 
 const EMPTY_DIRECTOR_MAP = Object.freeze({});
 
@@ -102,6 +105,29 @@ async function prepareReportImagesSafely(options) {
   }
 }
 
+async function prepareLetterheadImagesSafely(enabled, exchanges) {
+  if (!enabled) return { imagesByKey: new Map(), warnings: [] };
+  try {
+    return await prepareLetterheadReportImagesForPdf({ exchanges, fetchImageBytes: fetchLetterheadReportImageBytes });
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return {
+      imagesByKey: new Map(),
+      warnings: (exchanges || []).filter((exchange) => exchange?.reportImage).map((exchange) => ({ exchangeId: exchange.id })),
+    };
+  }
+}
+
+function letterheadPhotoNotice(exchanges, includePhotos, warnings) {
+  if (!includePhotos) return null;
+  const missing = letterheadExchangesMissingReportPhoto(exchanges).map((item) => item.label);
+  const failedIds = new Set((warnings || []).map((warning) => warning.exchangeId));
+  const failed = (exchanges || [])
+    .filter((exchange) => failedIds.has(exchange.id))
+    .map((exchange) => buildLetterheadExchangeHeading({ ...exchange, associatedEvent: null }));
+  return missing.length || failed.length ? { missing, failed } : null;
+}
+
 async function loadLetterheadExchangeReport(enabled, selectedMonths) {
   if (!enabled) return { exchanges: [] };
   try {
@@ -133,6 +159,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
   const [clubRank, setClubRank] = useState("");
   const [includeMonthlyLetterheadExchanges, setIncludeMonthlyLetterheadExchanges] = useState(false);
   const [includeSecretarialLetterheadExchanges, setIncludeSecretarialLetterheadExchanges] = useState(false);
+  const [includeLetterheadExchangePhotos, setIncludeLetterheadExchangePhotos] = useState(true);
+  const [letterheadNotice, setLetterheadNotice] = useState(null);
   const [selection, setSelection] = useState(() => ({ scope: "", ids: new Set() }));
   const [directorData, setDirectorData] = useState(() => ({ scope: "", state: "idle", directorsByAvenue: {} }));
   const [appearance, setAppearance] = useState(BOD_AVENUE_REPORT_DEFAULT_APPEARANCE);
@@ -284,7 +312,9 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     if (!canDownload) return;
     setDownloading(true);
     setMessage("");
+    setLetterheadNotice(null);
     try {
+      const includeLetterheadPhotos = includeMonthlyLetterheadExchanges && showMonthlyLetterheadExchangeOption && includeLetterheadExchangePhotos;
       const letterheadReport = await loadLetterheadExchangeReport(includeMonthlyLetterheadExchanges && showMonthlyLetterheadExchangeOption, selectedMonths);
       const finalized = buildBodAvenueReportModel({
         selectedMonths,
@@ -295,16 +325,26 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
         directorsByAvenue,
         appearance,
         includeLetterheadExchanges: includeMonthlyLetterheadExchanges && showMonthlyLetterheadExchangeOption,
+        includeLetterheadExchangePhotos: includeLetterheadPhotos,
         letterheadExchanges: letterheadReport.exchanges,
         generatedAt: new Date(),
       });
+      // Non-blocking: exchanges with photos but no report photo are listed, never refused.
+      const missingPhotoNotice = letterheadPhotoNotice(letterheadReport.exchanges, includeLetterheadPhotos, []);
+      if (missingPhotoNotice) setLetterheadNotice(missingPhotoNotice);
       const preparedImages = await prepareReportImagesSafely({
         sourceEvents: events,
         includedEventIds: avenueReportEventIds(finalized),
       });
+      const letterheadImages = await prepareLetterheadImagesSafely(includeLetterheadPhotos, finalized.letterheadExchanges);
+      const imagesByEventId = new Map([...preparedImages.imagesByEventId, ...letterheadImages.imagesByKey]);
+      setLetterheadNotice(letterheadPhotoNotice(letterheadReport.exchanges, includeLetterheadPhotos, letterheadImages.warnings));
       const { downloadBodAvenueReportPdf } = await import("./bodAvenueReportPdf.js");
-      await downloadBodAvenueReportPdf(finalized, { imagesByEventId: preparedImages.imagesByEventId });
-      const imageWarning = reportImageWarningText(preparedImages.warnings.length);
+      await downloadBodAvenueReportPdf(finalized, { imagesByEventId });
+      const imageWarning = [
+        reportImageWarningText(preparedImages.warnings.length),
+        letterheadImages.warnings.length ? `${letterheadImages.warnings.length} Letterhead Exchange photo${letterheadImages.warnings.length === 1 ? "" : "s"} could not be included.` : "",
+      ].filter(Boolean).join(" ");
       const message = `${finalized.eventCount} report item${finalized.eventCount === 1 ? "" : "s"} included in the PDF download.${imageWarning ? ` ${imageWarning}` : ""}`;
       setMessage(message);
       onNotice?.({ type: "success", message: imageWarning ? `Monthly avenue report downloaded. ${imageWarning}` : "Monthly avenue report downloaded. No event records were changed." });
@@ -364,10 +404,19 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
                   <label htmlFor={`bod-report-avenue-${avenue.code}`}><input id={`bod-report-avenue-${avenue.code}`} type="checkbox" checked={selected} disabled={secretarialMode} onChange={(event) => updateAvenues(toggleValue(selectedAvenueCodes, avenue.code, event.target.checked, normalizeBodReportAvenueCodes))} /> {avenue.label}</label>
                   {showLetterheadOption ? (
                     <label className="bod-avenue-report__letterhead-toggle" htmlFor="bod-report-include-letterhead-exchanges">
-                      <input id="bod-report-include-letterhead-exchanges" type="checkbox" checked={includeMonthlyLetterheadExchanges} onChange={(event) => { setIncludeMonthlyLetterheadExchanges(event.target.checked); setShowPreview(false); setMessage(""); }} />
+                      <input id="bod-report-include-letterhead-exchanges" type="checkbox" checked={includeMonthlyLetterheadExchanges} onChange={(event) => { setIncludeMonthlyLetterheadExchanges(event.target.checked); setShowPreview(false); setMessage(""); setLetterheadNotice(null); }} />
                       <span>
                         <strong>Include Letterhead Exchanges</strong>
                         <small>Add recorded Letterhead Exchanges from the selected reporting month(s).</small>
+                      </span>
+                    </label>
+                  ) : null}
+                  {showLetterheadOption && includeMonthlyLetterheadExchanges ? (
+                    <label className="bod-avenue-report__letterhead-toggle bod-avenue-report__letterhead-toggle--photos" htmlFor="bod-report-include-letterhead-photos">
+                      <input id="bod-report-include-letterhead-photos" type="checkbox" checked={includeLetterheadExchangePhotos} onChange={(event) => { setIncludeLetterheadExchangePhotos(event.target.checked); setMessage(""); setLetterheadNotice(null); }} />
+                      <span>
+                        <strong>Include exchange photos</strong>
+                        <small>Show each exchange&apos;s report photo under its block.</small>
                       </span>
                     </label>
                   ) : null}
@@ -477,6 +526,22 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
         })}</ol>
       </section> : null}
       {message ? <p className={isErrorMessage ? "bod-avenue-report__error" : "bod-avenue-report__success"} role={isErrorMessage ? "alert" : "status"} aria-live="polite">{message}</p> : null}
+      {!secretarialMode && letterheadNotice ? (
+        <div className="bod-avenue-report__letterhead-notice" role="status" aria-live="polite">
+          {letterheadNotice.missing.length ? (
+            <>
+              <p><strong>These Letterhead Exchanges have photos but no report photo,</strong> so their blocks print without a photo. Choose one under Letterhead Exchanges → Manage → Photos.</p>
+              <ul>{letterheadNotice.missing.map((label, index) => <li key={`missing-${index}`}>{label}</li>)}</ul>
+            </>
+          ) : null}
+          {letterheadNotice.failed.length ? (
+            <>
+              <p><strong>These report photos could not be loaded</strong> and were left out of the PDF:</p>
+              <ul>{letterheadNotice.failed.map((label, index) => <li key={`failed-${index}`}>{label}</li>)}</ul>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
