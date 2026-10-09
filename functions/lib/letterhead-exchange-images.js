@@ -11,6 +11,10 @@ const {
 } = require('./visit-drive');
 const {
   LETTERHEAD_EXCHANGES_COLLECTION,
+  activeReportImage,
+  activeStoredImages,
+  isActiveStoredImage,
+  isReportEligibleImage,
   normalizeStoredExchange,
 } = require('./letterhead-exchanges');
 const { stripRotaractorPrefix } = require('./member-name');
@@ -463,8 +467,24 @@ function usableExchange(data = {}) {
   return status === 'active';
 }
 
+// The image limit and imageCount count active (not soft-removed) images only.
 function exchangeImageCount(exchange = {}) {
-  return rawImages(exchange).length;
+  return activeStoredImages(exchange).length;
+}
+
+function imageIdOf(image = {}) {
+  return text(image.imageId || image.uploadSessionId, 160);
+}
+
+function currentReportImageId(exchange = {}) {
+  const image = activeReportImage(exchange);
+  return image ? imageIdOf(image) : '';
+}
+
+// With no report photo chosen, a single remaining active image becomes the report photo.
+function resolveReportImageId(reportImageId, activeImages) {
+  if (reportImageId) return reportImageId;
+  return activeImages.length === 1 && isReportEligibleImage(activeImages[0]) ? imageIdOf(activeImages[0]) : '';
 }
 
 function uploadedFileName(exchangeId, sessionId, originalName) {
@@ -923,7 +943,7 @@ function createLetterheadExchangeImageService(options = {}) {
         };
         return;
       }
-      if (images.length >= IMAGE_MAX_COUNT) {
+      if (exchangeImageCount(exchange) >= IMAGE_MAX_COUNT) {
         throw makeError(HttpsError, 'resource-exhausted', `A Letterhead Exchange can have at most ${IMAGE_MAX_COUNT} images.`);
       }
       const now = timestamp();
@@ -941,9 +961,11 @@ function createLetterheadExchangeImageService(options = {}) {
         uploadSessionId: sessionId,
       };
       const nextImages = images.concat(readyImage);
+      const nextActiveImages = nextImages.filter(isActiveStoredImage);
       const exchangePatch = {
         images: nextImages,
-        imageCount: nextImages.length,
+        imageCount: nextActiveImages.length,
+        reportImageId: resolveReportImageId(currentReportImageId(exchange), nextActiveImages),
         updatedAt: now,
         updatedByUid: uid,
         updatedByName: actor.name,
@@ -959,6 +981,7 @@ function createLetterheadExchangeImageService(options = {}) {
         unchanged: false,
         exchange: normalizeStoredExchange(exchangeId, { ...exchange, ...exchangePatch }),
         image: publicImageMetadata(readyImage),
+        reportImageAutoSelected: !currentReportImageId(exchange) && exchangePatch.reportImageId === sessionId,
       };
     });
     if (!response.unchanged && typeof writeLog === 'function') {
@@ -974,7 +997,119 @@ function createLetterheadExchangeImageService(options = {}) {
           newImageCount: response.exchange.imageCount,
           mimeType: response.image.mimeType,
           sizeBytes: response.image.sizeBytes,
+          reportImageAutoSelected: response.reportImageAutoSelected === true,
         },
+      });
+    }
+    return response;
+  }
+
+  async function setReportImage(uid, data = {}, context = {}) {
+    assertAllowedFields(data, new Set(['exchangeId', 'imageId']), HttpsError);
+    const { access, actor } = await requireAccess(uid, context.request);
+    const exchangeId = normalizeDocumentId(data.exchangeId, 'exchangeId', HttpsError);
+    if (data.imageId !== undefined && data.imageId !== null && typeof data.imageId !== 'string') {
+      throw makeError(HttpsError, 'invalid-argument', 'imageId must be text.');
+    }
+    const requestedImageId = text(data.imageId, 160);
+    const imageId = requestedImageId ? normalizeSessionId(requestedImageId, HttpsError) : '';
+    let response;
+    let previousImageId = '';
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(exchangeRef(exchangeId));
+      const { exchange } = readExchangeFromSnap(snap, exchangeId);
+      previousImageId = currentReportImageId(exchange);
+      if (imageId) {
+        const image = findRawImage(exchange, imageId);
+        if (!image || !isActiveStoredImage(image)) {
+          throw makeError(HttpsError, 'not-found', 'Letterhead Exchange image was not found.');
+        }
+        if (!isReportEligibleImage(image)) {
+          throw makeError(HttpsError, 'failed-precondition', 'This image type cannot be used as the report photo.');
+        }
+      }
+      if (previousImageId === imageId) {
+        response = { ok: true, unchanged: true, exchange: normalizeStoredExchange(exchangeId, exchange) };
+        return;
+      }
+      const patch = {
+        reportImageId: imageId,
+        updatedAt: timestamp(),
+        updatedByUid: uid,
+        updatedByName: actor.name,
+      };
+      tx.update(exchangeRef(exchangeId), patch);
+      response = { ok: true, unchanged: false, exchange: normalizeStoredExchange(exchangeId, { ...exchange, ...patch }) };
+    });
+    if (!response.unchanged && typeof writeLog === 'function') {
+      await writeLog({
+        uid,
+        request: context.request,
+        authority: access,
+        actor,
+        exchangeId,
+        action: imageId ? 'report_image_selected' : 'report_image_cleared',
+        metadata: {
+          hadReportImage: Boolean(previousImageId),
+          hasReportImage: Boolean(imageId),
+          imageCount: response.exchange.imageCount,
+        },
+      });
+    }
+    return response;
+  }
+
+  // Soft remove: the image is hidden from the app and reports; its Drive file is never touched.
+  async function removeImage(uid, data = {}, context = {}) {
+    assertAllowedFields(data, new Set(['exchangeId', 'imageId']), HttpsError);
+    const { access, actor } = await requireAccess(uid, context.request);
+    const exchangeId = normalizeDocumentId(data.exchangeId, 'exchangeId', HttpsError);
+    const imageId = normalizeSessionId(data.imageId, HttpsError);
+    let response;
+    let logMetadata = null;
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(exchangeRef(exchangeId));
+      const { exchange } = readExchangeFromSnap(snap, exchangeId);
+      const images = rawImages(exchange);
+      const index = images.findIndex(image => imageIdOf(image) === imageId);
+      if (index < 0) throw makeError(HttpsError, 'not-found', 'Letterhead Exchange image was not found.');
+      if (!isActiveStoredImage(images[index])) {
+        response = { ok: true, unchanged: true, exchange: normalizeStoredExchange(exchangeId, exchange) };
+        return;
+      }
+      const removedAt = timestamp();
+      const nextImages = images.map((image, imageIndex) => (imageIndex === index
+        ? { ...image, removedAt, removedByUid: uid, removedByName: actor.name }
+        : image));
+      const nextActiveImages = nextImages.filter(isActiveStoredImage);
+      const previousReportImageId = currentReportImageId(exchange);
+      const keptReportImageId = previousReportImageId === imageId ? '' : previousReportImageId;
+      const reportImageId = resolveReportImageId(keptReportImageId, nextActiveImages);
+      const patch = {
+        images: nextImages,
+        imageCount: nextActiveImages.length,
+        reportImageId,
+        updatedAt: removedAt,
+        updatedByUid: uid,
+        updatedByName: actor.name,
+      };
+      tx.update(exchangeRef(exchangeId), patch);
+      response = { ok: true, unchanged: false, exchange: normalizeStoredExchange(exchangeId, { ...exchange, ...patch }) };
+      logMetadata = {
+        newImageCount: nextActiveImages.length,
+        reportImageCleared: previousReportImageId === imageId,
+        reportImageAutoSelected: !keptReportImageId && Boolean(reportImageId),
+      };
+    });
+    if (!response.unchanged && typeof writeLog === 'function') {
+      await writeLog({
+        uid,
+        request: context.request,
+        authority: access,
+        actor,
+        exchangeId,
+        action: 'image_removed',
+        metadata: logMetadata,
       });
     }
     return response;
@@ -992,7 +1127,7 @@ function createLetterheadExchangeImageService(options = {}) {
     const imageId = normalizeSessionId(data.imageId, HttpsError);
     const { exchange } = await loadExchange(exchangeId);
     const image = findRawImage(exchange, imageId);
-    if (!image || !text(image.driveFileId, 300)) {
+    if (!image || !isActiveStoredImage(image) || !text(image.driveFileId, 300)) {
       throw makeError(HttpsError, 'not-found', 'Letterhead Exchange image was not found.');
     }
     const proof = generateProof();
@@ -1055,6 +1190,13 @@ function createLetterheadExchangeImageService(options = {}) {
       if (!proofMatches(proof, access.proofHash)) {
         throw makeError(HttpsError, 'permission-denied', 'Image access link is invalid.');
       }
+      // Access links issued before a soft remove must stop working once the image is removed.
+      const exchangeSnap = await exchangeRef(text(access.exchangeId, 160)).get();
+      const exchangeData = exchangeSnap?.exists ? (exchangeSnap.data() || {}) : null;
+      const storedImage = exchangeData && usableExchange(exchangeData) ? findRawImage(exchangeData, access.imageId) : null;
+      if (!storedImage || !isActiveStoredImage(storedImage) || text(storedImage.driveFileId, 300) !== access.driveFileId) {
+        throw makeError(HttpsError, 'not-found', 'Letterhead Exchange image was not found.');
+      }
       const file = await drive.getFileMetadata(access.driveFileId);
       if (
         file.trashed
@@ -1094,6 +1236,8 @@ function createLetterheadExchangeImageService(options = {}) {
     createUploadSession,
     uploadHttp,
     finalizeUpload,
+    setReportImage,
+    removeImage,
     getImageAccess,
     downloadImageHttp,
   };
