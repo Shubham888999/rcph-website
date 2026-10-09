@@ -117,6 +117,25 @@ test("Letterhead Exchange report fetch is gated by mode-specific checkboxes and 
   assert.doesNotMatch(service, /letterheadExchanges/);
 });
 
+test("Include event photos checkbox is shown in both modes, defaults checked, and gates event image downloads", () => {
+  assert.match(panel, /\[includeEventPhotos, setIncludeEventPhotos\] = useState\(true\)/);
+  assert.match(panel, /<label className="bod-avenue-report__letterhead-toggle bod-avenue-report__letterhead-toggle--event-photos" htmlFor="bod-report-include-event-photos">/);
+  assert.match(panel, /<input id="bod-report-include-event-photos" type="checkbox" checked=\{includeEventPhotos\}/);
+  assert.match(panel, /<strong>Include event photos<\/strong>/);
+  assert.match(panel, /Untick to export events without their report photos\./);
+  // Rendered unconditionally between the mode toggle and the secretarial-only fields.
+  const modeBlock = panel.match(/<div className="bod-avenue-report__mode">[\s\S]*?\{secretarialMode \? <div className="bod-avenue-report__secretarial-fields">/)?.[0] || "";
+  assert.match(modeBlock, /bod-report-secretarial-mode[\s\S]*bod-report-include-event-photos/);
+  assert.equal((panel.match(/bod-report-include-event-photos"/g) || []).length, 2);
+  assert.match(panel, /function updateIncludeEventPhotos\(checked\) \{\s*setIncludeEventPhotos\(checked\);\s*setShowPreview\(false\);\s*setMessage\(""\);/);
+  assert.match(panel, /resolveReportImageOptions\(\{ includeEventPhotos, mode: "secretarial" \}\)/);
+  assert.match(panel, /resolveReportImageOptions\(\{ includeEventPhotos, includeLetterheadPhotos, mode: "avenue" \}\)/);
+  assert.equal((panel.match(/prepareReportImagesSafely\(imageOptions\.prepareEventImages, \{/g) || []).length, 2);
+  assert.match(panel, /prepareLetterheadImagesSafely\(imageOptions\.prepareLetterheadImages, finalized\.letterheadExchanges\)/);
+  assert.match(panel, /if \(!enabled\) return \{ imagesByEventId: new Map\(\), warnings: \[\] \};/);
+  assert.match(styles, /\.bod-avenue-report__letterhead-toggle--event-photos/);
+});
+
 test("report image preparation is finalized-row driven and warning-safe", () => {
   assert.match(panel, /function avenueReportEventIds\(report\)[\s\S]*report\.events[\s\S]*event\?\.eventId/);
   assert.match(panel, /function secretarialReportEventIds\(report\)[\s\S]*report\?\.months[\s\S]*month\?\.events[\s\S]*event\?\.eventId/);

@@ -12,6 +12,7 @@ import {
   normalizeBodAvenueDirectors,
   normalizeBodReportAvenueCodes,
   normalizeBodReportMonths,
+  resolveReportImageOptions,
   toggleBodAvenueEvent,
 } from "./bodAvenueReportModel";
 import { buildBodSecretarialReportModel } from "./bodSecretarialReportModel";
@@ -93,7 +94,9 @@ function reportImageWarningText(count) {
   return `${count} selected event image${count === 1 ? "" : "s"} could not be included.`;
 }
 
-async function prepareReportImagesSafely(options) {
+async function prepareReportImagesSafely(enabled, options) {
+  // Event photos excluded: no downloads, and every event renders without a photo.
+  if (!enabled) return { imagesByEventId: new Map(), warnings: [] };
   try {
     return await prepareBodReportImagesForPdf(options);
   } catch (error) {
@@ -160,6 +163,7 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
   const [includeMonthlyLetterheadExchanges, setIncludeMonthlyLetterheadExchanges] = useState(false);
   const [includeSecretarialLetterheadExchanges, setIncludeSecretarialLetterheadExchanges] = useState(false);
   const [includeLetterheadExchangePhotos, setIncludeLetterheadExchangePhotos] = useState(true);
+  const [includeEventPhotos, setIncludeEventPhotos] = useState(true);
   const [letterheadNotice, setLetterheadNotice] = useState(null);
   const [selection, setSelection] = useState(() => ({ scope: "", ids: new Set() }));
   const [directorData, setDirectorData] = useState(() => ({ scope: "", state: "idle", directorsByAvenue: {} }));
@@ -254,6 +258,12 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
     setMessage("");
   }
 
+  function updateIncludeEventPhotos(checked) {
+    setIncludeEventPhotos(checked);
+    setShowPreview(false);
+    setMessage("");
+  }
+
   function updateClubScore(value) {
     setClubScore(value);
     setMessage("");
@@ -291,7 +301,8 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
           letterheadExchanges: letterheadReport.exchanges,
           generatedAt: new Date(),
         });
-        const preparedImages = await prepareReportImagesSafely({
+        const imageOptions = resolveReportImageOptions({ includeEventPhotos, mode: "secretarial" });
+        const preparedImages = await prepareReportImagesSafely(imageOptions.prepareEventImages, {
           sourceEvents: events,
           includedEventIds: secretarialReportEventIds(finalized),
         });
@@ -332,11 +343,12 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
       // Non-blocking: exchanges with photos but no report photo are listed, never refused.
       const missingPhotoNotice = letterheadPhotoNotice(letterheadReport.exchanges, includeLetterheadPhotos, []);
       if (missingPhotoNotice) setLetterheadNotice(missingPhotoNotice);
-      const preparedImages = await prepareReportImagesSafely({
+      const imageOptions = resolveReportImageOptions({ includeEventPhotos, includeLetterheadPhotos, mode: "avenue" });
+      const preparedImages = await prepareReportImagesSafely(imageOptions.prepareEventImages, {
         sourceEvents: events,
         includedEventIds: avenueReportEventIds(finalized),
       });
-      const letterheadImages = await prepareLetterheadImagesSafely(includeLetterheadPhotos, finalized.letterheadExchanges);
+      const letterheadImages = await prepareLetterheadImagesSafely(imageOptions.prepareLetterheadImages, finalized.letterheadExchanges);
       const imagesByEventId = new Map([...preparedImages.imagesByEventId, ...letterheadImages.imagesByKey]);
       setLetterheadNotice(letterheadPhotoNotice(letterheadReport.exchanges, includeLetterheadPhotos, letterheadImages.warnings));
       const { downloadBodAvenueReportPdf } = await import("./bodAvenueReportPdf.js");
@@ -428,6 +440,13 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
             <label className="bod-avenue-report__mode-toggle" htmlFor="bod-report-secretarial-mode">
               <input id="bod-report-secretarial-mode" type="checkbox" checked={secretarialMode} onChange={(event) => updateSecretarialMode(event.target.checked)} /> Secretarial Reporting
             </label>
+            <label className="bod-avenue-report__letterhead-toggle bod-avenue-report__letterhead-toggle--event-photos" htmlFor="bod-report-include-event-photos">
+              <input id="bod-report-include-event-photos" type="checkbox" checked={includeEventPhotos} onChange={(event) => updateIncludeEventPhotos(event.target.checked)} />
+              <span>
+                <strong>Include event photos</strong>
+                <small>Untick to export events without their report photos.</small>
+              </span>
+            </label>
             {secretarialMode ? <div className="bod-avenue-report__secretarial-fields">
               <label htmlFor="bod-report-club-score">Club Score (optional)<input id="bod-report-club-score" type="text" value={clubScore} onChange={(event) => updateClubScore(event.target.value)} /></label>
               <label htmlFor="bod-report-club-rank">Club Rank (As of Now, optional)<input id="bod-report-club-rank" type="text" value={clubRank} onChange={(event) => updateClubRank(event.target.value)} /></label>
@@ -468,6 +487,7 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
             {cleanOptional(clubScore) ? <div><dt>Club Score</dt><dd>{cleanOptional(clubScore)}</dd></div> : null}
             {cleanOptional(clubRank) ? <div><dt>Club Rank (As of Now)</dt><dd>{cleanOptional(clubRank)}</dd></div> : null}
             <div><dt>Letterhead Exchanges</dt><dd>{includeSecretarialLetterheadExchanges ? "Included on download" : "Not included"}</dd></div>
+            <div><dt>Event photos</dt><dd>{includeEventPhotos ? "Included on download" : "Not included"}</dd></div>
           </dl>
           {secretarialValidationErrors.length ? (
             <ul className="bod-avenue-report__secretarial-errors" role="alert">
@@ -518,6 +538,7 @@ export default function BodAvenueReportPanel({ events, onNotice }) {
           <div><dt>Total expense</dt><dd>{formatReportAmount(preview.grandExpenseTotal)}</dd></div>
           {preview.monthTotals?.length > 1 ? <div><dt>Month expenses</dt><dd>{preview.monthTotals.map((month) => `${month.monthLabel}: ${formatReportAmount(month.monthExpenseTotal)}`).join(" / ")}</dd></div> : null}
           <div><dt>Groups</dt><dd>{preview.groupCount}</dd></div>
+          <div><dt>Event photos</dt><dd>{includeEventPhotos ? "Included on download" : "Not included"}</dd></div>
           {showMonthlyLetterheadExchangeOption ? <div><dt>Letterhead Exchanges</dt><dd>{includeMonthlyLetterheadExchanges ? "Included on download" : "Not included"}</dd></div> : null}
         </dl>
         <ol>{preview.events.map((event, index) => {
