@@ -321,6 +321,21 @@ function isFineLinkedTreasury(data) {
       allow read, write: if false;
     }
 
+    // Written only by permanentlyDeleteArchivedBodEvent (Admin SDK).
+    match /eventDeletionAudit/{auditId} {
+      allow read: if hasApprovedActiveRole('admin')
+        || hasApprovedActiveRole('president')
+        || hasPresidentAuthority();
+      allow write: if false;
+
+      match /{document=**} {
+        allow read: if hasApprovedActiveRole('admin')
+          || hasApprovedActiveRole('president')
+          || hasPresidentAuthority();
+        allow write: if false;
+      }
+    }
+
     match /auditLogs/{logId} {
       allow read, write: if false;
     }
