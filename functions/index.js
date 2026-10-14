@@ -300,7 +300,8 @@ function genOtp() {
   return (Math.floor(100000 + Math.random() * 900000)).toString();
 }
 
-exports.requestPasswordOtp = functions.https.onCall(async (data) => {
+exports.requestPasswordOtp = functions.https.onCall(async (request) => {
+  const data = request?.data || {};
   const email = (data?.email || '').trim().toLowerCase();
   if (!email) throw new functions.https.HttpsError('invalid-argument', 'Email required.');
 
@@ -330,7 +331,8 @@ exports.requestPasswordOtp = functions.https.onCall(async (data) => {
   return { ok: true };
 });
 
-exports.resetPasswordWithOtp = functions.https.onCall(async (data) => {
+exports.resetPasswordWithOtp = functions.https.onCall(async (request) => {
+  const data = request?.data || {};
   const email = (data?.email || '').trim().toLowerCase();
   const otp = (data?.otp || '').trim();
   const newPassword = (data?.newPassword || '').trim();
