@@ -65,6 +65,7 @@ const {
   normalizedNameSimilarity: reportingNameSimilarity,
 } = require('./lib/reminderCore');
 const avenueReportingLocks = require('./lib/avenue-reporting-locks');
+const archivedEventLifecycle = require('./lib/archived-event-lifecycle');
 const systemLogs = require('./lib/system-logs');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 const {
@@ -4392,6 +4393,8 @@ async function archiveBodToolsMeetingFromBodEventCallable({
   bodEventData = {},
 }) {
   const meetingId = validateEventDocId(bodEventData.syncedMeetingId || bodEventData.bodMeetingId || eventId);
+  const mirrorSnap = eventId !== meetingId ? await db.collection('bodEvents').doc(meetingId).get() : null;
+  const mirrorData = mirrorSnap?.exists ? (mirrorSnap.data() || {}) : {};
   const now = admin.firestore.FieldValue.serverTimestamp();
   const batch = db.batch();
   batch.set(db.collection('bodMeetings').doc(meetingId), {
@@ -4401,6 +4404,7 @@ async function archiveBodToolsMeetingFromBodEventCallable({
     updatedAt: now,
   }, { merge: true });
   batch.set(db.collection('bodEvents').doc(eventId), {
+    ...archivedEventLifecycle.statusBeforeArchivePatch(bodEventData),
     archived: true,
     status: 'deleted',
     archivedAt: now,
@@ -4411,6 +4415,7 @@ async function archiveBodToolsMeetingFromBodEventCallable({
   }, { merge: true });
   if (eventId !== meetingId) {
     batch.set(db.collection('bodEvents').doc(meetingId), {
+      ...archivedEventLifecycle.statusBeforeArchivePatch(mirrorData),
       archived: true,
       status: 'deleted',
       archivedAt: now,
@@ -9368,6 +9373,7 @@ exports.archiveBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   const now = admin.firestore.FieldValue.serverTimestamp();
   const batch = db.batch();
   batch.set(db.collection('bodEvents').doc(eventId), {
+    ...archivedEventLifecycle.statusBeforeArchivePatch(bodEventData),
     status: 'deleted',
     archived: true,
     deletedAt: now,
@@ -9444,6 +9450,299 @@ exports.createAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
   });
 
   return { ok: true, eventId, eventCreated, attendanceRowsUpdated, prospectProgressSummary };
+});
+
+// Restore and permanent delete reuse archiveBodEvent's auth, role set, and bodEvents lock.
+async function requireArchivedBodEventLifecycleAccess(request) {
+  const uid = requireAuth(request);
+  const authority = await getAuthorityContext(uid);
+  if (!authority.role || !archivedEventLifecycle.canManageArchivedEvents(authority.role)) {
+    throw new HttpsError('permission-denied', 'Approved BOD, admin, or president access required.');
+  }
+  await assertBodEventsUnlockedForRole(authority);
+  return { uid, authority };
+}
+
+async function loadArchivedBodEventTarget(eventId, notArchivedMessage) {
+  const bodEventRef = db.collection('bodEvents').doc(eventId);
+  const bodEventSnap = await bodEventRef.get();
+  if (!bodEventSnap.exists) throw new HttpsError('not-found', 'BOD event not found.');
+  const bodEventData = bodEventSnap.data() || {};
+  const isMeeting = bodEventRecordIsBodMeeting(bodEventData);
+  if (!isMeeting) await assertBodEventRecordIsClubEvent(eventId);
+  if (bodEventData.archived !== true) throw new HttpsError('failed-precondition', notArchivedMessage);
+  const meetingId = isMeeting
+    ? (validateEventDocId(bodEventData.syncedMeetingId || bodEventData.bodMeetingId || eventId) || eventId)
+    : '';
+  return { bodEventRef, bodEventData, isMeeting, meetingId };
+}
+
+function archivedFlagsRestorePatch(uid, now, extra = {}) {
+  const remove = admin.firestore.FieldValue.delete();
+  return {
+    archived: remove,
+    archivedAt: remove,
+    archivedBy: remove,
+    restoredAt: now,
+    restoredBy: uid,
+    updatedAt: now,
+    ...extra,
+  };
+}
+
+function bodEventRestorePatch(uid, now, status) {
+  const remove = admin.firestore.FieldValue.delete();
+  return archivedFlagsRestorePatch(uid, now, {
+    status,
+    deletedAt: remove,
+    deletedBy: remove,
+    statusBeforeArchive: remove,
+  });
+}
+
+async function collectSubcollectionDocsForDeletion(docRef, out) {
+  const collections = await docRef.listCollections();
+  for (const collection of collections) {
+    const snap = await collection.get();
+    for (const doc of snap.docs) {
+      out.push({ ref: doc.ref, path: doc.ref.path, data: doc.data() || {} });
+      await collectSubcollectionDocsForDeletion(doc.ref, out);
+    }
+  }
+}
+
+exports.restoreArchivedBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
+  const data = request?.data || {};
+  const { uid, authority } = await requireArchivedBodEventLifecycleAccess(request);
+  const eventId = validateEventDocId(data.eventId);
+  if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
+  const target = await loadArchivedBodEventTarget(eventId, 'Only archived events can be restored.');
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const refs = {
+    bodEvent: target.bodEventRef,
+    event: db.collection('events').doc(eventId),
+  };
+  if (target.isMeeting) {
+    refs.meeting = db.collection('bodMeetings').doc(target.meetingId);
+    if (target.meetingId !== eventId) refs.mirror = db.collection('bodEvents').doc(target.meetingId);
+  }
+
+  const restoredStatus = await db.runTransaction(async (tx) => {
+    const keys = Object.keys(refs);
+    const snaps = await Promise.all(keys.map(key => tx.get(refs[key])));
+    const snapByKey = Object.fromEntries(keys.map((key, index) => [key, snaps[index]]));
+    const current = snapByKey.bodEvent.exists ? (snapByKey.bodEvent.data() || {}) : null;
+    if (!current || current.archived !== true) {
+      throw new HttpsError('failed-precondition', 'Only archived events can be restored.');
+    }
+    const status = archivedEventLifecycle.restoredBodEventStatus(current);
+    tx.update(refs.bodEvent, bodEventRestorePatch(uid, now, status));
+    if (snapByKey.event.exists) tx.update(refs.event, archivedFlagsRestorePatch(uid, now));
+    if (snapByKey.meeting?.exists) tx.update(refs.meeting, archivedFlagsRestorePatch(uid, now));
+    const mirror = snapByKey.mirror?.exists ? (snapByKey.mirror.data() || {}) : null;
+    if (mirror?.archived === true) {
+      tx.update(refs.mirror, bodEventRestorePatch(uid, now, archivedEventLifecycle.restoredBodEventStatus(mirror)));
+    }
+    return status;
+  });
+  const prospectProgressSummary = await recalcAllActiveProspects();
+
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: 'updated',
+    status: 'success',
+    targetType: target.isMeeting ? 'bod_meeting' : 'bod_event',
+    targetId: eventId,
+    targetLabel: normalizeText(target.bodEventData.name, 180) || eventId,
+    details: `Archived ${target.isMeeting ? 'BOD meeting' : 'BOD event'} restored with status "${restoredStatus}".`,
+    source: 'restoreArchivedBodEvent',
+    relatedDocPath: `bodEvents/${eventId}`,
+    metadata: { eventId, meetingId: target.meetingId, restoredStatus },
+  });
+
+  return { ok: true, eventId, status: restoredStatus, prospectProgressSummary };
+});
+
+exports.permanentlyDeleteArchivedBodEvent = onCall(CALLABLE_OPTIONS, async (request) => {
+  const data = request?.data || {};
+  const { uid, authority } = await requireArchivedBodEventLifecycleAccess(request);
+  const eventId = validateEventDocId(data.eventId);
+  if (!eventId) throw new HttpsError('invalid-argument', 'Event ID is required.');
+  if (!archivedEventLifecycle.isPermanentDeleteConfirmation(data.confirmText)) {
+    throw new HttpsError('invalid-argument', `Type ${archivedEventLifecycle.PERMANENT_DELETE_CONFIRM_TEXT} to confirm.`);
+  }
+  const notArchivedMessage = 'Only archived events can be permanently deleted.';
+  const target = await loadArchivedBodEventTarget(eventId, notArchivedMessage);
+  const eventIds = [...new Set([eventId, target.meetingId].filter(Boolean))];
+
+  // Top-level docs owned by this event. bodEvents/{eventId} is deleted last.
+  const primaryRefs = [db.collection('events').doc(eventId)];
+  if (target.isMeeting) {
+    primaryRefs.push(db.collection('bodMeetings').doc(target.meetingId));
+    if (target.meetingId !== eventId) primaryRefs.push(db.collection('bodEvents').doc(target.meetingId));
+  }
+  const primarySnaps = await Promise.all(primaryRefs.map(ref => ref.get()));
+  const primaryDocs = primarySnaps.filter(snap => snap.exists)
+    .map(snap => ({ ref: snap.ref, path: snap.ref.path, data: snap.data() || {} }));
+  const primaryDataByPath = Object.fromEntries(primaryDocs.map(doc => [doc.path, doc.data]));
+
+  // Subcollections (e.g. bodEvents/{id}/attachments Drive metadata) would be orphaned by a parent delete.
+  const relatedDocs = [];
+  for (const ref of [target.bodEventRef, ...primaryDocs.map(doc => doc.ref)]) {
+    await collectSubcollectionDocsForDeletion(ref, relatedDocs);
+  }
+
+  // Attendance docs hold one field per event: remove only this event's field, never the doc.
+  const attendanceSnaps = await Promise.all(
+    archivedEventLifecycle.ATTENDANCE_COLLECTIONS.map(collection => db.collection(collection).get())
+  );
+  const attendance = archivedEventLifecycle.ATTENDANCE_COLLECTIONS.flatMap((collection, index) =>
+    archivedEventLifecycle.findAttendanceFieldRemovals(collection, attendanceSnaps[index].docs, eventIds));
+  const attendanceDocs = archivedEventLifecycle.groupAttendanceRemovalsByDoc(attendance);
+
+  const reminderFieldNames = ['eventId', 'targetId', 'linkedTargetId', 'linkedEventId', 'linkedBodEventId', 'linkedMeetingId'];
+  const reminderSnaps = await Promise.all(eventIds.flatMap(id =>
+    reminderFieldNames.map(field => db.collection('reminders').where(field, '==', id).get())));
+  const reminderDocsById = new Map();
+  reminderSnaps.forEach(snap => snap.docs.forEach(doc => reminderDocsById.set(doc.id, doc)));
+  const reminderDocs = [...reminderDocsById.values()];
+  const deletedReminderDocs = reminderDocs.filter(doc =>
+    archivedEventLifecycle.isDeletableEventReminder(doc.data() || {}, eventIds));
+  const keptReportingWindows = reminderDocs.filter(doc =>
+    archivedEventLifecycle.isLinkedReportingWindow(doc.data() || {}, eventIds));
+
+  const fineSnaps = await Promise.all(eventIds.map(id => db.collection('fines').where('eventId', '==', id).get()));
+  const fineIds = [...new Set(fineSnaps.flatMap(snap => snap.docs.map(doc => doc.id)))];
+
+  const userProfile = await getCallableUserProfile(uid, request);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const auditRef = db.collection('eventDeletionAudit').doc();
+  const deleteRefs = [
+    ...deletedReminderDocs.map(doc => doc.ref),
+    ...relatedDocs.map(doc => doc.ref),
+    ...primaryDocs.map(doc => doc.ref),
+    target.bodEventRef,
+  ];
+  const counts = {
+    attendanceFields: attendance.length,
+    attendanceDocs: attendanceDocs.length,
+    deletedReminders: deletedReminderDocs.length,
+    keptReportingWindows: keptReportingWindows.length,
+    relatedDocs: relatedDocs.length,
+    deletedDocs: deleteRefs.length,
+    fines: fineIds.length,
+  };
+  const auditBase = {
+    eventId,
+    eventIds,
+    eventType: target.isMeeting ? 'bodMeeting' : 'clubEvent',
+    meetingId: target.meetingId || null,
+    bodEvent: target.bodEventData,
+    event: primaryDataByPath[`events/${eventId}`] || null,
+    meeting: target.isMeeting ? (primaryDataByPath[`bodMeetings/${target.meetingId}`] || null) : null,
+    mirrorBodEvent: target.isMeeting && target.meetingId !== eventId
+      ? (primaryDataByPath[`bodEvents/${target.meetingId}`] || null)
+      : null,
+    deletedReminders: deletedReminderDocs.map(doc => ({ id: doc.id, data: doc.data() || {} })),
+    keptReportingWindows: keptReportingWindows.map(doc => ({ id: doc.id, data: doc.data() || {} })),
+    fineIds,
+    references: archivedEventLifecycle.collectEventReferences(target.bodEventData, ...primaryDocs.map(doc => doc.data)),
+    deletedBy: uid,
+    deletedByName: userProfile.name || '',
+    deletedByEmail: userProfile.email || '',
+    deletedByRole: authority.role || '',
+    deletedAt: now,
+    counts,
+  };
+  const relatedDocSnapshots = relatedDocs.map(doc => ({ path: doc.path, data: doc.data }));
+  const plan = archivedEventLifecycle.planPermanentDelete({
+    auditBase,
+    attendance,
+    relatedDocs: relatedDocSnapshots,
+    deleteDocCount: deleteRefs.length,
+    attendanceDocCount: attendanceDocs.length,
+  });
+  const auditDoc = {
+    ...auditBase,
+    attendance: plan.attendanceInline ? attendance : [],
+    attendanceStorage: plan.attendanceInline ? 'inline' : 'subcollection:attendance',
+    relatedDocs: plan.relatedDocsInline ? relatedDocSnapshots : [],
+    relatedDocsStorage: plan.relatedDocsInline ? 'inline' : 'subcollection:relatedDocs',
+    writeMode: plan.mode,
+    totalWrites: plan.totalWrites,
+    completed: plan.mode === 'single_batch',
+    completedAt: plan.mode === 'single_batch' ? now : null,
+  };
+
+  // Ordered so a partial chunked run leaves the archived bodEvents doc in place for a retry.
+  const writeOps = [];
+  if (!plan.attendanceInline) {
+    attendance.forEach(entry => writeOps.push(writer => writer.set(auditRef.collection('attendance').doc(), entry)));
+  }
+  if (!plan.relatedDocsInline) {
+    relatedDocSnapshots.forEach(entry => writeOps.push(writer => writer.set(auditRef.collection('relatedDocs').doc(), entry)));
+  }
+  attendanceDocs.forEach(({ collection, uid: attendanceUid, fields }) => {
+    const fieldRemovals = fields.flatMap(field => [new admin.firestore.FieldPath(field), admin.firestore.FieldValue.delete()]);
+    writeOps.push(writer => writer.update(db.collection(collection).doc(attendanceUid), ...fieldRemovals));
+  });
+  deleteRefs.forEach(ref => writeOps.push(writer => writer.delete(ref)));
+
+  const assertStillArchived = async (tx) => {
+    const fresh = await tx.get(target.bodEventRef);
+    if (!fresh.exists || (fresh.data() || {}).archived !== true) {
+      throw new HttpsError('failed-precondition', notArchivedMessage);
+    }
+  };
+
+  if (plan.mode === 'single_batch') {
+    await db.runTransaction(async (tx) => {
+      await assertStillArchived(tx);
+      tx.set(auditRef, auditDoc);
+      writeOps.forEach(op => op(tx));
+    });
+  } else {
+    await db.runTransaction(async (tx) => {
+      await assertStillArchived(tx);
+      tx.set(auditRef, auditDoc);
+    });
+    for (const ops of archivedEventLifecycle.chunk(writeOps, archivedEventLifecycle.CHUNK_WRITE_LIMIT)) {
+      const batch = db.batch();
+      ops.forEach(op => op(batch));
+      await batch.commit();
+    }
+    await auditRef.update({ completed: true, completedAt: now, counts });
+  }
+  const prospectProgressSummary = await recalcAllActiveProspects();
+
+  await writeSystemMutationLog({
+    uid,
+    request,
+    authority,
+    category: 'bod_event',
+    action: 'deleted',
+    status: 'success',
+    targetType: target.isMeeting ? 'bod_meeting' : 'bod_event',
+    targetId: eventId,
+    targetLabel: normalizeText(target.bodEventData.name, 180) || eventId,
+    details: `Archived event permanently deleted; ${attendance.length} attendance marks removed, ${deletedReminderDocs.length} reminders deleted. Drive, fines, and treasury untouched.`,
+    source: 'permanentlyDeleteArchivedBodEvent',
+    relatedDocPath: `eventDeletionAudit/${auditRef.id}`,
+    metadata: { eventId, meetingId: target.meetingId, auditId: auditRef.id, writeMode: plan.mode, counts },
+  });
+
+  return {
+    ok: true,
+    eventId,
+    auditId: auditRef.id,
+    removedAttendanceFields: attendance.length,
+    deletedReminders: deletedReminderDocs.length,
+    prospectProgressSummary,
+  };
 });
 
 exports.updateAdminClubEvent = onCall(CALLABLE_OPTIONS, async (request) => {
