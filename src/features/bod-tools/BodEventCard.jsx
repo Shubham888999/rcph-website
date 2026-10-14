@@ -4,7 +4,8 @@ function dateLabel(event) {
   return event.endDate && event.endDate !== event.startDate ? `${event.startDate} - ${event.endDate}` : event.startDate;
 }
 
-export default function BodEventCard({ event, permissions, onDetails, onEdit, onArchive, onSync }) {
+export default function BodEventCard({ event, permissions, archivedPermissions, onDetails, onEdit, onArchive, onSync, onRestore, onPermanentDelete }) {
+  const archivedLockTitle = archivedPermissions?.lockedMessage || undefined;
   return (
     <li className={`bod-event-row ${event.isActive ? "" : "bod-event-row--archived"}`}>
       <span className="bod-event-row__rail" aria-hidden="true" />
@@ -36,7 +37,14 @@ export default function BodEventCard({ event, permissions, onDetails, onEdit, on
           {permissions.canEdit ? <button type="button" onClick={() => onEdit(event)}>Edit</button> : null}
           {permissions.canArchive ? <button type="button" className="bod-button--danger" onClick={() => onArchive(event)}>Archive</button> : null}
           {permissions.canSync ? <button type="button" className="bod-button--teal" onClick={() => onSync(event)}>Sync</button> : null}
+          {archivedPermissions?.showActions ? (
+            <>
+              <button type="button" className="bod-button--teal" onClick={() => onRestore(event)} disabled={!archivedPermissions.canRestore} title={archivedLockTitle}>Restore</button>
+              <button type="button" className="bod-button--danger" onClick={() => onPermanentDelete(event)} disabled={!archivedPermissions.canPermanentlyDelete} title={archivedLockTitle}>Delete permanently</button>
+            </>
+          ) : null}
         </div>
+        {archivedPermissions?.lockedMessage ? <p className="bod-event-row__lock-note" role="note">{archivedPermissions.lockedMessage}</p> : null}
       </aside>
     </li>
   );
