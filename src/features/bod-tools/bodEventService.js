@@ -170,6 +170,33 @@ export function archiveBodEvent(eventId) {
   return call("archiveBodEvent", { eventId });
 }
 
+export async function restoreArchivedBodEvent(eventId) {
+  requireCurrentUser();
+  const result = await httpsCallable(functions, "restoreArchivedBodEvent")({ eventId: safeDocumentId(eventId, "event") });
+  const data = result?.data && typeof result.data === "object" ? result.data : {};
+  return {
+    ok: data.ok === true,
+    eventId: typeof data.eventId === "string" ? data.eventId : "",
+    status: typeof data.status === "string" ? data.status : "",
+  };
+}
+
+export async function permanentlyDeleteArchivedBodEvent(eventId, confirmText) {
+  requireCurrentUser();
+  const result = await httpsCallable(functions, "permanentlyDeleteArchivedBodEvent")({
+    eventId: safeDocumentId(eventId, "event"),
+    confirmText: typeof confirmText === "string" ? confirmText : "",
+  });
+  const data = result?.data && typeof result.data === "object" ? result.data : {};
+  const count = (value) => (Number.isInteger(value) && value >= 0 ? value : null);
+  return {
+    ok: data.ok === true,
+    auditId: typeof data.auditId === "string" ? data.auditId : "",
+    removedAttendanceFields: count(data.removedAttendanceFields),
+    deletedReminders: count(data.deletedReminders),
+  };
+}
+
 export function syncBodEventToAttendance(bodEventId) {
   return call("syncBodEventToAttendance", { bodEventId });
 }

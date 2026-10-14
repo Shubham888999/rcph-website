@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import BodArchivedEventDialog from "../../features/bod-tools/BodArchivedEventDialog";
 import BodEventArchiveDialog from "../../features/bod-tools/BodEventArchiveDialog";
 import BodAvenueReportPanel from "../../features/bod-tools/BodAvenueReportPanel";
 import BodEventDetailsDialog from "../../features/bod-tools/BodEventDetailsDialog";
@@ -8,6 +9,11 @@ import BodEventForm from "../../features/bod-tools/BodEventForm";
 import BodEventList from "../../features/bod-tools/BodEventList";
 import BodEventMutationNotice from "../../features/bod-tools/BodEventMutationNotice";
 import BodReportingQueuePanel from "../../features/bod-tools/BodReportingQueuePanel";
+import {
+  buildPermanentDeleteSuccessMessage,
+  buildRestoreSuccessMessage,
+  getArchivedBodEventActionError,
+} from "../../features/bod-tools/archivedBodEventModel";
 import { getBodEventDiagnostic, getSafeBodEventError } from "../../features/bod-tools/bodEventErrors";
 import { filterBodEvents } from "../../features/bod-tools/bodEventModel";
 import {
@@ -15,6 +21,8 @@ import {
   clearBodEventCache,
   fetchBodReportingQueue,
   fetchReportingWindowPrefill,
+  permanentlyDeleteArchivedBodEvent,
+  restoreArchivedBodEvent,
   submitBodEvent,
   syncBodEventToAttendance,
   updateBodEvent,
@@ -140,7 +148,7 @@ export default function BodToolsPage() {
   const months = useMemo(() => [...new Set(events.map((event) => event.startDate.slice(0, 7)))].sort().reverse(), [events]);
   const displayName = formatRotaractorName(access?.user?.name || user?.displayName || "RCPH member", access?.user || access?.storedRole);
 
-  async function runMutation(operation, request, successMessage, close) {
+  async function runMutation(operation, request, successMessage, close, mapError = getSafeBodEventError) {
     if (mutationLockRef.current || !canMutate) return;
     mutationLockRef.current = true;
     setBusy(true);
@@ -151,14 +159,18 @@ export default function BodToolsPage() {
       if (sessionUidRef.current !== requestUid) return;
       if (result.ok !== true) throw new Error("Invalid mutation response.");
       close();
-      const rows = result.attendanceRowsUpdated;
-      setNotice({ type: "success", message: `${successMessage}${rows === null ? "" : ` Attendance initialized for ${rows} member rows.`}` });
+      if (typeof successMessage === "function") {
+        setNotice({ type: "success", message: successMessage(result) });
+      } else {
+        const rows = result.attendanceRowsUpdated;
+        setNotice({ type: "success", message: `${successMessage}${rows === null ? "" : ` Attendance initialized for ${rows} member rows.`}` });
+      }
       reload();
       refreshReportingQueue();
     } catch (error) {
       if (sessionUidRef.current !== requestUid) return;
       if (import.meta.env.DEV) console.error("BOD event operation failed.", getBodEventDiagnostic(error, operation, requestUid));
-      setMutationError(getSafeBodEventError(error));
+      setMutationError(mapError(error));
     } finally {
       if (sessionUidRef.current === requestUid) setBusy(false);
       mutationLockRef.current = false;
@@ -276,6 +288,21 @@ export default function BodToolsPage() {
       runMutation("sync", () => syncBodEventToAttendance(event.id), "Synchronization complete.", () => setConfirmation(null));
     }
   }
+
+  function confirmArchivedAction(confirmText) {
+    if (!confirmation) return;
+    const { event, mode } = confirmation;
+    const close = () => setConfirmation(null);
+    if (mode === "restore") {
+      runMutation("restore", () => restoreArchivedBodEvent(event.id), () => buildRestoreSuccessMessage(event), close,
+        (error) => getArchivedBodEventActionError(error, "restore"));
+    } else if (mode === "delete") {
+      runMutation("permanentDelete", () => permanentlyDeleteArchivedBodEvent(event.id, confirmText), (result) => buildPermanentDeleteSuccessMessage(event, result), close,
+        (error) => getArchivedBodEventActionError(error, "delete"));
+    }
+  }
+
+  const archivedConfirmation = confirmation?.mode === "restore" || confirmation?.mode === "delete" ? confirmation : null;
 
   async function handleSignOut() {
     clearBodEventCache(uid);
@@ -406,6 +433,14 @@ export default function BodToolsPage() {
             setMutationError("");
             setConfirmation({ event, mode: "sync" });
           }}
+          onRestore={(event) => {
+            setMutationError("");
+            setConfirmation({ event, mode: "restore" });
+          }}
+          onPermanentDelete={(event) => {
+            setMutationError("");
+            setConfirmation({ event, mode: "delete" });
+          }}
           onReset={() => setFilters(DEFAULT_FILTERS)}
         />
       </div>
@@ -436,7 +471,8 @@ export default function BodToolsPage() {
         onClose={() => setDetails(null)}
       />
       {form ? <BodEventForm key={form.event?.id || form.prefill?.reportingWindowId || "create"} event={form.event || null} prefill={form.prefill || null} displayName={displayName} busy={busy} mutationError={mutationError} lockedAvenueReportingLocks={avenueReportingLocks.items} onClose={() => { if (!busy) { setForm(null); setMutationError(""); } }} onSubmit={submitForm} onComplete={completeForm} /> : null}
-      <BodEventArchiveDialog event={confirmation?.event || null} mode={confirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmMutation} />
+      <BodArchivedEventDialog key={archivedConfirmation ? `${archivedConfirmation.mode}:${archivedConfirmation.event.id}` : "closed"} event={archivedConfirmation?.event || null} mode={archivedConfirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmArchivedAction} />
+      <BodEventArchiveDialog event={archivedConfirmation ? null : confirmation?.event || null} mode={confirmation?.mode} busy={busy} error={mutationError} onClose={() => { if (!busy) { setConfirmation(null); setMutationError(""); } }} onConfirm={confirmMutation} />
     
     
     </main>
