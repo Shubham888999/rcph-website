@@ -241,18 +241,12 @@ test("ledger, table and panel blocks sit on an opaque background in the carrot s
   assert.match(carrotSection(), /\.visit-dashboard-masthead::after \{\s*text-shadow: none;/);
 });
 
-test("background carrots use three depth layers, blur only the far one, and ignore the site theme", () => {
-  assert.match(fieldSource, /carrotLayersForWidth\(width\)\.join\(","\)/);
-  assert.match(fieldSource, /className=\{`visit-dashboard-carrot-field__carrot is-\$\{layer\}`\}/);
+test("background carrots are one kind: no layers, no blur, opacity from the config", () => {
+  assert.match(fieldSource, /carrotCountForWidth\(window\.innerWidth\)/);
+  assert.match(fieldSource, /className="visit-dashboard-carrot-field__carrot"/);
   assert.match(fieldSource, /element\.style\.opacity = String\(carrot\.opacity\);/);
-  assert.doesNotMatch(fieldSource, /MutationObserver|dataset\.theme|carrotOpacity/, "opacity no longer depends on the site theme");
-  const rules = cssRules(carrotSection());
-  const layerRule = (layer) => rules.find((rule) => rule.selector.endsWith(`.visit-dashboard-carrot-field__carrot.is-${layer}`));
-  assert.match(layerRule("near").body, /z-index: 3;/);
-  assert.match(layerRule("mid").body, /z-index: 2;/);
-  assert.match(layerRule("far").body, /z-index: 1;[\s\S]*filter: blur\(1px\);/);
-  const blurRules = rules.filter((rule) => /filter:\s*blur/.test(rule.body));
-  assert.equal(blurRules.length, 1, "blur only on the far layer");
-  const field = rules.find((rule) => /\.visit-dashboard-carrot-field$/.test(rule.selector));
-  assert.match(field.body, /z-index: 0;/, "the field stays one layer behind the content");
+  assert.doesNotMatch(fieldSource, /carrotLayersForWidth|is-\$\{layer\}|MutationObserver|dataset\.theme/);
+  assert.doesNotMatch(cssSource, /carrot-field__carrot\.is-|filter:\s*blur/, "no layer or blur rules");
+  const field = cssRules(carrotSection()).find((rule) => /\.visit-dashboard-carrot-field$/.test(rule.selector));
+  assert.match(field.body, /z-index: 0;/, "the field stays behind the content");
 });

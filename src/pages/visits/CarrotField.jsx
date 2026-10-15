@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  carrotLayersForWidth,
+  carrotCountForWidth,
   carrotTransform,
   createCarrot,
   stepCarrot,
@@ -11,11 +11,6 @@ const RESIZE_DEBOUNCE_MS = 200;
 
 function viewportBounds() {
   return { width: window.innerWidth, height: window.innerHeight };
-}
-
-// A string key so an unchanged layout after a resize keeps the running field.
-function layoutForWidth(width) {
-  return carrotLayersForWidth(width).join(",");
 }
 
 function prefersReducedMotion() {
@@ -34,8 +29,7 @@ function paintCarrot(element, carrot) {
 // DZR carrot theme only: decorative carrots drifting behind the page content.
 // Positions are written straight to the elements; React only renders the list.
 export default function CarrotField() {
-  const [layout, setLayout] = useState(() => layoutForWidth(window.innerWidth));
-  const layers = layout ? layout.split(",") : [];
+  const [count, setCount] = useState(() => carrotCountForWidth(window.innerWidth));
   const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
   const elementsRef = useRef([]);
 
@@ -43,7 +37,7 @@ export default function CarrotField() {
     let timer = 0;
     const onResize = () => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => setLayout(layoutForWidth(window.innerWidth)), RESIZE_DEBOUNCE_MS);
+      timer = window.setTimeout(() => setCount(carrotCountForWidth(window.innerWidth)), RESIZE_DEBOUNCE_MS);
     };
     window.addEventListener("resize", onResize);
     let query = null;
@@ -63,7 +57,7 @@ export default function CarrotField() {
 
   useEffect(() => {
     const random = Math.random;
-    let carrots = (layout ? layout.split(",") : []).map((layer) => createCarrot(viewportBounds(), random, layer));
+    let carrots = Array.from({ length: count }, () => createCarrot(viewportBounds(), random));
 
     carrots.forEach((carrot, index) => {
       const element = elementsRef.current[index];
@@ -108,14 +102,14 @@ export default function CarrotField() {
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [layout, reducedMotion]);
+  }, [count, reducedMotion]);
 
   return (
     <div className="visit-dashboard-carrot-field" aria-hidden="true">
-      {layers.map((layer, index) => (
+      {Array.from({ length: count }, (_, index) => (
         <img
-          className={`visit-dashboard-carrot-field__carrot is-${layer}`}
-          key={`${layer}-${index}`}
+          className="visit-dashboard-carrot-field__carrot"
+          key={index}
           ref={(element) => {
             elementsRef.current[index] = element;
           }}

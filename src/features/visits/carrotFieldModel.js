@@ -1,21 +1,20 @@
 // Background carrots for the DZR carrot theme. Pure maths only: every
 // function takes the random source as an argument so tests can seed it.
 
+// One kind of carrot, the same in light and dark: small, faint and slow.
 export const CARROT_FIELD = Object.freeze({
+  opacity: 0.15,
+  minHeight: 50,
+  maxHeight: 75,
   widthRatio: 0.4,
+  minSpeed: 12,
+  maxSpeed: 22,
   minTurnSeconds: 2,
   maxTurnSeconds: 6,
   steerRate: 1.6,
+  maxTurnDegrees: 30,
   wobbleDegrees: 8,
   maxStepSeconds: 0.05,
-});
-
-// Three depth layers, the same in light and dark. Far carrots are small,
-// faint, slow and turn a little slower so they read as distant.
-export const CARROT_LAYERS = Object.freeze({
-  near: Object.freeze({ opacity: [1, 1], height: [120, 150], speed: [30, 45], maxTurnDegrees: 40 }),
-  mid: Object.freeze({ opacity: [0.5, 0.5], height: [85, 110], speed: [20, 30], maxTurnDegrees: 40 }),
-  far: Object.freeze({ opacity: [0.1, 0.2], height: [50, 75], speed: [10, 18], maxTurnDegrees: 30 }),
 });
 
 export function randomBetween(random, min, max) {
@@ -28,34 +27,10 @@ export function carrotCountForWidth(width) {
   return 3;
 }
 
-// near = min(2, total) (1 on a phone), then the rest splits mid/far with
-// any odd one going to far.
-export function carrotLayerCounts(total, width = Infinity) {
-  const count = Math.max(0, Math.floor(Number(total) || 0));
-  const near = Math.min(width < 760 ? 1 : 2, count);
-  const rest = count - near;
-  const mid = Math.floor(rest / 2);
-  return { near, mid, far: rest - mid };
-}
-
-// The layer of every carrot for a viewport width, nearest first.
-export function carrotLayersForWidth(width) {
-  const { near, mid, far } = carrotLayerCounts(carrotCountForWidth(width), width);
-  return [
-    ...Array(near).fill("near"),
-    ...Array(mid).fill("mid"),
-    ...Array(far).fill("far"),
-  ];
-}
-
-function layerSettings(layer) {
-  return CARROT_LAYERS[layer] || CARROT_LAYERS.mid;
-}
-
-// A new travel target: random heading at the layer's speed.
-export function pickCarrotHeading(random, layer = "mid") {
+// A new travel target: random heading, speed 12-22 px/s.
+export function pickCarrotHeading(random) {
   const heading = random() * Math.PI * 2;
-  const speed = randomBetween(random, ...layerSettings(layer).speed);
+  const speed = randomBetween(random, CARROT_FIELD.minSpeed, CARROT_FIELD.maxSpeed);
   return { vx: Math.cos(heading) * speed, vy: Math.sin(heading) * speed };
 }
 
@@ -101,21 +76,19 @@ export function turnToward(angle, target, maxStep) {
   return angle + Math.max(-maxStep, Math.min(maxStep, delta));
 }
 
-export function createCarrot(bounds, random, layer = "mid") {
-  const settings = layerSettings(layer);
-  const height = Math.round(randomBetween(random, ...settings.height));
+export function createCarrot(bounds, random) {
+  const height = Math.round(randomBetween(random, CARROT_FIELD.minHeight, CARROT_FIELD.maxHeight));
   const width = Math.round(height * CARROT_FIELD.widthRatio);
-  const velocity = pickCarrotHeading(random, layer);
-  const target = pickCarrotHeading(random, layer);
+  const velocity = pickCarrotHeading(random);
+  const target = pickCarrotHeading(random);
   return {
-    layer,
     height,
     width,
     x: random() * Math.max(0, bounds.width - width),
     y: random() * Math.max(0, bounds.height - height),
     angle: randomBetween(random, -180, 180),
     flip: random() < 0.5 ? -1 : 1,
-    opacity: randomBetween(random, ...settings.opacity),
+    opacity: CARROT_FIELD.opacity,
     vx: velocity.vx,
     vy: velocity.vy,
     targetVx: target.vx,
@@ -131,7 +104,7 @@ export function stepCarrot(carrot, rawDt, bounds, random) {
   const dt = Math.min(CARROT_FIELD.maxStepSeconds, Math.max(0, rawDt));
   let next = { ...carrot, turnIn: carrot.turnIn - dt };
   if (next.turnIn <= 0) {
-    const target = pickCarrotHeading(random, next.layer);
+    const target = pickCarrotHeading(random);
     next.targetVx = target.vx;
     next.targetVy = target.vy;
     next.turnIn = randomBetween(random, CARROT_FIELD.minTurnSeconds, CARROT_FIELD.maxTurnSeconds);
@@ -146,7 +119,7 @@ export function stepCarrot(carrot, rawDt, bounds, random) {
   next.wobblePhase += next.wobbleSpeed * dt;
   const travel = (Math.atan2(next.vy, next.vx) * 180) / Math.PI - 90;
   const desired = travel + Math.sin(next.wobblePhase) * CARROT_FIELD.wobbleDegrees;
-  next.angle = turnToward(next.angle, desired, layerSettings(next.layer).maxTurnDegrees * dt);
+  next.angle = turnToward(next.angle, desired, CARROT_FIELD.maxTurnDegrees * dt);
   return next;
 }
 
