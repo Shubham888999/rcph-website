@@ -2086,9 +2086,6 @@ a.visit-dashboard-document-action:hover {
   --internal-shadow-panel: 5px 5px 0 var(--visit-block-shadow);
   --visit-edge: rgba(255, 190, 120, 0.38);
   --visit-block-shadow: rgba(255, 127, 31, 0.38);
-  --visit-rings: rgba(43, 18, 0, 0.22);
-  --visit-soil: #8a5a32;
-  --visit-carrot-track: var(--internal-surface-raised);
   --internal-focus-ring:
     0 0 0 0.125rem var(--internal-page-bg),
     0 0 0 0.25rem var(--visit-leaf-fill);
@@ -2130,8 +2127,6 @@ a.visit-dashboard-document-action:hover {
   --internal-status-danger: #b3283f;
   --visit-edge: rgba(59, 29, 8, 0.55);
   --visit-block-shadow: #3b1d08;
-  --visit-rings: rgba(59, 29, 8, 0.16);
-  --visit-soil: #7a4a26;
   --visit-carrot-fill: #e5600a;
   --visit-carrot-ink: #a33d00;
   --visit-leaf-fill: #3d8a1b;
@@ -2184,8 +2179,8 @@ a.visit-dashboard-document-action:hover {
   color: var(--visit-leaf-fill);
 }
 
-/* Glance: members split and treasury in/out stay straight two-segment bars */
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-bar {
+/* Glance: members, events, treasury */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-glance-bar, .visit-dashboard-tree-bar, .visit-dashboard-avenue-bar) {
   border-radius: 0;
   background: var(--visit-track);
 }
@@ -2196,6 +2191,34 @@ a.visit-dashboard-document-action:hover {
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-bar .is-female {
   background: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-columns i {
+  border-radius: 0;
+  background: var(--visit-carrot-fill);
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-columns span:last-child i {
+  background: var(--visit-leaf-fill);
+}
+
+/* Carrot-tipped single-value bars */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-tree-bar span, .visit-dashboard-avenue-bar span) {
+  border-radius: 0;
+  clip-path: polygon(0 0, 94% 18%, 100% 50%, 94% 82%, 0 100%);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-bar span {
+  background: var(--visit-leaf-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-bar span {
+  background: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node.is-board .visit-dashboard-tree-bar span {
+  background: var(--visit-leaf-fill);
 }
 
 /* Attendance tree kickers */
@@ -2349,7 +2372,7 @@ a.visit-dashboard-document-action:hover {
   background-image: linear-gradient(90deg, var(--visit-tint), var(--visit-track), var(--visit-tint));
 }
 
-/* DZR carrot shapes: sharp edges, block shadows, carrot charts.
+/* DZR carrot shapes: sharp edges and block shadows.
    The radius tokens are 0 in the token block above; these rules cover the
    hard-coded radii. AttendanceMark artwork is left untouched. */
 .visit-dashboard-page[data-visit-theme="carrot"] :is(
@@ -2424,100 +2447,30 @@ a.visit-dashboard-document-action:hover {
   }
 }
 
-/* Carrot charts */
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-leaf {
-  flex: 0 0 auto;
-  display: block;
-  fill: var(--visit-leaf-fill);
+/* Background carrots: a fixed layer painted before the shell. The shell is
+   positioned without a z-index, so it paints above the carrots without
+   trapping the viewer dialog's z-index in a new stacking context. */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-/* a) Attendance tree: leaf + body track; the fill is rate% of the body. */
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar__body {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 24px;
-  display: block;
-  background: var(--visit-carrot-track);
-  clip-path: polygon(0 0, 60% 11%, 100% 50%, 60% 89%, 0 100%);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar.is-large .visit-dashboard-carrot-bar__body {
-  height: 30px;
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar.is-small .visit-dashboard-carrot-bar__body {
-  height: 20px;
-}
-
-/* The overall box is surface-raised too, so its track steps down a shade. */
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node.is-level-1 {
-  --visit-carrot-track: var(--internal-surface-soft);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-carrot-bar__fill, .visit-dashboard-avenue-carrot__body) {
-  height: 100%;
-  display: block;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 16px, var(--visit-rings) 16px 18px),
-    var(--visit-carrot-fill);
-}
-
-/* b) Events held: planted carrots, height linear from zero (max 46px). */
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted {
-  position: relative;
-  width: max-content;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 16px;
-  column-gap: 8px;
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted::after {
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-field__carrot {
   position: absolute;
-  top: 14px;
-  right: 0;
+  top: 0;
   left: 0;
-  height: 2px;
-  background: var(--visit-soil);
-  content: "";
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted__plant {
-  display: grid;
-  grid-template-rows: 14px 2px 46px;
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted__body {
-  grid-row: 3;
-  align-self: start;
-  width: 16px;
+  width: 48px;
+  height: 120px;
+  max-width: none;
   display: block;
-  background:
-    repeating-linear-gradient(180deg, transparent 0 16px, var(--visit-rings) 16px 18px),
-    var(--visit-carrot-fill);
-  clip-path: polygon(0 0, 100% 0, 86% 52%, 50% 100%, 14% 52%);
+  opacity: 0;
+  user-select: none;
+  will-change: transform;
 }
 
-/* c) Avenue-wise events: whole carrot, constant 18px thickness, length = count / max. */
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-carrot {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-carrot__track {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: block;
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-carrot__body {
-  height: 18px;
-  clip-path: polygon(0 0, 60% 11%, 100% 50%, 60% 89%, 0 100%);
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-shell {
+  position: relative;
 }

@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAccessibleDialog from "../../features/bod-tools/useAccessibleDialog";
 import useAuth from "../../hooks/useAuth";
-import { AvenueCarrot, CarrotTreeBar, PlantedCarrots } from "./CarrotCharts";
+import CarrotField from "./CarrotField";
 import {
   VISIT_ATTENDANCE_TABS,
   VISIT_DOCUMENT_FILTERS,
@@ -183,23 +183,19 @@ function GlanceBar({ segments, label }) {
   );
 }
 
-const TREE_CARROT_SIZE = Object.freeze({ 1: "large", 2: "medium", 3: "small" });
-
-function AttendanceTreeBar({ node, name, level, theme }) {
-  const label = node.rate === null ? `${name} attendance, no records yet` : `${name} attendance ${node.label}`;
-  if (theme === "carrot") return <CarrotTreeBar rate={node.rate} label={label} size={TREE_CARROT_SIZE[level]} />;
+function AttendanceTreeBar({ node, name }) {
   return (
     <div
       className="visit-dashboard-tree-bar"
       role="img"
-      aria-label={label}
+      aria-label={node.rate === null ? `${name} attendance, no records yet` : `${name} attendance ${node.label}`}
     >
       {node.rate === null ? null : <span style={{ width: `${node.rate}%` }} />}
     </div>
   );
 }
 
-function AttendanceTreeNode({ area, level, kicker, note, node, name, theme }) {
+function AttendanceTreeNode({ area, level, kicker, note, node, name }) {
   return (
     <article className={`visit-dashboard-tree-node is-${area} is-level-${level}`}>
       <div className="visit-dashboard-tree-node__head">
@@ -207,27 +203,27 @@ function AttendanceTreeNode({ area, level, kicker, note, node, name, theme }) {
         {note ? <p className="visit-dashboard-tree-note">{note}</p> : null}
       </div>
       <p className="visit-dashboard-tree-value">{node.label}</p>
-      <AttendanceTreeBar node={node} name={name} level={level} theme={theme} />
+      <AttendanceTreeBar node={node} name={name} />
     </article>
   );
 }
 
-function AttendanceTree({ tree, theme }) {
+function AttendanceTree({ tree }) {
   return (
     <section className="visit-dashboard-attendance-tree" aria-labelledby="visit-dashboard-attendance-tree-title">
       <h3 id="visit-dashboard-attendance-tree-title">Attendance</h3>
       <div className="visit-dashboard-tree-grid">
-        <AttendanceTreeNode area="overall" level={1} kicker="Overall attendance" note="GBMs + club events + BOD meetings" node={tree.overall} name="Overall" theme={theme} />
-        <AttendanceTreeNode area="club" level={2} kicker="Overall › Club" note="GBMs + club events" node={tree.club} name="Club" theme={theme} />
-        <AttendanceTreeNode area="board" level={2} kicker="Overall › Board" note="BOD meetings" node={tree.bod} name="Board" theme={theme} />
-        <AttendanceTreeNode area="gbm" level={3} kicker="Club › GBMs" node={tree.gbm} name="GBM" theme={theme} />
-        <AttendanceTreeNode area="events" level={3} kicker="Club › Events" node={tree.events} name="Club event" theme={theme} />
+        <AttendanceTreeNode area="overall" level={1} kicker="Overall attendance" note="GBMs + club events + BOD meetings" node={tree.overall} name="Overall" />
+        <AttendanceTreeNode area="club" level={2} kicker="Overall › Club" note="GBMs + club events" node={tree.club} name="Club" />
+        <AttendanceTreeNode area="board" level={2} kicker="Overall › Board" note="BOD meetings" node={tree.bod} name="Board" />
+        <AttendanceTreeNode area="gbm" level={3} kicker="Club › GBMs" node={tree.gbm} name="GBM" />
+        <AttendanceTreeNode area="events" level={3} kicker="Club › Events" node={tree.events} name="Club event" />
       </div>
     </section>
   );
 }
 
-function ClubAtAGlance({ glance, attendanceTree, theme }) {
+function ClubAtAGlance({ glance, attendanceTree }) {
   const { members, events, treasury } = glance;
   return (
     <section
@@ -257,12 +253,7 @@ function ClubAtAGlance({ glance, attendanceTree, theme }) {
         <article className="visit-dashboard-glance-tile">
           <h3>Events held</h3>
           <p className="visit-dashboard-glance-value">{events.total}</p>
-          {events.bars.length && theme === "carrot" ? (
-            <PlantedCarrots
-              bars={events.bars}
-              label={`Events by avenue: ${events.bars.map((bar) => `${bar.avenueCode} ${bar.count}`).join(", ")}`}
-            />
-          ) : events.bars.length ? (
+          {events.bars.length ? (
             <div
               className="visit-dashboard-glance-columns"
               role="img"
@@ -291,12 +282,12 @@ function ClubAtAGlance({ glance, attendanceTree, theme }) {
         </article>
       </div>
 
-      <AttendanceTree tree={attendanceTree} theme={theme} />
+      <AttendanceTree tree={attendanceTree} />
     </section>
   );
 }
 
-function AvenueCounts({ rows, attendance, theme }) {
+function AvenueCounts({ rows, attendance }) {
   const activeAvenueRows = rows
     .filter((row) => (
       row.avenueCode !== "GBM"
@@ -336,13 +327,9 @@ function AvenueCounts({ rows, attendance, theme }) {
                       <small>{row.avenueCode}</small>
                     </span>
 
-                    {theme === "carrot" ? (
-                      <AvenueCarrot count={eventCount} maxCount={maxEventCount} />
-                    ) : (
-                      <span className="visit-dashboard-avenue-bar" aria-hidden="true">
-                        <span style={{ width: `${Math.round((eventCount / maxEventCount) * 100)}%` }} />
-                      </span>
-                    )}
+                    <span className="visit-dashboard-avenue-bar" aria-hidden="true">
+                      <span style={{ width: `${Math.round((eventCount / maxEventCount) * 100)}%` }} />
+                    </span>
 
                     <span className="visit-dashboard-avenue-count-wrap">
                       <b aria-label={`${eventCount} ${eventCount === 1 ? "event" : "events"}`}>
@@ -1195,6 +1182,7 @@ export default function VisitDashboardPage() {
 
   return (
     <main className="visit-dashboard-page" data-visit-theme={theme || undefined}>
+      {theme === "carrot" ? <CarrotField /> : null}
       <div className="visit-dashboard-shell">
         <header className="visit-dashboard-masthead" aria-labelledby="visit-dashboard-title">
           <div>
@@ -1214,9 +1202,9 @@ export default function VisitDashboardPage() {
 
         <SectionLinks showLetterhead={Boolean(letterhead)} />
 
-        <ClubAtAGlance glance={glance} attendanceTree={attendanceTree} theme={theme} />
+        <ClubAtAGlance glance={glance} attendanceTree={attendanceTree} />
 
-        <AvenueCounts rows={stats.avenueEventCounts} attendance={attendance} theme={theme} />
+        <AvenueCounts rows={stats.avenueEventCounts} attendance={attendance} />
 
         <DocumentPanels panels={documentPanels} theme={theme} />
 

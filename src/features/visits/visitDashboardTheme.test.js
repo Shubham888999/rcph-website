@@ -1,16 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
-import {
-  carrotFillPercent,
-  carrotLengthPercent,
-  getVisitDashboardTheme,
-  plantedCarrotHeight,
-  splitVisitDashboardTitle,
-} from "./visitDashboardModel.js";
+import { getVisitDashboardTheme, splitVisitDashboardTitle } from "./visitDashboardModel.js";
 
 const pageSource = readFileSync(new URL("../../pages/visits/VisitDashboardPage.jsx", import.meta.url), "utf8");
-const chartSource = readFileSync(new URL("../../pages/visits/CarrotCharts.jsx", import.meta.url), "utf8");
+const fieldSource = readFileSync(new URL("../../pages/visits/CarrotField.jsx", import.meta.url), "utf8");
+const carrotSvgUrl = new URL("../../../public/visit-theme/carrot.svg", import.meta.url);
 const cssSource = readFileSync(new URL("../../styles/components/visit-dashboard.css", import.meta.url), "utf8");
 
 const CARROT_SCOPE = '.visit-dashboard-page[data-visit-theme="carrot"]';
@@ -106,50 +101,6 @@ test("former raw hex in the tree, tiles and viewer only survive as variable defa
 
 const carrotSection = () => cssSource.slice(cssSource.indexOf("/* DZR Visit carrot theme."));
 
-test("carrot fill clamps to 0-100 and treats null as empty", () => {
-  assert.equal(carrotFillPercent(64), 64);
-  assert.equal(carrotFillPercent(0), 0);
-  assert.equal(carrotFillPercent(100), 100);
-  assert.equal(carrotFillPercent(140), 100);
-  assert.equal(carrotFillPercent(-5), 0);
-  assert.equal(carrotFillPercent(null), 0);
-  assert.equal(carrotFillPercent(undefined), 0);
-  assert.equal(carrotFillPercent("abc"), 0);
-  assert.equal(carrotFillPercent(33.333), 33.3);
-});
-
-test("carrot length and planted height scale linearly from zero", () => {
-  assert.equal(carrotLengthPercent(5, 10), 50);
-  assert.equal(carrotLengthPercent(10, 10), 100);
-  assert.equal(carrotLengthPercent(1, 3), 33.3);
-  assert.equal(carrotLengthPercent(0, 10), 0);
-  assert.equal(carrotLengthPercent(4, 0), 0, "zero max draws nothing");
-  assert.equal(carrotLengthPercent(12, 10), 100);
-  assert.equal(plantedCarrotHeight(6, 6, 46), 46);
-  assert.equal(plantedCarrotHeight(3, 6, 46), 23);
-  assert.equal(plantedCarrotHeight(1, 3, 46), 15.3);
-  assert.equal(plantedCarrotHeight(0, 6, 46), 0);
-  assert.equal(plantedCarrotHeight(2, 0, 46), 0);
-  assert.equal(plantedCarrotHeight(1, 2), 23, "46px is the default maximum");
-  assert.equal(plantedCarrotHeight(1, 4) * 2, plantedCarrotHeight(2, 4), "linear");
-  assert.equal(plantedCarrotHeight(1, 4) * 4, plantedCarrotHeight(4, 4), "linear to the max");
-});
-
-test("carrot charts render only for the carrot theme and keep text and labels", () => {
-  assert.match(pageSource, /if \(theme === "carrot"\) return <CarrotTreeBar rate=\{node\.rate\} label=\{label\}/);
-  assert.match(pageSource, /events\.bars\.length && theme === "carrot" \? \(\s*<PlantedCarrots/);
-  assert.match(pageSource, /theme === "carrot" \? \(\s*<AvenueCarrot count=\{eventCount\} maxCount=\{maxEventCount\} \/>/);
-  assert.match(pageSource, /className="visit-dashboard-avenue-bar"/, "other visits keep the straight avenue bar");
-  assert.match(pageSource, /className="visit-dashboard-glance-columns"/, "other visits keep the mini columns");
-  assert.match(pageSource, /className="visit-dashboard-tree-bar"/, "other visits keep the tree bar");
-  assert.match(chartSource, /role="img" aria-label=\{label\}/);
-  assert.match(chartSource, /title=\{`\$\{bar\.avenueName \|\| bar\.avenueCode\}: \$\{bar\.count\}`\}/);
-  assert.match(chartSource, /carrotFillPercent\(rate\)/);
-  assert.match(chartSource, /carrotLengthPercent\(count, maxCount\)/);
-  assert.match(chartSource, /plantedCarrotHeight\(bar\.count, maxCount, PLANTED_CARROT_MAX_HEIGHT\)/);
-  assert.match(chartSource, /aria-hidden="true"/);
-});
-
 test("carrot section: every rule is scoped and shadows never blur", () => {
   const rules = cssRules(carrotSection());
   assert.ok(rules.length > 40);
@@ -177,10 +128,63 @@ test("radius tokens are zero only in the carrot scope and attendance marks stay 
   assert.doesNotMatch(carrotSection(), /attendance-mark/, "AttendanceMark artwork is not restyled");
 });
 
-test("avenue carrots keep a constant thickness; only length follows the count", () => {
-  const body = cssRules(carrotSection()).find((rule) => /\.visit-dashboard-avenue-carrot__body$/.test(rule.selector));
-  assert.match(body.body, /height: 18px;/);
-  const avenueCarrot = chartSource.slice(chartSource.indexOf("export function AvenueCarrot"));
-  assert.doesNotMatch(avenueCarrot, /height:/, "no inline height scaling");
-  assert.match(avenueCarrot, /style=\{\{ width: `\$\{carrotLengthPercent\(count, maxCount\)\}%` \}\}/);
+test("the three stats charts render the v2.16.0 markup for every visit", () => {
+  assert.doesNotMatch(pageSource, /CarrotCharts|CarrotTreeBar|PlantedCarrots|AvenueCarrot/);
+  assert.match(pageSource, /className="visit-dashboard-tree-bar"[\s\S]{0,160}\{node\.rate === null \? null : <span style=\{\{ width: `\$\{node\.rate\}%` \}\} \/>\}/);
+  assert.match(pageSource, /<i style=\{\{ height: `\$\{Math\.max\(bar\.share, 8\)\}%` \}\} \/>/, "events columns keep their minimum height");
+  assert.match(pageSource, /<span className="visit-dashboard-avenue-bar" aria-hidden="true">\s*<span style=\{\{ width: `\$\{Math\.round\(\(eventCount \/ maxEventCount\) \* 100\)\}%` \}\} \/>/);
+  const section = carrotSection();
+  assert.match(section, /\.visit-dashboard-glance-columns i \{[^}]*border-radius: 0;[^}]*clip-path: polygon\(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%\)/);
+  assert.match(section, /\.visit-dashboard-glance-columns span:last-child i \{\s*background: var\(--visit-leaf-fill\)/);
+  assert.match(section, /:is\(\.visit-dashboard-tree-bar span, \.visit-dashboard-avenue-bar span\) \{[^}]*clip-path: polygon\(0 0, 94% 18%, 100% 50%, 94% 82%, 0 100%\)/);
+  assert.match(section, /\.is-board \.visit-dashboard-tree-bar span \{\s*background: var\(--visit-leaf-fill\)/);
+  assert.match(section, /:is\(\.visit-dashboard-glance-bar, \.visit-dashboard-tree-bar, \.visit-dashboard-avenue-bar\) \{\s*border-radius: 0;/, "tracks follow the sharp edges");
+  assert.doesNotMatch(section, /carrot-bar|visit-dashboard-planted|avenue-carrot|--visit-rings|--visit-soil/);
+});
+
+test("v2.16.1 sharp edges and block shadows are still present and scoped", () => {
+  const rules = cssRules(carrotSection());
+  // A selector can have several rules (colour in v2.16.0, shape in v2.16.1).
+  const hasRule = (selector, ...bodies) => rules.some((rule) => (
+    selector.test(rule.selector) && bodies.every((body) => body.test(rule.body))
+  ));
+  assert.ok(hasRule(/\.visit-dashboard-glance-grid$/, /box-shadow: 6px 6px 0 var\(--visit-block-shadow\)/));
+  assert.ok(hasRule(/ \.visit-dashboard-tree-node$/, /border: 1\.5px solid var\(--visit-edge\);\s*box-shadow: 5px 5px 0/));
+  assert.ok(hasRule(/\.visit-dashboard-doc-tile:hover$/, /translate\(-2px, -2px\)/, /8px 8px 0/), "tile hover lift");
+  assert.ok(hasRule(/\.visit-dashboard-doc-viewer$/, /10px 10px 0/), "viewer block shadow");
+  assert.ok(hasRule(/button\[aria-pressed="true"\]$/, /3px 3px 0/), "active chip block shadow");
+  assert.match(cssSource, /--internal-radius-control: 0;[\s\S]*--visit-edge: rgba\(59, 29, 8, 0\.55\);[\s\S]*--visit-block-shadow: #3b1d08;/);
+});
+
+test("the carrot field renders only for DZR and stays decorative", () => {
+  assert.match(pageSource, /\{theme === "carrot" \? <CarrotField \/> : null\}/);
+  assert.equal(pageSource.match(/<CarrotField/g).length, 1, "rendered once");
+  assert.ok(
+    pageSource.indexOf("<CarrotField />") < pageSource.indexOf('<div className="visit-dashboard-shell">'),
+    "the field paints before the content",
+  );
+  assert.match(fieldSource, /<div className="visit-dashboard-carrot-field" aria-hidden="true">/);
+  assert.match(fieldSource, /src=\{CARROT_SRC\}\s*alt=""\s*aria-hidden="true"\s*draggable="false"/);
+  assert.match(fieldSource, /const CARROT_SRC = "\/visit-theme\/carrot\.svg";/);
+  assert.match(fieldSource, /requestAnimationFrame\(tick\)/);
+  assert.match(fieldSource, /visibilitychange/);
+  assert.match(fieldSource, /cancelAnimationFrame\(frame\)/);
+  assert.match(fieldSource, /if \(reducedMotion\) \{/);
+  assert.doesNotMatch(fieldSource.slice(fieldSource.indexOf("const tick")), /set[A-Z]\w*\(/, "no React state updates per frame");
+  const field = cssRules(carrotSection()).find((rule) => /\.visit-dashboard-carrot-field$/.test(rule.selector));
+  assert.match(field.body, /position: fixed;[\s\S]*inset: 0;[\s\S]*z-index: 0;[\s\S]*overflow: hidden;[\s\S]*pointer-events: none;/);
+  const carrot = cssRules(carrotSection()).find((rule) => /__carrot$/.test(rule.selector));
+  assert.match(carrot.body, /will-change: transform;/);
+  const shell = cssRules(carrotSection()).find((rule) => /\.visit-dashboard-shell$/.test(rule.selector));
+  assert.match(shell.body, /position: relative;/);
+  assert.doesNotMatch(shell.body, /z-index/, "no stacking context, so the viewer dialog stays on top");
+});
+
+test("the carrot asset ships from public/ unchanged", () => {
+  assert.ok(existsSync(carrotSvgUrl));
+  const svg = readFileSync(carrotSvgUrl, "utf8");
+  assert.ok(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 300" width="120" height="300">'));
+  assert.ok(svg.endsWith('<path d="M60 284 C60 288 61 292 63 298" stroke="#a8420a" stroke-width="1" fill="none"/></svg>'));
+  assert.equal((svg.match(/<ellipse /g) || []).length, 32);
+  assert.equal(svg.length, 4084);
 });
