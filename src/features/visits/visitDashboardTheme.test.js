@@ -188,3 +188,55 @@ test("the carrot asset ships from public/ unchanged", () => {
   assert.equal((svg.match(/<ellipse /g) || []).length, 32);
   assert.equal(svg.length, 4084);
 });
+
+test("ledger, table and panel blocks sit on an opaque background in the carrot scope", () => {
+  const rules = cssRules(carrotSection());
+  const surfaceTokens = ["--internal-surface", "--internal-surface-soft", "--internal-surface-raised"];
+  for (const selector of [CARROT_SCOPE, LIGHT_CARROT_SCOPE]) {
+    const block = cssRules(cssSource).find((rule) => rule.selector === selector);
+    surfaceTokens.forEach((token) => {
+      assert.match(block.body, new RegExp(`${token}: #[0-9a-f]{6};`), `${selector} ${token} is a solid hex`);
+    });
+  }
+  // A background is opaque when it is a surface token, or when its last
+  // layer (the base under any tint) is a surface token.
+  const isOpaque = (value) => {
+    const clean = value.replace(/\s*!important\s*$/, "").trim();
+    if (/\btransparent\b/.test(clean)) return false;
+    const layers = clean.split(/,(?![^(]*\))/).map((layer) => layer.trim());
+    return /^var\(--internal-surface(?:-soft|-raised)?\)$/.test(layers.at(-1));
+  };
+  const backgroundsFor = (selectorPattern) => rules
+    .filter((rule) => selectorParts(rule.selector).some((part) => selectorPattern.test(part)))
+    .flatMap((rule) => [...rule.body.matchAll(/(?:^|[;\s])background(?:-color)?:\s*([^;]+);/g)].map((match) => match[1]));
+  const required = [
+    /\.visit-dashboard-ledger-wrap$/,
+    /\.visit-dashboard-ledger-table tbody td$/,
+    /\.visit-dashboard-ledger-table tbody th$/,
+    /\.visit-dashboard-ledger-table tbody tr:nth-child\(even\) :is\(td, th\)$/,
+    /\.visit-dashboard-ledger-month th$/,
+    /\.visit-dashboard-attendance-table td$/,
+    /\.visit-dashboard-attendance-tabs button:not\(\.is-active\)$/,
+    /\.visit-dashboard-attendance > summary b$/,
+    /:is\(\.visit-dashboard-attendance-panel, \.visit-dashboard-state\)$/,
+    /\.visit-dashboard-records > summary$/,
+    /\.visit-dashboard-attendance > summary$/,
+    /\.visit-dashboard-treasury > \.visit-dashboard-section-heading$/,
+    /\.visit-dashboard-avenue-disclosure$/,
+    /\.visit-dashboard-avenue-event-list li$/,
+    /\.visit-dashboard-glance-grid$/,
+    /\.visit-dashboard-doc-filters button:not\(\[aria-pressed="true"\]\)$/,
+    /\.visit-dashboard-empty-state$/,
+  ];
+  required.forEach((pattern) => {
+    const values = backgroundsFor(pattern);
+    assert.ok(values.length, `no carrot background for ${pattern}`);
+    values.forEach((value) => assert.ok(isOpaque(value), `${pattern} -> ${value}`));
+  });
+  // No light-mode rule may re-tint those blocks with a bare translucent colour.
+  rules
+    .filter((rule) => rule.selector.startsWith(LIGHT_CARROT_SCOPE))
+    .filter((rule) => /ledger|attendance-tabs|summary b|avenue-event-list|avenue-disclosure|empty-state/.test(rule.selector))
+    .forEach((rule) => assert.doesNotMatch(rule.body, /background(?:-color)?:/, `light rule re-tints: ${rule.selector}`));
+  assert.match(carrotSection(), /\.visit-dashboard-masthead::after \{\s*text-shadow: none;/);
+});

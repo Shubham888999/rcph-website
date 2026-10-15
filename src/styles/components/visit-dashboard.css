@@ -2100,6 +2100,8 @@ a.visit-dashboard-document-action:hover {
   --visit-track: rgba(255, 255, 255, 0.07);
   --visit-hairline: rgba(255, 255, 255, 0.08);
   --visit-tint: rgba(255, 255, 255, 0.035);
+  --visit-faint: rgba(255, 255, 255, 0.025);
+  --visit-stripe: rgba(255, 255, 255, 0.018);
   --visit-tree-level-1: var(--internal-surface-raised);
   --visit-deep-bg: var(--internal-surface-soft);
   --visit-line: var(--internal-border);
@@ -2137,6 +2139,8 @@ a.visit-dashboard-document-action:hover {
   --visit-track: rgba(59, 29, 8, 0.1);
   --visit-hairline: rgba(59, 29, 8, 0.12);
   --visit-tint: rgba(59, 29, 8, 0.04);
+  --visit-faint: var(--visit-tint);
+  --visit-stripe: var(--visit-tint);
 }
 
 /* Page background behind overscroll, DZR page only. */
@@ -2294,7 +2298,7 @@ a.visit-dashboard-document-action:hover {
 }
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-ledger-month th {
-  background: var(--visit-carrot-wash) !important;
+  background: linear-gradient(var(--visit-carrot-wash), var(--visit-carrot-wash)), var(--internal-surface) !important;
 }
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-bill-link {
@@ -2331,25 +2335,13 @@ a.visit-dashboard-document-action:hover {
   border-left-color: var(--visit-hairline);
 }
 
-:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] :is(
-  .visit-dashboard-avenue-event-list li,
-  .visit-dashboard-attendance-status:is(.is-present, .is-excused)
-) {
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-event-list li {
+  border-color: var(--visit-hairline);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-status:is(.is-present, .is-excused) {
   border-color: var(--visit-hairline);
   background: var(--visit-tint);
-}
-
-:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] :is(
-  .visit-dashboard-attendance > summary b,
-  .visit-dashboard-attendance-tabs button,
-  .visit-dashboard-ledger-table tbody tr:nth-child(even) td,
-  .visit-dashboard-ledger-table tbody tr:nth-child(even) th
-) {
-  background: var(--visit-tint);
-}
-
-:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-tabs button.is-active {
-  background: var(--internal-surface);
 }
 
 :root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-table thead th {
@@ -2473,4 +2465,72 @@ a.visit-dashboard-document-action:hover {
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-shell {
   position: relative;
+}
+
+/* Opaque content: the background carrots may only show in empty page space,
+   so every content block sits on a solid surface. Tints are layered over
+   that surface (tint, tint), never over the page. */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-grid {
+  background: linear-gradient(var(--internal-border), var(--internal-border)), var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-ledger-wrap,
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-ledger-table tbody td,
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-ledger-table tbody th {
+  background: var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-ledger-table tbody tr:nth-child(even) :is(td, th) {
+  background: linear-gradient(var(--visit-stripe), var(--visit-stripe)), var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-table td {
+  background-color: var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-tabs button:not(.is-active) {
+  background: linear-gradient(var(--visit-faint), var(--visit-faint)), var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance > summary b {
+  background: linear-gradient(var(--visit-tint), var(--visit-tint)), var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-disclosure {
+  padding-inline: 0.65rem;
+  background: var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-event-list li {
+  background: linear-gradient(var(--visit-faint), var(--visit-faint)), var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-filters button:not([aria-pressed="true"]) {
+  background: var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-empty-state {
+  padding-right: 1rem;
+  background: var(--internal-surface);
+}
+
+/* Text that sits straight on the page gets a page-coloured halo, so a carrot
+   drifting behind it never lowers its contrast. The giant faint watermark is
+   excluded: a solid halo would draw opaque letter shapes. */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(
+  .visit-dashboard-masthead,
+  .visit-dashboard-section-links,
+  .visit-dashboard-glance > .visit-dashboard-section-heading,
+  .visit-dashboard-documents > .visit-dashboard-section-heading,
+  .visit-dashboard-avenue-section > header,
+  .visit-dashboard-attendance-tree > h3
+) {
+  text-shadow:
+    0 0 2px var(--internal-page-bg),
+    0 0 6px var(--internal-page-bg),
+    0 0 12px var(--internal-page-bg);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-masthead::after {
+  text-shadow: none;
 }
