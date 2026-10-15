@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  CARROT_FIELD,
+  CARROT_LAYERS,
   angleDelta,
   bounceCarrot,
   carrotCountForWidth,
-  carrotOpacity,
+  carrotLayerCounts,
+  carrotLayersForWidth,
   carrotTransform,
   createCarrot,
   pickCarrotHeading,
@@ -38,34 +39,66 @@ test("carrot count follows the viewport width", () => {
   assert.equal(carrotCountForWidth(1920), 8);
 });
 
-test("new carrots respect every random range", () => {
-  for (const mode of ["light", "dark"]) {
-    const random = seeded(mode === "light" ? 7 : 11);
-    const [minOpacity, maxOpacity] = mode === "light" ? [0.3, 0.45] : [0.22, 0.34];
+test("layers split the same total: near, then mid and far", () => {
+  assert.deepEqual(carrotLayerCounts(8, 1280), { near: 2, mid: 3, far: 3 });
+  assert.deepEqual(carrotLayerCounts(5, 900), { near: 2, mid: 1, far: 2 });
+  assert.deepEqual(carrotLayerCounts(3, 375), { near: 1, mid: 1, far: 1 });
+  assert.deepEqual(carrotLayerCounts(0, 1280), { near: 0, mid: 0, far: 0 });
+  assert.deepEqual(carrotLayerCounts(1, 1280), { near: 1, mid: 0, far: 0 });
+  assert.deepEqual(carrotLayerCounts(4, 1280), { near: 2, mid: 1, far: 1 });
+  assert.deepEqual(carrotLayerCounts(11, 1280), { near: 2, mid: 4, far: 5 });
+  assert.deepEqual(carrotLayerCounts(2, 375), { near: 1, mid: 0, far: 1 });
+  for (let total = 0; total <= 20; total += 1) {
+    for (const width of [375, 900, 1280]) {
+      const { near, mid, far } = carrotLayerCounts(total, width);
+      assert.equal(near + mid + far, total, "the total never changes");
+      assert.equal(near, Math.min(width < 760 ? 1 : 2, total));
+      assert.ok(far - mid === 0 || far - mid === 1, "any odd one goes to far");
+    }
+  }
+  assert.deepEqual(carrotLayersForWidth(1280), ["near", "near", "mid", "mid", "mid", "far", "far", "far"]);
+  assert.deepEqual(carrotLayersForWidth(900), ["near", "near", "mid", "far", "far"]);
+  assert.deepEqual(carrotLayersForWidth(375), ["near", "mid", "far"]);
+});
+
+test("each layer keeps its opacity, size and speed ranges", () => {
+  const expected = {
+    near: { opacity: [1, 1], height: [120, 150], speed: [30, 45] },
+    mid: { opacity: [0.5, 0.5], height: [85, 110], speed: [20, 30] },
+    far: { opacity: [0.1, 0.2], height: [50, 75], speed: [10, 18] },
+  };
+  for (const [layer, range] of Object.entries(expected)) {
+    const random = seeded(layer.length * 97);
+    const within = (value, [min, max]) => value >= min - 1e-9 && value <= max + 1e-9;
     for (let index = 0; index < 500; index += 1) {
-      const carrot = createCarrot(BOUNDS, random, mode);
-      assert.ok(carrot.height >= 70 && carrot.height <= 140, `height ${carrot.height}`);
+      const carrot = createCarrot(BOUNDS, random, layer);
+      assert.equal(carrot.layer, layer);
+      assert.ok(within(carrot.opacity, range.opacity), `${layer} opacity ${carrot.opacity}`);
+      assert.ok(within(carrot.height, range.height), `${layer} height ${carrot.height}`);
       assert.equal(carrot.width, Math.round(carrot.height * 0.4));
       assert.ok(carrot.x >= 0 && carrot.x <= BOUNDS.width - carrot.width);
       assert.ok(carrot.y >= 0 && carrot.y <= BOUNDS.height - carrot.height);
       assert.ok(carrot.angle >= -180 && carrot.angle <= 180);
       assert.ok(carrot.flip === 1 || carrot.flip === -1);
-      assert.ok(carrot.opacity >= minOpacity - 1e-9 && carrot.opacity <= maxOpacity + 1e-9, `opacity ${carrot.opacity}`);
       assert.ok(carrot.turnIn >= 2 && carrot.turnIn <= 6);
-      const speed = Math.hypot(carrot.targetVx, carrot.targetVy);
-      assert.ok(speed >= 18 - 1e-9 && speed <= 45 + 1e-9, `speed ${speed}`);
+      assert.ok(within(Math.hypot(carrot.vx, carrot.vy), range.speed), `${layer} speed`);
+      assert.ok(within(Math.hypot(carrot.targetVx, carrot.targetVy), range.speed), `${layer} target speed`);
+      const later = stepCarrot({ ...carrot, turnIn: 0 }, 0.05, BOUNDS, random);
+      assert.ok(within(Math.hypot(later.targetVx, later.targetVy), range.speed), `${layer} new heading speed`);
     }
   }
-  assert.equal(createCarrot(BOUNDS, constant(0.2)).flip, -1);
-  assert.equal(createCarrot(BOUNDS, constant(0.8)).flip, 1);
-  assert.equal(carrotOpacity("light", 0), 0.3);
-  assert.equal(carrotOpacity("dark", 1), 0.34);
+  assert.equal(createCarrot(BOUNDS, constant(0.2), "near").flip, -1);
+  assert.equal(createCarrot(BOUNDS, constant(0.8), "near").flip, 1);
+  assert.equal(CARROT_LAYERS.near.maxTurnDegrees, 40);
+  assert.equal(CARROT_LAYERS.mid.maxTurnDegrees, 40);
+  assert.equal(CARROT_LAYERS.far.maxTurnDegrees, 30);
 });
 
-test("headings cover the speed range at the extremes", () => {
-  assert.equal(Math.round(Math.hypot(...Object.values(pickCarrotHeading(constant(0))))), 18);
-  const fastest = pickCarrotHeading(constant(0.999999));
-  assert.ok(Math.abs(Math.hypot(fastest.vx, fastest.vy) - 45) < 0.001);
+test("headings cover each layer's speed range at the extremes", () => {
+  assert.ok(Math.abs(Math.hypot(...Object.values(pickCarrotHeading(constant(0), "near"))) - 30) < 1e-9);
+  assert.ok(Math.abs(Math.hypot(...Object.values(pickCarrotHeading(constant(0.999999), "near"))) - 45) < 0.001);
+  assert.ok(Math.abs(Math.hypot(...Object.values(pickCarrotHeading(constant(0), "far"))) - 10) < 1e-9);
+  assert.ok(Math.abs(Math.hypot(...Object.values(pickCarrotHeading(constant(0.999999), "far"))) - 18) < 0.001);
 });
 
 test("steering eases toward the target without overshooting", () => {
@@ -101,19 +134,24 @@ test("bounce keeps the carrot box inside the viewport and reflects the heading",
   assert.deepEqual(bounceCarrot(inside, BOUNDS), inside);
 });
 
-test("stepping keeps every carrot on screen, turns gently and clamps dt", () => {
+test("stepping keeps every carrot on screen, caps turns per layer and clamps dt", () => {
   const random = seeded(42);
-  let carrots = Array.from({ length: 8 }, () => createCarrot(BOUNDS, random));
+  let carrots = carrotLayersForWidth(1280).map((layer) => createCarrot(BOUNDS, random, layer));
+  const maxTurnSeen = { near: 0, mid: 0, far: 0 };
   for (let frame = 0; frame < 3000; frame += 1) {
     carrots = carrots.map((carrot) => {
       const next = stepCarrot(carrot, 1 / 60, BOUNDS, random);
       assert.ok(next.x >= 0 && next.x <= BOUNDS.width - next.width);
       assert.ok(next.y >= 0 && next.y <= BOUNDS.height - next.height);
-      assert.ok(Math.abs(angleDelta(carrot.angle, next.angle)) <= CARROT_FIELD.maxTurnDegrees / 60 + 1e-9, "max 40°/s");
+      const turnRate = Math.abs(angleDelta(carrot.angle, next.angle)) * 60;
+      assert.ok(turnRate <= CARROT_LAYERS[carrot.layer].maxTurnDegrees + 1e-6, `${carrot.layer} turned ${turnRate}°/s`);
+      maxTurnSeen[carrot.layer] = Math.max(maxTurnSeen[carrot.layer], turnRate);
       return next;
     });
   }
-  const carrot = { ...createCarrot(BOUNDS, seeded(3)), x: 600, y: 300, vx: 40, vy: 0, targetVx: 40, targetVy: 0, turnIn: 5 };
+  assert.ok(maxTurnSeen.far <= 30 + 1e-6, "far carrots: 30°/s");
+  assert.ok(maxTurnSeen.near > 30, "near carrots do use the faster 40°/s cap");
+  const carrot = { ...createCarrot(BOUNDS, seeded(3), "near"), x: 600, y: 300, vx: 40, vy: 0, targetVx: 40, targetVy: 0, turnIn: 5 };
   const longFrame = stepCarrot(carrot, 2, BOUNDS, seeded(3));
   assert.ok(Math.abs(longFrame.x - 600) <= 40 * 0.05 + 1e-9, "a 2 s frame moves like 50 ms");
   const retarget = stepCarrot({ ...carrot, turnIn: 0.01 }, 0.05, BOUNDS, seeded(9));

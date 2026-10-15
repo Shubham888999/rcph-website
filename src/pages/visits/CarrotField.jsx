@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  carrotCountForWidth,
-  carrotOpacity,
+  carrotLayersForWidth,
   carrotTransform,
   createCarrot,
   stepCarrot,
@@ -14,8 +13,9 @@ function viewportBounds() {
   return { width: window.innerWidth, height: window.innerHeight };
 }
 
-function siteThemeMode() {
-  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+// A string key so an unchanged layout after a resize keeps the running field.
+function layoutForWidth(width) {
+  return carrotLayersForWidth(width).join(",");
 }
 
 function prefersReducedMotion() {
@@ -34,7 +34,8 @@ function paintCarrot(element, carrot) {
 // DZR carrot theme only: decorative carrots drifting behind the page content.
 // Positions are written straight to the elements; React only renders the list.
 export default function CarrotField() {
-  const [count, setCount] = useState(() => carrotCountForWidth(window.innerWidth));
+  const [layout, setLayout] = useState(() => layoutForWidth(window.innerWidth));
+  const layers = layout ? layout.split(",") : [];
   const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
   const elementsRef = useRef([]);
 
@@ -42,7 +43,7 @@ export default function CarrotField() {
     let timer = 0;
     const onResize = () => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => setCount(carrotCountForWidth(window.innerWidth)), RESIZE_DEBOUNCE_MS);
+      timer = window.setTimeout(() => setLayout(layoutForWidth(window.innerWidth)), RESIZE_DEBOUNCE_MS);
     };
     window.addEventListener("resize", onResize);
     let query = null;
@@ -62,8 +63,7 @@ export default function CarrotField() {
 
   useEffect(() => {
     const random = Math.random;
-    let mode = siteThemeMode();
-    let carrots = Array.from({ length: count }, () => createCarrot(viewportBounds(), random, mode));
+    let carrots = (layout ? layout.split(",") : []).map((layer) => createCarrot(viewportBounds(), random, layer));
 
     carrots.forEach((carrot, index) => {
       const element = elementsRef.current[index];
@@ -74,19 +74,8 @@ export default function CarrotField() {
       paintCarrot(element, carrot);
     });
 
-    const themeObserver = new MutationObserver(() => {
-      const nextMode = siteThemeMode();
-      if (nextMode === mode) return;
-      mode = nextMode;
-      carrots.forEach((carrot, index) => {
-        const element = elementsRef.current[index];
-        if (element) element.style.opacity = String(carrotOpacity(mode, carrot.opacityT));
-      });
-    });
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-
     if (reducedMotion) {
-      return () => themeObserver.disconnect();
+      return undefined;
     }
 
     let frame = 0;
@@ -118,16 +107,15 @@ export default function CarrotField() {
     return () => {
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
-      themeObserver.disconnect();
     };
-  }, [count, reducedMotion]);
+  }, [layout, reducedMotion]);
 
   return (
     <div className="visit-dashboard-carrot-field" aria-hidden="true">
-      {Array.from({ length: count }, (_, index) => (
+      {layers.map((layer, index) => (
         <img
-          className="visit-dashboard-carrot-field__carrot"
-          key={index}
+          className={`visit-dashboard-carrot-field__carrot is-${layer}`}
+          key={`${layer}-${index}`}
           ref={(element) => {
             elementsRef.current[index] = element;
           }}

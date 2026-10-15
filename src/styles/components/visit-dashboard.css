@@ -2467,6 +2467,22 @@ a.visit-dashboard-document-action:hover {
   position: relative;
 }
 
+/* Depth layers. The field's own z-index: 0 keeps all three behind the
+   content; these only order the carrots among themselves. Blur is on the
+   far layer only (at most three images). */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-field__carrot.is-near {
+  z-index: 3;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-field__carrot.is-mid {
+  z-index: 2;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-field__carrot.is-far {
+  z-index: 1;
+  filter: blur(1px);
+}
+
 /* Opaque content: the background carrots may only show in empty page space,
    so every content block sits on a solid surface. Tints are layered over
    that surface (tint, tint), never over the page. */
