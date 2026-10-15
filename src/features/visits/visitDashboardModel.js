@@ -689,6 +689,135 @@ export function getVisitDocumentBlockAriaLabel(block) {
   return [name, roles, formatVisitDocumentBlockFileCount(block)].filter(Boolean).join(" — ");
 }
 
+export function getVisitDocumentRoleCode(panel) {
+  return resolveVisitDocumentRoleCode(
+    panel,
+    formatVisitAttendanceRoleCode(panel?.positionTitle || panel?.positionKey || panel?.avenueCode),
+  );
+}
+
+export const VISIT_DOCUMENT_FILTERS = Object.freeze([
+  { key: "all", label: "All" },
+  { key: "core", label: "Core team" },
+  { key: "avenue", label: "Avenue directors" },
+  { key: "co", label: "Co-directors" },
+  { key: "support", label: "Support roles" },
+]);
+
+// Position keys come first because the display codes for co-positions are
+// irregular (Co-VP, CPRES, CSEC, CA, CR ...); codes are only a fallback.
+const CORE_DOCUMENT_POSITION_KEYS = new Set([
+  "president", "immediate-past-president", "vice-president", "secretary",
+  "joint-secretary", "treasurer", "club-advisor", "saa",
+]);
+const AVENUE_DOCUMENT_POSITION_KEYS = new Set(["csd", "cmd", "isd", "pdd", "dei", "pro", "rrro"]);
+const CORE_DOCUMENT_ROLE_CODES = new Set(["PRES", "IPP", "VP", "SEC", "JSEC", "TREAS", "ADV", "SAA"]);
+const AVENUE_DOCUMENT_ROLE_CODES = new Set(["CSD", "CMD", "ISD", "PDD", "DEI", "PRO", "RRRO"]);
+
+export function getVisitDocumentPanelFilterGroup(panel) {
+  const key = text(panel?.positionKey, 80).toLowerCase();
+  const code = getVisitDocumentRoleCode(panel).toUpperCase();
+  if (key.startsWith("co-") || code.startsWith("CO-")) return "co";
+  if (CORE_DOCUMENT_POSITION_KEYS.has(key) || CORE_DOCUMENT_ROLE_CODES.has(code)) return "core";
+  if (AVENUE_DOCUMENT_POSITION_KEYS.has(key) || AVENUE_DOCUMENT_ROLE_CODES.has(code)) return "avenue";
+  return "support";
+}
+
+// A person belongs to every group one of their roles matches.
+export function blockMatchesVisitDocumentFilter(block, filterKey) {
+  if (filterKey === "all") return true;
+  return (Array.isArray(block?.panels) ? block.panels : [])
+    .some((panel) => getVisitDocumentPanelFilterGroup(panel) === filterKey);
+}
+
+export function countVisitDocumentFilters(blocks) {
+  const list = Array.isArray(blocks) ? blocks : [];
+  return VISIT_DOCUMENT_FILTERS.reduce((counts, filter) => {
+    counts[filter.key] = list.filter((block) => blockMatchesVisitDocumentFilter(block, filter.key)).length;
+    return counts;
+  }, {});
+}
+
+// Keeps the incoming (hierarchy) order; filtering never reorders.
+export function filterVisitDocumentBlocks(blocks, filterKey) {
+  return (Array.isArray(blocks) ? blocks : []).filter((block) => blockMatchesVisitDocumentFilter(block, filterKey));
+}
+
+export function getVisitDocumentTileAriaLabel(block) {
+  const name = block?.vacant ? "Vacant" : block?.title || "Role holder";
+  const roles = (Array.isArray(block?.panels) ? block.panels : [])
+    .map((panel) => panel?.positionTitle || panel?.positionKey)
+    .filter(Boolean)
+    .join(", ");
+  return `${[name, roles, formatVisitDocumentBlockFileCount(block)].filter(Boolean).join(", ")}. Open documents.`;
+}
+
+// "CODE · Title"; the code is skipped when it would only repeat the title.
+export function formatVisitDocumentRoleLabel(panel) {
+  const code = getVisitDocumentRoleCode(panel);
+  const title = panel?.positionTitle || panel?.positionKey || "";
+  return [code, title].filter(Boolean).join(" · ");
+}
+
+export function isVisitDocumentMainPresentation(panel, file) {
+  return Boolean(file?.submissionId && panel?.primaryPresentation?.submissionId === file.submissionId);
+}
+
+// Main presentation first, then the folder's other files in their order.
+export function orderVisitDocumentPanelFiles(panel) {
+  const files = Array.isArray(panel?.files) ? panel.files : [];
+  const main = files.filter((file) => isVisitDocumentMainPresentation(panel, file));
+  return [...main, ...files.filter((file) => !isVisitDocumentMainPresentation(panel, file))];
+}
+
+export function getVisitDocumentMainPresentations(block) {
+  return (Array.isArray(block?.panels) ? block.panels : [])
+    .map((panel) => panel?.primaryPresentation)
+    .filter(Boolean);
+}
+
+export function getVisitDocumentFileKey(panel, file) {
+  return `${panel?.positionKey || ""}:${file?.submissionId || ""}`;
+}
+
+// First main presentation, else first previewable file, else first file.
+export function pickDefaultVisitDocumentFileKey(block) {
+  const entries = (Array.isArray(block?.panels) ? block.panels : [])
+    .flatMap((panel) => orderVisitDocumentPanelFiles(panel).map((file) => ({ panel, file })));
+  const pick = entries.find(({ panel, file }) => isVisitDocumentMainPresentation(panel, file))
+    || entries.find(({ file }) => file.canPreview && file.previewUrl)
+    || entries[0];
+  return pick ? getVisitDocumentFileKey(pick.panel, pick.file) : "";
+}
+
+const DOCUMENT_TYPE_BY_EXTENSION = Object.freeze({
+  pdf: "PDF",
+  ppt: "PPTX",
+  pptx: "PPTX",
+  doc: "DOCX",
+  docx: "DOCX",
+  xls: "XLSX",
+  xlsx: "XLSX",
+  csv: "XLSX",
+  png: "IMG",
+  jpg: "IMG",
+  jpeg: "IMG",
+  gif: "IMG",
+  webp: "IMG",
+  heic: "IMG",
+  svg: "IMG",
+});
+
+export function getVisitDocumentFileType(file) {
+  const mimeType = text(file?.mimeType, 160).toLowerCase();
+  if (mimeType === "application/pdf") return "PDF";
+  if (mimeType.startsWith("image/")) return "IMG";
+  if (/presentation|powerpoint/.test(mimeType)) return "PPTX";
+  if (/spreadsheet|excel|text\/csv/.test(mimeType)) return "XLSX";
+  if (/wordprocessing|msword|google-apps\.document/.test(mimeType)) return "DOCX";
+  return DOCUMENT_TYPE_BY_EXTENSION[fileExtension(file?.fileName) || fileExtension(file?.title)] || "FILE";
+}
+
 function normalizeAttendanceStatus(value) {
   const raw = text(value, 40).toLowerCase();
   return ATTENDANCE_STATUSES.has(raw) ? raw : "unknown";
@@ -727,6 +856,43 @@ function averageNullablePercentage(items) {
 function attendanceRateLabel(value) {
   const rate = nullablePercentage(value);
   return rate === null ? "N/A" : `${rate}%`;
+}
+
+function isGbmAttendanceColumn(column) {
+  return column?.avenueCode === "GBM"
+    || (Array.isArray(column?.avenueCodes) && column.avenueCodes.includes("GBM"));
+}
+
+function attendanceViewStatuses(view, columnFilter) {
+  const columns = (Array.isArray(view?.columns) ? view.columns : []).filter(columnFilter);
+  const rows = Array.isArray(view?.rows) ? view.rows : [];
+  return rows.flatMap((row) => columns.map((column) => row?.cells?.[column.eventId]));
+}
+
+function attendanceTreeNode(attended, eligible) {
+  const rate = eligible ? Math.round((attended / eligible) * 100) : null;
+  return { attended, eligible, rate, label: rate === null ? "—" : `${rate}%` };
+}
+
+function sumAttendanceTreeNodes(...nodes) {
+  return attendanceTreeNode(
+    nodes.reduce((sum, node) => sum + node.attended, 0),
+    nodes.reduce((sum, node) => sum + node.eligible, 0),
+  );
+}
+
+// Pooled by marks from the row cells, using the same rule as
+// attendanceMetricsFromStatuses. District attendance is not included.
+export function buildVisitAttendanceTree(attendance) {
+  const fromStatuses = (statuses) => {
+    const metrics = attendanceMetricsFromStatuses(statuses);
+    return attendanceTreeNode(metrics.attendedCount, metrics.eligibleCount);
+  };
+  const gbm = fromStatuses(attendanceViewStatuses(attendance?.club, isGbmAttendanceColumn));
+  const events = fromStatuses(attendanceViewStatuses(attendance?.club, (column) => !isGbmAttendanceColumn(column)));
+  const bod = fromStatuses(attendanceViewStatuses(attendance?.bod, () => true));
+  const club = sumAttendanceTreeNodes(gbm, events);
+  return { overall: sumAttendanceTreeNodes(club, bod), club, bod, gbm, events };
 }
 
 function normalizeAttendanceColumn(raw) {
@@ -1138,7 +1304,7 @@ function percentShare(part, total) {
   return total > 0 ? Math.round((part / total) * 1000) / 10 : 0;
 }
 
-export function buildGlanceStats({ stats, attendance, treasury } = {}) {
+export function buildGlanceStats({ stats, treasury } = {}) {
   const source = stats || normalizeStats(null);
   const male = count(source.maleMembers);
   const female = count(source.femaleMembers);
@@ -1154,11 +1320,6 @@ export function buildGlanceStats({ stats, attendance, treasury } = {}) {
     .filter((row) => row.avenueCode !== "GBM" && count(row.count) > 0)
     .sort((left, right) => right.count - left.count || left.avenueCode.localeCompare(right.avenueCode));
   const maxAvenueCount = avenueRows.length ? avenueRows[0].count : 0;
-
-  const clubView = attendance?.club;
-  const clubSummary = clubView?.summary || {};
-  const hasClubAttendance = Boolean(clubView?.columns?.length);
-  const clubRate = hasClubAttendance ? nullablePercentage(clubSummary.averageAttendanceRate) : null;
 
   const ledger = buildTreasuryLedger(treasury?.rows);
   const flowTotal = ledger.totals.receipts + ledger.totals.payments;
@@ -1185,14 +1346,6 @@ export function buildGlanceStats({ stats, attendance, treasury } = {}) {
       line: avenueRows.length
         ? `across ${plural(avenueRows.length, "avenue")} · most active: ${avenueRows[0].avenueName || avenueRows[0].avenueCode}`
         : "No avenue-wise events yet",
-    },
-    attendance: {
-      hasData: hasClubAttendance && clubRate !== null,
-      rate: clubRate ?? 0,
-      label: hasClubAttendance && clubRate !== null ? attendanceRateLabel(clubRate) : "—",
-      line: hasClubAttendance
-        ? `average across ${plural(count(clubSummary.totalEvents), "club event")} · ${plural(count(clubSummary.totalPeople), "member")}`
-        : "No club attendance recorded yet",
     },
     treasury: {
       net: ledger.totals.closing,

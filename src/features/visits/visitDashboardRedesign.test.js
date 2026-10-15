@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildGlanceStats,
   buildTreasuryLedger,
+  buildVisitAttendanceTree,
   finesHasNotes,
   formatVisitLedgerAmount,
   normalizeLetterheadExchanges,
@@ -63,7 +64,7 @@ test("ledger amounts use Indian grouping and two decimals", () => {
   assert.equal(formatVisitLedgerAmount(0), "0.00");
 });
 
-test("glance stats summarise members, events, club attendance and the treasury ledger", () => {
+test("glance stats summarise members, events and the treasury ledger", () => {
   const data = normalizeVisitDashboardData({
     visit: { visitType: "dzrVisit" },
     stats: {
@@ -96,8 +97,7 @@ test("glance stats summarise members, events, club attendance and the treasury l
   assert.equal(glance.events.total, 9);
   assert.deepEqual(glance.events.bars.map((bar) => [bar.avenueCode, bar.count, bar.share]), [["CSD", 4, 100], ["CMD", 2, 50]]);
   assert.equal(glance.events.line, "across 2 avenues · most active: Club Service");
-  assert.deepEqual([glance.attendance.label, glance.attendance.rate, glance.attendance.hasData], ["64%", 64, true]);
-  assert.equal(glance.attendance.line, "average across 3 club events · 20 members");
+  assert.equal("attendance" in glance, false, "club attendance moved to the attendance tree");
   assert.equal(glance.treasury.net, 200, "net comes from the ledger so it equals the closing balance");
   assert.equal(glance.treasury.net, buildTreasuryLedger(data.treasury.rows).totals.closing);
   assert.equal(glance.treasury.negative, false);
@@ -110,8 +110,6 @@ test("glance stats handle empty data and singulars", () => {
     treasury: { rows: [txn("a", "2026-07-01", "expense", 10)] },
   }, "dzrVisit"));
   assert.deepEqual(glance.members.segments.map((segment) => segment.key), ["male", "female", "other"]);
-  assert.equal(glance.attendance.label, "—");
-  assert.equal(glance.attendance.hasData, false);
   assert.equal(glance.events.bars.length, 0);
   assert.equal(glance.treasury.negative, true);
   assert.match(glance.treasury.line, /1 entry$/);
@@ -154,4 +152,66 @@ test("fines notes column appears only when some note has text", () => {
   assert.equal(finesHasNotes([{ notes: "" }, { notes: "  " }, {}]), false);
   assert.equal(finesHasNotes([{ notes: "" }, { notes: "Arrived late" }]), true);
   assert.equal(finesHasNotes(undefined), false);
+});
+
+function attendanceView(columns, rows) {
+  return {
+    columns,
+    rows: rows.map(([personId, cells]) => ({ personId, name: personId, cells })),
+  };
+}
+
+test("attendance tree pools marks: GBM vs club events, late counts, excused and unknown ignored", () => {
+  const data = normalizeVisitDashboardData({
+    attendance: {
+      club: attendanceView(
+        [
+          { eventId: "g1", title: "GBM 1", avenueCode: "GBM" },
+          { eventId: "g2", title: "GBM 2", avenue: ["GBM"] },
+          { eventId: "e1", title: "Blood drive", avenueCodes: ["CMD"] },
+          { eventId: "e2", title: "Joint event", avenueCodes: ["CSD", "ISD"] },
+        ],
+        [
+          ["a", { g1: "present", g2: "late", e1: "absent", e2: "present" }],
+          ["b", { g1: "absent", g2: "excused", e1: "present", e2: "unknown" }],
+          ["c", { g1: "late", e1: "excused" }],
+        ],
+      ),
+      bod: attendanceView(
+        [{ eventId: "b1", title: "BOD 1" }, { eventId: "b2", title: "BOD 2" }],
+        [["x", { b1: "present", b2: "absent" }], ["y", { b1: "late", b2: "present" }]],
+      ),
+      district: attendanceView(
+        [{ eventId: "d1", title: "District" }],
+        [["a", { d1: "absent" }], ["b", { d1: "absent" }]],
+      ),
+    },
+  }, "dzrVisit");
+  const tree = buildVisitAttendanceTree(data.attendance);
+  assert.deepEqual(tree.gbm, { attended: 3, eligible: 4, rate: 75, label: "75%" });
+  assert.deepEqual(tree.events, { attended: 2, eligible: 3, rate: 67, label: "67%" });
+  assert.deepEqual(tree.club, { attended: 5, eligible: 7, rate: 71, label: "71%" }, "pooled marks, not an average of 75 and 67");
+  assert.deepEqual(tree.bod, { attended: 3, eligible: 4, rate: 75, label: "75%" });
+  assert.deepEqual(tree.overall, { attended: 8, eligible: 11, rate: 73, label: "73%" }, "district marks are not included");
+});
+
+test("attendance tree club figure matches the pooled club summary rule", () => {
+  const club = attendanceView(
+    [{ eventId: "g1", title: "GBM", avenueCode: "GBM" }, { eventId: "e1", title: "Event", avenueCodes: ["PDD"] }],
+    [["a", { g1: "present", e1: "absent" }], ["b", { g1: "present", e1: "late" }], ["c", { g1: "absent", e1: "absent" }]],
+  );
+  const data = normalizeVisitDashboardData({ attendance: { club } }, "dzrVisit");
+  assert.equal(buildVisitAttendanceTree(data.attendance).club.rate, data.attendance.club.summary.averageAttendanceRate);
+});
+
+test("attendance tree shows a dash and null rate when nothing is eligible", () => {
+  const empty = buildVisitAttendanceTree(normalizeVisitDashboardData(null, "dzrVisit").attendance);
+  for (const key of ["overall", "club", "bod", "gbm", "events"]) {
+    assert.deepEqual(empty[key], { attended: 0, eligible: 0, rate: null, label: "—" }, key);
+  }
+  const onlyExcused = buildVisitAttendanceTree(normalizeVisitDashboardData({
+    attendance: { bod: attendanceView([{ eventId: "b1", title: "BOD" }], [["x", { b1: "excused" }]]) },
+  }, "dzrVisit").attendance);
+  assert.equal(onlyExcused.bod.label, "—");
+  assert.equal(buildVisitAttendanceTree(undefined).overall.rate, null);
 });

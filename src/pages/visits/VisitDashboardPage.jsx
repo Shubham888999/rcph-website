@@ -1,12 +1,17 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
+import useAccessibleDialog from "../../features/bod-tools/useAccessibleDialog";
 import useAuth from "../../hooks/useAuth";
 import {
   VISIT_ATTENDANCE_TABS,
+  VISIT_DOCUMENT_FILTERS,
   attendanceStatusLabel,
   buildGlanceStats,
   buildTreasuryLedger,
+  buildVisitAttendanceTree,
+  countVisitDocumentFilters,
+  filterVisitDocumentBlocks,
   finesHasNotes,
   formatVisitAttendanceName,
   formatVisitAttendanceRoleCode,
@@ -15,15 +20,22 @@ import {
   formatVisitDashboardFileSize,
   formatVisitDashboardMoney,
   formatVisitDocumentBlockFileCount,
+  formatVisitDocumentRoleLabel,
   formatVisitLedgerAmount,
-  getVisitDocumentBlockAriaLabel,
+  getVisitDocumentFileKey,
+  getVisitDocumentFileType,
+  getVisitDocumentMainPresentations,
   getVisitDocumentPanelActionLabel,
+  getVisitDocumentRoleCode,
+  getVisitDocumentTileAriaLabel,
   getVisitAttendanceEventsForAvenue,
   getVisitDashboardErrorMessage,
   groupDocumentPanelsByPerson,
+  isVisitDocumentMainPresentation,
   normalizeVisitDashboardData,
+  orderVisitDocumentPanelFiles,
   parseOfficialDisplayName,
-  resolveVisitDocumentRoleCode,
+  pickDefaultVisitDocumentFileKey,
   validVisitAttendanceTab,
   visitTypeFromSlug,
 } from "../../features/visits/visitDashboardModel.js";
@@ -140,8 +152,48 @@ function GlanceBar({ segments, label }) {
   );
 }
 
-function ClubAtAGlance({ glance }) {
-  const { members, events, attendance, treasury } = glance;
+function AttendanceTreeBar({ node, name }) {
+  return (
+    <div
+      className="visit-dashboard-tree-bar"
+      role="img"
+      aria-label={node.rate === null ? `${name} attendance, no records yet` : `${name} attendance ${node.label}`}
+    >
+      {node.rate === null ? null : <span style={{ width: `${node.rate}%` }} />}
+    </div>
+  );
+}
+
+function AttendanceTreeNode({ area, level, kicker, note, node, name }) {
+  return (
+    <article className={`visit-dashboard-tree-node is-${area} is-level-${level}`}>
+      <div className="visit-dashboard-tree-node__head">
+        <p className="visit-dashboard-tree-kicker">{kicker}</p>
+        {note ? <p className="visit-dashboard-tree-note">{note}</p> : null}
+      </div>
+      <p className="visit-dashboard-tree-value">{node.label}</p>
+      <AttendanceTreeBar node={node} name={name} />
+    </article>
+  );
+}
+
+function AttendanceTree({ tree }) {
+  return (
+    <section className="visit-dashboard-attendance-tree" aria-labelledby="visit-dashboard-attendance-tree-title">
+      <h3 id="visit-dashboard-attendance-tree-title">Attendance</h3>
+      <div className="visit-dashboard-tree-grid">
+        <AttendanceTreeNode area="overall" level={1} kicker="Overall attendance" note="GBMs + club events + BOD meetings" node={tree.overall} name="Overall" />
+        <AttendanceTreeNode area="club" level={2} kicker="Overall › Club" note="GBMs + club events" node={tree.club} name="Club" />
+        <AttendanceTreeNode area="board" level={2} kicker="Overall › Board" note="BOD meetings" node={tree.bod} name="Board" />
+        <AttendanceTreeNode area="gbm" level={3} kicker="Club › GBMs" node={tree.gbm} name="GBM" />
+        <AttendanceTreeNode area="events" level={3} kicker="Club › Events" node={tree.events} name="Club event" />
+      </div>
+    </section>
+  );
+}
+
+function ClubAtAGlance({ glance, attendanceTree }) {
+  const { members, events, treasury } = glance;
   return (
     <section
       className="visit-dashboard-glance"
@@ -187,17 +239,6 @@ function ClubAtAGlance({ glance }) {
         </article>
 
         <article className="visit-dashboard-glance-tile">
-          <h3>Club attendance</h3>
-          <p className="visit-dashboard-glance-value">{attendance.label}</p>
-          {attendance.hasData ? (
-            <div className="visit-dashboard-glance-bar" role="img" aria-label={`Average club attendance ${attendance.label}`}>
-              <span className="is-progress" style={{ width: `${attendance.rate}%` }} />
-            </div>
-          ) : null}
-          <p className="visit-dashboard-glance-line">{attendance.line}</p>
-        </article>
-
-        <article className="visit-dashboard-glance-tile">
           <h3>Treasury balance</h3>
           <p className={`visit-dashboard-glance-value ${treasury.negative ? "is-negative" : "is-positive"}`}>
             {formatVisitDashboardMoney(treasury.net)}
@@ -209,6 +250,8 @@ function ClubAtAGlance({ glance }) {
           <p className="visit-dashboard-glance-line">{treasury.line}</p>
         </article>
       </div>
+
+      <AttendanceTree tree={attendanceTree} />
     </section>
   );
 }
@@ -293,186 +336,270 @@ function AvenueCounts({ rows, attendance }) {
   );
 }
 
-function getPanelDocumentGroups(panel) {
-  return {
-    primary: panel?.primaryPresentation || null,
-  };
-}
-
-function DocumentFileList({ files }) {
-  if (!files.length) {
-    return (
-      <p className="visit-dashboard-document-empty">
-        No other documents in this folder.
-      </p>
-    );
-  }
-
+function PresentationIcon() {
   return (
-    <ul className="visit-dashboard-document-list">
-      {files.map((file) => {
-        const sizeLabel = formatVisitDashboardFileSize(file.fileSize);
-        const meta = [file.fileName || "Document", sizeLabel].filter(Boolean).join(" / ");
-        return (
-          <li key={file.submissionId}>
-            <div>
-              <strong>{file.title}</strong>
-              <span>{meta}</span>
-            </div>
-            {file.canOpen && file.openUrl ? (
-              <a
-                className="visit-dashboard-document-action"
-                href={file.openUrl}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                Open file
-              </a>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
+    <svg className="visit-dashboard-doc-tile__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path d="M3 4h18M4 4v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V4M12 15v3M8 21l4-3 4 3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-function DocumentPanelBody({ panel, showEmptyFolderLink = false }) {
-  const actionLabel = getVisitDocumentPanelActionLabel(panel);
-  const { primary } = getPanelDocumentGroups(panel);
-  if (!panel.files.length) {
-    return (
-      <div className="visit-dashboard-empty-state visit-dashboard-empty-state--compact">
-        <strong>No visible documents uploaded for this folder yet.</strong>
-        {showEmptyFolderLink && actionLabel ? (
-          <a
-            className="visit-dashboard-folder-action"
-            href={panel.openUrl}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            {actionLabel}
-          </a>
-        ) : null}
-      </div>
-    );
-  }
+function documentPersonName(block) {
+  return block.vacant ? "Vacant" : block.title;
+}
 
+function DocumentTile({ block, onOpen }) {
+  const mains = getVisitDocumentMainPresentations(block);
   return (
-    <div className="visit-dashboard-document-panel-body">
-      {primary ? (
-        <div className="visit-dashboard-document-preview">
-          <div className="visit-dashboard-document-preview-heading">
-            <div>
-              <p className="visit-dashboard-document-kicker">Primary preview</p>
-              <h3>{primary.title}</h3>
-              <span>{primary.fileName || "Document"}</span>
-            </div>
-          </div>
+    <button
+      type="button"
+      className="visit-dashboard-doc-tile"
+      aria-label={getVisitDocumentTileAriaLabel(block)}
+      onClick={(event) => {
+        // Safari does not focus buttons on click; the viewer returns focus here.
+        event.currentTarget.focus();
+        onOpen(block.blockKey);
+      }}
+    >
+      <span className="visit-dashboard-doc-tile__top">
+        {block.vacant ? (
+          <span className="visit-dashboard-doc-tile__name visit-dashboard-person-vacant">Vacant</span>
+        ) : (
+          <strong className="visit-dashboard-doc-tile__name" title={block.title}>{block.title}</strong>
+        )}
+        <span className="visit-dashboard-doc-tile__count">{formatVisitDocumentBlockFileCount(block)}</span>
+      </span>
 
-          <iframe
-            className="visit-dashboard-document-preview-frame"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            src={primary.previewUrl}
-            title={`Preview of ${primary.title}`}
-          />
-        </div>
-      ) : (
-        <p className="visit-dashboard-document-empty">
-          No main presentation has been selected for this folder.
-        </p>
-      )}
+      <span className="visit-dashboard-doc-tile__roles">
+        {block.panels.map((panel) => {
+          const code = getVisitDocumentRoleCode(panel);
+          return (
+            <span className="visit-dashboard-doc-tile__role" key={panel.positionKey}>
+              {code ? <span className="visit-dashboard-role-code">{code}</span> : null}
+              <span className="visit-dashboard-role-title">{panel.positionTitle}</span>
+            </span>
+          );
+        })}
+      </span>
 
-      <details className="visit-dashboard-document-files" aria-label="Other documents">
-        <summary>
-          <span className="visit-dashboard-document-files-title">
-            All Files
+      {mains.length ? (
+        <span className="visit-dashboard-doc-tile__main">
+          <PresentationIcon />
+          <span className="visit-dashboard-doc-tile__main-text">
+            <span className="visit-dashboard-doc-tile__main-label">
+              {mains.length === 1 ? "Main presentation" : `${mains.length} main presentations`}
+            </span>
+            {mains.map((file) => (
+              <span className="visit-dashboard-doc-tile__main-title" key={file.submissionId}>{file.title}</span>
+            ))}
           </span>
+        </span>
+      ) : (
+        <span className="visit-dashboard-doc-tile__main is-empty">No main presentation selected yet</span>
+      )}
+    </button>
+  );
+}
 
-          {actionLabel ? (
-            <a
-              className="visit-dashboard-folder-action"
-              href={panel.openUrl}
-              onClick={(event) => event.stopPropagation()}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              {actionLabel}
-            </a>
-          ) : null}
-        </summary>
+function DocumentTypeBadge({ file }) {
+  return <span className="visit-dashboard-doc-type">{getVisitDocumentFileType(file)}</span>;
+}
 
-        <DocumentFileList files={panel.files} />
-      </details>
+function DocumentFolderLink({ panel }) {
+  const actionLabel = getVisitDocumentPanelActionLabel(panel);
+  if (!actionLabel) return null;
+  return (
+    <a
+      className="visit-dashboard-folder-action"
+      href={panel.openUrl}
+      aria-label={`${actionLabel} for ${panel.positionTitle}`}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      {actionLabel}
+    </a>
+  );
+}
+
+function DocumentOpenLink({ file }) {
+  if (!file.canOpen || !file.openUrl) return null;
+  return (
+    <a
+      className="visit-dashboard-document-action"
+      href={file.openUrl}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      Open in new tab
+    </a>
+  );
+}
+
+function DocumentPreview({ panel, file }) {
+  const canPreview = Boolean(file.canPreview && file.previewUrl);
+  return (
+    <div className="visit-dashboard-doc-preview">
+      <div className="visit-dashboard-doc-preview__head">
+        <div className="visit-dashboard-doc-preview__title">
+          <h3>{file.title}</h3>
+          <span className="visit-dashboard-doc-preview__tags">
+            <DocumentTypeBadge file={file} />
+            {isVisitDocumentMainPresentation(panel, file) ? (
+              <span className="visit-dashboard-doc-main-pill">Main presentation</span>
+            ) : null}
+          </span>
+        </div>
+        {canPreview ? <DocumentOpenLink file={file} /> : null}
+      </div>
+
+      {canPreview ? (
+        <iframe
+          className="visit-dashboard-document-preview-frame"
+          key={file.previewUrl}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          src={file.previewUrl}
+          title={`Preview of ${file.title}`}
+        />
+      ) : (
+        <div className="visit-dashboard-doc-preview__none">
+          <p>Preview not available for this file type.</p>
+          <DocumentOpenLink file={file} />
+        </div>
+      )}
     </div>
   );
 }
 
-function DocumentRoleLabel({ panel }) {
-  const folderCode = resolveVisitDocumentRoleCode(
-    panel,
-    formatVisitAttendanceRoleCode(panel.positionTitle || panel.positionKey || panel.avenueCode),
-  );
+function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNavigate, onClose }) {
+  const dialogRef = useAccessibleDialog({ open: true, onClose });
+  const [selection, setSelection] = useState({ blockKey: "", fileKey: "" });
+  const fileKey = selection.blockKey === block.blockKey ? selection.fileKey : pickDefaultVisitDocumentFileKey(block);
+  const selected = block.panels
+    .flatMap((panel) => panel.files.map((file) => ({ panel, file })))
+    .find((entry) => getVisitDocumentFileKey(entry.panel, entry.file) === fileKey);
+  const name = documentPersonName(block);
+  const canNavigate = total > 1;
+
   return (
-    <span className="visit-dashboard-role-inline" title={panel.folderLabel}>
-      {folderCode ? <span className="visit-dashboard-role-code">{folderCode}</span> : null}
-      <span className="visit-dashboard-role-title">{panel.positionTitle}</span>
-    </span>
-  );
-}
-
-function DocumentBlock({ block }) {
-  const multiRole = block.panels.length > 1;
-  return (
-    <details className="visit-dashboard-folder-panel visit-dashboard-person-block">
-      <summary aria-label={getVisitDocumentBlockAriaLabel(block)} title={block.title}>
-        <span className="visit-dashboard-folder-title visit-dashboard-person-heading">
-          {block.vacant ? (
-            <span className="visit-dashboard-person-vacant">Vacant</span>
-          ) : (
-            <strong>{block.title}</strong>
-          )}
-          <span className="visit-dashboard-role-inline-list">
-            {block.panels.map((panel) => (
-              <Fragment key={panel.positionKey}>
-                <span className="visit-dashboard-role-divider" aria-hidden="true" />
-                <DocumentRoleLabel panel={panel} />
-              </Fragment>
-            ))}
-          </span>
-        </span>
-
-        <span className="visit-dashboard-folder-actions">
-          <span className="visit-dashboard-folder-count">{formatVisitDocumentBlockFileCount(block)}</span>
-        </span>
-      </summary>
-
-      {multiRole ? (
-        <div className="visit-dashboard-person-roles">
-          {block.panels.map((panel) => (
-            <section
-              className="visit-dashboard-person-role"
-              aria-labelledby={`visit-dashboard-role-${block.blockKey}-${panel.positionKey}`}
-              key={panel.positionKey}
+    <div
+      className="visit-dashboard-doc-viewer-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="visit-dashboard-doc-viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="visit-dashboard-doc-viewer-title"
+        tabIndex={-1}
+      >
+        <header className="visit-dashboard-doc-viewer__header">
+          <div className="visit-dashboard-doc-viewer__who">
+            <h2 id="visit-dashboard-doc-viewer-title">{name}</h2>
+            <p>{block.panels.map(formatVisitDocumentRoleLabel).join(" | ")}</p>
+          </div>
+          <div className="visit-dashboard-doc-viewer__nav">
+            <span className="visit-dashboard-doc-viewer__position">{position} of {total}</span>
+            <button
+              type="button"
+              disabled={!canNavigate}
+              aria-label={`Previous: ${documentPersonName(previousBlock)}`}
+              onClick={() => onNavigate(previousBlock.blockKey)}
             >
-              <h3 className="visit-dashboard-person-role-heading" id={`visit-dashboard-role-${block.blockKey}-${panel.positionKey}`}>
-                <DocumentRoleLabel panel={panel} />
-                <small>{panel.fileCount} {panel.fileCount === 1 ? "file" : "files"}</small>
-              </h3>
-              <DocumentPanelBody panel={panel} showEmptyFolderLink />
-            </section>
-          ))}
+              Prev
+            </button>
+            <button
+              type="button"
+              disabled={!canNavigate}
+              aria-label={`Next: ${documentPersonName(nextBlock)}`}
+              onClick={() => onNavigate(nextBlock.blockKey)}
+            >
+              Next
+            </button>
+            <button
+              type="button"
+              className="visit-dashboard-doc-viewer__close"
+              aria-label="Close document viewer"
+              onClick={onClose}
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+        </header>
+
+        <div className="visit-dashboard-doc-viewer__body">
+          <div className="visit-dashboard-doc-rail">
+            {block.panels.map((panel) => {
+              const files = orderVisitDocumentPanelFiles(panel);
+              const headingId = `visit-dashboard-doc-rail-${panel.positionKey}`;
+              return (
+                <section className="visit-dashboard-doc-rail__group" aria-labelledby={headingId} key={panel.positionKey}>
+                  <div className="visit-dashboard-doc-rail__heading">
+                    <h3 id={headingId}>{formatVisitDocumentRoleLabel(panel)}</h3>
+                    <DocumentFolderLink panel={panel} />
+                  </div>
+                  {files.length ? (
+                    <ul>
+                      {files.map((file) => {
+                        const key = getVisitDocumentFileKey(panel, file);
+                        const current = key === fileKey;
+                        const sizeLabel = formatVisitDashboardFileSize(file.fileSize);
+                        return (
+                          <li key={key}>
+                            <button
+                              type="button"
+                              className={current ? "visit-dashboard-doc-file is-selected" : "visit-dashboard-doc-file"}
+                              aria-current={current ? "true" : undefined}
+                              onClick={() => setSelection({ blockKey: block.blockKey, fileKey: key })}
+                            >
+                              <DocumentTypeBadge file={file} />
+                              <span className="visit-dashboard-doc-file__title">{file.title}</span>
+                              {sizeLabel ? <span className="visit-dashboard-doc-file__size">{sizeLabel}</span> : null}
+                              {isVisitDocumentMainPresentation(panel, file) ? (
+                                <span className="visit-dashboard-doc-main-tag">MAIN</span>
+                              ) : null}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="visit-dashboard-doc-rail__empty">No visible documents uploaded for this folder yet.</p>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+
+          <div className="visit-dashboard-doc-viewer__preview">
+            {selected ? (
+              <DocumentPreview panel={selected.panel} file={selected.file} />
+            ) : (
+              <div className="visit-dashboard-empty-state">
+                <strong>No visible documents uploaded for these folders yet.</strong>
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <DocumentPanelBody panel={block.panels[0]} />
-      )}
-    </details>
+      </section>
+    </div>
   );
 }
 
 function DocumentPanels({ panels }) {
+  const [filterKey, setFilterKey] = useState("all");
+  const [openBlockKey, setOpenBlockKey] = useState("");
   const hasPanels = panels.length > 0;
-  const blocks = groupDocumentPanelsByPerson(panels);
+  const blocks = useMemo(() => groupDocumentPanelsByPerson(panels), [panels]);
+  const counts = useMemo(() => countVisitDocumentFilters(blocks), [blocks]);
+  const filters = VISIT_DOCUMENT_FILTERS.filter((filter) => filter.key === "all" || counts[filter.key] > 0);
+  const activeFilter = filters.some((filter) => filter.key === filterKey) ? filterKey : "all";
+  const visibleBlocks = filterVisitDocumentBlocks(blocks, activeFilter);
+  const openIndex = visibleBlocks.findIndex((block) => block.blockKey === openBlockKey);
+  const closeViewer = useCallback(() => setOpenBlockKey(""), []);
 
   return (
     <section
@@ -497,10 +624,40 @@ function DocumentPanels({ panels }) {
           <strong>No role holders or documents to show for the selected folders yet.</strong>
         </div>
       ) : (
-        <div className="visit-dashboard-folder-directory">
-          {blocks.map((block) => <DocumentBlock block={block} key={block.blockKey} />)}
-        </div>
+        <>
+          <div className="visit-dashboard-doc-filters" role="group" aria-label="Filter folders">
+            {filters.map((filter) => (
+              <button
+                type="button"
+                key={filter.key}
+                aria-pressed={activeFilter === filter.key}
+                onClick={() => setFilterKey(filter.key)}
+              >
+                {filter.label}
+                <span className="visit-dashboard-doc-filters__count">{counts[filter.key]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="visit-dashboard-doc-grid">
+            {visibleBlocks.map((block) => (
+              <DocumentTile block={block} key={block.blockKey} onOpen={setOpenBlockKey} />
+            ))}
+          </div>
+        </>
       )}
+
+      {openIndex >= 0 ? (
+        <DocumentViewer
+          block={visibleBlocks[openIndex]}
+          position={openIndex + 1}
+          total={visibleBlocks.length}
+          previousBlock={visibleBlocks[(openIndex - 1 + visibleBlocks.length) % visibleBlocks.length]}
+          nextBlock={visibleBlocks[(openIndex + 1) % visibleBlocks.length]}
+          onNavigate={setOpenBlockKey}
+          onClose={closeViewer}
+        />
+      ) : null}
     </section>
   );
 }
@@ -978,7 +1135,8 @@ export default function VisitDashboardPage() {
 
   const data = loadState.data || fallbackData;
   const { visit, stats, documentPanels, attendance, fines, treasury, letterhead } = data;
-  const glance = buildGlanceStats({ stats, attendance, treasury });
+  const glance = buildGlanceStats({ stats, treasury });
+  const attendanceTree = buildVisitAttendanceTree(attendance);
   const dataAsOf = formatVisitDashboardDateTime(data.generatedAt);
 
   if (loadState.status === LOAD_STATUS.loading && !loadState.data) {
@@ -1010,7 +1168,7 @@ export default function VisitDashboardPage() {
 
         <SectionLinks showLetterhead={Boolean(letterhead)} />
 
-        <ClubAtAGlance glance={glance} />
+        <ClubAtAGlance glance={glance} attendanceTree={attendanceTree} />
 
         <AvenueCounts rows={stats.avenueEventCounts} attendance={attendance} />
 
