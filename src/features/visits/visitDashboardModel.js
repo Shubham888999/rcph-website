@@ -1379,6 +1379,33 @@ export function getVisitDashboardTheme(visitType) {
   return visitType === "dzrVisit" ? "carrot" : "";
 }
 
+function clampPercent(value) {
+  return Math.round(Math.min(100, Math.max(0, value)) * 10) / 10;
+}
+
+// Carrot chart geometry: every measure is linear from zero, and the leaf
+// tuft is never part of the measured length.
+export function carrotFillPercent(rate) {
+  if (rate === null || rate === undefined || rate === "") return 0;
+  const number = Number(rate);
+  return Number.isFinite(number) ? clampPercent(number) : 0;
+}
+
+function carrotRatio(count, max) {
+  const total = Number(max);
+  const value = Number(count);
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value / total));
+}
+
+export function carrotLengthPercent(count, max) {
+  return clampPercent(carrotRatio(count, max) * 100);
+}
+
+export function plantedCarrotHeight(count, max, maxHeight = 46) {
+  return Math.round(carrotRatio(count, max) * maxHeight * 10) / 10;
+}
+
 // "DZR Visit Dashboard" -> { lead: "DZR Visit", tail: "Dashboard" }; a title
 // that does not end with the word "Dashboard" stays whole.
 export function splitVisitDashboardTitle(title) {

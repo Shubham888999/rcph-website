@@ -2080,7 +2080,15 @@ a.visit-dashboard-document-action:hover {
   --internal-border: rgba(255, 190, 120, 0.2);
   --internal-border-strong: rgba(255, 190, 120, 0.35);
   --internal-status-danger: #ff6b81;
-  --internal-shadow-panel: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+  --internal-radius-control: 0;
+  --internal-radius-card: 0;
+  --internal-radius-panel: 0;
+  --internal-shadow-panel: 5px 5px 0 var(--visit-block-shadow);
+  --visit-edge: rgba(255, 190, 120, 0.38);
+  --visit-block-shadow: rgba(255, 127, 31, 0.38);
+  --visit-rings: rgba(43, 18, 0, 0.22);
+  --visit-soil: #8a5a32;
+  --visit-carrot-track: var(--internal-surface-raised);
   --internal-focus-ring:
     0 0 0 0.125rem var(--internal-page-bg),
     0 0 0 0.25rem var(--visit-leaf-fill);
@@ -2120,7 +2128,10 @@ a.visit-dashboard-document-action:hover {
   --internal-border: rgba(59, 29, 8, 0.18);
   --internal-border-strong: rgba(59, 29, 8, 0.32);
   --internal-status-danger: #b3283f;
-  --internal-shadow-panel: 0 1rem 2.5rem rgba(59, 29, 8, 0.14);
+  --visit-edge: rgba(59, 29, 8, 0.55);
+  --visit-block-shadow: #3b1d08;
+  --visit-rings: rgba(59, 29, 8, 0.16);
+  --visit-soil: #7a4a26;
   --visit-carrot-fill: #e5600a;
   --visit-carrot-ink: #a33d00;
   --visit-leaf-fill: #3d8a1b;
@@ -2173,8 +2184,9 @@ a.visit-dashboard-document-action:hover {
   color: var(--visit-leaf-fill);
 }
 
-/* Glance: members, events, treasury */
-.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-glance-bar, .visit-dashboard-tree-bar, .visit-dashboard-avenue-bar) {
+/* Glance: members split and treasury in/out stay straight two-segment bars */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-bar {
+  border-radius: 0;
   background: var(--visit-track);
 }
 
@@ -2184,34 +2196,6 @@ a.visit-dashboard-document-action:hover {
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-bar .is-female {
   background: var(--visit-carrot-fill);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-columns i {
-  border-radius: 0;
-  background: var(--visit-carrot-fill);
-  clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-columns span:last-child i {
-  background: var(--visit-leaf-fill);
-}
-
-/* Carrot-tipped single-value bars */
-.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-tree-bar span, .visit-dashboard-avenue-bar span) {
-  border-radius: 0;
-  clip-path: polygon(0 0, 94% 18%, 100% 50%, 94% 82%, 0 100%);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-bar span {
-  background: var(--visit-leaf-fill);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-bar span {
-  background: var(--visit-carrot-fill);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node.is-board .visit-dashboard-tree-bar span {
-  background: var(--visit-leaf-fill);
 }
 
 /* Attendance tree kickers */
@@ -2269,9 +2253,7 @@ a.visit-dashboard-document-action:hover {
 
 /* Attendance records, ledgers, states */
 .visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-attendance-panel, .visit-dashboard-state) {
-  background:
-    linear-gradient(145deg, var(--visit-carrot-wash), transparent 70%),
-    var(--internal-surface);
+  background: var(--internal-surface);
 }
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-status.is-late {
@@ -2365,4 +2347,177 @@ a.visit-dashboard-document-action:hover {
 
 :root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-skeleton span {
   background-image: linear-gradient(90deg, var(--visit-tint), var(--visit-track), var(--visit-tint));
+}
+
+/* DZR carrot shapes: sharp edges, block shadows, carrot charts.
+   The radius tokens are 0 in the token block above; these rules cover the
+   hard-coded radii. AttendanceMark artwork is left untouched. */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(
+  .visit-dashboard-doc-filters button,
+  .visit-dashboard-doc-type,
+  .visit-dashboard-doc-main-tag,
+  .visit-dashboard-doc-main-pill
+) {
+  border-radius: 0;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 0;
+}
+
+/* Block shadows: solid offset, no blur. Tables, ledgers and file rows stay flat. */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-grid {
+  border: 1.5px solid var(--visit-edge);
+  box-shadow: 6px 6px 0 var(--visit-block-shadow);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node {
+  border: 1.5px solid var(--visit-edge);
+  box-shadow: 5px 5px 0 var(--visit-block-shadow);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-tile {
+  border: 1.5px solid var(--visit-edge);
+  box-shadow: 5px 5px 0 var(--visit-block-shadow);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-tile:hover {
+  border-color: var(--visit-carrot-fill);
+  box-shadow: 8px 8px 0 var(--visit-block-shadow);
+  transform: translate(-2px, -2px);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-records > summary,
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance > summary,
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-treasury > .visit-dashboard-section-heading {
+  padding: 0.85rem 1rem;
+  border: 1.5px solid var(--visit-edge);
+  background: var(--internal-surface);
+  box-shadow: 5px 5px 0 var(--visit-block-shadow);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-records[open] > summary,
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance[open] > summary {
+  margin-bottom: 1rem;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-viewer {
+  border-width: 1.5px;
+  box-shadow: 10px 10px 0 var(--visit-block-shadow);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-filters button[aria-pressed="true"] {
+  box-shadow: 3px 3px 0 var(--visit-block-shadow);
+}
+
+@media (max-width: 760px) {
+  .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-viewer {
+    border-width: 0;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-tile:hover {
+    transform: none;
+  }
+}
+
+/* Carrot charts */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-leaf {
+  flex: 0 0 auto;
+  display: block;
+  fill: var(--visit-leaf-fill);
+}
+
+/* a) Attendance tree: leaf + body track; the fill is rate% of the body. */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 24px;
+  display: block;
+  background: var(--visit-carrot-track);
+  clip-path: polygon(0 0, 60% 11%, 100% 50%, 60% 89%, 0 100%);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar.is-large .visit-dashboard-carrot-bar__body {
+  height: 30px;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-bar.is-small .visit-dashboard-carrot-bar__body {
+  height: 20px;
+}
+
+/* The overall box is surface-raised too, so its track steps down a shade. */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node.is-level-1 {
+  --visit-carrot-track: var(--internal-surface-soft);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-carrot-bar__fill, .visit-dashboard-avenue-carrot__body) {
+  height: 100%;
+  display: block;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 16px, var(--visit-rings) 16px 18px),
+    var(--visit-carrot-fill);
+}
+
+/* b) Events held: planted carrots, height linear from zero (max 46px). */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted {
+  position: relative;
+  width: max-content;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 16px;
+  column-gap: 8px;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted::after {
+  position: absolute;
+  top: 14px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--visit-soil);
+  content: "";
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted__plant {
+  display: grid;
+  grid-template-rows: 14px 2px 46px;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-planted__body {
+  grid-row: 3;
+  align-self: start;
+  width: 16px;
+  display: block;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 16px, var(--visit-rings) 16px 18px),
+    var(--visit-carrot-fill);
+  clip-path: polygon(0 0, 100% 0, 86% 52%, 50% 100%, 14% 52%);
+}
+
+/* c) Avenue-wise events: whole carrot, constant 18px thickness, length = count / max. */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-carrot {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-carrot__track {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-carrot__body {
+  height: 18px;
+  clip-path: polygon(0 0, 60% 11%, 100% 50%, 60% 89%, 0 100%);
 }
