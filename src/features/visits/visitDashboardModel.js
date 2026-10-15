@@ -1374,6 +1374,19 @@ export function visitDashboardName(visitType) {
   return VISIT_DASHBOARD_NAMES[visitType] || "Visit";
 }
 
+// Only the DZR visit is themed; every other visit keeps the shared look.
+export function getVisitDashboardTheme(visitType) {
+  return visitType === "dzrVisit" ? "carrot" : "";
+}
+
+// "DZR Visit Dashboard" -> { lead: "DZR Visit", tail: "Dashboard" }; a title
+// that does not end with the word "Dashboard" stays whole.
+export function splitVisitDashboardTitle(title) {
+  const value = text(title, 160);
+  const match = /^(.*\S)\s+(Dashboard)$/.exec(value);
+  return match ? { lead: match[1], tail: match[2] } : { lead: value, tail: "" };
+}
+
 export function getVisitAttendanceEventsForAvenue(attendance, row) {
   const columns = Array.isArray(attendance?.club?.columns) ? attendance.club.columns : [];
   const avenueCode = normalizeAvenueCode(row?.avenueCode || row?.code || row?.avenue || row?.avenueName);

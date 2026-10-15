@@ -524,7 +524,7 @@ a.visit-dashboard-document-action:hover {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  border: 1px solid #3a2129;
+  border: 1px solid var(--visit-line, #3a2129);
   border-radius: var(--internal-radius-card);
   color: var(--internal-text);
   background: var(--internal-surface);
@@ -604,9 +604,9 @@ a.visit-dashboard-document-action:hover {
   display: flex;
   align-items: flex-start;
   gap: 0.55rem;
-  border: 1px solid #3a2129;
+  border: 1px solid var(--visit-line, #3a2129);
   border-radius: var(--internal-radius-control);
-  background: #1d0b11;
+  background: var(--visit-deep-bg, #1d0b11);
 }
 
 .visit-dashboard-doc-tile__main.is-empty {
@@ -661,7 +661,7 @@ a.visit-dashboard-document-action:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #4a2a33;
+  border: 1px solid var(--visit-line-strong, #4a2a33);
   border-radius: var(--internal-radius-panel);
   color: var(--internal-text);
   background: var(--internal-surface);
@@ -679,7 +679,7 @@ a.visit-dashboard-document-action:hover {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem 1.25rem;
-  border-bottom: 1px solid #3a2129;
+  border-bottom: 1px solid var(--visit-line, #3a2129);
   background: var(--internal-surface-soft);
 }
 
@@ -761,8 +761,8 @@ a.visit-dashboard-document-action:hover {
   align-content: start;
   gap: 1.1rem;
   overflow-y: auto;
-  border-right: 1px solid #3a2129;
-  background: #1d0b11;
+  border-right: 1px solid var(--visit-line, #3a2129);
+  background: var(--visit-deep-bg, #1d0b11);
 }
 
 .visit-dashboard-doc-rail__heading {
@@ -838,7 +838,7 @@ a.visit-dashboard-document-action:hover {
 .visit-dashboard-doc-type {
   min-width: 2.9rem;
   padding: 0.15rem 0.35rem;
-  border: 1px solid #4a2a33;
+  border: 1px solid var(--visit-line-strong, #4a2a33);
   border-radius: 4px;
   color: var(--internal-text-muted);
   font-size: 0.66rem;
@@ -850,7 +850,7 @@ a.visit-dashboard-document-action:hover {
 .visit-dashboard-doc-main-tag {
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
-  color: #1d0b11;
+  color: var(--visit-on-accent, #1d0b11);
   background: var(--internal-accent);
   font-size: 0.62rem;
   font-weight: 800;
@@ -928,7 +928,7 @@ a.visit-dashboard-document-action:hover {
   display: grid;
   justify-items: start;
   gap: 0.75rem;
-  border: 1px dashed #4a2a33;
+  border: 1px dashed var(--visit-line-strong, #4a2a33);
   border-radius: var(--internal-radius-control);
 }
 
@@ -955,7 +955,7 @@ a.visit-dashboard-document-action:hover {
   .visit-dashboard-doc-rail {
     overflow: visible;
     border-right: 0;
-    border-bottom: 1px solid #3a2129;
+    border-bottom: 1px solid var(--visit-line, #3a2129);
   }
 
   .visit-dashboard-doc-viewer__preview {
@@ -1512,7 +1512,7 @@ a.visit-dashboard-document-action:hover {
   display: grid;
   align-content: start;
   gap: 0.6rem;
-  border: 1px solid #3a2129;
+  border: 1px solid var(--visit-line, #3a2129);
   border-radius: var(--internal-radius-control);
 }
 
@@ -1527,8 +1527,8 @@ a.visit-dashboard-document-action:hover {
 }
 
 .visit-dashboard-tree-node.is-level-1 {
-  border-color: #4a2a33;
-  background: var(--internal-surface-soft);
+  border-color: var(--visit-line-strong, #4a2a33);
+  background: var(--visit-tree-level-1, var(--internal-surface-soft));
 }
 
 .visit-dashboard-tree-node.is-level-2 {
@@ -1536,7 +1536,7 @@ a.visit-dashboard-document-action:hover {
 }
 
 .visit-dashboard-tree-node.is-level-3 {
-  background: #1d0b11;
+  background: var(--visit-deep-bg, #1d0b11);
 }
 
 .visit-dashboard-tree-node__head {
@@ -2058,4 +2058,311 @@ a.visit-dashboard-document-action:hover {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* DZR Visit carrot theme. Every rule below is scoped to
+   [data-visit-theme="carrot"], which only the DZR visit root carries.
+   Fills (bars, chips, tags) use --visit-*-fill; text uses the --internal-*
+   tokens, which resolve to text-safe ink colours in light mode. */
+.visit-dashboard-page[data-visit-theme="carrot"] {
+  color-scheme: dark;
+  --internal-bg: #1c120a;
+  --internal-page-bg: #1c120a;
+  --internal-page-bg-end: #1c120a;
+  --internal-surface: #2a1a0e;
+  --internal-surface-soft: #22160c;
+  --internal-surface-raised: #3b2412;
+  --internal-text: #fff1dc;
+  --internal-text-muted: #d9b48a;
+  --internal-accent: #ff7f1f;
+  --internal-accent-soft: #ffb35c;
+  --internal-accent-secondary: #86cf4a;
+  --internal-border: rgba(255, 190, 120, 0.2);
+  --internal-border-strong: rgba(255, 190, 120, 0.35);
+  --internal-status-danger: #ff6b81;
+  --internal-shadow-panel: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+  --internal-focus-ring:
+    0 0 0 0.125rem var(--internal-page-bg),
+    0 0 0 0.25rem var(--visit-leaf-fill);
+  --visit-carrot-fill: #ff7f1f;
+  --visit-carrot-ink: #ffb35c;
+  --visit-leaf-fill: #86cf4a;
+  --visit-leaf-ink: #86cf4a;
+  --visit-on-accent: #2b1200;
+  --visit-carrot-wash: rgba(255, 127, 31, 0.12);
+  --visit-leaf-wash: rgba(134, 207, 74, 0.1);
+  --visit-glow: rgba(255, 127, 31, 0.12);
+  --visit-track: rgba(255, 255, 255, 0.07);
+  --visit-hairline: rgba(255, 255, 255, 0.08);
+  --visit-tint: rgba(255, 255, 255, 0.035);
+  --visit-tree-level-1: var(--internal-surface-raised);
+  --visit-deep-bg: var(--internal-surface-soft);
+  --visit-line: var(--internal-border);
+  --visit-line-strong: var(--internal-border);
+  background:
+    radial-gradient(900px 420px at 85% -10%, var(--visit-glow), transparent 70%),
+    var(--internal-page-bg);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] {
+  color-scheme: light;
+  --internal-bg: #fff3df;
+  --internal-page-bg: #fff3df;
+  --internal-page-bg-end: #fff3df;
+  --internal-surface: #ffe6c2;
+  --internal-surface-soft: #fff8ec;
+  --internal-surface-raised: #ffd9a3;
+  --internal-text: #3b1d08;
+  --internal-text-muted: #6e4120;
+  --internal-accent: #a33d00;
+  --internal-accent-soft: #a33d00;
+  --internal-accent-secondary: #2f6e12;
+  --internal-border: rgba(59, 29, 8, 0.18);
+  --internal-border-strong: rgba(59, 29, 8, 0.32);
+  --internal-status-danger: #b3283f;
+  --internal-shadow-panel: 0 1rem 2.5rem rgba(59, 29, 8, 0.14);
+  --visit-carrot-fill: #e5600a;
+  --visit-carrot-ink: #a33d00;
+  --visit-leaf-fill: #3d8a1b;
+  --visit-leaf-ink: #2f6e12;
+  --visit-carrot-wash: rgba(229, 96, 10, 0.1);
+  --visit-leaf-wash: rgba(61, 138, 27, 0.1);
+  --visit-glow: rgba(229, 96, 10, 0.1);
+  --visit-track: rgba(59, 29, 8, 0.1);
+  --visit-hairline: rgba(59, 29, 8, 0.12);
+  --visit-tint: rgba(59, 29, 8, 0.04);
+}
+
+/* Page background behind overscroll, DZR page only. */
+:root:has(.visit-dashboard-page[data-visit-theme="carrot"]) {
+  background: #1c120a;
+}
+
+:root[data-theme="light"]:has(.visit-dashboard-page[data-visit-theme="carrot"]) {
+  background: #fff3df;
+}
+
+/* Motifs */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-eyebrow:has(> .visit-dashboard-carrot-icon) {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-icon {
+  flex: 0 0 auto;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-icon__leaf {
+  fill: var(--visit-leaf-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-carrot-icon__root {
+  fill: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-title-accent {
+  color: var(--visit-carrot-ink);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-masthead::after {
+  color: color-mix(in srgb, var(--visit-carrot-fill) 2.8%, transparent);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-readonly::before {
+  color: var(--visit-leaf-fill);
+}
+
+/* Glance: members, events, treasury */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-glance-bar, .visit-dashboard-tree-bar, .visit-dashboard-avenue-bar) {
+  background: var(--visit-track);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-bar :is(.is-male, .is-income) {
+  background: var(--visit-leaf-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-bar .is-female {
+  background: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-columns i {
+  border-radius: 0;
+  background: var(--visit-carrot-fill);
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-glance-columns span:last-child i {
+  background: var(--visit-leaf-fill);
+}
+
+/* Carrot-tipped single-value bars */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-tree-bar span, .visit-dashboard-avenue-bar span) {
+  border-radius: 0;
+  clip-path: polygon(0 0, 94% 18%, 100% 50%, 94% 82%, 0 100%);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-bar span {
+  background: var(--visit-leaf-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-bar span {
+  background: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node.is-board .visit-dashboard-tree-bar span {
+  background: var(--visit-leaf-fill);
+}
+
+/* Attendance tree kickers */
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node.is-level-1 .visit-dashboard-tree-kicker {
+  color: var(--visit-leaf-ink);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-node.is-level-2 .visit-dashboard-tree-kicker {
+  color: var(--visit-carrot-ink);
+}
+
+/* Links, chips, tiles, viewer */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-action-link, .visit-dashboard-folder-action, .visit-dashboard-document-action) {
+  border-bottom-color: color-mix(in srgb, var(--visit-carrot-fill) 58%, transparent);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-filters button[aria-pressed="true"] {
+  border-color: var(--visit-carrot-fill);
+  color: var(--visit-on-accent);
+  background: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-filters button[aria-pressed="true"] .visit-dashboard-doc-filters__count {
+  color: var(--visit-on-accent);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-tile:hover {
+  border-color: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-viewer {
+  border-color: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-file:hover {
+  background: var(--visit-tint);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-file.is-selected {
+  border-color: transparent;
+  background: var(--visit-carrot-wash);
+  box-shadow: inset 0 0 0 1px var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-main-tag,
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-type[data-file-type="PPTX"] {
+  border-color: var(--visit-carrot-fill);
+  color: var(--visit-on-accent);
+  background: var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-document-preview-frame {
+  background: var(--visit-tint);
+}
+
+/* Attendance records, ledgers, states */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-attendance-panel, .visit-dashboard-state) {
+  background:
+    linear-gradient(145deg, var(--visit-carrot-wash), transparent 70%),
+    var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-status.is-late {
+  border-color: color-mix(in srgb, var(--visit-leaf-fill) 34%, transparent);
+  background: var(--visit-leaf-wash);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-status.is-unknown {
+  border-color: color-mix(in srgb, var(--visit-carrot-fill) 34%, transparent);
+  background: var(--visit-carrot-wash);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-table-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--visit-carrot-fill) 55%, transparent);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-ledger-month th {
+  background: var(--visit-carrot-wash) !important;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-bill-link {
+  border-color: color-mix(in srgb, var(--visit-carrot-fill) 35%, transparent);
+  background: var(--visit-carrot-wash);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-bill-link:hover {
+    border-color: var(--visit-carrot-fill);
+    color: var(--visit-on-accent);
+    background: var(--visit-carrot-fill);
+  }
+}
+
+/* Focus rings are leaf inside the DZR scope. */
+.visit-dashboard-page[data-visit-theme="carrot"] :focus-visible {
+  outline-color: var(--visit-leaf-fill);
+}
+
+/* Light (cream): the shared rules draw hairlines, tracks and tints in
+   translucent white, which disappears on cream; redraw them in soil brown. */
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] :is(
+  .visit-dashboard-avenue-list li,
+  .visit-dashboard-avenue-disclosure,
+  .visit-dashboard-attendance-summary,
+  .visit-dashboard-attendance-table td,
+  .visit-dashboard-ledger-table td
+) {
+  border-bottom-color: var(--visit-hairline);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-summary div {
+  border-left-color: var(--visit-hairline);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] :is(
+  .visit-dashboard-avenue-event-list li,
+  .visit-dashboard-attendance-status:is(.is-present, .is-excused)
+) {
+  border-color: var(--visit-hairline);
+  background: var(--visit-tint);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] :is(
+  .visit-dashboard-attendance > summary b,
+  .visit-dashboard-attendance-tabs button,
+  .visit-dashboard-ledger-table tbody tr:nth-child(even) td,
+  .visit-dashboard-ledger-table tbody tr:nth-child(even) th
+) {
+  background: var(--visit-tint);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-tabs button.is-active {
+  background: var(--internal-surface);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-table thead th {
+  box-shadow: 0 1px 0 var(--visit-hairline);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-attendance-role-heading, .visit-dashboard-attendance-role) {
+  box-shadow: 1px 0 0 var(--visit-hairline);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-list small::before {
+  color: var(--internal-border-strong);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance-table-wrap::-webkit-scrollbar-track {
+  background: var(--visit-track);
+}
+
+:root[data-theme="light"] .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-skeleton span {
+  background-image: linear-gradient(90deg, var(--visit-tint), var(--visit-track), var(--visit-tint));
 }
