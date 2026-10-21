@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES } from "./visitModel.js";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES } from "./visitModel.js";
 test("visit and folder models whitelist verified fields",()=>{const visit=normalizeVisit({visitType:"dzrVisit",displayTitle:" DZR ",secret:"x"});assert.equal(visit.displayTitle,"DZR");assert.equal(Object.hasOwn(visit,"secret"),false);const folder=normalizeFolder({visitType:"dzrVisit",positionKey:"cwd",maxActiveFiles:40,primaryPresentationSubmissionId:"selected-file"});assert.equal(folder.positionKey,"cwd");assert.equal(folder.primaryPresentationSubmissionId,"selected-file")});
 test("submission ignores unsafe URL",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"x",fileUrl:"javascript:x"});assert.equal(item.fileUrl,"")});
 test("submission normalizes primary presentation controls",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"deck.pptx",isPrimaryPresentation:true,canSetPrimaryPresentation:true});assert.equal(item.isPrimaryPresentation,true);assert.equal(item.canSetPrimaryPresentation,true)});
@@ -20,6 +20,17 @@ test("submissions carry a safe document category and move permission", () => {
 test("folders expose whether they support document categories", () => {
   assert.equal(normalizeFolder({ visitType: "clubAssembly", positionKey: "secretary", supportsDocumentCategories: true }).supportsDocumentCategories, true);
   assert.equal(normalizeFolder({ visitType: "clubAssembly", positionKey: "editor" }).supportsDocumentCategories, false);
+});
+
+test("folder holders may edit the main presentation only when the backend flags their folder", () => {
+  const holderFolder = normalizeFolder({ visitType: "dzrVisit", positionKey: "pid", canSetPrimaryPresentation: true });
+  const lockedFolder = normalizeFolder({ visitType: "dzrVisit", positionKey: "pid", canSetPrimaryPresentation: false, locked: true });
+  assert.equal(holderFolder.canSetPrimaryPresentation, true);
+  assert.equal(normalizeFolder({ visitType: "dzrVisit", positionKey: "pid", canSetPrimaryPresentation: "yes" }).canSetPrimaryPresentation, false);
+  assert.equal(canEditVisitPrimaryPresentation({ canManage: false }, holderFolder), true, "holder of an open folder");
+  assert.equal(canEditVisitPrimaryPresentation({ canManage: false }, lockedFolder), false, "holder of a locked folder");
+  assert.equal(canEditVisitPrimaryPresentation({ canManage: true }, lockedFolder), true, "manager always");
+  assert.equal(canEditVisitPrimaryPresentation({}, null), false);
 });
 
 test("library groups render Inward, Outward, then Supporting files with their items", () => {

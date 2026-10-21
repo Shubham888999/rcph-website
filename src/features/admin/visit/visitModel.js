@@ -59,9 +59,15 @@ export function normalizeFolder(value) {
     canOpen: value.canOpen === true,
     canUpload: value.canUpload === true,
     canManage: value.canManage === true,
+    canSetPrimaryPresentation: value.canSetPrimaryPresentation === true,
     supportsDocumentCategories: value.supportsDocumentCategories === true,
     holders: normalizeVisitHolders(value.holders),
   };
+}
+
+// Managers always; folder holders when the backend says their folder is writable for them.
+export function canEditVisitPrimaryPresentation(access, folder) {
+  return access?.canManage === true || folder?.canSetPrimaryPresentation === true;
 }
 
 export function normalizeFolders(values, visitType = "") {

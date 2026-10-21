@@ -732,9 +732,12 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /BOD Documents/);
   assert.match(pageSource, /visit-dashboard-doc-grid/);
   assert.match(pageSource, /className="visit-dashboard-doc-tile"/);
-  assert.match(pageSource, /role="group" aria-label="Filter folders"/);
-  assert.match(pageSource, /aria-pressed=\{activeFilter === filter\.key\}/);
-  assert.match(pageSource, /filterVisitDocumentBlocks\(blocks, activeFilter\)/);
+  // v2.17.0: no filter chips; Prev/Next and "N of M" run over every visible tile.
+  assert.doesNotMatch(pageSource, /Filter folders|aria-pressed|activeFilter|filterVisitDocumentBlocks|countVisitDocumentFilters|VISIT_DOCUMENT_FILTERS/);
+  assert.doesNotMatch(visitCssSource, /visit-dashboard-doc-filters/);
+  assert.match(pageSource, /total=\{blocks\.length\}/);
+  assert.match(pageSource, /previousBlock=\{blocks\[\(openIndex - 1 \+ blocks\.length\) % blocks\.length\]\}/);
+  assert.match(pageSource, /nextBlock=\{blocks\[\(openIndex \+ 1\) % blocks\.length\]\}/);
   assert.match(pageSource, /getVisitDocumentRoleCode\(panel\)/);
   assert.match(pageSource, /getVisitDocumentPanelActionLabel\(panel\)/);
   assert.match(pageSource, /getVisitDocumentMainPresentations\(block\)/);
@@ -766,11 +769,12 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /No visible documents uploaded for this folder yet\./);
   assert.doesNotMatch(pageSource, /Documents are grouped by director/);
   assert.doesNotMatch(pageSource, /visit-dashboard-documents-note/);
-  assert.match(pageSource, /groupDocumentPanelsByPerson\(panels\)/);
+  assert.match(pageSource, /groupVisibleDocumentPanelsByPerson\(panels\)/, "vacant folders never get a tile");
   assert.doesNotMatch(pageSource, /groupVisitDocumentBlocksBySection|section\.label|visit-dashboard-person-section/);
   assert.match(pageSource, /getVisitDocumentTileAriaLabel\(block\)/);
   assert.match(pageSource, /formatVisitDocumentBlockFileCount\(block\)/);
-  assert.match(pageSource, /visit-dashboard-person-vacant/);
+  assert.doesNotMatch(pageSource, /visit-dashboard-person-vacant|block\.vacant|"Vacant"/);
+  assert.doesNotMatch(visitCssSource, /visit-dashboard-person-vacant/);
   assert.match(pageSource, /visit-dashboard-role-code/);
   assert.match(pageSource, /visit-dashboard-role-title/);
   assert.doesNotMatch(pageSource, /visit-dashboard-role-chip|visit-dashboard-vacant-tag/);
