@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAccessibleDialog from "../../features/bod-tools/useAccessibleDialog";
 import useAuth from "../../hooks/useAuth";
+import CarrotField from "./CarrotField";
 import {
   VISIT_ATTENDANCE_TABS,
   attendanceStatusLabel,
@@ -27,12 +28,14 @@ import {
   getVisitDocumentTileAriaLabel,
   getVisitAttendanceEventsForAvenue,
   getVisitDashboardErrorMessage,
+  getVisitDashboardTheme,
   groupVisibleDocumentPanelsByPerson,
   isVisitDocumentMainPresentation,
   normalizeVisitDashboardData,
   orderVisitDocumentPanelFiles,
   parseOfficialDisplayName,
   pickDefaultVisitDocumentFileKey,
+  splitVisitDashboardTitle,
   validVisitAttendanceTab,
   visitTypeFromSlug,
 } from "../../features/visits/visitDashboardModel.js";
@@ -45,12 +48,40 @@ const LOAD_STATUS = Object.freeze({
   error: "error",
 });
 
-function VisitDashboardLoading({ title }) {
+function CarrotIcon({ className = "visit-dashboard-carrot-icon" }) {
   return (
-    <main className="visit-dashboard-page">
+    <svg className={className} width="16" height="20" viewBox="0 0 32 40" aria-hidden="true" focusable="false">
+      <path className="visit-dashboard-carrot-icon__leaf" d="M16 14 C10 4 6 4 5 1 C11 1 15 5 16 11 C17 4 20 1 27 0 C25 4 20 6 16 14Z" />
+      <path className="visit-dashboard-carrot-icon__root" d="M6 14 H26 C26 24 20 34 16 40 C12 34 6 24 6 14Z" />
+    </svg>
+  );
+}
+
+function VisitEyebrow({ theme }) {
+  return (
+    <p className="visit-dashboard-eyebrow">
+      {theme === "carrot" ? <CarrotIcon /> : null}
+      Visit dashboard
+    </p>
+  );
+}
+
+function VisitTitle({ title, theme }) {
+  const { lead, tail } = splitVisitDashboardTitle(title);
+  if (theme !== "carrot" || !tail) return title;
+  return (
+    <>
+      {lead} <span className="visit-dashboard-title-accent">{tail}</span>
+    </>
+  );
+}
+
+function VisitDashboardLoading({ title, theme }) {
+  return (
+    <main className="visit-dashboard-page" data-visit-theme={theme || undefined}>
       <section className="visit-dashboard-state" aria-labelledby="visit-dashboard-loading-title">
-        <p className="visit-dashboard-eyebrow">Visit dashboard</p>
-        <h1 id="visit-dashboard-loading-title">{title}</h1>
+        <VisitEyebrow theme={theme} />
+        <h1 id="visit-dashboard-loading-title"><VisitTitle title={title} theme={theme} /></h1>
         <p>Loading protected visit totals.</p>
         <div className="visit-dashboard-skeleton" aria-hidden="true">
           <span />
@@ -63,12 +94,12 @@ function VisitDashboardLoading({ title }) {
   );
 }
 
-function VisitDashboardError({ title, onRetry }) {
+function VisitDashboardError({ title, theme, onRetry }) {
   return (
-    <main className="visit-dashboard-page">
+    <main className="visit-dashboard-page" data-visit-theme={theme || undefined}>
       <section className="visit-dashboard-state" aria-labelledby="visit-dashboard-error-title">
-        <p className="visit-dashboard-eyebrow">Visit dashboard</p>
-        <h1 id="visit-dashboard-error-title">{title}</h1>
+        <VisitEyebrow theme={theme} />
+        <h1 id="visit-dashboard-error-title"><VisitTitle title={title} theme={theme} /></h1>
         <p>{getVisitDashboardErrorMessage()}</p>
         <button type="button" onClick={onRetry}>Retry</button>
       </section>
@@ -341,7 +372,7 @@ function PresentationIcon() {
   );
 }
 
-function DocumentTile({ block, onOpen }) {
+function DocumentTile({ block, theme, onOpen }) {
   const mains = getVisitDocumentMainPresentations(block);
   return (
     <button
@@ -373,7 +404,7 @@ function DocumentTile({ block, onOpen }) {
 
       {mains.length ? (
         <span className="visit-dashboard-doc-tile__main">
-          <PresentationIcon />
+          {theme === "carrot" ? <CarrotIcon className="visit-dashboard-doc-tile__icon" /> : <PresentationIcon />}
           <span className="visit-dashboard-doc-tile__main-text">
             <span className="visit-dashboard-doc-tile__main-label">
               {mains.length === 1 ? "Main presentation" : `${mains.length} main presentations`}
@@ -391,7 +422,8 @@ function DocumentTile({ block, onOpen }) {
 }
 
 function DocumentTypeBadge({ file }) {
-  return <span className="visit-dashboard-doc-type">{getVisitDocumentFileType(file)}</span>;
+  const type = getVisitDocumentFileType(file);
+  return <span className="visit-dashboard-doc-type" data-file-type={type}>{type}</span>;
 }
 
 function DocumentFolderLink({ panel }) {
@@ -578,7 +610,7 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
   );
 }
 
-function DocumentPanels({ panels }) {
+function DocumentPanels({ panels, theme }) {
   const [openBlockKey, setOpenBlockKey] = useState("");
   const hasPanels = panels.length > 0;
   const blocks = useMemo(() => groupVisibleDocumentPanelsByPerson(panels), [panels]);
@@ -610,7 +642,7 @@ function DocumentPanels({ panels }) {
       ) : (
         <div className="visit-dashboard-doc-grid">
           {blocks.map((block) => (
-            <DocumentTile block={block} key={block.blockKey} onOpen={setOpenBlockKey} />
+            <DocumentTile block={block} key={block.blockKey} theme={theme} onOpen={setOpenBlockKey} />
           ))}
         </div>
       )}
@@ -1067,6 +1099,7 @@ export default function VisitDashboardPage() {
   const { visitSlug = "" } = useParams();
   const { user } = useAuth();
   const visitType = visitTypeFromSlug(visitSlug);
+  const theme = getVisitDashboardTheme(visitType);
   const fallbackData = useMemo(
     () => normalizeVisitDashboardData(null, visitType),
     [visitType],
@@ -1108,20 +1141,21 @@ export default function VisitDashboardPage() {
   const dataAsOf = formatVisitDashboardDateTime(data.generatedAt);
 
   if (loadState.status === LOAD_STATUS.loading && !loadState.data) {
-    return <VisitDashboardLoading title={visit.title} />;
+    return <VisitDashboardLoading title={visit.title} theme={theme} />;
   }
 
   if (loadState.status === LOAD_STATUS.error) {
-    return <VisitDashboardError title={visit.title} onRetry={loadDashboard} />;
+    return <VisitDashboardError title={visit.title} theme={theme} onRetry={loadDashboard} />;
   }
 
   return (
-    <main className="visit-dashboard-page">
+    <main className="visit-dashboard-page" data-visit-theme={theme || undefined}>
+      {theme === "carrot" ? <CarrotField /> : null}
       <div className="visit-dashboard-shell">
         <header className="visit-dashboard-masthead" aria-labelledby="visit-dashboard-title">
           <div>
-            <p className="visit-dashboard-eyebrow">Visit dashboard</p>
-            <h1 id="visit-dashboard-title">{visit.title}</h1>
+            <VisitEyebrow theme={theme} />
+            <h1 id="visit-dashboard-title"><VisitTitle title={visit.title} theme={theme} /></h1>
             <p className="visit-dashboard-intro">Welcome District Officials</p>
             <VisitingPanel names={visit.officialDisplayNames} />
           </div>
@@ -1140,7 +1174,7 @@ export default function VisitDashboardPage() {
 
         <AvenueCounts rows={stats.avenueEventCounts} attendance={attendance} />
 
-        <DocumentPanels panels={documentPanels} />
+        <DocumentPanels panels={documentPanels} theme={theme} />
 
         <AttendanceRecords attendance={attendance} />
 
