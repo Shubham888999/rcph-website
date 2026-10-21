@@ -953,12 +953,31 @@ function canMoveSubmissionCategory(submission, access) {
   return folderAccessPositionKeys(access).includes(positionKey) && submission.uploadedByUid === access.uid;
 }
 
+// Same rule that decides whether a folder holder may upload (see assertVisitFolderAllowsUpload).
+function visitFolderAllowsUpload(config, folder) {
+  return config?.enabled !== false
+    && config?.submissionOpen !== false
+    && folder?.enabled !== false
+    && folder?.submissionOpen !== false
+    && folder?.locked !== true;
+}
+
+// Managers may always set the main presentation; folder holders only while their folder is writable.
+function canSetFolderPrimaryPresentation(access, positionKey, folderWritable) {
+  if (access?.canManageVisitSystem === true) return true;
+  return Boolean(
+    access?.role === 'bod'
+      && folderAccessPositionKeys(access).includes(positionKey)
+      && folderWritable === true
+  );
+}
+
 function shapeSubmission(submission, access, options = {}) {
   const permissions = submissionActionPermissions(submission, access);
   const submissionId = submission.submissionId || submission.id || '';
   const primaryPresentationSubmissionId = safePrimaryPresentationSubmissionId(options.primaryPresentationSubmissionId);
   const canSetPrimaryPresentation = Boolean(
-    access?.canManageVisitSystem === true
+    canSetFolderPrimaryPresentation(access, submission.positionKey, options.folderWritable === true)
       && isActivePrimaryPresentationSubmission(submission)
       && canUseAsPrimaryPresentation(submission)
   );
@@ -989,14 +1008,8 @@ function shapeSubmission(submission, access, options = {}) {
 
 function buildFolderResponse(config, folder, access, holdersByPosition = null) {
   const authorized = access.canManageVisitSystem || folderAccessPositionKeys(access).includes(folder.positionKey);
-  const canUpload = Boolean(
-    authorized
-      && config.enabled !== false
-      && config.submissionOpen !== false
-      && folder.enabled !== false
-      && folder.submissionOpen !== false
-      && folder.locked !== true
-  );
+  const folderWritable = visitFolderAllowsUpload(config, folder);
+  const canUpload = Boolean(authorized && folderWritable);
   return {
     folderId: visitPositionDocId(folder.visitType, folder.positionKey),
     visitType: folder.visitType,
@@ -1015,6 +1028,7 @@ function buildFolderResponse(config, folder, access, holdersByPosition = null) {
     canOpen: authorized,
     canUpload,
     canManage: access.canManageVisitSystem === true,
+    canSetPrimaryPresentation: canSetFolderPrimaryPresentation(access, folder.positionKey, folderWritable),
     supportsDocumentCategories: supportsDocumentCategories(folder.positionKey),
     holders: positionHolders.holdersForPosition(holdersByPosition, folder.positionKey),
   };
@@ -1572,7 +1586,10 @@ function createVisitSubmissionService(options) {
       submissions: submissions.map(doc => shapeSubmission(
         { id: doc.id, ...doc.data },
         access,
-        { primaryPresentationSubmissionId: folder.primaryPresentationSubmissionId }
+        {
+          primaryPresentationSubmissionId: folder.primaryPresentationSubmissionId,
+          folderWritable: visitFolderAllowsUpload(config, folder),
+        }
       )),
       limits: {
         maxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES),
@@ -1659,6 +1676,73 @@ function createVisitSubmissionService(options) {
       }, now));
     }
     return { ok: true, visitType, positionKey, changedFields };
+  }
+
+  // Managers, or the holder of this folder while it is writable, may set or clear its main presentation.
+  // Only primaryPresentationSubmissionId (plus updatedAt/updatedBy) is ever written here.
+  async function setPrimaryPresentation(uid, input) {
+    const access = await resolveAccessContext(uid);
+    const visitType = normalizeVisitType(input?.visitType);
+    const positionKey = normalizeCanonicalPositionKey(input?.positionKey, positionHelpers);
+    assertFolderAccess(access, positionKey);
+    if (!hasOwn(input || {}, 'submissionId')) {
+      throw makeVisitSubmissionError('invalid-argument', 'submissionId is required ("" clears the main presentation).');
+    }
+    const submissionId = input.submissionId === null || input.submissionId === ''
+      ? ''
+      : normalizeSubmissionId(input.submissionId);
+    const updates = { primaryPresentationSubmissionId: submissionId };
+    const docId = visitPositionDocId(visitType, positionKey, positionHelpers);
+    const now = adapter.serverTimestamp();
+    let changes = {};
+    await adapter.runTransaction(async (tx) => {
+      const [configSnap, snap] = await Promise.all([
+        tx.getDoc('visitSubmissionConfig', visitType),
+        tx.getDoc('visitSubmissionPositions', docId),
+      ]);
+      if (!configSnap.exists) {
+        throw makeVisitSubmissionError('failed-precondition', 'Visit Submission structure has not been initialized.');
+      }
+      if (!snap.exists) {
+        throw makeVisitSubmissionError('not-found', 'Visit position folder has not been initialized.');
+      }
+      if (access.canManageVisitSystem !== true) {
+        assertVisitFolderAllowsUpload(
+          shapeConfig(configSnap.data, visitType, null, null),
+          shapePosition(snap.data, visitType, positionKey, null, null, positionHelpers)
+        );
+      }
+      if (submissionId) {
+        const selectedSnap = await tx.getDoc('visitSubmissions', submissionId);
+        if (!selectedSnap.exists) {
+          throw makeVisitSubmissionError('invalid-argument', 'Main presentation submission not found.');
+        }
+        assertPrimaryPresentationSubmission(
+          { id: selectedSnap.id, ...(selectedSnap.data || {}) },
+          submissionId,
+          visitType,
+          positionKey
+        );
+      }
+      changes = safeDiff(snap.data, updates);
+      if (Object.keys(changes).length) {
+        tx.updateDoc('visitSubmissionPositions', docId, {
+          ...updates,
+          updatedAt: now,
+          updatedBy: uid,
+        });
+      }
+    });
+    const changed = Object.keys(changes).length > 0;
+    if (changed) {
+      await adapter.addDoc('visitSubmissionAudit', buildAuditPayload('visitPrimaryPresentationUpdated', access, {
+        visitType,
+        positionKey,
+        submissionId: submissionId || null,
+        details: { changes, asManager: access.canManageVisitSystem === true },
+      }, now));
+    }
+    return { ok: true, visitType, positionKey, primaryPresentationSubmissionId: submissionId, changed };
   }
 
   function normalizeUploadFileDescriptors(files, folder, visitType, positionKey) {
@@ -2508,7 +2592,8 @@ function createVisitSubmissionService(options) {
         });
         nextActiveFileCount = activeFileCount;
         if (currentPrimaryPresentationSubmissionId === replacingSubmissionId) {
-          nextPrimaryPresentationSubmissionId = access.canManageVisitSystem === true && canUseAsPrimaryPresentation(submission)
+          nextPrimaryPresentationSubmissionId = canSetFolderPrimaryPresentation(access, session.positionKey, true)
+            && canUseAsPrimaryPresentation(submission)
             ? submissionId
             : '';
         }
@@ -2913,6 +2998,7 @@ function createVisitSubmissionService(options) {
     getFolder,
     updateConfig,
     updateFolder,
+    setPrimaryPresentation,
     createUploadSession,
     createBulkUploadSessions,
     recordBulkUploadAudit,
@@ -2979,6 +3065,8 @@ module.exports = {
   submissionActionPermissions,
   normalizeDocumentCategory,
   canMoveSubmissionCategory,
+  visitFolderAllowsUpload,
+  canSetFolderPrimaryPresentation,
   shapeSubmission,
   buildFolderResponse,
   createFirestoreVisitSubmissionAdapter,

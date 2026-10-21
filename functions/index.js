@@ -5438,6 +5438,20 @@ exports.updateVisitSubmissionFolder = onCall(CALLABLE_OPTIONS, async (request) =
   }
 });
 
+exports.setVisitSubmissionPrimaryPresentation = onCall(CALLABLE_OPTIONS, async (request) => {
+  const data = request?.data || {};
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.setPrimaryPresentation(uid, {
+      visitType: data.visitType,
+      positionKey: data.positionKey,
+      submissionId: data.submissionId,
+    });
+  } catch (err) {
+    throwCallableServiceError(err, 'Main presentation update failed.');
+  }
+});
+
 exports.createVisitSubmissionUploadSession = onCall(CALLABLE_OPTIONS, async (request) => {
   try {
     const uid = requireAuth(request);
