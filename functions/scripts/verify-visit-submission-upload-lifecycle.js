@@ -604,11 +604,12 @@ function assertNoSecretFields(value, pathLabel = 'root') {
       driveFileUrl: 'https://drive.google.com/file/d/driveFileUPLOADERREPLACEMENT/view',
     },
   });
-  await finalize(uploaderPrimaryEnv, 'bod-secretary', uploaderPrimaryReplacement, uploaderReplacementCompletion);
+  const uploaderPrimaryNew = await finalize(uploaderPrimaryEnv, 'bod-secretary', uploaderPrimaryReplacement, uploaderReplacementCompletion);
+  // v2.17.0: folder holders may set their own main presentation, so an eligible replacement keeps it.
   assert.strictEqual(
     folderDoc(uploaderPrimaryEnv).primaryPresentationSubmissionId,
-    '',
-    'ordinary uploader replacement clears selected main presentation pending manager review'
+    uploaderPrimaryNew.submissionId,
+    'folder holder replacement transfers selected main presentation to eligible replacement'
   );
 
   await createSession(env, 'bod-secretary', { file: { clientFileId: 'reserved-live' } });
