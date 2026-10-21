@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as visitDashboardModel from "./visitDashboardModel.js";
 import {
-  countVisitDocumentFilters,
-  filterVisitDocumentBlocks,
   formatVisitDocumentBlockFileCount,
   formatVisitDocumentRoleLabel,
   getVisitDocumentBlockAriaLabel,
   getVisitDocumentFileType,
-  getVisitDocumentPanelFilterGroup,
   getVisitDocumentTileAriaLabel,
   groupDocumentPanelsByPerson,
+  groupVisibleDocumentPanelsByPerson,
   groupVisitDocumentBlocksBySection,
   normalizeVisitDashboardData,
   orderVisitDocumentPanelFiles,
@@ -243,69 +242,25 @@ test("role chip code falls back to the avenue code instead of repeating the titl
   assert.equal(resolveVisitDocumentRoleCode({ positionTitle: "Secretary" }, "Secretary"), "");
 });
 
-// Codes as the catalog resolves them today: the co- codes are irregular
-// (Co-VP, CPRES, CSEC, CA, CR), so position keys decide the group.
-const CATALOG_FILTER_CASES = [
-  ["president", "President", "PRES", "core"],
-  ["immediate-past-president", "Immediate Past President", "IPP", "core"],
-  ["vice-president", "Vice President", "VP", "core"],
-  ["secretary", "Secretary", "SEC", "core"],
-  ["joint-secretary", "Joint Secretary", "JSEC", "core"],
-  ["treasurer", "Treasurer", "TREAS", "core"],
-  ["club-advisor", "Club Advisor", "ADV", "core"],
-  ["saa", "Sergeant-at-Arms", "SAA", "core"],
-  ["csd", "Club Service Director", "CSD", "avenue"],
-  ["cmd", "Community Service Director", "CMD", "avenue"],
-  ["isd", "International Service Director", "ISD", "avenue"],
-  ["pdd", "Professional Development Director", "PDD", "avenue"],
-  ["dei", "DEI Director", "DEI", "avenue"],
-  ["pro", "Public Relations Officer", "PRO", "avenue"],
-  ["rrro", "Rotary Rotaract Relations Officer", "RRRO", "avenue"],
-  ["co-president", "Co-President", "CPRES", "co"],
-  ["co-vice-president", "Co-Vice President", "CVP", "co"],
-  ["co-secretary", "Co-Secretary", "CSEC", "co"],
-  ["co-club-advisor", "Co-Club Advisor", "CADV", "co"],
-  ["co-csd", "Co-Club Service Director", "CCSD", "co"],
-  ["co-wr", "Co-Women's Representative", "CWR", "co"],
-  ["editor", "Editor", "EDITOR", "support"],
-  ["cwd", "Website Director", "CWD", "support"],
-  ["sports-representative", "Sports Representative", "SPORTS", "support"],
-  ["wrwc", "World Rotaract Week Chairperson", "WRWC", "support"],
-  ["pid", "Public Image Director", "PID", "support"],
-  ["mdo", "Membership Development Officer", "MDO", "support"],
-];
-
-test("document filter groups follow position keys for every catalog role", () => {
-  for (const [positionKey, positionTitle, avenueCode, group] of CATALOG_FILTER_CASES) {
-    assert.equal(getVisitDocumentPanelFilterGroup({ positionKey, positionTitle, avenueCode }), group, positionKey);
-  }
+test("visit dashboard tiles exclude vacant folders, even when they hold files", () => {
+  const all = groupDocumentPanelsByPerson(realWorldPanels);
+  const visible = groupVisibleDocumentPanelsByPerson(realWorldPanels);
+  assert.equal(all.some((block) => block.vacant), true, "fixture has a vacant folder with files");
+  assert.equal(visible.some((block) => block.vacant), false, "no Vacant tile");
+  assert.equal(visible.flatMap((block) => block.panels).some((item) => item.positionKey === "editor"), false, "vacant editor is hidden");
+  assert.deepEqual(
+    visible.map((block) => block.blockKey),
+    all.filter((block) => !block.vacant).map((block) => block.blockKey),
+    "holder tiles keep the admin order",
+  );
+  assert.deepEqual(groupVisibleDocumentPanelsByPerson([panel("cwd", "Website Director", [], 4)]), []);
+  assert.deepEqual(groupVisibleDocumentPanelsByPerson(null), []);
 });
 
-test("document filter groups fall back to codes for unknown keys", () => {
-  assert.equal(getVisitDocumentPanelFilterGroup({ positionKey: "custom-1", positionTitle: "Co Public Relations Lead" }), "co");
-  assert.equal(getVisitDocumentPanelFilterGroup({ positionKey: "custom-2", positionTitle: "Avenue lead", avenueCode: "PDD" }), "avenue");
-  assert.equal(getVisitDocumentPanelFilterGroup({ positionKey: "custom-3", positionTitle: "Treasurer", avenueCode: "TREAS" }), "core");
-  assert.equal(getVisitDocumentPanelFilterGroup({ positionKey: "custom-4", positionTitle: "Photographer" }), "support");
-  assert.equal(getVisitDocumentPanelFilterGroup({}), "support");
-});
-
-test("multi-role people appear in every matching filter and filtering keeps hierarchy order", () => {
-  const blocks = groupDocumentPanelsByPerson(realWorldPanels);
-  const counts = countVisitDocumentFilters(blocks);
-  assert.equal(counts.all, blocks.length);
-  const yashali = (key) => filterVisitDocumentBlocks(blocks, key).some((block) => block.title === "Rtr. Yashali Shirodkar");
-  assert.equal(yashali("avenue"), true, "PRO role");
-  assert.equal(yashali("co"), true, "Co-ISD role");
-  assert.equal(yashali("core"), false);
-  const anish = filterVisitDocumentBlocks(blocks, "support").find((block) => block.title === "Rtr. Anish Abhijit Joglekar");
-  assert.ok(anish, "PID + MDO holder is a support role");
-  for (const filter of ["core", "avenue", "co", "support"]) {
-    const filtered = filterVisitDocumentBlocks(blocks, filter).map((block) => block.blockKey);
-    assert.equal(counts[filter], filtered.length, filter);
-    assert.deepEqual(filtered, blocks.map((block) => block.blockKey).filter((key) => filtered.includes(key)), `${filter} keeps order`);
+test("document filter helpers are gone", () => {
+  for (const name of ["VISIT_DOCUMENT_FILTERS", "countVisitDocumentFilters", "filterVisitDocumentBlocks", "getVisitDocumentPanelFilterGroup", "blockMatchesVisitDocumentFilter"]) {
+    assert.equal(name in visitDashboardModel, false, name);
   }
-  assert.equal(filterVisitDocumentBlocks(blocks, "all").length, blocks.length);
-  assert.equal(countVisitDocumentFilters([]).core, 0);
 });
 
 test("tile labels, role labels and file types read cleanly", () => {

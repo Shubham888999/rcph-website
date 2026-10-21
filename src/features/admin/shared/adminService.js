@@ -107,7 +107,7 @@ export const visitCalls = {
   createSession: (payload) => callable("createVisitSubmissionUploadSession", payload), finalize: (payload) => callable("finalizeVisitSubmissionUpload", payload), cancelSession: (sessionId) => callable("cancelVisitSubmissionUploadSession", { sessionId }),
   createBulkSessions: (payload) => callable("createVisitSubmissionBulkUploadSessions", payload), recordBulkUploadAudit: (bulkUploadId) => callable("recordVisitSubmissionBulkUploadAudit", { bulkUploadId }),
   withdraw: (submissionId) => callable("withdrawVisitSubmission", { submissionId }), remove: (submissionId, reason) => callable("removeVisitSubmission", { submissionId, reason }), replace: (submissionId, files) => callable("replaceVisitSubmission", { submissionId, files }),
-  setPrimaryPresentation: (visitType, positionKey, submissionId = "") => callable("updateVisitSubmissionFolder", { visitType, positionKey, primaryPresentationSubmissionId: submissionId || "" }),
+  setPrimaryPresentation: (visitType, positionKey, submissionId = "") => callable("setVisitSubmissionPrimaryPresentation", { visitType, positionKey, submissionId: submissionId || "" }),
   moderation: (payload) => callable("getVisitSubmissionModerationData", payload), reconcile: (visitType, positionKey) => callable("reconcileVisitSubmissionFolderCount", { visitType, positionKey }), cleanup: () => callable("cleanupExpiredVisitUploadSessions", { limit: 25 }),
   moveCategory: (submissionId, documentCategory) => callable("moveVisitSubmissionCategory", { submissionId, documentCategory }),
 };

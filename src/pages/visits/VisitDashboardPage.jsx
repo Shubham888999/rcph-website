@@ -5,13 +5,10 @@ import useAccessibleDialog from "../../features/bod-tools/useAccessibleDialog";
 import useAuth from "../../hooks/useAuth";
 import {
   VISIT_ATTENDANCE_TABS,
-  VISIT_DOCUMENT_FILTERS,
   attendanceStatusLabel,
   buildGlanceStats,
   buildTreasuryLedger,
   buildVisitAttendanceTree,
-  countVisitDocumentFilters,
-  filterVisitDocumentBlocks,
   finesHasNotes,
   formatVisitAttendanceName,
   formatVisitAttendanceRoleCode,
@@ -30,7 +27,7 @@ import {
   getVisitDocumentTileAriaLabel,
   getVisitAttendanceEventsForAvenue,
   getVisitDashboardErrorMessage,
-  groupDocumentPanelsByPerson,
+  groupVisibleDocumentPanelsByPerson,
   isVisitDocumentMainPresentation,
   normalizeVisitDashboardData,
   orderVisitDocumentPanelFiles,
@@ -344,10 +341,6 @@ function PresentationIcon() {
   );
 }
 
-function documentPersonName(block) {
-  return block.vacant ? "Vacant" : block.title;
-}
-
 function DocumentTile({ block, onOpen }) {
   const mains = getVisitDocumentMainPresentations(block);
   return (
@@ -362,11 +355,7 @@ function DocumentTile({ block, onOpen }) {
       }}
     >
       <span className="visit-dashboard-doc-tile__top">
-        {block.vacant ? (
-          <span className="visit-dashboard-doc-tile__name visit-dashboard-person-vacant">Vacant</span>
-        ) : (
-          <strong className="visit-dashboard-doc-tile__name" title={block.title}>{block.title}</strong>
-        )}
+        <strong className="visit-dashboard-doc-tile__name" title={block.title}>{block.title}</strong>
         <span className="visit-dashboard-doc-tile__count">{formatVisitDocumentBlockFileCount(block)}</span>
       </span>
 
@@ -478,7 +467,7 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
   const selected = block.panels
     .flatMap((panel) => panel.files.map((file) => ({ panel, file })))
     .find((entry) => getVisitDocumentFileKey(entry.panel, entry.file) === fileKey);
-  const name = documentPersonName(block);
+  const name = block.title;
   const canNavigate = total > 1;
 
   return (
@@ -506,7 +495,7 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
             <button
               type="button"
               disabled={!canNavigate}
-              aria-label={`Previous: ${documentPersonName(previousBlock)}`}
+              aria-label={`Previous: ${previousBlock.title}`}
               onClick={() => onNavigate(previousBlock.blockKey)}
             >
               Prev
@@ -514,7 +503,7 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
             <button
               type="button"
               disabled={!canNavigate}
-              aria-label={`Next: ${documentPersonName(nextBlock)}`}
+              aria-label={`Next: ${nextBlock.title}`}
               onClick={() => onNavigate(nextBlock.blockKey)}
             >
               Next
@@ -590,15 +579,10 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
 }
 
 function DocumentPanels({ panels }) {
-  const [filterKey, setFilterKey] = useState("all");
   const [openBlockKey, setOpenBlockKey] = useState("");
   const hasPanels = panels.length > 0;
-  const blocks = useMemo(() => groupDocumentPanelsByPerson(panels), [panels]);
-  const counts = useMemo(() => countVisitDocumentFilters(blocks), [blocks]);
-  const filters = VISIT_DOCUMENT_FILTERS.filter((filter) => filter.key === "all" || counts[filter.key] > 0);
-  const activeFilter = filters.some((filter) => filter.key === filterKey) ? filterKey : "all";
-  const visibleBlocks = filterVisitDocumentBlocks(blocks, activeFilter);
-  const openIndex = visibleBlocks.findIndex((block) => block.blockKey === openBlockKey);
+  const blocks = useMemo(() => groupVisibleDocumentPanelsByPerson(panels), [panels]);
+  const openIndex = blocks.findIndex((block) => block.blockKey === openBlockKey);
   const closeViewer = useCallback(() => setOpenBlockKey(""), []);
 
   return (
@@ -624,36 +608,20 @@ function DocumentPanels({ panels }) {
           <strong>No role holders or documents to show for the selected folders yet.</strong>
         </div>
       ) : (
-        <>
-          <div className="visit-dashboard-doc-filters" role="group" aria-label="Filter folders">
-            {filters.map((filter) => (
-              <button
-                type="button"
-                key={filter.key}
-                aria-pressed={activeFilter === filter.key}
-                onClick={() => setFilterKey(filter.key)}
-              >
-                {filter.label}
-                <span className="visit-dashboard-doc-filters__count">{counts[filter.key]}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="visit-dashboard-doc-grid">
-            {visibleBlocks.map((block) => (
-              <DocumentTile block={block} key={block.blockKey} onOpen={setOpenBlockKey} />
-            ))}
-          </div>
-        </>
+        <div className="visit-dashboard-doc-grid">
+          {blocks.map((block) => (
+            <DocumentTile block={block} key={block.blockKey} onOpen={setOpenBlockKey} />
+          ))}
+        </div>
       )}
 
       {openIndex >= 0 ? (
         <DocumentViewer
-          block={visibleBlocks[openIndex]}
+          block={blocks[openIndex]}
           position={openIndex + 1}
-          total={visibleBlocks.length}
-          previousBlock={visibleBlocks[(openIndex - 1 + visibleBlocks.length) % visibleBlocks.length]}
-          nextBlock={visibleBlocks[(openIndex + 1) % visibleBlocks.length]}
+          total={blocks.length}
+          previousBlock={blocks[(openIndex - 1 + blocks.length) % blocks.length]}
+          nextBlock={blocks[(openIndex + 1) % blocks.length]}
           onNavigate={setOpenBlockKey}
           onClose={closeViewer}
         />

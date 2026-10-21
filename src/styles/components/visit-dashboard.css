@@ -389,12 +389,6 @@
   content: "/";
 }
 
-.visit-dashboard-person-vacant {
-  color: var(--internal-text-muted);
-  font-weight: 700;
-  font-style: italic;
-}
-
 .visit-dashboard-role-code {
   flex: 0 0 auto;
   color: var(--internal-accent-secondary);
@@ -470,47 +464,7 @@ a.visit-dashboard-document-action:hover {
   white-space: nowrap;
 }
 
-/* BOD documents: filter chips + person tiles */
-.visit-dashboard-doc-filters {
-  margin: 0 0 1rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.visit-dashboard-doc-filters button {
-  min-height: 44px;
-  padding: 0 1rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  border: 1px solid var(--internal-border);
-  border-radius: 999px;
-  color: var(--internal-text-muted);
-  background: transparent;
-  font: inherit;
-  font-size: 0.86rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.visit-dashboard-doc-filters button[aria-pressed="true"] {
-  border-color: var(--internal-accent);
-  color: var(--internal-text);
-  background: rgba(229, 194, 104, 0.12);
-}
-
-.visit-dashboard-doc-filters button:focus-visible {
-  outline: 2px solid var(--internal-accent-secondary);
-  outline-offset: 2px;
-}
-
-.visit-dashboard-doc-filters__count {
-  color: var(--internal-accent-secondary);
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-}
-
+/* BOD documents: person tiles */
 .visit-dashboard-doc-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -562,10 +516,6 @@ a.visit-dashboard-document-action:hover {
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.visit-dashboard-doc-tile__name.visit-dashboard-person-vacant {
-  color: var(--internal-text-muted);
 }
 
 .visit-dashboard-doc-tile__count {

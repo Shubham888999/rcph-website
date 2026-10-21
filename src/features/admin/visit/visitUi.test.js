@@ -89,6 +89,27 @@ test("details keep file links when thumbnails fail and preserve optional folder 
   assert.match(detailsSource, /target="_blank" rel="noopener noreferrer"/);
 });
 
+test("folder holders get main presentation controls; folder admin tools stay manager-only", () => {
+  const start = moduleSource.indexOf("function FolderDetailWorkspaceView(");
+  const viewSource = moduleSource.slice(start, moduleSource.indexOf("\n}\n", start));
+  assert.ok(start >= 0);
+  assert.match(viewSource, /const canEditPrimary = canEditVisitPrimaryPresentation\(data\.access, folder\);/);
+  assert.match(viewSource, /canManagePrimaryPresentation=\{canEditPrimary\}/);
+  assert.match(viewSource, /\{canEditPrimary \? <button type="button" disabled=\{Boolean\(primarySelectionBusy\)\}[^\n]*"Change"/);
+  assert.match(viewSource, /canEditPrimary && data\.submissions\.some\(\(item\) => item\.canSetPrimaryPresentation\) \? \(\s*<p className="visit-subtle-note">No main presentation selected\. Use a document's action menu to set one\.<\/p>/);
+  assert.match(viewSource, /\{canManageFolder \? \(\s*<section className="visit-workspace-panel visit-maintenance-panel"[\s\S]*Folder settings[\s\S]*Reconcile counts/);
+  assert.doesNotMatch(viewSource, /canEditPrimary \? \(\s*<section className="visit-workspace-panel visit-maintenance-panel"/);
+  assert.match(moduleSource, /canManagePrimaryPresentation=\{canEditVisitPrimaryPresentation\(data\.access, folder\)\}/);
+  // Per-file actions still require the backend's per-file flag.
+  assert.match(detailsSource, /canManagePrimaryPresentation && item\.canSetPrimaryPresentation && !isPrimary/);
+});
+
+test("main presentation uses the holder-capable callable, not the manager-only folder update", () => {
+  const serviceSource = readFileSync(new URL("../shared/adminService.js", import.meta.url), "utf8");
+  assert.match(serviceSource, /setPrimaryPresentation: \(visitType, positionKey, submissionId = ""\) => callable\("setVisitSubmissionPrimaryPresentation", \{ visitType, positionKey, submissionId: submissionId \|\| "" \}\)/);
+  assert.match(serviceSource, /updateFolder: \(payload\) => callable\("updateVisitSubmissionFolder", payload\)/);
+});
+
 test("BOD Club Visits direct URL has its own capability guard", () => {
   assert.match(routerSource, /capability="visitSubmissions"[\s\S]*path: "\/admin\/visit-submissions"/);
 });

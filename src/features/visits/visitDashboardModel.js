@@ -653,6 +653,12 @@ export function groupDocumentPanelsByPerson(panels) {
     .map((entry) => entry.block);
 }
 
+// Visit dashboards show role holders only: vacant folders stay in Club Visits
+// (files untouched) but never get a tile, so Prev/Next skip them too.
+export function groupVisibleDocumentPanelsByPerson(panels) {
+  return groupDocumentPanelsByPerson(panels).filter((block) => !block.vacant);
+}
+
 // Section headings in the fixed admin group order; blocks keep their order.
 export function groupVisitDocumentBlocksBySection(blocks) {
   const sections = new Map();
@@ -694,53 +700,6 @@ export function getVisitDocumentRoleCode(panel) {
     panel,
     formatVisitAttendanceRoleCode(panel?.positionTitle || panel?.positionKey || panel?.avenueCode),
   );
-}
-
-export const VISIT_DOCUMENT_FILTERS = Object.freeze([
-  { key: "all", label: "All" },
-  { key: "core", label: "Core team" },
-  { key: "avenue", label: "Avenue directors" },
-  { key: "co", label: "Co-directors" },
-  { key: "support", label: "Support roles" },
-]);
-
-// Position keys come first because the display codes for co-positions are
-// irregular (Co-VP, CPRES, CSEC, CA, CR ...); codes are only a fallback.
-const CORE_DOCUMENT_POSITION_KEYS = new Set([
-  "president", "immediate-past-president", "vice-president", "secretary",
-  "joint-secretary", "treasurer", "club-advisor", "saa",
-]);
-const AVENUE_DOCUMENT_POSITION_KEYS = new Set(["csd", "cmd", "isd", "pdd", "dei", "pro", "rrro"]);
-const CORE_DOCUMENT_ROLE_CODES = new Set(["PRES", "IPP", "VP", "SEC", "JSEC", "TREAS", "ADV", "SAA"]);
-const AVENUE_DOCUMENT_ROLE_CODES = new Set(["CSD", "CMD", "ISD", "PDD", "DEI", "PRO", "RRRO"]);
-
-export function getVisitDocumentPanelFilterGroup(panel) {
-  const key = text(panel?.positionKey, 80).toLowerCase();
-  const code = getVisitDocumentRoleCode(panel).toUpperCase();
-  if (key.startsWith("co-") || code.startsWith("CO-")) return "co";
-  if (CORE_DOCUMENT_POSITION_KEYS.has(key) || CORE_DOCUMENT_ROLE_CODES.has(code)) return "core";
-  if (AVENUE_DOCUMENT_POSITION_KEYS.has(key) || AVENUE_DOCUMENT_ROLE_CODES.has(code)) return "avenue";
-  return "support";
-}
-
-// A person belongs to every group one of their roles matches.
-export function blockMatchesVisitDocumentFilter(block, filterKey) {
-  if (filterKey === "all") return true;
-  return (Array.isArray(block?.panels) ? block.panels : [])
-    .some((panel) => getVisitDocumentPanelFilterGroup(panel) === filterKey);
-}
-
-export function countVisitDocumentFilters(blocks) {
-  const list = Array.isArray(blocks) ? blocks : [];
-  return VISIT_DOCUMENT_FILTERS.reduce((counts, filter) => {
-    counts[filter.key] = list.filter((block) => blockMatchesVisitDocumentFilter(block, filter.key)).length;
-    return counts;
-  }, {});
-}
-
-// Keeps the incoming (hierarchy) order; filtering never reorders.
-export function filterVisitDocumentBlocks(blocks, filterKey) {
-  return (Array.isArray(blocks) ? blocks : []).filter((block) => blockMatchesVisitDocumentFilter(block, filterKey));
 }
 
 export function getVisitDocumentTileAriaLabel(block) {
