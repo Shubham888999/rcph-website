@@ -389,6 +389,22 @@
   text-align: center;
 }
 
+@container woh (max-width: 479px) {
+  .woh__eyebrow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .woh__eyebrow-separator {
+    display: none;
+  }
+
+  .woh__credits {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @container woh (min-width: 900px) {
   .woh__contrail {
     height: 22rem;

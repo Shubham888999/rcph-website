@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import {
   INSTAGRAM_HIGHLIGHT_URL,
+  LOGOS_ENABLED,
   SECTION_ID,
   STORY_COUNT,
   collaborators,
@@ -70,7 +71,7 @@ test("collaborator ribbon lists the host and all 13 collaborating clubs", () => 
   assert.equal(collaborators.filter((club) => club.host).length, 1);
   assert.equal(new Set(collaborators.map((club) => club.name)).size, 14);
   for (const club of collaborators) {
-    assert.equal(club.logo, `/media/wings-of-honour/logos/${club.slug}.webp`);
+    assert.equal(club.logo, LOGOS_ENABLED ? `/media/wings-of-honour/logos/${club.slug}.webp` : null);
   }
 });
 
