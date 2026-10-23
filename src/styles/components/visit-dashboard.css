@@ -2010,6 +2010,63 @@ a.visit-dashboard-document-action:hover {
   }
 }
 
+/* =========================================================
+   COLLABORATIONS (map + list)
+   ========================================================= */
+.visit-dashboard-collab-body {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.visit-dashboard-collab-note {
+  margin: 0;
+  color: var(--internal-text-muted);
+  font-size: 0.85rem;
+}
+
+.visit-dashboard-collab-list > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+}
+
+.visit-dashboard-collab-list > summary::-webkit-details-marker {
+  display: none;
+}
+
+.visit-dashboard-collab-list > summary:focus-visible {
+  outline: 2px solid var(--internal-accent);
+  outline-offset: 4px;
+}
+
+.visit-dashboard-collab-list[open] .visit-dashboard-records-chevron {
+  transform: rotate(45deg);
+}
+
+.visit-dashboard-collab-list .visit-dashboard-ledger-wrap {
+  margin-top: 0.75rem;
+}
+
+.visit-dashboard-collab-partners {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.visit-dashboard-collab-partners li + li {
+  margin-top: 0.35rem;
+}
+
+.visit-dashboard-collab-partners small {
+  display: block;
+  color: var(--internal-text-muted);
+}
+
 /* DZR Visit carrot theme. Every rule below is scoped to
    [data-visit-theme="carrot"], which only the DZR visit root carries.
    Fills (bars, chips, tags) use --visit-*-fill; text uses the --internal-*
