@@ -245,16 +245,12 @@ function DirectorSlide({ slide }) {
       <header className="visit-present__director-head">
         {/* Director and co-director are equal board members: same layout, same size, side by side. */}
         <div className="visit-present__presenters">
-          <div>
-            <p className="visit-present__eyebrow">{slide.role}</p>
-            <h2>{slide.title}</h2>
-          </div>
-          {slide.co ? (
-            <div>
-              <p className="visit-present__eyebrow">{slide.co.role}</p>
-              <h2>{slide.co.names.join(", ")}</h2>
+          {slide.presenters.map((person) => (
+            <div key={person.role}>
+              <p className="visit-present__eyebrow">{person.role}</p>
+              <h2>{person.names.join(", ")}</h2>
             </div>
-          ) : null}
+          ))}
         </div>
         {slide.file.openUrl ? (
           <a className="visit-present__link" href={slide.file.openUrl} target="_blank" rel="noopener noreferrer">

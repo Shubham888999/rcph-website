@@ -77,18 +77,30 @@ test("the co-director is named on the director's slide and their shared deck is 
 
   assert.equal(slides.length, 1);
   assert.equal(slides[0].title, "Rtr. Harshal Nikam");
-  assert.deepEqual(slides[0].co, { role: "Co-Club Service Director", names: ["Rtr. Shivani Kulkarni"] });
+  assert.deepEqual(slides[0].presenters.map((person) => person.names), [["Rtr. Harshal Nikam"], ["Rtr. Shivani Kulkarni"]]);
+  assert.match(slides[0].presenters[1].role, /Co-Club Service Director$/);
 
   const noCo = buildVisitPresentationSlides(sampleData()).filter((slide) => slide.kind === "director");
-  assert.ok(noCo.every((slide) => slide.co === null));
+  assert.ok(noCo.every((slide) => slide.presenters.length === 1));
 });
 
-test("a co-role keeps its own slide when the main role has no deck", () => {
+test("when only the co-director uploaded a deck, the director is still named first", () => {
   const slides = buildVisitPresentationSlides(sampleData({
-    documentPanels: [panel("csd", "Club Service Director", "Rtr. Harshal Nikam", null), panel("co-csd", "Co-Club Service Director", "Rtr. Shivani Kulkarni", "deck-co")],
+    documentPanels: [panel("cmd", "Community Service Director", "Rtr. Tanishka Patekar", null), panel("co-cmd", "Co-Community Service Director", "Rtr. Soumitra Lokur", "deck-co")],
   })).filter((slide) => slide.kind === "director");
 
-  assert.deepEqual(slides.map((slide) => slide.title), ["Rtr. Shivani Kulkarni"]);
+  assert.equal(slides.length, 1);
+  assert.deepEqual(slides[0].presenters.map((person) => person.names[0]), ["Rtr. Tanishka Patekar", "Rtr. Soumitra Lokur"]);
+  assert.equal(slides[0].title, "Rtr. Tanishka Patekar");
+  assert.match(slides[0].file.previewUrl, /\/deck-co\/preview$/);
+});
+
+test("a co-director gets a slide of their own only when the director's folder is not selected", () => {
+  const slides = buildVisitPresentationSlides(sampleData({
+    documentPanels: [panel("co-cmd", "Co-Community Service Director", "Rtr. Soumitra Lokur", "deck-co")],
+  })).filter((slide) => slide.kind === "director");
+
+  assert.deepEqual(slides.map((slide) => slide.presenters.map((person) => person.names[0])), [["Rtr. Soumitra Lokur"]]);
 });
 
 test("fines and treasury show every row, split across slides", () => {
