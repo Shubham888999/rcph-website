@@ -574,6 +574,8 @@
   width: auto;
   height: 100%;
   object-fit: contain;
+  /* Logos come on white; multiply lets the white take the ribbon colour. */
+  mix-blend-mode: multiply;
 }
 
 .woh-ribbon__of {
