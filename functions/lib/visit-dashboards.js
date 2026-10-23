@@ -1389,6 +1389,11 @@ function shapeFolderOption(raw, fallbackId = '', options = {}) {
 }
 
 const MAX_DASHBOARD_LETTERHEAD_EXCHANGES = 100;
+const MAX_DASHBOARD_COLLABORATIONS = 200;
+const MAX_COLLABORATION_PARTNERS = 20;
+const COLLABORATION_RCPH_ROLES = new Set(['host', 'cohost', 'collaborator', 'participant']);
+// RCPH's own name in free text ("Rotaract Club of Pune Heritage", "RCPH") is never a partner.
+const RCPH_CLUB_NAME_PATTERN = /\bpune\s+heritage\b|^\s*rcph\s*$/i;
 
 // Rotary year (RIY) runs 1 July - 30 June; dates are IST calendar days.
 function currentRotaryYearRange(nowValue = new Date()) {
@@ -1437,6 +1442,64 @@ function buildVisitDashboardLetterheadExchanges(docs, range) {
   return {
     letterheadExchanges: rows.slice(0, MAX_DASHBOARD_LETTERHEAD_EXCHANGES),
     letterheadExchangeSummary: { count: rows.length, clubCount: clubs.size },
+  };
+}
+
+function normalizeCollaborationRole(value) {
+  const cleaned = normalizeText(value, 40).toLowerCase();
+  return COLLABORATION_RCPH_ROLES.has(cleaned) ? cleaned : 'host';
+}
+
+function collaborationPartnerName(value) {
+  const raw = typeof value === 'string' ? value : value?.name;
+  return normalizeText(raw, 180).replace(/\s+/g, ' ');
+}
+
+// One club event that RCPH ran with, or joined at, another club. Only event facts and
+// partner club names leave the server; collaboration notes and people stay private.
+function shapeDashboardCollaboration(record) {
+  const event = recordData(record);
+  if (!isDashboardClubEvent(event)) return null;
+  const date = dateOnly(event.date || event.eventStart);
+  if (!date) return null;
+
+  const rcphRole = normalizeCollaborationRole(event.rcphRole);
+  const partners = [];
+  const seen = new Set();
+  const addPartner = (value, relation) => {
+    const name = collaborationPartnerName(value);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key) || RCPH_CLUB_NAME_PATTERN.test(name)) return;
+    seen.add(key);
+    partners.push({ name, relation });
+  };
+
+  // When RCPH did not host, the host club is a partner too.
+  if (rcphRole !== 'host') addPartner(event.hostClub, 'host');
+  (Array.isArray(event.collaborators) ? event.collaborators : [])
+    .forEach(item => addPartner(item, 'collaborator'));
+  if (!partners.length) return null;
+
+  return {
+    eventId: recordId(record),
+    name: normalizeText(event.name || event.title, 180),
+    date,
+    avenueCodes: resolveEventAvenueCodes(event),
+    rcphRole,
+    partners: partners.slice(0, MAX_COLLABORATION_PARTNERS),
+  };
+}
+
+function buildVisitDashboardCollaborations(docs, range) {
+  const rows = (Array.isArray(docs) ? docs : [])
+    .map(shapeDashboardCollaboration)
+    .filter(row => row && (!range || (row.date >= range.start && row.date <= range.end)))
+    .sort((a, b) => b.date.localeCompare(a.date) || a.eventId.localeCompare(b.eventId));
+  const clubs = new Set();
+  rows.forEach(row => row.partners.forEach(partner => clubs.add(partner.name.toLowerCase())));
+  return {
+    collaborations: rows.slice(0, MAX_DASHBOARD_COLLABORATIONS),
+    collaborationSummary: { eventCount: rows.length, clubCount: clubs.size },
   };
 }
 
@@ -1721,6 +1784,7 @@ function createVisitDashboardService(options = {}) {
       fines: buildVisitDashboardFines(fines),
       treasury: buildVisitDashboardTreasury(treasury),
       ...buildVisitDashboardLetterheadExchanges(letterheadExchangeDocs, rotaryYear),
+      ...buildVisitDashboardCollaborations(events, rotaryYear),
       generatedAt: new Date().toISOString(),
     };
   }
@@ -1802,6 +1866,7 @@ module.exports = {
   buildVisitDashboardAccess,
   buildVisitDashboardAttendance,
   buildDocumentPanels,
+  buildVisitDashboardCollaborations,
   buildVisitDashboardFines,
   buildVisitDashboardLetterheadExchanges,
   buildVisitDashboardTreasury,
