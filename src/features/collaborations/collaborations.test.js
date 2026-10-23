@@ -44,6 +44,14 @@ test("free-text collaborator names find the right club", () => {
     "Rotaract Club of Mumbai Juhu Youth": "mumbai-juhu-youth",
     "Rotaract club of LIA (Lead India Ahead)": "lead-india-ahead",
     "Rotaract Club of Pune Westside": "pune-westside",
+    "Rotaract Club of Mumbai Medico Marvels": "mumbai-medico-marvels",
+    "Rotaract Club of Pune Mdeast": "pune-mideast",
+    "Rotaract Club of Pune-Baner": "pune-baner",
+    "Rotaract Club of Pune Baner": "pune-baner",
+    "Rotaract Club of Pune Nigdi": "pune-nigdi",
+    "Rotaract Club of Pune Camp Pioneer": "pune-camp-pioneer",
+    "Rotary district 3131": "rotary-district-3131",
+    "Rotaract Club of Belgaum Yuva Darpan": "belgaum-yuva-darpan",
   };
   for (const [name, key] of Object.entries(cases)) {
     assert.equal(findClub(name)?.key, key, name);
@@ -80,6 +88,28 @@ test("unknown clubs stay listed as unplaced and repeat events do not duplicate",
   assert.equal(bengaluru.clubs.length, 1);
   assert.deepEqual(bengaluru.clubs[0].events.map((event) => event.eventId), ["a", "b"]);
   assert.equal(geography.summary.clubCount, 2);
+});
+
+test("a Rotary district is a partner but not counted as a club or district, and spellings merge", () => {
+  const geography = buildCollaborationGeography([
+    { eventId: "c", name: "CONCORD", date: "2026-09-06", rcphRole: "host", partners: [
+      { name: "Rotaract Club of Pune-Baner", relation: "collaborator" },
+      { name: "Rotaract Club of Pune Baner", relation: "collaborator" },
+      { name: "Rotary district 3131", relation: "collaborator" },
+    ] },
+  ]);
+
+  const pune = geography.cities.find((city) => city.key === "pune");
+  assert.equal(pune.clubCount, 1);
+  assert.deepEqual(pune.clubs.map((club) => [club.name, club.kind]), [["Pune Baner", "club"], ["Rotary District 3131", "organization"]]);
+  assert.equal(geography.summary.clubCount, 1);
+  assert.equal(geography.summary.districtCount, 1);
+});
+
+test("map legend names Pune and partner clubs without extra wording", () => {
+  assert.doesNotMatch(mapSource, /home of/);
+  assert.doesNotMatch(mapSource, /larger means/);
+  assert.match(mapSource, /Rotaract Club of \$\{club\.name\}/);
 });
 
 test("cities project inside the map", () => {

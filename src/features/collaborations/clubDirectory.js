@@ -1,4 +1,5 @@
 // Where partner clubs are based, so collaborations can be placed on the map.
+// Entries with kind "organization" (for example a Rotary district) are partners but not Rotaract clubs.
 // Collaborator names are typed freely in BOD tools ("RC RVCE", "Rotaract Club of R.V.C.E. (RID 3191)"),
 // so each club lists the name variants that should match it. To add a club, add an entry here;
 // to add a city, add it to CITIES first.
@@ -10,6 +11,7 @@ export const CITIES = Object.freeze({
   curchorem: { city: "Curchorem", state: "Goa", latitude: 15.2636, longitude: 74.108, labelSide: "left" },
   bhubaneswar: { city: "Bhubaneswar", state: "Odisha", latitude: 20.2961, longitude: 85.8245, labelSide: "right" },
   coimbatore: { city: "Coimbatore", state: "Tamil Nadu", latitude: 11.0168, longitude: 76.9558, labelSide: "right" },
+  belagavi: { city: "Belagavi", state: "Karnataka", latitude: 15.8497, longitude: 74.4977, labelSide: "right" },
 });
 
 // RCPH's home, the point every collaboration line starts from.
@@ -23,11 +25,25 @@ export const CLUB_DIRECTORY = Object.freeze([
   { key: "sspu", name: "SSPU", district: "RID 3131", cityKey: "pune", aliases: ["sspu", "symbiosis skills and professional university"] },
   { key: "gsmcoe", name: "GSMCOE", district: "RID 3131", cityKey: "pune", aliases: ["gsmcoe", "genba sopanrao moze college of engineering"] },
   { key: "roar-nibm", name: "Roar NIBM", district: "RID 3131", cityKey: "pune", aliases: ["roar nibm", "nibm"] },
+  { key: "pune-mideast", name: "Pune Mideast", district: "RID 3131", cityKey: "pune", aliases: ["pune mideast", "pune mdeast"] },
+  { key: "pune-baner", name: "Pune Baner", district: "RID 3131", cityKey: "pune", aliases: ["pune baner"] },
+  { key: "pune-nigdi", name: "Pune Nigdi", district: "RID 3131", cityKey: "pune", aliases: ["pune nigdi"] },
+  { key: "pune-camp-pioneer", name: "Pune Camp Pioneer", district: "RID 3131", cityKey: "pune", aliases: ["pune camp pioneer", "camp pioneer"] },
+  {
+    key: "rotary-district-3131",
+    name: "Rotary District 3131",
+    kind: "organization",
+    district: "RID 3131",
+    cityKey: "pune",
+    aliases: ["rotary district 3131", "rotary international district 3131"],
+  },
   { key: "mumbai-downtown", name: "Mumbai DownTown", district: "RID 3141", cityKey: "mumbai", aliases: ["mumbai downtown", "mumbai down town"] },
   { key: "mumbai-juhu-youth", name: "Mumbai Juhu Youth", district: "RID 3141", cityKey: "mumbai", aliases: ["mumbai juhu youth", "juhu youth"] },
+  { key: "mumbai-medico-marvels", name: "Mumbai Medico Marvels", district: "RID 3141", cityKey: "mumbai", aliases: ["mumbai medico marvels", "medico marvels"] },
   { key: "rvce", name: "RVCE", district: "RID 3191", cityKey: "bengaluru", aliases: ["rvce", "rv college of engineering"] },
   { key: "mount-carmel", name: "Mount Carmel", district: "RID 3191", cityKey: "bengaluru", aliases: ["mount carmel"] },
   { key: "curchorem-sanvordem", name: "Curchorem-Sanvordem", district: "RID 3170", cityKey: "curchorem", aliases: ["curchorem sanvordem", "curchorem"] },
+  { key: "belgaum-yuva-darpan", name: "Belgaum Yuva Darpan", district: "RID 3170", cityKey: "belagavi", aliases: ["belgaum yuva darpan", "belagavi yuva darpan", "yuva darpan"] },
   { key: "bhubaneshwar-jaydev", name: "Bhubaneshwar Jaydev", district: "RID 3262", cityKey: "bhubaneswar", aliases: ["bhubaneshwar jaydev", "bhubaneswar jaydev"] },
   // City to confirm: placed at Coimbatore, the centre of RID 3206.
   { key: "lead-india-ahead", name: "Lead India Ahead", district: "RID 3206", cityKey: "coimbatore", aliases: ["lead india ahead", "lia"] },

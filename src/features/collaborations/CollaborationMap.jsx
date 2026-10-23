@@ -54,12 +54,12 @@ function CityCard({ city, formatDate }) {
       <p className="collab-map__card-kicker">{city.state}</p>
       <h3 className="collab-map__card-title">{city.city}</h3>
       <p className="collab-map__card-count">
-        {city.clubs.length} {city.clubs.length === 1 ? "club" : "clubs"}
+        {city.clubCount} {city.clubCount === 1 ? "club" : "clubs"}
       </p>
       <ul className="collab-map__clubs">
         {city.clubs.map((club) => (
           <li key={club.key}>
-            <strong>Rotaract Club of {club.name}</strong>
+            <strong>{club.kind === "organization" ? club.name : `Rotaract Club of ${club.name}`}</strong>
             <span className="collab-map__club-district">{club.district}</span>
             <ul className="collab-map__events">
               {club.events.map((event) => (
@@ -81,7 +81,7 @@ function CityCard({ city, formatDate }) {
 // India map of collaborations: a home marker, a line to every partner city and a card per city.
 // `geography` comes from buildCollaborationGeography(); the component has no data source of its own,
 // so it can be reused on public pages.
-export default function CollaborationMap({ geography, homeLabel = "RCPH", formatDate = defaultFormatDate }) {
+export default function CollaborationMap({ geography, formatDate = defaultFormatDate }) {
   const [paths, setPaths] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [selectedKey, setSelectedKey] = useState(geography.cities[0]?.key || null);
@@ -137,7 +137,7 @@ export default function CollaborationMap({ geography, homeLabel = "RCPH", format
                 <path d="M0,-7 L2,-2 L7,-2 L3,1.5 L4.5,7 L0,3.6 L-4.5,7 L-3,1.5 L-7,-2 L-2,-2 Z" className="collab-map__home-star" />
               </g>
               {cities.map((city) => {
-                const radius = markerRadius(city.clubs.length);
+                const radius = markerRadius(city.clubCount);
                 const isHome = city.key === home.key;
                 const labelX = city.labelSide === "left" ? -(radius + 6) : radius + 6;
                 return (
@@ -154,7 +154,7 @@ export default function CollaborationMap({ geography, homeLabel = "RCPH", format
                       className="collab-map__label"
                     >
                       {city.city}
-                      <tspan className="collab-map__label-count"> {city.clubs.length}</tspan>
+                      <tspan className="collab-map__label-count"> {city.clubCount}</tspan>
                     </text>
                   </g>
                 );
@@ -179,7 +179,7 @@ export default function CollaborationMap({ geography, homeLabel = "RCPH", format
                   className="collab-map__hit"
                   style={{ left: percent(city.x, width), top: percent(city.y, height) }}
                   aria-pressed={city.key === selectedKey}
-                  aria-label={`${city.city}, ${city.clubs.length} ${city.clubs.length === 1 ? "club" : "clubs"}`}
+                  aria-label={`${city.city}, ${city.clubCount} ${city.clubCount === 1 ? "club" : "clubs"}`}
                   onClick={() => setSelectedKey(city.key)}
                   onMouseEnter={() => setSelectedKey(city.key)}
                 />
@@ -188,10 +188,10 @@ export default function CollaborationMap({ geography, homeLabel = "RCPH", format
         </div>
         <figcaption className="collab-map__legend">
           <span className="collab-map__legend-item">
-            <span className="collab-map__legend-home" aria-hidden="true" /> {home.city}, home of {homeLabel}
+            <span className="collab-map__legend-home" aria-hidden="true" /> {home.city}
           </span>
           <span className="collab-map__legend-item">
-            <span className="collab-map__legend-dot" aria-hidden="true" /> Partner clubs, larger means more clubs
+            <span className="collab-map__legend-dot" aria-hidden="true" /> Partner clubs
           </span>
         </figcaption>
         <p className="collab-map__credit">Map data: DataMeet, Survey of India outline (CC BY 2.5 India).</p>

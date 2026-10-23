@@ -33,19 +33,29 @@ export function buildCollaborationGeography(collaborations) {
         return;
       }
 
-      districts.add(club.district);
+      if (club.kind !== "organization") districts.add(club.district);
       const city = cities.get(club.cityKey) || { ...placeCity(club.cityKey), clubs: new Map() };
-      const clubEntry = city.clubs.get(club.key) || { key: club.key, name: club.name, district: club.district, events: [] };
+      const clubEntry = city.clubs.get(club.key) || {
+        key: club.key,
+        name: club.name,
+        kind: club.kind || "club",
+        district: club.district,
+        events: [],
+      };
       if (!clubEntry.events.some((item) => item.eventId === event.eventId)) clubEntry.events.push(event);
       city.clubs.set(club.key, clubEntry);
       cities.set(club.cityKey, city);
     });
   });
 
+  // Rotaract clubs first, then other partner organizations such as a Rotary district.
   const placedCities = [...cities.values()]
-    .map((city) => ({ ...city, clubs: [...city.clubs.values()].sort((a, b) => a.name.localeCompare(b.name)) }))
-    .sort((a, b) => b.clubs.length - a.clubs.length || a.city.localeCompare(b.city));
-  const clubCount = placedCities.reduce((total, city) => total + city.clubs.length, 0) + unplaced.size;
+    .map((city) => {
+      const clubs = [...city.clubs.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "club" ? -1 : 1));
+      return { ...city, clubs, clubCount: clubs.filter((club) => club.kind === "club").length };
+    })
+    .sort((a, b) => b.clubCount - a.clubCount || a.city.localeCompare(b.city));
+  const clubCount = placedCities.reduce((total, city) => total + city.clubCount, 0) + unplaced.size;
 
   return {
     home: getHomeCity(),
