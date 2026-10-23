@@ -698,6 +698,17 @@
   animation: woh-progress var(--woh-duration, 6s) linear forwards;
 }
 
+/* Keeps the club name and buttons readable over light story artwork. */
+.woh-viewer__frame::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  height: 6.5rem;
+  background: linear-gradient(180deg, rgba(5, 9, 16, 0.75), rgba(5, 9, 16, 0));
+  pointer-events: none;
+}
+
 .woh-viewer__top {
   position: absolute;
   top: 1.4rem;

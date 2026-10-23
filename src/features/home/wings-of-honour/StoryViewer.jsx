@@ -20,22 +20,74 @@ function describe(item) {
   return { title: `Rotaract Club of ${item.club}`, detail: item.district };
 }
 
-function StoryMedia({ item, soundOn, onProgress, onEnded }) {
+function SpeakerIcon({ muted }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 5 6 9H3v6h3l5 4V5Z" fill="currentColor" />
+      {muted ? (
+        <>
+          <path d="m16 9 5 6" />
+          <path d="m21 9-5 6" />
+        </>
+      ) : (
+        <>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// React only applies `muted` on first render, so sound is set on the element directly.
+// Playback starts with sound; if the browser refuses, it falls back to muted.
+function StoryVideo({ item, soundOn, onAutoplayMuted, onProgress, onEnded }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = !soundOn;
+    video.play().catch(() => {
+      video.muted = true;
+      onAutoplayMuted();
+      video.play().catch(() => {});
+    });
+    // Start playback once per story; later sound changes are handled below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = !soundOn;
+  }, [soundOn]);
+
+  return (
+    <video
+      ref={videoRef}
+      className="woh-viewer__media"
+      src={item.video}
+      poster={item.poster || undefined}
+      aria-label={item.alt}
+      playsInline
+      preload="auto"
+      onTimeUpdate={(event) => {
+        const { currentTime, duration } = event.currentTarget;
+        if (duration > 0) onProgress(currentTime / duration);
+      }}
+      onEnded={onEnded}
+    />
+  );
+}
+
+function StoryMedia({ item, soundOn, onAutoplayMuted, onProgress, onEnded }) {
   if (item.video) {
     return (
-      <video
-        className="woh-viewer__media"
-        src={item.video}
-        poster={item.poster || undefined}
-        aria-label={item.alt}
-        autoPlay
-        muted={!soundOn}
-        playsInline
-        preload="auto"
-        onTimeUpdate={(event) => {
-          const { currentTime, duration } = event.currentTarget;
-          if (duration > 0) onProgress(currentTime / duration);
-        }}
+      <StoryVideo
+        item={item}
+        soundOn={soundOn}
+        onAutoplayMuted={onAutoplayMuted}
+        onProgress={onProgress}
         onEnded={onEnded}
       />
     );
@@ -63,7 +115,7 @@ export default function StoryViewer({ items, index, timing, onIndexChange, onClo
   const closeButtonRef = useRef(null);
   const progressRef = useRef(null);
   const swipeRef = useRef({ startY: null, swiped: false });
-  const [soundOn, setSoundOn] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
 
   const showNext = useCallback(() => {
     if (index >= items.length - 1) onClose();
@@ -166,6 +218,7 @@ export default function StoryViewer({ items, index, timing, onIndexChange, onClo
           key={item.id}
           item={item}
           soundOn={soundOn}
+          onAutoplayMuted={() => setSoundOn(false)}
           onProgress={updateVideoProgress}
           onEnded={showNext}
         />
@@ -198,8 +251,13 @@ export default function StoryViewer({ items, index, timing, onIndexChange, onClo
           </p>
           <div className="woh-viewer__buttons">
             {item.video ? (
-              <button type="button" className="woh-viewer__button" aria-pressed={soundOn} onClick={() => setSoundOn((on) => !on)}>
-                {soundOn ? "Sound off" : "Sound on"}
+              <button
+                type="button"
+                className="woh-viewer__button"
+                aria-label={soundOn ? "Mute" : "Unmute"}
+                onClick={() => setSoundOn((on) => !on)}
+              >
+                <SpeakerIcon muted={!soundOn} />
               </button>
             ) : null}
             <button ref={closeButtonRef} type="button" className="woh-viewer__button" aria-label="Close stories" onClick={onClose}>

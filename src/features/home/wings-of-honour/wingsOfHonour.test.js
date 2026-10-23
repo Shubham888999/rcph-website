@@ -131,7 +131,8 @@ test("story viewer is an accessible modal", () => {
   assert.match(viewerSource, /event\.key === "Escape"/);
   assert.match(viewerSource, /event\.key === "ArrowRight"/);
   assert.match(viewerSource, /event\.key !== "Tab"/);
-  assert.match(viewerSource, /muted=\{!soundOn\}/);
+  assert.match(viewerSource, /video\.muted = !soundOn/);
+  assert.match(viewerSource, /aria-label=\{soundOn \? "Mute" : "Unmute"\}/);
   assert.match(viewerSource, /playsInline/);
 });
 
