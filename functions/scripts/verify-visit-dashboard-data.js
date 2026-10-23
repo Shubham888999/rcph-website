@@ -332,7 +332,7 @@ function assertOnlySafeDriveUrls(value, pathLabel = 'root') {
   }
   if (typeof value === 'string' && value.includes('drive.google.com')) {
     const isFolderOpenUrl = /^https:\/\/drive\.google\.com\/drive\/folders\/[A-Za-z0-9_-]+$/.test(value);
-    const isBillOpenUrl = pathLabel.endsWith('.billOpenUrl')
+    const isBillOpenUrl = (pathLabel.endsWith('.billOpenUrl') || /\.rows\[\d+\]\.proofOpenUrl$/.test(pathLabel))
       && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(value);
     const isDocumentOpenUrl = (
       /\.documentPanels\[\d+\]\.files\[\d+\]\.openUrl$/.test(pathLabel)
@@ -380,6 +380,36 @@ assert.equal('billDriveFileId' in districtDuesTreasury.rows[0], false, 'raw bill
 assert.equal('billUrl' in districtDuesTreasury.rows[0], false, 'raw bill URL hidden');
 assert.equal('billFolderUrl' in districtDuesTreasury.rows[0], false, 'bill folder URL hidden from treasury rows');
 assertNoSensitivePayload(districtDuesTreasury);
+
+const finesWithProof = dashboards.buildVisitDashboardFines([
+  {
+    id: 'fine-with-proof',
+    data: {
+      memberName: 'Proof Member',
+      reason: 'late',
+      amount: 50,
+      date: '2026-09-26',
+      treasuryEntryId: 'fine_fine-with-proof',
+      billUrl: 'https://drive.google.com/file/d/fine-proof-file-id/view?usp=drivesdk',
+      billDriveFileId: 'fine-proof-file-id',
+      billFolderUrl: 'https://drive.google.com/drive/folders/private-folder',
+      billUploadedByUid: 'private-uploader',
+    },
+  },
+  { id: 'fine-without-proof', data: { memberName: 'No Proof', reason: 'late', amount: 50, date: '2026-09-25' } },
+]);
+assert.equal(finesWithProof.rows[0].proofCanOpen, true, 'fine proof is shown');
+assert.equal(
+  finesWithProof.rows[0].proofOpenUrl,
+  'https://drive.google.com/file/d/fine-proof-file-id/view',
+  'fine proof uses the canonical Drive file URL'
+);
+assert.equal(finesWithProof.rows[1].proofCanOpen, false, 'fines without proof have no link');
+assert.equal(finesWithProof.rows[1].proofOpenUrl, '', 'fines without proof have an empty link');
+['billUrl', 'billDriveFileId', 'billFolderUrl', 'billUploadedByUid'].forEach((field) => {
+  assert.equal(field in finesWithProof.rows[0], false, `raw ${field} hidden from fine rows`);
+});
+assertNoSensitivePayload(finesWithProof);
 
 const finesSummary = dashboards.buildVisitDashboardFines([
   {
@@ -816,7 +846,7 @@ assertNoSensitivePayload(jointEventDashboard);
   );
   assert.deepEqual(
     Object.keys(districtByDefault.fines.rows[0]).sort(),
-    ['amount', 'date', 'fineKey', 'memberName', 'notes', 'reason', 'status', 'title'].sort()
+    ['amount', 'date', 'fineKey', 'memberName', 'notes', 'proofCanOpen', 'proofOpenUrl', 'reason', 'status', 'title'].sort()
   );
   assert.deepEqual(
     districtByDefault.documentPanels.map(panel => ({

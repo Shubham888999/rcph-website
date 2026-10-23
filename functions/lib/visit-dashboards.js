@@ -926,6 +926,8 @@ function shapeFineRow(doc) {
   const memberName = normalizeText(source.memberName || source.member || source.name, 160);
   const reason = fineReasonLabel(source.reason || source.title || source.description || source.eventName);
   if (amount === null || !date || !memberName || !reason) return null;
+  // Payment proof is saved on the Fine and its Treasury entry together (setFineProof).
+  const proofOpenUrl = driveFileOpenUrl(source);
   return {
     memberName,
     reason,
@@ -934,6 +936,8 @@ function shapeFineRow(doc) {
     status: normalizeFineStatus(source),
     date,
     notes: normalizeText(source.dashboardNotes || source.visitDashboardNotes || source.publicNotes, 500),
+    proofCanOpen: Boolean(proofOpenUrl),
+    proofOpenUrl,
   };
 }
 

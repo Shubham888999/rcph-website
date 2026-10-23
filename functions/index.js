@@ -67,6 +67,7 @@ const {
 const avenueReportingLocks = require('./lib/avenue-reporting-locks');
 const archivedEventLifecycle = require('./lib/archived-event-lifecycle');
 const systemLogs = require('./lib/system-logs');
+const fineProof = require('./lib/fine-proof');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 const {
   MemberProfileValidationError,
@@ -6587,6 +6588,81 @@ exports.deleteFine = onCall(
       fineId,
       treasuryDeleted,
     };
+  }
+);
+
+// Attaches, replaces or removes a Fine's payment proof. The file is already in
+// Drive (Treasury uploader); this saves its link on the Fine and on the linked
+// Treasury entry in one transaction, since Fine-linked Treasury entries are
+// backend-only in the Firestore rules.
+exports.setFineProof = onCall(
+  CALLABLE_OPTIONS,
+  async (request) => {
+    const actorUid = requireAuth(request);
+    const authority = await assertAdminOrPresidentAuthority(actorUid);
+    await assertApprovedActiveCallableAccount(actorUid);
+    await assertPanelUnlockedForRole('fines', authority, 'Fines');
+    await assertPanelUnlockedForRole('treasury', authority, 'Treasury');
+
+    const data = request.data || {};
+    const fineId = validateFineDocumentId(data.fineId);
+    const remove = data.remove === true;
+    const proof = remove
+      ? null
+      : fineProof.normalizeFineProof(data.proof, (code, message) => new HttpsError(code, message));
+
+    const fineRef = db.collection('fines').doc(fineId);
+    const auditRef = db.collection(ADMIN_MAINTENANCE_AUDIT_COLLECTION).doc();
+    const actorProfile = await getCallableUserProfile(actorUid, request);
+    let treasuryEntryId = '';
+
+    await db.runTransaction(async (tx) => {
+      const fineSnap = await tx.get(fineRef);
+      if (!fineSnap.exists) throw new HttpsError('not-found', 'Fine not found.');
+      const fineData = fineSnap.data() || {};
+
+      treasuryEntryId = normalizeText(fineData.treasuryEntryId, 128);
+      const treasuryRef = treasuryEntryId ? db.collection('treasury').doc(treasuryEntryId) : null;
+      const treasurySnap = treasuryRef ? await tx.get(treasuryRef) : null;
+      if (treasurySnap?.exists) {
+        const treasuryData = treasurySnap.data() || {};
+        if (treasuryData.source !== 'fine' || treasuryData.fineId !== fineId) {
+          throw new HttpsError('failed-precondition', 'The linked Treasury record does not match this Fine.');
+        }
+      }
+
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      const update = fineProof.buildFineProofUpdate({
+        proof,
+        actorUid,
+        actorName: actorProfile.name || '',
+        now,
+        deleteField: admin.firestore.FieldValue.delete(),
+      });
+
+      tx.update(fineRef, { ...update, updatedAt: now, updatedBy: actorUid });
+      if (treasurySnap?.exists) {
+        tx.update(treasuryRef, {
+          ...update,
+          updatedAt: now,
+          updatedByUid: actorUid,
+          updatedByName: actorProfile.name || '',
+        });
+      }
+
+      tx.set(auditRef, {
+        action: remove ? 'fine_proof_removed' : 'fine_proof_set',
+        actorUid,
+        actorRole: authority.role || '',
+        fineId,
+        treasuryEntryId: treasurySnap?.exists ? treasuryEntryId : null,
+        memberName: normalizeText(fineData.memberName, 160),
+        billDriveFileId: proof ? proof.billDriveFileId : null,
+        createdAt: now,
+      });
+    });
+
+    return { ok: true, fineId, removed: remove, treasuryEntryId: treasuryEntryId || null };
   }
 );
 
