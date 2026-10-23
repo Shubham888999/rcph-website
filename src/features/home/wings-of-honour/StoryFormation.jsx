@@ -6,6 +6,8 @@ const DRAG_STEP_PX = 110;
 const EAGER_CARD_COUNT = 3;
 const PHONE_VISIBLE_DEPTH = 3;
 const DESKTOP_VISIBLE_QUEUE = 5;
+// Cards this close to the front (or just behind it) fetch their image; the rest wait their turn.
+const PRELOAD_QUEUE = 7;
 
 function ChevronIcon({ direction }) {
   return (
@@ -27,6 +29,7 @@ function getCardLayout(index, lead, count) {
   return {
     queue,
     leaving,
+    near: queue <= PRELOAD_QUEUE || leaving,
     farPhone,
     farDesktop,
     style: {
@@ -55,9 +58,12 @@ function PlayIcon() {
 }
 
 // Shows the card image, or a placeholder when the image is missing or fails to load.
-function CardFace({ item, number, eager }) {
+// The image is only requested once the card first comes near the front, then kept.
+function CardFace({ item, number, eager, near }) {
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(item.card) && !failed;
+  const [activated, setActivated] = useState(near);
+  if (near && !activated) setActivated(true);
+  const showImage = Boolean(item.card) && !failed && activated;
 
   return (
     <>
@@ -237,7 +243,7 @@ export default function StoryFormation({ items, rotation, focusRequest, onOpen }
                 onClick={() => handleCardClick(index)}
                 onKeyDown={handleCardKeyDown}
               >
-                <CardFace item={item} number={index} eager={index < EAGER_CARD_COUNT} />
+                <CardFace item={item} number={index} eager={index < EAGER_CARD_COUNT} near={layout.near} />
               </button>
             );
           })}

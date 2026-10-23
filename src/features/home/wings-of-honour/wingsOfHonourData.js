@@ -90,8 +90,10 @@ const stories = Array.from({ length: STORY_COUNT }, (_, index) => {
 // The rotation order. The banner leads, then each story.
 export const formationItems = [banner, ...stories];
 
-// Ribbon of every participating club. Logos are picked up automatically from
-// public/media/wings-of-honour/logos/<slug>.webp; a missing logo shows the placeholder circle.
+// Ribbon of every participating club. With LOGOS_ENABLED, logos are picked up from
+// public/media/wings-of-honour/logos/<slug>.webp; a club without a file shows its name only.
+// Leave it false until the logo files are added, so the live site makes no requests for them.
+export const LOGOS_ENABLED = false;
 const LOGO_ROOT = `${MEDIA_ROOT}/logos`;
 
 export const collaborators = [
@@ -109,7 +111,7 @@ export const collaborators = [
   { slug: "rvce", name: "RVCE", district: "RID 3191" },
   { slug: "mount-carmel", name: "Mount Carmel (Deemed to be University)", district: "RID 3191" },
   { slug: "mumbai-downtown", name: "Mumbai DownTown", district: "RID 3141" },
-].map((club) => ({ ...club, logo: `${LOGO_ROOT}/${club.slug}.webp` }));
+].map((club) => ({ ...club, logo: LOGOS_ENABLED ? `${LOGO_ROOT}/${club.slug}.webp` : null }));
 
 export const timing = {
   autoAdvanceMs: 4200,
