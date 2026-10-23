@@ -93,7 +93,7 @@ export const formationItems = [banner, ...stories];
 // Ribbon of the collaborating clubs (RCPH hosts, so it is not listed). With LOGOS_ENABLED, logos are picked up from
 // public/media/wings-of-honour/logos/<slug>.webp; a club without a file shows its name only.
 // Leave it false until the logo files are added, so the live site makes no requests for them.
-export const LOGOS_ENABLED = false;
+export const LOGOS_ENABLED = true;
 const LOGO_ROOT = `${MEDIA_ROOT}/logos`;
 
 export const collaborators = [
