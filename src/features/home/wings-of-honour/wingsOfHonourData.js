@@ -18,9 +18,9 @@ export const eventDetails = {
   eyebrow: ["Tri-Service Tribute", "Indian Air Force Day, 8 October 2026"],
   title: "Wings of Honour",
   lede:
-    "On the 94th Indian Air Force Day, RCPH and 13 collaborating clubs came together on Instagram to thank the heroes who guard our skies, each in their own mother tongue.",
+    "On the 94th Indian Air Force Day, RCPH and 14 collaborating clubs came together on Instagram to thank the heroes who guard our skies, each in their own mother tongue.",
   stats: [
-    { value: "14", label: "clubs" },
+    { value: "14", label: "collaborating clubs" },
     { value: "6", label: "Rotaract districts" },
     { value: "11", label: "languages" },
   ],
@@ -110,6 +110,7 @@ export const collaborators = [
   { slug: "rvce", name: "RVCE", district: "RID 3191" },
   { slug: "mount-carmel", name: "Mount Carmel (Deemed to be University)", district: "RID 3191" },
   { slug: "mumbai-downtown", name: "Mumbai DownTown", district: "RID 3141" },
+  { slug: "mumbai-juhu-youth", name: "Mumbai Juhu Youth", district: "RID 3141" },
 ].map((club) => ({ ...club, logo: LOGOS_ENABLED ? `${LOGO_ROOT}/${club.slug}.webp` : null }));
 
 export const timing = {
