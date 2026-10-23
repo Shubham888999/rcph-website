@@ -90,23 +90,26 @@ const stories = Array.from({ length: STORY_COUNT }, (_, index) => {
 // The rotation order. The banner leads, then each story.
 export const formationItems = [banner, ...stories];
 
-// Ribbon of every participating club. Add a logo path (square PNG or WebP) to replace the placeholder circle.
+// Ribbon of every participating club. Logos are picked up automatically from
+// public/media/wings-of-honour/logos/<slug>.webp; a missing logo shows the placeholder circle.
+const LOGO_ROOT = `${MEDIA_ROOT}/logos`;
+
 export const collaborators = [
-  { name: "Pune Heritage", district: "Host · RID 3131", host: true, logo: null },
-  { name: "RSCOE", district: "RID 3131", logo: null },
-  { name: "Pune Westside", district: "RID 3131", logo: null },
-  { name: "Pune Shaniwarwada", district: "RID 3131", logo: null },
-  { name: "Pune Aurora", district: "RID 3131", logo: null },
-  { name: "SSPU", district: "RID 3131", logo: null },
-  { name: "GSMCOE", district: "RID 3131", logo: null },
-  { name: "Roar NIBM", district: "RID 3131", logo: null },
-  { name: "Bhubaneshwar Jaydev", district: "RID 3262", logo: null },
-  { name: "Lead India Ahead", district: "RID 3206", logo: null },
-  { name: "Curchorem-Sanvordem", district: "RID 3170", logo: null },
-  { name: "RVCE", district: "RID 3191", logo: null },
-  { name: "Mount Carmel (Deemed to be University)", district: "RID 3191", logo: null },
-  { name: "Mumbai DownTown", district: "RID 3141", logo: null },
-];
+  { slug: "pune-heritage", name: "Pune Heritage", district: "Host · RID 3131", host: true },
+  { slug: "rscoe", name: "RSCOE", district: "RID 3131" },
+  { slug: "pune-westside", name: "Pune Westside", district: "RID 3131" },
+  { slug: "pune-shaniwarwada", name: "Pune Shaniwarwada", district: "RID 3131" },
+  { slug: "pune-aurora", name: "Pune Aurora", district: "RID 3131" },
+  { slug: "sspu", name: "SSPU", district: "RID 3131" },
+  { slug: "gsmcoe", name: "GSMCOE", district: "RID 3131" },
+  { slug: "roar-nibm", name: "Roar NIBM", district: "RID 3131" },
+  { slug: "bhubaneshwar-jaydev", name: "Bhubaneshwar Jaydev", district: "RID 3262" },
+  { slug: "lead-india-ahead", name: "Lead India Ahead", district: "RID 3206" },
+  { slug: "curchorem-sanvordem", name: "Curchorem-Sanvordem", district: "RID 3170" },
+  { slug: "rvce", name: "RVCE", district: "RID 3191" },
+  { slug: "mount-carmel", name: "Mount Carmel (Deemed to be University)", district: "RID 3191" },
+  { slug: "mumbai-downtown", name: "Mumbai DownTown", district: "RID 3141" },
+].map((club) => ({ ...club, logo: `${LOGO_ROOT}/${club.slug}.webp` }));
 
 export const timing = {
   autoAdvanceMs: 4200,

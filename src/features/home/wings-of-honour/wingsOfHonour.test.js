@@ -69,6 +69,9 @@ test("collaborator ribbon lists the host and all 13 collaborating clubs", () => 
   assert.equal(collaborators.length, 14);
   assert.equal(collaborators.filter((club) => club.host).length, 1);
   assert.equal(new Set(collaborators.map((club) => club.name)).size, 14);
+  for (const club of collaborators) {
+    assert.equal(club.logo, `/media/wings-of-honour/logos/${club.slug}.webp`);
+  }
 });
 
 test("visible copy avoids em dashes", () => {

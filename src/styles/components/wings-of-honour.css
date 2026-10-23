@@ -514,22 +514,6 @@
   text-transform: uppercase;
 }
 
-.woh-ribbon__pause {
-  min-height: 2.75rem;
-  padding: 0 0.75rem;
-  border: 0;
-  border-radius: 0.5rem;
-  color: var(--woh-paper-ink);
-  background: transparent;
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.woh-ribbon__pause:hover {
-  background: rgba(26, 36, 54, 0.06);
-}
-
 .woh-ribbon__viewport {
   overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
@@ -542,7 +526,6 @@
   animation: woh-ribbon-scroll 70s linear infinite;
 }
 
-.woh-ribbon__track.is-paused,
 .woh-ribbon:hover .woh-ribbon__track {
   animation-play-state: paused;
 }
@@ -579,15 +562,23 @@
   text-transform: uppercase;
 }
 
-.woh-ribbon__logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.woh-ribbon__club.is-host .woh-ribbon__logo {
+  border-style: solid;
 }
 
-.woh-ribbon__club.is-host .woh-ribbon__logo,
+/* Real logos keep their own shape: fixed height, natural width. */
 .woh-ribbon__logo.has-image {
-  border-style: solid;
+  width: auto;
+  max-width: 7rem;
+  flex-basis: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.woh-ribbon__logo img {
+  width: auto;
+  height: 100%;
+  object-fit: contain;
 }
 
 .woh-ribbon__of {
@@ -804,15 +795,10 @@
 .woh__highlight-link:focus-visible,
 .woh-card:focus-visible,
 .woh-formation__control:focus-visible,
-.woh-ribbon__pause:focus-visible,
 .woh-viewer__button:focus-visible,
 .woh-viewer__tap:focus-visible {
   outline: 2px solid #f1e8d8;
   outline-offset: 3px;
-}
-
-.woh-ribbon__pause:focus-visible {
-  outline-color: var(--woh-paper-ink);
 }
 
 @keyframes woh-contrail-draw {
@@ -888,8 +874,7 @@
     row-gap: 1rem;
   }
 
-  .woh-ribbon__list + .woh-ribbon__list,
-  .woh-ribbon__pause {
+  .woh-ribbon__list + .woh-ribbon__list {
     display: none;
   }
 
