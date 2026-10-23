@@ -395,6 +395,22 @@ export function isReimbursementRecord(record) {
   return status !== "Not Applicable" || Boolean(text(record.reimbursedTo, 180) || validDate(text(record.reimbursementDate, 20)));
 }
 
+// The date a transaction reaches the club's accounts. A reimbursement marked Done
+// goes by the day the club repaid the member, as on the bank statement; everything
+// else, including Pending reimbursements, goes by its own date.
+export function treasuryLedgerDate(record = {}) {
+  const date = text(record?.date, 20);
+  if (!isReimbursementRecord(record) || normalizeReimbursementStatus(record.reimbursementStatus || record.reimburse) !== "Done") return date;
+  const repaid = text(record.reimbursementDate, 20);
+  return validDate(repaid) ? repaid : date;
+}
+
+// The original expense date, when the ledger shows a different (repayment) date.
+export function treasurySpentDate(record = {}) {
+  const date = text(record?.date, 20);
+  return validDate(date) && treasuryLedgerDate(record) !== date ? date : "";
+}
+
 export function workflowFromRecord(record) {
   if (!record) return "income";
   if (normalizeStoredType(record.type) === "income") return "income";
@@ -672,7 +688,7 @@ export function buildTreasurySummary(transactions = [], now = new Date()) {
   const income = transactions.filter((item) => item.type === "income").reduce((sum, item) => sum + item.amount, 0);
   const expense = transactions.filter((item) => item.type === "expense").reduce((sum, item) => sum + item.amount, 0);
   const pending = transactions.filter((item) => normalizeReimbursementStatus(item.reimbursementStatus) === "Pending");
-  const monthItems = transactions.filter((item) => text(item.date, 20).startsWith(monthKey));
+  const monthItems = transactions.filter((item) => treasuryLedgerDate(item).startsWith(monthKey));
   const monthIncome = monthItems.filter((item) => item.type === "income").reduce((sum, item) => sum + item.amount, 0);
   const monthExpense = monthItems.filter((item) => item.type === "expense").reduce((sum, item) => sum + item.amount, 0);
   return {
@@ -743,7 +759,7 @@ export function filterAndSortTreasury(transactions = [], filters = DEFAULT_TREAS
     if (filters.type === "income" && item.type !== "income") return false;
     if (filters.type === "expense" && (item.type !== "expense" || isReimbursementRecord(item))) return false;
     if (filters.type === "reimbursement" && !isReimbursementRecord(item)) return false;
-    if (filters.month && !text(item.date, 20).startsWith(filters.month)) return false;
+    if (filters.month && !treasuryLedgerDate(item).startsWith(filters.month)) return false;
     if (filters.avenue && normalizeTreasuryAvenue(item.avenue) !== normalizeTreasuryAvenue(filters.avenue)) return false;
     if (filters.paymentMode && item.paymentMode !== filters.paymentMode) return false;
     if (filters.reimbursementStatus && normalizeReimbursementStatus(item.reimbursementStatus) !== filters.reimbursementStatus) return false;
@@ -757,7 +773,7 @@ export function filterAndSortTreasury(transactions = [], filters = DEFAULT_TREAS
       const diff = (b.amount || 0) - (a.amount || 0);
       return sort === "amount-desc" ? diff : -diff;
     }
-    const diff = text(b.date, 20).localeCompare(text(a.date, 20));
+    const diff = treasuryLedgerDate(b).localeCompare(treasuryLedgerDate(a));
     return sort === "newest" ? diff : -diff;
   });
 }
@@ -765,7 +781,8 @@ export function filterAndSortTreasury(transactions = [], filters = DEFAULT_TREAS
 export function groupTreasuryByMonth(transactions = []) {
   const groups = new Map();
   transactions.forEach((item) => {
-    const key = validDate(text(item.date, 20)) ? item.date.slice(0, 7) : "undated";
+    const date = treasuryLedgerDate(item);
+    const key = validDate(date) ? date.slice(0, 7) : "undated";
     const current = groups.get(key) || { key, label: key === "undated" ? "Undated" : formatTreasuryMonth(key), income: 0, expense: 0, net: 0, items: [] };
     if (item.type === "income") current.income += item.amount;
     if (item.type === "expense") current.expense += item.amount;
@@ -777,7 +794,7 @@ export function groupTreasuryByMonth(transactions = []) {
 }
 
 export function getTreasuryMonthOptions(transactions = []) {
-  return [...new Set(transactions.map((item) => text(item.date, 20).slice(0, 7)).filter((value) => /^\d{4}-\d{2}$/.test(value)))]
+  return [...new Set(transactions.map((item) => treasuryLedgerDate(item).slice(0, 7)).filter((value) => /^\d{4}-\d{2}$/.test(value)))]
     .sort((a, b) => b.localeCompare(a))
     .map((value) => ({ value, label: formatTreasuryMonth(value) }));
 }

@@ -223,28 +223,64 @@
   letter-spacing: 0;
 }
 
+.visit-dashboard-avenue-range {
+  margin: 0.65rem 0 0;
+  color: var(--internal-text-muted);
+}
+
+/* Avenue rows by month, July to now. Every row shares one grid so the month
+   columns line up; the strip scrolls sideways on narrow screens. */
+.visit-dashboard-avenue-strip {
+  --strip-columns: minmax(8.5rem, 1fr) repeat(var(--strip-months, 1), minmax(2.4rem, 4.5rem)) 4.25rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.visit-dashboard-avenue-strip__inner {
+  min-width: calc(12.75rem + var(--strip-months, 1) * 2.55rem);
+}
+
+.visit-dashboard-avenue-strip__row {
+  display: grid;
+  grid-template-columns: var(--strip-columns);
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.visit-dashboard-avenue-strip__row.is-head,
+.visit-dashboard-avenue-strip__row.is-total {
+  padding: 0.35rem 0;
+  color: var(--internal-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.visit-dashboard-avenue-strip__row.is-head > :first-child,
+.visit-dashboard-avenue-strip__row.is-total > :first-child {
+  text-align: left;
+}
+
+.visit-dashboard-avenue-strip__row.is-total {
+  color: var(--internal-text);
+  font-size: 0.9rem;
+}
+
 .visit-dashboard-avenue-list {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 1.5rem;
+  grid-template-columns: 1fr;
+  gap: 0;
   list-style: none;
 }
 
 .visit-dashboard-avenue-list li {
   min-width: 0;
-  min-height: 2.15rem;
-  padding: 0.32rem 0;
-  display: flex;
-  gap: 0.55rem;
-  align-items: center;
-  justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.075);
-}
-
-.visit-dashboard-avenue-list li:first-child {
-  padding-top: 0.32rem;
 }
 
 .visit-dashboard-avenue-chip__label {
@@ -282,23 +318,10 @@
   text-align: right;
   white-space: nowrap;
 }
-.visit-dashboard-avenue-list li {
-  display: block;
-  min-height: 0;
-  padding: 0;
-}
-
-.visit-dashboard-avenue-disclosure {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
-}
 
 .visit-dashboard-avenue-disclosure summary {
-  min-height: 2.15rem;
-  padding: 0.32rem 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(3rem, 1fr) auto;
-  gap: 0.75rem;
-  align-items: center;
+  min-height: 2.6rem;
+  padding: 0.3rem 0;
   cursor: pointer;
   list-style: none;
 }
@@ -308,27 +331,46 @@
   outline-offset: 2px;
 }
 
-.visit-dashboard-avenue-bar {
-  height: 0.38rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.visit-dashboard-avenue-bar span {
-  height: 100%;
-  display: block;
-  border-radius: inherit;
-  background: var(--internal-accent-secondary);
-}
-
 .visit-dashboard-avenue-disclosure summary::-webkit-details-marker {
   display: none;
+}
+
+/* Heat cells: the fill is the accent mixed into the surface, so it stays opaque;
+   the two busiest levels switch to page-coloured text for contrast. */
+.visit-dashboard-avenue-cell {
+  min-height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-text-muted);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.visit-dashboard-avenue-cell.is-level-1 {
+  color: var(--internal-text);
+  background: color-mix(in srgb, var(--internal-accent) 22%, var(--internal-surface));
+}
+
+.visit-dashboard-avenue-cell.is-level-2 {
+  color: var(--internal-text);
+  background: color-mix(in srgb, var(--internal-accent) 45%, var(--internal-surface));
+}
+
+.visit-dashboard-avenue-cell.is-level-3 {
+  color: var(--internal-page-bg);
+  background: color-mix(in srgb, var(--internal-accent) 85%, var(--internal-surface));
+}
+
+.visit-dashboard-avenue-cell.is-level-4 {
+  color: var(--internal-page-bg);
+  background: var(--internal-accent);
 }
 
 .visit-dashboard-avenue-count-wrap {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.35rem;
   white-space: nowrap;
 }
@@ -347,6 +389,7 @@
 
 .visit-dashboard-avenue-event-list {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
   gap: 0.35rem;
   margin: 0.2rem 0 0.65rem;
   padding: 0;
@@ -368,14 +411,180 @@
   white-space: normal;
 }
 
-.visit-dashboard-avenue-event-list span,
-.visit-dashboard-avenue-empty {
+.visit-dashboard-avenue-event-list span {
   color: var(--internal-text-muted);
   font-size: 0.78rem;
+  white-space: nowrap;
 }
 
-.visit-dashboard-avenue-empty {
-  margin: 0.25rem 0 0.65rem;
+/* Attendance trend: one dot per record, Club and BOD lines. */
+.visit-trend {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0.5rem 0 1rem;
+  padding: 0.9rem 1rem 0.6rem;
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-card, 0.75rem);
+}
+
+.visit-trend--empty p {
+  margin: 0;
+  color: var(--internal-text-muted);
+}
+
+.visit-trend__head {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+}
+
+.visit-trend__legend {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 1.25rem;
+  color: var(--internal-text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.visit-trend__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.visit-trend__legend i {
+  width: 1.6rem;
+  border-top: 3px solid var(--trend-club);
+}
+
+.visit-trend__legend .is-bod i {
+  border-top-style: dashed;
+  border-top-color: var(--trend-bod);
+}
+
+.visit-trend__chart {
+  --trend-height: clamp(9rem, 24vw, 15rem);
+  position: relative;
+  padding: 0.5rem 0 1.6rem 2.6rem;
+}
+
+.visit-trend {
+  --trend-club: var(--internal-accent);
+  --trend-bod: var(--internal-accent-secondary);
+}
+
+.visit-trend__y,
+.visit-trend__x {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--internal-text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.visit-trend__y {
+  position: absolute;
+  top: 0.5rem;
+  left: 0;
+  width: 2.2rem;
+  height: var(--trend-height);
+}
+
+.visit-trend__y li {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+}
+
+.visit-trend__area {
+  position: relative;
+  height: var(--trend-height);
+}
+
+.visit-trend__grid {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--internal-border);
+}
+
+.visit-trend__month {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--internal-border);
+}
+
+.visit-trend__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.visit-trend__lines polyline {
+  fill: none;
+  stroke: var(--trend-club);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.visit-trend__lines polyline.is-bod {
+  stroke: var(--trend-bod);
+  stroke-dasharray: 6 5;
+}
+
+.visit-trend__dot {
+  position: absolute;
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 2px solid var(--internal-page-bg);
+  border-radius: 50%;
+  background: var(--trend-club);
+  transform: translate(-50%, 50%);
+}
+
+.visit-trend__dot.is-bod {
+  border-radius: 0;
+  background: var(--trend-bod);
+  transform: translate(-50%, 50%) rotate(45deg);
+}
+
+.visit-trend__x {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 2.6rem;
+  height: 1.2rem;
+}
+
+.visit-trend__x li {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.visit-trend.is-animated .visit-trend__area {
+  animation: visit-trend-draw 1.6s cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+@keyframes visit-trend-draw {
+  from {
+    clip-path: inset(-1rem 100% -1rem 0);
+  }
+
+  to {
+    clip-path: inset(-1rem 0 -1rem 0);
+  }
 }
 .visit-dashboard-glance,
 .visit-dashboard-documents,
@@ -954,6 +1163,7 @@ a.visit-dashboard-document-action:hover {
   max-width: 100%;
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-self: stretch;
   overflow: visible;
   box-sizing: border-box;
@@ -2029,6 +2239,23 @@ a.visit-dashboard-document-action:hover {
     grid-template-columns: 1fr;
   }
 
+  /* Phones: names wrap instead of truncating, and narrower columns fit four months. */
+  .visit-dashboard-avenue-strip {
+    --strip-columns: minmax(7rem, 1fr) repeat(var(--strip-months, 1), minmax(2.1rem, 3.5rem)) 2.75rem;
+  }
+
+  .visit-dashboard-avenue-strip__inner {
+    min-width: calc(9.75rem + var(--strip-months, 1) * 2.25rem);
+  }
+
+  .visit-dashboard-avenue-strip .visit-dashboard-avenue-list strong {
+    white-space: normal;
+  }
+
+  .visit-dashboard-avenue-strip .visit-dashboard-avenue-list small {
+    display: none;
+  }
+
   .visit-dashboard-avenue-event-list li {
     align-items: flex-start;
     flex-direction: column;
@@ -2227,7 +2454,7 @@ a.visit-dashboard-document-action:hover {
 }
 
 /* Glance: members, events, treasury */
-.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-glance-bar, .visit-dashboard-tree-bar, .visit-dashboard-avenue-bar) {
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-glance-bar, .visit-dashboard-tree-bar) {
   border-radius: 0;
   background: var(--visit-track);
 }
@@ -2251,13 +2478,9 @@ a.visit-dashboard-document-action:hover {
 }
 
 /* Carrot-tipped single-value bars */
-.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-tree-bar span, .visit-dashboard-avenue-bar span) {
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-bar span {
   border-radius: 0;
   clip-path: polygon(0 0, 94% 18%, 100% 50%, 94% 82%, 0 100%);
-}
-
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-bar span {
-  background: var(--visit-leaf-fill);
 }
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-tree-bar span {
@@ -2531,6 +2754,20 @@ a.visit-dashboard-document-action:hover {
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-avenue-event-list li {
   background: linear-gradient(var(--visit-faint), var(--visit-faint)), var(--internal-surface);
+}
+
+/* The strip's month header and total sit on the page: give them the same
+   surface and inset as the avenue rows so the columns line up. */
+.visit-dashboard-page[data-visit-theme="carrot"] :is(.visit-dashboard-avenue-strip__row.is-head, .visit-dashboard-avenue-strip__row.is-total) {
+  padding-inline: 0.65rem;
+  background: var(--internal-surface);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-trend {
+  border-radius: 0;
+  background: var(--internal-surface);
+  --trend-club: var(--visit-carrot-fill);
+  --trend-bod: var(--visit-leaf-fill);
 }
 
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-empty-state {

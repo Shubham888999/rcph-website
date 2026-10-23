@@ -982,6 +982,8 @@ function normalizeTreasuryRow(raw) {
     avenueCode: text(raw.avenueCode, 40).toUpperCase(),
     avenueName: text(raw.avenueName, 80),
     notes: text(raw.notes, 500),
+    // Repaid reimbursements are dated by repayment; this is the day the money was spent.
+    spentDate: dateOnly(raw.spentDate) !== date ? dateOnly(raw.spentDate) : "",
     billCanOpen: Boolean(billOpenUrl) && raw.billCanOpen !== false,
     billOpenUrl,
   };
@@ -1068,7 +1070,14 @@ function normalizeFineRow(raw, index = 0) {
     status: normalizeFineStatus(raw),
     date,
     notes: text(raw.notes || raw.note || raw.remarks, 500),
+    ...fineProof(raw),
   };
+}
+
+// Payment screenshot, the same file as the fine's Treasury entry bill.
+function fineProof(raw) {
+  const proofOpenUrl = normalizeDriveFileOpenUrlFromCandidates([raw.proofOpenUrl]);
+  return { proofCanOpen: Boolean(proofOpenUrl) && raw.proofCanOpen !== false, proofOpenUrl };
 }
 
 function summarizeFineRows(rows) {
@@ -1415,6 +1424,7 @@ export function getVisitAttendanceEventsForAvenue(attendance, row) {
       eventId: column.eventId,
       title: column.title,
       date: formatVisitDashboardDate(column.date) || column.date || "Date unavailable",
+      isoDate: column.date,
     }];
   });
 }

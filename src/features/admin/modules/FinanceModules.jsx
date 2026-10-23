@@ -8,7 +8,10 @@ import {
   findFineEventOption,
   formatInr,
 } from "../shared/adminModel";
-import { addFine, deleteFine, deleteTreasury, newTreasuryId, setTreasuryById, updateTreasury, uploadTreasuryBill } from "../shared/adminService";
+import { addFine, deleteFine, deleteTreasury, newTreasuryId, setTreasuryById, updateTreasury, uploadFineProof, uploadTreasuryBill } from "../shared/adminService";
+import FineProofDialog from "../fines/FineProofDialog";
+import RowActionsMenu from "../fines/RowActionsMenu";
+import { fineHasProof, fineProofTargetFromFine, fineProofTargetFromTreasury, isFineLinkedTreasury } from "../fines/fineProofModel";
 import useAdminMutation from "../shared/useAdminMutation";
 import TreasuryAttachments from "../treasury/TreasuryAttachments";
 import TreasuryFileField from "../treasury/TreasuryFileField";
@@ -40,6 +43,8 @@ import {
   createEmptyTreasuryDraft,
   filterAndSortTreasury,
   formatTreasuryDate,
+  treasuryLedgerDate,
+  treasurySpentDate,
   getTreasuryAvenueOptions,
   getTreasuryFieldPlan,
   getTreasuryMonthOptions,
@@ -89,6 +94,8 @@ const empty = {
 };
   const [draft, setDraft] = useState(empty);
   const [target, setTarget] = useState(null);
+  const [proofTarget, setProofTarget] = useState(null);
+  const [addUpload, setAddUpload] = useState(createTreasuryUploadState());
   const { busy, run } = useAdminMutation({ uid, module: "fines", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const total = fines.reduce((sum, fine) => sum + fine.amount, 0);
@@ -140,7 +147,7 @@ function selectEvent(value) {
     date: selected.date,
   });
 }
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     const member = members.find((item) => item.id === draft.memberId);
     const payload = buildFinePayload({ ...draft, memberName: member?.name || "" });
@@ -158,7 +165,30 @@ if (
 ) {
   return;
 }
-    run("add-fine", () => addFine(payload), "Fine added.").then((result) => { if (result) setDraft(empty); });
+    const file = addUpload.file;
+    const fileError = file ? validateTreasuryUploadFile(file) : "";
+    if (fileError) {
+      setAddUpload((current) => ({ ...current, error: fileError }));
+      return;
+    }
+    const created = await run("add-fine", () => addFine(payload), "Fine added.");
+    if (!created) return;
+    setDraft(empty);
+    if (!file) return;
+    // The screenshot is optional: if it fails, the fine stays and Manage can retry.
+    const proofFor = fineProofTargetFromFine({ ...payload, id: created.fineId, treasuryEntryId: created.treasuryEntryId });
+    await run(
+      "upload-fine-proof",
+      () => uploadFineProof(file, proofFor, (status) => setAddUpload((current) => ({ ...current, status, error: "" }))),
+      "Payment screenshot saved.",
+      {
+        onError(error) {
+          onNotice?.({ type: "error", message: `The fine was added, but its screenshot was not uploaded. ${getSafeTreasuryUploadError(error)} Use Manage on the fine to try again.` });
+          return true;
+        },
+      },
+    );
+    setAddUpload(createTreasuryUploadState());
   }
   return (
     <>
@@ -202,10 +232,51 @@ if (
 </label>
           <label>Date<input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} required /></label>
           <label>Amount INR<input type="number" min="0" step="1" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} required /></label>
-          <button disabled={locked || busy}>Add fine</button>
+          <button disabled={locked || busy || isTreasuryUploadWorking(addUpload)}>Add fine</button>
         </form>
+        <div className="fine-add-proof">
+          <TreasuryFileField
+            value={addUpload}
+            onChange={setAddUpload}
+            disabled={locked || busy}
+            heading="Payment screenshot (optional)"
+            helpText="Add a screenshot or PDF of the payment now, or later from Manage on the fine."
+          />
+        </div>
       </section>
-      {fines.length ? <div className="admin-table-wrap"><table><caption>Fine records</caption><thead><tr><th>Member</th><th>Amount</th><th>Reason</th><th>Event</th><th>Date</th><th>Action</th></tr></thead><tbody>{fines.map((fine) => <tr key={fine.id}><td>{formatRotaractorName(fine.memberName || fine.memberId, true)}</td><td>{formatInr(fine.amount)}</td><td>{fine.reason}</td><td>{fine.eventName}</td><td>{fine.date}</td><td><button className="danger" disabled={locked} onClick={() => setTarget(fine)}>Delete</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No fine records." />}
+      {fines.length ? (
+        <div className="admin-table-wrap">
+          <table>
+            <caption>Fine records</caption>
+            <thead><tr><th>Member</th><th>Amount</th><th>Reason</th><th>Event</th><th>Date</th><th>Screenshot</th><th>Action</th></tr></thead>
+            <tbody>
+              {fines.map((fine) => {
+                const name = formatRotaractorName(fine.memberName || fine.memberId, true);
+                return (
+                  <tr key={fine.id}>
+                    <td>{name}</td>
+                    <td>{formatInr(fine.amount)}</td>
+                    <td>{fine.reason}</td>
+                    <td>{fine.eventName}</td>
+                    <td>{fine.date}</td>
+                    <td>{fineHasProof(fine) ? <a href={fine.billUrl} target="_blank" rel="noopener noreferrer">View</a> : <span className="treasury-muted">None</span>}</td>
+                    <td>
+                      <RowActionsMenu
+                        label={`Actions for ${name}'s fine on ${fine.date}`}
+                        items={[
+                          { label: "Manage", onSelect: () => setProofTarget(fineProofTargetFromFine(fine)) },
+                          { label: "Delete", danger: true, disabled: locked, onSelect: () => setTarget(fine) },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : <AdminEmpty message="No fine records." />}
+      {proofTarget ? <FineProofDialog target={proofTarget} locked={locked} busy={busy} run={run} onClose={() => setProofTarget(null)} /> : null}
       {target ? <AdminDialog title="Permanently delete fine?" busy={busy} onClose={() => setTarget(null)}><p>This matches production behavior and cannot be undone.</p><div className="admin-actions"><button onClick={() => setTarget(null)}>Cancel</button><button className="danger" onClick={() => run("delete-fine", () => deleteFine(target.id), "Fine permanently deleted.").then((result) => { if (result !== null) setTarget(null); })}>Delete permanently</button></div></AdminDialog> : null}
     </>
   );
@@ -289,6 +360,7 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const [draftErrors, setDraftErrors] = useState({});
   const [draftUpload, setDraftUpload] = useState(createTreasuryUploadState);
   const [draftRecordId, setDraftRecordId] = useState("");
+  const [fineProofTarget, setFineProofTarget] = useState(null);
   const duesRowSequence = useRef(1);
   const [clubDuesMode, setClubDuesMode] = useState(false);
   const [duesRows, setDuesRows] = useState(() => [createClubDuesDraft({ clientId: "club-dues-1" })]);
@@ -927,11 +999,13 @@ async function exportBalanceSheet() {
   onDetails={setDetails}
   onEdit={startEdit}
   onDelete={setTarget}
+  onManageProof={(item) => setFineProofTarget(fineProofTargetFromTreasury(item))}
   exporting={exporting}
   onExportExcel={() => exportTreasury("excel")}
   onExportPdf={() => exportTreasury("pdf")}
   onExportBalanceSheet={openBalanceSheetExport}
 />
+{fineProofTarget ? <FineProofDialog target={fineProofTarget} locked={locked} busy={busy} run={run} onClose={() => setFineProofTarget(null)} /> : null}
 {balanceSheetDraft ? (
   <AdminDialog
     title="Export Treasury Balance Sheet"
@@ -1704,6 +1778,7 @@ function TreasuryHistory({
   onDetails,
   onEdit,
   onDelete,
+  onManageProof,
   exporting,
   onExportExcel,
   onExportPdf,
@@ -1772,7 +1847,7 @@ function TreasuryHistory({
                   <table>
                     <caption>{group.label} Treasury transactions</caption>
                     <thead><tr><th>Date</th><th>Transaction</th><th>Type</th><th>Amount</th><th>Party</th><th>Avenue</th><th>Payment mode</th><th>Reimbursement</th><th>File</th><th>Actions</th></tr></thead>
-                    <tbody>{group.items.map((item) => <TreasuryTableRow key={item.id} item={item} locked={locked} onDetails={onDetails} onEdit={onEdit} onDelete={onDelete} />)}</tbody>
+                    <tbody>{group.items.map((item) => <TreasuryTableRow key={item.id} item={item} locked={locked} onDetails={onDetails} onEdit={onEdit} onDelete={onDelete} onManageProof={onManageProof} />)}</tbody>
                   </table>
                 </div>
               </section>
@@ -1797,6 +1872,7 @@ function TreasuryHistory({
                       onDetails={() => runMobileAction(onDetails, item)}
                       onEdit={() => runMobileAction(onEdit, item)}
                       onDelete={() => runMobileAction(onDelete, item)}
+                      onManageProof={() => runMobileAction(onManageProof, item)}
                     />
                   ))}
                 </div>
@@ -1869,11 +1945,18 @@ function TreasuryFilterBar({ filters, monthOptions, avenueOptions, onFilter, onC
   );
 }
 
-function TreasuryTableRow({ item, locked, onDetails, onEdit, onDelete }) {
+// Repaid reimbursements are listed by the repayment date (as on the bank statement);
+// the day the member spent the money is shown underneath.
+function TreasurySpentNote({ item }) {
+  const spent = treasurySpentDate(item);
+  return spent ? <span className="treasury-muted">Spent {formatTreasuryDate(spent)}</span> : null;
+}
+
+function TreasuryTableRow({ item, locked, onDetails, onEdit, onDelete, onManageProof }) {
   const type = transactionTypeLabel(item);
   return (
     <tr>
-      <td>{formatTreasuryDate(item.date)}</td>
+      <td>{formatTreasuryDate(treasuryLedgerDate(item))}<TreasurySpentNote item={item} /></td>
       <td><strong>{item.title || "Untitled transaction"}</strong><span className="treasury-muted">{item.purpose || "No notes"}</span></td>
       <td><span className={`treasury-chip is-${type.toLowerCase()}`}>{type}</span></td>
       <td><span className={`treasury-amount is-${item.type}`}>{formatInr(item.amount)}</span></td>
@@ -1882,19 +1965,32 @@ function TreasuryTableRow({ item, locked, onDetails, onEdit, onDelete }) {
       <td>{item.paymentMode || "-"}</td>
       <td>{reimbursementLabel(item.reimbursementStatus)}</td>
       <td>{treasuryHasSupportingFile(item) ? <button type="button" onClick={() => onDetails(item)}>View</button> : <span className="treasury-muted">None</span>}</td>
-      <td><div className="treasury-row-actions"><button type="button" onClick={() => onDetails(item)}>Details</button><button type="button" disabled={locked} onClick={() => onEdit(item)}>Edit</button><button type="button" className="danger" disabled={locked} onClick={() => onDelete(item)}>Delete</button></div></td>
+      <td>
+        <div className="treasury-row-actions">
+          <button type="button" onClick={() => onDetails(item)}>Details</button>
+          {/* Fine entries are kept by Fines: only their payment screenshot is managed here. */}
+          {isFineLinkedTreasury(item) ? (
+            <button type="button" onClick={() => onManageProof(item)} title="Fine entry: edit or delete it from Fines">Screenshot</button>
+          ) : (
+            <>
+              <button type="button" disabled={locked} onClick={() => onEdit(item)}>Edit</button>
+              <button type="button" className="danger" disabled={locked} onClick={() => onDelete(item)}>Delete</button>
+            </>
+          )}
+        </div>
+      </td>
     </tr>
   );
 }
 
-function TreasuryMobileRow({ item, locked, menuOpen, menuRef, onToggleMenu, onDetails, onEdit, onDelete }) {
+function TreasuryMobileRow({ item, locked, menuOpen, menuRef, onToggleMenu, onDetails, onEdit, onDelete, onManageProof }) {
   const type = transactionTypeLabel(item);
   const party = compactTransactionParty(item);
   const menuId = `treasury-mobile-actions-${item.id}`;
   return (
     <article className={`treasury-mobile-row is-${item.type}`}>
       <div className="treasury-mobile-row__top">
-        <span className="treasury-mobile-row__date">{formatTreasuryDate(item.date)}</span>
+        <span className="treasury-mobile-row__date">{formatTreasuryDate(treasuryLedgerDate(item))}<TreasurySpentNote item={item} /></span>
         <span className={`treasury-chip is-${type.toLowerCase()}`}>{type}</span>
         <strong className={`treasury-mobile-row__amount treasury-amount is-${item.type}`}>{formatInr(item.amount)}</strong>
         <div className="treasury-mobile-row__actions" ref={menuRef}>
@@ -1912,8 +2008,14 @@ function TreasuryMobileRow({ item, locked, menuOpen, menuRef, onToggleMenu, onDe
           {menuOpen ? (
             <div className="treasury-mobile-row__menu" id={menuId} role="menu" aria-label="Transaction actions">
               <button type="button" role="menuitem" onClick={onDetails}>View details</button>
-              <button type="button" role="menuitem" disabled={locked} onClick={onEdit}>Edit transaction</button>
-              <button type="button" role="menuitem" className="danger" disabled={locked} onClick={onDelete}>Delete transaction</button>
+              {isFineLinkedTreasury(item) ? (
+                <button type="button" role="menuitem" onClick={onManageProof}>Manage screenshot</button>
+              ) : (
+                <>
+                  <button type="button" role="menuitem" disabled={locked} onClick={onEdit}>Edit transaction</button>
+                  <button type="button" role="menuitem" className="danger" disabled={locked} onClick={onDelete}>Delete transaction</button>
+                </>
+              )}
             </div>
           ) : null}
         </div>
@@ -1933,7 +2035,7 @@ function TreasuryDetails({ record }) {
   const rows = [
     ["Type", transactionTypeLabel(record)],
     ["Amount", formatInr(record.amount)],
-    ["Date", formatTreasuryDate(record.date)],
+    [treasurySpentDate(record) ? "Expense date" : "Date", formatTreasuryDate(record.date)],
     ["Party", transactionPartyLabel(record)],
     ["Avenue", normalizeTreasuryAvenue(record.avenue) || "Not recorded"],
     ["Purpose / notes", record.purpose || "Not recorded"],

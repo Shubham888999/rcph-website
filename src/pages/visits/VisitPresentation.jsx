@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import CollaborationMap from "../../features/collaborations/CollaborationMap.jsx";
+import AttendanceTrendChart from "../../features/visits/AttendanceTrendChart.jsx";
 import {
   formatVisitAttendanceName,
   formatVisitDashboardDate,
@@ -96,7 +97,7 @@ function GlanceSlide({ slide }) {
   return (
     <>
       <SlideHeading eyebrow="Overview" title={slide.title} />
-      <div className="visit-present__tiles">
+      <div className={slide.roster.length ? "visit-present__tiles is-compact" : "visit-present__tiles"}>
         <article className="visit-present__tile">
           <h3>Members</h3>
           <p className="visit-present__number"><CountUp value={members.total} /></p>
@@ -115,7 +116,28 @@ function GlanceSlide({ slide }) {
           <p>{treasury.line}</p>
         </article>
       </div>
+      {slide.roster.length ? <ClubRoster roster={slide.roster} /> : null}
     </>
+  );
+}
+
+// Every member, in board order, filling the rest of the slide. The text size
+// follows the number of rows so the whole club fits on one screen.
+function ClubRoster({ roster }) {
+  const columns = roster.length <= 32 ? 4 : roster.length <= 70 ? 5 : 6;
+  const rows = Math.ceil(roster.length / columns);
+  return (
+    <section className="visit-present__roster" aria-label={`Our members, ${plural(roster.length, "member")}`}>
+      <h3>Our RCPH family</h3>
+      <ol style={{ "--roster-columns": columns, "--roster-rows": rows }}>
+        {roster.map((member, index) => (
+          <li key={member.key} className={member.role === "GBM" ? "is-gbm" : "is-board"} style={{ "--roster-index": Math.min(index, 60) }}>
+            <span title={member.name}>{member.name}</span>
+            <b>{member.role}</b>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -139,7 +161,7 @@ function AttendanceSlide({ slide }) {
   return (
     <>
       <SlideHeading eyebrow="Overview" title={slide.title} />
-      <div className="visit-present__attendance">
+      <div className={slide.trend.hasPoints ? "visit-present__attendance is-compact" : "visit-present__attendance"}>
         {ATTENDANCE_NODES.map((node) => {
           const value = slide.tree[node.key];
           return (
@@ -152,23 +174,49 @@ function AttendanceSlide({ slide }) {
           );
         })}
       </div>
+      {slide.trend.hasPoints ? <AttendanceTrendChart trend={slide.trend} animated /> : null}
     </>
   );
 }
 
+// Months fill in left to right: each column's cells share a delay.
 function AvenuesSlide({ slide }) {
+  const { months, rows, totals, total } = slide.strip;
+  const range = months.length > 1 ? `${months[0].label} to ${months.at(-1).label}` : months[0].label;
   return (
     <>
-      <SlideHeading eyebrow="Club activity" title={slide.title} />
-      <ul className="visit-present__avenues">
-        {slide.rows.map((row) => (
-          <li key={row.avenueCode}>
-            <span className="visit-present__avenue-name">{row.avenueName}</span>
-            <Bar share={row.share} />
-            <strong>{row.eventCount}</strong>
-          </li>
-        ))}
-      </ul>
+      <SlideHeading eyebrow={`Club activity · ${range}`} title={slide.title} />
+      <div className="visit-present__strip-wrap">
+        <table className="visit-present__strip">
+          <thead>
+            <tr>
+              <th scope="col">Avenue</th>
+              {months.map((month) => <th scope="col" key={month.key}>{month.label}</th>)}
+              <th scope="col" className="is-number">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.avenueCode}>
+                <th scope="row">{row.avenueName}</th>
+                {row.counts.map((value, index) => (
+                  <td key={months[index].key} style={{ "--strip-col": index }}>
+                    <span className={`visit-present__cell is-level-${row.levels[index]}`}>{value || "·"}</span>
+                  </td>
+                ))}
+                <td className="is-number">{row.total}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Total</th>
+              {totals.map((value, index) => <td key={months[index].key}>{value || "·"}</td>)}
+              <td className="is-number">{total}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </>
   );
 }
@@ -218,16 +266,12 @@ function DirectorSlide({ slide }) {
       <header className="visit-present__director-head">
         {/* Director and co-director are equal board members: same layout, same size, side by side. */}
         <div className="visit-present__presenters">
-          <div>
-            <p className="visit-present__eyebrow">{slide.role}</p>
-            <h2>{slide.title}</h2>
-          </div>
-          {slide.co ? (
-            <div>
-              <p className="visit-present__eyebrow">{slide.co.role}</p>
-              <h2>{slide.co.names.join(", ")}</h2>
+          {slide.presenters.map((person) => (
+            <div key={person.role}>
+              <p className="visit-present__eyebrow">{person.role}</p>
+              <h2>{person.names.join(", ")}</h2>
             </div>
-          ) : null}
+          ))}
         </div>
         {slide.file.openUrl ? (
           <a className="visit-present__link" href={slide.file.openUrl} target="_blank" rel="noopener noreferrer">
