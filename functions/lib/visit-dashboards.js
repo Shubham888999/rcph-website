@@ -810,13 +810,26 @@ function isActiveTreasuryRecord(row) {
   );
 }
 
+const REIMBURSEMENT_DONE_STATUSES = new Set(['done', 'reimbursed', 'fully reimbursed', 'complete', 'completed']);
+
+// A reimbursement marked Done is listed on the day the club repaid the member, as on
+// the bank statement (same rule as treasuryLedgerDate in the Admin Treasury page).
+// Everything else, including Pending reimbursements, keeps its own date.
+function treasuryLedgerDate(source) {
+  const date = dateOnly(source.date);
+  const status = normalizeText(source.reimbursementStatus || source.reimburse, 80).toLowerCase();
+  if (normalizeTreasuryType(source.type) !== 'expense' || !REIMBURSEMENT_DONE_STATUSES.has(status)) return date;
+  return dateOnly(source.reimbursementDate) || date;
+}
+
 function shapeTreasuryRow(doc, index = 0) {
   const source = doc?.data && typeof doc.data === 'object'
     ? doc.data
     : (doc && typeof doc === 'object' ? doc : {});
   if (!isActiveTreasuryRecord(source)) return null;
   const amount = money(source.amount);
-  const date = dateOnly(source.date);
+  const date = treasuryLedgerDate(source);
+  const spentDate = dateOnly(source.date);
   const transactionId = normalizeSafeId(source.transactionId || source.id || doc?.id || `treasury-${index + 1}`, 180);
   const title = normalizeText(source.title || source.name || source.purpose || source.linkedEventName || 'Untitled transaction', 180);
   if (!transactionId || amount === null || !date || !title) return null;
@@ -833,6 +846,7 @@ function shapeTreasuryRow(doc, index = 0) {
     avenueCode,
     avenueName: avenueNameForCode(avenueCode),
     notes: normalizeText(source.notes || source.note || source.remarks, 500),
+    spentDate: spentDate && spentDate !== date ? spentDate : '',
     billCanOpen: Boolean(billOpenUrl),
     billOpenUrl,
   };

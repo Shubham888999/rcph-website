@@ -381,6 +381,20 @@ assert.equal('billUrl' in districtDuesTreasury.rows[0], false, 'raw bill URL hid
 assert.equal('billFolderUrl' in districtDuesTreasury.rows[0], false, 'bill folder URL hidden from treasury rows');
 assertNoSensitivePayload(districtDuesTreasury);
 
+// Reimbursements marked Done go by the repayment date (bank statement); Pending keep the expense date.
+const reimbursementTreasury = dashboards.buildVisitDashboardTreasury([
+  { id: 'done', data: { title: 'Decor', type: 'expense', amount: 500, date: '2026-09-28', reimbursementStatus: 'Done', reimbursedTo: 'Member', reimbursementDate: '2026-10-03' } },
+  { id: 'pending', data: { title: 'Snacks', type: 'expense', amount: 200, date: '2026-09-29', reimbursementStatus: 'Pending', reimbursedTo: 'Member' } },
+  { id: 'done-no-date', data: { title: 'Banner', type: 'expense', amount: 300, date: '2026-09-27', reimbursementStatus: 'Done' } },
+  { id: 'plain', data: { title: 'Hall', type: 'expense', amount: 900, date: '2026-09-30' } },
+]);
+const byId = Object.fromEntries(reimbursementTreasury.rows.map(row => [row.transactionId, row]));
+assert.deepEqual([byId.done.date, byId.done.spentDate], ['2026-10-03', '2026-09-28'], 'repaid reimbursement uses the repayment date');
+assert.deepEqual([byId.pending.date, byId.pending.spentDate], ['2026-09-29', ''], 'pending reimbursement keeps the expense date');
+assert.deepEqual([byId['done-no-date'].date, byId['done-no-date'].spentDate], ['2026-09-27', ''], 'missing repayment date falls back');
+assert.deepEqual([byId.plain.date, byId.plain.spentDate], ['2026-09-30', ''], 'other entries keep their date');
+assert.equal(reimbursementTreasury.rows[0].transactionId, 'done', 'rows sort by the ledger date');
+
 const finesWithProof = dashboards.buildVisitDashboardFines([
   {
     id: 'fine-with-proof',
@@ -787,6 +801,7 @@ assertNoSensitivePayload(jointEventDashboard);
       'date',
       'description',
       'notes',
+      'spentDate',
       'title',
       'transactionId',
       'type',
