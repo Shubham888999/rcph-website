@@ -1,0 +1,884 @@
+/* =========================================================
+   WINGS OF HONOUR (homepage tribute section)
+   Navy and parchment palette taken from the event banner.
+   Motion uses transform and opacity only.
+   ========================================================= */
+.woh {
+  --woh-bg-0: #0b1422;
+  --woh-bg-1: #13203a;
+  --woh-bg-2: #1f3150;
+  --woh-ink: #f1e8d8;
+  --woh-muted: #a9b4c4;
+  --woh-subtle: #8f9bb0;
+  --woh-accent: #d8b47a;
+  --woh-line: rgba(216, 180, 122, 0.3);
+  --woh-paper: #efe5d3;
+  --woh-paper-ink: #1a2436;
+  --woh-paper-muted: #545e70;
+  --woh-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  container-type: inline-size;
+  container-name: woh;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--woh-ink);
+  background: radial-gradient(110% 90% at 75% 25%, var(--woh-bg-2) 0%, var(--woh-bg-1) 50%, var(--woh-bg-0) 100%);
+}
+
+.woh__contrail {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 0;
+  width: 100%;
+  height: 9rem;
+  pointer-events: none;
+}
+
+.woh__contrail path {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.woh__contrail.is-drawing path {
+  animation:
+    woh-contrail-draw 3.2s cubic-bezier(0.45, 0.05, 0.25, 1) forwards,
+    woh-contrail-settle 2.4s ease 3.4s forwards;
+}
+
+.woh__contrail.is-drawing path:nth-child(2) {
+  animation-delay: 0.14s, 3.5s;
+}
+
+.woh__contrail.is-drawing path:nth-child(3) {
+  animation-delay: 0.28s, 3.6s;
+}
+
+.woh__contrail.is-static path {
+  stroke-dashoffset: 0;
+  opacity: 0.4;
+}
+
+.woh__inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.75rem;
+  width: min(var(--content-max-width), calc(100% - (2 * var(--page-gutter))));
+  margin-inline: auto;
+  padding-block: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.woh__eyebrow {
+  margin: 0 0 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--woh-accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.woh__eyebrow-separator {
+  opacity: 0.6;
+}
+
+.woh__title {
+  margin: 0;
+  color: var(--woh-ink);
+  font-family: Cinzel, Georgia, "Times New Roman", serif;
+  font-size: clamp(2.4rem, 6.4cqi, 4.2rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: 0.02em;
+}
+
+.woh__thanks {
+  min-height: 3.75rem;
+  margin: 0.75rem 0 0.25rem;
+  display: flex;
+  align-items: center;
+  color: var(--woh-accent);
+  font-size: clamp(1.6rem, 4.2cqi, 2.4rem);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.woh__thanks-word {
+  display: inline-block;
+  animation: woh-word-in 0.9s var(--woh-ease);
+}
+
+.woh__lede {
+  max-width: 46ch;
+  margin: 0.5rem 0 1.15rem;
+  color: var(--woh-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.woh__stats {
+  margin: 0 0 1.4rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.woh__stats strong {
+  color: var(--woh-accent);
+  font-weight: 700;
+}
+
+.woh__credits {
+  margin: 0 0 1.4rem;
+  padding: 0.9rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1.25rem;
+  border-top: 1px solid var(--woh-line);
+}
+
+.woh__credit--wide {
+  grid-column: 1 / -1;
+}
+
+.woh__credits dt {
+  color: var(--woh-subtle);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.woh__credits dd {
+  margin: 0.2rem 0 0;
+  color: var(--woh-ink);
+  font-size: 0.9rem;
+}
+
+.woh__highlight-link {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--woh-accent);
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+
+.woh__highlight-link:hover {
+  color: var(--woh-ink);
+}
+
+/* ---------------------------------------------------------
+   FORMATION
+   Phone: a V with the lead at the apex.
+   Desktop: a diagonal conveyor from the centre to the right edge.
+   --------------------------------------------------------- */
+.woh-formation {
+  --woh-sp: 4.5rem;
+  --woh-dy: 1.125rem;
+  --woh-card-w: 9.4rem;
+
+  position: relative;
+  height: 20.5rem;
+  touch-action: pan-y;
+  user-select: none;
+  cursor: grab;
+}
+
+.woh-formation.is-dragging {
+  cursor: grabbing;
+}
+
+.woh-formation__fleet {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.5s var(--woh-ease);
+}
+
+.woh-formation.is-dragging .woh-formation__fleet {
+  transition: none;
+}
+
+.woh-card {
+  position: absolute;
+  top: 1.6rem;
+  left: 50%;
+  z-index: var(--woh-zv);
+  width: var(--woh-card-w);
+  aspect-ratio: 9 / 16;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0.75rem;
+  color: #f1e8d8;
+  background: var(--woh-tone, #1f3150);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  opacity: var(--woh-ov);
+  box-shadow: 0 1.1rem 2.5rem rgba(0, 0, 0, 0.4);
+  transform:
+    translateX(-50%)
+    translateX(calc(var(--woh-sp) * var(--woh-r)))
+    translateY(calc(var(--woh-dy) * var(--woh-a) - var(--woh-lift)))
+    scale(calc(1 - 0.09 * var(--woh-a)));
+  transition:
+    transform 1s var(--woh-ease),
+    opacity 0.8s ease,
+    box-shadow 0.8s ease;
+}
+
+.woh-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #0b1422;
+  opacity: var(--woh-dim-v);
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+
+.woh-card.is-lead {
+  box-shadow:
+    0 1.6rem 3.75rem rgba(0, 0, 0, 0.55),
+    0 0 0 2px var(--woh-accent);
+}
+
+.woh-card.is-leaving {
+  transform: translateX(-50%) translateY(-2.9rem) scale(1.04);
+}
+
+.woh-card.is-far-phone,
+.woh-card.is-leaving {
+  pointer-events: none;
+}
+
+.woh-card--banner {
+  background-image: linear-gradient(180deg, #0b1422 0%, #1f3150 55%, #6b4a3a 100%);
+}
+
+.woh-card__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.woh-card__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background-image: linear-gradient(180deg, transparent 45%, rgba(5, 10, 20, 0.85) 100%);
+}
+
+.woh-card__tag {
+  color: rgba(241, 232, 216, 0.72);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.woh-card__face--media {
+  justify-content: flex-end;
+  align-items: flex-end;
+  background-image: linear-gradient(180deg, transparent 70%, rgba(5, 10, 20, 0.6) 100%);
+}
+
+.woh-card__face--media .woh-card__play {
+  align-self: flex-end;
+  width: 2rem;
+  height: 2rem;
+}
+
+.woh-card__play {
+  align-self: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: #d8b47a;
+}
+
+.woh-card__banner-title {
+  align-self: center;
+  color: #efe5d3;
+  font-family: Cinzel, Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.woh-card__banner-title small {
+  display: block;
+  margin-top: 0.5rem;
+  color: #d8b47a;
+  font-family: inherit;
+  font-size: 0.56rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.woh-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.woh-card__of {
+  color: #a9b4c4;
+  font-size: 0.62rem;
+}
+
+.woh-card__club {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.woh-card__detail {
+  color: #d8b47a;
+  font-size: 0.7rem;
+}
+
+.woh-formation__controls {
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--woh-muted);
+  font-size: 0.82rem;
+}
+
+.woh-formation__control {
+  min-width: 2.75rem;
+  height: 2.75rem;
+  padding: 0 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.5rem;
+  color: var(--woh-ink);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.woh-formation__control:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.woh-formation__count {
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+@container woh (max-width: 479px) {
+  .woh__eyebrow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .woh__eyebrow-separator {
+    display: none;
+  }
+
+  .woh__credits {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container woh (min-width: 900px) {
+  .woh__contrail {
+    height: 22rem;
+  }
+
+  .woh__inner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 2.5rem;
+  }
+
+  .woh__stage-column {
+    margin-right: calc((min(var(--content-max-width), 100cqi - (2 * var(--page-gutter))) - 100cqi) / 2);
+  }
+
+  .woh-formation {
+    container-type: inline-size;
+    container-name: woh-formation;
+    height: 40rem;
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 80%, transparent 100%);
+    mask-image: linear-gradient(90deg, #000 0, #000 80%, transparent 100%);
+  }
+
+  .woh-formation__controls {
+    justify-content: flex-start;
+  }
+}
+
+@container woh-formation (min-width: 1px) {
+  .woh-card {
+    top: 2.1rem;
+    left: 0;
+    z-index: var(--woh-zd);
+    width: 18.75rem;
+    opacity: var(--woh-od);
+    transform-origin: 0 0;
+    transform:
+      translate(
+        calc((100cqi - 6.75rem) / 4 * var(--woh-q)),
+        calc(2.6rem * var(--woh-q) - var(--woh-lift))
+      )
+      scale(calc(1 - 0.07 * var(--woh-q)));
+  }
+
+  .woh-card.is-leaving {
+    transform: translate(-2.5rem, -1.5rem) scale(1.03);
+  }
+
+  .woh-card::after {
+    opacity: var(--woh-dim-d);
+  }
+
+  .woh-card.is-far-phone {
+    pointer-events: auto;
+  }
+
+  .woh-card.is-far-desktop {
+    pointer-events: none;
+  }
+
+  .woh-card__face {
+    padding: 1.1rem;
+  }
+
+  .woh-card__tag {
+    font-size: 0.7rem;
+  }
+
+  .woh-card__play {
+    width: 3.75rem;
+    height: 3.75rem;
+  }
+
+  .woh-card__banner-title {
+    font-size: 2.25rem;
+  }
+
+  .woh-card__banner-title small {
+    font-size: 0.7rem;
+  }
+
+  .woh-card__of {
+    font-size: 0.75rem;
+  }
+
+  .woh-card__club {
+    font-size: 1.25rem;
+  }
+
+  .woh-card__detail {
+    font-size: 0.88rem;
+  }
+}
+
+/* ---------------------------------------------------------
+   COLLABORATOR RIBBON
+   --------------------------------------------------------- */
+.woh-ribbon {
+  position: relative;
+  z-index: 1;
+  padding: 0.85rem 0 1.1rem;
+  color: var(--woh-paper-ink);
+  background: var(--woh-paper);
+}
+
+.woh-ribbon__head {
+  width: min(var(--content-max-width), calc(100% - (2 * var(--page-gutter))));
+  margin: 0 auto 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.woh-ribbon__title {
+  margin: 0;
+  color: var(--woh-paper-ink);
+  font-size: 0.76rem;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+
+.woh-ribbon__viewport {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+
+.woh-ribbon__track {
+  width: max-content;
+  display: flex;
+  /* The moving track is its own layer; giving it the ribbon colour lets the logo blend work. */
+  background: var(--woh-paper);
+  animation: woh-ribbon-scroll 70s linear infinite;
+}
+
+.woh-ribbon:hover .woh-ribbon__track {
+  animation-play-state: paused;
+}
+
+.woh-ribbon__list {
+  margin: 0;
+  padding: 0 2.75rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 2.75rem;
+  list-style: none;
+}
+
+.woh-ribbon__club {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Logos keep their own shape: fixed height, natural width. */
+.woh-ribbon__logo {
+  height: 2.75rem;
+  max-width: 7rem;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.woh-ribbon__logo img {
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+  /* Logos come on white; multiply lets the white take the ribbon colour. */
+  mix-blend-mode: multiply;
+}
+
+.woh-ribbon__of {
+  display: block;
+  color: var(--woh-paper-muted);
+  font-size: 0.62rem;
+}
+
+.woh-ribbon__name {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.woh-ribbon__district {
+  display: block;
+  color: var(--woh-paper-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+/* ---------------------------------------------------------
+   STORY VIEWER
+   --------------------------------------------------------- */
+.woh-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 9, 16, 0.95);
+  animation: woh-fade-in 0.35s ease;
+}
+
+.woh-viewer__frame {
+  position: relative;
+  height: min(92dvh, calc(100vw * 16 / 9));
+  max-width: 100vw;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: 0.875rem;
+  color: #f1e8d8;
+  background: var(--woh-tone, #13203a);
+  touch-action: none;
+}
+
+.woh-viewer__frame--banner {
+  background-image: linear-gradient(180deg, #0b1422 0%, #1f3150 55%, #6b4a3a 100%);
+}
+
+.woh-viewer__media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.woh-viewer__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.woh-viewer__placeholder-word {
+  color: #d8b47a;
+  font-size: 2.5rem;
+}
+
+.woh-viewer__placeholder-note {
+  color: rgba(241, 232, 216, 0.7);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.woh-viewer__bars {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  left: 0.625rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.woh-viewer__bar {
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(241, 232, 216, 0.3);
+}
+
+.woh-viewer__bar-fill {
+  display: block;
+  height: 100%;
+  background: #f1e8d8;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.woh-viewer__bar.is-done .woh-viewer__bar-fill {
+  transform: scaleX(1);
+}
+
+.woh-viewer__bar.is-timed .woh-viewer__bar-fill {
+  animation: woh-progress var(--woh-duration, 6s) linear forwards;
+}
+
+/* Keeps the club name and buttons readable over light story artwork. */
+.woh-viewer__frame::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  height: 6.5rem;
+  background: linear-gradient(180deg, rgba(5, 9, 16, 0.75), rgba(5, 9, 16, 0));
+  pointer-events: none;
+}
+
+.woh-viewer__top {
+  position: absolute;
+  top: 1.4rem;
+  right: 0.5rem;
+  left: 0.75rem;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.woh-viewer__who {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.woh-viewer__who small {
+  display: block;
+  color: #d8b47a;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.woh-viewer__buttons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.woh-viewer__button {
+  min-width: 2.75rem;
+  height: 2.75rem;
+  padding: 0 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.5rem;
+  color: #f1e8d8;
+  background: rgba(0, 0, 0, 0.4);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.woh-viewer__tap {
+  position: absolute;
+  top: 5rem;
+  bottom: 0;
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.woh-viewer__tap--prev {
+  left: 0;
+  width: 32%;
+}
+
+.woh-viewer__tap--next {
+  right: 0;
+  width: 68%;
+}
+
+.woh-viewer__hint {
+  position: absolute;
+  right: 0;
+  bottom: 0.9rem;
+  left: 0;
+  z-index: 3;
+  margin: 0;
+  color: rgba(241, 232, 216, 0.65);
+  font-size: 0.7rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   FOCUS, KEYFRAMES, REDUCED MOTION
+   --------------------------------------------------------- */
+.woh__highlight-link:focus-visible,
+.woh-card:focus-visible,
+.woh-formation__control:focus-visible,
+.woh-viewer__button:focus-visible,
+.woh-viewer__tap:focus-visible {
+  outline: 2px solid #f1e8d8;
+  outline-offset: 3px;
+}
+
+@keyframes woh-contrail-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes woh-contrail-settle {
+  to {
+    opacity: 0.35;
+  }
+}
+
+@keyframes woh-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes woh-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes woh-progress {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes woh-ribbon-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .woh__thanks-word,
+  .woh-viewer {
+    animation: none;
+  }
+
+  .woh-card,
+  .woh-formation__fleet {
+    transition: none;
+  }
+
+  .woh-ribbon__track {
+    width: auto;
+    animation: none;
+  }
+
+  .woh-ribbon__list {
+    padding: 0 var(--page-gutter);
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 1rem;
+  }
+
+  .woh-ribbon__list + .woh-ribbon__list {
+    display: none;
+  }
+
+  .woh-ribbon__viewport {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}

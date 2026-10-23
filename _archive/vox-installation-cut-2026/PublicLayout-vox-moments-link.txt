@@ -1,0 +1,21 @@
+
+            <span className="public-brand-copy">
+              <strong>RCPH</strong>
+              <small>Rotaract Club of Pune Heritage</small>
+            </span>
+          </NavLink>
+
+          <Link
+            className="public-vox-link"
+            to={VOX_MOMENTS_TARGET}
+            aria-label="View the newly released VOX &rsquo;26 Installation moments"
+            onClick={closeMenu}
+          >
+            <span className="public-vox-link__event">VOX &rsquo;26</span>
+            <span className="public-vox-link__divider" aria-hidden="true" />
+            <span className="public-vox-link__live">
+              <span className="public-vox-link__live-dot" aria-hidden="true" />
+              MOMENTS LIVE
+            </span>
+          </Link>
+

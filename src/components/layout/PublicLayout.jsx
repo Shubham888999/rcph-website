@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-
-const VOX_MOMENTS_TARGET = "/#installation-cut";
+import { featuredEventBadge } from "../../features/home/wings-of-honour/wingsOfHonourData";
 const HASH_SCROLL_MAX_ATTEMPTS = 24;
 const HASH_SCROLL_OFFSET = 16;
 
@@ -135,16 +134,14 @@ export default function PublicLayout() {
           </NavLink>
 
           <Link
-            className="public-vox-link"
-            to={VOX_MOMENTS_TARGET}
-            aria-label="View the newly released VOX &rsquo;26 Installation moments"
+            className="public-event-link"
+            to={featuredEventBadge.to}
+            aria-label={featuredEventBadge.ariaLabel}
             onClick={closeMenu}
           >
-            <span className="public-vox-link__event">VOX &rsquo;26</span>
-            <span className="public-vox-link__divider" aria-hidden="true" />
-            <span className="public-vox-link__live">
-              <span className="public-vox-link__live-dot" aria-hidden="true" />
-              MOMENTS LIVE
+            <span className="public-event-link__live">
+              <span className="public-event-link__live-dot" aria-hidden="true" />
+              {featuredEventBadge.label}
             </span>
           </Link>
 
