@@ -94,6 +94,27 @@ export async function deleteFine(id) {
     fineId: id,
   });
 }
+// Payment proof for a Fine: uploaded with the Treasury uploader, then saved on the
+// Fine and its linked Treasury entry by the backend (Fine-linked entries are backend-only).
+export async function setFineProof(fineId, proof) {
+  requireUser();
+  return callable("setFineProof", { fineId, proof });
+}
+
+export async function removeFineProof(fineId) {
+  requireUser();
+  return callable("setFineProof", { fineId, remove: true });
+}
+
+export async function uploadFineProof(file, target, onStatus) {
+  const proof = { ...(await uploadTreasuryBill(file, target.transaction, target.transactionId, onStatus)) };
+  // The backend stamps the upload time itself.
+  delete proof.billUploadedAt;
+  onStatus?.("processing");
+  await setFineProof(target.fineId, proof);
+  return proof;
+}
+
 export async function addTreasury(payload) { requireUser(); const target = doc(collection(db, "treasury")); await setDoc(target, { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); return target.id; }
 export function newTreasuryId() { requireUser(); return doc(collection(db, "treasury")).id; }
 export async function setTreasuryById(id, payload) { requireUser(); await setDoc(doc(db, "treasury", id), { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); return id; }

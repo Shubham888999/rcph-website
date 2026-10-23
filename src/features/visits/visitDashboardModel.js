@@ -1068,7 +1068,14 @@ function normalizeFineRow(raw, index = 0) {
     status: normalizeFineStatus(raw),
     date,
     notes: text(raw.notes || raw.note || raw.remarks, 500),
+    ...fineProof(raw),
   };
+}
+
+// Payment screenshot, the same file as the fine's Treasury entry bill.
+function fineProof(raw) {
+  const proofOpenUrl = normalizeDriveFileOpenUrlFromCandidates([raw.proofOpenUrl]);
+  return { proofCanOpen: Boolean(proofOpenUrl) && raw.proofCanOpen !== false, proofOpenUrl };
 }
 
 function summarizeFineRows(rows) {

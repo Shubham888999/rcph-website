@@ -1066,7 +1066,7 @@ function Collaborations({ collaborations }) {
 
 function FinesRecords({ fines }) {
   const showNotes = finesHasNotes(fines.rows);
-  const columnCount = showNotes ? 7 : 6;
+  const columnCount = showNotes ? 8 : 7;
   return (
     <RecordsDisclosure
       id="visit-dashboard-fines"
@@ -1093,6 +1093,7 @@ function FinesRecords({ fines }) {
                 <th scope="col">Event</th>
                 <th scope="col" className="is-number">Amount</th>
                 <th scope="col">Status</th>
+                <th scope="col">Proof</th>
                 {showNotes ? <th scope="col">Notes</th> : null}
               </tr>
             </thead>
@@ -1109,6 +1110,21 @@ function FinesRecords({ fines }) {
                     <td>{fine.title && fine.title !== fine.reason ? fine.title : "—"}</td>
                     <td className="is-number">{rupees(fine.amount)}</td>
                     <td className={`visit-dashboard-fines-status is-${statusClass}`}>{fineStatusLabel(statusClass)}</td>
+                    <td className="visit-dashboard-bill-cell">
+                      {fine.proofCanOpen && fine.proofOpenUrl ? (
+                        <a
+                          className="visit-dashboard-bill-link"
+                          href={fine.proofOpenUrl}
+                          aria-label={`View payment proof for ${formatVisitAttendanceName(fine.memberName)}, ${fine.date}`}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        <span className="visit-dashboard-bill-empty" aria-label="No payment proof">&mdash;</span>
+                      )}
+                    </td>
                     {showNotes ? <td className="visit-dashboard-fines-notes">{fine.notes || "—"}</td> : null}
                   </tr>
                 );

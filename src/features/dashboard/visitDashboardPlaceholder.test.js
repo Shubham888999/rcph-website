@@ -453,6 +453,8 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       status: "paid",
       date: "2026-07-16",
       notes: "Safe public note",
+      proofCanOpen: false,
+      proofOpenUrl: "",
     }, {
       fineKey: "safe-fine-2",
       memberName: "Pending Member",
@@ -462,6 +464,8 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       status: "pending",
       date: "2026-07-15",
       notes: "",
+      proofCanOpen: false,
+      proofOpenUrl: "",
     }, {
       fineKey: "safe-fine-3",
       memberName: "Waived Member",
@@ -471,6 +475,8 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       status: "waived",
       date: "2026-07-14",
       notes: "",
+      proofCanOpen: false,
+      proofOpenUrl: "",
     }],
   });
   assert.equal("fineId" in normalized.fines.rows[0], false);

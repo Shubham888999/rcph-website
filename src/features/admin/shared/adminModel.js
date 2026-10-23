@@ -265,6 +265,15 @@ export function normalizeFine(id, raw) {
       raw.treasuryEntryId,
       128,
     ),
+
+    // Payment proof, saved on the Fine and its Treasury entry by setFineProof.
+    billUrl: safeUrl(raw.billUrl),
+    billDriveFileId: text(raw.billDriveFileId, 180),
+    billFileName: text(raw.billFileName, 180),
+    billMimeType: text(raw.billMimeType, 100).toLowerCase(),
+    billSizeBytes: Number.isFinite(raw.billSizeBytes) && raw.billSizeBytes >= 0 ? raw.billSizeBytes : 0,
+    billFolderUrl: safeUrl(raw.billFolderUrl),
+    billFolderName: text(raw.billFolderName, 180),
   };
 }
 export function normalizeTreasury(id, raw) { const amount = money(raw?.amount); const type = text(raw?.type, 20).toLowerCase(); if (!id || !raw || amount === null || amount <= 0 || !["income", "expense"].includes(type) || !validDate(text(raw.date, 20))) return null; return { id, title: text(raw.title || raw.name, 180), type, amount, date: text(raw.date, 20), avenue: text(raw.avenue, 40), purpose: text(raw.purpose || raw.linkedEventName, 500), paidBy: text(raw.paidBy, 180), paidByType: text(raw.paidByType, 20), paidByMemberId: text(raw.paidByMemberId, 128), paidTo: text(raw.paidTo, 180), paidToType: text(raw.paidToType, 20), paidToMemberId: text(raw.paidToMemberId, 128), paymentMode: text(raw.paymentMode, 80), referenceNumber: text(raw.referenceNumber || raw.cheque, 180), reimbursementStatus: text(raw.reimbursementStatus || raw.reimburse, 80), reimbursedTo: text(raw.reimbursedTo, 180), reimbursementDate: validDate(text(raw.reimbursementDate, 20)) ? text(raw.reimbursementDate, 20) : "", billUrl: safeUrl(raw.billUrl), billDriveFileId: text(raw.billDriveFileId || raw.billFileId, 180), billFileName: text(raw.billFileName, 180), billMimeType: text(raw.billMimeType, 100).toLowerCase(), billSizeBytes: Number.isFinite(raw.billSizeBytes) && raw.billSizeBytes >= 0 ? raw.billSizeBytes : 0, billFolderId: text(raw.billFolderId, 180), billFolderUrl: safeUrl(raw.billFolderUrl), billFolderName: text(raw.billFolderName, 180),

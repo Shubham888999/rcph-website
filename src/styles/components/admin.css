@@ -8975,6 +8975,73 @@ min-width: 250px;
   text-align: left;
 }
 
+/* Fines: row ⋮ menu, optional screenshot on Add fine, Manage dialog. */
+.admin-row-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.admin-row-menu__trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.admin-row-menu__dots {
+  display: grid;
+  gap: 0.14rem;
+}
+
+.admin-row-menu__dots span {
+  display: block;
+  width: 0.24rem;
+  height: 0.24rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.admin-row-menu__list {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  min-width: 9rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(244,180,58,0.25);
+  border-radius: var(--radius-sm);
+  background: rgba(39,31,26,0.98);
+  box-shadow: 0 16px 32px rgba(0,0,0,0.32);
+}
+
+.admin-row-menu__list button {
+  justify-content: flex-start;
+  min-height: 2.25rem;
+  padding: 0.48rem 0.65rem;
+  border: 0;
+  text-align: left;
+}
+
+.fine-add-proof {
+  margin-top: 1rem;
+}
+
+.fine-proof-dialog {
+  display: grid;
+  gap: 1rem;
+}
+
+.fine-proof-dialog__summary {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.fine-proof-dialog__summary span,
+.fine-proof-dialog__note {
+  color: var(--color-muted);
+}
+
 .treasury-details {
   display: grid;
   gap: 1rem;
