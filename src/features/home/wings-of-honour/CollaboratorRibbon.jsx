@@ -1,17 +1,13 @@
 import { useState } from "react";
 
-// Shows the club logo, or the placeholder circle when the file is missing.
+// Shows the club logo once its file exists; a club without one shows its name only.
 function ClubLogo({ src }) {
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(src) && !failed;
+  if (!src || failed) return null;
 
   return (
-    <span className={`woh-ribbon__logo${showImage ? " has-image" : ""}`} aria-hidden="true">
-      {showImage ? (
-        <img src={src} alt="" height="44" loading="lazy" decoding="async" onError={() => setFailed(true)} />
-      ) : (
-        "Logo"
-      )}
+    <span className="woh-ribbon__logo" aria-hidden="true">
+      <img src={src} alt="" height="44" loading="lazy" decoding="async" onError={() => setFailed(true)} />
     </span>
   );
 }
