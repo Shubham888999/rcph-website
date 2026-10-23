@@ -53,7 +53,7 @@ export const thankYous = [
 // The banner uses 00-banner-card.webp and 00-banner-poster.webp.
 // A missing file shows a placeholder, so stories appear as soon as their files are added.
 // Change STORY_COUNT to show more or fewer stories.
-export const STORY_COUNT = 8;
+export const STORY_COUNT = 26;
 
 const STORY_TONES = ["#2b3d5a", "#24344f", "#33476a", "#1a2740", "#2f4260", "#203049", "#28395a", "#1d2c45"];
 
