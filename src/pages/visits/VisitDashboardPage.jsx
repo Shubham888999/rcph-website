@@ -426,6 +426,7 @@ function DocumentTile({ block, theme, onOpen }) {
         })}
       </span>
 
+      {/* Not every board member presents, so tiles without a main presentation show nothing here. */}
       {mains.length ? (
         <span className="visit-dashboard-doc-tile__main">
           {theme === "carrot" ? <CarrotIcon className="visit-dashboard-doc-tile__icon" /> : <PresentationIcon />}
@@ -438,9 +439,7 @@ function DocumentTile({ block, theme, onOpen }) {
             ))}
           </span>
         </span>
-      ) : (
-        <span className="visit-dashboard-doc-tile__main is-empty">No main presentation selected yet</span>
-      )}
+      ) : null}
     </button>
   );
 }

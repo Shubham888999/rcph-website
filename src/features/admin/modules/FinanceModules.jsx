@@ -1965,20 +1965,20 @@ function TreasuryTableRow({ item, locked, onDetails, onEdit, onDelete, onManageP
       <td>{normalizeTreasuryAvenue(item.avenue) || "-"}</td>
       <td>{item.paymentMode || "-"}</td>
       <td>{reimbursementLabel(item.reimbursementStatus)}</td>
-      <td>{treasuryHasSupportingFile(item) ? <button type="button" onClick={() => onDetails(item)}>View</button> : <span className="treasury-muted">None</span>}</td>
+      <td>{treasuryHasSupportingFile(item) ? <button type="button" className="treasury-file-link" onClick={() => onDetails(item)}>View</button> : <span className="treasury-muted">None</span>}</td>
       <td>
-        <div className="treasury-row-actions">
-          <button type="button" onClick={() => onDetails(item)}>Details</button>
-          {/* Fine entries are kept by Fines: only their payment screenshot is managed here. */}
-          {isFineLinkedTreasury(item) ? (
-            <button type="button" onClick={() => onManageProof(item)} title="Fine entry: edit or delete it from Fines">Screenshot</button>
-          ) : (
-            <>
-              <button type="button" disabled={locked} onClick={() => onEdit(item)}>Edit</button>
-              <button type="button" className="danger" disabled={locked} onClick={() => onDelete(item)}>Delete</button>
-            </>
-          )}
-        </div>
+        {/* Fine entries are kept by Fines: only their payment screenshot is managed here. */}
+        <RowActionsMenu
+          label={`Actions for ${item.title || "untitled transaction"}, ${formatTreasuryDate(treasuryLedgerDate(item))}`}
+          items={isFineLinkedTreasury(item) ? [
+            { label: "View details", onSelect: () => onDetails(item) },
+            { label: "Manage screenshot", onSelect: () => onManageProof(item) },
+          ] : [
+            { label: "View details", onSelect: () => onDetails(item) },
+            { label: "Edit transaction", disabled: locked, onSelect: () => onEdit(item) },
+            { label: "Delete transaction", danger: true, disabled: locked, onSelect: () => onDelete(item) },
+          ]}
+        />
       </td>
     </tr>
   );

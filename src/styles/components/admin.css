@@ -8787,16 +8787,13 @@ min-width: 250px;
   font-size: 0.84rem;
 }
 
+/* Transaction type as coloured text, no outline. */
 .treasury-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.7rem;
-  padding: 0.2rem 0.45rem;
-  border: 1px solid rgba(229,194,104,0.28);
-  border-radius: var(--radius-sm);
+  display: inline;
   color: var(--color-gold-soft);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 900;
+  letter-spacing: 0.02em;
 }
 
 .treasury-chip.is-income,
@@ -8818,15 +8815,32 @@ min-width: 250px;
   white-space: nowrap;
 }
 
-.treasury-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+/* "View" supporting file: highlighted text, not a button pill. */
+.admin-page button.treasury-file-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-gold-soft);
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-color: rgba(229,194,104,0.45);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
 }
 
-.treasury-row-actions button {
-  min-height: 2.1rem;
-  padding: 0.35rem 0.55rem;
+.admin-page button.treasury-file-link:hover {
+  color: var(--color-gold);
+  background: none;
+  text-decoration-color: currentColor;
+}
+
+.admin-page button.treasury-file-link:focus-visible {
+  outline: 2px solid var(--color-gold-soft);
+  outline-offset: 2px;
 }
 
 .treasury-history__mobile {
