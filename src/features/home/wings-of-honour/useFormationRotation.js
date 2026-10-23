@@ -11,18 +11,15 @@ export function queuePosition(index, lead, count) {
   return wrapIndex(index - lead, count);
 }
 
-// Drives the looping formation: timed auto advance, step-by-step travel to a chosen item,
-// and pauses while the visitor is interacting, the section is off screen or the tab is hidden.
+// Drives the looping formation: timed auto advance that pauses while the visitor is interacting,
+// the section is off screen or the tab is hidden.
 export default function useFormationRotation({ count, active, reduceMotion, timing }) {
   const [lead, setLead] = useState(0);
-  const [target, setTarget] = useState(null);
   const [userPaused, setUserPaused] = useState(false);
   const leadRef = useRef(0);
-  const targetRef = useRef(null);
   const blockersRef = useRef(new Set());
   const holdUntilRef = useRef(0);
   const nextAutoAtRef = useRef(0);
-  const nextStepAtRef = useRef(0);
 
   const applyLead = useCallback(
     (index) => {
@@ -41,36 +38,15 @@ export default function useFormationRotation({ count, active, reduceMotion, timi
     [timing.holdAfterInteractionMs],
   );
 
-  const clearTarget = useCallback(() => {
-    targetRef.current = null;
-    setTarget(null);
-  }, []);
-
   const goTo = useCallback(
     (index) => {
-      clearTarget();
       applyLead(index);
       hold();
     },
-    [applyLead, clearTarget, hold],
+    [applyLead, hold],
   );
 
   const step = useCallback((delta) => goTo(leadRef.current + delta), [goTo]);
-
-  // Moves forward one item at a time until `index` leads, so the formation keeps rotating in order.
-  const travelTo = useCallback(
-    (index) => {
-      if (reduceMotion) {
-        goTo(index);
-        return;
-      }
-
-      nextStepAtRef.current = 0;
-      targetRef.current = wrapIndex(index, count);
-      setTarget(targetRef.current);
-    },
-    [count, goTo, reduceMotion],
-  );
 
   const setBlocker = useCallback((name, isBlocking) => {
     if (isBlocking) blockersRef.current.add(name);
@@ -91,20 +67,6 @@ export default function useFormationRotation({ count, active, reduceMotion, timi
       const now = Date.now();
       const blocked = blockersRef.current.size > 0 || document.visibilityState === "hidden";
 
-      if (targetRef.current !== null) {
-        if (blockersRef.current.has("viewer") || now < nextStepAtRef.current) return;
-
-        if (leadRef.current === targetRef.current) {
-          clearTarget();
-          hold();
-          return;
-        }
-
-        applyLead(leadRef.current + 1);
-        nextStepAtRef.current = now + timing.stepMs;
-        return;
-      }
-
       if (reduceMotion || userPaused || blocked) return;
       if (now < holdUntilRef.current || now < nextAutoAtRef.current) return;
 
@@ -113,15 +75,13 @@ export default function useFormationRotation({ count, active, reduceMotion, timi
     }, TICK_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [active, applyLead, clearTarget, count, hold, reduceMotion, timing.autoAdvanceMs, timing.stepMs, userPaused]);
+  }, [active, applyLead, count, reduceMotion, timing.autoAdvanceMs, userPaused]);
 
   return {
     lead,
-    target,
     userPaused,
     goTo,
     step,
-    travelTo,
     hold,
     setBlocker,
     toggleUserPaused,

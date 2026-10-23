@@ -5,13 +5,12 @@ import StoryFormation from "./StoryFormation";
 import StoryViewer from "./StoryViewer";
 import useFormationRotation from "./useFormationRotation";
 import {
-  BANNER_LANGUAGE,
   INSTAGRAM_HIGHLIGHT_URL,
   SECTION_ID,
   collaborators,
   eventDetails,
   formationItems,
-  languages,
+  thankYous,
   timing,
 } from "./wingsOfHonourData";
 import "../../../styles/components/wings-of-honour.css";
@@ -21,6 +20,31 @@ const CONTRAIL_PATHS = [
   { d: "M -40 337 C 260 307, 560 217, 820 147 S 1140 47, 1260 25", stroke: "#f1e8d8" },
   { d: "M -40 344 C 260 314, 560 224, 820 154 S 1140 54, 1260 32", stroke: "#2fa84f" },
 ];
+
+// Cycles "thank you" through the campaign languages on its own, independent of the cards.
+function ThankYouCycler({ running }) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (!running) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      setIndex((current) => (current + 1) % thankYous.length);
+    }, timing.thankYouMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [running]);
+
+  const thankYou = thankYous[index];
+
+  return (
+    <p className="woh__thanks">
+      <span key={index} className="woh__thanks-word" lang={thankYou.lang} dir={thankYou.dir}>
+        {thankYou.text}
+      </span>
+    </p>
+  );
+}
 
 function Contrail({ state }) {
   return (
@@ -51,7 +75,7 @@ export default function WingsOfHonourSection() {
     reduceMotion,
     timing,
   });
-  const { lead, goTo, travelTo, setBlocker } = rotation;
+  const { goTo, setBlocker } = rotation;
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -73,8 +97,6 @@ export default function WingsOfHonourSection() {
     setBlocker("viewer", viewerIndex !== null);
   }, [setBlocker, viewerIndex]);
 
-  const leadItem = formationItems[lead];
-  const leadLanguage = languages[leadItem.type === "story" ? leadItem.language : BANNER_LANGUAGE];
   const contrailState = reduceMotion ? "static" : hasEntered ? "drawing" : "";
 
   function openViewer(index) {
@@ -110,11 +132,7 @@ export default function WingsOfHonourSection() {
             {eventDetails.title}
           </h2>
 
-          <p className="woh__thanks">
-            <span key={leadLanguage.lang} className="woh__thanks-word" lang={leadLanguage.lang} dir={leadLanguage.dir}>
-              {leadLanguage.thankYou}
-            </span>
-          </p>
+          <ThankYouCycler running={inView && !reduceMotion && viewerIndex === null} />
 
           <p className="woh__lede">{eventDetails.lede}</p>
 
@@ -135,31 +153,6 @@ export default function WingsOfHonourSection() {
             ))}
           </dl>
 
-          <div className="woh__languages" role="group" aria-label="Choose a language">
-            {formationItems.map((item, index) => {
-              if (item.type !== "story") return null;
-              const language = languages[item.language];
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="woh__language"
-                  aria-pressed={index === lead}
-                  aria-label={`${language.name}, Rotaract Club of ${item.club}`}
-                  onClick={() => travelTo(index)}
-                >
-                  <span className="woh__language-native" lang={language.lang} dir={language.dir}>
-                    {language.native}
-                  </span>
-                  <span className="woh__language-name" aria-hidden="true">
-                    {language.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
           {INSTAGRAM_HIGHLIGHT_URL ? (
             <a className="woh__highlight-link" href={INSTAGRAM_HIGHLIGHT_URL} target="_blank" rel="noreferrer">
               {eventDetails.highlightLabel}
@@ -173,7 +166,6 @@ export default function WingsOfHonourSection() {
 
         <StoryFormation
           items={formationItems}
-          languages={languages}
           rotation={rotation}
           focusRequest={focusRequest}
           onOpen={openViewer}
@@ -185,7 +177,6 @@ export default function WingsOfHonourSection() {
       {viewerIndex !== null ? (
         <StoryViewer
           items={formationItems}
-          languages={languages}
           index={viewerIndex}
           timing={timing}
           onIndexChange={changeViewerIndex}

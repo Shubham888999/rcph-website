@@ -32,24 +32,21 @@ export const eventDetails = {
   highlightLabel: "See all stories on Instagram",
 };
 
-// "Thank you" in each campaign language. Pending native speaker review.
-// `lang` is the BCP 47 code used for the lang attribute; `dir` is the text direction.
-export const languages = {
-  hi: { name: "Hindi", native: "हिन्दी", thankYou: "धन्यवाद", lang: "hi", dir: "ltr" },
-  mr: { name: "Marathi", native: "मराठी", thankYou: "धन्यवाद", lang: "mr", dir: "ltr" },
-  gu: { name: "Gujarati", native: "ગુજરાતી", thankYou: "આભાર", lang: "gu", dir: "ltr" },
-  kok: { name: "Konkani", native: "कोंकणी", thankYou: "देव बरें करूं", lang: "kok", dir: "ltr" },
-  or: { name: "Odia", native: "ଓଡ଼ିଆ", thankYou: "ଧନ୍ୟବାଦ", lang: "or", dir: "ltr" },
-  te: { name: "Telugu", native: "తెలుగు", thankYou: "ధన్యవాదాలు", lang: "te", dir: "ltr" },
-  ta: { name: "Tamil", native: "தமிழ்", thankYou: "நன்றி", lang: "ta", dir: "ltr" },
-  kn: { name: "Kannada", native: "ಕನ್ನಡ", thankYou: "ಧನ್ಯವಾದಗಳು", lang: "kn", dir: "ltr" },
-  pa: { name: "Punjabi", native: "ਪੰਜਾਬੀ", thankYou: "ਧੰਨਵਾਦ", lang: "pa", dir: "ltr" },
-  ur: { name: "Urdu", native: "اردو", thankYou: "شکریہ", lang: "ur", dir: "rtl" },
-  en: { name: "English", native: "English", thankYou: "Thank you", lang: "en", dir: "ltr" },
-};
-
-// Language shown under the headline while the banner is at the front.
-export const BANNER_LANGUAGE = "en";
+// "Thank you" in each campaign language, shown one at a time under the title.
+// Hindi and Marathi share a word, so keep them apart. Pending native speaker review. `lang` is the BCP 47 code; `dir` is the text direction.
+export const thankYous = [
+  { name: "English", text: "Thank you", lang: "en", dir: "ltr" },
+  { name: "Hindi", text: "धन्यवाद", lang: "hi", dir: "ltr" },
+  { name: "Gujarati", text: "આભાર", lang: "gu", dir: "ltr" },
+  { name: "Konkani", text: "देव बरें करूं", lang: "kok", dir: "ltr" },
+  { name: "Odia", text: "ଧନ୍ୟବାଦ", lang: "or", dir: "ltr" },
+  { name: "Marathi", text: "धन्यवाद", lang: "mr", dir: "ltr" },
+  { name: "Telugu", text: "ధన్యవాదాలు", lang: "te", dir: "ltr" },
+  { name: "Tamil", text: "நன்றி", lang: "ta", dir: "ltr" },
+  { name: "Kannada", text: "ಧನ್ಯವಾದಗಳು", lang: "kn", dir: "ltr" },
+  { name: "Punjabi", text: "ਧੰਨਵਾਦ", lang: "pa", dir: "ltr" },
+  { name: "Urdu", text: "شکریہ", lang: "ur", dir: "rtl" },
+];
 
 // Each item's files live in public/media/wings-of-honour/ as <slug>-card.webp (400px wide),
 // <slug>-poster.webp (1080px wide) and <slug>.mp4 (viewer only).
@@ -83,80 +80,72 @@ export const formationItems = [
     type: "story",
     club: "Pune Heritage",
     district: "RID 3131",
-    language: "mr",
-    alt: "A member of the Rotaract Club of Pune Heritage thanks the Indian Air Force in Marathi",
+    alt: "A member of the Rotaract Club of Pune Heritage thanks the Indian Air Force",
     tone: "#2b3d5a",
-    ...storyMedia("01-pune-heritage-marathi"),
+    ...storyMedia("01-pune-heritage"),
   },
   {
     id: "bhubaneshwar-jaydev",
     type: "story",
     club: "Bhubaneshwar Jaydev",
     district: "RID 3262",
-    language: "or",
-    alt: "A member of the Rotaract Club of Bhubaneshwar Jaydev thanks the Indian Air Force in Odia",
+    alt: "A member of the Rotaract Club of Bhubaneshwar Jaydev thanks the Indian Air Force",
     tone: "#24344f",
-    ...storyMedia("02-bhubaneshwar-jaydev-odia"),
+    ...storyMedia("02-bhubaneshwar-jaydev"),
   },
   {
     id: "curchorem-sanvordem",
     type: "story",
     club: "Curchorem-Sanvordem",
     district: "RID 3170",
-    language: "kok",
-    alt: "A member of the Rotaract Club of Curchorem-Sanvordem thanks the Indian Air Force in Konkani",
+    alt: "A member of the Rotaract Club of Curchorem-Sanvordem thanks the Indian Air Force",
     tone: "#33476a",
-    ...storyMedia("03-curchorem-sanvordem-konkani"),
+    ...storyMedia("03-curchorem-sanvordem"),
   },
   {
     id: "lead-india-ahead",
     type: "story",
     club: "Lead India Ahead",
     district: "RID 3206",
-    language: "ta",
-    alt: "A member of the Rotaract Club of Lead India Ahead thanks the Indian Air Force in Tamil",
+    alt: "A member of the Rotaract Club of Lead India Ahead thanks the Indian Air Force",
     tone: "#1a2740",
-    ...storyMedia("04-lead-india-ahead-tamil"),
+    ...storyMedia("04-lead-india-ahead"),
   },
   {
     id: "rvce",
     type: "story",
     club: "RVCE",
     district: "RID 3191",
-    language: "te",
-    alt: "A member of the Rotaract Club of RVCE thanks the Indian Air Force in Telugu",
+    alt: "A member of the Rotaract Club of RVCE thanks the Indian Air Force",
     tone: "#2f4260",
-    ...storyMedia("05-rvce-telugu"),
+    ...storyMedia("05-rvce"),
   },
   {
     id: "mumbai-downtown",
     type: "story",
     club: "Mumbai DownTown",
     district: "RID 3141",
-    language: "hi",
-    alt: "A member of the Rotaract Club of Mumbai DownTown thanks the Indian Air Force in Hindi",
+    alt: "A member of the Rotaract Club of Mumbai DownTown thanks the Indian Air Force",
     tone: "#203049",
-    ...storyMedia("06-mumbai-downtown-hindi"),
+    ...storyMedia("06-mumbai-downtown"),
   },
   {
     id: "mount-carmel",
     type: "story",
     club: "Mount Carmel",
     district: "RID 3191",
-    language: "ur",
-    alt: "A member of the Rotaract Club of Mount Carmel thanks the Indian Air Force in Urdu",
+    alt: "A member of the Rotaract Club of Mount Carmel thanks the Indian Air Force",
     tone: "#28395a",
-    ...storyMedia("07-mount-carmel-urdu"),
+    ...storyMedia("07-mount-carmel"),
   },
   {
     id: "roar-nibm",
     type: "story",
     club: "Roar NIBM",
     district: "RID 3131",
-    language: "gu",
-    alt: "A member of the Rotaract Club of Roar NIBM thanks the Indian Air Force in Gujarati",
+    alt: "A member of the Rotaract Club of Roar NIBM thanks the Indian Air Force",
     tone: "#1d2c45",
-    ...storyMedia("08-roar-nibm-gujarati"),
+    ...storyMedia("08-roar-nibm"),
   },
 ];
 
@@ -180,7 +169,7 @@ export const collaborators = [
 
 export const timing = {
   autoAdvanceMs: 4200,
-  stepMs: 560,
+  thankYouMs: 2600,
   holdAfterInteractionMs: 9000,
   placeholderStoryMs: 6000,
   bannerStoryMs: 5000,

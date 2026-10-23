@@ -12,18 +12,15 @@ function CloseIcon() {
   );
 }
 
-function describe(item, languages) {
+function describe(item) {
   if (item.type === "banner") {
     return { title: item.title, detail: item.meta.join(" · ") };
   }
 
-  return {
-    title: `Rotaract Club of ${item.club}`,
-    detail: `${item.district} · ${languages[item.language].name}`,
-  };
+  return { title: `Rotaract Club of ${item.club}`, detail: item.district };
 }
 
-function StoryMedia({ item, language, soundOn, onProgress, onEnded }) {
+function StoryMedia({ item, soundOn, onProgress, onEnded }) {
   if (item.video) {
     return (
       <video
@@ -50,13 +47,7 @@ function StoryMedia({ item, language, soundOn, onProgress, onEnded }) {
 
   return (
     <div className="woh-viewer__placeholder" role="img" aria-label={item.alt}>
-      {item.type === "banner" ? (
-        <span className="woh-viewer__placeholder-word">{item.title}</span>
-      ) : (
-        <span className="woh-viewer__placeholder-word" lang={language.lang} dir={language.dir}>
-          {language.thankYou}
-        </span>
-      )}
+      <span className="woh-viewer__placeholder-word">{item.type === "banner" ? item.title : item.club}</span>
       <span className="woh-viewer__placeholder-note">
         {item.type === "banner" ? "Event banner placeholder" : "Story video placeholder"}
       </span>
@@ -64,10 +55,9 @@ function StoryMedia({ item, language, soundOn, onProgress, onEnded }) {
   );
 }
 
-export default function StoryViewer({ items, languages, index, timing, onIndexChange, onClose }) {
+export default function StoryViewer({ items, index, timing, onIndexChange, onClose }) {
   const item = items[index];
-  const language = item.type === "story" ? languages[item.language] : null;
-  const { title, detail } = describe(item, languages);
+  const { title, detail } = describe(item);
   const timedDuration = item.type === "banner" ? timing.bannerStoryMs : timing.placeholderStoryMs;
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -175,7 +165,6 @@ export default function StoryViewer({ items, languages, index, timing, onIndexCh
         <StoryMedia
           key={item.id}
           item={item}
-          language={language}
           soundOn={soundOn}
           onProgress={updateVideoProgress}
           onEnded={showNext}

@@ -166,76 +166,6 @@
   font-size: 0.9rem;
 }
 
-.woh__languages {
-  margin: 0 0 1.1rem;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-top: 1px solid var(--woh-line);
-  border-left: 1px solid var(--woh-line);
-}
-
-.woh__language {
-  position: relative;
-  min-height: 4.1rem;
-  padding: 0.6rem 0.35rem 0.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  border: 0;
-  border-right: 1px solid var(--woh-line);
-  border-bottom: 1px solid var(--woh-line);
-  border-radius: 0;
-  color: var(--woh-ink);
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-  transition: background-color 0.5s ease, color 0.5s ease;
-}
-
-.woh__language::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  right: 0;
-  left: 0;
-  height: 2px;
-  background: var(--woh-accent);
-  transform: scaleX(0);
-  transition: transform 0.6s var(--woh-ease);
-}
-
-.woh__language:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.woh__language[aria-pressed="true"] {
-  color: var(--woh-accent);
-  background: rgba(216, 180, 122, 0.1);
-}
-
-.woh__language[aria-pressed="true"]::before {
-  transform: scaleX(1);
-}
-
-.woh__language-native {
-  font-size: 1.1rem;
-  line-height: 1.2;
-}
-
-.woh__language-name {
-  color: var(--woh-subtle);
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  transition: color 0.5s ease;
-}
-
-.woh__language[aria-pressed="true"] .woh__language-name {
-  color: var(--woh-accent);
-}
-
 .woh__highlight-link {
   min-height: 2.75rem;
   display: inline-flex;
@@ -370,12 +300,11 @@
   justify-content: flex-end;
 }
 
-.woh-card__word {
+.woh-card__play {
   align-self: center;
+  width: 2.75rem;
+  height: 2.75rem;
   color: #d8b47a;
-  font-size: 1.4rem;
-  font-weight: 500;
-  text-align: center;
 }
 
 .woh-card__banner-title {
@@ -521,8 +450,9 @@
     font-size: 0.7rem;
   }
 
-  .woh-card__word {
-    font-size: 2.5rem;
+  .woh-card__play {
+    width: 3.75rem;
+    height: 3.75rem;
   }
 
   .woh-card__banner-title {
@@ -852,7 +782,6 @@
 /* ---------------------------------------------------------
    FOCUS, KEYFRAMES, REDUCED MOTION
    --------------------------------------------------------- */
-.woh__language:focus-visible,
 .woh__highlight-link:focus-visible,
 .woh-card:focus-visible,
 .woh-formation__control:focus-visible,
@@ -924,9 +853,7 @@
   }
 
   .woh-card,
-  .woh-formation__fleet,
-  .woh__language,
-  .woh__language::before {
+  .woh-formation__fleet {
     transition: none;
   }
 

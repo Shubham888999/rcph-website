@@ -45,7 +45,16 @@ function getCardLayout(index, lead, count) {
   };
 }
 
-function CardFace({ item, language, eager }) {
+function PlayIcon() {
+  return (
+    <svg className="woh-card__play" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+      <circle cx="22" cy="22" r="21" stroke="currentColor" strokeOpacity="0.7" />
+      <path d="M18 15 30 22 18 29Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CardFace({ item, eager }) {
   const image = item.card ? (
     <img
       className="woh-card__image"
@@ -90,24 +99,20 @@ function CardFace({ item, language, eager }) {
         {item.card ? null : (
           <>
             <span className="woh-card__tag">Placeholder story</span>
-            <span className="woh-card__word" lang={language.lang} dir={language.dir}>
-              {language.thankYou}
-            </span>
+            <PlayIcon />
           </>
         )}
         <span className="woh-card__meta">
           <span className="woh-card__of">Rotaract Club of</span>
           <span className="woh-card__club">{item.club}</span>
-          <span className="woh-card__detail">
-            {item.district} · {language.name}
-          </span>
+          <span className="woh-card__detail">{item.district}</span>
         </span>
       </span>
     </>
   );
 }
 
-export default function StoryFormation({ items, languages, rotation, focusRequest, onOpen }) {
+export default function StoryFormation({ items, rotation, focusRequest, onOpen }) {
   const { lead, userPaused, goTo, step, setBlocker, toggleUserPaused } = rotation;
   const count = items.length;
   const fleetRef = useRef(null);
@@ -212,7 +217,6 @@ export default function StoryFormation({ items, languages, rotation, focusReques
         <div ref={fleetRef} className="woh-formation__fleet">
           {items.map((item, index) => {
             const layout = getCardLayout(index, lead, count);
-            const language = item.type === "story" ? languages[item.language] : null;
             const isLead = layout.queue === 0;
             const label =
               item.type === "banner"
@@ -243,7 +247,7 @@ export default function StoryFormation({ items, languages, rotation, focusReques
                 onClick={() => handleCardClick(index)}
                 onKeyDown={handleCardKeyDown}
               >
-                <CardFace item={item} language={language} eager={index < EAGER_CARD_COUNT} />
+                <CardFace item={item} eager={index < EAGER_CARD_COUNT} />
               </button>
             );
           })}

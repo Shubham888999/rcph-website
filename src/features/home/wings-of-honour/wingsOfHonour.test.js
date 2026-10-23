@@ -2,14 +2,13 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import {
-  BANNER_LANGUAGE,
   INSTAGRAM_HIGHLIGHT_URL,
   SECTION_ID,
   collaborators,
   eventDetails,
   featuredEventBadge,
   formationItems,
-  languages,
+  thankYous,
 } from "./wingsOfHonourData.js";
 import { queuePosition, wrapIndex } from "./useFormationRotation.js";
 
@@ -34,28 +33,33 @@ test("formation starts with the banner and features eight stories", () => {
   assert.equal(new Set(formationItems.map((item) => item.id)).size, formationItems.length);
 });
 
-test("every story credits its club, district and a known language", () => {
+test("every story credits its club and district", () => {
   for (const story of stories) {
     assert.ok(story.club, `${story.id} needs a club`);
     assert.match(story.district, /^RID \d{4}$/);
-    assert.ok(languages[story.language], `${story.id} uses unknown language ${story.language}`);
     assert.ok(story.alt.length > 30, `${story.id} needs real alt text`);
   }
 
-  assert.equal(new Set(stories.map((story) => story.language)).size, stories.length, "featured languages should not repeat");
   assert.equal(new Set(stories.map((story) => story.district)).size, 6, "all six districts should be featured");
-  assert.ok(languages[BANNER_LANGUAGE]);
 });
 
-test("languages carry script direction and Urdu reads right to left", () => {
-  for (const [key, language] of Object.entries(languages)) {
-    assert.ok(language.thankYou, `${key} needs a thank you`);
-    assert.ok(language.native, `${key} needs a native name`);
-    assert.ok(["ltr", "rtl"].includes(language.dir));
+test("thank you cycles through all 11 campaign languages with script direction", () => {
+  assert.equal(thankYous.length, 11);
+  assert.equal(new Set(thankYous.map((entry) => entry.lang)).size, 11);
+
+  for (const entry of thankYous) {
+    assert.ok(entry.text, `${entry.name} needs a thank you`);
+    assert.ok(["ltr", "rtl"].includes(entry.dir));
   }
 
-  assert.equal(languages.ur.dir, "rtl");
-  assert.equal(Object.keys(languages).length, 11);
+  assert.equal(thankYous.find((entry) => entry.lang === "ur").dir, "rtl");
+});
+
+test("cards and viewer no longer show a language per story", () => {
+  assert.doesNotMatch(formationSource, /language/);
+  assert.doesNotMatch(viewerSource, /language/);
+  assert.doesNotMatch(sectionSource, /woh__language/);
+  assert.match(sectionSource, /<ThankYouCycler/);
 });
 
 test("media paths are either all set or all empty for each item", () => {
