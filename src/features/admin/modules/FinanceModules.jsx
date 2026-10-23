@@ -287,6 +287,7 @@ const TREASURY_TYPE_FILTERS = [
   ["income", "Income"],
   ["expense", "Expense"],
   ["reimbursement", "Reimbursement"],
+  ["outflow", "All expenses"],
 ];
 
 const TREASURY_SORT_LABELS = {

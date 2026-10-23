@@ -43,6 +43,7 @@ const FILTER_TYPE_LABELS = Object.freeze({
   income: "Income",
   expense: "Expense",
   reimbursement: "Reimbursement",
+  outflow: "All expenses",
 });
 
 const TREASURER_KEYS = Object.freeze(["treasurer", "co-treasurer"]);
