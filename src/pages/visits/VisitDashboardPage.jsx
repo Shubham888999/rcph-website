@@ -40,6 +40,9 @@ import {
   visitTypeFromSlug,
 } from "../../features/visits/visitDashboardModel.js";
 import { loadVisitDashboardData } from "../../features/visits/visitDashboardService.js";
+import CollaborationMap from "../../features/collaborations/CollaborationMap.jsx";
+import { buildCollaborationGeography } from "../../features/collaborations/collaborationGeography.js";
+import { CITIES, findClub } from "../../features/collaborations/clubDirectory.js";
 import "../../styles/components/visit-dashboard.css";
 
 const LOAD_STATUS = Object.freeze({
@@ -113,6 +116,7 @@ const SECTION_LINKS = Object.freeze([
   { id: "visit-dashboard-documents", label: "BOD documents" },
   { id: "visit-dashboard-attendance", label: "Attendance" },
   { id: "visit-dashboard-letterhead", label: "Letterhead exchanges", letterhead: true },
+  { id: "visit-dashboard-collaborations", label: "Collaborations", collaborations: true },
   { id: "visit-dashboard-fines", label: "Fines" },
   { id: "visit-dashboard-treasury", label: "Treasury ledger" },
 ]);
@@ -151,10 +155,10 @@ function VisitingPanel({ names }) {
   );
 }
 
-function SectionLinks({ showLetterhead }) {
+function SectionLinks({ showLetterhead, showCollaborations }) {
   return (
     <nav className="visit-dashboard-section-links" aria-label="Dashboard sections">
-      {SECTION_LINKS.filter((link) => showLetterhead || !link.letterhead).map((link) => (
+      {SECTION_LINKS.filter((link) => (showLetterhead || !link.letterhead) && (showCollaborations || !link.collaborations)).map((link) => (
         <a
           href={`#${link.id}`}
           key={link.id}
@@ -878,7 +882,7 @@ function RecordsDisclosure({ id, className, titleId, title, meta, children }) {
         <span className="visit-dashboard-records-meta">{meta}</span>
         <span className="visit-dashboard-records-toggle">{open ? "Hide records" : "Show records"}</span>
       </summary>
-      {children}
+      {typeof children === "function" ? children(open) : children}
     </details>
   );
 }
@@ -939,6 +943,101 @@ function LetterheadExchanges({ letterhead }) {
           <strong>No letterhead exchanges recorded yet.</strong>
         </div>
       )}
+    </RecordsDisclosure>
+  );
+}
+
+const COLLABORATION_ROLE_LABELS = Object.freeze({
+  host: "Host",
+  cohost: "Co-host",
+  collaborator: "Collaborator",
+  participant: "Participant",
+});
+
+function CollaborationList({ rows }) {
+  return (
+    <details className="visit-dashboard-collab-list">
+      <summary>
+        <span className="visit-dashboard-records-chevron" aria-hidden="true" />
+        View as a list
+      </summary>
+      <div className="visit-dashboard-ledger-wrap" tabIndex={0} aria-label="Collaborations table">
+        <table className="visit-dashboard-ledger-table visit-dashboard-collab-table">
+          <caption>Read-only collaborations this Rotary year</caption>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Event</th>
+              <th scope="col">RCPH role</th>
+              <th scope="col">Partner clubs</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.eventId}>
+                <td className="is-date">{formatVisitDashboardDate(row.date)}</td>
+                <th scope="row">{row.name}</th>
+                <td>{COLLABORATION_ROLE_LABELS[row.rcphRole]}</td>
+                <td>
+                  <ul className="visit-dashboard-collab-partners">
+                    {row.partners.map((partner) => {
+                      const club = findClub(partner.name);
+                      return (
+                        <li key={partner.name}>
+                          {partner.name}
+                          {partner.relation === "host" ? <em> (host)</em> : null}
+                          <small>{club ? `${club.district} · ${CITIES[club.cityKey].city}` : "Location not set"}</small>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
+function Collaborations({ collaborations }) {
+  const { rows } = collaborations;
+  const geography = useMemo(() => buildCollaborationGeography(rows), [rows]);
+  const { summary } = geography;
+
+  return (
+    <RecordsDisclosure
+      id="visit-dashboard-collaborations"
+      className="visit-dashboard-collaborations"
+      titleId="visit-dashboard-collaborations-title"
+      title="Collaborations"
+      meta={(
+        <>
+          <span>{summary.eventCount} {summary.eventCount === 1 ? "event" : "events"}</span>
+          <span>{summary.clubCount} {summary.clubCount === 1 ? "club" : "clubs"}</span>
+          <span>{summary.districtCount} {summary.districtCount === 1 ? "district" : "districts"}</span>
+        </>
+      )}
+    >
+      {(open) => (rows.length ? (
+        <div className="visit-dashboard-collab-body">
+          {/* The map and its outlines load only once the section is opened. */}
+          {open ? (
+            <CollaborationMap geography={geography} formatDate={formatVisitDashboardDate} />
+          ) : null}
+          {geography.unplaced.length ? (
+            <p className="visit-dashboard-collab-note">
+              Not on the map yet: {geography.unplaced.map((club) => club.name).join(", ")}.
+            </p>
+          ) : null}
+          <CollaborationList rows={rows} />
+        </div>
+      ) : (
+        <div className="visit-dashboard-empty-state">
+          <strong>No collaborations recorded yet this Rotary year.</strong>
+        </div>
+      ))}
     </RecordsDisclosure>
   );
 }
@@ -1135,7 +1234,7 @@ export default function VisitDashboardPage() {
   }, [loadDashboard]);
 
   const data = loadState.data || fallbackData;
-  const { visit, stats, documentPanels, attendance, fines, treasury, letterhead } = data;
+  const { visit, stats, documentPanels, attendance, fines, treasury, letterhead, collaborations } = data;
   const glance = buildGlanceStats({ stats, treasury });
   const attendanceTree = buildVisitAttendanceTree(attendance);
   const dataAsOf = formatVisitDashboardDateTime(data.generatedAt);
@@ -1168,7 +1267,7 @@ export default function VisitDashboardPage() {
           </div>
         </header>
 
-        <SectionLinks showLetterhead={Boolean(letterhead)} />
+        <SectionLinks showLetterhead={Boolean(letterhead)} showCollaborations={Boolean(collaborations)} />
 
         <ClubAtAGlance glance={glance} attendanceTree={attendanceTree} />
 
@@ -1179,6 +1278,8 @@ export default function VisitDashboardPage() {
         <AttendanceRecords attendance={attendance} />
 
         {letterhead ? <LetterheadExchanges letterhead={letterhead} /> : null}
+
+        {collaborations ? <Collaborations collaborations={collaborations} /> : null}
 
         <FinesRecords fines={fines} />
 

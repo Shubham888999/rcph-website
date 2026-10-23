@@ -1176,6 +1176,52 @@ export function summarizeLetterheadExchanges(rows, rawSummary) {
   };
 }
 
+const COLLABORATION_ROLES = new Set(["host", "cohost", "collaborator", "participant"]);
+const MAX_COLLABORATIONS = 200;
+const MAX_COLLABORATION_PARTNERS = 20;
+
+function normalizeCollaborationPartners(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map((partner) => ({
+      name: text(partner?.name, 180).replace(/\s+/g, " "),
+      relation: partner?.relation === "host" ? "host" : "collaborator",
+    }))
+    .filter((partner) => {
+      const key = partner.name.toLowerCase();
+      if (!partner.name || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_COLLABORATION_PARTNERS);
+}
+
+function normalizeCollaboration(raw) {
+  const date = dateOnly(raw?.date);
+  const partners = normalizeCollaborationPartners(raw?.partners);
+  if (!date || !partners.length) return null;
+  const role = text(raw?.rcphRole, 40).toLowerCase();
+  return {
+    eventId: safeId(raw?.eventId) || `${date}-${partners[0].name}`,
+    name: text(raw?.name, 180) || "Club event",
+    date,
+    avenueCodes: normalizeAvenueCodes(raw?.avenueCodes),
+    rcphRole: COLLABORATION_ROLES.has(role) ? role : "host",
+    partners,
+  };
+}
+
+// Absent on older function versions: the section stays hidden until the backend sends it.
+function normalizeCollaborationsSection(source) {
+  if (!Array.isArray(source.collaborations)) return null;
+  const rows = source.collaborations
+    .map(normalizeCollaboration)
+    .filter(Boolean)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, MAX_COLLABORATIONS);
+  return { rows };
+}
+
 function normalizeLetterheadSection(source) {
   if (!Array.isArray(source.letterheadExchanges)) return null;
   const rows = normalizeLetterheadExchanges(source.letterheadExchanges);
@@ -1394,6 +1440,7 @@ export function normalizeVisitDashboardData(raw, fallbackVisitType = "") {
     fines: normalizeFines(source.fines),
     treasury: normalizeTreasury(source.treasury),
     letterhead: normalizeLetterheadSection(source),
+    collaborations: normalizeCollaborationsSection(source),
     generatedAt: normalizeGeneratedAt(source.generatedAt),
   };
 }
