@@ -579,15 +579,23 @@
   text-transform: uppercase;
 }
 
-.woh-ribbon__logo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.woh-ribbon__club.is-host .woh-ribbon__logo {
+  border-style: solid;
 }
 
-.woh-ribbon__club.is-host .woh-ribbon__logo,
+/* Real logos keep their own shape: fixed height, natural width. */
 .woh-ribbon__logo.has-image {
-  border-style: solid;
+  width: auto;
+  max-width: 7rem;
+  flex-basis: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.woh-ribbon__logo img {
+  width: auto;
+  height: 100%;
+  object-fit: contain;
 }
 
 .woh-ribbon__of {
