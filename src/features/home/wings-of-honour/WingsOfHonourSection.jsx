@@ -100,7 +100,9 @@ export default function WingsOfHonourSection() {
         <div>
           <p className="woh__eyebrow">
             <span>{eventDetails.eyebrow[0]}</span>
-            <span className="woh__eyebrow-rule" aria-hidden="true" />
+            <span className="woh__eyebrow-separator" aria-hidden="true">
+              |
+            </span>
             <span>{eventDetails.eyebrow[1]}</span>
           </p>
 

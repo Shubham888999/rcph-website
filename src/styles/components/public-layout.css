@@ -249,15 +249,13 @@
   align-items: center;
   gap: 0.56rem;
   flex: 0 1 auto;
-  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.46);
+  border: 1px solid rgba(216, 180, 122, 0.55);
   border-radius: 0.48rem;
-  color: var(--lakshya-cream);
-  background:
-    linear-gradient(135deg, rgba(var(--lakshya-burgundy-950-rgb), 0.96), rgba(var(--lakshya-burgundy-700-rgb), 0.92)),
-    var(--lakshya-burgundy-900);
+  color: #f1e8d8;
+  background: linear-gradient(135deg, #0b1422, #1f3150);
   box-shadow:
-    0 0.74rem 1.8rem rgba(17, 1, 5, 0.24),
-    inset 0 0 0 1px rgba(var(--lakshya-cream-rgb), 0.055);
+    0 0.74rem 1.8rem rgba(5, 10, 20, 0.28),
+    inset 0 0 0 1px rgba(241, 232, 216, 0.06);
   text-decoration: none;
   white-space: nowrap;
   transition:
@@ -266,37 +264,25 @@
     transform var(--transition-fast);
 }
 
-.public-event-link::before,
+/* Thin saffron, white and green line echoing the Wings of Honour contrail. */
 .public-event-link::after {
   content: "";
   position: absolute;
   z-index: -1;
-  right: 0.45rem;
-  left: 0.45rem;
-  height: 0.28rem;
-  opacity: 0.44;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(var(--lakshya-gold-rgb), 0.72) 0 0.13rem,
-      transparent 0.13rem 0.46rem
-    );
-}
-
-.public-event-link::before {
-  top: 0.2rem;
-}
-
-.public-event-link::after {
-  bottom: 0.2rem;
+  right: 0.6rem;
+  bottom: 0.3rem;
+  left: 0.6rem;
+  height: 2px;
+  opacity: 0.7;
+  background: linear-gradient(90deg, #ff9933 0 33%, #f1e8d8 33% 66%, #2fa84f 66% 100%);
 }
 
 .public-event-link:hover {
-  border-color: rgba(var(--lakshya-gold-rgb), 0.84);
+  border-color: rgba(216, 180, 122, 0.9);
   box-shadow:
-    0 0.88rem 2.1rem rgba(17, 1, 5, 0.32),
-    0 0 1.15rem rgba(var(--lakshya-gold-rgb), 0.16),
-    inset 0 0 0 1px rgba(var(--lakshya-cream-rgb), 0.075);
+    0 0.88rem 2.1rem rgba(5, 10, 20, 0.36),
+    0 0 1.15rem rgba(216, 180, 122, 0.16),
+    inset 0 0 0 1px rgba(241, 232, 216, 0.08);
   transform: translateY(-1px);
 }
 
@@ -313,7 +299,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.38rem;
-  color: var(--lakshya-cream);
+  color: #f1e8d8;
   font-size: 0.74rem;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -324,8 +310,8 @@
   height: 0.42rem;
   flex: 0 0 0.42rem;
   border-radius: 50%;
-  background: var(--lakshya-gold);
-  box-shadow: 0 0 0 0.28rem rgba(var(--lakshya-gold-rgb), 0.14);
+  background: #d8b47a;
+  box-shadow: 0 0 0 0.28rem rgba(216, 180, 122, 0.16);
   animation: public-event-live-pulse 2.4s ease-in-out infinite;
 }
 

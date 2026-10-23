@@ -87,10 +87,7 @@
   text-transform: uppercase;
 }
 
-.woh__eyebrow-rule {
-  width: 1.75rem;
-  height: 1px;
-  background: currentColor;
+.woh__eyebrow-separator {
   opacity: 0.6;
 }
 
