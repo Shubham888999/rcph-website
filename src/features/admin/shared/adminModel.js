@@ -35,7 +35,8 @@ export function safeUrl(value) {
   try { const url = new URL(text(value, 1000)); return ["https:", "http:"].includes(url.protocol) ? url.href : ""; } catch { return ""; }
 }
 export function money(value) { const n = Number(value); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null; }
-export function formatInr(value) { const amount = money(value); return amount === null ? "Unavailable" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amount); }
+// Negative amounts (a month with more expense than income) show as -₹500.00; only non-numbers are "Unavailable".
+export function formatInr(value) { const amount = Number(value); return Number.isFinite(amount) ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Math.round(amount * 100) / 100) : "Unavailable"; }
 export function cleanAvenues(value) { const values = Array.isArray(value) ? value : value ? [value] : []; return [...new Set(values.map((x) => text(x, 40).toUpperCase()).filter(Boolean))]; }
 export function normalizeAttendance(value) { return value === true || value === false || value === "NA" ? value : "NA"; }
 export function isRemovedProfileRecord(record = {}) {

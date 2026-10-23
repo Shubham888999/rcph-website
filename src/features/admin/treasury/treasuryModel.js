@@ -759,6 +759,8 @@ export function filterAndSortTreasury(transactions = [], filters = DEFAULT_TREAS
     if (filters.type === "income" && item.type !== "income") return false;
     if (filters.type === "expense" && (item.type !== "expense" || isReimbursementRecord(item))) return false;
     if (filters.type === "reimbursement" && !isReimbursementRecord(item)) return false;
+    // "All expenses": everything that went out, plain expenses and reimbursements together.
+    if (filters.type === "outflow" && item.type !== "expense") return false;
     if (filters.month && !treasuryLedgerDate(item).startsWith(filters.month)) return false;
     if (filters.avenue && normalizeTreasuryAvenue(item.avenue) !== normalizeTreasuryAvenue(filters.avenue)) return false;
     if (filters.paymentMode && item.paymentMode !== filters.paymentMode) return false;
