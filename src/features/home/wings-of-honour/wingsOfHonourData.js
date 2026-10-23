@@ -20,7 +20,7 @@ export const eventDetails = {
   lede:
     "On the 94th Indian Air Force Day, RCPH and 14 collaborating clubs came together on Instagram to thank the heroes who guard our skies, each in their own mother tongue.",
   stats: [
-    { value: "15", label: "clubs" },
+    { value: "14", label: "collaborating clubs" },
     { value: "6", label: "Rotaract districts" },
     { value: "11", label: "languages" },
   ],
