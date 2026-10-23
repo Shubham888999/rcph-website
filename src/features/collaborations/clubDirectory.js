@@ -45,7 +45,7 @@ export const CLUB_DIRECTORY = Object.freeze([
   { key: "curchorem-sanvordem", name: "Curchorem-Sanvordem", district: "RID 3170", cityKey: "curchorem", aliases: ["curchorem sanvordem", "curchorem"] },
   { key: "belgaum-yuva-darpan", name: "Belgaum Yuva Darpan", district: "RID 3170", cityKey: "belagavi", aliases: ["belgaum yuva darpan", "belagavi yuva darpan", "yuva darpan"] },
   { key: "bhubaneshwar-jaydev", name: "Bhubaneshwar Jaydev", district: "RID 3262", cityKey: "bhubaneswar", aliases: ["bhubaneshwar jaydev", "bhubaneswar jaydev"] },
-  // City to confirm: placed at Coimbatore, the centre of RID 3206.
+  // Sponsored by the Rotary Club of Coimbatore Texcity.
   { key: "lead-india-ahead", name: "Lead India Ahead", district: "RID 3206", cityKey: "coimbatore", aliases: ["lead india ahead", "lia"] },
 ]);
 
