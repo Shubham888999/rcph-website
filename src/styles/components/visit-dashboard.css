@@ -172,6 +172,42 @@
   border-bottom-color: var(--internal-accent);
   background: transparent;
 }
+
+.visit-dashboard-present-button {
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--internal-accent);
+  border-radius: var(--internal-radius-control);
+  color: var(--internal-bg);
+  background: var(--internal-accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.visit-dashboard-present-button::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 0.35rem solid transparent;
+  border-bottom: 0.35rem solid transparent;
+  border-left: 0.55rem solid currentColor;
+}
+
+.visit-dashboard-present-button:hover {
+  background: var(--internal-accent-soft, var(--internal-accent));
+}
+
+.visit-dashboard-present-button:focus-visible {
+  outline: 2px solid var(--internal-text);
+  outline-offset: 3px;
+}
 .visit-dashboard-avenue-section {
   display: grid;
   grid-template-columns: minmax(12rem, 0.28fr) minmax(0, 1fr);

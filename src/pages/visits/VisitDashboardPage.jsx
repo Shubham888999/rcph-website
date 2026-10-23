@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAccessibleDialog from "../../features/bod-tools/useAccessibleDialog";
@@ -43,6 +43,11 @@ import { loadVisitDashboardData } from "../../features/visits/visitDashboardServ
 import CollaborationMap from "../../features/collaborations/CollaborationMap.jsx";
 import { buildCollaborationGeography } from "../../features/collaborations/collaborationGeography.js";
 import { CITIES, findClub } from "../../features/collaborations/clubDirectory.js";
+import { buildVisitPresentationSlides } from "../../features/visits/visitPresentationModel.js";
+
+// Presentation mode loads only when someone presses Present.
+const VisitPresentation = lazy(() => import("./VisitPresentation.jsx"));
+const PRESENT_BUTTON_ID = "visit-dashboard-present";
 import "../../styles/components/visit-dashboard.css";
 
 const LOAD_STATUS = Object.freeze({
@@ -1238,6 +1243,13 @@ export default function VisitDashboardPage() {
   const glance = buildGlanceStats({ stats, treasury });
   const attendanceTree = buildVisitAttendanceTree(attendance);
   const dataAsOf = formatVisitDashboardDateTime(data.generatedAt);
+  const [presenting, setPresenting] = useState(false);
+  // Built when Present is pressed, so slides follow the latest data and main presentations.
+  const slides = useMemo(() => (presenting ? buildVisitPresentationSlides(data) : []), [presenting, data]);
+  const closePresentation = useCallback(() => {
+    setPresenting(false);
+    document.getElementById(PRESENT_BUTTON_ID)?.focus();
+  }, []);
 
   if (loadState.status === LOAD_STATUS.loading && !loadState.data) {
     return <VisitDashboardLoading title={visit.title} theme={theme} />;
@@ -1259,6 +1271,14 @@ export default function VisitDashboardPage() {
             <VisitingPanel names={visit.officialDisplayNames} />
           </div>
           <div className="visit-dashboard-masthead__actions">
+            <button
+              id={PRESENT_BUTTON_ID}
+              type="button"
+              className="visit-dashboard-present-button"
+              onClick={() => setPresenting(true)}
+            >
+              Present
+            </button>
             <a className="visit-dashboard-action-link" href="/access">
               Access page
             </a>
@@ -1285,6 +1305,12 @@ export default function VisitDashboardPage() {
 
         <TreasuryLedger treasury={treasury} />
       </div>
+
+      {presenting ? (
+        <Suspense fallback={null}>
+          <VisitPresentation slides={slides} onClose={closePresentation} />
+        </Suspense>
+      ) : null}
     </main>
   );
 }
