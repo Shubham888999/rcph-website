@@ -1,0 +1,130 @@
+/* Archived VOX '26 header ticket styles from src/styles/components/public-layout.css (lines 241-350, 592-610 and responsive overrides). Reference only. */
+.public-vox-link {
+  position: relative;
+  isolation: isolate;
+  min-height: 2.72rem;
+  max-width: min(20rem, 32vw);
+  padding: 0.42rem 0.78rem;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.56rem;
+  flex: 0 1 auto;
+  border: 1px solid rgba(var(--lakshya-gold-rgb), 0.46);
+  border-radius: 0.48rem;
+  color: var(--lakshya-cream);
+  background:
+    linear-gradient(135deg, rgba(var(--lakshya-burgundy-950-rgb), 0.96), rgba(var(--lakshya-burgundy-700-rgb), 0.92)),
+    var(--lakshya-burgundy-900);
+  box-shadow:
+    0 0.74rem 1.8rem rgba(17, 1, 5, 0.24),
+    inset 0 0 0 1px rgba(var(--lakshya-cream-rgb), 0.055);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.public-vox-link::before,
+.public-vox-link::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: 0.45rem;
+  left: 0.45rem;
+  height: 0.28rem;
+  opacity: 0.44;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--lakshya-gold-rgb), 0.72) 0 0.13rem,
+      transparent 0.13rem 0.46rem
+    );
+}
+
+.public-vox-link::before {
+  top: 0.2rem;
+}
+
+.public-vox-link::after {
+  bottom: 0.2rem;
+}
+
+.public-vox-link:hover {
+  border-color: rgba(var(--lakshya-gold-rgb), 0.84);
+  box-shadow:
+    0 0.88rem 2.1rem rgba(17, 1, 5, 0.32),
+    0 0 1.15rem rgba(var(--lakshya-gold-rgb), 0.16),
+    inset 0 0 0 1px rgba(var(--lakshya-cream-rgb), 0.075);
+  transform: translateY(-1px);
+}
+
+.public-vox-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.public-vox-link__event,
+.public-vox-link__live {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.public-vox-link__event {
+  color: rgba(var(--lakshya-gold-rgb), 0.92);
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+}
+
+.public-vox-link__divider {
+  position: relative;
+  z-index: 1;
+  width: 1px;
+  height: 1.18rem;
+  flex: 0 0 1px;
+  background: rgba(var(--lakshya-cream-rgb), 0.28);
+}
+
+.public-vox-link__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  color: var(--lakshya-cream);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.public-vox-link__live-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 0.42rem;
+  border-radius: 50%;
+  background: var(--lakshya-gold);
+  box-shadow: 0 0 0 0.28rem rgba(var(--lakshya-gold-rgb), 0.14);
+  animation: public-vox-live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes public-vox-live-pulse {
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: scale(0.86);
+  }
+
+  45% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 1120px) {
+  .public-header-inner {
+    gap: clamp(0.55rem, 2vw, 0.85rem);
+    padding-right: 3.35rem;
+  }
+
