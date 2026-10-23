@@ -69,6 +69,28 @@ test("there is one director slide per main presentation, so decks that come and 
   assert.equal(withoutDecks.some((slide) => slide.kind === "director"), false);
 });
 
+test("the co-director is named on the director's slide and their shared deck is not repeated", () => {
+  const coPanel = { ...panel("co-csd", "Co-Club Service Director", "Rtr. Shivani Kulkarni", "deck-csd"), positionKey: "co-csd" };
+  const slides = buildVisitPresentationSlides(sampleData({
+    documentPanels: [panel("csd", "Club Service Director", "Rtr. Harshal Nikam", "deck-csd"), coPanel],
+  })).filter((slide) => slide.kind === "director");
+
+  assert.equal(slides.length, 1);
+  assert.equal(slides[0].title, "Rtr. Harshal Nikam");
+  assert.deepEqual(slides[0].co, { role: "Co-Club Service Director", names: ["Rtr. Shivani Kulkarni"] });
+
+  const noCo = buildVisitPresentationSlides(sampleData()).filter((slide) => slide.kind === "director");
+  assert.ok(noCo.every((slide) => slide.co === null));
+});
+
+test("a co-role keeps its own slide when the main role has no deck", () => {
+  const slides = buildVisitPresentationSlides(sampleData({
+    documentPanels: [panel("csd", "Club Service Director", "Rtr. Harshal Nikam", null), panel("co-csd", "Co-Club Service Director", "Rtr. Shivani Kulkarni", "deck-co")],
+  })).filter((slide) => slide.kind === "director");
+
+  assert.deepEqual(slides.map((slide) => slide.title), ["Rtr. Shivani Kulkarni"]);
+});
+
 test("fines and treasury show every row, split across slides", () => {
   const slides = buildVisitPresentationSlides(sampleData());
   const fines = slides.filter((slide) => slide.kind === "fines");

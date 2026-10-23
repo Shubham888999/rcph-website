@@ -219,6 +219,12 @@ function DirectorSlide({ slide }) {
         <div>
           <p className="visit-present__eyebrow">{slide.role}</p>
           <h2>{slide.title}</h2>
+          {slide.co ? (
+            <p className="visit-present__co">
+              <span>{slide.co.role}</span>
+              {slide.co.names.join(", ")}
+            </p>
+          ) : null}
         </div>
         {slide.file.openUrl ? (
           <a className="visit-present__link" href={slide.file.openUrl} target="_blank" rel="noopener noreferrer">

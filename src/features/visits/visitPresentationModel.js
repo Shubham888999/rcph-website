@@ -35,18 +35,36 @@ function avenueRows(stats, attendance) {
   return rows.map((row) => ({ ...row, share: Math.round((row.eventCount / max) * 100) }));
 }
 
+const CO_ROLE_PREFIX = "co-";
+
+function holderNames(panel) {
+  return (Array.isArray(panel?.holders) ? panel.holders : []).map((holder) => holder.displayName).filter(Boolean);
+}
+
 // One slide per main presentation, in the same order as the BOD documents section.
 // Built from whatever is selected when Present is pressed, so it follows decks as they change.
+// A co-role ("co-csd" for "csd") shares the director's deck: its holders are named on the
+// director's slide, and it gets no slide of its own while the director has a deck.
 function directorSlides(documentPanels) {
-  return groupVisibleDocumentPanelsByPerson(documentPanels).flatMap((block) => block.panels
-    .filter((panel) => panel.primaryPresentation?.previewUrl)
-    .map((panel) => ({
-      key: `director:${block.blockKey}:${panel.positionKey}`,
-      kind: "director",
-      title: block.title,
-      role: formatVisitDocumentRoleLabel(panel),
-      file: panel.primaryPresentation,
-    })));
+  const panels = Array.isArray(documentPanels) ? documentPanels : [];
+  const byKey = new Map(panels.map((panel) => [panel.positionKey, panel]));
+  const hasDeck = (panel) => Boolean(panel?.primaryPresentation?.previewUrl);
+
+  return groupVisibleDocumentPanelsByPerson(panels).flatMap((block) => block.panels
+    .filter((panel) => hasDeck(panel))
+    .filter((panel) => !(panel.positionKey.startsWith(CO_ROLE_PREFIX) && hasDeck(byKey.get(panel.positionKey.slice(CO_ROLE_PREFIX.length)))))
+    .map((panel) => {
+      const coPanel = byKey.get(`${CO_ROLE_PREFIX}${panel.positionKey}`);
+      const coNames = holderNames(coPanel);
+      return {
+        key: `director:${block.blockKey}:${panel.positionKey}`,
+        kind: "director",
+        title: block.title,
+        role: formatVisitDocumentRoleLabel(panel),
+        co: coNames.length ? { role: coPanel.positionTitle || formatVisitDocumentRoleLabel(coPanel), names: coNames } : null,
+        file: panel.primaryPresentation,
+      };
+    }));
 }
 
 function treasuryPages(treasury) {
