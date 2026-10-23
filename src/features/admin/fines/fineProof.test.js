@@ -74,7 +74,11 @@ test("fine rows use a ⋮ menu with Manage and Delete, and show the screenshot",
 });
 
 test("Treasury swaps Edit and Delete for the screenshot on fine entries", () => {
-  assert.match(financeSource, /isFineLinkedTreasury\(item\) \? \(\s*<button type="button" onClick=\{\(\) => onManageProof\(item\)\}/);
+  // v2.23.0: desktop rows use the ⋮ menu too.
+  assert.match(financeSource, /items=\{isFineLinkedTreasury\(item\) \? \[\s*\{ label: "View details", onSelect: \(\) => onDetails\(item\) \},\s*\{ label: "Manage screenshot", onSelect: \(\) => onManageProof\(item\) \},/);
+  assert.match(financeSource, /\{ label: "Delete transaction", danger: true, disabled: locked, onSelect: \(\) => onDelete\(item\) \}/);
+  assert.doesNotMatch(financeSource, /className="treasury-row-actions"/, "no more button row");
+  assert.match(financeSource, /<button type="button" className="treasury-file-link" onClick=\{\(\) => onDetails\(item\)\}>View<\/button>/);
   assert.match(financeSource, /<button type="button" role="menuitem" onClick=\{onManageProof\}>Manage screenshot<\/button>/);
   assert.match(financeSource, /<FineProofDialog target=\{fineProofTarget\}/);
 });
@@ -99,4 +103,13 @@ test("the DZR fines table links the same screenshot", () => {
   assert.equal(badLink.proofCanOpen, false, "only Drive file links are shown");
   assert.match(visitPageSource, /<th scope="col">Proof<\/th>/);
   assert.match(visitPageSource, /href=\{fine\.proofOpenUrl\}/);
+});
+
+test("Treasury type and View are plain highlighted text, and BOD tiles hide the empty deck box", () => {
+  const adminCss = read("../../../styles/components/admin.css");
+  const chip = adminCss.slice(adminCss.indexOf(".treasury-chip {"), adminCss.indexOf("}", adminCss.indexOf(".treasury-chip {")));
+  assert.doesNotMatch(chip, /border|padding/, "type label has no outline");
+  assert.match(adminCss, /\.admin-page button\.treasury-file-link \{[^}]*border: 0;[^}]*background: none;/);
+  assert.doesNotMatch(visitPageSource, /No main presentation selected yet/);
+  assert.match(visitPageSource, /\) : null\}\s*<\/button>/);
 });

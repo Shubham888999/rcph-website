@@ -747,7 +747,7 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /getVisitDocumentRoleCode\(panel\)/);
   assert.match(pageSource, /getVisitDocumentPanelActionLabel\(panel\)/);
   assert.match(pageSource, /getVisitDocumentMainPresentations\(block\)/);
-  assert.match(pageSource, /No main presentation selected yet/);
+  assert.doesNotMatch(pageSource, /No main presentation selected yet/, "tiles without a deck show no empty box");
   assert.doesNotMatch(pageSource, /visit-dashboard-folder-directory|getPanelDocumentGroups|function DocumentBlock\b|DocumentFileList|DocumentPanelBody/);
   assert.doesNotMatch(pageSource, /isPrimaryPreviewDocument/);
   assert.doesNotMatch(pageSource, /previewable\.find|previewable\[0\]/);

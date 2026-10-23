@@ -804,13 +804,6 @@ a.visit-dashboard-document-action:hover {
   background: var(--visit-deep-bg, #1d0b11);
 }
 
-.visit-dashboard-doc-tile__main.is-empty {
-  border-style: dashed;
-  color: var(--internal-text-muted);
-  background: transparent;
-  font-size: 0.8rem;
-}
-
 .visit-dashboard-doc-tile__icon {
   flex: 0 0 auto;
   color: var(--internal-accent);
