@@ -7,6 +7,7 @@ import {
   groupVisibleDocumentPanelsByPerson,
   parseOfficialDisplayName,
 } from "./visitDashboardModel.js";
+import { buildVisitClubRoster } from "./visitRosterModel.js";
 import { buildAttendanceTrend, buildAvenueMonthStrip } from "./visitTrendsModel.js";
 
 // Rows per slide for long tables, sized to stay readable on a projector.
@@ -85,7 +86,13 @@ export function buildVisitPresentationSlides(data, today = new Date()) {
     officials: visit.officialDisplayNames.map(parseOfficialDisplayName),
   });
 
-  slides.push({ key: "glance", kind: "glance", title: "Club at a glance", glance: buildGlanceStats({ stats, treasury }) });
+  slides.push({
+    key: "glance",
+    kind: "glance",
+    title: "Club at a glance",
+    glance: buildGlanceStats({ stats, treasury }),
+    roster: buildVisitClubRoster(attendance),
+  });
   slides.push({
     key: "attendance",
     kind: "attendance",

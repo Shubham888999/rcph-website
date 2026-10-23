@@ -97,7 +97,7 @@ function GlanceSlide({ slide }) {
   return (
     <>
       <SlideHeading eyebrow="Overview" title={slide.title} />
-      <div className="visit-present__tiles">
+      <div className={slide.roster.length ? "visit-present__tiles is-compact" : "visit-present__tiles"}>
         <article className="visit-present__tile">
           <h3>Members</h3>
           <p className="visit-present__number"><CountUp value={members.total} /></p>
@@ -116,7 +116,28 @@ function GlanceSlide({ slide }) {
           <p>{treasury.line}</p>
         </article>
       </div>
+      {slide.roster.length ? <ClubRoster roster={slide.roster} /> : null}
     </>
+  );
+}
+
+// Every member, in board order, filling the rest of the slide. The text size
+// follows the number of rows so the whole club fits on one screen.
+function ClubRoster({ roster }) {
+  const columns = roster.length <= 32 ? 4 : roster.length <= 70 ? 5 : 6;
+  const rows = Math.ceil(roster.length / columns);
+  return (
+    <section className="visit-present__roster" aria-label={`Our members, ${plural(roster.length, "member")}`}>
+      <h3>Our RCPH family</h3>
+      <ol style={{ "--roster-columns": columns, "--roster-rows": rows }}>
+        {roster.map((member, index) => (
+          <li key={member.key} className={member.role === "GBM" ? "is-gbm" : "is-board"} style={{ "--roster-index": Math.min(index, 60) }}>
+            <span title={member.name}>{member.name}</span>
+            <b>{member.role}</b>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

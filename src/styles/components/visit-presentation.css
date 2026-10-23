@@ -175,6 +175,113 @@
   animation: visit-present-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Club at a glance with the member grid: slimmer tiles, the grid fills the rest. */
+.visit-present__tiles.is-compact {
+  gap: clamp(0.5rem, 1.2vw, 1rem);
+}
+
+.visit-present__tiles.is-compact .visit-present__tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 0.9rem;
+  padding: clamp(0.45rem, 1.2vh, 0.8rem) clamp(0.75rem, 1.4vw, 1.1rem);
+}
+
+.visit-present__tiles.is-compact .visit-present__tile h3 {
+  grid-column: 1 / -1;
+  font-size: clamp(0.75rem, 1.1vw, 0.9rem);
+}
+
+.visit-present__tiles.is-compact .visit-present__tile .visit-present__number {
+  margin: 0.1rem 0 0;
+  font-size: clamp(1.5rem, min(3vw, 5.5vh), 2.6rem);
+}
+
+.visit-present__tiles.is-compact .visit-present__tile p:not(.visit-present__number) {
+  margin: 0;
+  font-size: clamp(0.75rem, 1vw, 0.9rem);
+}
+
+.visit-present__roster {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.visit-present__roster h3 {
+  margin: 0;
+  color: var(--internal-accent);
+  font-size: clamp(0.8rem, 1.2vw, 1rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Font size comes from the space left on screen divided by the number of rows. */
+.visit-present__roster ol {
+  /* Fit by height (rows left on screen) and by width (about 18.5 em per column, enough for a full name and its code). */
+  --roster-font: clamp(0.62rem, min(calc((100vh - 25rem) / var(--roster-rows, 10) / 2.2), calc((100vw - 9rem) / var(--roster-columns, 5) / 18.5)), 1.15rem);
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--roster-columns, 5), minmax(0, 1fr));
+  /* Rows grow into spare height (up to about 2.6 lines) so the grid fills the slide. */
+  grid-auto-rows: minmax(auto, calc(var(--roster-font) * 2.6));
+  align-content: start;
+  gap: calc(var(--roster-font) * 0.3) clamp(0.5rem, 1.2vw, 1rem);
+  font-size: var(--roster-font);
+  list-style: none;
+  overflow: auto;
+}
+
+.visit-present__roster li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em;
+  padding: 0.3em 0.55em;
+  border-left: 3px solid var(--internal-accent);
+  background: var(--internal-surface-raised, var(--internal-surface));
+  line-height: 1.25;
+  animation: visit-present-cell 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.2s + var(--roster-index, 0) * 0.02s);
+}
+
+.visit-present__roster li.is-gbm {
+  border-left-color: var(--internal-accent-secondary);
+}
+
+.visit-present__roster li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.visit-present__roster li b {
+  flex: 0 0 auto;
+  color: var(--internal-accent);
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+}
+
+.visit-present__roster li.is-gbm b {
+  color: var(--internal-text-muted);
+}
+
+@media (max-width: 40rem) {
+  .visit-present__roster ol {
+    --roster-font: 0.85rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Attendance with the trend: one compact row of tiles above the chart. */
 .visit-present__attendance.is-compact {
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
@@ -527,6 +634,7 @@
   .visit-present__slide,
   .visit-present__bar span,
   .visit-present__cell,
+  .visit-present__roster li,
   .visit-present .visit-trend.is-animated .visit-trend__area {
     animation: none;
   }
