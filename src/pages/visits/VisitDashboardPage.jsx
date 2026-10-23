@@ -26,7 +26,6 @@ import {
   getVisitDocumentPanelActionLabel,
   getVisitDocumentRoleCode,
   getVisitDocumentTileAriaLabel,
-  getVisitAttendanceEventsForAvenue,
   getVisitDashboardErrorMessage,
   getVisitDashboardTheme,
   groupVisibleDocumentPanelsByPerson,
@@ -44,6 +43,8 @@ import CollaborationMap from "../../features/collaborations/CollaborationMap.jsx
 import { buildCollaborationGeography } from "../../features/collaborations/collaborationGeography.js";
 import { CITIES, findClub } from "../../features/collaborations/clubDirectory.js";
 import { buildVisitPresentationSlides } from "../../features/visits/visitPresentationModel.js";
+import { buildAttendanceTrend, buildAvenueMonthStrip } from "../../features/visits/visitTrendsModel.js";
+import AttendanceTrendChart from "../../features/visits/AttendanceTrendChart.jsx";
 
 // Presentation mode loads only when someone presses Present.
 const VisitPresentation = lazy(() => import("./VisitPresentation.jsx"));
@@ -293,18 +294,10 @@ function ClubAtAGlance({ glance, attendanceTree }) {
   );
 }
 
-function AvenueCounts({ rows, attendance }) {
-  const activeAvenueRows = rows
-    .filter((row) => (
-      row.avenueCode !== "GBM"
-      && Number(row.count) > 0
-    ))
-    .map((row) => ({
-      ...row,
-      events: getVisitAttendanceEventsForAvenue(attendance, row),
-    }))
-    .filter((row) => row.events.length > 0);
-  const maxEventCount = Math.max(1, ...activeAvenueRows.map((row) => row.events.length));
+function AvenueMonthStrip({ stats, attendance }) {
+  const strip = useMemo(() => buildAvenueMonthStrip(stats, attendance, new Date()), [stats, attendance]);
+  const { months, rows, totals } = strip;
+  const range = months.length > 1 ? `${months[0].label} to ${months.at(-1).label}` : months[0].label;
 
   return (
     <section
@@ -316,54 +309,76 @@ function AvenueCounts({ rows, attendance }) {
       <header>
         <p className="visit-dashboard-eyebrow">Club activity</p>
         <h2 id="visit-dashboard-avenues-title">Avenue-wise events</h2>
+        <p className="visit-dashboard-avenue-range">{range}, events per month</p>
       </header>
 
-      {activeAvenueRows.length ? (
-        <ul className="visit-dashboard-avenue-list">
-          {activeAvenueRows.map((row) => {
-            const events = row.events;
-            const eventCount = events.length;
+      {rows.length ? (
+        <div className="visit-dashboard-avenue-strip" style={{ "--strip-months": months.length }}>
+          <div className="visit-dashboard-avenue-strip__inner">
+            <div className="visit-dashboard-avenue-strip__row is-head" aria-hidden="true">
+              <span>Avenue</span>
+              {months.map((month) => <span key={month.key}>{month.label}</span>)}
+              <span>Total</span>
+            </div>
 
-            return (
-              <li key={row.avenueCode}>
-                <details className="visit-dashboard-avenue-disclosure">
-                  <summary>
-                    <span className="visit-dashboard-avenue-chip__label">
-                      <strong>{row.avenueName}</strong>
-                      <small>{row.avenueCode}</small>
-                    </span>
+            <ul className="visit-dashboard-avenue-list">
+              {rows.map((row) => {
+                const events = row.events;
+                const eventCount = events.length;
+                const monthSummary = months
+                  .map((month, index) => (row.counts[index] ? `${row.counts[index]} in ${month.label}` : ""))
+                  .filter(Boolean)
+                  .join(", ");
 
-                    <span className="visit-dashboard-avenue-bar" aria-hidden="true">
-                      <span style={{ width: `${Math.round((eventCount / maxEventCount) * 100)}%` }} />
-                    </span>
+                return (
+                  <li key={row.avenueCode}>
+                    <details className="visit-dashboard-avenue-disclosure">
+                      <summary
+                        className="visit-dashboard-avenue-strip__row"
+                        aria-label={`${row.avenueName}: ${eventCount} ${eventCount === 1 ? "event" : "events"}${monthSummary ? ` (${monthSummary})` : ""}`}
+                      >
+                        <span className="visit-dashboard-avenue-chip__label">
+                          <strong>{row.avenueName}</strong>
+                          <small>{row.avenueCode}</small>
+                        </span>
 
-                    <span className="visit-dashboard-avenue-count-wrap">
-                      <b aria-label={`${eventCount} ${eventCount === 1 ? "event" : "events"}`}>
-                        {eventCount}
-                      </b>
-                      <i aria-hidden="true">&gt;</i>
-                    </span>
-                  </summary>
+                        {row.counts.map((value, index) => (
+                          <span
+                            aria-hidden="true"
+                            className={`visit-dashboard-avenue-cell is-level-${row.levels[index]}`}
+                            key={months[index].key}
+                          >
+                            {value || "·"}
+                          </span>
+                        ))}
 
-                  {events.length ? (
-                    <ul className="visit-dashboard-avenue-event-list">
-                      {events.map((event) => (
-                        <li key={event.eventId}>
-                          <strong>{event.title}</strong>
-                          <span>{event.date}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="visit-dashboard-avenue-empty">
-                      No linked attendance records found for this avenue yet.
-                    </p>
-                  )}
-                </details>
-              </li>
-            );
-          })}
-        </ul>
+                        <span className="visit-dashboard-avenue-count-wrap" aria-hidden="true">
+                          <b>{eventCount}</b>
+                          <i>&gt;</i>
+                        </span>
+                      </summary>
+
+                      <ul className="visit-dashboard-avenue-event-list">
+                        {events.map((event) => (
+                          <li key={event.eventId}>
+                            <strong>{event.title}</strong>
+                            <span>{event.date}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="visit-dashboard-avenue-strip__row is-total" aria-label={`Total: ${strip.total} events`}>
+              <span>Total</span>
+              {totals.map((value, index) => <span aria-hidden="true" key={months[index].key}>{value || "·"}</span>)}
+              <span aria-hidden="true">{strip.total}</span>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="visit-dashboard-empty-state">
           <strong>No avenue-wise events have been recorded yet.</strong>
@@ -790,6 +805,7 @@ function AttendanceTable({ view }) {
 function AttendanceRecords({ attendance }) {
   const [activeTab, setActiveTab] = useState(VISIT_ATTENDANCE_TABS[0].key);
   const currentTab = validVisitAttendanceTab(activeTab);
+  const trend = useMemo(() => buildAttendanceTrend(attendance, new Date()), [attendance]);
 
   return (
     <details className="visit-dashboard-attendance" id="visit-dashboard-attendance" aria-labelledby="visit-dashboard-attendance-title">
@@ -800,6 +816,7 @@ function AttendanceRecords({ attendance }) {
         </span>
         <b>View</b>
       </summary>
+      <AttendanceTrendChart trend={trend} />
       <div className="visit-dashboard-attendance-tabs" role="tablist" aria-label="Attendance views">
         {VISIT_ATTENDANCE_TABS.map((tab) => (
           <button
@@ -1291,7 +1308,7 @@ export default function VisitDashboardPage() {
 
         <ClubAtAGlance glance={glance} attendanceTree={attendanceTree} />
 
-        <AvenueCounts rows={stats.avenueEventCounts} attendance={attendance} />
+        <AvenueMonthStrip stats={stats} attendance={attendance} />
 
         <DocumentPanels panels={documentPanels} theme={theme} />
 

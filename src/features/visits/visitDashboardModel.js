@@ -1415,6 +1415,7 @@ export function getVisitAttendanceEventsForAvenue(attendance, row) {
       eventId: column.eventId,
       title: column.title,
       date: formatVisitDashboardDate(column.date) || column.date || "Date unavailable",
+      isoDate: column.date,
     }];
   });
 }

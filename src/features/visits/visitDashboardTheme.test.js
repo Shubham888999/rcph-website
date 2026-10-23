@@ -132,13 +132,15 @@ test("the three stats charts render the v2.16.0 markup for every visit", () => {
   assert.doesNotMatch(pageSource, /CarrotCharts|CarrotTreeBar|PlantedCarrots|AvenueCarrot/);
   assert.match(pageSource, /className="visit-dashboard-tree-bar"[\s\S]{0,160}\{node\.rate === null \? null : <span style=\{\{ width: `\$\{node\.rate\}%` \}\} \/>\}/);
   assert.match(pageSource, /<i style=\{\{ height: `\$\{Math\.max\(bar\.share, 8\)\}%` \}\} \/>/, "events columns keep their minimum height");
-  assert.match(pageSource, /<span className="visit-dashboard-avenue-bar" aria-hidden="true">\s*<span style=\{\{ width: `\$\{Math\.round\(\(eventCount \/ maxEventCount\) \* 100\)\}%` \}\} \/>/);
+  // v2.21.0: the avenue bars became the July to now month strip.
+  assert.doesNotMatch(pageSource, /visit-dashboard-avenue-bar/);
+  assert.match(pageSource, /className=\{`visit-dashboard-avenue-cell is-level-\$\{row\.levels\[index\]\}`\}/);
   const section = carrotSection();
   assert.match(section, /\.visit-dashboard-glance-columns i \{[^}]*border-radius: 0;[^}]*clip-path: polygon\(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%\)/);
   assert.match(section, /\.visit-dashboard-glance-columns span:last-child i \{\s*background: var\(--visit-leaf-fill\)/);
-  assert.match(section, /:is\(\.visit-dashboard-tree-bar span, \.visit-dashboard-avenue-bar span\) \{[^}]*clip-path: polygon\(0 0, 94% 18%, 100% 50%, 94% 82%, 0 100%\)/);
+  assert.match(section, /\.visit-dashboard-tree-bar span \{[^}]*clip-path: polygon\(0 0, 94% 18%, 100% 50%, 94% 82%, 0 100%\)/);
   assert.match(section, /\.is-board \.visit-dashboard-tree-bar span \{\s*background: var\(--visit-leaf-fill\)/);
-  assert.match(section, /:is\(\.visit-dashboard-glance-bar, \.visit-dashboard-tree-bar, \.visit-dashboard-avenue-bar\) \{\s*border-radius: 0;/, "tracks follow the sharp edges");
+  assert.match(section, /:is\(\.visit-dashboard-glance-bar, \.visit-dashboard-tree-bar\) \{\s*border-radius: 0;/, "tracks follow the sharp edges");
   assert.doesNotMatch(section, /carrot-bar|visit-dashboard-planted|avenue-carrot|--visit-rings|--visit-soil/);
 });
 

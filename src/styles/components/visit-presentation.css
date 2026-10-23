@@ -175,25 +175,127 @@
   animation: visit-present-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.visit-present__avenues {
+/* Attendance with the trend: one compact row of tiles above the chart. */
+.visit-present__attendance.is-compact {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: clamp(0.5rem, 1.2vw, 1rem);
+}
+
+.visit-present__attendance.is-compact .is-overall {
+  grid-column: auto;
+}
+
+.visit-present__attendance.is-compact .visit-present__tile {
+  padding: clamp(0.6rem, 1.6vh, 1rem) clamp(0.75rem, 1.4vw, 1.1rem);
+}
+
+.visit-present__attendance.is-compact .visit-present__note {
+  display: none;
+}
+
+.visit-present__attendance.is-compact .visit-present__tile .visit-present__number {
+  font-size: clamp(1.6rem, min(3.4vw, 6vh), 3rem);
+}
+
+.visit-present .visit-trend {
+  flex: 1;
+  min-height: 0;
   margin: 0;
-  padding: 0;
-  display: grid;
-  gap: clamp(0.6rem, 1.6vh, 1rem);
-  list-style: none;
 }
 
-.visit-present__avenues li {
-  display: grid;
-  grid-template-columns: minmax(10rem, 18rem) minmax(0, 1fr) 3rem;
-  align-items: center;
-  gap: 1rem;
-  font-size: clamp(1rem, 1.6vw, 1.35rem);
+.visit-present .visit-trend__chart {
+  --trend-height: clamp(8rem, calc(100vh - 31rem), 22rem);
 }
 
-.visit-present__avenues strong {
-  text-align: right;
+.visit-present .visit-trend__head strong {
+  font-size: clamp(1rem, 1.6vw, 1.3rem);
+}
+
+.visit-present .visit-trend__legend,
+.visit-present .visit-trend__y,
+.visit-present .visit-trend__x {
+  font-size: clamp(0.8rem, 1.2vw, 1rem);
+}
+
+.visit-present .visit-trend__dot {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+/* Avenue strip: months fill in left to right. */
+.visit-present__strip-wrap {
+  min-height: 0;
+  overflow: auto;
+}
+
+.visit-present__strip {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0.3rem;
+  font-size: clamp(0.9rem, min(1.8vw, 2.9vh), 1.5rem);
   font-variant-numeric: tabular-nums;
+}
+
+.visit-present__strip th {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.visit-present__strip thead th {
+  color: var(--internal-text-muted);
+  font-size: 0.8em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.visit-present__strip :is(thead, tbody, tfoot) th:first-child {
+  text-align: left;
+}
+
+.visit-present__strip td {
+  text-align: center;
+}
+
+.visit-present__strip .is-number {
+  text-align: right;
+  font-weight: 800;
+}
+
+.visit-present__strip tfoot :is(th, td) {
+  padding-top: 0.4rem;
+  border-top: 2px solid var(--internal-border-strong, var(--internal-border));
+  font-weight: 800;
+}
+
+.visit-present__cell {
+  min-height: max(1.9rem, 5vh);
+  display: grid;
+  place-items: center;
+  border-radius: var(--internal-radius-control, 0.5rem);
+  color: var(--internal-text-muted);
+  font-weight: 800;
+  animation: visit-present-cell 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.25s + var(--strip-col, 0) * 0.14s);
+}
+
+.visit-present__cell.is-level-1 {
+  color: var(--internal-text);
+  background: color-mix(in srgb, var(--internal-accent) 22%, var(--internal-surface));
+}
+
+.visit-present__cell.is-level-2 {
+  color: var(--internal-text);
+  background: color-mix(in srgb, var(--internal-accent) 45%, var(--internal-surface));
+}
+
+.visit-present__cell.is-level-3 {
+  color: var(--internal-page-bg);
+  background: color-mix(in srgb, var(--internal-accent) 85%, var(--internal-surface));
+}
+
+.visit-present__cell.is-level-4 {
+  color: var(--internal-page-bg);
+  background: var(--internal-accent);
 }
 
 .visit-present__map {
@@ -408,26 +510,24 @@
   }
 }
 
+@keyframes visit-present-cell {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
 @keyframes visit-present-grow {
   from {
     transform: scaleX(0);
   }
 }
 
-@media (max-width: 40rem) {
-  .visit-present__avenues li {
-    grid-template-columns: minmax(0, 1fr) 2.5rem;
-  }
-
-  .visit-present__avenues .visit-present__bar {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .visit-present__slide,
-  .visit-present__bar span {
+  .visit-present__bar span,
+  .visit-present__cell,
+  .visit-present .visit-trend.is-animated .visit-trend__area {
     animation: none;
   }
 

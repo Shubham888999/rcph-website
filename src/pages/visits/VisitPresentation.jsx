@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import CollaborationMap from "../../features/collaborations/CollaborationMap.jsx";
+import AttendanceTrendChart from "../../features/visits/AttendanceTrendChart.jsx";
 import {
   formatVisitAttendanceName,
   formatVisitDashboardDate,
@@ -139,7 +140,7 @@ function AttendanceSlide({ slide }) {
   return (
     <>
       <SlideHeading eyebrow="Overview" title={slide.title} />
-      <div className="visit-present__attendance">
+      <div className={slide.trend.hasPoints ? "visit-present__attendance is-compact" : "visit-present__attendance"}>
         {ATTENDANCE_NODES.map((node) => {
           const value = slide.tree[node.key];
           return (
@@ -152,23 +153,49 @@ function AttendanceSlide({ slide }) {
           );
         })}
       </div>
+      {slide.trend.hasPoints ? <AttendanceTrendChart trend={slide.trend} animated /> : null}
     </>
   );
 }
 
+// Months fill in left to right: each column's cells share a delay.
 function AvenuesSlide({ slide }) {
+  const { months, rows, totals, total } = slide.strip;
+  const range = months.length > 1 ? `${months[0].label} to ${months.at(-1).label}` : months[0].label;
   return (
     <>
-      <SlideHeading eyebrow="Club activity" title={slide.title} />
-      <ul className="visit-present__avenues">
-        {slide.rows.map((row) => (
-          <li key={row.avenueCode}>
-            <span className="visit-present__avenue-name">{row.avenueName}</span>
-            <Bar share={row.share} />
-            <strong>{row.eventCount}</strong>
-          </li>
-        ))}
-      </ul>
+      <SlideHeading eyebrow={`Club activity · ${range}`} title={slide.title} />
+      <div className="visit-present__strip-wrap">
+        <table className="visit-present__strip">
+          <thead>
+            <tr>
+              <th scope="col">Avenue</th>
+              {months.map((month) => <th scope="col" key={month.key}>{month.label}</th>)}
+              <th scope="col" className="is-number">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.avenueCode}>
+                <th scope="row">{row.avenueName}</th>
+                {row.counts.map((value, index) => (
+                  <td key={months[index].key} style={{ "--strip-col": index }}>
+                    <span className={`visit-present__cell is-level-${row.levels[index]}`}>{value || "·"}</span>
+                  </td>
+                ))}
+                <td className="is-number">{row.total}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Total</th>
+              {totals.map((value, index) => <td key={months[index].key}>{value || "·"}</td>)}
+              <td className="is-number">{total}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </>
   );
 }

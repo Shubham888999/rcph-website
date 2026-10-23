@@ -719,12 +719,10 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /Avenue-wise events/);
   assert.match(pageSource, /visit-dashboard-avenue-chip__label/);
   assert.match(pageSource, /visit-dashboard-avenue-disclosure/);
-  assert.match(pageSource, /getVisitAttendanceEventsForAvenue\(attendance, row\)/);
+  assert.match(pageSource, /buildAvenueMonthStrip\(stats, attendance, new Date\(\)\)/);
   assert.match(pageSource, /visit-dashboard-avenue-event-list/);
-  assert.match(pageSource, /\.filter\(\(row\) => row\.events\.length > 0\)/);
   assert.match(pageSource, /const eventCount = events\.length/);
-  assert.match(pageSource, /activeAvenueRows\.map\(\(row\)/);
-  assert.match(pageSource, /No linked attendance records found for this avenue yet\./);
+  assert.match(pageSource, /rows\.map\(\(row\) => \{/);
   assert.doesNotMatch(pageSource, /No events recorded for this avenue yet\./);
   assert.doesNotMatch(pageSource, /is-zero/);
   assert.doesNotMatch(pageSource, /keep existing summary\/body exactly same/i);
@@ -897,7 +895,8 @@ test("visit dashboard CSS keeps metrics readable and compact sections gridded", 
   assert.doesNotMatch(visitCssSource, /visit-dashboard-stat-rail|visit-dashboard-finance-|visit-dashboard-treasury-summary|visit-dashboard-fines-summary/);
   assert.match(visitCssSource, /\.visit-dashboard-glance-grid \{[\s\S]*repeat\(auto-fit, minmax\(min\(260px, 100%\), 1fr\)\)/);
   assert.match(visitCssSource, /\.visit-dashboard-glance-value \{[\s\S]*font-variant-numeric: tabular-nums/);
-  assert.match(visitCssSource, /\.visit-dashboard-avenue-list \{[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(visitCssSource, /\.visit-dashboard-avenue-strip__row \{[\s\S]*grid-template-columns: var\(--strip-columns\)/);
+  assert.match(visitCssSource, /\.visit-dashboard-avenue-strip \{[^}]*overflow-x: auto/);
   assert.match(visitCssSource, /@media \(max-width: 720px\) \{[\s\S]*\.visit-dashboard-avenue-list \{\s*grid-template-columns: 1fr/);
   assert.match(visitCssSource, /\.visit-dashboard-avenue-list li \{[\s\S]*border-bottom:/);
   assert.doesNotMatch(visitCssSource, /\.visit-dashboard-avenue-list li \{[^}]*border-radius/);

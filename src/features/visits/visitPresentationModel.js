@@ -4,10 +4,10 @@ import {
   buildTreasuryLedger,
   buildVisitAttendanceTree,
   formatVisitDocumentRoleLabel,
-  getVisitAttendanceEventsForAvenue,
   groupVisibleDocumentPanelsByPerson,
   parseOfficialDisplayName,
 } from "./visitDashboardModel.js";
+import { buildAttendanceTrend, buildAvenueMonthStrip } from "./visitTrendsModel.js";
 
 // Rows per slide for long tables, sized to stay readable on a projector.
 export const PRESENTATION_ROWS_PER_SLIDE = 10;
@@ -20,19 +20,6 @@ function chunk(items, size) {
 
 function pageTitle(title, pageIndex, pageCount) {
   return pageCount > 1 ? `${title} (${pageIndex + 1} of ${pageCount})` : title;
-}
-
-function avenueRows(stats, attendance) {
-  const rows = (Array.isArray(stats?.avenueEventCounts) ? stats.avenueEventCounts : [])
-    .filter((row) => row.avenueCode !== "GBM" && Number(row.count) > 0)
-    .map((row) => ({
-      avenueCode: row.avenueCode,
-      avenueName: row.avenueName || row.avenueCode,
-      eventCount: getVisitAttendanceEventsForAvenue(attendance, row).length,
-    }))
-    .filter((row) => row.eventCount > 0);
-  const max = Math.max(1, ...rows.map((row) => row.eventCount));
-  return rows.map((row) => ({ ...row, share: Math.round((row.eventCount / max) * 100) }));
 }
 
 const CO_ROLE_PREFIX = "co-";
@@ -74,7 +61,7 @@ function treasuryPages(treasury) {
 }
 
 // Turns normalized visit dashboard data into presentation slides.
-export function buildVisitPresentationSlides(data) {
+export function buildVisitPresentationSlides(data, today = new Date()) {
   const { visit, stats, documentPanels, attendance, fines, treasury, letterhead, collaborations } = data;
   const slides = [];
 
@@ -87,10 +74,16 @@ export function buildVisitPresentationSlides(data) {
   });
 
   slides.push({ key: "glance", kind: "glance", title: "Club at a glance", glance: buildGlanceStats({ stats, treasury }) });
-  slides.push({ key: "attendance", kind: "attendance", title: "Attendance", tree: buildVisitAttendanceTree(attendance) });
+  slides.push({
+    key: "attendance",
+    kind: "attendance",
+    title: "Attendance",
+    tree: buildVisitAttendanceTree(attendance),
+    trend: buildAttendanceTrend(attendance, today),
+  });
 
-  const avenues = avenueRows(stats, attendance);
-  if (avenues.length) slides.push({ key: "avenues", kind: "avenues", title: "Avenue-wise events", rows: avenues });
+  const strip = buildAvenueMonthStrip(stats, attendance, today);
+  if (strip.rows.length) slides.push({ key: "avenues", kind: "avenues", title: "Avenue-wise events", strip });
 
   if (collaborations?.rows.length) {
     slides.push({
