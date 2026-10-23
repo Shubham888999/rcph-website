@@ -16,7 +16,7 @@ function ClubList({ clubs, hidden }) {
   return (
     <ul className="woh-ribbon__list" aria-hidden={hidden ? "true" : undefined}>
       {clubs.map((club) => (
-        <li key={club.slug} className={`woh-ribbon__club${club.host ? " is-host" : ""}`}>
+        <li key={club.slug} className="woh-ribbon__club">
           <ClubLogo src={club.logo} />
           <span>
             <span className="woh-ribbon__of">Rotaract Club of</span>

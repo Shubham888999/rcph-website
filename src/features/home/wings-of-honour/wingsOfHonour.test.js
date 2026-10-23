@@ -66,10 +66,10 @@ test("cards and viewer show no club name or language per story", () => {
   assert.match(sectionSource, /<ThankYouCycler/);
 });
 
-test("collaborator ribbon lists the host and all 13 collaborating clubs", () => {
-  assert.equal(collaborators.length, 14);
-  assert.equal(collaborators.filter((club) => club.host).length, 1);
-  assert.equal(new Set(collaborators.map((club) => club.name)).size, 14);
+test("collaborator ribbon lists the 13 collaborating clubs, not the host", () => {
+  assert.equal(collaborators.length, 13);
+  assert.equal(collaborators.some((club) => club.slug === "pune-heritage"), false);
+  assert.equal(new Set(collaborators.map((club) => club.name)).size, 13);
   for (const club of collaborators) {
     assert.equal(club.logo, LOGOS_ENABLED ? `/media/wings-of-honour/logos/${club.slug}.webp` : null);
   }

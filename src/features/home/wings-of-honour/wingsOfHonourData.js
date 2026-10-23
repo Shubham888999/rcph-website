@@ -90,14 +90,13 @@ const stories = Array.from({ length: STORY_COUNT }, (_, index) => {
 // The rotation order. The banner leads, then each story.
 export const formationItems = [banner, ...stories];
 
-// Ribbon of every participating club. With LOGOS_ENABLED, logos are picked up from
+// Ribbon of the collaborating clubs (RCPH hosts, so it is not listed). With LOGOS_ENABLED, logos are picked up from
 // public/media/wings-of-honour/logos/<slug>.webp; a club without a file shows its name only.
 // Leave it false until the logo files are added, so the live site makes no requests for them.
 export const LOGOS_ENABLED = false;
 const LOGO_ROOT = `${MEDIA_ROOT}/logos`;
 
 export const collaborators = [
-  { slug: "pune-heritage", name: "Pune Heritage", district: "Host · RID 3131", host: true },
   { slug: "rscoe", name: "RSCOE", district: "RID 3131" },
   { slug: "pune-westside", name: "Pune Westside", district: "RID 3131" },
   { slug: "pune-shaniwarwada", name: "Pune Shaniwarwada", district: "RID 3131" },
