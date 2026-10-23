@@ -15,7 +15,6 @@ export function queuePosition(index, lead, count) {
 // the section is off screen or the tab is hidden.
 export default function useFormationRotation({ count, active, reduceMotion, timing }) {
   const [lead, setLead] = useState(0);
-  const [userPaused, setUserPaused] = useState(false);
   const leadRef = useRef(0);
   const blockersRef = useRef(new Set());
   const holdUntilRef = useRef(0);
@@ -53,11 +52,6 @@ export default function useFormationRotation({ count, active, reduceMotion, timi
     else blockersRef.current.delete(name);
   }, []);
 
-  const toggleUserPaused = useCallback(() => {
-    setUserPaused((paused) => !paused);
-    nextAutoAtRef.current = Date.now() + 1200;
-  }, []);
-
   useEffect(() => {
     if (!active || count < 2) return undefined;
 
@@ -67,7 +61,7 @@ export default function useFormationRotation({ count, active, reduceMotion, timi
       const now = Date.now();
       const blocked = blockersRef.current.size > 0 || document.visibilityState === "hidden";
 
-      if (reduceMotion || userPaused || blocked) return;
+      if (reduceMotion || blocked) return;
       if (now < holdUntilRef.current || now < nextAutoAtRef.current) return;
 
       applyLead(leadRef.current + 1);
@@ -75,15 +69,13 @@ export default function useFormationRotation({ count, active, reduceMotion, timi
     }, TICK_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [active, applyLead, count, reduceMotion, timing.autoAdvanceMs, userPaused]);
+  }, [active, applyLead, count, reduceMotion, timing.autoAdvanceMs]);
 
   return {
     lead,
-    userPaused,
     goTo,
     step,
     hold,
     setBlocker,
-    toggleUserPaused,
   };
 }

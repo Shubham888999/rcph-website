@@ -264,19 +264,6 @@
     transform var(--transition-fast);
 }
 
-/* Thin saffron, white and green line echoing the Wings of Honour contrail. */
-.public-event-link::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  right: 0.6rem;
-  bottom: 0.3rem;
-  left: 0.6rem;
-  height: 2px;
-  opacity: 0.7;
-  background: linear-gradient(90deg, #ff9933 0 33%, #f1e8d8 33% 66%, #2fa84f 66% 100%);
-}
-
 .public-event-link:hover {
   border-color: rgba(216, 180, 122, 0.9);
   box-shadow:

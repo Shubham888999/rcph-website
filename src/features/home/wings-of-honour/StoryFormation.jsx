@@ -103,7 +103,7 @@ function CardFace({ item, number, eager }) {
 }
 
 export default function StoryFormation({ items, rotation, focusRequest, onOpen }) {
-  const { lead, userPaused, goTo, step, setBlocker, toggleUserPaused } = rotation;
+  const { lead, goTo, step, setBlocker } = rotation;
   const count = items.length;
   const fleetRef = useRef(null);
   const cardRefs = useRef([]);
@@ -253,14 +253,6 @@ export default function StoryFormation({ items, rotation, focusRequest, onOpen }
         </span>
         <button type="button" className="woh-formation__control" aria-label="Next story" onClick={() => step(1)}>
           <ChevronIcon direction="next" />
-        </button>
-        <button
-          type="button"
-          className="woh-formation__control"
-          aria-pressed={userPaused}
-          onClick={toggleUserPaused}
-        >
-          {userPaused ? "Play" : "Pause"}
         </button>
       </div>
     </div>
