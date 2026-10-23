@@ -48,106 +48,47 @@ export const thankYous = [
   { name: "Urdu", text: "شکریہ", lang: "ur", dir: "rtl" },
 ];
 
-// Each item's files live in public/media/wings-of-honour/ as <slug>-card.webp (400px wide),
-// <slug>-poster.webp (1080px wide) and <slug>.mp4 (viewer only).
-// Pass `true` once an item's files are committed; until then it shows a placeholder.
-function storyMedia(slug, ready = false) {
-  if (!ready) return { mediaSlug: slug, card: null, poster: null, video: null };
+// Story files go in public/media/wings-of-honour/, numbered in any order you like:
+//   story-01-card.webp (400px wide), story-01-poster.webp (1080px wide), story-01.mp4 (viewer only)
+// The banner uses 00-banner-card.webp and 00-banner-poster.webp.
+// A missing file shows a placeholder, so stories appear as soon as their files are added.
+// Change STORY_COUNT to show more or fewer stories.
+export const STORY_COUNT = 8;
 
+const STORY_TONES = ["#2b3d5a", "#24344f", "#33476a", "#1a2740", "#2f4260", "#203049", "#28395a", "#1d2c45"];
+
+function mediaFor(slug, { hasVideo = true } = {}) {
   return {
-    mediaSlug: slug,
     card: `${MEDIA_ROOT}/${slug}-card.webp`,
     poster: `${MEDIA_ROOT}/${slug}-poster.webp`,
-    video: `${MEDIA_ROOT}/${slug}.mp4`,
+    video: hasVideo ? `${MEDIA_ROOT}/${slug}.mp4` : null,
   };
 }
 
+const banner = {
+  id: "banner",
+  type: "banner",
+  title: "Wings of Honour",
+  subtitle: "Presented by RCPH",
+  meta: ["Tri-Service Tribute", "Indian Air Force Day", "8 October 2026"],
+  alt: "Wings of Honour event banner: a tribute to the Indian Air Force, presented by the Rotaract Club of Pune Heritage on 8 October 2026",
+  ...mediaFor("00-banner", { hasVideo: false }),
+};
+
+const stories = Array.from({ length: STORY_COUNT }, (_, index) => {
+  const number = String(index + 1).padStart(2, "0");
+
+  return {
+    id: `story-${number}`,
+    type: "story",
+    alt: "A Rotaractor thanks the Indian Air Force in their mother tongue",
+    tone: STORY_TONES[index % STORY_TONES.length],
+    ...mediaFor(`story-${number}`),
+  };
+});
+
 // The rotation order. The banner leads, then each story.
-export const formationItems = [
-  {
-    id: "banner",
-    type: "banner",
-    title: "Wings of Honour",
-    subtitle: "Presented by RCPH",
-    meta: ["Tri-Service Tribute", "Indian Air Force Day", "8 October 2026"],
-    alt: "Wings of Honour event banner: a tribute to the Indian Air Force, presented by the Rotaract Club of Pune Heritage on 8 October 2026",
-    // The banner is a still image, so it has no video.
-    ...storyMedia("00-banner"),
-    video: null,
-  },
-  {
-    id: "rcph",
-    type: "story",
-    club: "Pune Heritage",
-    district: "RID 3131",
-    alt: "A member of the Rotaract Club of Pune Heritage thanks the Indian Air Force",
-    tone: "#2b3d5a",
-    ...storyMedia("01-pune-heritage"),
-  },
-  {
-    id: "bhubaneshwar-jaydev",
-    type: "story",
-    club: "Bhubaneshwar Jaydev",
-    district: "RID 3262",
-    alt: "A member of the Rotaract Club of Bhubaneshwar Jaydev thanks the Indian Air Force",
-    tone: "#24344f",
-    ...storyMedia("02-bhubaneshwar-jaydev"),
-  },
-  {
-    id: "curchorem-sanvordem",
-    type: "story",
-    club: "Curchorem-Sanvordem",
-    district: "RID 3170",
-    alt: "A member of the Rotaract Club of Curchorem-Sanvordem thanks the Indian Air Force",
-    tone: "#33476a",
-    ...storyMedia("03-curchorem-sanvordem"),
-  },
-  {
-    id: "lead-india-ahead",
-    type: "story",
-    club: "Lead India Ahead",
-    district: "RID 3206",
-    alt: "A member of the Rotaract Club of Lead India Ahead thanks the Indian Air Force",
-    tone: "#1a2740",
-    ...storyMedia("04-lead-india-ahead"),
-  },
-  {
-    id: "rvce",
-    type: "story",
-    club: "RVCE",
-    district: "RID 3191",
-    alt: "A member of the Rotaract Club of RVCE thanks the Indian Air Force",
-    tone: "#2f4260",
-    ...storyMedia("05-rvce"),
-  },
-  {
-    id: "mumbai-downtown",
-    type: "story",
-    club: "Mumbai DownTown",
-    district: "RID 3141",
-    alt: "A member of the Rotaract Club of Mumbai DownTown thanks the Indian Air Force",
-    tone: "#203049",
-    ...storyMedia("06-mumbai-downtown"),
-  },
-  {
-    id: "mount-carmel",
-    type: "story",
-    club: "Mount Carmel",
-    district: "RID 3191",
-    alt: "A member of the Rotaract Club of Mount Carmel thanks the Indian Air Force",
-    tone: "#28395a",
-    ...storyMedia("07-mount-carmel"),
-  },
-  {
-    id: "roar-nibm",
-    type: "story",
-    club: "Roar NIBM",
-    district: "RID 3131",
-    alt: "A member of the Rotaract Club of Roar NIBM thanks the Indian Air Force",
-    tone: "#1d2c45",
-    ...storyMedia("08-roar-nibm"),
-  },
-];
+export const formationItems = [banner, ...stories];
 
 // Ribbon of every participating club. Add a logo path (square PNG or WebP) to replace the placeholder circle.
 export const collaborators = [

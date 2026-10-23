@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   INSTAGRAM_HIGHLIGHT_URL,
   SECTION_ID,
+  STORY_COUNT,
   collaborators,
   eventDetails,
   featuredEventBadge,
@@ -27,20 +28,22 @@ const packageJson = JSON.parse(read("../../../../package.json"));
 
 const stories = formationItems.filter((item) => item.type === "story");
 
-test("formation starts with the banner and features eight stories", () => {
+test("formation starts with the banner followed by numbered stories", () => {
   assert.equal(formationItems[0].type, "banner");
-  assert.equal(stories.length, 8);
+  assert.equal(stories.length, STORY_COUNT);
   assert.equal(new Set(formationItems.map((item) => item.id)).size, formationItems.length);
-});
 
-test("every story credits its club and district", () => {
-  for (const story of stories) {
-    assert.ok(story.club, `${story.id} needs a club`);
-    assert.match(story.district, /^RID \d{4}$/);
-    assert.ok(story.alt.length > 30, `${story.id} needs real alt text`);
-  }
+  stories.forEach((story, index) => {
+    const slug = `story-${String(index + 1).padStart(2, "0")}`;
+    assert.equal(story.id, slug);
+    assert.equal(story.card, `/media/wings-of-honour/${slug}-card.webp`);
+    assert.equal(story.poster, `/media/wings-of-honour/${slug}-poster.webp`);
+    assert.equal(story.video, `/media/wings-of-honour/${slug}.mp4`);
+    assert.ok(story.alt.length > 30, `${slug} needs alt text`);
+  });
 
-  assert.equal(new Set(stories.map((story) => story.district)).size, 6, "all six districts should be featured");
+  assert.equal(formationItems[0].card, "/media/wings-of-honour/00-banner-card.webp");
+  assert.equal(formationItems[0].video, null, "the banner is a still image");
 });
 
 test("thank you cycles through all 11 campaign languages with script direction", () => {
@@ -55,25 +58,11 @@ test("thank you cycles through all 11 campaign languages with script direction",
   assert.equal(thankYous.find((entry) => entry.lang === "ur").dir, "rtl");
 });
 
-test("cards and viewer no longer show a language per story", () => {
-  assert.doesNotMatch(formationSource, /language/);
-  assert.doesNotMatch(viewerSource, /language/);
+test("cards and viewer show no club name or language per story", () => {
+  assert.doesNotMatch(formationSource, /language|item\.club|item\.district/);
+  assert.doesNotMatch(viewerSource, /language|item\.club|item\.district/);
   assert.doesNotMatch(sectionSource, /woh__language/);
   assert.match(sectionSource, /<ThankYouCycler/);
-});
-
-test("media paths are either all set or all empty for each item", () => {
-  for (const item of formationItems) {
-    const hasCard = Boolean(item.card);
-    assert.equal(Boolean(item.poster), hasCard, `${item.id} card and poster should be set together`);
-    if (item.card) {
-      assert.match(item.card, /^\/media\/wings-of-honour\/.+-card\.webp$/);
-      assert.match(item.poster, /^\/media\/wings-of-honour\/.+-poster\.webp$/);
-    }
-    if (item.video) assert.match(item.video, /^\/media\/wings-of-honour\/.+\.mp4$/);
-  }
-
-  assert.equal(formationItems[0].video, null, "the banner is a still image");
 });
 
 test("collaborator ribbon lists the host and all 13 collaborating clubs", () => {
@@ -115,6 +104,12 @@ test("nav badge reads from the event data and drops the VOX copy", () => {
   assert.match(layoutSource, /\{featuredEventBadge\.label\}/);
   assert.doesNotMatch(layoutSource, /VOX|MOMENTS LIVE|installation-cut/);
   assert.doesNotMatch(layoutCss, /public-vox-link/);
+});
+
+test("missing media falls back to a placeholder instead of a broken image", () => {
+  assert.match(formationSource, /onError=\{\(\) => setFailed\(true\)\}/);
+  assert.match(viewerSource, /onFailed\("video"\)/);
+  assert.match(viewerSource, /onFailed\("all"\)/);
 });
 
 test("cards never load video and only the first three load eagerly", () => {

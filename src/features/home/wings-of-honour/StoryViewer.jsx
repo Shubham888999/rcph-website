@@ -12,12 +12,12 @@ function CloseIcon() {
   );
 }
 
-function describe(item) {
+function describe(item, index, total) {
   if (item.type === "banner") {
     return { title: item.title, detail: item.meta.join(" · ") };
   }
 
-  return { title: `Rotaract Club of ${item.club}`, detail: item.district };
+  return { title: "Wings of Honour", detail: `Story ${index} of ${total}` };
 }
 
 function SpeakerIcon({ muted }) {
@@ -41,7 +41,7 @@ function SpeakerIcon({ muted }) {
 
 // React only applies `muted` on first render, so sound is set on the element directly.
 // Playback starts with sound; if the browser refuses, it falls back to muted.
-function StoryVideo({ item, soundOn, onAutoplayMuted, onProgress, onEnded }) {
+function StoryVideo({ item, soundOn, onAutoplayMuted, onProgress, onEnded, onFailed }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -76,12 +76,14 @@ function StoryVideo({ item, soundOn, onAutoplayMuted, onProgress, onEnded }) {
         if (duration > 0) onProgress(currentTime / duration);
       }}
       onEnded={onEnded}
+      onError={onFailed}
     />
   );
 }
 
-function StoryMedia({ item, soundOn, onAutoplayMuted, onProgress, onEnded }) {
-  if (item.video) {
+// Plays the video, falls back to the still if the video is missing, then to a placeholder.
+function StoryMedia({ item, label, failure, soundOn, onAutoplayMuted, onProgress, onEnded, onFailed }) {
+  if (item.video && !failure) {
     return (
       <StoryVideo
         item={item}
@@ -89,17 +91,20 @@ function StoryMedia({ item, soundOn, onAutoplayMuted, onProgress, onEnded }) {
         onAutoplayMuted={onAutoplayMuted}
         onProgress={onProgress}
         onEnded={onEnded}
+        onFailed={() => onFailed("video")}
       />
     );
   }
 
-  if (item.poster) {
-    return <img className="woh-viewer__media" src={item.poster} alt={item.alt} decoding="async" />;
+  if (item.poster && failure !== "all") {
+    return (
+      <img className="woh-viewer__media" src={item.poster} alt={item.alt} decoding="async" onError={() => onFailed("all")} />
+    );
   }
 
   return (
     <div className="woh-viewer__placeholder" role="img" aria-label={item.alt}>
-      <span className="woh-viewer__placeholder-word">{item.type === "banner" ? item.title : item.club}</span>
+      <span className="woh-viewer__placeholder-word">{label}</span>
       <span className="woh-viewer__placeholder-note">
         {item.type === "banner" ? "Event banner placeholder" : "Story video placeholder"}
       </span>
@@ -109,7 +114,10 @@ function StoryMedia({ item, soundOn, onAutoplayMuted, onProgress, onEnded }) {
 
 export default function StoryViewer({ items, index, timing, onIndexChange, onClose }) {
   const item = items[index];
-  const { title, detail } = describe(item);
+  const { title, detail } = describe(item, index, items.length - 1);
+  const [failures, setFailures] = useState({});
+  const failure = failures[item.id];
+  const playsVideo = Boolean(item.video) && !failure;
   const timedDuration = item.type === "banner" ? timing.bannerStoryMs : timing.placeholderStoryMs;
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -217,6 +225,9 @@ export default function StoryViewer({ items, index, timing, onIndexChange, onClo
         <StoryMedia
           key={item.id}
           item={item}
+          label={item.type === "banner" ? item.title : `Story ${index}`}
+          failure={failure}
+          onFailed={(level) => setFailures((current) => ({ ...current, [item.id]: level }))}
           soundOn={soundOn}
           onAutoplayMuted={() => setSoundOn(false)}
           onProgress={updateVideoProgress}
@@ -226,7 +237,7 @@ export default function StoryViewer({ items, index, timing, onIndexChange, onClo
         <div className="woh-viewer__bars" aria-hidden="true">
           {items.map((entry, barIndex) => {
             const isCurrent = barIndex === index;
-            const isTimed = isCurrent && !item.video;
+            const isTimed = isCurrent && !playsVideo;
 
             return (
               <span
@@ -250,7 +261,7 @@ export default function StoryViewer({ items, index, timing, onIndexChange, onClo
             <small>{detail}</small>
           </p>
           <div className="woh-viewer__buttons">
-            {item.video ? (
+            {playsVideo ? (
               <button
                 type="button"
                 className="woh-viewer__button"

@@ -54,27 +54,31 @@ function PlayIcon() {
   );
 }
 
-function CardFace({ item, eager }) {
-  const image = item.card ? (
-    <img
-      className="woh-card__image"
-      src={item.card}
-      srcSet={`${item.card} 400w`}
-      sizes="(min-width: 900px) 300px, 150px"
-      width="400"
-      height="711"
-      alt=""
-      loading={eager ? "eager" : "lazy"}
-      decoding="async"
-      draggable="false"
-    />
-  ) : null;
+// Shows the card image, or a placeholder when the image is missing or fails to load.
+function CardFace({ item, number, eager }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(item.card) && !failed;
 
-  if (item.type === "banner") {
-    return (
-      <>
-        {image}
-        {item.card ? null : (
+  return (
+    <>
+      {showImage ? (
+        <img
+          className="woh-card__image"
+          src={item.card}
+          srcSet={`${item.card} 400w`}
+          sizes="(min-width: 900px) 300px, 150px"
+          width="400"
+          height="711"
+          alt=""
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
+          draggable="false"
+          onError={() => setFailed(true)}
+        />
+      ) : null}
+
+      {item.type === "banner" ? (
+        showImage ? null : (
           <span className="woh-card__face">
             <span className="woh-card__tag">Event banner</span>
             <span className="woh-card__banner-title">
@@ -87,27 +91,13 @@ function CardFace({ item, eager }) {
               <span className="woh-card__detail">{item.meta[2]}</span>
             </span>
           </span>
-        )}
-      </>
-    );
-  }
-
-  return (
-    <>
-      {image}
-      <span className={`woh-card__face${item.card ? " woh-card__face--media" : ""}`}>
-        {item.card ? null : (
-          <>
-            <span className="woh-card__tag">Placeholder story</span>
-            <PlayIcon />
-          </>
-        )}
-        <span className="woh-card__meta">
-          <span className="woh-card__of">Rotaract Club of</span>
-          <span className="woh-card__club">{item.club}</span>
-          <span className="woh-card__detail">{item.district}</span>
+        )
+      ) : (
+        <span className={`woh-card__face${showImage ? " woh-card__face--media" : ""}`}>
+          {showImage ? null : <span className="woh-card__tag">Story {number}</span>}
+          <PlayIcon />
         </span>
-      </span>
+      )}
     </>
   );
 }
@@ -221,7 +211,7 @@ export default function StoryFormation({ items, rotation, focusRequest, onOpen }
             const label =
               item.type === "banner"
                 ? `Open the event banner. ${item.alt}`
-                : `Watch story ${index + 1} of ${count}. ${item.alt}`;
+                : `Watch story ${index} of ${count - 1}. ${item.alt}`;
 
             return (
               <button
@@ -247,7 +237,7 @@ export default function StoryFormation({ items, rotation, focusRequest, onOpen }
                 onClick={() => handleCardClick(index)}
                 onKeyDown={handleCardKeyDown}
               >
-                <CardFace item={item} eager={index < EAGER_CARD_COUNT} />
+                <CardFace item={item} number={index} eager={index < EAGER_CARD_COUNT} />
               </button>
             );
           })}

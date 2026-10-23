@@ -298,6 +298,14 @@
 
 .woh-card__face--media {
   justify-content: flex-end;
+  align-items: flex-end;
+  background-image: linear-gradient(180deg, transparent 70%, rgba(5, 10, 20, 0.6) 100%);
+}
+
+.woh-card__face--media .woh-card__play {
+  align-self: flex-end;
+  width: 2rem;
+  height: 2rem;
 }
 
 .woh-card__play {
