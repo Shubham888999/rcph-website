@@ -538,6 +538,8 @@
 .woh-ribbon__track {
   width: max-content;
   display: flex;
+  /* The moving track is its own layer; giving it the ribbon colour lets the logo blend work. */
+  background: var(--woh-paper);
   animation: woh-ribbon-scroll 70s linear infinite;
 }
 
