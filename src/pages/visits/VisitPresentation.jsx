@@ -216,14 +216,17 @@ function DirectorSlide({ slide }) {
   return (
     <div className="visit-present__director">
       <header className="visit-present__director-head">
-        <div>
-          <p className="visit-present__eyebrow">{slide.role}</p>
-          <h2>{slide.title}</h2>
+        {/* Director and co-director are equal board members: same layout, same size, side by side. */}
+        <div className="visit-present__presenters">
+          <div>
+            <p className="visit-present__eyebrow">{slide.role}</p>
+            <h2>{slide.title}</h2>
+          </div>
           {slide.co ? (
-            <p className="visit-present__co">
-              <span>{slide.co.role}</span>
-              {slide.co.names.join(", ")}
-            </p>
+            <div>
+              <p className="visit-present__eyebrow">{slide.co.role}</p>
+              <h2>{slide.co.names.join(", ")}</h2>
+            </div>
           ) : null}
         </div>
         {slide.file.openUrl ? (

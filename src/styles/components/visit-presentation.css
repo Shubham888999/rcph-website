@@ -242,19 +242,10 @@
   gap: 0.75rem 1.5rem;
 }
 
-.visit-present__co {
-  margin: 0.5rem 0 0;
-  font-size: clamp(1.1rem, min(2.2vw, 3.4vh), 1.8rem);
-  font-weight: 700;
-}
-
-.visit-present__co span {
-  display: block;
-  margin-bottom: 0.15rem;
-  color: var(--internal-accent);
-  font-size: clamp(0.75rem, 1.1vw, 0.9rem);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.visit-present__presenters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem clamp(2rem, 5vw, 4.5rem);
 }
 
 .visit-present__deck {
