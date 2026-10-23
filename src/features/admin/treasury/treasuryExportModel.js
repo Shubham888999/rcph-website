@@ -8,6 +8,8 @@ import {
   isReimbursementRecord,
   normalizeReimbursementStatus,
   normalizeTreasuryAvenue,
+  treasuryLedgerDate,
+  treasurySpentDate,
 } from "./treasuryModel.js";
 import { formatRotaractorName } from "../../../utils/memberName.js";
 
@@ -189,12 +191,14 @@ function linkedRecordFor(record = {}) {
   if (reference) parts.push(`Reference: ${reference}`);
   const reimbursementStatus = normalizeReimbursementStatus(record.reimbursementStatus || record.reimburse);
   if (reimbursementStatus !== "Not Applicable") parts.push(`Reimbursement: ${reimbursementStatus}`);
+  const spent = treasurySpentDate(record);
+  if (spent) parts.push(`Spent: ${formatTreasuryDate(spent)}`);
   return parts.join("; ") || "Not linked";
 }
 
 function exportRow(record = {}, index = 0) {
   const typeLabel = treasuryExportTypeLabel(record);
-  const dateValue = text(record.date, 20);
+  const dateValue = treasuryLedgerDate(record);
   const date = parseTreasuryExportDate(dateValue);
   const createdAt = parseTreasuryExportTimestamp(record.createdAt);
   const amount = Number(record.amount || 0);

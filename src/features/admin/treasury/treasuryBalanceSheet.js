@@ -1,3 +1,4 @@
+import { treasuryLedgerDate } from "./treasuryModel.js";
 const COLORS = Object.freeze({
   darkBlue: "1F4E78",
   blue: "2E75B6",
@@ -114,7 +115,7 @@ function groupedLines(records, type) {
 function transactionNetBefore(transactions, startMonth) {
   const boundary = `${startMonth}-01`;
   return transactions.reduce((total, record) => {
-    const date = cleanText(record?.date, 10);
+    const date = cleanText(treasuryLedgerDate(record), 10);
     if (!date || date >= boundary) return total;
     const amount = safeAmount(record?.amount);
     return total + (record?.type === "income" ? amount : record?.type === "expense" ? -amount : 0);
@@ -135,7 +136,7 @@ export function buildTreasuryBalanceSheetModel({
   let previousClosingCash = safeAmount(openingCashInHand);
 
   const months = monthKeys.map((key) => {
-    const records = transactions.filter((record) => monthKeyFromDate(record?.date) === key);
+    const records = transactions.filter((record) => monthKeyFromDate(treasuryLedgerDate(record)) === key);
     const incomeLines = groupedLines(records, "income");
     const expenseLines = groupedLines(records, "expense");
     const income = incomeLines.reduce((sum, line) => sum + line.total, 0);

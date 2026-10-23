@@ -982,6 +982,8 @@ function normalizeTreasuryRow(raw) {
     avenueCode: text(raw.avenueCode, 40).toUpperCase(),
     avenueName: text(raw.avenueName, 80),
     notes: text(raw.notes, 500),
+    // Repaid reimbursements are dated by repayment; this is the day the money was spent.
+    spentDate: dateOnly(raw.spentDate) !== date ? dateOnly(raw.spentDate) : "",
     billCanOpen: Boolean(billOpenUrl) && raw.billCanOpen !== false,
     billOpenUrl,
   };

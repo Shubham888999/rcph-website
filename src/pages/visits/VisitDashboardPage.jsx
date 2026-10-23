@@ -1190,6 +1190,7 @@ function TreasuryLedger({ treasury }) {
                     <th scope="row" className="visit-dashboard-ledger-particulars">
                       <strong>{row.title}</strong>
                       {row.description && row.description !== row.title ? <span>{row.description}</span> : null}
+                      {row.spentDate ? <span>Spent {formatVisitDashboardDate(row.spentDate) || row.spentDate}, repaid on this date</span> : null}
                     </th>
                     <td className="visit-dashboard-bill-cell">
                       {row.billCanOpen && row.billOpenUrl ? (

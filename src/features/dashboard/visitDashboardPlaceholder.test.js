@@ -495,6 +495,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       avenueCode: "GBM",
       avenueName: "General Body Meeting",
       notes: "Cash deposited",
+      spentDate: "",
       billCanOpen: true,
       billOpenUrl: "https://drive.google.com/file/d/private-drive-file/view",
     }, {
@@ -508,6 +509,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       avenueCode: "CSD",
       avenueName: "Club Service",
       notes: "",
+      spentDate: "",
       billCanOpen: false,
       billOpenUrl: "",
     }],

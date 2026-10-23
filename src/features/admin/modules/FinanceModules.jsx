@@ -43,6 +43,8 @@ import {
   createEmptyTreasuryDraft,
   filterAndSortTreasury,
   formatTreasuryDate,
+  treasuryLedgerDate,
+  treasurySpentDate,
   getTreasuryAvenueOptions,
   getTreasuryFieldPlan,
   getTreasuryMonthOptions,
@@ -1943,11 +1945,18 @@ function TreasuryFilterBar({ filters, monthOptions, avenueOptions, onFilter, onC
   );
 }
 
+// Repaid reimbursements are listed by the repayment date (as on the bank statement);
+// the day the member spent the money is shown underneath.
+function TreasurySpentNote({ item }) {
+  const spent = treasurySpentDate(item);
+  return spent ? <span className="treasury-muted">Spent {formatTreasuryDate(spent)}</span> : null;
+}
+
 function TreasuryTableRow({ item, locked, onDetails, onEdit, onDelete, onManageProof }) {
   const type = transactionTypeLabel(item);
   return (
     <tr>
-      <td>{formatTreasuryDate(item.date)}</td>
+      <td>{formatTreasuryDate(treasuryLedgerDate(item))}<TreasurySpentNote item={item} /></td>
       <td><strong>{item.title || "Untitled transaction"}</strong><span className="treasury-muted">{item.purpose || "No notes"}</span></td>
       <td><span className={`treasury-chip is-${type.toLowerCase()}`}>{type}</span></td>
       <td><span className={`treasury-amount is-${item.type}`}>{formatInr(item.amount)}</span></td>
@@ -1981,7 +1990,7 @@ function TreasuryMobileRow({ item, locked, menuOpen, menuRef, onToggleMenu, onDe
   return (
     <article className={`treasury-mobile-row is-${item.type}`}>
       <div className="treasury-mobile-row__top">
-        <span className="treasury-mobile-row__date">{formatTreasuryDate(item.date)}</span>
+        <span className="treasury-mobile-row__date">{formatTreasuryDate(treasuryLedgerDate(item))}<TreasurySpentNote item={item} /></span>
         <span className={`treasury-chip is-${type.toLowerCase()}`}>{type}</span>
         <strong className={`treasury-mobile-row__amount treasury-amount is-${item.type}`}>{formatInr(item.amount)}</strong>
         <div className="treasury-mobile-row__actions" ref={menuRef}>
@@ -2026,7 +2035,7 @@ function TreasuryDetails({ record }) {
   const rows = [
     ["Type", transactionTypeLabel(record)],
     ["Amount", formatInr(record.amount)],
-    ["Date", formatTreasuryDate(record.date)],
+    [treasurySpentDate(record) ? "Expense date" : "Date", formatTreasuryDate(record.date)],
     ["Party", transactionPartyLabel(record)],
     ["Avenue", normalizeTreasuryAvenue(record.avenue) || "Not recorded"],
     ["Purpose / notes", record.purpose || "Not recorded"],
