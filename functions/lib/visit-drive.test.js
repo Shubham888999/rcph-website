@@ -197,6 +197,38 @@ test('ensureVisitFolderHierarchy creates and reuses the Inward and Outward folde
   assert.deepEqual(inwardFolder.parents, [plain.positionFolderId]);
 });
 
+test('registers get their own Inward Register and Outward Register folders beside Inward and Outward', async () => {
+  const fakeDrive = createFakeDrive();
+  const drive = createVisitDriveService({ driveClient: fakeDrive.client });
+  const validation = (documentCategory) => ({ visitType: 'dzrVisit', positionTitle: 'Secretary', documentCategory });
+
+  const inward = await drive.ensureVisitFolderHierarchy(validation('inward'), DRIVE_CONFIG);
+  const inwardRegister = await drive.ensureVisitFolderHierarchy(validation('inward-register'), DRIVE_CONFIG);
+  const outwardRegister = await drive.ensureVisitFolderHierarchy(validation('outward-register'), DRIVE_CONFIG);
+  const againInwardRegister = await drive.ensureVisitFolderHierarchy(validation('inward-register'), DRIVE_CONFIG);
+
+  assert.deepEqual(fakeDrive.calls.create.map((call) => call.name), ['Secretary', 'Inward', 'Inward Register', 'Outward Register']);
+  assert.equal(inwardRegister.targetFolderId, againInwardRegister.targetFolderId);
+  assert.notEqual(inwardRegister.targetFolderId, inward.targetFolderId);
+  assert.notEqual(inwardRegister.targetFolderId, outwardRegister.targetFolderId);
+  assert.deepEqual(fakeDrive.items.get(outwardRegister.targetFolderId).parents, [inward.positionFolderId]);
+});
+
+test('a register upload lands in its folder and can move to another register', async () => {
+  const env = await createEnv();
+  const upload = await uploadVia(env, 'bod-secretary', 'secretary', 'inward-register');
+  const folderDoc = env.adapter.store.visitSubmissionPositions.clubAssembly_secretary;
+  assert.equal(folderDoc.categoryFolderIds['inward-register'], upload.folder.targetFolderId);
+  assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, 'inward-register');
+
+  const result = await env.move('bod-secretary', { submissionId: upload.submissionId, documentCategory: 'outward-register' });
+  assert.deepEqual(result, { ok: true, documentCategory: 'outward-register' });
+  const movedFolderDoc = env.adapter.store.visitSubmissionPositions.clubAssembly_secretary;
+  assert.ok(movedFolderDoc.categoryFolderIds['outward-register']);
+  assert.equal(movedFolderDoc.categoryFolderIds['inward-register'], upload.folder.targetFolderId);
+  assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, 'outward-register');
+});
+
 test('the uploader can move a document between categories without changing folder counts', async () => {
   const env = await createEnv();
   const upload = await uploadVia(env, 'bod-secretary', 'secretary', 'inward');

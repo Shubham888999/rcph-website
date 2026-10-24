@@ -56,7 +56,10 @@ const VISIT_ASSIGNMENT_BLOCKED_FLAGS = Object.freeze(['deleted', 'isDeleted', 'r
 
 const DEFAULT_MAX_ACTIVE_FILES = 40;
 const DOCUMENT_CATEGORY_POSITION_KEYS = new Set(['secretary', 'joint-secretary', 'co-secretary']);
-const DOCUMENT_CATEGORIES = Object.freeze(['inward', 'outward']);
+// Secretary folders: letters received / sent ("inward" / "outward", kept for existing
+// uploads) and their Excel registers (date, day, from/to, subject, reference).
+const DOCUMENT_CATEGORIES = Object.freeze(['inward', 'outward', 'inward-register', 'outward-register']);
+const DOCUMENT_CATEGORY_ERROR = 'Document category must be inward, outward, inward-register, outward-register, or empty.';
 const DEFAULT_MAX_FILES_PER_SELECTION = 10;
 const DEFAULT_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MIN_FILE_SIZE_BYTES = 1024 * 1024;
@@ -409,7 +412,7 @@ function safePrimaryPresentationSubmissionId(value) {
 function normalizeDocumentCategory(value) {
   if (value === undefined || value === null || value === '') return '';
   if (DOCUMENT_CATEGORIES.includes(value)) return value;
-  throw makeVisitSubmissionError('invalid-argument', 'Document category must be inward, outward, or empty.');
+  throw makeVisitSubmissionError('invalid-argument', DOCUMENT_CATEGORY_ERROR);
 }
 
 function storedDocumentCategory(value) {
