@@ -33,20 +33,23 @@ test("folder holders may edit the main presentation only when the backend flags 
   assert.equal(canEditVisitPrimaryPresentation({}, null), false);
 });
 
-test("library groups render Inward, Outward, then Supporting files with their items", () => {
+test("library groups render Inward file and register, Outward file and register, then Supporting files", () => {
   const groups = groupVisitSubmissionsByCategory([
     { submissionId: "a", documentCategory: "" },
     { submissionId: "b", documentCategory: "outward" },
     { submissionId: "c", documentCategory: "inward" },
     { submissionId: "d" },
+    { submissionId: "e", documentCategory: "outward-register" },
   ]);
-  assert.deepEqual(groups.map((group) => group.label), ["Inward", "Outward", "Supporting files"]);
-  assert.deepEqual(groups.map((group) => group.items.map((item) => item.submissionId)), [["c"], ["b"], ["a", "d"]]);
-  assert.deepEqual(groups.map((group) => group.emptyNote), ["No inward documents yet.", "No outward documents yet.", "No supporting files yet."]);
-  assert.deepEqual(groupVisitSubmissionsByCategory([]).map((group) => group.items.length), [0, 0, 0]);
+  assert.deepEqual(groups.map((group) => group.label), ["Inward file", "Inward register", "Outward file", "Outward register", "Supporting files"]);
+  assert.deepEqual(groups.map((group) => group.items.map((item) => item.submissionId)), [["c"], [], ["b"], ["e"], ["a", "d"]]);
+  assert.deepEqual(groups.map((group) => group.emptyNote), ["No inward documents yet.", "No inward register yet.", "No outward documents yet.", "No outward register yet.", "No supporting files yet."]);
+  assert.deepEqual(groupVisitSubmissionsByCategory([]).map((group) => group.items.length), [0, 0, 0, 0, 0]);
 });
 
 test("move labels and upload choices use the agreed wording", () => {
-  assert.deepEqual(VISIT_DOCUMENT_CATEGORIES.map((category) => category.moveLabel), ["Move to Inward", "Move to Outward", "Move to Supporting files"]);
-  assert.deepEqual(VISIT_UPLOAD_CATEGORY_CHOICES.map((choice) => [choice.key, choice.label]), [["", "None"], ["inward", "Inward"], ["outward", "Outward"]]);
+  assert.deepEqual(VISIT_DOCUMENT_CATEGORIES.map((category) => category.moveLabel), ["Move to Inward file", "Move to Inward register", "Move to Outward file", "Move to Outward register", "Move to Supporting files"]);
+  assert.deepEqual(VISIT_UPLOAD_CATEGORY_CHOICES.map((choice) => [choice.key, choice.label]), [["", "None"], ["inward", "Inward file"], ["inward-register", "Inward register"], ["outward", "Outward file"], ["outward-register", "Outward register"]]);
+  assert.equal(normalizeSubmission({ submissionId: "s", documentCategory: "inward-register" }).documentCategory, "inward-register");
+  assert.equal(normalizeSubmission({ submissionId: "s", documentCategory: "outward-register" }).documentCategory, "outward-register");
 });

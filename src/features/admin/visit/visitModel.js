@@ -84,19 +84,24 @@ export function normalizeFolders(values, visitType = "") {
   }
   return folders;
 }
-const VISIT_DOCUMENT_CATEGORY_KEYS = Object.freeze(["inward", "outward"]);
+const VISIT_DOCUMENT_CATEGORY_KEYS = Object.freeze(["inward", "outward", "inward-register", "outward-register"]);
 
 // Library groups in display order; "" is the uncategorised Supporting files group.
+// Secretary folders: the letters themselves ("file") and their Excel registers.
 export const VISIT_DOCUMENT_CATEGORIES = Object.freeze([
-  Object.freeze({ key: "inward", label: "Inward", moveLabel: "Move to Inward", emptyNote: "No inward documents yet." }),
-  Object.freeze({ key: "outward", label: "Outward", moveLabel: "Move to Outward", emptyNote: "No outward documents yet." }),
+  Object.freeze({ key: "inward", label: "Inward file", moveLabel: "Move to Inward file", emptyNote: "No inward documents yet." }),
+  Object.freeze({ key: "inward-register", label: "Inward register", moveLabel: "Move to Inward register", emptyNote: "No inward register yet." }),
+  Object.freeze({ key: "outward", label: "Outward file", moveLabel: "Move to Outward file", emptyNote: "No outward documents yet." }),
+  Object.freeze({ key: "outward-register", label: "Outward register", moveLabel: "Move to Outward register", emptyNote: "No outward register yet." }),
   Object.freeze({ key: "", label: "Supporting files", moveLabel: "Move to Supporting files", emptyNote: "No supporting files yet." }),
 ]);
 
 export const VISIT_UPLOAD_CATEGORY_CHOICES = Object.freeze([
   Object.freeze({ key: "", label: "None" }),
-  Object.freeze({ key: "inward", label: "Inward" }),
-  Object.freeze({ key: "outward", label: "Outward" }),
+  Object.freeze({ key: "inward", label: "Inward file" }),
+  Object.freeze({ key: "inward-register", label: "Inward register" }),
+  Object.freeze({ key: "outward", label: "Outward file" }),
+  Object.freeze({ key: "outward-register", label: "Outward register" }),
 ]);
 
 export function normalizeSubmission(value) {
