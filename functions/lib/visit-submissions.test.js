@@ -259,11 +259,14 @@ async function uploadThroughDrive(env, uid, session, { driveFileId, driveFolderI
   return { validation, result };
 }
 
-test('normalizeDocumentCategory accepts only inward, outward, or empty', () => {
+test('normalizeDocumentCategory accepts the inward/outward files and registers, or empty', () => {
   assert.equal(visit.normalizeDocumentCategory(undefined), '');
   assert.equal(visit.normalizeDocumentCategory(''), '');
   assert.equal(visit.normalizeDocumentCategory('inward'), 'inward');
   assert.equal(visit.normalizeDocumentCategory('outward'), 'outward');
+  assert.equal(visit.normalizeDocumentCategory('inward-register'), 'inward-register');
+  assert.equal(visit.normalizeDocumentCategory('outward-register'), 'outward-register');
+  assert.throws(() => visit.normalizeDocumentCategory('register'), (err) => err.code === 'invalid-argument');
   assert.throws(() => visit.normalizeDocumentCategory('Inward'), (err) => err.code === 'invalid-argument');
   assert.throws(() => visit.normalizeDocumentCategory('sideways'), (err) => err.code === 'invalid-argument');
 });

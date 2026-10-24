@@ -30,9 +30,13 @@ const VISIT_DRIVE_AUTH_MODES = Object.freeze(['shared-drive', 'oauth']);
 const VISIT_FOLDER_LOCK_TTL_MS = 90 * 1000;
 const VISIT_FOLDER_LOCK_RETRY_MS = 100;
 const VISIT_FOLDER_LOCK_RETRY_COUNT = 3;
+// Drive subfolders inside the position folder. "Inward"/"Outward" keep their
+// original names so files already uploaded stay where they are.
 const VISIT_CATEGORY_FOLDER_NAMES = Object.freeze({
   inward: 'Inward',
   outward: 'Outward',
+  'inward-register': 'Inward Register',
+  'outward-register': 'Outward Register',
 });
 const VISIT_FOLDER_BUSY_MESSAGE = 'This folder is busy. Please try again in a moment.';
 
@@ -481,7 +485,7 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
     if (!category) return parentId;
     const folderName = VISIT_CATEGORY_FOLDER_NAMES[category];
     if (!folderName) {
-      throw makeVisitSubmissionError('invalid-argument', 'Document category must be inward, outward, or empty.');
+      throw makeVisitSubmissionError('invalid-argument', 'Document category must be inward, outward, inward-register, outward-register, or empty.');
     }
     getDriveClient(config);
     const categoryFolder = await getOrCreateUniqueFolder(parentId, folderName);
