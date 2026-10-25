@@ -735,6 +735,13 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
+  // Straight to the Google Form CSV/Excel import: the entry form in Club dues mode.
+  function openDuesImport() {
+    setEntryOpen(true);
+    setClubDuesMode(true);
+    requestAnimationFrame(() => document.querySelector(".treasury-dues-import")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
   // Custom starts from the months currently on screen.
   function updatePeriod(changes) {
     setFilters((current) => {
@@ -986,6 +993,8 @@ async function exportBalanceSheet() {
         onPeriod={updatePeriod}
         entryOpen={entryOpen || Boolean(draftRecordId)}
         onToggleEntry={() => setEntryOpen((current) => !(current || Boolean(draftRecordId)))}
+        importDisabled={locked || busy || isTreasuryUploadWorking(draftUpload)}
+        onImportDues={openDuesImport}
       />
       <TreasurySummaryStrip summary={summary} />
       {entryOpen || draftRecordId ? (
@@ -1377,7 +1386,7 @@ function TreasurySummaryStrip({ summary }) {
 }
 
 // Period picker shared by the ledger, the summary strip and the exports.
-function TreasuryPeriodBar({ filters, monthOptions, onPeriod, entryOpen, onToggleEntry }) {
+function TreasuryPeriodBar({ filters, monthOptions, onPeriod, entryOpen, onToggleEntry, importDisabled, onImportDues }) {
   const months = [...monthOptions].sort((a, b) => a.value.localeCompare(b.value));
   return (
     <div className="treasury-periodbar">
@@ -1401,7 +1410,10 @@ function TreasuryPeriodBar({ filters, monthOptions, onPeriod, entryOpen, onToggl
           </div>
         ) : null}
       </div>
-      <button type="button" className="treasury-new-entry" aria-expanded={entryOpen} aria-controls="treasury-entry" onClick={onToggleEntry}>{entryOpen ? "Close entry form" : "+ New entry"}</button>
+      <div className="treasury-periodbar__actions">
+        <button type="button" className="treasury-import-dues" disabled={importDisabled} onClick={onImportDues}>Import dues (CSV/Excel)</button>
+        <button type="button" className="treasury-new-entry" aria-expanded={entryOpen} aria-controls="treasury-entry" onClick={onToggleEntry}>{entryOpen ? "Close entry form" : "+ New entry"}</button>
+      </div>
     </div>
   );
 }

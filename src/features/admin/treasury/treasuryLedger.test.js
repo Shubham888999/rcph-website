@@ -125,3 +125,10 @@ test("admin pages have square corners and borderless ⋮ buttons", () => {
   // The member dashboard does not load admin.css, so its ⋮ is fixed in its own stylesheet.
   assert.match(memberCss, /\.announcement-card__menu-trigger \{[^}]*border: 0;[^}]*border-radius: 0;/);
 });
+
+test("Import dues (CSV/Excel) opens the entry form in Club dues mode at the import", () => {
+  assert.match(financeSource, />Import dues \(CSV\/Excel\)<\/button>/);
+  assert.match(financeSource, /function openDuesImport\(\) \{\s*setEntryOpen\(true\);\s*setClubDuesMode\(true\);/);
+  assert.match(financeSource, /document\.querySelector\("\.treasury-dues-import"\)\?\.scrollIntoView/);
+  assert.match(financeSource, /importDisabled=\{locked \|\| busy \|\| isTreasuryUploadWorking\(draftUpload\)\}/);
+});

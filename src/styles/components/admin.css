@@ -9977,9 +9977,19 @@ min-width: 250px;
   background: var(--internal-control-bg);
 }
 
+.treasury-periodbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .admin-page button.treasury-new-entry {
   border-color: var(--internal-accent);
   font-weight: 800;
+}
+
+.treasury-dues-import {
+  scroll-margin-top: 5.5rem;
 }
 
 /* Flat segmented buttons for Period and Type. */
@@ -10382,6 +10392,8 @@ min-width: 250px;
 
   .treasury-periodbar,
   .treasury-periodbar__period,
+  .treasury-periodbar__actions,
+  .admin-page button.treasury-import-dues,
   .admin-page button.treasury-new-entry {
     width: 100%;
   }
