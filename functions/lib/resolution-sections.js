@@ -3,7 +3,7 @@
 const MODES = Object.freeze(['standard', 'custom']);
 const SOURCE_MODES = Object.freeze(['standard', 'custom', 'uploadedPdf']);
 const TYPES = Object.freeze(['heading', 'paragraph', 'table', 'votesTable', 'spacer']);
-const FONTS = Object.freeze(['Helvetica', 'Times Roman', 'Courier']);
+const FONTS = Object.freeze(['Helvetica', 'Times Roman', 'Courier', 'Poppins']);
 const ALIGNMENTS = Object.freeze(['left', 'center', 'right']);
 const VOTE_COLUMNS = Object.freeze(['name', 'position', 'vote', 'timestamp', 'signature']);
 const LIMITS = Object.freeze({ sections: 100, characters: 50000, rows: 200, columns: 20 });
@@ -432,4 +432,40 @@ function assertNoNestedArrays(value, path = 'value') {
   return true;
 }
 
-module.exports = { DEFAULT_GENERATED_PAGE_ORDER, GENERATED_PAGE_TYPES, LIMITS, MODES, RESOLUTION_PAGE_LIMITS, SOURCE_MODES, TYPES, VOTE_COLUMNS, assertNoNestedArrays, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, normalizeSections, normalizeSourceMode, normalizeUploadedVotesTableConfig, validateLayout };
+// "majority of ____": once voting has closed, the blank becomes approvals out of
+// the board members present, as a percentage. Present is the "No. of Board
+// Members" number when it is filled in, otherwise the members who voted.
+// Matches the website's resolutionSectionsModel.js.
+const FINAL_RESULT_STATUSES = ['passed', 'rejected', 'closed_without_decision'];
+const MAJORITY_BLANK = /(majority\s+of\s+)_{2,}\s*%?/gi;
+
+function resolutionMajorityPercent({ approveCount, boardMembersPresent, votesReceivedCount } = {}) {
+  const typedPresent = /^\s*\d+\s*$/.test(String(boardMembersPresent ?? '')) ? Number(boardMembersPresent) : 0;
+  const present = typedPresent > 0 ? typedPresent : Number.isInteger(votesReceivedCount) && votesReceivedCount > 0 ? votesReceivedCount : 0;
+  const approvals = Number.isInteger(approveCount) && approveCount >= 0 ? approveCount : null;
+  if (!present || approvals === null) return '';
+  return `${Number((approvals / present * 100).toFixed(2))}%`;
+}
+
+function fillResolutionMajority(value, resolution = {}, details = {}) {
+  if (!FINAL_RESULT_STATUSES.includes(resolution.status) || resolution.approvalMethod === 'record_only') return value;
+  const percent = resolutionMajorityPercent({ approveCount: resolution.approveCount, boardMembersPresent: details.boardMembersPresent, votesReceivedCount: resolution.votesReceivedCount });
+  return percent ? String(value).replace(MAJORITY_BLANK, `$1${percent}`) : value;
+}
+
+// A line starting with "-", "*" or "•" followed by a space is a bullet point.
+const BULLET_LINE = /^\s*[-*\u2022]\s+/;
+
+function splitResolutionStatement(value) {
+  const segments = [];
+  String(value || '').replace(/\r\n/g, '\n').split('\n').forEach(line => {
+    const bullet = BULLET_LINE.test(line);
+    const lineText = bullet ? line.replace(BULLET_LINE, '') : line;
+    const last = segments[segments.length - 1];
+    if (last && last.bullet === bullet) last.lines.push(lineText);
+    else segments.push({ bullet, lines: [lineText] });
+  });
+  return segments.map(segment => ({ bullet: segment.bullet, text: segment.lines.join('\n') }));
+}
+
+module.exports = { DEFAULT_GENERATED_PAGE_ORDER, FONTS, fillResolutionMajority, resolutionMajorityPercent, splitResolutionStatement, GENERATED_PAGE_TYPES, LIMITS, MODES, RESOLUTION_PAGE_LIMITS, SOURCE_MODES, TYPES, VOTE_COLUMNS, assertNoNestedArrays, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, normalizeSections, normalizeSourceMode, normalizeUploadedVotesTableConfig, validateLayout };

@@ -392,6 +392,7 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
           meetingLocation: frozen.meetingLocation,
           place: frozen.place,
           resultLabel: String(frozen.result || frozen.status || '').replaceAll('_', ' ').toUpperCase(),
+          majority: { status: frozen.status, approvalMethod: frozen.approvalMethod, approveCount: frozen.approveCount, votesReceivedCount: frozen.votesReceivedCount },
           approveCount: frozen.approveCount,
           rejectCount: frozen.rejectCount,
           abstainCount: frozen.abstainCount,

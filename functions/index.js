@@ -2582,9 +2582,17 @@ function buildDefaultOfficialEmailBody(resolution, documentShortHash, actor) {
     '',
     'Warm regards,',
     `Rtr. ${presidentName}`,
-    'President | RIY',
+    `President | RIY ${resolutionRiyLabel(resolution.meetingDate)}`,
     'Rotaract Club of Pune Heritage',
   ].join('\n');
+}
+
+// The RIY runs July to June: a meeting in October 2026 is RIY 2026-2027.
+function resolutionRiyLabel(meetingDate) {
+  const value = /^\d{4}-\d{2}/.test(normalizeText(meetingDate, 20)) ? normalizeText(meetingDate, 20) : new Date().toISOString().slice(0, 10);
+  const [year, month] = value.split('-').map(Number);
+  const start = month >= 7 ? year : year - 1;
+  return `${start}-${start + 1}`;
 }
 
 function buildDashboardResolutionNotice({ resolution, voter, documentShortHash }) {
