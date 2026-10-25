@@ -1,4 +1,5 @@
-import { normalizeGeneratedPageOrder, normalizeResolutionPageConfig, normalizeResolutionSections, normalizeUploadedVotesTableConfig, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
+import { fillResolutionMajority, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, normalizeResolutionSections, normalizeUploadedVotesTableConfig, splitResolutionStatement, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
+import { POPPINS_FAMILY, poppinsTextWidth } from "./resolutionPoppins.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
 import { isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 
@@ -31,6 +32,7 @@ function dateTime(value) {
 }
 
 function approximateTextWidth(text, size, family = "Helvetica", bold = false) {
+  if (family === POPPINS_FAMILY) return poppinsTextWidth(text, size, bold);
   const factor = family === "Courier" ? 0.6 : family === "Times Roman" ? 0.48 : 0.52;
   return String(text).length * size * factor * (bold ? 1.04 : 1);
 }
@@ -996,23 +998,30 @@ export function buildResolutionPagePdfPages(details, config) {
 
   renderResolutionDetails(pager, normalized);
 
-  renderTextSection(
-    pager,
-    {
-      id: "resolution_page_statement",
-      type: "paragraph",
-      text: normalized.mainStatement.text,
-      listStyle: "none",
-      style: {
-        ...normalized.mainStatement,
-        lineSpacing: 1.45,
+  // The statement keeps its line breaks; "-", "*" or "•" lines print as bullet points.
+  const statement = fillResolutionMajority(normalized.mainStatement.text, details?.resolution || {}, normalized.details);
+  const segments = splitResolutionStatement(statement);
+  segments.forEach((segment, index) => {
+    renderTextSection(
+      pager,
+      {
+        id: `resolution_page_statement_${index + 1}`,
+        type: "paragraph",
+        text: segment.text,
+        listStyle: segment.bullet ? "bullet" : "none",
+        style: {
+          ...normalized.mainStatement,
+          lineSpacing: 1.45,
+          spaceBefore: index === 0 ? normalized.mainStatement.spaceBefore : 0,
+          spaceAfter: index === segments.length - 1 ? normalized.mainStatement.spaceAfter : 0,
+        },
       },
-    },
-    {
-      left: RESOLUTION_PAGE_LEFT,
-      width: RESOLUTION_STATEMENT_WIDTH,
-    },
-  );
+      {
+        left: RESOLUTION_PAGE_LEFT,
+        width: RESOLUTION_STATEMENT_WIDTH,
+      },
+    );
+  });
 
   normalized.blocks.forEach((block) => {
     if (block.type === "paragraph") {

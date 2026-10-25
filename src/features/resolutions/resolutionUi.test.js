@@ -83,7 +83,7 @@ test("Hybrid email editor uses generated content as editable values with indepen
   assert.match(adminModule, /setEmailField\("officialEmailBody"\)/);
   assert.match(adminModule, /resetEmailField\("subject"\)/);
   assert.match(adminModule, /resetEmailField\("body"\)/);
-  assert.match(adminModule, /withGeneratedHybridEmail\(item, meeting\)/);
+  assert.match(adminModule, /withGeneratedHybridEmail\(item, meeting, state\.roster\)/);
   assert.match(model, /Enter an official email subject before saving or opening hybrid email voting/);
   assert.match(model, /Enter an official email body before saving or opening hybrid email voting/);
 });

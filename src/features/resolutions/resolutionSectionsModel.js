@@ -3,7 +3,7 @@ export const DOCUMENT_SOURCE_MODES = Object.freeze(["standard", "custom", "uploa
 export const RESOLUTION_SECTION_TYPES = Object.freeze(["heading", "paragraph", "table", "votesTable", "spacer"]);
 export const RESOLUTION_PDF_LIMITS = Object.freeze({ sections: 100, textCharacters: 50000, tableRows: 200, tableColumns: 20 });
 export const RESOLUTION_PAGE_LIMITS = Object.freeze({ blocks: 20, paragraphCharacters: 10000, tableRows: 100, tableColumns: 10, cellCharacters: 2000 });
-export const RESOLUTION_FONTS = Object.freeze(["Helvetica", "Times Roman", "Courier"]);
+export const RESOLUTION_FONTS = Object.freeze(["Helvetica", "Times Roman", "Courier", "Poppins"]);
 export const RESOLUTION_ALIGNMENTS = Object.freeze(["left", "center", "right"]);
 export const VOTES_TABLE_COLUMNS = Object.freeze(["name", "position", "vote", "timestamp", "signature"]);
 export const GENERATED_PAGE_TYPES = Object.freeze(["resolution_page", "vote_table"]);
@@ -36,6 +36,55 @@ function isUntouchedDefaultStatementWithPlaceholder(value) {
         === createDefaultResolutionStatement({ title: "" }).replace(RESOLUTION_SUBJECT_PLACEHOLDER, "").trim()
     );
 }
+// "majority of ____": once voting has closed, the blank becomes approvals out of
+// the board members present, as a percentage. Present is the "No. of Board
+// Members" number when it is filled in, otherwise the members who voted.
+const FINAL_RESULT_STATUSES = ["passed", "rejected", "closed_without_decision"];
+const MAJORITY_BLANK = /(majority\s+of\s+)_{2,}\s*%?/gi;
+
+export function resolutionMajorityPercent({ approveCount, boardMembersPresent, votesReceivedCount } = {}) {
+  const typedPresent = /^\s*\d+\s*$/.test(String(boardMembersPresent ?? "")) ? Number(boardMembersPresent) : 0;
+  const present = typedPresent > 0 ? typedPresent : Number.isInteger(votesReceivedCount) && votesReceivedCount > 0 ? votesReceivedCount : 0;
+  const approvals = Number.isInteger(approveCount) && approveCount >= 0 ? approveCount : null;
+  if (!present || approvals === null) return "";
+  return `${Number((approvals / present * 100).toFixed(2))}%`;
+}
+
+export function fillResolutionMajority(text, resolution = {}, details = {}) {
+  if (!FINAL_RESULT_STATUSES.includes(resolution.status) || resolution.approvalMethod === "record_only") return text;
+  const percent = resolutionMajorityPercent({ approveCount: resolution.approveCount, boardMembersPresent: details.boardMembersPresent, votesReceivedCount: resolution.votesReceivedCount });
+  return percent ? String(text).replace(MAJORITY_BLANK, `$1${percent}`) : text;
+}
+
+// Splits statement text into plain paragraphs and bullet lists. A line starting
+// with "-", "*" or "•" followed by a space is a bullet point.
+const BULLET_LINE = /^\s*[-*\u2022]\s+/;
+
+export function splitResolutionStatement(text) {
+  const segments = [];
+  String(text || "").replace(/\r\n/g, "\n").split("\n").forEach((line) => {
+    const bullet = BULLET_LINE.test(line);
+    const value = bullet ? line.replace(BULLET_LINE, "") : line;
+    const last = segments.at(-1);
+    if (last && last.bullet === bullet) last.lines.push(value);
+    else segments.push({ bullet, lines: [value] });
+  });
+  return segments.map((segment) => ({ bullet: segment.bullet, text: segment.lines.join("\n") }));
+}
+
+// While editing, text is kept exactly as typed (spaces, new lines, an empty box);
+// it is trimmed when saved.
+function editableText(value, max) {
+  if (typeof value !== "string") return "";
+  return Array.from(value.replace(/\r\n/g, "\n"))
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return !(code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127);
+    })
+    .join("")
+    .slice(0, max);
+}
+
 function cleanText(value, max = 50000) {
   if (typeof value !== "string") return "";
   const safe = Array.from(value, (character) => ({ character, code: character.charCodeAt(0) }))
@@ -175,25 +224,26 @@ function normalizeTable(raw, id) {
   };
 }
 
-function normalizeResolutionPageTable(raw, id) {
+function normalizeResolutionPageTable(raw, id, options = {}) {
+  const pageText = options.editing ? editableText : cleanText;
   const rawRows = Array.isArray(raw.rows) ? raw.rows.slice(0, RESOLUTION_PAGE_LIMITS.tableRows) : [];
   const inferredColumns = Math.max(1, Math.min(RESOLUTION_PAGE_LIMITS.tableColumns, Array.isArray(raw.columns) ? raw.columns.length : Math.max(0, ...rawRows.map((row) => legacyRowValues(row)?.length || 0))));
   const widths = normalizedWidths((raw.columns || []).map((column) => column?.widthPercent ?? column?.width), inferredColumns);
   const columns = Array.from({ length: inferredColumns }, (_, index) => ({
     id: sectionId(raw.columns?.[index]?.id, `column_${index + 1}`),
-    label: cleanText(raw.columns?.[index]?.label, 200),
+    label: pageText(raw.columns?.[index]?.label, 200),
     widthPercent: widths[index],
     alignment: choice(raw.columns?.[index]?.alignment, RESOLUTION_ALIGNMENTS, "left"),
   }));
   const sourceRows = rawRows.length ? rawRows : [{ id: "row_1", cells: {} }];
   const rows = sourceRows.map((row, rowIndex) => ({
     id: tableRowId(row?.id, `row_${rowIndex + 1}`),
-    cells: Object.fromEntries(columns.map((column, columnIndex) => [column.id, cleanText(cellValue(row, column, columnIndex), RESOLUTION_PAGE_LIMITS.cellCharacters)])),
+    cells: Object.fromEntries(columns.map((column, columnIndex) => [column.id, pageText(cellValue(row, column, columnIndex), RESOLUTION_PAGE_LIMITS.cellCharacters)])),
   }));
   return {
     id,
     type: "table",
-    title: cleanText(raw.title, 200),
+    title: pageText(raw.title, 200),
     columns,
     rows,
     options: {
@@ -216,7 +266,7 @@ function normalizeResolutionPageTable(raw, id) {
   };
 }
 
-export function normalizeResolutionPageBlock(raw, fallbackId = createSectionId()) {
+export function normalizeResolutionPageBlock(raw, fallbackId = createSectionId(), options = {}) {
   if (!raw || typeof raw !== "object") return null;
   const type = choice(raw.type, ["paragraph", "table"], "");
   if (!type) return null;
@@ -225,16 +275,16 @@ export function normalizeResolutionPageBlock(raw, fallbackId = createSectionId()
     return {
       id,
       type,
-      text: cleanText(raw.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters),
+      text: (options.editing ? editableText : cleanText)(raw.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters),
       style: normalizeResolutionPageTextStyle(raw.style, { fontFamily: "Helvetica", fontSize: 10, alignment: "left", lineSpacing: 1.25, spaceBefore: 6, spaceAfter: 8 }),
     };
   }
-  return normalizeResolutionPageTable(raw, id);
+  return normalizeResolutionPageTable(raw, id, options);
 }
 
-export function normalizeResolutionPageBlocks(raw) {
+export function normalizeResolutionPageBlocks(raw, options = {}) {
   const seen = new Set();
-  return (Array.isArray(raw) ? raw : []).slice(0, RESOLUTION_PAGE_LIMITS.blocks).map((block, index) => normalizeResolutionPageBlock(block, `block_${index + 1}`)).filter(Boolean).map((block) => {
+  return (Array.isArray(raw) ? raw : []).slice(0, RESOLUTION_PAGE_LIMITS.blocks).map((block, index) => normalizeResolutionPageBlock(block, `block_${index + 1}`, options)).filter(Boolean).map((block) => {
     let id = block.id;
     let suffix = 2;
     while (seen.has(id)) id = `${block.id}_${suffix++}`;
@@ -243,7 +293,17 @@ export function normalizeResolutionPageBlocks(raw) {
   });
 }
 
-function normalizeResolutionPageDetails(raw = {}, defaults = {}) {
+function normalizeResolutionPageDetails(raw = {}, defaults = {}, options = {}) {
+  if (options.editing) {
+    const typed = (key, max, fallback) => (typeof raw[key] === "string" ? editableText(raw[key], max) : cleanText(fallback, max));
+    return {
+      subject: typed("subject", 300, defaults.subject || defaults.title),
+      date: typed("date", 80, defaults.date || defaults.meetingDate),
+      place: typed("place", 160, defaults.place || defaults.meetingLocation),
+      boardMembersPresent: typed("boardMembersPresent", 80, ""),
+      totalBoardMembers: typed("totalBoardMembers", 80, ""),
+    };
+  }
   return {
     subject: cleanText(raw.subject, 300) || cleanText(defaults.subject || defaults.title, 300),
     date: cleanText(raw.date, 80) || cleanText(defaults.date || defaults.meetingDate, 80),
@@ -261,7 +321,7 @@ export function normalizeGeneratedPageOrder(raw) {
   return order;
 }
 
-export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
+export function normalizeResolutionPageConfig(raw = {}, defaults = {}, options = {}) {
   const source =
     raw && typeof raw === "object" && !Array.isArray(raw)
       ? raw
@@ -308,15 +368,17 @@ export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
     detailsStyleSource.spaceAfter = 32;
   }
 
-  const existingStatementText = cleanText(
-    source.mainStatement?.text,
-    RESOLUTION_PAGE_LIMITS.paragraphCharacters,
-  );
+  const editing = options.editing === true;
+  const typedStatement = editing && typeof source.mainStatement?.text === "string";
+  const existingStatementText = typedStatement
+    ? editableText(source.mainStatement.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters)
+    : cleanText(source.mainStatement?.text, RESOLUTION_PAGE_LIMITS.paragraphCharacters);
 
   const defaultStatement = createDefaultResolutionStatement(defaults);
   const hasDefaultSubject = resolutionSubjectMatter(defaults) !== RESOLUTION_SUBJECT_PLACEHOLDER;
+  // While editing, an emptied box stays empty instead of refilling with the default.
   const useNewDefaultStatement =
-    !existingStatementText ||
+    (!existingStatementText && !typedStatement) ||
     existingStatementText === LEGACY_RESOLUTION_STATEMENT ||
     (hasDefaultSubject && isUntouchedDefaultStatementWithPlaceholder(existingStatementText));
 
@@ -359,12 +421,12 @@ export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
         spaceBefore: 0,
         spaceAfter: 30,
       }),
-      text:
-        cleanText(source.heading?.text ?? source.headingText, 120) ||
-        "RESOLUTION",
+      text: editing && typeof source.heading?.text === "string"
+        ? editableText(source.heading.text, 120)
+        : cleanText(source.heading?.text ?? source.headingText, 120) || "RESOLUTION",
     },
 
-    details: normalizeResolutionPageDetails(source.details, defaults),
+    details: normalizeResolutionPageDetails(source.details, defaults, options),
 
     detailsStyle: normalizeResolutionPageTextStyle(
       detailsStyleSource,
@@ -394,7 +456,7 @@ export function normalizeResolutionPageConfig(raw = {}, defaults = {}) {
         : existingStatementText,
     },
 
-    blocks: normalizeResolutionPageBlocks(source.blocks),
+    blocks: normalizeResolutionPageBlocks(source.blocks, options),
   };
 }
 
@@ -624,28 +686,31 @@ export function createResolutionPageBlock(type, id = createSectionId()) {
   return normalizeResolutionPageBlock({ id, type: "paragraph", text: "Paragraph text", style: { fontFamily: "Helvetica", fontSize: 10, alignment: "left" } }, id);
 }
 
+// The block helpers below are used by the editor, so they keep text as typed.
+const EDITING = Object.freeze({ editing: true });
+
 export function addResolutionPageBlock(blocks, type, id) {
-  return [...normalizeResolutionPageBlocks(blocks), createResolutionPageBlock(type, id)];
+  return [...normalizeResolutionPageBlocks(blocks, EDITING), createResolutionPageBlock(type, id)];
 }
 
 export function updateResolutionPageBlock(blocks, id, changes) {
-  return normalizeResolutionPageBlocks(blocks).map((block) => block.id === id ? normalizeResolutionPageBlock({ ...block, ...changes, id: block.id, type: block.type }, block.id) : block);
+  return normalizeResolutionPageBlocks(blocks, EDITING).map((block) => block.id === id ? normalizeResolutionPageBlock({ ...block, ...changes, id: block.id, type: block.type }, block.id, EDITING) : block);
 }
 
 export function deleteResolutionPageBlock(blocks, id) {
-  return normalizeResolutionPageBlocks(blocks).filter((block) => block.id !== id);
+  return normalizeResolutionPageBlocks(blocks, EDITING).filter((block) => block.id !== id);
 }
 
 export function duplicateResolutionPageBlock(blocks, id, newId = createSectionId()) {
-  const normalized = normalizeResolutionPageBlocks(blocks);
+  const normalized = normalizeResolutionPageBlocks(blocks, EDITING);
   const index = normalized.findIndex((block) => block.id === id);
   if (index < 0) return normalized;
-  const copy = normalizeResolutionPageBlock({ ...structuredClone(normalized[index]), id: newId }, newId);
+  const copy = normalizeResolutionPageBlock({ ...structuredClone(normalized[index]), id: newId }, newId, EDITING);
   return [...normalized.slice(0, index + 1), copy, ...normalized.slice(index + 1)];
 }
 
 export function moveResolutionPageBlock(blocks, id, direction) {
-  const normalized = normalizeResolutionPageBlocks(blocks);
+  const normalized = normalizeResolutionPageBlocks(blocks, EDITING);
   const index = normalized.findIndex((block) => block.id === id);
   const target = direction === "up" ? index - 1 : direction === "down" ? index + 1 : index;
   if (index < 0 || target < 0 || target >= normalized.length) return normalized;

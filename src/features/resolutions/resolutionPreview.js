@@ -1,5 +1,5 @@
 import { FINAL_RESOLUTION_STATUSES } from "./resolutionModel.js";
-import { buildResolutionPdfDocument } from "./resolutionPdf.js";
+import { buildResolutionPdfDocument, loadPoppinsForPages } from "./resolutionPdf.js";
 import {
   buildGeneratedVotesTablePdfPages,
   buildResolutionPagePdfPages,
@@ -192,11 +192,18 @@ export async function generateGeneratedPagesPreviewPdf(input = {}, options = {})
     loadLetterhead: options.loadLetterhead || getResolutionLetterheadJpeg,
     loadOfficialLetterhead: options.loadOfficialLetterhead || getResolutionOfficialLetterheadJpeg,
   });
+  let poppinsFonts;
+  try {
+    poppinsFonts = await loadPoppinsForPages(pages, options);
+  } catch {
+    throw new Error("The Poppins font could not be loaded for the preview.");
+  }
   const pdf = buildResolutionPdfDocument(details, letterhead, {
     preview: true,
     previewLabel: false,
     officialLetterhead,
     pages,
+    poppinsFonts,
   });
   return {
     pdf,

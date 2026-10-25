@@ -75,7 +75,24 @@ function resolutionApprovalMethodLabel(resolution) {
   return approvalMethodLabel(resolution?.approvalMethod);
 }
 
-function buildHybridEmailPlaceholder(value, meeting) {
+// The RIY runs July to June: a meeting in October 2026 is RIY 2026-2027.
+function resolutionRiyLabel(meetingDate) {
+  const parsed = /^\d{4}-\d{2}/.test(meetingDate || "") ? meetingDate : new Date().toISOString().slice(0, 10);
+  const [year, month] = parsed.split("-").map(Number);
+  const start = month >= 7 ? year : year - 1;
+  return `${start}-${start + 1}`;
+}
+
+// The current President from the BOD roster: a position of exactly "President".
+function currentPresidentName(roster) {
+  const president = (Array.isArray(roster) ? roster : []).find((member) => String(member?.position || "")
+    .split(/\s*(?:,|;|\/|\|)\s*/)
+    .some((position) => position.trim().toLowerCase() === "president"));
+  return president?.name || "";
+}
+
+function buildHybridEmailPlaceholder(value, meeting, roster = []) {
+  const presidentName = currentPresidentName(roster);
   const resolutionLine = value.resolutionNumber
     ? `Resolution ${value.resolutionNumber}: ${value.title || "[TITLE]"}`
     : `Resolution: ${value.title || "[TITLE]"}`;
@@ -101,8 +118,8 @@ function buildHybridEmailPlaceholder(value, meeting) {
     "Until voting is closed by the Resolution manager.",
     "",
     "Warm regards,",
-    "Rtr. [PRESIDENT NAME]",
-    "President | RIY",
+    presidentName ? formatRotaractorName(presidentName, true) : "Rtr. [PRESIDENT NAME]",
+    `President | RIY ${resolutionRiyLabel(meeting?.date)}`,
     "Rotaract Club of Pune Heritage",
   ].join("\n");
 }
@@ -165,12 +182,12 @@ function persistedDraftId(result) {
   return candidates.find((candidate) => typeof candidate === "string" && candidate.trim()) || "";
 }
 
-function withGeneratedHybridEmail(value, meeting) {
+function withGeneratedHybridEmail(value, meeting, roster) {
   if ((value?.approvalMethod || "website") !== "hybrid_email") return value;
   return {
     ...value,
     officialEmailSubject: value.officialEmailSubject || buildHybridEmailSubject(value),
-    officialEmailBody: value.officialEmailBody || buildHybridEmailPlaceholder(value, meeting),
+    officialEmailBody: value.officialEmailBody || buildHybridEmailPlaceholder(value, meeting, roster),
   };
 }
 
@@ -231,7 +248,7 @@ function ResolutionForm({ value, onChange, meetings, roster, busy, submitLabel, 
   const selectedVoters = activeEligibleRoster(roster).filter((member) => selectedVoterIds.includes(member.uid));
   const meeting = meetings.find((item) => item.id === value.meetingId);
   const generatedEmailSubject = buildHybridEmailSubject(value);
-  const generatedEmailBody = buildHybridEmailPlaceholder(value, meeting);
+  const generatedEmailBody = buildHybridEmailPlaceholder(value, meeting, roster);
   const emailStateKey = value.id || "new";
   const optionalTextKey = value.id || "new";
   const optionalTextId = `resolution-optional-text-${optionalTextKey}`;
@@ -558,7 +575,7 @@ export default function ResolutionsModule({ uid, onNotice }) {
 
   function requestOpen(item) {
     const meeting = state.meetings.find((entry) => entry.id === item.meetingId) || { date: item.meetingDate };
-    const payload = withResolvedEligibleVoters(withGeneratedHybridEmail(item, meeting), state.roster);
+    const payload = withResolvedEligibleVoters(withGeneratedHybridEmail(item, meeting, state.roster), state.roster);
     const result = validateResolutionDraft(payload, payload.eligibleVoterIds.length);
     if (!result.ok) { onNotice({ type: "error", message: result.errors[0] }); return; }
     setConfirm({ type: "open", item: { ...item, eligibleVoterIds: result.payload.eligibleVoterIds, eligibleVoterCount: result.payload.eligibleVoterIds.length } });

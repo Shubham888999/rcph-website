@@ -30,6 +30,8 @@ import {
 } from "../../resolutions/resolutionPreview";
 import ResolutionPdfUploadPanel from "./ResolutionPdfUploadPanel";
 
+// The editor keeps text exactly as typed; it is cleaned up when the draft is saved.
+const EDITING_TEXT = Object.freeze({ editing: true });
 const TYPE_LABELS = { heading: "Heading", paragraph: "Paragraph", table: "Table", votesTable: "Votes Table", spacer: "Spacer / Page Break" };
 const COLUMN_LABELS = { name: "Name", position: "Position", vote: "Vote", timestamp: "Timestamp", signature: "Signature" };
 
@@ -113,7 +115,7 @@ function ResolutionPageBlockEditor({ block, index, total, onUpdate, onDelete, on
 }
 
 function ResolutionPageEditor({ resolution, config, onChange }) {
-  const set = (changes) => onChange(normalizeResolutionPageConfig({ ...config, ...changes }, resolution));
+  const set = (changes) => onChange(normalizeResolutionPageConfig({ ...config, ...changes }, resolution, EDITING_TEXT));
   const setDetails = (key) => (event) => set({ details: { ...config.details, [key]: event.target.value } });
   const setHeading = (changes) => set({ heading: { ...config.heading, ...changes } });
   const setMainStatement = (changes) => set({ mainStatement: { ...config.mainStatement, ...changes } });
@@ -136,7 +138,8 @@ function ResolutionPageEditor({ resolution, config, onChange }) {
       </div>
       <TextStyleEditor style={config.detailsStyle} onChange={(detailsStyle) => set({ detailsStyle })} />
     </fieldset>
-    <label>Main statement<textarea rows="5" maxLength={RESOLUTION_PAGE_LIMITS.paragraphCharacters} value={config.mainStatement.text} onChange={(event) => setMainStatement({ text: event.target.value })} /></label>
+    <label>Main statement<textarea className="resolution-page-builder__statement" rows="10" maxLength={RESOLUTION_PAGE_LIMITS.paragraphCharacters} value={config.mainStatement.text} onChange={(event) => setMainStatement({ text: event.target.value })} /></label>
+    <p className="admin-help">Press Enter for a new line. Start a line with - or • and a space to make it a bullet point. Leave the blank after "majority of ____" as it is: when voting closes, it is filled with the approvals out of the No. of Board Members present (or the members who voted, if that box is empty).</p>
     <TextStyleEditor style={config.mainStatement} paragraph onChange={(style) => setMainStatement(style)} />
     <div className="resolution-page-builder__custom">
       <div className="resolution-page-builder__subhead"><h4>Additional content</h4><span>{config.blocks.length}/{RESOLUTION_PAGE_LIMITS.blocks}</span></div>
@@ -176,11 +179,11 @@ export default function ResolutionPdfBuilder({ value, onChange, disabled = false
   const [generatedPreview, setGeneratedPreview] = useState({ mode: GENERATED_PAGES_PREVIEW_MODES.ALL, action: "", error: "" });
   const mode = value.documentSourceMode || (value.pdfLayoutMode === "custom" ? "custom" : "standard");
   const sections = value.pdfSections || [];
-  const resolutionPageConfig = normalizeResolutionPageConfig(value.resolutionPageConfig, value);
+  const resolutionPageConfig = normalizeResolutionPageConfig(value.resolutionPageConfig, value, EDITING_TEXT);
   const generatedPageOrder = Array.isArray(value.generatedPageOrder) ? value.generatedPageOrder : ["resolution_page", "vote_table"];
   const setSections = (pdfSections) => onChange({ ...value, pdfSections });
   const setMode = (documentSourceMode) => onChange({ ...value, documentSourceMode, pdfLayoutMode: documentSourceMode === "custom" ? "custom" : "standard" });
-  const setResolutionPageConfig = (config) => onChange({ ...value, resolutionPageConfig: normalizeResolutionPageConfig(config, value) });
+  const setResolutionPageConfig = (config) => onChange({ ...value, resolutionPageConfig: normalizeResolutionPageConfig(config, value, EDITING_TEXT) });
   const setGeneratedPageOrder = (order) => onChange({ ...value, generatedPageOrder: order });
   const toggleResolutionPage = (enabled) => setResolutionPageConfig(enabled ? { ...(value.resolutionPageConfig ? resolutionPageConfig : createDefaultResolutionPageConfig(value)), enabled: true } : { ...resolutionPageConfig, enabled: false });
   const generatedOrderValue = generatedPageOrder[0] === "vote_table" ? "vote_table_first" : "resolution_page_first";
