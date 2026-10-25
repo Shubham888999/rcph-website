@@ -8644,8 +8644,14 @@ min-width: 250px;
   background: var(--internal-control-bg);
 }
 
-.treasury-filterbar__count {
+.treasury-filterbar__end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-left: auto;
+}
+
+.treasury-filterbar__count {
   color: var(--color-muted);
   font-size: 0.84rem;
   white-space: nowrap;
@@ -10124,6 +10130,8 @@ min-width: 250px;
 
 /* Ledger table. */
 .treasury-ledger-wrap {
+  /* Anchors the hidden screen-reader labels inside the scroll box, so they never widen the page. */
+  position: relative;
   max-height: 75vh;
   overflow: auto;
   border: 1px solid var(--internal-border);
@@ -10378,10 +10386,6 @@ min-width: 250px;
 
   .treasury-filterbar__search {
     max-width: none;
-  }
-
-  .treasury-filterbar__count {
-    margin-left: 0;
   }
 }
 

@@ -106,6 +106,13 @@ test("rows open a details side sheet; the entry form opens from + New entry", ()
   assert.match(css, /\.treasury-ledger \.is-number \{[\s\S]*?font-variant-numeric: tabular-nums;[\s\S]*?text-align: right/);
 });
 
+test("count and Export stay on the right when the filter bar wraps, so the menu opens on screen", () => {
+  assert.match(financeSource, /<div className="treasury-filterbar__end">\s*<span className="treasury-filterbar__count">\{count\}<\/span>\s*\{exportMenu\}/);
+  assert.match(css, /\.treasury-filterbar__end \{[^}]*margin-left: auto;/);
+  assert.match(css, /\.treasury-ledger-wrap \{[^}]*position: relative;/);
+  assert.match(css, /\.treasury-export-menu__list \{[\s\S]*?right: 0/);
+});
+
 test("filters: type as a flat bar, the rest under More filters, and Reimbursed filters by its stored value", () => {
   assert.match(financeSource, /\["all", "All"\],/);
   assert.match(financeSource, /aria-controls="treasury-more-filters"/);
