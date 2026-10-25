@@ -4,8 +4,9 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const fontkit = require('@pdf-lib/fontkit');
 const { formatRotaractorName } = require('./member-name');
-const { normalizeGeneratedPageOrder, normalizeResolutionPageConfig } = require('./resolution-sections');
+const { fillResolutionMajority, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, splitResolutionStatement } = require('./resolution-sections');
 
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_SOURCE_PAGES = 25;
@@ -37,7 +38,7 @@ function safePdfText(value) {
     .replace(/[\u2010-\u2015]/g, '-')
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201c\u201d]/g, '"')
-    .replace(/[^\x20-\x7e\u00a0-\u00ff]/g, '?')
+    .replace(/[^\x20-\x7e\u00a0-\u00ff\u2022]/g, '?')
     .trim();
 }
 
@@ -104,8 +105,32 @@ function wrapMultilineText(value, font, size, width) {
   return String(value ?? '').replace(/\r\n/g, '\n').split('\n').flatMap(line => wrapText(line, font, size, width));
 }
 
-async function embedResolutionFonts(document) {
+// Poppins (SIL Open Font License) ships in functions/fonts/poppins.
+const POPPINS_DIR = path.join(__dirname, '..', 'fonts', 'poppins');
+const POPPINS_FILES = Object.freeze({
+  PoppinsRegular: 'Poppins-Regular.ttf',
+  PoppinsBold: 'Poppins-Bold.ttf',
+  PoppinsItalic: 'Poppins-Italic.ttf',
+  PoppinsBoldItalic: 'Poppins-BoldItalic.ttf',
+});
+
+function configUsesPoppins(config = {}) {
+  const styles = [config.heading, config.detailsStyle, config.mainStatement, ...(config.blocks || []).map(block => block.style)];
+  return styles.some(style => style?.fontFamily === 'Poppins' || style?.headerFontFamily === 'Poppins');
+}
+
+async function embedPoppinsFonts(document) {
+  document.registerFontkit(fontkit);
+  const fonts = {};
+  for (const [key, file] of Object.entries(POPPINS_FILES)) {
+    fonts[key] = await document.embedFont(fs.readFileSync(path.join(POPPINS_DIR, file)));
+  }
+  return fonts;
+}
+
+async function embedResolutionFonts(document, config = {}) {
   return {
+    ...(configUsesPoppins(config) ? await embedPoppinsFonts(document) : {}),
     Helvetica: await document.embedFont(StandardFonts.Helvetica),
     HelveticaBold: await document.embedFont(StandardFonts.HelveticaBold),
     HelveticaOblique: await document.embedFont(StandardFonts.HelveticaOblique),
@@ -127,6 +152,7 @@ function pickResolutionFont(fonts, style = {}) {
   const italic = style.italic === true;
   if (family === 'Times Roman') return bold && italic ? fonts.TimesRomanBoldItalic : bold ? fonts.TimesRomanBold : italic ? fonts.TimesRomanItalic : fonts.TimesRoman;
   if (family === 'Courier') return bold && italic ? fonts.CourierBoldOblique : bold ? fonts.CourierBold : italic ? fonts.CourierOblique : fonts.Courier;
+  if (family === 'Poppins' && fonts.PoppinsRegular) return bold && italic ? fonts.PoppinsBoldItalic : bold ? fonts.PoppinsBold : italic ? fonts.PoppinsItalic : fonts.PoppinsRegular;
   return bold && italic ? fonts.HelveticaBoldOblique : bold ? fonts.HelveticaBold : italic ? fonts.HelveticaOblique : fonts.Helvetica;
 }
 
@@ -236,7 +262,7 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
   const resolutionDefaults = details?.resolution && typeof details.resolution === 'object' ? details.resolution : details;
   const config = normalizeResolutionPageConfig(details.resolutionPageConfig, resolutionDefaults);
   if (!config.enabled) return 0;
-  const fonts = await embedResolutionFonts(document);
+  const fonts = await embedResolutionFonts(document, config);
   const background = await document.embedPng(letterheadBytes);
   const pages = [];
   let page;
@@ -282,6 +308,35 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
         page.drawLine({ start: { x, y: y - 2 }, end: { x: x + width, y: y - 2 }, thickness: 0.5, color: rgb(0, 0, 0) });
       }
       y -= lineHeight;
+    }
+    if (style.spaceAfter) {
+      ensure(style.spaceAfter);
+      y -= style.spaceAfter;
+    }
+  }
+
+  function drawBulletList(value, style, options = {}) {
+    const font = pickResolutionFont(fonts, style);
+    const size = Number(style.fontSize) || 10;
+    const lineHeight = size * (Number(style.lineSpacing) || 1.25);
+    const left = options.left ?? BOUNDS.left;
+    const width = options.width ?? WIDTH;
+    const prefix = '\u2022 ';
+    const indent = font.widthOfTextAtSize(prefix, size);
+    const items = String(value ?? '').split('\n').map(item => item.trim()).filter(Boolean);
+    if (style.spaceBefore) {
+      ensure(style.spaceBefore);
+      y -= style.spaceBefore;
+    }
+    for (const item of items) {
+      wrapMultilineText(item, font, size, width - indent).forEach((line, lineIndex) => {
+        ensure(lineHeight);
+        const x = left + (lineIndex ? indent : 0);
+        const lineText = safePdfText(`${lineIndex ? '' : prefix}${line}`);
+        page.drawText(lineText, { x, y, size, font, color: rgb(0, 0, 0) });
+        if (style.underline) page.drawLine({ start: { x, y: y - 2 }, end: { x: x + font.widthOfTextAtSize(lineText, size), y: y - 2 }, thickness: 0.5, color: rgb(0, 0, 0) });
+        y -= lineHeight;
+      });
     }
     if (style.spaceAfter) {
       ensure(style.spaceAfter);
@@ -394,7 +449,20 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
   addPage();
   drawTextBlock(config.heading.text, config.heading, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_PAGE_WIDTH });
   renderResolutionDetails();
-  drawTextBlock(config.mainStatement.text, { ...config.mainStatement, lineSpacing: 1.45 }, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH });
+  // The statement keeps its line breaks; "-", "*" or "•" lines print as bullet points,
+  // and "majority of ____" is filled with the percentage once voting has closed.
+  const statement = fillResolutionMajority(config.mainStatement.text, details.majority || {}, config.details);
+  const segments = splitResolutionStatement(statement);
+  segments.forEach((segment, index) => {
+    const style = {
+      ...config.mainStatement,
+      lineSpacing: 1.45,
+      spaceBefore: index === 0 ? config.mainStatement.spaceBefore : 0,
+      spaceAfter: index === segments.length - 1 ? config.mainStatement.spaceAfter : 0,
+    };
+    if (segment.bullet) drawBulletList(segment.text, style, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH });
+    else drawTextBlock(segment.text, style, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH });
+  });
   config.blocks.forEach(block => {
     if (block.type === 'paragraph') drawTextBlock(block.text, block.style, { left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH });
     else if (block.type === 'table') drawTable(block);

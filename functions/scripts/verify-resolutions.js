@@ -126,7 +126,8 @@ assert.match(resolutionPdfMergeSource, /const RESOLUTION_PAGE_START_Y = START_Y 
 assert.match(resolutionPdfMergeSource, /function renderResolutionDetails\(\)/, 'backend merge renderer has canonical Resolution details layout');
 assert.match(resolutionPdfMergeSource, /renderTwoColumnRow\(`Date - \$\{config\.details\.date \|\| ''\}`, `Place - \$\{config\.details\.place \|\| ''\}`\)/, 'backend merge renderer keeps Date and Place on one row');
 assert.match(resolutionPdfMergeSource, /renderTwoColumnRow\(`No\. of Board Members - \$\{config\.details\.boardMembersPresent \|\| ''\}`, `Total No\. of Board Members - \$\{config\.details\.totalBoardMembers \|\| ''\}`\)/, 'backend merge renderer keeps member counts on one row');
-assert.match(resolutionPdfMergeSource, /drawTextBlock\(config\.mainStatement\.text, \{ \.\.\.config\.mainStatement, lineSpacing: 1\.45 \}, \{ left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH \}\)/, 'backend merge renderer uses the preview statement width');
+assert.match(resolutionPdfMergeSource, /const statement = fillResolutionMajority\(config\.mainStatement\.text, details\.majority \|\| \{\}, config\.details\);/, 'backend merge renderer fills the majority percentage');
+assert.match(resolutionPdfMergeSource, /lineSpacing: 1\.45,[\s\S]*?else drawTextBlock\(segment\.text, style, \{ left: RESOLUTION_PAGE_LEFT, width: RESOLUTION_STATEMENT_WIDTH \}\);/, 'backend merge renderer uses the preview statement width');
 assert.match(resolutionUploadSource, /rows: frozen\.finalizedVoteRowsSnapshot/, 'retry PDF merge uses frozen finalized vote rows');
 assert.match(submitVoteBody, /voterEmail: normalizeEmail\(voter\.email \|\| ''\)/, 'vote submission freezes the voter email used for verification');
 assert.match(submitVoteBody, /requiredSenderEmail: approvalMethod === 'hybrid_email' \? normalizeEmail\(voter\.email \|\| ''\) : ''/, 'submit response returns the same frozen sender email to the current voter');
