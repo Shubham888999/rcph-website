@@ -10435,3 +10435,11 @@ min-width: 250px;
     width: auto;
   }
 }
+
+/* Resolution Page main statement: a roomy box that keeps line breaks as typed. */
+.resolution-page-builder__statement {
+  min-height: 12rem;
+  resize: vertical;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}

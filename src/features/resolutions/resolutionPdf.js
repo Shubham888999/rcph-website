@@ -1,6 +1,8 @@
 import { FINAL_RESOLUTION_STATUSES, approvalMethodLabel, getResolutionPdfFilename, isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 import { buildCustomResolutionPdfPages, buildGeneratedResolutionAppendixPages, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
 import { getResolutionLetterheadJpeg, getResolutionOfficialLetterheadJpeg } from "./resolutionLetterhead.js";
+import { POPPINS_FAMILY, POPPINS_VARIANTS, loadResolutionPoppinsFonts, poppinsVariantKey, poppinsVariantsUsed } from "./resolutionPoppins.js";
+import { POPPINS_METRICS } from "./resolutionPoppinsMetrics.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
 
 export const RESOLUTION_PDF_PAGE = Object.freeze({ width: 595, height: 842 });
@@ -38,11 +40,12 @@ function plainPdfText(value) {
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201c\u201d]/g, '"')
     .normalize("NFKD")
-    .replace(/[^\x20-\x7E\n]/g, "");
+    .replace(/[^\x20-\x7E\n\u2022]/g, "");
 }
 
+// Fonts use WinAnsiEncoding, where the bullet is byte 0x95 (octal 225).
 function pdfText(value) {
-  return plainPdfText(value).replace(/[\\()]/g, (character) => `\\${character}`);
+  return plainPdfText(value).replace(/[\\()]/g, (character) => `\\${character}`).replace(/\u2022/g, "\\225");
 }
 
 function wrapText(value, width, size = 10, mono = false) {
@@ -250,6 +253,7 @@ export function buildResolutionPdfPages(details, options = {}) {
 function fontResource(line) {
   if (line.mono) return "F3";
   const family = line.fontFamily || "Helvetica";
+  if (family === POPPINS_FAMILY) return POPPINS_VARIANTS[poppinsVariantKey(line.bold, line.italic)].resource;
   if (family === "Times Roman") return line.bold && line.italic ? "F9" : line.bold ? "F7" : line.italic ? "F8" : "F6";
   if (family === "Courier") return line.bold && line.italic ? "F12" : line.bold ? "F10" : line.italic ? "F11" : "F3";
   return line.bold && line.italic ? "F5" : line.bold ? "F2" : line.italic ? "F4" : "F1";
@@ -285,6 +289,18 @@ function imageObject(letterhead) {
 
 function streamObject(bytes) {
   return joinBytes([ascii(`<< /Length ${bytes.length} >>\nstream\n`), bytes, ascii("\nendstream")]);
+}
+
+// Poppins as a simple TrueType font: font dictionary, descriptor and the embedded font file.
+function poppinsFontObjects(key, bytes, fontId) {
+  const variant = POPPINS_VARIANTS[key];
+  const metrics = POPPINS_METRICS[key];
+  const flags = 32 + (metrics.italicAngle ? 64 : 0);
+  return [
+    ascii(`<< /Type /Font /Subtype /TrueType /BaseFont /${variant.baseFont} /FirstChar 32 /LastChar 255 /Widths [${metrics.widths.join(" ")}] /Encoding /WinAnsiEncoding /FontDescriptor ${fontId + 1} 0 R >>`),
+    ascii(`<< /Type /FontDescriptor /FontName /${variant.baseFont} /Flags ${flags} /FontBBox [${metrics.bbox.join(" ")}] /ItalicAngle ${metrics.italicAngle} /Ascent ${metrics.ascent} /Descent ${metrics.descent} /CapHeight ${metrics.capHeight} /StemV ${key.startsWith("bold") ? 140 : 80} /FontFile2 ${fontId + 2} 0 R >>`),
+    joinBytes([ascii(`<< /Length ${bytes.length} /Length1 ${bytes.length} >>\nstream\n`), bytes, ascii("\nendstream")]),
+  ];
 }
 
 function assemblePdf(objects) {
@@ -329,16 +345,26 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
     ["F6", "Times-Roman"], ["F7", "Times-Bold"], ["F8", "Times-Italic"], ["F9", "Times-BoldItalic"],
     ["F10", "Courier-Bold"], ["F11", "Courier-Oblique"], ["F12", "Courier-BoldOblique"],
   ] : [];
-  const extraFontResources = extraFonts.map(([name], index) => `/${name} ${extraFontStart + index} 0 R`).join(" ");
+  const poppinsStart = extraFontStart + extraFonts.length;
+  const poppinsKeys = poppinsVariantsUsed(pages);
+  poppinsKeys.forEach((key) => {
+    if (!(options.poppinsFonts?.[key] instanceof Uint8Array) || !options.poppinsFonts[key].length) throw new TypeError("The Poppins font is required for this Resolution PDF.");
+  });
+  const poppinsResources = poppinsKeys.map((key, index) => `/${POPPINS_VARIANTS[key].resource} ${poppinsStart + index * 3} 0 R`);
+  const extraFontResources = [...extraFonts.map(([name], index) => `/${name} ${extraFontStart + index} 0 R`), ...poppinsResources].join(" ");
   const fontResources = `/F1 3 0 R /F2 4 0 R /F3 5 0 R${extraFontResources ? ` ${extraFontResources}` : ""}`;
   objects[1] = ascii("<< /Type /Catalog /Pages 2 0 R >>");
   objects[2] = ascii(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>`);
-  objects[3] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-  objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
-  objects[5] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
+  objects[3] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  objects[4] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  objects[5] = ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>");
   objects[imageId] = imageObject(letterhead);
   if (needsOfficialLetterhead) objects[officialImageId] = imageObject(officialLetterhead);
-  extraFonts.forEach(([, baseFont], index) => { objects[extraFontStart + index] = ascii(`<< /Type /Font /Subtype /Type1 /BaseFont /${baseFont} >>`); });
+  extraFonts.forEach(([, baseFont], index) => { objects[extraFontStart + index] = ascii(`<< /Type /Font /Subtype /Type1 /BaseFont /${baseFont} /Encoding /WinAnsiEncoding >>`); });
+  poppinsKeys.forEach((key, index) => {
+    const fontId = poppinsStart + index * 3;
+    poppinsFontObjects(key, options.poppinsFonts[key], fontId).forEach((object, offset) => { objects[fontId + offset] = object; });
+  });
   pages.forEach((page, index) => {
     const pageId = pageIds[index];
     const contentId = pageId + 1;
@@ -357,6 +383,13 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
   return assemblePdf(objects);
 }
 
+// Loads only the Poppins styles the pages use, so other PDFs fetch nothing extra.
+export async function loadPoppinsForPages(pages, options = {}) {
+  const variants = poppinsVariantsUsed(pages);
+  if (!variants.length) return {};
+  return (options.loadPoppinsFonts || loadResolutionPoppinsFonts)(variants);
+}
+
 export async function generateResolutionPdf(details, options = {}) {
   const resolution = assertFinalized(details);
   const loadLetterhead = options.loadLetterhead || getResolutionLetterheadJpeg;
@@ -364,7 +397,8 @@ export async function generateResolutionPdf(details, options = {}) {
   const letterhead = await loadLetterhead();
   const pages = buildResolutionPdfPages(details);
   const officialLetterhead = pages.some((page) => page.letterhead === "official") ? await loadOfficialLetterhead() : undefined;
-  const pdf = buildResolutionPdfDocument(details, letterhead, { officialLetterhead, pages });
+  const poppinsFonts = await loadPoppinsForPages(pages, options);
+  const pdf = buildResolutionPdfDocument(details, letterhead, { officialLetterhead, pages, poppinsFonts });
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
@@ -380,7 +414,8 @@ export async function generateResolutionPreviewPdf(details, options = {}) {
   const letterhead = await loadLetterhead();
   const pages = buildResolutionPdfPages(details, { preview: true });
   const officialLetterhead = pages.some((page) => page.letterhead === "official") ? await loadOfficialLetterhead() : undefined;
-  const pdf = buildResolutionPdfDocument(details, letterhead, { preview: true, officialLetterhead, pages });
+  const poppinsFonts = await loadPoppinsForPages(pages, options);
+  const pdf = buildResolutionPdfDocument(details, letterhead, { preview: true, officialLetterhead, pages, poppinsFonts });
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
