@@ -2159,8 +2159,11 @@ function TreasuryFilterBar({ filters, avenueOptions, onFilter, onClear, activeFi
         <button type="button" className="treasury-filterbar__more" aria-expanded={showMore} aria-controls="treasury-more-filters" onClick={onToggleMore}>
           More filters{moreFilterCount ? ` (${moreFilterCount})` : ""} {showMore ? "▴" : "▾"}
         </button>
-        <span className="treasury-filterbar__count">{count}</span>
-        {exportMenu}
+        {/* Kept on the right, also when the bar wraps, so the Export menu opens on screen. */}
+        <div className="treasury-filterbar__end">
+          <span className="treasury-filterbar__count">{count}</span>
+          {exportMenu}
+        </div>
       </div>
       {showMore ? (
         <div className="treasury-filterbar__more-row" id="treasury-more-filters">
