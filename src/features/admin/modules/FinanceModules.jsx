@@ -24,6 +24,7 @@ import {
   treasuryBalanceSheetMonthRange,
 } from "../treasury/treasuryBalanceSheet";
 import { downloadTreasuryPdf } from "../treasury/treasuryPdf";
+import { buildTreasuryExpenseSheetModel, defaultExpenseSheetRange, downloadTreasuryExpenseSheet, expenseSheetMonthOptions, expenseSheetMonthRange } from "../treasury/treasuryExpenseSheet";
 import { createTreasuryUploadState, getSafeTreasuryUploadError, validateTreasuryUploadFile } from "../treasury/treasuryUploadModel";
 import {
   CLUB_DUES_AMOUNT,
@@ -381,6 +382,7 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const [filters, setFilters] = useState(DEFAULT_TREASURY_FILTERS);
   const [exporting, setExporting] = useState("");
   const [balanceSheetDraft, setBalanceSheetDraft] = useState(null);
+  const [expenseSheetDraft, setExpenseSheetDraft] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "treasury", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const summary = useMemo(() => buildTreasurySummary(transactions), [transactions]);
@@ -801,6 +803,37 @@ function validBalanceSheetAmount(value) {
   return Number.isFinite(amount) && amount >= 0;
 }
 
+// Expense sheet: month-wise tabs plus a grand total, expenses on the day they were paid.
+const expenseSheetOptions = useMemo(() => expenseSheetMonthOptions(transactions), [transactions]);
+
+function openExpenseSheetExport() {
+  if (!expenseSheetOptions.length) {
+    reportValidation("Add at least one dated expense before exporting an Expense Sheet.");
+    return;
+  }
+  setExpenseSheetDraft(defaultExpenseSheetRange(expenseSheetOptions));
+}
+
+async function exportExpenseSheet() {
+  if (!expenseSheetDraft || exporting) return;
+  if (!expenseSheetMonthRange(expenseSheetDraft.startMonth, expenseSheetDraft.endMonth).length) {
+    reportValidation("Choose a From month that is not after the To month.");
+    return;
+  }
+  setExporting("expense-sheet");
+  try {
+    const model = buildTreasuryExpenseSheetModel({ transactions, ...expenseSheetDraft });
+    await downloadTreasuryExpenseSheet(model);
+    setExpenseSheetDraft(null);
+    onNotice?.({ type: "success", message: `Expense Sheet downloaded (${model.months.length} ${model.months.length === 1 ? "month" : "months"}).` });
+  } catch (error) {
+    if (import.meta.env.DEV) console.error("Expense Sheet export failed.", error);
+    onNotice?.({ type: "error", message: "The Expense Sheet could not be generated. Please try again." });
+  } finally {
+    setExporting("");
+  }
+}
+
 async function exportBalanceSheet() {
   if (!balanceSheetDraft || exporting) return;
 
@@ -1005,7 +1038,44 @@ async function exportBalanceSheet() {
   onExportExcel={() => exportTreasury("excel")}
   onExportPdf={() => exportTreasury("pdf")}
   onExportBalanceSheet={openBalanceSheetExport}
+  onExportExpenseSheet={openExpenseSheetExport}
 />
+{expenseSheetDraft ? (
+  <AdminDialog
+    title="Export Expense Sheet"
+    busy={exporting === "expense-sheet"}
+    onClose={() => {
+      if (!exporting) setExpenseSheetDraft(null);
+    }}
+  >
+    <div className="treasury-balance-sheet-dialog">
+      <p>
+        One tab per month plus a Grand Total, with every expense and reimbursement.
+        Reimbursements are listed on the day the money was spent, not the day they were repaid.
+      </p>
+      <div className="treasury-balance-sheet-range">
+        {[["startMonth", "From month"], ["endMonth", "To month"]].map(([key, label]) => (
+          <label key={key}>
+            <FieldLabel label={label} required />
+            <select
+              value={expenseSheetDraft[key]}
+              onChange={(event) => setExpenseSheetDraft((current) => ({ ...current, [key]: event.target.value }))}
+              disabled={Boolean(exporting)}
+            >
+              {expenseSheetOptions.map((month) => <option value={month.value} key={month.value}>{month.label}</option>)}
+            </select>
+          </label>
+        ))}
+      </div>
+      <div className="admin-actions">
+        <button type="button" onClick={exportExpenseSheet} disabled={Boolean(exporting)}>
+          {exporting === "expense-sheet" ? "Generating Expense Sheet..." : "Export Expense Sheet"}
+        </button>
+        <button type="button" onClick={() => setExpenseSheetDraft(null)} disabled={Boolean(exporting)}>Cancel</button>
+      </div>
+    </div>
+  </AdminDialog>
+) : null}
 {fineProofTarget ? <FineProofDialog target={fineProofTarget} locked={locked} busy={busy} run={run} onClose={() => setFineProofTarget(null)} /> : null}
 {balanceSheetDraft ? (
   <AdminDialog
@@ -1784,6 +1854,7 @@ function TreasuryHistory({
   onExportExcel,
   onExportPdf,
   onExportBalanceSheet,
+  onExportExpenseSheet,
 }) {
     const [activeMobileMenuId, setActiveMobileMenuId] = useState("");
   const activeMobileMenuRef = useRef(null);
@@ -1830,6 +1901,9 @@ function TreasuryHistory({
   {exporting === "balance-sheet"
     ? "Generating Balance Sheet..."
     : "Export Balance Sheet"}
+</button>
+<button type="button" onClick={onExportExpenseSheet} disabled={Boolean(exporting)}>
+  {exporting === "expense-sheet" ? "Generating Expense Sheet..." : "Export Expense Sheet"}
 </button>
           </div>
         </div>
