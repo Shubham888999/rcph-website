@@ -17,6 +17,11 @@ export const CLUB_DUES_IMPORT_REQUIRED_HEADERS = Object.freeze(["timestamp", "me
 export const DEFAULT_TREASURY_FILTERS = Object.freeze({
   search: "",
   type: "all",
+  // Period: "all", "month" (this month), "last-month", "riy" (July to June) or
+  // "custom" with fromMonth/toMonth. The ledger, totals and exports all use it.
+  period: "all",
+  fromMonth: "",
+  toMonth: "",
   month: "",
   avenue: "",
   paymentMode: "",
@@ -751,10 +756,107 @@ function searchText(record = {}) {
     .join(" ");
 }
 
-export function filterAndSortTreasury(transactions = [], filters = DEFAULT_TREASURY_FILTERS) {
+export const TREASURY_PERIODS = Object.freeze([
+  ["month", "This month"],
+  ["last-month", "Last month"],
+  ["riy", "This RIY"],
+  ["custom", "Custom"],
+  ["all", "All time"],
+]);
+
+function shiftMonth(monthKey, delta) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(year, month - 1 + delta, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// The Rotaract year runs July to June.
+export function treasuryRiyRange(now = new Date()) {
+  const current = localToday(now).slice(0, 7);
+  const [year, month] = current.split("-").map(Number);
+  const startYear = month >= 7 ? year : year - 1;
+  return { fromMonth: `${startYear}-07`, toMonth: `${startYear + 1}-06`, label: `RIY ${startYear}-${String(startYear + 1).slice(2)}` };
+}
+
+// The month range a period covers. Empty months mean no limit on that side.
+export function resolveTreasuryPeriod(filters = {}, now = new Date()) {
+  const current = localToday(now).slice(0, 7);
+  if (filters.period === "month") return { fromMonth: current, toMonth: current, label: formatTreasuryMonth(current) };
+  if (filters.period === "last-month") {
+    const last = shiftMonth(current, -1);
+    return { fromMonth: last, toMonth: last, label: formatTreasuryMonth(last) };
+  }
+  if (filters.period === "riy") return treasuryRiyRange(now);
+  if (filters.period === "custom") {
+    const months = [filters.fromMonth, filters.toMonth].filter((value) => /^\d{4}-\d{2}$/.test(value || ""));
+    if (!months.length) return { fromMonth: "", toMonth: "", label: "" };
+    const [fromMonth, toMonth] = months.length === 2 ? [...months].sort() : [months[0], months[0]];
+    return { fromMonth, toMonth, label: fromMonth === toMonth ? formatTreasuryMonth(fromMonth) : `${formatTreasuryMonth(fromMonth)} to ${formatTreasuryMonth(toMonth)}` };
+  }
+  return { fromMonth: "", toMonth: "", label: "" };
+}
+
+function inTreasuryPeriod(item, range) {
+  if (!range.fromMonth && !range.toMonth) return true;
+  const month = treasuryLedgerDate(item).slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) return false;
+  return (!range.fromMonth || month >= range.fromMonth) && (!range.toMonth || month <= range.toMonth);
+}
+
+// Oldest first, the order money moved: ledger date, then the order entries were made.
+function compareLedgerOrder(a, b) {
+  return treasuryLedgerDate(a).localeCompare(treasuryLedgerDate(b))
+    || String(a.createdAt || "").localeCompare(String(b.createdAt || ""))
+    || String(a.id || "").localeCompare(String(b.id || ""));
+}
+
+function signedAmount(item) {
+  if (item.type === "income") return item.amount || 0;
+  if (item.type === "expense") return -(item.amount || 0);
+  return 0;
+}
+
+// Running balance after each entry, like a bank passbook. It always counts every
+// entry, so filtering the table never changes a row's balance.
+export function buildTreasuryRunningBalances(transactions = []) {
+  const balances = new Map();
+  let balance = 0;
+  [...transactions].sort(compareLedgerOrder).forEach((item) => {
+    balance += signedAmount(item);
+    balances.set(item.id, Math.round(balance * 100) / 100);
+  });
+  return balances;
+}
+
+// Totals for the summary strip: receipts and payments in the period, the balance
+// at the end of it, this month's net and the pending reimbursements.
+export function buildTreasuryPeriodSummary(transactions = [], filters = DEFAULT_TREASURY_FILTERS, now = new Date()) {
+  const range = resolveTreasuryPeriod(filters, now);
+  const inPeriod = transactions.filter((item) => inTreasuryPeriod(item, range));
+  const sum = (items, type) => items.filter((item) => item.type === type).reduce((total, item) => total + (item.amount || 0), 0);
+  const closing = transactions
+    .filter((item) => !range.toMonth || treasuryLedgerDate(item).slice(0, 7) <= range.toMonth)
+    .reduce((total, item) => total + signedAmount(item), 0);
+  const overall = buildTreasurySummary(transactions, now);
+  return {
+    period: range,
+    currentMonth: overall.monthKey,
+    receipts: sum(inPeriod, "income"),
+    payments: sum(inPeriod, "expense"),
+    closingBalance: Math.round(closing * 100) / 100,
+    monthNet: overall.monthNet,
+    monthTransactionCount: overall.monthTransactionCount,
+    pendingReimbursementAmount: overall.pendingReimbursementAmount,
+    pendingReimbursementCount: overall.pendingReimbursementCount,
+  };
+}
+
+export function filterAndSortTreasury(transactions = [], filters = DEFAULT_TREASURY_FILTERS, now = new Date()) {
   const query = text(filters.search, 120).toLowerCase();
   const sort = TREASURY_SORT_OPTIONS.includes(filters.sort) ? filters.sort : "newest";
+  const range = resolveTreasuryPeriod(filters, now);
   const rows = transactions.filter((item) => {
+    if (!inTreasuryPeriod(item, range)) return false;
     if (query && !searchText(item).includes(query)) return false;
     if (filters.type === "income" && item.type !== "income") return false;
     if (filters.type === "expense" && (item.type !== "expense" || isReimbursementRecord(item))) return false;
@@ -775,8 +877,8 @@ export function filterAndSortTreasury(transactions = [], filters = DEFAULT_TREAS
       const diff = (b.amount || 0) - (a.amount || 0);
       return sort === "amount-desc" ? diff : -diff;
     }
-    const diff = treasuryLedgerDate(b).localeCompare(treasuryLedgerDate(a));
-    return sort === "newest" ? diff : -diff;
+    const diff = compareLedgerOrder(a, b);
+    return sort === "newest" ? -diff : diff;
   });
 }
 

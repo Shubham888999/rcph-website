@@ -31,6 +31,7 @@ import {
   CLUB_DUES_TRANSACTION_TITLE,
   DEFAULT_TREASURY_FILTERS,
   TREASURY_PAYMENT_MODES,
+  TREASURY_PERIODS,
   TREASURY_REIMBURSEMENT_STATUSES,
   TREASURY_WORKFLOW_TYPES,
   addClubDuesRow,
@@ -38,12 +39,15 @@ import {
   buildClubDuesImportPayloads,
   buildClubDuesPayloads,
   buildTreasuryPayload,
+  buildTreasuryPeriodSummary,
   buildTreasuryReview,
-  buildTreasurySummary,
+  buildTreasuryRunningBalances,
   createClubDuesDraft,
   createEmptyTreasuryDraft,
   filterAndSortTreasury,
   formatTreasuryDate,
+  formatTreasuryMonth,
+  resolveTreasuryPeriod,
   treasuryLedgerDate,
   treasurySpentDate,
   getTreasuryAvenueOptions,
@@ -284,7 +288,7 @@ if (
 }
 
 const TREASURY_TYPE_FILTERS = [
-  ["all", "All types"],
+  ["all", "All"],
   ["income", "Income"],
   ["expense", "Expense"],
   ["reimbursement", "Reimbursement"],
@@ -378,21 +382,23 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const [editErrors, setEditErrors] = useState({});
   const [editUpload, setEditUpload] = useState(createTreasuryUploadState);
   const [details, setDetails] = useState(null);
+  const [selectedId, setSelectedId] = useState("");
+  const [entryOpen, setEntryOpen] = useState(false);
   const [target, setTarget] = useState(null);
-  const [filters, setFilters] = useState(DEFAULT_TREASURY_FILTERS);
+  const [filters, setFilters] = useState(() => ({ ...DEFAULT_TREASURY_FILTERS, period: "riy" }));
   const [exporting, setExporting] = useState("");
   const [balanceSheetDraft, setBalanceSheetDraft] = useState(null);
   const [expenseSheetDraft, setExpenseSheetDraft] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "treasury", onNotice });
   const locked = lock.status !== "success" || lock.locked;
-  const summary = useMemo(() => buildTreasurySummary(transactions), [transactions]);
+  const summary = useMemo(() => buildTreasuryPeriodSummary(transactions, filters), [transactions, filters]);
+  const balances = useMemo(() => buildTreasuryRunningBalances(transactions), [transactions]);
+  const selected = selectedId ? transactions.find((item) => item.id === selectedId) || null : null;
   const filteredTransactions = useMemo(() => filterAndSortTreasury(transactions, filters), [transactions, filters]);
   const groupedTransactions = useMemo(() => groupTreasuryByMonth(filteredTransactions), [filteredTransactions]);
   const duesImportValidation = useMemo(() => validateClubDuesImportRows(duesImportRows, transactions), [duesImportRows, transactions]);
   const monthOptions = useMemo(() => getTreasuryMonthOptions(transactions), [transactions]);
   const avenueOptions = useMemo(() => getTreasuryAvenueOptions(transactions), [transactions]);
-  const incomeCount = transactions.filter((item) => item.type === "income").length;
-  const expenseCount = transactions.filter((item) => item.type === "expense").length;
   const duesUploadWorking = duesUploads.some(isTreasuryUploadWorking);
   const duesBusy = busy || locked || duesSaving || duesUploadWorking || duesImportSaving;
   const duesAmountLabel = formatInr(CLUB_DUES_AMOUNT).replace(".00", "");
@@ -728,6 +734,36 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   function updateFilter(key, value) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
+
+  // Straight to the Google Form CSV/Excel import: the entry form in Club dues mode.
+  function openDuesImport() {
+    setEntryOpen(true);
+    setClubDuesMode(true);
+    requestAnimationFrame(() => document.querySelector(".treasury-dues-import")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  // Custom starts from the months currently on screen.
+  function updatePeriod(changes) {
+    setFilters((current) => {
+      const next = { ...current, ...changes };
+      if (changes.period === "custom" && (!current.fromMonth || !current.toMonth)) {
+        const shown = resolveTreasuryPeriod(current);
+        const months = monthOptions.map((item) => item.value).sort();
+        const inRange = months.filter((month) => (!shown.fromMonth || month >= shown.fromMonth) && (!shown.toMonth || month <= shown.toMonth));
+        const range = inRange.length ? inRange : months;
+        next.fromMonth = range[0] || "";
+        next.toMonth = range.at(-1) || "";
+      }
+      return next;
+    });
+  }
+
+  // Export dialogs open on the months of the chosen period, within the months they offer.
+  function periodMonthsWithin(months) {
+    const period = resolveTreasuryPeriod(filters);
+    const inRange = months.filter((month) => (!period.fromMonth || month >= period.fromMonth) && (!period.toMonth || month <= period.toMonth));
+    return inRange.length ? { startMonth: inRange[0], endMonth: inRange.at(-1) } : null;
+  }
 function openBalanceSheetExport() {
   const availableMonths = monthOptions
     .map((item) => item.value)
@@ -740,8 +776,8 @@ function openBalanceSheetExport() {
     return;
   }
 
-  const startMonth = availableMonths[0];
-  const endMonth = availableMonths.at(-1);
+  const { startMonth, endMonth } = periodMonthsWithin(availableMonths)
+    || { startMonth: availableMonths[0], endMonth: availableMonths.at(-1) };
   const selectedMonths = treasuryBalanceSheetMonthRange(
     startMonth,
     endMonth,
@@ -811,7 +847,10 @@ function openExpenseSheetExport() {
     reportValidation("Add at least one dated expense before exporting an Expense Sheet.");
     return;
   }
-  setExpenseSheetDraft(defaultExpenseSheetRange(expenseSheetOptions));
+  setExpenseSheetDraft(
+    periodMonthsWithin(expenseSheetOptions.map((month) => month.value))
+    || defaultExpenseSheetRange(expenseSheetOptions),
+  );
 }
 
 async function exportExpenseSheet() {
@@ -948,8 +987,18 @@ async function exportBalanceSheet() {
       <div className={`admin-lock-banner ${locked ? "is-locked" : ""}`}>
         {locked ? "Treasury is locked or unavailable." : "Treasury is open for authorized finance updates."}
       </div>
-      <TreasuryOverview summary={summary} incomeCount={incomeCount} expenseCount={expenseCount} />
-      <section className="treasury-entry-grid" aria-label="Quick transaction entry">
+      <TreasuryPeriodBar
+        filters={filters}
+        monthOptions={monthOptions}
+        onPeriod={updatePeriod}
+        entryOpen={entryOpen || Boolean(draftRecordId)}
+        onToggleEntry={() => setEntryOpen((current) => !(current || Boolean(draftRecordId)))}
+        importDisabled={locked || busy || isTreasuryUploadWorking(draftUpload)}
+        onImportDues={openDuesImport}
+      />
+      <TreasurySummaryStrip summary={summary} />
+      {entryOpen || draftRecordId ? (
+      <section className="treasury-entry-grid" id="treasury-entry" aria-label="Quick transaction entry">
         <div className="admin-panel treasury-entry-panel">
           <div className="treasury-section-heading">
             <div>
@@ -1020,16 +1069,19 @@ async function exportBalanceSheet() {
           )}
         </div>
       </section>
+      ) : null}
 <TreasuryHistory
   transactions={transactions}
   filteredTransactions={filteredTransactions}
   groupedTransactions={groupedTransactions}
+  balances={balances}
   filters={filters}
-  monthOptions={monthOptions}
   avenueOptions={avenueOptions}
   locked={locked}
+  selectedId={selected?.id || ""}
   onFilter={updateFilter}
-  onClearFilters={() => setFilters(DEFAULT_TREASURY_FILTERS)}
+  onClearFilters={() => setFilters((current) => ({ ...DEFAULT_TREASURY_FILTERS, period: current.period, fromMonth: current.fromMonth, toMonth: current.toMonth }))}
+  onSelect={(item) => setSelectedId((current) => (current === item.id ? "" : item.id))}
   onDetails={setDetails}
   onEdit={startEdit}
   onDelete={setTarget}
@@ -1039,6 +1091,17 @@ async function exportBalanceSheet() {
   onExportPdf={() => exportTreasury("pdf")}
   onExportBalanceSheet={openBalanceSheetExport}
   onExportExpenseSheet={openExpenseSheetExport}
+  detailPanel={selected ? (
+    <TreasuryDetailPanel
+      record={selected}
+      balance={balances.get(selected.id)}
+      locked={locked}
+      onClose={() => setSelectedId("")}
+      onEdit={startEdit}
+      onDelete={setTarget}
+      onManageProof={(item) => setFineProofTarget(fineProofTargetFromTreasury(item))}
+    />
+  ) : null}
 />
 {expenseSheetDraft ? (
   <AdminDialog
@@ -1299,24 +1362,59 @@ async function exportBalanceSheet() {
   );
 }
 
-function TreasuryOverview({ summary, incomeCount, expenseCount }) {
-  const cards = [
-    { label: "Total Income", amount: summary.income, detail: `${incomeCount} income records`, tone: "income" },
-    { label: "Total Expense", amount: summary.expense, detail: `${expenseCount} expense records`, tone: "expense" },
-    { label: "Net Balance", amount: summary.net, detail: summary.net >= 0 ? "Positive club balance" : "Expenses exceed income", tone: summary.net >= 0 ? "net" : "danger" },
-    { label: "Pending Reimbursements", amount: summary.pendingReimbursementAmount, detail: `${summary.pendingReimbursementCount} records`, tone: summary.pendingReimbursementCount ? "warning" : "neutral" },
-    { label: "This Month", amount: summary.monthNet, detail: `${summary.monthTransactionCount} transactions`, tone: summary.monthNet >= 0 ? "net" : "danger" },
+// One thin strip of totals for the chosen period, like an accounts summary line.
+function TreasurySummaryStrip({ summary }) {
+  const periodLabel = summary.period.label || "All time";
+  const cells = [
+    { label: "Receipts", value: formatInr(summary.receipts), detail: periodLabel, tone: "income" },
+    { label: "Payments", value: formatInr(summary.payments), detail: periodLabel, tone: "expense" },
+    { label: "Closing balance", value: formatInr(summary.closingBalance), detail: summary.period.toMonth && summary.period.toMonth < summary.currentMonth ? `End of ${formatTreasuryMonth(summary.period.toMonth)}` : "As of today", tone: summary.closingBalance >= 0 ? "net" : "expense" },
+    { label: "This month net", value: formatInr(summary.monthNet), detail: `${summary.monthTransactionCount} transactions`, tone: summary.monthNet >= 0 ? "neutral" : "expense" },
+    { label: "Pending reimbursements", value: `${summary.pendingReimbursementCount} · ${formatInr(summary.pendingReimbursementAmount)}`, detail: summary.pendingReimbursementCount ? "Not repaid yet" : "All repaid", tone: summary.pendingReimbursementCount ? "warning" : "neutral" },
   ];
   return (
-    <section className="treasury-overview" aria-label="Treasury overview">
-      {cards.map((card) => (
-        <article className={`treasury-metric is-${card.tone}`} key={card.label}>
-          <span>{card.label}</span>
-          <strong>{formatInr(card.amount)}</strong>
-          <small>{card.detail}</small>
-        </article>
+    <section className="treasury-strip" aria-label="Treasury summary">
+      {cells.map((cell) => (
+        <div className={`treasury-strip__cell is-${cell.tone}`} key={cell.label}>
+          <span>{cell.label}</span>
+          <strong>{cell.value}</strong>
+          <small>{cell.detail}</small>
+        </div>
       ))}
     </section>
+  );
+}
+
+// Period picker shared by the ledger, the summary strip and the exports.
+function TreasuryPeriodBar({ filters, monthOptions, onPeriod, entryOpen, onToggleEntry, importDisabled, onImportDues }) {
+  const months = [...monthOptions].sort((a, b) => a.value.localeCompare(b.value));
+  return (
+    <div className="treasury-periodbar">
+      <div className="treasury-periodbar__period" role="group" aria-label="Period">
+        <span className="treasury-periodbar__label">Period</span>
+        <div className="treasury-segmented">
+          {TREASURY_PERIODS.map(([value, label]) => (
+            <button type="button" key={value} aria-pressed={filters.period === value} className={filters.period === value ? "is-active" : undefined} onClick={() => onPeriod({ period: value })}>{label}</button>
+          ))}
+        </div>
+        {filters.period === "custom" ? (
+          <div className="treasury-periodbar__custom">
+            {[["fromMonth", "From"], ["toMonth", "To"]].map(([key, label]) => (
+              <label key={key}>
+                <span>{label}</span>
+                <select value={filters[key]} onChange={(event) => onPeriod({ [key]: event.target.value })}>
+                  {months.map((month) => <option value={month.value} key={month.value}>{month.label}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <div className="treasury-periodbar__actions">
+        <button type="button" className="treasury-import-dues" disabled={importDisabled} onClick={onImportDues}>Import dues (CSV/Excel)</button>
+        <button type="button" className="treasury-new-entry" aria-expanded={entryOpen} aria-controls="treasury-entry" onClick={onToggleEntry}>{entryOpen ? "Close entry form" : "+ New entry"}</button>
+      </div>
+    </div>
   );
 }
 
@@ -1836,16 +1934,63 @@ function TreasuryReviewPanel({ value, upload, errors, compact = false }) {
   );
 }
 
+const TREASURY_LEDGER_COLUMNS = 10;
+
+function TreasuryExportMenu({ exporting, onExportExcel, onExportPdf, onExportBalanceSheet, onExportExpenseSheet }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const labels = { excel: "Generating Excel...", pdf: "Generating PDF...", "balance-sheet": "Generating Balance Sheet...", "expense-sheet": "Generating Expense Sheet..." };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function closeOnOutsideClick(event) {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    }
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  const items = [
+    ["Export Excel", onExportExcel],
+    ["Export PDF", onExportPdf],
+    ["Export Balance Sheet", onExportBalanceSheet],
+    ["Export Expense Sheet", onExportExpenseSheet],
+  ];
+  return (
+    <div className="treasury-export-menu" ref={ref}>
+      <button type="button" className="treasury-export-menu__trigger" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? "treasury-export-list" : undefined} disabled={Boolean(exporting)} onClick={() => setOpen(!open)}>
+        {exporting ? labels[exporting] : "Export ▾"}
+      </button>
+      {open ? (
+        <div className="treasury-export-menu__list" id="treasury-export-list" role="menu" aria-label="Treasury exports">
+          {items.map(([label, action], index) => (
+            <button type="button" role="menuitem" key={label} className={index === 2 ? "is-separated" : undefined} disabled={Boolean(exporting)} onClick={() => { setOpen(false); action(); }}>{label}</button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TreasuryHistory({
   transactions,
   filteredTransactions,
   groupedTransactions,
+  balances,
   filters,
-  monthOptions,
   avenueOptions,
   locked,
+  selectedId,
   onFilter,
   onClearFilters,
+  onSelect,
   onDetails,
   onEdit,
   onDelete,
@@ -1855,10 +2000,15 @@ function TreasuryHistory({
   onExportPdf,
   onExportBalanceSheet,
   onExportExpenseSheet,
+  detailPanel,
 }) {
     const [activeMobileMenuId, setActiveMobileMenuId] = useState("");
   const activeMobileMenuRef = useRef(null);
-  const activeFilters = Object.entries(filters).some(([key, value]) => key !== "sort" && Boolean(value)) || filters.sort !== DEFAULT_TREASURY_FILTERS.sort;
+  const moreFilterCount = ["paymentMode", "reimbursementStatus", "hasFile"].filter((key) => Boolean(filters[key])).length + (filters.sort !== DEFAULT_TREASURY_FILTERS.sort ? 1 : 0);
+  const [showMoreFilters, setShowMoreFilters] = useState(moreFilterCount > 0);
+  const activeFilters = ["search", "avenue", "paymentMode", "reimbursementStatus", "hasFile"].some((key) => Boolean(filters[key]))
+    || filters.type !== DEFAULT_TREASURY_FILTERS.type
+    || filters.sort !== DEFAULT_TREASURY_FILTERS.sort;
 
   useEffect(() => {
     if (!activeMobileMenuId) return undefined;
@@ -1883,50 +2033,76 @@ function TreasuryHistory({
 
   return (
     <section className="admin-panel treasury-history" aria-labelledby="treasury-history-title">
-      <div className="treasury-section-heading">
-        <div>
-          <span>History</span>
-          <h3 id="treasury-history-title">Transaction history</h3>
-        </div>
-        <div className="treasury-history__actions">
-          <strong>{filteredTransactions.length} of {transactions.length}</strong>
-          <div className="admin-actions treasury-export-actions" aria-label="Treasury export actions">
-            <button type="button" onClick={onExportExcel} disabled={Boolean(exporting)}>{exporting === "excel" ? "Generating Excel..." : "Export Excel"}</button>
-            <button type="button" onClick={onExportPdf} disabled={Boolean(exporting)}>{exporting === "pdf" ? "Generating PDF..." : "Export PDF"}</button>
-          <button
-  type="button"
-  onClick={onExportBalanceSheet}
-  disabled={Boolean(exporting)}
->
-  {exporting === "balance-sheet"
-    ? "Generating Balance Sheet..."
-    : "Export Balance Sheet"}
-</button>
-<button type="button" onClick={onExportExpenseSheet} disabled={Boolean(exporting)}>
-  {exporting === "expense-sheet" ? "Generating Expense Sheet..." : "Export Expense Sheet"}
-</button>
-          </div>
-        </div>
-      </div>
-      <TreasuryFilterBar filters={filters} monthOptions={monthOptions} avenueOptions={avenueOptions} onFilter={onFilter} onClear={onClearFilters} activeFilters={activeFilters} />
+      <h3 id="treasury-history-title" className="treasury-visually-hidden">Treasury ledger</h3>
+      <TreasuryFilterBar
+        filters={filters}
+        avenueOptions={avenueOptions}
+        onFilter={onFilter}
+        onClear={onClearFilters}
+        activeFilters={activeFilters}
+        showMore={showMoreFilters}
+        moreFilterCount={moreFilterCount}
+        onToggleMore={() => setShowMoreFilters((current) => !current)}
+        count={`${filteredTransactions.length} of ${transactions.length}`}
+        exportMenu={(
+          <TreasuryExportMenu
+            exporting={exporting}
+            onExportExcel={onExportExcel}
+            onExportPdf={onExportPdf}
+            onExportBalanceSheet={onExportBalanceSheet}
+            onExportExpenseSheet={onExportExpenseSheet}
+          />
+        )}
+      />
       {filteredTransactions.length ? (
         <>
           <div className="treasury-history__desktop">
-            {groupedTransactions.map((group) => (
-              <section className="treasury-month-group" key={group.key}>
-                <header>
-                  <h4>{group.label}</h4>
-                  <span>Income {formatInr(group.income)} - Expense {formatInr(group.expense)} - Net {formatInr(group.net)}</span>
-                </header>
-                <div className="admin-table-wrap treasury-table-wrap">
-                  <table>
-                    <caption>{group.label} Treasury transactions</caption>
-                    <thead><tr><th>Date</th><th>Transaction</th><th>Type</th><th>Amount</th><th>Party</th><th>Avenue</th><th>Payment mode</th><th>Reimbursement</th><th>File</th><th>Actions</th></tr></thead>
-                    <tbody>{group.items.map((item) => <TreasuryTableRow key={item.id} item={item} locked={locked} onDetails={onDetails} onEdit={onEdit} onDelete={onDelete} onManageProof={onManageProof} />)}</tbody>
-                  </table>
-                </div>
-              </section>
-            ))}
+            <div className="treasury-ledger-wrap">
+              <table className="treasury-ledger">
+                <caption>Treasury ledger, sorted by bank date. Click a row to see its details.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Particulars</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Avenue</th>
+                    <th scope="col">Mode</th>
+                    <th scope="col" className="is-number">Receipts</th>
+                    <th scope="col" className="is-number">Payments</th>
+                    <th scope="col" className="is-number">Balance</th>
+                    <th scope="col"><span className="treasury-visually-hidden">File</span></th>
+                    <th scope="col"><span className="treasury-visually-hidden">Actions</span></th>
+                  </tr>
+                </thead>
+                {groupedTransactions.map((group) => (
+                  <tbody key={group.key}>
+                    <tr className="treasury-ledger__month"><th scope="colgroup" colSpan={TREASURY_LEDGER_COLUMNS}>{group.label}</th></tr>
+                    {group.items.map((item) => (
+                      <TreasuryTableRow
+                        key={item.id}
+                        item={item}
+                        balance={balances.get(item.id)}
+                        selected={item.id === selectedId}
+                        locked={locked}
+                        onSelect={onSelect}
+                        onDetails={onSelect}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onManageProof={onManageProof}
+                      />
+                    ))}
+                    <tr className="treasury-ledger__total">
+                      <th scope="row" colSpan={5}>{group.label} total</th>
+                      <td className="is-number is-income">{formatLedgerAmount(group.income)}</td>
+                      <td className="is-number is-expense">{formatLedgerAmount(group.expense)}</td>
+                      <td className="is-number">Net {formatLedgerAmount(group.net)}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tbody>
+                ))}
+              </table>
+            </div>
+            {detailPanel}
           </div>
           <div className="treasury-history__mobile">
             {groupedTransactions.map((group) => (
@@ -1955,68 +2131,84 @@ function TreasuryHistory({
             ))}
           </div>
         </>
-      ) : <AdminEmpty message="No treasury transactions match the current filters." />}
+      ) : <AdminEmpty message="No treasury transactions match the current period and filters." />}
     </section>
   );
 }
 
-function TreasuryFilterBar({ filters, monthOptions, avenueOptions, onFilter, onClear, activeFilters }) {
+function TreasuryFilterBar({ filters, avenueOptions, onFilter, onClear, activeFilters, showMore, moreFilterCount, onToggleMore, count, exportMenu }) {
   return (
     <div className="treasury-filterbar">
-      <label className="treasury-filterbar__search">
-        <span>Search</span>
-        <input value={filters.search} onChange={(event) => onFilter("search", event.target.value)} placeholder="Title, purpose, party, reference" />
-      </label>
-      <label>
-        <span>Type</span>
-        <select value={filters.type} onChange={(event) => onFilter("type", event.target.value)}>
-          {TREASURY_TYPE_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-      </label>
-      <label>
-        <span>Month</span>
-        <select value={filters.month} onChange={(event) => onFilter("month", event.target.value)}>
-          <option value="">All months</option>
-          {monthOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </select>
-      </label>
-      <label>
-        <span>Avenue</span>
-        <select value={filters.avenue} onChange={(event) => onFilter("avenue", event.target.value)}>
-          <option value="">All avenues</option>
-          {avenueOptions.map((item) => <option key={item}>{item}</option>)}
-        </select>
-      </label>
-      <label>
-        <span>Payment mode</span>
-        <select value={filters.paymentMode} onChange={(event) => onFilter("paymentMode", event.target.value)}>
-          <option value="">All modes</option>
-          {TREASURY_PAYMENT_MODES.map((item) => <option key={item}>{item}</option>)}
-        </select>
-      </label>
-      <label>
-        <span>Reimbursement</span>
-        <select value={filters.reimbursementStatus} onChange={(event) => onFilter("reimbursementStatus", event.target.value)}>
-          <option value="">All statuses</option>
-          {TREASURY_REIMBURSEMENT_STATUSES.map((item) => <option key={item}>{reimbursementLabel(item)}</option>)}
-        </select>
-      </label>
-      <label>
-        <span>File</span>
-        <select value={filters.hasFile} onChange={(event) => onFilter("hasFile", event.target.value)}>
-          <option value="">Any</option>
-          <option value="yes">Has file</option>
-          <option value="no">No file</option>
-        </select>
-      </label>
-      <label>
-        <span>Sort</span>
-        <select value={filters.sort} onChange={(event) => onFilter("sort", event.target.value)}>
-          {Object.entries(TREASURY_SORT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-      </label>
-      <button className="treasury-filterbar__clear" type="button" onClick={onClear} disabled={!activeFilters}>Clear filters</button>
+      <div className="treasury-filterbar__main">
+        <label className="treasury-filterbar__search">
+          <span className="treasury-visually-hidden">Search</span>
+          <input value={filters.search} onChange={(event) => onFilter("search", event.target.value)} placeholder="Search title, party, reference" />
+        </label>
+        <div className="treasury-segmented" role="group" aria-label="Type">
+          {TREASURY_TYPE_FILTERS.map(([value, label]) => (
+            <button type="button" key={value} aria-pressed={filters.type === value} className={filters.type === value ? "is-active" : undefined} onClick={() => onFilter("type", value)}>{label}</button>
+          ))}
+        </div>
+        <label>
+          <span className="treasury-visually-hidden">Avenue</span>
+          <select value={filters.avenue} onChange={(event) => onFilter("avenue", event.target.value)}>
+            <option value="">All avenues</option>
+            {avenueOptions.map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+        <button type="button" className="treasury-filterbar__more" aria-expanded={showMore} aria-controls="treasury-more-filters" onClick={onToggleMore}>
+          More filters{moreFilterCount ? ` (${moreFilterCount})` : ""} {showMore ? "▴" : "▾"}
+        </button>
+        <span className="treasury-filterbar__count">{count}</span>
+        {exportMenu}
+      </div>
+      {showMore ? (
+        <div className="treasury-filterbar__more-row" id="treasury-more-filters">
+          <label>
+            <span>Payment mode</span>
+            <select value={filters.paymentMode} onChange={(event) => onFilter("paymentMode", event.target.value)}>
+              <option value="">All modes</option>
+              {TREASURY_PAYMENT_MODES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Reimbursement</span>
+            <select value={filters.reimbursementStatus} onChange={(event) => onFilter("reimbursementStatus", event.target.value)}>
+              <option value="">All statuses</option>
+              {TREASURY_REIMBURSEMENT_STATUSES.map((item) => <option key={item} value={item}>{reimbursementLabel(item)}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>File</span>
+            <select value={filters.hasFile} onChange={(event) => onFilter("hasFile", event.target.value)}>
+              <option value="">Any</option>
+              <option value="yes">Has file</option>
+              <option value="no">No file</option>
+            </select>
+          </label>
+          <label>
+            <span>Sort</span>
+            <select value={filters.sort} onChange={(event) => onFilter("sort", event.target.value)}>
+              {Object.entries(TREASURY_SORT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <button className="treasury-filterbar__clear" type="button" onClick={onClear} disabled={!activeFilters}>Clear filters</button>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+// Amounts in the ledger columns: no rupee sign, digits lined up on the right.
+function formatLedgerAmount(value) {
+  return value ? formatInr(value).replace("₹", "") : "";
+}
+
+function TreasuryFileIcon() {
+  return (
+    <svg className="treasury-file-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+      <path d="M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+    </svg>
   );
 }
 
@@ -2027,34 +2219,112 @@ function TreasurySpentNote({ item }) {
   return spent ? <span className="treasury-muted">Spent {formatTreasuryDate(spent)}</span> : null;
 }
 
-function TreasuryTableRow({ item, locked, onDetails, onEdit, onDelete, onManageProof }) {
+function treasuryRowActions(item, locked, { onDetails, onEdit, onDelete, onManageProof }) {
+  // Fine entries are kept by Fines: only their payment screenshot is managed here.
+  return isFineLinkedTreasury(item) ? [
+    { label: "View details", onSelect: () => onDetails(item) },
+    { label: "Manage screenshot", onSelect: () => onManageProof(item) },
+  ] : [
+    { label: "View details", onSelect: () => onDetails(item) },
+    { label: "Edit transaction", disabled: locked, onSelect: () => onEdit(item) },
+    { label: "Delete transaction", danger: true, disabled: locked, onSelect: () => onDelete(item) },
+  ];
+}
+
+function TreasuryTableRow({ item, balance, selected, locked, onSelect, onDetails, onEdit, onDelete, onManageProof }) {
   const type = transactionTypeLabel(item);
+  const party = compactTransactionParty(item);
+  const reimbursement = isReimbursementRecord(item) ? normalizeReimbursementStatus(item.reimbursementStatus) : "";
   return (
-    <tr>
-      <td>{formatTreasuryDate(treasuryLedgerDate(item))}<TreasurySpentNote item={item} /></td>
-      <td><strong>{item.title || "Untitled transaction"}</strong><span className="treasury-muted">{item.purpose || "No notes"}</span></td>
-      <td><span className={`treasury-chip is-${type.toLowerCase()}`}>{type}</span></td>
-      <td><span className={`treasury-amount is-${item.type}`}>{formatInr(item.amount)}</span></td>
-      <td>{transactionPartyLabel(item)}</td>
+    <tr
+      className={`treasury-ledger__row${selected ? " is-selected" : ""}`}
+      tabIndex={0}
+      aria-selected={selected}
+      onClick={() => onSelect(item)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onSelect(item);
+      }}
+    >
+      <td className="treasury-ledger__date">{formatTreasuryDate(treasuryLedgerDate(item))}<TreasurySpentNote item={item} /></td>
+      <td className="treasury-ledger__particulars"><strong>{item.title || "Untitled transaction"}</strong><span className="treasury-muted">{party.value}</span></td>
+      <td>
+        <span className={`treasury-chip is-${type.toLowerCase()}`}>{type}</span>
+        {reimbursement ? <span className={`treasury-reimbursement is-${reimbursement.toLowerCase()}`}>{reimbursementLabel(reimbursement)}</span> : null}
+      </td>
       <td>{normalizeTreasuryAvenue(item.avenue) || "-"}</td>
       <td>{item.paymentMode || "-"}</td>
-      <td>{reimbursementLabel(item.reimbursementStatus)}</td>
-      <td>{treasuryHasSupportingFile(item) ? <button type="button" className="treasury-file-link" onClick={() => onDetails(item)}>View</button> : <span className="treasury-muted">None</span>}</td>
-      <td>
-        {/* Fine entries are kept by Fines: only their payment screenshot is managed here. */}
+      <td className="is-number is-income">{item.type === "income" ? formatLedgerAmount(item.amount) : ""}</td>
+      <td className="is-number is-expense">{item.type === "expense" ? formatLedgerAmount(item.amount) : ""}</td>
+      <td className="is-number treasury-ledger__balance">{balance === undefined ? "" : formatInr(balance).replace("₹", "")}</td>
+      <td className="treasury-ledger__file">{treasuryHasSupportingFile(item) ? <span title="File attached"><TreasuryFileIcon /><span className="treasury-visually-hidden">File attached</span></span> : null}</td>
+      <td className="treasury-ledger__actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
         <RowActionsMenu
           label={`Actions for ${item.title || "untitled transaction"}, ${formatTreasuryDate(treasuryLedgerDate(item))}`}
-          items={isFineLinkedTreasury(item) ? [
-            { label: "View details", onSelect: () => onDetails(item) },
-            { label: "Manage screenshot", onSelect: () => onManageProof(item) },
-          ] : [
-            { label: "View details", onSelect: () => onDetails(item) },
-            { label: "Edit transaction", disabled: locked, onSelect: () => onEdit(item) },
-            { label: "Delete transaction", danger: true, disabled: locked, onSelect: () => onDelete(item) },
-          ]}
+          items={treasuryRowActions(item, locked, { onDetails, onEdit, onDelete, onManageProof })}
         />
       </td>
     </tr>
+  );
+}
+
+// Desktop: the selected row's details in a side sheet over the right edge of the
+// ledger. The ledger stays usable; clicking another row switches the sheet.
+function TreasuryDetailPanel({ record, balance, locked, onClose, onEdit, onDelete, onManageProof }) {
+  useEffect(() => {
+    function closeOnEscape(event) {
+      if (event.key === "Escape" && !document.querySelector(".admin-dialog-backdrop")) onClose();
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  const type = transactionTypeLabel(record);
+  const reimbursement = isReimbursementRecord(record) ? normalizeReimbursementStatus(record.reimbursementStatus) : "";
+  const rows = [
+    ["Type", reimbursement ? `${type} · ${reimbursement === "Done" ? "Repaid" : reimbursement}` : type],
+    [treasurySpentDate(record) ? "Spent on" : "Date", formatTreasuryDate(record.date)],
+    ...(treasurySpentDate(record) ? [["Repaid on", `${formatTreasuryDate(treasuryLedgerDate(record))} (bank date)`]] : []),
+    ["Party", transactionPartyLabel(record)],
+    ["Avenue", normalizeTreasuryAvenue(record.avenue) || "Not recorded"],
+    ["Payment mode", record.paymentMode || "Not recorded"],
+    ["Reference", record.referenceNumber || "Not recorded"],
+    ["Purpose", record.purpose || "Not recorded"],
+    ["Balance after", balance === undefined ? "Not available" : formatInr(balance)],
+    ["Last updated", `${formatTimestamp(record.updatedAt || record.createdAt)}${record.updatedByName || record.createdByName ? ` by ${record.updatedByName || record.createdByName}` : ""}`],
+  ];
+  const fine = isFineLinkedTreasury(record);
+  return (
+    <aside className="treasury-detail-panel" aria-labelledby="treasury-detail-title">
+      <header>
+        <h4 id="treasury-detail-title">Entry details</h4>
+        <button type="button" className="treasury-detail-panel__close" aria-label="Close details" onClick={onClose}>✕</button>
+      </header>
+      <div className={`treasury-detail-panel__amount is-${record.type}`}>
+        <span>{record.title || "Untitled transaction"}</span>
+        <strong>{record.type === "expense" ? "- " : "+ "}{formatInr(record.amount)}</strong>
+      </div>
+      <dl>
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <TreasuryAttachments record={record} />
+      <div className="treasury-detail-panel__actions">
+        {fine ? (
+          <button type="button" onClick={() => onManageProof(record)}>Manage screenshot</button>
+        ) : (
+          <>
+            <button type="button" disabled={locked} onClick={() => onEdit(record)}>Edit</button>
+            <button type="button" className="danger" disabled={locked} onClick={() => onDelete(record)}>Delete</button>
+          </>
+        )}
+      </div>
+    </aside>
   );
 }
 

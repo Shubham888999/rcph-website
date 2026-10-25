@@ -3,6 +3,7 @@ import { POSITION_CATALOG } from "../shared/positionCatalog.js";
 import {
   DEFAULT_TREASURY_FILTERS,
   filterAndSortTreasury,
+  resolveTreasuryPeriod,
   formatTreasuryDate,
   formatTreasuryMonth,
   isReimbursementRecord,
@@ -285,7 +286,7 @@ function buildCategorySummary(rows = [], typePredicate) {
 }
 
 function hasExportFilter(filters = {}) {
-  return ["search", "month", "avenue", "paymentMode", "reimbursementStatus", "hasFile"].some((key) => Boolean(filters[key]))
+  return (filters.period && filters.period !== "all") || ["search", "month", "avenue", "paymentMode", "reimbursementStatus", "hasFile"].some((key) => Boolean(filters[key]))
     || (filters.type && filters.type !== "all");
 }
 
@@ -295,8 +296,9 @@ function dateRange(rows = []) {
   return { from: dates[0], to: dates.at(-1) };
 }
 
-function reportPeriodFor(filters = {}, rows = []) {
+function reportPeriodFor(filters = {}, rows = [], period = {}) {
   if (filters.month) return formatTreasuryMonth(filters.month);
+  if (period.label) return period.label;
   if (!hasExportFilter(filters)) return "All Records";
   const range = dateRange(rows);
   if (range.from && range.to) {
@@ -307,16 +309,18 @@ function reportPeriodFor(filters = {}, rows = []) {
   return "Filtered Records";
 }
 
-function periodSlugFor(filters = {}, rows = []) {
+function periodSlugFor(filters = {}, rows = [], period = {}) {
   if (filters.month) return filters.month;
+  if (period.fromMonth && period.toMonth) return period.fromMonth === period.toMonth ? period.fromMonth : `${period.fromMonth}_to_${period.toMonth}`;
   if (!hasExportFilter(filters)) return "All-Records";
   const range = dateRange(rows);
   if (range.from && range.to) return range.from === range.to ? range.from : `${range.from}_to_${range.to}`;
   return "Filtered-Records";
 }
 
-function filterSummary(filters = {}) {
+function filterSummary(filters = {}, period = {}) {
   const result = [];
+  if (period.label) result.push(`Period: ${period.label}`);
   if (text(filters.search, 120)) result.push(`Search: ${text(filters.search, 120)}`);
   if (filters.type && filters.type !== "all") result.push(`Type: ${FILTER_TYPE_LABELS[filters.type] || filters.type}`);
   if (filters.month) result.push(`Month: ${formatTreasuryMonth(filters.month)}`);
@@ -341,24 +345,26 @@ export function buildTreasuryExportReport({
   generatedAt = new Date(),
 } = {}) {
   const normalizedFilters = { ...DEFAULT_TREASURY_FILTERS, ...(filters || {}) };
-  const filteredTransactions = filterAndSortTreasury(transactions, normalizedFilters);
+  const generatedDate = generatedAt instanceof Date ? generatedAt : new Date(generatedAt);
+  const now = Number.isNaN(generatedDate.getTime()) ? new Date() : generatedDate;
+  const period = resolveTreasuryPeriod(normalizedFilters, now);
+  const filteredTransactions = filterAndSortTreasury(transactions, normalizedFilters, now);
   const rows = filteredTransactions.map(exportRow);
   const summary = summarizeRows(rows);
   const monthlySummary = buildMonthlySummary(rows);
   const incomeCategories = buildCategorySummary(rows, (row) => row.type === "Income");
   const expenseCategories = buildCategorySummary(rows, (row) => row.type !== "Income");
-  const generatedDate = generatedAt instanceof Date ? generatedAt : new Date(generatedAt);
-  const periodSlug = periodSlugFor(normalizedFilters, rows);
+  const periodSlug = periodSlugFor(normalizedFilters, rows, period);
   return {
     title: TREASURY_EXPORT_TITLE,
     clubName: TREASURY_EXPORT_CLUB_NAME,
     generatedAt: Number.isNaN(generatedDate.getTime()) ? new Date() : generatedDate,
     generatedAtLabel: formatGeneratedTimestamp(generatedDate),
     treasurerName: resolveTreasurerName(members),
-    reportPeriod: reportPeriodFor(normalizedFilters, rows),
+    reportPeriod: reportPeriodFor(normalizedFilters, rows, period),
     periodSlug,
     filters: normalizedFilters,
-    filterSummary: filterSummary(normalizedFilters),
+    filterSummary: filterSummary(normalizedFilters, period),
     sortLabel: SORT_LABELS[normalizedFilters.sort] || SORT_LABELS.newest,
     transactions: rows,
     transactionCount: rows.length,

@@ -88,7 +88,7 @@ test("the workbook has one tab per month in the treasurer's layout, then Grand T
 });
 
 test("Treasury has an Export Expense Sheet button with a From/To month dialog", () => {
-  assert.match(financeSource, /onClick=\{onExportExpenseSheet\}/);
+  assert.match(financeSource, /\["Export Expense Sheet", onExportExpenseSheet\]/);
   assert.match(financeSource, /title="Export Expense Sheet"/);
   assert.match(financeSource, /\[\["startMonth", "From month"\], \["endMonth", "To month"\]\]/);
   assert.match(financeSource, /buildTreasuryExpenseSheetModel\(\{ transactions, \.\.\.expenseSheetDraft \}\)/);

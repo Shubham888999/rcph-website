@@ -682,8 +682,8 @@
   width: 2.5rem;
   min-height: 2.5rem;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: 50%;
+  border: 0;
+  border-radius: 0;
   color: var(--internal-text);
   background: transparent;
   font-size: 1rem;
@@ -691,10 +691,11 @@
   line-height: 1;
 }
 
+/* ⋮ menu: just the dots, no border or box. */
 .announcement-card__menu-trigger:hover,
 .announcement-card__menu-trigger[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.07);
+  color: var(--internal-accent);
+  background: transparent;
 }
 
 .announcement-card__menu-panel {
