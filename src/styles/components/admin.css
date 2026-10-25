@@ -7988,25 +7988,6 @@ min-width: 250px;
   }
 }
 
-.treasury-overview {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.treasury-metric {
-  display: grid;
-  gap: 0.45rem;
-  min-width: 0;
-  padding: 0.95rem;
-  border: 0;
-  border-top: 2px solid rgba(229, 194, 104, 0.7);
-  border-radius: 4px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
-}
-
-.treasury-metric span,
 .treasury-section-heading > div > span,
 .treasury-field-label em {
   color: var(--color-muted);
@@ -8014,30 +7995,6 @@ min-width: 250px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-.treasury-metric strong {
-  color: var(--color-text);
-  font-size: 1.45rem;
-  line-height: 1.05;
-}
-
-.treasury-metric small {
-  color: var(--color-muted);
-}
-
-.treasury-metric.is-income,
-.treasury-metric.is-net {
-  border-top-color: var(--color-teal);
-}
-
-.treasury-metric.is-expense,
-.treasury-metric.is-danger {
-  border-top-color: var(--color-danger);
-}
-
-.treasury-metric.is-warning {
-  border-top-color: var(--color-gold);
 }
 
 .treasury-entry-grid,
@@ -8637,15 +8594,32 @@ min-width: 250px;
 
 .treasury-filterbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(128px, 1fr));
-  gap: 0.65rem;
-  align-items: end;
-  margin-bottom: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   max-width: 100%;
+  border: 1px solid var(--internal-border);
+  border-bottom: 0;
+  background: var(--internal-surface);
+}
+
+.treasury-filterbar__main,
+.treasury-filterbar__more-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem;
+}
+
+.treasury-filterbar__more-row {
+  align-items: end;
+  border-top: 1px solid var(--internal-border);
+  background: var(--internal-surface-soft);
 }
 
 .treasury-filterbar__search {
-  grid-column: span 2;
+  flex: 1 1 15rem;
+  max-width: 22rem;
 }
 
 .treasury-filterbar label {
@@ -8663,12 +8637,18 @@ min-width: 250px;
 .treasury-filterbar input,
 .treasury-filterbar select {
   width: 100%;
-  min-height: 2.45rem;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  min-height: 2.3rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--internal-border-strong);
   color: var(--color-text);
-  background: var(--color-bg);
+  background: var(--internal-control-bg);
+}
+
+.treasury-filterbar__count {
+  margin-left: auto;
+  color: var(--color-muted);
+  font-size: 0.84rem;
+  white-space: nowrap;
 }
 
 .treasury-filterbar__clear {
@@ -8684,21 +8664,6 @@ min-width: 250px;
   box-shadow: none;
 }
 
-.treasury-history__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.55rem 0.75rem;
-}
-
-.treasury-export-actions {
-  justify-content: flex-end;
-}
-
-.treasury-export-actions button {
-  white-space: nowrap;
-}
 .treasury-balance-sheet-dialog {
   display: grid;
   gap: 1.2rem;
@@ -8815,34 +8780,6 @@ min-width: 250px;
   white-space: nowrap;
 }
 
-/* "View" supporting file: highlighted text, not a button pill. */
-.admin-page button.treasury-file-link {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  color: var(--color-gold-soft);
-  background: none;
-  box-shadow: none;
-  font: inherit;
-  font-weight: 800;
-  text-decoration: underline;
-  text-decoration-color: rgba(229,194,104,0.45);
-  text-underline-offset: 0.2em;
-  cursor: pointer;
-}
-
-.admin-page button.treasury-file-link:hover {
-  color: var(--color-gold);
-  background: none;
-  text-decoration-color: currentColor;
-}
-
-.admin-page button.treasury-file-link:focus-visible {
-  outline: 2px solid var(--color-gold-soft);
-  outline-offset: 2px;
-}
-
 .treasury-history__mobile {
   display: none;
 }
@@ -8872,7 +8809,7 @@ min-width: 250px;
 
 .treasury-mobile-row__top {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) 2rem;
+  grid-template-columns: auto minmax(0, 1fr) auto 2rem;
   align-items: center;
   gap: 0.42rem;
   min-width: 0;
@@ -9075,10 +9012,6 @@ min-width: 250px;
 }
 
 @media (max-width: 1100px) {
-  .treasury-overview {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .treasury-entry-grid,
   .treasury-edit-shell {
     grid-template-columns: 1fr;
@@ -9091,26 +9024,12 @@ min-width: 250px;
   .treasury-review-column {
     width: 100%;
   }
-
-  .treasury-filterbar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .treasury-filterbar__search {
-    grid-column: span 3;
-  }
 }
 
 @media (max-width: 820px) {
-  .treasury-overview,
   .treasury-club-dues-grid,
-  .treasury-form-grid,
-  .treasury-filterbar {
+  .treasury-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .treasury-filterbar__search {
-    grid-column: span 2;
   }
 
   .treasury-filterbar__clear {
@@ -9130,21 +9049,9 @@ min-width: 250px;
 }
 
 @media (max-width: 600px) {
-  .treasury-overview {
-    display: flex;
-    overflow-x: auto;
-    padding-bottom: 0.2rem;
-  }
-
-  .treasury-metric {
-    min-width: 12rem;
-  }
-
   .treasury-type-selector,
   .treasury-club-dues-grid,
   .treasury-form-grid,
-  .treasury-filterbar,
-  .treasury-filterbar__search,
   .treasury-review dl div,
   .treasury-details dl div {
     grid-template-columns: 1fr;
@@ -9157,12 +9064,6 @@ min-width: 250px;
   .treasury-month-group > header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .treasury-history__actions,
-  .treasury-export-actions {
-    justify-content: stretch;
-    width: 100%;
   }
 
   .treasury-form {
@@ -9981,5 +9882,540 @@ min-width: 250px;
 
   .dashboard-preview__role-switcher button {
     flex: 1 1 7.5rem;
+  }
+}
+
+/* Square corners across the admin pages: no pills, no rounded edges. Dots
+   (the ⋮ glyph, status and legend markers) and the ring chart stay round. */
+.admin-page *,
+.admin-page *::before,
+.admin-page *::after {
+  border-radius: 0 !important;
+}
+
+.admin-page :is(.admin-row-menu__dots, .treasury-mobile-row__menu-dots, .visit-action-menu__dots, .reminders-action-menu__trigger) span,
+.admin-page .member-status::before,
+.admin-page .attendance-overview__ring,
+.admin-page .attendance-workspace__legend i,
+.admin-page .visit-folder-card__status i {
+  border-radius: 50% !important;
+}
+
+/* ⋮ menu buttons: just the dots, no border or box, anywhere. */
+.admin-page button.admin-row-menu__trigger,
+.admin-page button.treasury-mobile-row__menu-trigger,
+.admin-page button.reminders-action-menu__trigger,
+.visit-action-menu summary {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-page button.admin-row-menu__trigger:hover,
+.admin-page button.admin-row-menu__trigger[aria-expanded="true"],
+.admin-page button.treasury-mobile-row__menu-trigger:hover,
+.admin-page button.treasury-mobile-row__menu-trigger[aria-expanded="true"],
+.admin-page button.reminders-action-menu__trigger:hover,
+.visit-action-menu summary:hover,
+.visit-action-menu[open] summary {
+  color: var(--internal-accent);
+  background: transparent;
+}
+
+/* Treasury ledger layout. */
+.treasury-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.treasury-periodbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.treasury-periodbar__period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.treasury-periodbar__label {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.treasury-periodbar__custom {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.treasury-periodbar__custom label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.84rem;
+}
+
+.treasury-periodbar__custom select {
+  min-height: 2.3rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--internal-border-strong);
+  color: var(--internal-text);
+  background: var(--internal-control-bg);
+}
+
+.admin-page button.treasury-new-entry {
+  border-color: var(--internal-accent);
+  font-weight: 800;
+}
+
+/* Flat segmented buttons for Period and Type. */
+.treasury-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--internal-border-strong);
+}
+
+.admin-page .treasury-segmented button {
+  min-height: 2.3rem;
+  padding: 0.35rem 0.8rem;
+  border: 0;
+  border-right: 1px solid var(--internal-border);
+  color: var(--internal-text-muted);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.admin-page .treasury-segmented button:last-child {
+  border-right: 0;
+}
+
+.admin-page .treasury-segmented button:hover {
+  color: var(--internal-text);
+}
+
+.admin-page .treasury-segmented button.is-active {
+  color: var(--internal-accent);
+  background: var(--internal-surface-raised);
+  box-shadow: inset 0 -2px 0 var(--internal-accent);
+}
+
+/* Summary strip. */
+.treasury-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 0.9rem;
+  border: 1px solid var(--internal-border);
+  background: var(--internal-surface);
+}
+
+.treasury-strip__cell {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.65rem 0.9rem;
+  border-right: 1px solid var(--internal-border);
+}
+
+.treasury-strip__cell:last-child {
+  border-right: 0;
+}
+
+.treasury-strip__cell span {
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.treasury-strip__cell strong {
+  color: var(--internal-text);
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.treasury-strip__cell small {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+}
+
+.treasury-strip__cell.is-income strong {
+  color: var(--color-teal);
+}
+
+.treasury-strip__cell.is-expense strong {
+  color: var(--color-danger);
+}
+
+.treasury-strip__cell.is-net strong,
+.treasury-strip__cell.is-warning strong {
+  color: var(--internal-accent);
+}
+
+/* Export menu. */
+.treasury-export-menu {
+  position: relative;
+}
+
+.admin-page button.treasury-export-menu__trigger {
+  white-space: nowrap;
+}
+
+.treasury-export-menu__list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 13rem;
+  border: 1px solid var(--internal-border-strong);
+  background: var(--internal-surface-raised);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.admin-page .treasury-export-menu__list button {
+  justify-content: flex-start;
+  min-height: 2.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-page .treasury-export-menu__list button.is-separated {
+  border-top: 1px solid var(--internal-border);
+}
+
+.admin-page .treasury-export-menu__list button:hover {
+  color: var(--internal-accent);
+  background: var(--internal-surface-soft);
+}
+
+.admin-page .treasury-filterbar__more {
+  white-space: nowrap;
+  background: transparent;
+}
+
+/* Ledger table. */
+.treasury-ledger-wrap {
+  max-height: 75vh;
+  overflow: auto;
+  border: 1px solid var(--internal-border);
+  background: var(--internal-surface);
+}
+
+.treasury-ledger {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.treasury-ledger caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.treasury-ledger thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.6rem 0.65rem;
+  border-bottom: 1px solid var(--internal-border-strong);
+  color: var(--color-muted);
+  background: var(--internal-surface-raised);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.treasury-ledger td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--internal-border);
+  vertical-align: middle;
+}
+
+.treasury-ledger .is-number {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.treasury-ledger td.is-income {
+  color: var(--color-teal);
+}
+
+.treasury-ledger td.is-expense {
+  color: var(--color-danger);
+}
+
+.treasury-ledger__row {
+  cursor: pointer;
+}
+
+.treasury-ledger__row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.treasury-ledger__row:hover {
+  background: rgba(229, 194, 104, 0.07);
+}
+
+.treasury-ledger__row:focus-visible {
+  outline: 2px solid var(--internal-accent);
+  outline-offset: -2px;
+}
+
+.treasury-ledger__row.is-selected {
+  background: rgba(229, 194, 104, 0.12);
+  box-shadow: inset 3px 0 0 var(--internal-accent);
+}
+
+.treasury-ledger__date {
+  white-space: nowrap;
+}
+
+.treasury-ledger__particulars {
+  min-width: 12rem;
+}
+
+.treasury-ledger__particulars strong {
+  display: block;
+}
+
+.treasury-reimbursement {
+  display: block;
+  font-size: 0.8rem;
+}
+
+.treasury-ledger__balance {
+  color: var(--internal-text);
+}
+
+.treasury-ledger__file {
+  width: 2rem;
+  color: var(--color-muted);
+}
+
+.treasury-file-icon {
+  display: block;
+}
+
+.treasury-ledger__actions {
+  width: 2.75rem;
+  text-align: center;
+}
+
+.treasury-ledger__month th {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid var(--internal-border);
+  color: var(--internal-accent-soft);
+  background: var(--internal-surface-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.treasury-ledger__total th,
+.treasury-ledger__total td {
+  padding: 0.55rem 0.65rem;
+  border-top: 1px solid var(--internal-border-strong);
+  border-bottom: 2px solid var(--internal-border-strong);
+  background: var(--internal-surface-raised);
+  font-weight: 800;
+  text-align: left;
+}
+
+.treasury-ledger__total td.is-number {
+  text-align: right;
+}
+
+.treasury-reimbursement.is-pending {
+  color: var(--internal-accent);
+  font-weight: 700;
+}
+
+.treasury-reimbursement.is-done {
+  color: var(--color-muted);
+}
+
+.treasury-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1500;
+  width: min(25rem, 100vw);
+  overflow: auto;
+  border-left: 1px solid var(--internal-border-strong);
+  background: var(--internal-surface);
+  box-shadow: -16px 0 36px rgba(0, 0, 0, 0.5);
+}
+
+.treasury-detail-panel header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--internal-border);
+  background: var(--internal-surface-raised);
+}
+
+.treasury-detail-panel h4 {
+  margin: 0;
+}
+
+.admin-page button.treasury-detail-panel__close {
+  min-height: 2rem;
+  padding: 0 0.5rem;
+  border: 0;
+  background: transparent;
+}
+
+.treasury-detail-panel__amount {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid var(--internal-border);
+}
+
+.treasury-detail-panel__amount span {
+  font-weight: 700;
+}
+
+.treasury-detail-panel__amount strong {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.treasury-detail-panel__amount.is-income strong {
+  color: var(--color-teal);
+}
+
+.treasury-detail-panel__amount.is-expense strong {
+  color: var(--color-danger);
+}
+
+.treasury-detail-panel dl {
+  display: grid;
+  margin: 0;
+}
+
+.treasury-detail-panel dl div {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--internal-border);
+}
+
+.treasury-detail-panel dt {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.treasury-detail-panel dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.treasury-detail-panel .treasury-attachments,
+.treasury-detail-panel .treasury-attachments__empty {
+  margin: 0.75rem 0.9rem;
+}
+
+.treasury-detail-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem 0.9rem;
+}
+
+@media (max-width: 820px) {
+  .treasury-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .treasury-strip__cell {
+    border-bottom: 1px solid var(--internal-border);
+  }
+
+  .treasury-filterbar__search {
+    max-width: none;
+  }
+
+  .treasury-filterbar__count {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .treasury-strip__cell:last-child {
+    grid-column: span 2;
+  }
+
+  .treasury-periodbar,
+  .treasury-periodbar__period,
+  .admin-page button.treasury-new-entry {
+    width: 100%;
+  }
+
+  .treasury-filterbar__main > label,
+  .treasury-filterbar__more-row > label {
+    flex: 1 1 100%;
+  }
+
+  .treasury-periodbar__period {
+    min-width: 0;
+  }
+
+  .treasury-mobile-row__top .treasury-chip {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Segmented buttons stay in one row and scroll sideways on phones. */
+  .treasury-segmented {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .admin-page .treasury-segmented button {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .admin-page .treasury-filterbar__more,
+  .admin-page .treasury-export-menu__trigger {
+    width: auto;
   }
 }

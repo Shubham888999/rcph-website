@@ -390,8 +390,8 @@ test("Treasury CSS anchors review, wraps filters, and disables sticky on smaller
   assert.match(css, /\.treasury-review-column[\s\S]*?align-self: start/);
   assert.match(css, /\.treasury-review \{[\s\S]*?position: sticky;[\s\S]*?top: 5\.5rem/);
   assert.match(css, /@media \(max-width: 1100px\)[\s\S]*?\.treasury-review \{[\s\S]*?position: static/);
-  assert.match(css, /\.treasury-filterbar \{[\s\S]*?grid-template-columns: minmax\(220px, 1\.5fr\) repeat\(4, minmax\(128px, 1fr\)\)/);
-  assert.match(css, /\.treasury-filterbar__search \{[\s\S]*?grid-column: span 2/);
+  assert.match(css, /\.treasury-filterbar__main,\s*\.treasury-filterbar__more-row \{[\s\S]*?flex-wrap: wrap/);
+  assert.match(css, /\.treasury-filterbar__search \{[\s\S]*?flex: 1 1 15rem/);
   assert.match(css, /\.treasury-filterbar__clear \{[\s\S]*?justify-self: end/);
   assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.treasury-club-dues-grid,[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.treasury-filterbar__clear \{[\s\S]*?width: 100%/);
@@ -401,7 +401,7 @@ test("Treasury mobile CSS keeps history rows compact without a full-width button
   const css = readFileSync(new URL("../../../styles/components/admin.css", import.meta.url), "utf8");
   assert.match(css, /\.treasury-mobile-list \{[\s\S]*?border-top: 1px solid/);
   assert.match(css, /\.treasury-mobile-row \{[\s\S]*?gap: 0\.32rem/);
-  assert.match(css, /\.treasury-mobile-row__top \{[\s\S]*?grid-template-columns: auto auto minmax\(0, 1fr\) 2rem/);
+  assert.match(css, /\.treasury-mobile-row__top \{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\) auto 2rem/);
   assert.match(css, /\.treasury-mobile-row__title \{[\s\S]*?-webkit-line-clamp: 2/);
   assert.match(css, /\.treasury-mobile-row__menu \{[\s\S]*?position: absolute;[\s\S]*?right: 0/);
   assert.match(css, /\.treasury-mobile-row__menu button \{[\s\S]*?min-height: 2\.25rem/);

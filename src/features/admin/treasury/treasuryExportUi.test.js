@@ -32,9 +32,11 @@ assert.match(
 });
 
 test("Treasury export UI has scoped responsive styles", () => {
-  assert.match(css, /\.treasury-history__actions \{/);
-  assert.match(css, /\.treasury-export-actions button \{[\s\S]*?white-space: nowrap/);
-  assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.treasury-history__actions,[\s\S]*?\.treasury-export-actions \{/);
+  // One "Export ▾" menu holds the four exports.
+  assert.match(css, /\.treasury-export-menu__list \{[\s\S]*?position: absolute;[\s\S]*?right: 0/);
+  assert.match(css, /\.admin-page \.treasury-export-menu__list button \{[\s\S]*?white-space: nowrap/);
+  assert.match(financeModules, /\["Export Excel", onExportExcel\],\s*\["Export PDF", onExportPdf\],\s*\["Export Balance Sheet", onExportBalanceSheet\],\s*\["Export Expense Sheet", onExportExpenseSheet\],/);
+  assert.match(financeModules, /role="menu" aria-label="Treasury exports"/);
 });
 
 test("Treasury export helpers remain read-only frontend generators", () => {
