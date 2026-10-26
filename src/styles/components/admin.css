@@ -10476,3 +10476,52 @@ min-width: 250px;
 .resolution-corrections__voter small {
   color: var(--internal-text-muted);
 }
+
+.visit-custom-folders__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  color: var(--internal-text-muted);
+  font-size: 0.82rem;
+}
+
+.visit-custom-folders__add {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--internal-border-strong);
+  border-radius: 0;
+  color: var(--internal-accent-soft);
+  background: var(--internal-surface-raised);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.visit-custom-folders__add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.visit-custom-folders__tools {
+  display: inline-flex;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.visit-custom-folders__tools button {
+  padding: 0.25rem 0;
+  border: 0;
+  color: var(--internal-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 750;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.visit-custom-folders__tools button:hover {
+  color: var(--internal-accent-soft);
+}

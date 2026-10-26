@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES } from "./visitModel.js";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES, visitFolderCategories, visitFolderUsesCategories, visitUploadChoices } from "./visitModel.js";
 test("visit and folder models whitelist verified fields",()=>{const visit=normalizeVisit({visitType:"dzrVisit",displayTitle:" DZR ",secret:"x"});assert.equal(visit.displayTitle,"DZR");assert.equal(Object.hasOwn(visit,"secret"),false);const folder=normalizeFolder({visitType:"dzrVisit",positionKey:"cwd",maxActiveFiles:40,primaryPresentationSubmissionId:"selected-file"});assert.equal(folder.positionKey,"cwd");assert.equal(folder.primaryPresentationSubmissionId,"selected-file")});
 test("submission ignores unsafe URL",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"x",fileUrl:"javascript:x"});assert.equal(item.fileUrl,"")});
 test("submission normalizes primary presentation controls",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"deck.pptx",isPrimaryPresentation:true,canSetPrimaryPresentation:true});assert.equal(item.isPrimaryPresentation,true);assert.equal(item.canSetPrimaryPresentation,true)});
@@ -52,4 +52,31 @@ test("move labels and upload choices use the agreed wording", () => {
   assert.deepEqual(VISIT_UPLOAD_CATEGORY_CHOICES.map((choice) => [choice.key, choice.label]), [["", "None"], ["inward", "Inward file"], ["inward-register", "Inward register"], ["outward", "Outward file"], ["outward-register", "Outward register"]]);
   assert.equal(normalizeSubmission({ submissionId: "s", documentCategory: "inward-register" }).documentCategory, "inward-register");
   assert.equal(normalizeSubmission({ submissionId: "s", documentCategory: "outward-register" }).documentCategory, "outward-register");
+});
+
+test("extra folders appear between the Secretary folders and Supporting files, for any position", () => {
+  const editor = normalizeFolder({ visitType: "clubAssembly", positionKey: "editor", supportsCustomFolders: true, canManageCustomFolders: true, customFolders: [{ key: "custom-0a1b2c3d", name: "Event photos" }, { key: "bad", name: "x" }, { key: "custom-0a1b2c3e", name: " " }] });
+  assert.deepEqual(editor.customFolders, [{ key: "custom-0a1b2c3d", name: "Event photos" }]);
+  assert.equal(editor.canManageCustomFolders, true);
+  assert.deepEqual(visitFolderCategories(editor).map((category) => category.label), ["Event photos", "Supporting files"]);
+  assert.equal(visitFolderUsesCategories(editor), true);
+  assert.deepEqual(visitUploadChoices(editor), [{ key: "", label: "None" }, { key: "custom-0a1b2c3d", label: "Event photos" }]);
+
+  const plain = normalizeFolder({ visitType: "clubAssembly", positionKey: "editor" });
+  assert.equal(visitFolderUsesCategories(plain), false);
+  assert.equal(visitUploadChoices(plain).length, 1);
+
+  const secretary = normalizeFolder({ visitType: "clubAssembly", positionKey: "secretary", supportsDocumentCategories: true, customFolders: [{ key: "custom-0a1b2c3d", name: "Bank letters" }] });
+  assert.deepEqual(visitFolderCategories(secretary).map((category) => category.label), ["Inward file", "Inward register", "Outward file", "Outward register", "Bank letters", "Supporting files"]);
+  assert.equal(visitFolderCategories(secretary).find((category) => category.custom).moveLabel, "Move to Bank letters");
+});
+
+test("documents sit in their extra folder, and an unknown folder key falls back to Supporting files", () => {
+  const folder = normalizeFolder({ visitType: "clubAssembly", positionKey: "editor", customFolders: [{ key: "custom-0a1b2c3d", name: "Event photos" }] });
+  const groups = groupVisitSubmissionsByCategory([
+    normalizeSubmission({ submissionId: "a", documentCategory: "custom-0a1b2c3d" }),
+    normalizeSubmission({ submissionId: "b", documentCategory: "custom-zzzzzzzz" }),
+    normalizeSubmission({ submissionId: "c" }),
+  ], folder);
+  assert.deepEqual(groups.map((group) => [group.label, group.items.map((item) => item.submissionId)]), [["Event photos", ["a"]], ["Supporting files", ["b", "c"]]]);
 });

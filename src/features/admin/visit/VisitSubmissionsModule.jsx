@@ -4,7 +4,7 @@ import AdminModuleHeader from "../AdminModuleHeader";
 import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
-import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, VISIT_STATUSES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES } from "./visitModel";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, visitFolderCategories, visitFolderUsesCategories, visitUploadChoices, VISIT_CUSTOM_FOLDER_NAME_MAX, VISIT_MAX_CUSTOM_FOLDERS, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
 import VisitSubmissionFiles, { VisitFileTypeBadge } from "./VisitSubmissionFiles";
 import {
   getFolderSummaryItems,
@@ -415,7 +415,7 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
             fileName: item.file.name,
             mimeType: item.file.type,
             sizeBytes: item.file.size,
-            ...(folder.supportsDocumentCategories ? { documentCategory: item.documentCategory || "" } : {}),
+            ...(visitUploadChoices(folder).length > 1 ? { documentCategory: item.documentCategory || "" } : {}),
           })),
         });
       } catch (error) {
@@ -536,6 +536,10 @@ function FolderDetailWorkspaceView({
   const canManageFolder = data.access.canManage === true;
   const canEditPrimary = canEditVisitPrimaryPresentation(data.access, folder);
   const focusUploadInput = () => uploadInputRef.current?.click();
+  const categories = visitFolderCategories(folder);
+  const uploadChoices = visitUploadChoices(folder);
+  const usesCategories = visitFolderUsesCategories(folder);
+  const canChangeFolders = folder.supportsCustomFolders && folder.canManageCustomFolders && (folder.canUpload || canManageFolder);
   const moveCategory = (item, documentCategory) => mutate(
     "move-category",
     () => visitCalls.moveCategory(item.submissionId, documentCategory),
@@ -556,6 +560,7 @@ function FolderDetailWorkspaceView({
       onWithdraw={(item) => setDialog({ type: "withdraw", item })}
       onRemove={(item) => setDialog({ type: "remove", item })}
       onMove={moveCategory}
+      categories={categories}
     />
   );
   return (
@@ -632,10 +637,10 @@ function FolderDetailWorkspaceView({
                     <strong>{item.file.name}</strong>
                     <span>{getVisitFileKind(item.file).label} - {formatVisitFileSize(item.file.size)}</span>
                     <span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span>
-                    {folder.supportsDocumentCategories ? (
+                    {uploadChoices.length > 1 ? (
                       <fieldset className="visit-category-choice" disabled={uploading || item.status === "Uploaded" || Boolean(item.completionProof)}>
                         <legend>Document type</legend>
-                        {VISIT_UPLOAD_CATEGORY_CHOICES.map((choice) => (
+                        {uploadChoices.map((choice) => (
                           <label key={choice.key || "none"}>
                             <input
                               type="radio"
@@ -669,19 +674,31 @@ function FolderDetailWorkspaceView({
         <div className="visit-section-heading">
           <div>
             <p className="visit-eyebrow">Document library</p>
-            <h3 id="visit-active-files">{folder.supportsDocumentCategories ? "Documents" : "Supporting files"}</h3>
+            <h3 id="visit-active-files">{usesCategories ? "Documents" : "Supporting files"}</h3>
           </div>
           <span>{folder.activeFileCount} / {folder.maxActiveFiles} active files</span>
         </div>
-        {folder.supportsDocumentCategories ? (
+        {canChangeFolders ? (
+          <div className="visit-custom-folders__bar">
+            <button type="button" className="visit-custom-folders__add" disabled={folder.customFolders.length >= VISIT_MAX_CUSTOM_FOLDERS} onClick={() => setDialog({ type: "custom-folder-create", folder })}>+ New folder</button>
+            <span>{folder.customFolders.length} of {VISIT_MAX_CUSTOM_FOLDERS} extra folders</span>
+          </div>
+        ) : null}
+        {usesCategories ? (
           <div className="visit-category-groups">
-            {groupVisitSubmissionsByCategory(data.submissions).map((group) => {
+            {groupVisitSubmissionsByCategory(data.submissions, folder).map((group) => {
               const groupId = `visit-category-group-${group.key || "supporting"}`;
               return (
                 <section className="visit-category-group" aria-labelledby={groupId} key={group.key || "supporting"}>
                   <h4 className="visit-category-group__title" id={groupId}>
                     {group.label}
                     <span className="visit-category-group__count">{group.items.length}</span>
+                    {group.custom && canChangeFolders ? (
+                      <span className="visit-custom-folders__tools">
+                        <button type="button" onClick={() => setDialog({ type: "custom-folder-rename", folder, customFolder: { key: group.key, name: group.label } })}>Rename</button>
+                        <button type="button" onClick={() => setDialog({ type: "custom-folder-delete", folder, customFolder: { key: group.key, name: group.label }, fileCount: group.items.length })}>Delete</button>
+                      </span>
+                    ) : null}
                   </h4>
                   {group.items.length ? renderFiles(group.items) : <p className="visit-category-group__empty">{group.emptyNote}</p>}
                 </section>
@@ -703,8 +720,36 @@ function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {
   if (dialog.type === "moderation") return <AdminDialog title="Visit moderation" busy={busy} onClose={onClose} className="admin-dialog--wide"><Moderation visits={visits} /></AdminDialog>;
   if (dialog.type === "bulk-upload") return <BulkVisitUploadDialog visit={dialog.visit} onClose={onClose} reload={reload} />;
   if (dialog.type === "replace") return <AdminDialog title={`Replace ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><label htmlFor="visit-replacement-file">Choose replacement file</label><input id="visit-replacement-file" type="file" accept={VISIT_FILE_ACCEPT} onChange={(event) => setFile(event.target.files?.[0] || null)} />{file ? <p>{file.name} · {formatVisitFileSize(file.size)}</p> : null}<button disabled={!file || busy} onClick={() => mutate("replace", async () => { const error = validateVisitFile(file, dialog.folder); if (error) throw new Error(error); const descriptor = { clientFileId: `replace-${Date.now()}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }; const session = await visitCalls.replace(dialog.item.submissionId, [descriptor]); const approved = session.files?.[0]; if (!approved) throw new Error("Replacement session failed."); const proof = await uploadVisitFile(file, session, approved); return visitCalls.finalize({ sessionId: session.sessionId, clientFileId: approved.clientFileId, ticket: approved.ticket, completionProof: proof.completionProof }); }, "Submission replaced.", reload)}>Replace file</button></AdminDialog>;
+  if (dialog.type.startsWith("custom-folder-")) return <CustomFolderDialog dialog={dialog} busy={busy} mutate={mutate} onClose={onClose} reload={reload} />;
   const remove = dialog.type === "remove";
   return <AdminDialog title={`${remove ? "Remove" : "Withdraw"} ${dialog.item.fileName}?`} busy={busy} onClose={onClose}>{remove ? <label>Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></label> : <p>The submission will be withdrawn and its active reservation released.</p>}<div className="admin-actions"><button onClick={onClose}>Cancel</button><button className="danger" disabled={busy || (remove && !reason.trim())} onClick={() => mutate(dialog.type, () => remove ? visitCalls.remove(dialog.item.submissionId, reason.trim()) : visitCalls.withdraw(dialog.item.submissionId), `Submission ${remove ? "removed" : "withdrawn"}.`, reload)}>Confirm</button></div></AdminDialog>;
+}
+
+// Adding, renaming and deleting the extra folders inside a position's folder.
+function CustomFolderDialog({ dialog, busy, mutate, onClose, reload }) {
+  const { folder, customFolder } = dialog;
+  const [name, setName] = useState(customFolder?.name || "");
+  if (dialog.type === "custom-folder-delete") {
+    const hasFiles = (dialog.fileCount || 0) > 0;
+    return <AdminDialog title={`Delete ${customFolder.name}?`} busy={busy} onClose={onClose}>
+      {hasFiles ? <p>This folder still has {dialog.fileCount} {dialog.fileCount === 1 ? "file" : "files"}. Move or remove them first, then delete the folder.</p> : <p>The folder will be removed from this list. It is empty, so no files are affected.</p>}
+      <div className="admin-actions"><button type="button" onClick={onClose}>Cancel</button><button type="button" className="danger" disabled={busy || hasFiles} onClick={() => mutate("delete-custom-folder", () => visitCalls.deleteCustomFolder(folder.visitType, folder.positionKey, customFolder.key), "Folder deleted.", reload)}>Delete folder</button></div>
+    </AdminDialog>;
+  }
+  const renaming = dialog.type === "custom-folder-rename";
+  const trimmed = name.trim();
+  return <AdminDialog title={renaming ? `Rename ${customFolder.name}` : "New folder"} busy={busy} onClose={onClose}>
+    <form className="admin-form" onSubmit={(event) => {
+      event.preventDefault();
+      if (!trimmed) return;
+      if (renaming) mutate("rename-custom-folder", () => visitCalls.renameCustomFolder(folder.visitType, folder.positionKey, customFolder.key, trimmed), "Folder renamed.", reload);
+      else mutate("create-custom-folder", () => visitCalls.createCustomFolder(folder.visitType, folder.positionKey, trimmed), "Folder created.", reload);
+    }}>
+      <label>Folder name<input value={name} maxLength={VISIT_CUSTOM_FOLDER_NAME_MAX} autoFocus onChange={(event) => setName(event.target.value)} /></label>
+      <p className="visit-subtle-note">Up to {VISIT_CUSTOM_FOLDER_NAME_MAX} characters. Files in this folder are kept together in Google Drive.</p>
+      <div className="admin-actions"><button type="button" onClick={onClose}>Cancel</button><button disabled={busy || !trimmed}>{renaming ? "Save name" : "Create folder"}</button></div>
+    </form>
+  </AdminDialog>;
 }
 
 function BulkVisitUploadDialog({ visit, onClose, reload }) {
