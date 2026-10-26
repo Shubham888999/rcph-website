@@ -15,7 +15,7 @@ const START_Y = BOUNDS.top - 10;
 const RESOLUTION_PAGE_START_Y = START_Y + 28;
 const PAGE_HEIGHT = START_Y - BOUNDS.bottom;
 // Official-letterhead pages may run over the skyline watermark, down to just above the footer contact block.
-const OFFICIAL_BOTTOM = 120;
+const OFFICIAL_BOTTOM = 95;
 
 function printable(value, fallback = "") {
   const result = String(value || "").trim();
