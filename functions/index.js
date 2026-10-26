@@ -5448,6 +5448,33 @@ exports.updateVisitSubmissionFolder = onCall(CALLABLE_OPTIONS, async (request) =
   }
 });
 
+exports.createVisitSubmissionCustomFolder = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.createCustomFolder(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission folder could not be created.');
+  }
+});
+
+exports.renameVisitSubmissionCustomFolder = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.renameCustomFolder(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission folder could not be renamed.');
+  }
+});
+
+exports.deleteVisitSubmissionCustomFolder = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    const uid = requireAuth(request);
+    return await visitSubmissions.deleteCustomFolder(uid, request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Visit Submission folder could not be deleted.');
+  }
+});
+
 exports.setVisitSubmissionPrimaryPresentation = onCall(CALLABLE_OPTIONS, async (request) => {
   const data = request?.data || {};
   try {

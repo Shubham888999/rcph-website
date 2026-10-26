@@ -466,6 +466,8 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
   const targetFolderId = await ensureCategoryFolder({
     positionFolderId: positionFolder.id,
     category: safeText(validation.documentCategory, 20),
+    categoryName: safeText(validation.documentCategoryName, 80),
+    existingFolderId: safeText(validation.documentCategoryFolderId, 300),
   }, resolvedConfig);
 
   return {
@@ -477,15 +479,17 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
   };
 }
 
-  async function ensureCategoryFolder({ positionFolderId, category }, config = null) {
+  async function ensureCategoryFolder({ positionFolderId, category, categoryName = '', existingFolderId = '' }, config = null) {
     const parentId = safeText(positionFolderId, 300);
     if (!parentId) {
       throw createHttpUploadError(500, 'Visit position folder is missing.');
     }
     if (!category) return parentId;
-    const folderName = VISIT_CATEGORY_FOLDER_NAMES[category];
+    // Extra folders keep their Drive folder by id, so files stay together if the folder is renamed.
+    if (/^custom-[a-f0-9]{8}$/.test(category) && existingFolderId) return existingFolderId;
+    const folderName = VISIT_CATEGORY_FOLDER_NAMES[category] || (/^custom-[a-f0-9]{8}$/.test(category) ? safeText(categoryName, 80) : '');
     if (!folderName) {
-      throw makeVisitSubmissionError('invalid-argument', 'Document category must be inward, outward, inward-register, outward-register, or empty.');
+      throw makeVisitSubmissionError('invalid-argument', 'Document category must be one of this position\'s folders, or empty.');
     }
     getDriveClient(config);
     const categoryFolder = await getOrCreateUniqueFolder(parentId, folderName);
@@ -810,6 +814,8 @@ function createVisitCategoryMoveHandler(options = {}) {
       targetFolderId = await driveService.ensureCategoryFolder({
         positionFolderId: plan.positionFolderId,
         category: plan.targetCategory,
+        categoryName: plan.targetCategoryName,
+        existingFolderId: plan.targetCategoryFolderId,
       }, driveConfig);
       await driveService.moveFileToFolder({ fileId: plan.driveFileId, targetFolderId }, driveConfig);
     } finally {

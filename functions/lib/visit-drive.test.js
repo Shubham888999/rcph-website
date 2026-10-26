@@ -315,3 +315,27 @@ test('a busy folder lock becomes a failed-precondition with the busy message', a
   assert.equal(env.fakeDrive.calls.update.length, 0);
   assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, 'inward');
 });
+
+test('an extra folder gets a Drive folder with its name, shared by later uploads and kept after a rename', async () => {
+  const env = await createEnv();
+  const { created } = await env.service.createCustomFolder('bod-editor', { visitType: 'clubAssembly', positionKey: 'editor', name: 'Event photos' });
+  const first = await uploadVia(env, 'bod-editor', 'editor', created.key, 'photo-1');
+  assert.deepEqual(env.fakeDrive.calls.create.filter((call) => call.folder).map((call) => call.name), ['Editor', 'Event photos']);
+  assert.notEqual(first.folder.targetFolderId, first.folder.positionFolderId);
+
+  await env.service.renameCustomFolder('bod-editor', { visitType: 'clubAssembly', positionKey: 'editor', folderKey: created.key, name: 'Photos 2026' });
+  const second = await uploadVia(env, 'bod-editor', 'editor', created.key, 'photo-2');
+  assert.equal(second.folder.targetFolderId, first.folder.targetFolderId);
+  assert.equal(env.fakeDrive.calls.create.filter((call) => call.folder).length, 2);
+});
+
+test('moving a document into an extra folder creates the Drive folder and moves the file', async () => {
+  const env = await createEnv();
+  const { created } = await env.service.createCustomFolder('bod-editor', { visitType: 'clubAssembly', positionKey: 'editor', name: 'Bank letters' });
+  const upload = await uploadVia(env, 'bod-editor', 'editor');
+  const result = await env.move('bod-editor', { submissionId: upload.submissionId, documentCategory: created.key });
+  assert.deepEqual(result, { ok: true, documentCategory: created.key });
+  const bankFolder = env.fakeDrive.calls.create.find((call) => call.name === 'Bank letters');
+  assert.deepEqual(env.fakeDrive.items.get(upload.driveFileId).parents, [bankFolder.id]);
+  assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, created.key);
+});

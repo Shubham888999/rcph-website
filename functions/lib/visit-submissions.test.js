@@ -397,3 +397,110 @@ test('bulk upload sessions always use no category', async () => {
     assert.equal(env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash].documentCategory, '');
   }
 });
+
+// ---------------------------------------------------------------------------
+// Extra folders added by the position holder or a Visit manager.
+// ---------------------------------------------------------------------------
+
+const extraFolder = (visitType, positionKey, name) => ({ visitType, positionKey, name });
+
+test('a holder adds extra folders to their own position folder, and managers to any', async () => {
+  const env = await categoryEnv();
+  const created = await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', '  Event   photos '));
+  assert.equal(created.created.name, 'Event photos');
+  assert.match(created.created.key, /^custom-[a-f0-9]{8}$/);
+
+  await rejectsWith(env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'secretary', 'Nope')), 'permission-denied');
+  const byManager = await env.service.createCustomFolder('president-uid', extraFolder('clubAssembly', 'secretary', 'Bank letters'));
+  assert.deepEqual(byManager.customFolders.map(item => item.name), ['Bank letters']);
+
+  const editorFolder = await env.service.getFolder('bod-editor', 'clubAssembly', 'editor');
+  assert.deepEqual(editorFolder.folder.customFolders, [{ key: created.created.key, name: 'Event photos' }]);
+  assert.equal(editorFolder.folder.supportsCustomFolders, true);
+  assert.equal(editorFolder.folder.canManageCustomFolders, true);
+  assert.equal(editorFolder.folder.supportsDocumentCategories, false);
+
+  const audit = Object.values(env.adapter.store.visitSubmissionAudit || {}).filter(item => item.action === 'visitCustomFolderCreated');
+  assert.equal(audit.length, 2);
+});
+
+test('extra folder names are checked and limited to ten', async () => {
+  const env = await categoryEnv();
+  await rejectsWith(env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Inward')), 'invalid-argument', /built-in/);
+  await rejectsWith(env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'a/b')), 'invalid-argument', /cannot contain/);
+  await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Photos'));
+  await rejectsWith(env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'photos')), 'invalid-argument', /already exists/);
+  for (let index = 1; index < 10; index += 1) await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', `Folder ${index}`));
+  await rejectsWith(env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Eleventh')), 'invalid-argument', /up to 10/);
+});
+
+test('files can be uploaded into an extra folder by key, and only that position may use the key', async () => {
+  const env = await categoryEnv();
+  const { created } = await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Event photos'));
+  await rejectsWith(env.service.createUploadSession('bod-editor', {
+    visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile({ documentCategory: 'custom-0a0a0a0a' })],
+  }), 'invalid-argument');
+  await rejectsWith(env.service.createUploadSession('bod-secretary', {
+    visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory: created.key })],
+  }), 'invalid-argument');
+  await rejectsWith(env.service.createUploadSession('bod-editor', {
+    visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile({ documentCategory: 'inward' })],
+  }), 'invalid-argument', /only available for secretary folders/);
+
+  const session = await env.service.createUploadSession('bod-editor', {
+    visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile({ clientFileId: 'p-1', fileName: 'Photo.pdf', documentCategory: created.key })],
+  });
+  const { validation, result } = await uploadThroughDrive(env, 'bod-editor', session, {
+    driveFileId: 'driveFilePhoto0001', driveFolderId: 'photosFolder00001', positionFolderId: 'editorFolder00001',
+  });
+  assert.equal(validation.documentCategory, created.key);
+  assert.equal(validation.documentCategoryName, 'Event photos');
+  assert.equal(validation.documentCategoryFolderId, '');
+  assert.deepEqual(env.adapter.store.visitSubmissionPositions.clubAssembly_editor.categoryFolderIds, { [created.key]: 'photosFolder00001' });
+  assert.equal(env.adapter.store.visitSubmissions[result.submissionId].documentCategory, created.key);
+
+  const next = await env.service.createUploadSession('bod-editor', {
+    visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile({ clientFileId: 'p-2', fileName: 'Photo2.pdf', documentCategory: created.key })],
+  });
+  const stored = env.adapter.store.visitSubmissionUploadSessions[next.sessionId];
+  assert.equal(env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash].documentCategoryFolderId, 'photosFolder00001');
+});
+
+test('a document can be moved into an extra folder, and back out', async () => {
+  const env = await categoryEnv();
+  const { created } = await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Event photos'));
+  const session = await env.service.createUploadSession('bod-editor', {
+    visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile({ clientFileId: 'p-1', fileName: 'Photo.pdf' })],
+  });
+  const { result } = await uploadThroughDrive(env, 'bod-editor', session, {
+    driveFileId: 'driveFilePhoto0001', driveFolderId: 'editorFolder00001',
+  });
+  const plan = await env.service.prepareCategoryMove('bod-editor', { submissionId: result.submissionId, documentCategory: created.key });
+  assert.equal(plan.targetCategory, created.key);
+  assert.equal(plan.targetCategoryName, 'Event photos');
+  await env.service.commitCategoryMove('bod-editor', {
+    submissionId: result.submissionId, targetCategory: created.key, driveFileId: 'driveFilePhoto0001', driveFolderId: 'photosFolder00001', positionFolderId: 'editorFolder00001',
+  });
+  assert.equal(env.adapter.store.visitSubmissions[result.submissionId].documentCategory, created.key);
+  await rejectsWith(env.service.prepareCategoryMove('bod-editor', { submissionId: result.submissionId, documentCategory: 'inward' }), 'invalid-argument', /only available for secretary folders/);
+  await rejectsWith(env.service.prepareCategoryMove('bod-editor', { submissionId: result.submissionId, documentCategory: 'custom-0a0a0a0a' }), 'invalid-argument');
+});
+
+test('an extra folder can be renamed, and deleted only when it has no active files', async () => {
+  const env = await categoryEnv();
+  const { created } = await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Photos'));
+  const renamed = await env.service.renameCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', 'Event photos'), folderKey: created.key });
+  assert.deepEqual(renamed.customFolders, [{ key: created.key, name: 'Event photos' }]);
+  await rejectsWith(env.service.renameCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'editor', 'Hijack'), folderKey: created.key }), 'permission-denied');
+
+  const session = await env.service.createUploadSession('bod-editor', {
+    visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile({ clientFileId: 'p-1', fileName: 'Photo.pdf', documentCategory: created.key })],
+  });
+  await uploadThroughDrive(env, 'bod-editor', session, { driveFileId: 'driveFilePhoto0001', driveFolderId: 'photosFolder00001', positionFolderId: 'editorFolder00001' });
+  await rejectsWith(env.service.deleteCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', ''), folderKey: created.key }), 'invalid-argument', /Move or remove/);
+
+  const second = await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Empty one'));
+  const deleted = await env.service.deleteCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', ''), folderKey: second.created.key });
+  assert.deepEqual(deleted.customFolders.map(item => item.name), ['Event photos']);
+  await rejectsWith(env.service.deleteCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', ''), folderKey: second.created.key }), 'invalid-argument', /no longer exists/);
+});

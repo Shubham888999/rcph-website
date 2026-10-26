@@ -3,6 +3,8 @@
 const crypto = require('crypto');
 const defaultPositionHelpers = require('./positions');
 const positionHolders = require('./position-holders');
+const customFolders = require('./visit-custom-folders');
+const { isCustomFolderKey, listCustomFolders } = customFolders;
 
 const VISIT_TYPES = Object.freeze({
   clubAssembly: Object.freeze({
@@ -59,7 +61,7 @@ const DOCUMENT_CATEGORY_POSITION_KEYS = new Set(['secretary', 'joint-secretary',
 // Secretary folders: letters received / sent ("inward" / "outward", kept for existing
 // uploads) and their Excel registers (date, day, from/to, subject, reference).
 const DOCUMENT_CATEGORIES = Object.freeze(['inward', 'outward', 'inward-register', 'outward-register']);
-const DOCUMENT_CATEGORY_ERROR = 'Document category must be inward, outward, inward-register, outward-register, or empty.';
+const DOCUMENT_CATEGORY_ERROR = 'Document category must be one of this position\'s folders, or empty.';
 const DEFAULT_MAX_FILES_PER_SELECTION = 10;
 const DEFAULT_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MIN_FILE_SIZE_BYTES = 1024 * 1024;
@@ -409,14 +411,39 @@ function safePrimaryPresentationSubmissionId(value) {
   return submissionId && !/[\\/]/.test(submissionId) ? submissionId : '';
 }
 
-function normalizeDocumentCategory(value) {
+// A category is a built-in Secretary folder, or one of the extra folders listed on the position folder.
+function normalizeDocumentCategory(value, customFolders = []) {
   if (value === undefined || value === null || value === '') return '';
   if (DOCUMENT_CATEGORIES.includes(value)) return value;
+  if (isCustomFolderKey(value) && customFolders.some(item => item.key === value)) return value;
   throw makeVisitSubmissionError('invalid-argument', DOCUMENT_CATEGORY_ERROR);
 }
 
 function storedDocumentCategory(value) {
-  return DOCUMENT_CATEGORIES.includes(value) ? value : '';
+  return DOCUMENT_CATEGORIES.includes(value) || isCustomFolderKey(value) ? value : '';
+}
+
+// For values already checked when the upload was set up (tickets, sessions).
+function checkedStoredCategory(value) {
+  if (value === undefined || value === null || value === '') return '';
+  const stored = storedDocumentCategory(value);
+  if (!stored) throw makeVisitSubmissionError('invalid-argument', DOCUMENT_CATEGORY_ERROR);
+  return stored;
+}
+
+function assertBuiltInCategoryAllowed(category, positionKey) {
+  if (DOCUMENT_CATEGORIES.includes(category) && !supportsDocumentCategories(positionKey)) {
+    throw makeVisitSubmissionError('invalid-argument', 'Document categories are only available for secretary folders.');
+  }
+}
+
+function customFolderName(folder, category) {
+  return listCustomFolders(folder).find(item => item.key === category)?.name || '';
+}
+
+function categoryFolderIdFor(folder, category) {
+  const ids = folder?.categoryFolderIds && typeof folder.categoryFolderIds === 'object' ? folder.categoryFolderIds : {};
+  return isCustomFolderKey(category) && typeof ids[category] === 'string' ? ids[category] : '';
 }
 
 function supportsDocumentCategories(positionKey) {
@@ -951,7 +978,6 @@ function submissionActionPermissions(submission, access) {
 function canMoveSubmissionCategory(submission, access) {
   if ((submission?.status || 'active') !== 'active' || !access) return false;
   const positionKey = submission.positionKey || '';
-  if (!supportsDocumentCategories(positionKey)) return false;
   if (access.canManageVisitSystem === true) return true;
   return folderAccessPositionKeys(access).includes(positionKey) && submission.uploadedByUid === access.uid;
 }
@@ -1033,6 +1059,9 @@ function buildFolderResponse(config, folder, access, holdersByPosition = null) {
     canManage: access.canManageVisitSystem === true,
     canSetPrimaryPresentation: canSetFolderPrimaryPresentation(access, folder.positionKey, folderWritable),
     supportsDocumentCategories: supportsDocumentCategories(folder.positionKey),
+    supportsCustomFolders: true,
+    canManageCustomFolders: authorized,
+    customFolders: listCustomFolders(folder).map(({ key, name }) => ({ key, name })),
     holders: positionHolders.holdersForPosition(holdersByPosition, folder.positionKey),
   };
 }
@@ -1681,6 +1710,58 @@ function createVisitSubmissionService(options) {
     return { ok: true, visitType, positionKey, changedFields };
   }
 
+  // Extra folders inside a position folder: the holder of the position or a Visit manager
+  // may add, rename or delete them, while the folder is writable (managers at any time).
+  async function changeCustomFolders(uid, input, action) {
+    const access = await resolveAccessContext(uid);
+    const visitType = normalizeVisitType(input?.visitType);
+    const positionKey = normalizeCanonicalPositionKey(input?.positionKey, positionHelpers);
+    assertFolderAccess(access, positionKey);
+    const [config, current] = await Promise.all([loadVisitConfig(visitType), loadFolder(visitType, positionKey)]);
+    if (!access.canManageVisitSystem) assertVisitFolderAllowsUpload(config, current);
+    const key = typeof input?.folderKey === 'string' ? input.folderKey : '';
+    let activeFileCount = 0;
+    if (action === 'delete') {
+      const active = await adapter.queryActiveSubmissionsForPositions(visitType, [positionKey]);
+      activeFileCount = active.filter(item => storedDocumentCategory(item.data?.documentCategory) === key).length;
+    }
+    const docId = visitPositionDocId(visitType, positionKey, positionHelpers);
+    let outcome = null;
+    await adapter.runTransaction(async (tx) => {
+      const snap = await tx.getDoc('visitSubmissionPositions', docId);
+      if (!snap.exists) throw makeVisitSubmissionError('not-found', 'Visit Submission structure is incomplete.');
+      const folder = snap.data || {};
+      const plan = action === 'create'
+        ? customFolders.planCreateFolder(folder, { name: input?.name, uid, nowMillis: nowMillis(clock), randomHex: () => generateRandomHex(4, tokenGenerator) })
+        : action === 'rename'
+          ? customFolders.planRenameFolder(folder, { key, name: input?.name })
+          : customFolders.planDeleteFolder(folder, { key, activeFileCount });
+      if (!plan.ok) throw makeVisitSubmissionError('invalid-argument', plan.error);
+      outcome = plan;
+      if (plan.unchanged) return;
+      const updates = { customFolders: plan.customFolders, updatedAt: adapter.serverTimestamp(), updatedBy: uid };
+      if (plan.categoryFolderIds) updates.categoryFolderIds = plan.categoryFolderIds;
+      tx.updateDoc('visitSubmissionPositions', docId, updates);
+    });
+    if (!outcome.unchanged) {
+      const details = action === 'create'
+        ? { key: outcome.created.key, name: outcome.created.name }
+        : action === 'rename' ? { key, from: outcome.previousName, to: outcome.name } : { key, name: outcome.removed.name };
+      await adapter.addDoc('visitSubmissionAudit', buildAuditPayload(`visitCustomFolder${action[0].toUpperCase()}${action.slice(1)}d`, access, { visitType, positionKey, details }, adapter.serverTimestamp()));
+    }
+    return {
+      ok: true,
+      visitType,
+      positionKey,
+      customFolders: outcome.customFolders.map(({ key: folderKey, name }) => ({ key: folderKey, name })),
+      ...(action === 'create' ? { created: { key: outcome.created.key, name: outcome.created.name } } : {}),
+    };
+  }
+
+  const createCustomFolder = (uid, input) => changeCustomFolders(uid, input, 'create');
+  const renameCustomFolder = (uid, input) => changeCustomFolders(uid, input, 'rename');
+  const deleteCustomFolder = (uid, input) => changeCustomFolders(uid, input, 'delete');
+
   // Managers, or the holder of this folder while it is writable, may set or clear its main presentation.
   // Only primaryPresentationSubmissionId (plus updatedAt/updatedBy) is ever written here.
   async function setPrimaryPresentation(uid, input) {
@@ -1829,16 +1910,20 @@ function createVisitSubmissionService(options) {
 
     const replacingSession = Boolean(replacementOptions.replacesSubmissionId);
     const inputFiles = Array.isArray(input?.files) ? input.files : [];
+    const extraFolders = listCustomFolders(folder);
     const files = normalizeUploadFileDescriptors(input?.files, folder, visitType, positionKey)
-      .map((file, index) => ({
-        ...file,
-        documentCategory: replacingSession
-          ? normalizeDocumentCategory(replacementOptions.documentCategory)
-          : normalizeDocumentCategory(inputFiles[index]?.documentCategory),
-      }));
-    if (!replacingSession && files.some(file => file.documentCategory) && !supportsDocumentCategories(positionKey)) {
-      throw makeVisitSubmissionError('invalid-argument', 'Document categories are only available for secretary folders.');
-    }
+      .map((file, index) => {
+        const documentCategory = replacingSession
+          ? normalizeDocumentCategory(replacementOptions.documentCategory, extraFolders)
+          : normalizeDocumentCategory(inputFiles[index]?.documentCategory, extraFolders);
+        return {
+          ...file,
+          documentCategory,
+          documentCategoryName: customFolderName(folder, documentCategory),
+          documentCategoryFolderId: categoryFolderIdFor(folder, documentCategory),
+        };
+      });
+    if (!replacingSession) files.forEach(file => assertBuiltInCategoryAllowed(file.documentCategory, positionKey));
     const nowValue = nowMillis(clock);
     const expiresAtMillis = nowValue + VISIT_UPLOAD_SESSION_TTL_MS;
     const sessionId = adapter.newDocId('visitSubmissionUploadSessions');
@@ -1935,6 +2020,8 @@ function createVisitSubmissionService(options) {
           sizeBytes: file.sizeBytes,
           uploadProofHash: file.uploadProofHash,
           documentCategory: file.documentCategory,
+          documentCategoryName: file.documentCategoryName,
+          documentCategoryFolderId: file.documentCategoryFolderId,
           expiresAt: timestampFromMillis(adapter, file.expiresAtMillis),
           expiresAtMillis: file.expiresAtMillis,
           deleteAt: timestampFromMillis(adapter, file.deleteAtMillis),
@@ -2361,7 +2448,9 @@ function createVisitSubmissionService(options) {
         mimeType: ticketData.mimeType,
         sizeBytes: ticketData.sizeBytes,
         uploaderUid: ticketData.uid,
-        documentCategory: normalizeDocumentCategory(ticketData.documentCategory),
+        documentCategory: checkedStoredCategory(ticketData.documentCategory),
+        documentCategoryName: normalizeText(ticketData.documentCategoryName, 80),
+        documentCategoryFolderId: normalizeText(ticketData.documentCategoryFolderId, 300),
         uploadProof,
       };
     });
@@ -2532,7 +2621,7 @@ function createVisitSubmissionService(options) {
         result = { ok: true, submissionId: existingId, alreadyFinalized: true };
         return;
       }
-      const documentCategory = normalizeDocumentCategory(ticketData.documentCategory);
+      const documentCategory = checkedStoredCategory(ticketData.documentCategory);
       if (documentCategory && driveFolderId === positionFolderId) {
         throw makeVisitSubmissionError('failed-precondition', 'Trusted Drive category folder is missing.');
       }
@@ -2814,7 +2903,6 @@ function createVisitSubmissionService(options) {
   async function prepareCategoryMove(uid, input) {
     const access = await resolveAccessContext(uid);
     const submissionId = normalizeSubmissionId(input?.submissionId);
-    const targetCategory = normalizeDocumentCategory(input?.documentCategory);
     const snap = await adapter.getDoc('visitSubmissions', submissionId);
     if (!snap.exists) throw makeVisitSubmissionError('not-found', 'Submission not found.');
     const submission = { ...(snap.data || {}), id: submissionId };
@@ -2823,9 +2911,6 @@ function createVisitSubmissionService(options) {
     }
     const visitType = normalizeVisitType(submission.visitType);
     const positionKey = normalizeCanonicalPositionKey(submission.positionKey, positionHelpers);
-    if (!supportsDocumentCategories(positionKey)) {
-      throw makeVisitSubmissionError('invalid-argument', 'Document categories are only available for secretary folders.');
-    }
     if (!canMoveSubmissionCategory({ ...submission, positionKey }, access)) {
       throw makeVisitSubmissionError('permission-denied', 'Only the uploader or a Visit manager may move this document.');
     }
@@ -2833,6 +2918,8 @@ function createVisitSubmissionService(options) {
       loadVisitConfig(visitType),
       loadFolder(visitType, positionKey),
     ]);
+    const targetCategory = normalizeDocumentCategory(input?.documentCategory, listCustomFolders(folder));
+    assertBuiltInCategoryAllowed(targetCategory, positionKey);
     if (!access.canManageVisitSystem) assertVisitFolderAllowsUpload(config, folder);
 
     const currentCategory = storedDocumentCategory(submission.documentCategory);
@@ -2847,13 +2934,22 @@ function createVisitSubmissionService(options) {
     if (!positionFolderId) {
       throw makeVisitSubmissionError('failed-precondition', 'The position folder could not be resolved.');
     }
-    return { submissionId, visitType, positionKey, driveFileId, positionFolderId, targetCategory };
+    return {
+      submissionId,
+      visitType,
+      positionKey,
+      driveFileId,
+      positionFolderId,
+      targetCategory,
+      targetCategoryName: customFolderName(folder, targetCategory),
+      targetCategoryFolderId: categoryFolderIdFor(folder, targetCategory),
+    };
   }
 
   async function commitCategoryMove(uid, input) {
     const access = await resolveAccessContext(uid);
     const submissionId = normalizeSubmissionId(input?.submissionId);
-    const targetCategory = normalizeDocumentCategory(input?.targetCategory);
+    const targetCategory = checkedStoredCategory(input?.targetCategory);
     const driveFolderId = normalizeDriveId(input?.driveFolderId, 'Drive folder ID');
     const positionFolderId = normalizeDriveId(input?.positionFolderId, 'Drive position folder ID');
     const driveFileId = normalizeText(input?.driveFileId, 256);
@@ -2878,6 +2974,9 @@ function createVisitSubmissionService(options) {
       const folderId = visitPositionDocId(submission.visitType, positionKey, positionHelpers);
       const folderSnap = await tx.getDoc('visitSubmissionPositions', folderId);
       const folder = folderSnap.exists ? (folderSnap.data || {}) : null;
+      if (isCustomFolderKey(targetCategory) && !listCustomFolders(folder).some(item => item.key === targetCategory)) {
+        throw makeVisitSubmissionError('failed-precondition', 'This folder no longer exists.');
+      }
       const fromCategory = storedDocumentCategory(submission.documentCategory);
       tx.updateDoc('visitSubmissions', submissionId, {
         documentCategory: targetCategory,
@@ -3001,6 +3100,9 @@ function createVisitSubmissionService(options) {
     getFolder,
     updateConfig,
     updateFolder,
+    createCustomFolder,
+    renameCustomFolder,
+    deleteCustomFolder,
     setPrimaryPresentation,
     createUploadSession,
     createBulkUploadSessions,
