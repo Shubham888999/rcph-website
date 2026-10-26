@@ -5,7 +5,7 @@ import { isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 
 const BOUNDS = Object.freeze({ left: 54, right: 541, bottom: 260, top: 665 });
 const WIDTH = BOUNDS.right - BOUNDS.left;
-const RESOLUTION_PAGE_SIDE_INSET = 28;
+const RESOLUTION_PAGE_SIDE_INSET = 0;
 const RESOLUTION_PAGE_LEFT =
   BOUNDS.left + RESOLUTION_PAGE_SIDE_INSET;
 const RESOLUTION_PAGE_WIDTH =
@@ -14,6 +14,8 @@ const RESOLUTION_STATEMENT_WIDTH = WIDTH;
 const START_Y = BOUNDS.top - 10;
 const RESOLUTION_PAGE_START_Y = START_Y + 28;
 const PAGE_HEIGHT = START_Y - BOUNDS.bottom;
+// Official-letterhead pages may run over the skyline watermark, down to just above the footer contact block.
+const OFFICIAL_BOTTOM = 120;
 
 function printable(value, fallback = "") {
   const result = String(value || "").trim();
@@ -66,17 +68,17 @@ function alignedX(text, style, width = WIDTH, left = BOUNDS.left) {
   return left;
 }
 
-function createPaginator(startY = START_Y) {
+function createPaginator(startY = START_Y, { bottom = BOUNDS.bottom, continueY = startY } = {}) {
   const pages = [[]];
   let y = startY;
   const current = () => pages.at(-1);
   const newPage = (force = false) => {
     if (current().length || force) pages.push([]);
-    y = startY;
+    y = continueY;
   };
   const ensure = (height) => {
     if (height > PAGE_HEIGHT) throw new Error("A PDF row is taller than the complete Resolution content area. Shorten the row before generating the PDF.");
-    if (current().length && y - height < BOUNDS.bottom) newPage();
+    if (current().length && y - height < bottom) newPage();
   };
   const space = (height) => {
     if (height <= 0) return;
@@ -91,7 +93,7 @@ function createPaginator(startY = START_Y) {
     y -= lineHeight;
   };
   const addLine = (x1, y1, x2, y2) => current().push({ kind: "line", x1, y1, x2, y2 });
-  return { pages, current, newPage, ensure, space, addText, addLine, get y() { return y; }, set y(value) { y = value; } };
+  return { pages, bottom, current, newPage, ensure, space, addText, addLine, get y() { return y; }, set y(value) { y = value; } };
 }
 
 function renderTextSection(pager, section, options = {}) {
@@ -550,7 +552,7 @@ function renderTable(
 
     if (
       pager.current().length &&
-      pager.y - model.height < BOUNDS.bottom
+      pager.y - model.height < pager.bottom
     ) {
       pager.newPage();
 
@@ -974,7 +976,7 @@ function renderResolutionDetails(pager, normalized) {
 }
 
 export function buildResolutionPagePdfPages(details, config) {
-  const pager = createPaginator(RESOLUTION_PAGE_START_Y);
+  const pager = createPaginator(RESOLUTION_PAGE_START_Y, { bottom: OFFICIAL_BOTTOM, continueY: START_Y });
 
   const normalized = normalizeResolutionPageConfig(
     config,
@@ -1045,7 +1047,7 @@ export function buildResolutionPagePdfPages(details, config) {
 
 export function buildGeneratedVotesTablePdfPages(details, config) {
   const normalized = normalizeUploadedVotesTableConfig(config);
-  const pager = createPaginator();
+  const pager = createPaginator(START_Y, { bottom: OFFICIAL_BOTTOM });
   const resolution = details?.resolution || {};
 
   renderTextSection(
