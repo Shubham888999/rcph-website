@@ -89,6 +89,47 @@ export function applyTreasuryEvent(draft = {}, option = null) {
   };
 }
 
+// Bank proofs: any number of files or links (up to the limit) kept on the entry, beside its bill.
+export const TREASURY_MAX_BANK_PROOFS = 10;
+
+function httpsUrl(value) {
+  try {
+    const url = new URL(text(value, 1000));
+    return url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+export function normalizeTreasuryBankProofs(record = {}) {
+  return (Array.isArray(record.bankProofs) ? record.bankProofs : [])
+    .map((item) => ({
+      id: text(item?.id, 80),
+      fileUrl: httpsUrl(item?.fileUrl),
+      fileName: text(item?.fileName, 180),
+      mimeType: text(item?.mimeType, 100),
+      sizeBytes: Number.isSafeInteger(item?.sizeBytes) ? item.sizeBytes : 0,
+      driveFileId: text(item?.driveFileId, 180),
+      kind: item?.kind === "link" ? "link" : "upload",
+      addedAt: text(item?.addedAt, 40),
+      addedBy: text(item?.addedBy, 180),
+    }))
+    .filter((item) => item.id && item.fileUrl)
+    .slice(0, TREASURY_MAX_BANK_PROOFS);
+}
+
+// From an uploaded file's metadata (the bill upload response) or a pasted https link.
+export function createTreasuryBankProof({ upload = null, link = "", id, addedAt, addedBy = "" } = {}) {
+  if (upload) {
+    const fileUrl = httpsUrl(upload.billUrl);
+    if (!fileUrl) return null;
+    return { id, fileUrl, fileName: text(upload.billFileName, 180) || "Bank proof", mimeType: text(upload.billMimeType, 100), sizeBytes: Number.isSafeInteger(upload.billSizeBytes) ? upload.billSizeBytes : 0, driveFileId: text(upload.billDriveFileId, 180), kind: "upload", addedAt, addedBy: text(addedBy, 180) };
+  }
+  const fileUrl = httpsUrl(link);
+  if (!fileUrl) return null;
+  return { id, fileUrl, fileName: "Bank proof link", mimeType: "", sizeBytes: 0, driveFileId: "", kind: "link", addedAt, addedBy: text(addedBy, 180) };
+}
+
 export function treasuryEventLabel(record = {}) {
   return text(record.eventName, 180) || TREASURY_NO_EVENT_LABEL;
 }
