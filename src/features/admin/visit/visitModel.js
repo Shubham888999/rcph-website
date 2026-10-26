@@ -92,10 +92,17 @@ const CUSTOM_FOLDER_KEY = /^custom-[a-f0-9]{8}$/;
 export const VISIT_MAX_CUSTOM_FOLDERS = 10;
 export const VISIT_CUSTOM_FOLDER_NAME_MAX = 40;
 
+export const VISIT_MAX_SUBFOLDERS = 10;
+export const VISIT_MAX_TOTAL_FOLDERS = 40;
+
 function normalizeCustomFolders(values) {
   return (Array.isArray(values) ? values : [])
     .filter((item) => item && CUSTOM_FOLDER_KEY.test(item.key) && text(item.name, 80))
-    .map((item) => ({ key: item.key, name: text(item.name, 80) }));
+    .map((item) => ({
+      key: item.key,
+      name: text(item.name, 80),
+      parentKey: VISIT_DOCUMENT_CATEGORY_KEYS.includes(item.parentKey) || CUSTOM_FOLDER_KEY.test(item.parentKey || "") ? item.parentKey : "",
+    }));
 }
 
 // Library groups in display order; "" is the uncategorised Supporting files group.
@@ -139,24 +146,48 @@ export function normalizeSubmission(value) {
   };
 }
 
-// The folders of one position: the four Secretary folders (Secretary positions only),
-// then the extra folders added by the holder or a manager, then Supporting files.
+// The folders of one position: the four Secretary folders (Secretary positions only), then the
+// extra folders added by the holder or a manager, each followed by its subfolders, then Supporting
+// files. A subfolder's fullLabel reads "Parent > Child".
 export function visitFolderCategories(folder) {
-  const builtIn = folder?.supportsDocumentCategories === true ? VISIT_DOCUMENT_CATEGORIES.filter((category) => category.key) : [];
-  const custom = (folder?.customFolders || []).map((item) => ({
+  const extras = folder?.customFolders || [];
+  const subfoldersOf = (parentKey) => extras.filter((item) => item.parentKey === parentKey);
+  const withSubfolders = (parent) => [
+    { ...parent, fullLabel: parent.label, depth: 0, canHaveSubfolders: true, subfolderCount: subfoldersOf(parent.key).length },
+    ...subfoldersOf(parent.key).map((item) => ({
+      key: item.key,
+      label: item.name,
+      fullLabel: `${parent.label} \u203A ${item.name}`,
+      moveLabel: `Move to ${parent.label} \u203A ${item.name}`,
+      emptyNote: `No documents in ${item.name} yet.`,
+      custom: true,
+      depth: 1,
+      parentKey: parent.key,
+      canHaveSubfolders: false,
+      subfolderCount: 0,
+    })),
+  ];
+  const builtIn = folder?.supportsDocumentCategories === true
+    ? VISIT_DOCUMENT_CATEGORIES.filter((category) => category.key).flatMap(withSubfolders)
+    : [];
+  const topLevel = extras.filter((item) => !item.parentKey).flatMap((item) => withSubfolders({
     key: item.key,
     label: item.name,
     moveLabel: `Move to ${item.name}`,
     emptyNote: `No documents in ${item.name} yet.`,
     custom: true,
   }));
-  return [...builtIn, ...custom, VISIT_DOCUMENT_CATEGORIES.find((category) => category.key === "")];
+  return [...builtIn, ...topLevel, VISIT_DOCUMENT_CATEGORIES.find((category) => category.key === "")];
+}
+
+export function visitTopLevelFolderCount(folder) {
+  return (folder?.customFolders || []).filter((item) => !item.parentKey).length;
 }
 
 export function visitUploadChoices(folder) {
   return [
     { key: "", label: "None" },
-    ...visitFolderCategories(folder).filter((category) => category.key).map(({ key, label }) => ({ key, label })),
+    ...visitFolderCategories(folder).filter((category) => category.key).map(({ key, label, fullLabel }) => ({ key, label: fullLabel || label })),
   ];
 }
 
