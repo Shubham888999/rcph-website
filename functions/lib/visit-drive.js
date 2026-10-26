@@ -463,11 +463,14 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
     rootFolderId,
     validation.positionTitle
   );
-  const targetFolderId = await ensureCategoryFolder({
+  const target = await ensureCategoryFolderDetailed({
     positionFolderId: positionFolder.id,
     category: safeText(validation.documentCategory, 20),
     categoryName: safeText(validation.documentCategoryName, 80),
     existingFolderId: safeText(validation.documentCategoryFolderId, 300),
+    parentCategory: safeText(validation.documentCategoryParentKey, 40),
+    parentName: safeText(validation.documentCategoryParentName, 80),
+    parentExistingFolderId: safeText(validation.documentCategoryParentFolderId, 300),
   }, resolvedConfig);
 
   return {
@@ -475,25 +478,45 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
     visitType: validation.visitType,
     positionFolderId: positionFolder.id,
     positionFolderName: positionFolder.name,
-    targetFolderId,
+    targetFolderId: target.folderId,
+    categoryParentFolderId: target.parentFolderId,
   };
 }
 
-  async function ensureCategoryFolder({ positionFolderId, category, categoryName = '', existingFolderId = '' }, config = null) {
-    const parentId = safeText(positionFolderId, 300);
-    if (!parentId) {
-      throw createHttpUploadError(500, 'Visit position folder is missing.');
-    }
-    if (!category) return parentId;
-    // Extra folders keep their Drive folder by id, so files stay together if the folder is renamed.
+  // A folder inside the position folder: a built-in Secretary folder (by its fixed name) or an extra
+  // folder (by its stored Drive id, so renaming it never splits its files, else by name).
+  async function resolveCategoryFolder({ parentId, category, name, existingFolderId }) {
     if (/^custom-[a-f0-9]{8}$/.test(category) && existingFolderId) return existingFolderId;
-    const folderName = VISIT_CATEGORY_FOLDER_NAMES[category] || (/^custom-[a-f0-9]{8}$/.test(category) ? safeText(categoryName, 80) : '');
+    const folderName = VISIT_CATEGORY_FOLDER_NAMES[category] || (/^custom-[a-f0-9]{8}$/.test(category) ? safeText(name, 80) : '');
     if (!folderName) {
       throw makeVisitSubmissionError('invalid-argument', 'Document category must be one of this position\'s folders, or empty.');
     }
+    return (await getOrCreateUniqueFolder(parentId, folderName)).id;
+  }
+
+  // Returns the target folder and, for a subfolder, the Drive folder of its parent.
+  async function ensureCategoryFolderDetailed({
+    positionFolderId, category, categoryName = '', existingFolderId = '', parentCategory = '', parentName = '', parentExistingFolderId = '',
+  }, config = null) {
+    const positionId = safeText(positionFolderId, 300);
+    if (!positionId) {
+      throw createHttpUploadError(500, 'Visit position folder is missing.');
+    }
+    if (!category) return { folderId: positionId, parentFolderId: '' };
     getDriveClient(config);
-    const categoryFolder = await getOrCreateUniqueFolder(parentId, folderName);
-    return categoryFolder.id;
+    if (/^custom-[a-f0-9]{8}$/.test(category) && existingFolderId) return { folderId: existingFolderId, parentFolderId: '' };
+    let parentFolderId = '';
+    let containerId = positionId;
+    if (parentCategory) {
+      parentFolderId = await resolveCategoryFolder({ parentId: positionId, category: parentCategory, name: parentName, existingFolderId: parentExistingFolderId });
+      containerId = parentFolderId;
+    }
+    const folderId = await resolveCategoryFolder({ parentId: containerId, category, name: categoryName, existingFolderId });
+    return { folderId, parentFolderId };
+  }
+
+  async function ensureCategoryFolder(params, config = null) {
+    return (await ensureCategoryFolderDetailed(params, config)).folderId;
   }
 
   async function moveFileToFolder({ fileId, targetFolderId }, config = null) {
@@ -540,6 +563,7 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
   return {
     ensureVisitFolderHierarchy,
     ensureCategoryFolder,
+    ensureCategoryFolderDetailed,
     moveFileToFolder,
     uploadFile,
   };
@@ -725,6 +749,7 @@ folderLock = await folderLockManager.acquireLock({
         driveFileId: driveFile.driveFileId,
         driveFolderId: folder.targetFolderId || folder.positionFolderId,
         positionFolderId: folder.positionFolderId,
+        ...(folder.categoryParentFolderId ? { categoryParentFolderId: folder.categoryParentFolderId } : {}),
         driveFileUrl: driveFile.driveFileUrl,
         fileName: metadata.fileName,
         finalFileName: validation.sanitizedOriginalFileName,
@@ -810,13 +835,19 @@ function createVisitCategoryMoveHandler(options = {}) {
     }
 
     let targetFolderId;
+    let parentFolderId = '';
     try {
-      targetFolderId = await driveService.ensureCategoryFolder({
+      const target = await driveService.ensureCategoryFolderDetailed({
         positionFolderId: plan.positionFolderId,
         category: plan.targetCategory,
         categoryName: plan.targetCategoryName,
         existingFolderId: plan.targetCategoryFolderId,
+        parentCategory: plan.targetCategoryParentKey,
+        parentName: plan.targetCategoryParentName,
+        parentExistingFolderId: plan.targetCategoryParentFolderId,
       }, driveConfig);
+      targetFolderId = target.folderId;
+      parentFolderId = target.parentFolderId;
       await driveService.moveFileToFolder({ fileId: plan.driveFileId, targetFolderId }, driveConfig);
     } finally {
       try {
@@ -835,6 +866,7 @@ function createVisitCategoryMoveHandler(options = {}) {
       driveFileId: plan.driveFileId,
       driveFolderId: targetFolderId,
       positionFolderId: plan.positionFolderId,
+      ...(parentFolderId ? { parentFolderId } : {}),
     });
     return { ok: true, documentCategory: plan.targetCategory };
   };

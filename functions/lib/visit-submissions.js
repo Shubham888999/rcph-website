@@ -437,13 +437,23 @@ function assertBuiltInCategoryAllowed(category, positionKey) {
   }
 }
 
-function customFolderName(folder, category) {
-  return listCustomFolders(folder).find(item => item.key === category)?.name || '';
-}
-
-function categoryFolderIdFor(folder, category) {
+// What the Drive side needs to place a file in an extra folder (and its parent, for a subfolder).
+function categoryDriveInfo(folder, category) {
+  const empty = { name: '', folderId: '', parentKey: '', parentName: '', parentFolderId: '' };
+  if (!isCustomFolderKey(category)) return empty;
+  const list = listCustomFolders(folder);
+  const item = list.find(entry => entry.key === category);
+  if (!item) return empty;
   const ids = folder?.categoryFolderIds && typeof folder.categoryFolderIds === 'object' ? folder.categoryFolderIds : {};
-  return isCustomFolderKey(category) && typeof ids[category] === 'string' ? ids[category] : '';
+  const idOf = key => (typeof ids[key] === 'string' ? ids[key] : '');
+  const parent = item.parentKey ? list.find(entry => entry.key === item.parentKey) : null;
+  return {
+    name: item.name,
+    folderId: idOf(category),
+    parentKey: item.parentKey || '',
+    parentName: parent?.name || '',
+    parentFolderId: item.parentKey ? idOf(item.parentKey) : '',
+  };
 }
 
 function supportsDocumentCategories(positionKey) {
@@ -1061,7 +1071,7 @@ function buildFolderResponse(config, folder, access, holdersByPosition = null) {
     supportsDocumentCategories: supportsDocumentCategories(folder.positionKey),
     supportsCustomFolders: true,
     canManageCustomFolders: authorized,
-    customFolders: listCustomFolders(folder).map(({ key, name }) => ({ key, name })),
+    customFolders: listCustomFolders(folder).map(({ key, name, parentKey }) => ({ key, name, parentKey })),
     holders: positionHolders.holdersForPosition(holdersByPosition, folder.positionKey),
   };
 }
@@ -1732,7 +1742,14 @@ function createVisitSubmissionService(options) {
       if (!snap.exists) throw makeVisitSubmissionError('not-found', 'Visit Submission structure is incomplete.');
       const folder = snap.data || {};
       const plan = action === 'create'
-        ? customFolders.planCreateFolder(folder, { name: input?.name, uid, nowMillis: nowMillis(clock), randomHex: () => generateRandomHex(4, tokenGenerator) })
+        ? customFolders.planCreateFolder(folder, {
+          name: input?.name,
+          uid,
+          nowMillis: nowMillis(clock),
+          randomHex: () => generateRandomHex(4, tokenGenerator),
+          parentKey: typeof input?.parentKey === 'string' ? input.parentKey : '',
+          builtInParents: supportsDocumentCategories(positionKey) ? DOCUMENT_CATEGORIES : [],
+        })
         : action === 'rename'
           ? customFolders.planRenameFolder(folder, { key, name: input?.name })
           : customFolders.planDeleteFolder(folder, { key, activeFileCount });
@@ -1745,7 +1762,7 @@ function createVisitSubmissionService(options) {
     });
     if (!outcome.unchanged) {
       const details = action === 'create'
-        ? { key: outcome.created.key, name: outcome.created.name }
+        ? { key: outcome.created.key, name: outcome.created.name, parentKey: outcome.created.parentKey }
         : action === 'rename' ? { key, from: outcome.previousName, to: outcome.name } : { key, name: outcome.removed.name };
       await adapter.addDoc('visitSubmissionAudit', buildAuditPayload(`visitCustomFolder${action[0].toUpperCase()}${action.slice(1)}d`, access, { visitType, positionKey, details }, adapter.serverTimestamp()));
     }
@@ -1753,8 +1770,8 @@ function createVisitSubmissionService(options) {
       ok: true,
       visitType,
       positionKey,
-      customFolders: outcome.customFolders.map(({ key: folderKey, name }) => ({ key: folderKey, name })),
-      ...(action === 'create' ? { created: { key: outcome.created.key, name: outcome.created.name } } : {}),
+      customFolders: outcome.customFolders.map(({ key: folderKey, name, parentKey }) => ({ key: folderKey, name, parentKey })),
+      ...(action === 'create' ? { created: { key: outcome.created.key, name: outcome.created.name, parentKey: outcome.created.parentKey } } : {}),
     };
   }
 
@@ -1916,11 +1933,15 @@ function createVisitSubmissionService(options) {
         const documentCategory = replacingSession
           ? normalizeDocumentCategory(replacementOptions.documentCategory, extraFolders)
           : normalizeDocumentCategory(inputFiles[index]?.documentCategory, extraFolders);
+        const info = categoryDriveInfo(folder, documentCategory);
         return {
           ...file,
           documentCategory,
-          documentCategoryName: customFolderName(folder, documentCategory),
-          documentCategoryFolderId: categoryFolderIdFor(folder, documentCategory),
+          documentCategoryName: info.name,
+          documentCategoryFolderId: info.folderId,
+          documentCategoryParentKey: info.parentKey,
+          documentCategoryParentName: info.parentName,
+          documentCategoryParentFolderId: info.parentFolderId,
         };
       });
     if (!replacingSession) files.forEach(file => assertBuiltInCategoryAllowed(file.documentCategory, positionKey));
@@ -2022,6 +2043,9 @@ function createVisitSubmissionService(options) {
           documentCategory: file.documentCategory,
           documentCategoryName: file.documentCategoryName,
           documentCategoryFolderId: file.documentCategoryFolderId,
+          documentCategoryParentKey: file.documentCategoryParentKey,
+          documentCategoryParentName: file.documentCategoryParentName,
+          documentCategoryParentFolderId: file.documentCategoryParentFolderId,
           expiresAt: timestampFromMillis(adapter, file.expiresAtMillis),
           expiresAtMillis: file.expiresAtMillis,
           deleteAt: timestampFromMillis(adapter, file.deleteAtMillis),
@@ -2451,6 +2475,9 @@ function createVisitSubmissionService(options) {
         documentCategory: checkedStoredCategory(ticketData.documentCategory),
         documentCategoryName: normalizeText(ticketData.documentCategoryName, 80),
         documentCategoryFolderId: normalizeText(ticketData.documentCategoryFolderId, 300),
+        documentCategoryParentKey: normalizeText(ticketData.documentCategoryParentKey, 40),
+        documentCategoryParentName: normalizeText(ticketData.documentCategoryParentName, 80),
+        documentCategoryParentFolderId: normalizeText(ticketData.documentCategoryParentFolderId, 300),
         uploadProof,
       };
     });
@@ -2472,6 +2499,9 @@ function createVisitSubmissionService(options) {
     const positionFolderId = normalizeText(input?.positionFolderId, 256)
       ? normalizeDriveId(input.positionFolderId, 'Drive position folder ID')
       : driveFolderId;
+    const categoryParentFolderId = normalizeText(input?.categoryParentFolderId, 256)
+      ? normalizeDriveId(input.categoryParentFolderId, 'Drive category parent folder ID')
+      : '';
     const driveFileUrl = normalizeDriveUrl(input?.driveFileUrl || input?.fileUrl);
     const finalFileName = sanitizeVisitFileName(input?.finalFileName || input?.fileName);
     const completionProof = generateRandomHex(32, tokenGenerator);
@@ -2536,6 +2566,7 @@ function createVisitSubmissionService(options) {
         driveFileId,
         driveFolderId,
         drivePositionFolderId: positionFolderId,
+        driveCategoryParentFolderId: categoryParentFolderId,
         driveFileUrl,
         finalFileName,
       });
@@ -2723,6 +2754,9 @@ function createVisitSubmissionService(options) {
           ...(folder.categoryFolderIds && typeof folder.categoryFolderIds === 'object' ? folder.categoryFolderIds : {}),
           [documentCategory]: driveFolderId,
         };
+        const parentKey = normalizeText(ticketData.documentCategoryParentKey, 40);
+        const parentFolderId = normalizeText(ticketData.driveCategoryParentFolderId, 256);
+        if (parentKey && parentFolderId) folderUpdates.categoryFolderIds[parentKey] = parentFolderId;
       }
       if (nextPrimaryPresentationSubmissionId !== currentPrimaryPresentationSubmissionId) {
         folderUpdates.primaryPresentationSubmissionId = nextPrimaryPresentationSubmissionId;
@@ -2920,6 +2954,7 @@ function createVisitSubmissionService(options) {
     ]);
     const targetCategory = normalizeDocumentCategory(input?.documentCategory, listCustomFolders(folder));
     assertBuiltInCategoryAllowed(targetCategory, positionKey);
+    const targetInfo = categoryDriveInfo(folder, targetCategory);
     if (!access.canManageVisitSystem) assertVisitFolderAllowsUpload(config, folder);
 
     const currentCategory = storedDocumentCategory(submission.documentCategory);
@@ -2941,8 +2976,11 @@ function createVisitSubmissionService(options) {
       driveFileId,
       positionFolderId,
       targetCategory,
-      targetCategoryName: customFolderName(folder, targetCategory),
-      targetCategoryFolderId: categoryFolderIdFor(folder, targetCategory),
+      targetCategoryName: targetInfo.name,
+      targetCategoryFolderId: targetInfo.folderId,
+      targetCategoryParentKey: targetInfo.parentKey,
+      targetCategoryParentName: targetInfo.parentName,
+      targetCategoryParentFolderId: targetInfo.parentFolderId,
     };
   }
 
@@ -2952,6 +2990,9 @@ function createVisitSubmissionService(options) {
     const targetCategory = checkedStoredCategory(input?.targetCategory);
     const driveFolderId = normalizeDriveId(input?.driveFolderId, 'Drive folder ID');
     const positionFolderId = normalizeDriveId(input?.positionFolderId, 'Drive position folder ID');
+    const parentFolderId = normalizeText(input?.parentFolderId, 256)
+      ? normalizeDriveId(input.parentFolderId, 'Drive category parent folder ID')
+      : '';
     const driveFileId = normalizeText(input?.driveFileId, 256);
     if (targetCategory ? driveFolderId === positionFolderId : driveFolderId !== positionFolderId) {
       throw makeVisitSubmissionError('failed-precondition', 'Trusted Drive destination does not match the document category.');
@@ -2991,6 +3032,8 @@ function createVisitSubmissionService(options) {
             ...(folder.categoryFolderIds && typeof folder.categoryFolderIds === 'object' ? folder.categoryFolderIds : {}),
             [targetCategory]: driveFolderId,
           };
+          const parentKey = listCustomFolders(folder).find(item => item.key === targetCategory)?.parentKey || '';
+          if (parentKey && parentFolderId) folderUpdates.categoryFolderIds[parentKey] = parentFolderId;
         }
         if (Object.keys(folderUpdates).length) {
           tx.updateDoc('visitSubmissionPositions', folderId, {

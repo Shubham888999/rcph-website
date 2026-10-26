@@ -415,7 +415,7 @@ test('a holder adds extra folders to their own position folder, and managers to 
   assert.deepEqual(byManager.customFolders.map(item => item.name), ['Bank letters']);
 
   const editorFolder = await env.service.getFolder('bod-editor', 'clubAssembly', 'editor');
-  assert.deepEqual(editorFolder.folder.customFolders, [{ key: created.created.key, name: 'Event photos' }]);
+  assert.deepEqual(editorFolder.folder.customFolders, [{ key: created.created.key, name: 'Event photos', parentKey: '' }]);
   assert.equal(editorFolder.folder.supportsCustomFolders, true);
   assert.equal(editorFolder.folder.canManageCustomFolders, true);
   assert.equal(editorFolder.folder.supportsDocumentCategories, false);
@@ -490,7 +490,7 @@ test('an extra folder can be renamed, and deleted only when it has no active fil
   const env = await categoryEnv();
   const { created } = await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Photos'));
   const renamed = await env.service.renameCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', 'Event photos'), folderKey: created.key });
-  assert.deepEqual(renamed.customFolders, [{ key: created.key, name: 'Event photos' }]);
+  assert.deepEqual(renamed.customFolders, [{ key: created.key, name: 'Event photos', parentKey: '' }]);
   await rejectsWith(env.service.renameCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'editor', 'Hijack'), folderKey: created.key }), 'permission-denied');
 
   const session = await env.service.createUploadSession('bod-editor', {
@@ -503,4 +503,39 @@ test('an extra folder can be renamed, and deleted only when it has no active fil
   const deleted = await env.service.deleteCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', ''), folderKey: second.created.key });
   assert.deepEqual(deleted.customFolders.map(item => item.name), ['Event photos']);
   await rejectsWith(env.service.deleteCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', ''), folderKey: second.created.key }), 'invalid-argument', /no longer exists/);
+});
+
+test('subfolders go inside a folder, one level deep, and uploads can use them', async () => {
+  const env = await categoryEnv();
+  const top = (await env.service.createCustomFolder('bod-editor', extraFolder('clubAssembly', 'editor', 'Bank letters'))).created;
+  const sub = await env.service.createCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', '2026'), parentKey: top.key });
+  assert.equal(sub.created.parentKey, top.key);
+  await rejectsWith(env.service.createCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', 'April'), parentKey: sub.created.key }), 'invalid-argument', /one level deep/);
+  await rejectsWith(env.service.createCustomFolder('bod-editor', { ...extraFolder('clubAssembly', 'editor', '2026'), parentKey: 'inward' }), 'invalid-argument', /one level deep/);
+  await rejectsWith(env.service.createCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'editor', 'x'), parentKey: top.key }), 'permission-denied');
+
+  const session = await env.service.createUploadSession('bod-editor', {
+    visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile({ clientFileId: 's-1', documentCategory: sub.created.key })],
+  });
+  const stored = env.adapter.store.visitSubmissionUploadSessions[session.sessionId];
+  const ticket = env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash];
+  assert.deepEqual([ticket.documentCategoryName, ticket.documentCategoryParentKey, ticket.documentCategoryParentName], ['2026', top.key, 'Bank letters']);
+  const { validation } = await uploadThroughDrive(env, 'bod-editor', session, {
+    driveFileId: 'driveFileSub000001', driveFolderId: 'subFolder000000001', positionFolderId: 'editorFolder00001',
+  });
+  assert.equal(validation.documentCategoryParentKey, top.key);
+});
+
+test('a Secretary folder can have subfolders, and a folder with subfolders cannot be deleted', async () => {
+  const env = await categoryEnv();
+  const sub = await env.service.createCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'secretary', '2026'), parentKey: 'outward' });
+  assert.equal(sub.created.parentKey, 'outward');
+  const top = (await env.service.createCustomFolder('bod-secretary', extraFolder('clubAssembly', 'secretary', 'Bank letters'))).created;
+  const inner = await env.service.createCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'secretary', '2026'), parentKey: top.key });
+  await rejectsWith(env.service.deleteCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'secretary', ''), folderKey: top.key }), 'invalid-argument', /Delete the subfolders first/);
+  await env.service.deleteCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'secretary', ''), folderKey: inner.created.key });
+  const gone = await env.service.deleteCustomFolder('bod-secretary', { ...extraFolder('clubAssembly', 'secretary', ''), folderKey: top.key });
+  assert.deepEqual(gone.customFolders.map(item => item.name), ['2026']);
+  const folder = await env.service.getFolder('bod-secretary', 'clubAssembly', 'secretary');
+  assert.deepEqual(folder.folder.customFolders, [{ key: sub.created.key, name: '2026', parentKey: 'outward' }]);
 });
