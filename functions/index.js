@@ -27,6 +27,7 @@ const {
 const resolutionModel = require('./lib/resolutions');
 const { createResolutionDriveService } = require('./lib/resolution-drive');
 const { createResolutionUploadService } = require('./lib/resolution-upload');
+const resolutionCorrections = require('./lib/resolution-corrections');
 const {
   ANNOUNCEMENT_ATTACHMENT_EMAIL_MAX_BYTES,
   createAnnouncementAttachmentService,
@@ -7836,9 +7837,15 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
   const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
   const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
   const now = resolutionTimestamp();
+  // Optional earlier official close time (e.g. the intended deadline). The audit
+  // history still records when the close was actually done.
+  const requestedCloseTime = typeof request.data?.effectiveClosedAt === 'string' && request.data.effectiveClosedAt.trim() ? request.data.effectiveClosedAt : '';
+  const closeReason = requestedCloseTime ? resolutionCorrections.correctionReason(request.data?.reason) : '';
+  if (requestedCloseTime && !closeReason) throw new HttpsError('invalid-argument', 'Give a reason for the earlier close time.');
   const finalizationId = crypto.randomUUID();
   let finalResult = null;
   let uploadedMode = false;
+  let closedAt = now;
   await db.runTransaction(async tx => {
     const resolutionSnap = await tx.get(resolutionRef);
     if (!resolutionSnap.exists) throw new HttpsError('not-found', 'Resolution not found.');
@@ -7846,6 +7853,11 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
     if (resolution.status !== 'open') throw new HttpsError('failed-precondition', 'Only an open resolution may be closed.');
     const votesSnap = await tx.get(resolutionRef.collection('votes'));
     const votes = votesSnap.docs.map(snap => snap.data() || {});
+    if (requestedCloseTime) {
+      const effective = resolutionCorrections.validateEffectiveCloseTime({ requested: requestedCloseTime, nowMillis: now.toMillis(), openedAt: resolution.openedAt, votes });
+      if (!effective.ok) throw new HttpsError('failed-precondition', effective.error);
+      closedAt = admin.firestore.Timestamp.fromMillis(effective.millis);
+    }
     finalResult = resolutionModel.calculateResolutionResult({
       votingRule: resolution.votingRule,
       customApprovalCount: resolution.customApprovalCount,
@@ -7866,17 +7878,18 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
       finalizedResolutionPageConfigSnapshot,
       finalizedGeneratedPageOrderSnapshot,
       finalizedVoteRowsSnapshot: buildFinalizedVoteRows(resolution, votes, resolutionModel.normalizeUploadedVotesTableConfig(resolution.uploadedVotesTableConfig)),
-      merge: { status: 'pending', finalizationId, attemptCount: 0, lastErrorCode: '', createdAt: now, updatedAt: now },
+      merge: { status: 'pending', finalizationId, attemptCount: 0, lastErrorCode: '', createdAt: closedAt, updatedAt: now },
     } : {};
     tx.update(resolutionRef, {
       ...finalResult,
       status: finalResult.status,
       result: finalResult.result,
-      closedAt: now,
+      closedAt,
       closedByUid: actor.uid,
       closedByName: actor.name,
       closedByPosition: actor.position,
-      votingClosedAt: now,
+      votingClosedAt: closedAt,
+      ...(requestedCloseTime ? { closeTimeCorrected: true, closeActionPerformedAt: now, closeTimeCorrectionReason: closeReason } : {}),
       votingClosedBy: actor.uid,
       finalResult: finalResult.result,
       finalizedPdfLayoutMode: resolution.pdfLayoutMode === 'custom' ? 'custom' : 'standard',
@@ -7887,11 +7900,17 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
         resolutionId,
         result: finalResult.result,
         counts: finalResult,
-        closedAt: now.toMillis ? now.toMillis() : Date.now(),
+        closedAt: closedAt.toMillis ? closedAt.toMillis() : Date.now(),
       }), 'utf8').digest('hex'),
       ...uploadedFinalization,
       updatedAt: now,
     });
+    if (requestedCloseTime) {
+      setResolutionAudit(tx, resolutionRef, 'close_time_corrected', actor, now, {
+        newValue: { effectiveClosedAt: timestampToIso(closedAt) },
+        metadata: { reason: closeReason, actionPerformedAt: timestampToIso(now) },
+      });
+    }
     setResolutionAudit(tx, resolutionRef, 'voting_closed', actor, now, {
       previousValue: { status: 'open' },
       newValue: { status: finalResult.status, result: finalResult.result },
@@ -7900,6 +7919,7 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
         rejectCount: finalResult.rejectCount,
         abstainCount: finalResult.abstainCount,
         votesReceivedCount: finalResult.votesReceivedCount,
+        effectiveClosedAt: timestampToIso(closedAt),
       },
     });
     setResolutionAudit(tx, resolutionRef, 'final_result_calculated', actor, now, { newValue: { result: finalResult.result } });
@@ -7910,7 +7930,53 @@ exports.closeResolutionVoting = onCall(RESOLUTION_PDF_CALLABLE_OPTIONS, async (r
     try { merge = await resolutionUploads.processMerge(resolutionId); }
     catch (error) { merge = { ok: false, status: 'failed', code: error.code || 'merge-failed' }; }
   }
-  return { ok: true, resolutionId, ...finalResult, closedAt: timestampToIso(now), merge };
+  return { ok: true, resolutionId, ...finalResult, closedAt: timestampToIso(closedAt), merge };
+});
+
+// Corrections while voting is open: remove voters who have not voted (a duplicate
+// account, or a member who was absent) and correct the board member counts on the
+// Resolution Page. Every change is written to the audit history with its reason.
+exports.correctOpenResolution = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const actor = await getResolutionManagerContext(uid);
+  const resolutionId = validateAnnouncementDocId(request.data?.resolutionId, 'resolutionId');
+  const reason = resolutionCorrections.correctionReason(request.data?.reason);
+  if (!reason) throw new HttpsError('invalid-argument', 'Give a reason for the correction (at least 5 characters).');
+  const removeVoterUids = Array.isArray(request.data?.removeVoterUids) ? request.data.removeVoterUids.slice(0, 50) : [];
+  const resolutionRef = db.collection(RESOLUTIONS_COLLECTION).doc(resolutionId);
+  const now = resolutionTimestamp();
+  let summary = null;
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(resolutionRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Resolution not found.');
+    const resolution = snap.data() || {};
+    if (resolution.status !== 'open') throw new HttpsError('failed-precondition', 'Only an open resolution can be corrected.');
+    const votesSnap = await tx.get(resolutionRef.collection('votes'));
+    const removal = resolutionCorrections.planVoterRemoval(resolution, votesSnap.docs.map(doc => doc.id), removeVoterUids);
+    if (!removal.ok) throw new HttpsError('failed-precondition', removal.errors[0], { errors: removal.errors });
+    const details = resolutionCorrections.planDetailsCorrection(resolution, request.data || {});
+    if (!removal.removed.length && !details.changed) throw new HttpsError('invalid-argument', 'There is nothing to correct.');
+    tx.update(resolutionRef, {
+      ...removal.updates,
+      ...(details.changed ? { resolutionPageConfig: details.resolutionPageConfig } : {}),
+      updatedAt: now,
+    });
+    removal.removed.forEach(voter => {
+      setResolutionAudit(tx, resolutionRef, 'eligible_voter_removed', actor, now, {
+        previousValue: { uid: voter.uid, name: voter.name, position: voter.position },
+        metadata: { reason, eligibleVoterCount: removal.updates.eligibleVoterUids.length },
+      });
+    });
+    if (details.changed) {
+      setResolutionAudit(tx, resolutionRef, 'resolution_page_details_corrected', actor, now, {
+        previousValue: details.previous,
+        newValue: details.next,
+        metadata: { reason },
+      });
+    }
+    summary = { removed: removal.removed, eligibleVoterCount: removal.removed.length ? removal.updates.eligibleVoterUids.length : (resolution.eligibleVoterUids || []).length, details: details.changed ? details.next : null };
+  });
+  return { ok: true, resolutionId, ...summary };
 });
 
 exports.cancelResolution = onCall(CALLABLE_OPTIONS, async (request) => {
