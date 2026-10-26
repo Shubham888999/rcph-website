@@ -825,7 +825,6 @@ function finalizedGeneratedPageOrder(resolution, preview) {
 function markGeneratedPages(pages, kind) {
   pages.forEach((page) => {
     page.letterhead = "official";
-    page.pageNumber = false;
     page.generatedKind = kind;
   });
   return pages;

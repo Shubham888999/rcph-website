@@ -247,7 +247,8 @@ export function buildResolutionPdfPages(details, options = {}) {
   const generatedVoteTable = generatedPages.some((page) => page.generatedKind === "vote_table");
   const layout = getResolutionRenderLayout(details, options.preview === true);
   const primaryPages = layout.mode === "custom" ? buildCustomResolutionPdfPages(details, layout.sections) : paginateBlocks(buildDocumentBlocks(details, { includeVoteTable: !generatedVoteTable }));
-  return [...primaryPages, ...generatedPages];
+  // The standard layout is the technical record (details, certification, audit reference), so it goes last.
+  return layout.mode === "custom" ? [...primaryPages, ...generatedPages] : [...generatedPages, ...primaryPages];
 }
 
 function fontResource(line) {
