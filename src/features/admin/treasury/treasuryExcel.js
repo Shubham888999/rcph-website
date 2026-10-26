@@ -101,6 +101,35 @@ function addTable(sheet, startRow, startColumn, headers, rows, options = {}) {
   return startRow + rows.length;
 }
 
+// Bill and bank proof links, shown as clickable cells after each entry.
+function linkValue(url, label) {
+  return url ? { text: label, hyperlink: url } : "Not attached";
+}
+
+function bankProofColumnCount(rows) {
+  return Math.max(1, ...rows.map((row) => (row.bankProofs || []).length));
+}
+
+function linkHeaders(proofColumns) {
+  return ["Bill", ...Array.from({ length: proofColumns }, (_, index) => (proofColumns === 1 ? "Bank proof" : `Bank proof ${index + 1}`))];
+}
+
+function linkValues(row, proofColumns) {
+  const proofs = row.bankProofs || [];
+  return [
+    linkValue(row.billUrl, row.billFileName || "Open bill"),
+    ...Array.from({ length: proofColumns }, (_, index) => (proofs[index] ? linkValue(proofs[index].fileUrl, proofs[index].kind === "link" ? "Open link" : proofs[index].fileName || "Open proof") : (index === 0 ? "Not attached" : ""))),
+  ];
+}
+
+function styleLinkCells(row, firstColumn, count) {
+  for (let column = firstColumn; column < firstColumn + count; column += 1) {
+    const cell = row.getCell(column);
+    if (cell.value && typeof cell.value === "object" && cell.value.hyperlink) cell.font = { name: "Aptos", color: { argb: "0563C1" }, underline: true };
+    else if (cell.value) cell.font = { name: "Aptos", italic: true, color: { argb: "8A7F72" } };
+  }
+}
+
 function addDashboardSheet(workbook, report) {
   const sheet = workbook.addWorksheet("Dashboard", { views: [{ state: "frozen", ySplit: 7 }] });
   sheet.columns = [
@@ -135,14 +164,17 @@ function addDashboardSheet(workbook, report) {
 
 function addTransactionsSheet(workbook, report) {
   const sheet = workbook.addWorksheet("Transactions");
+  const proofColumns = bankProofColumnCount(report.transactions);
+  const columns = [...TREASURY_EXPORT_COLUMNS, ...linkHeaders(proofColumns)];
   sheet.columns = [
     { width: 14 }, { width: 16 }, { width: 18 }, { width: 42 }, { width: 16 }, { width: 18 },
     { width: 26 }, { width: 26 }, { width: 44 }, { width: 22 }, { width: 22 }, { width: 24 },
+    ...linkHeaders(proofColumns).map(() => ({ width: 22 })),
   ];
-  styleTitle(sheet, `${report.title} | Transactions`, `${report.transactionCount} filtered transaction${report.transactionCount === 1 ? "" : "s"} | ${report.reportPeriod}`, TREASURY_EXPORT_COLUMNS.length);
+  styleTitle(sheet, `${report.title} | Transactions`, `${report.transactionCount} filtered transaction${report.transactionCount === 1 ? "" : "s"} | ${report.reportPeriod}`, columns.length);
   addKeyValueRow(sheet, ["Treasurer", report.treasurerName, "Generated", report.generatedAtLabel, "Filters", report.filterSummary.join("; ")]);
   sheet.addRow([]);
-  const headerRow = sheet.addRow(TREASURY_EXPORT_COLUMNS);
+  const headerRow = sheet.addRow(columns);
   styleHeader(headerRow);
   const firstDataRow = headerRow.number + 1;
 
@@ -161,6 +193,7 @@ function addTransactionsSheet(workbook, report) {
         transaction.createdBy,
         transaction.createdAt || transaction.createdAtLabel,
         transaction.id,
+        ...linkValues(transaction, proofColumns),
       ]);
       if (transaction.date) row.getCell(1).numFmt = "yyyy-mm-dd";
       row.getCell(5).numFmt = TREASURY_INR_FORMAT;
@@ -171,6 +204,7 @@ function addTransactionsSheet(workbook, report) {
       });
       const typeFill = transaction.type === "Income" ? COLORS.mint : transaction.type === "Reimbursement" ? COLORS.cream : COLORS.rose;
       row.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: typeFill } };
+      styleLinkCells(row, TREASURY_EXPORT_COLUMNS.length + 1, proofColumns + 1);
     });
   } else {
     const row = sheet.addRow(["", "", "", "No matching Treasury transactions for the active filters.", 0, "", "", "", "", "", "", ""]);
@@ -191,7 +225,7 @@ function addTransactionsSheet(workbook, report) {
   sheet.views = [{ state: "frozen", ySplit: headerRow.number }];
   sheet.autoFilter = {
     from: { row: headerRow.number, column: 1 },
-    to: { row: headerRow.number, column: TREASURY_EXPORT_COLUMNS.length },
+    to: { row: headerRow.number, column: columns.length },
   };
   styleWorksheet(sheet, "Treasury transaction ledger");
 }
@@ -252,6 +286,112 @@ function addAnalysisSheet(workbook, report) {
   styleWorksheet(sheet, "Treasury chart-ready analysis");
 }
 
+function addSectionHeading(sheet, label, endColumn) {
+  sheet.addRow([]);
+  const row = sheet.addRow([label]);
+  sheet.mergeCells(row.number, 1, row.number, endColumn);
+  row.getCell(1).font = { name: "Aptos Display", size: 13, bold: true, color: { argb: COLORS.wine } };
+  row.getCell(1).border = { bottom: { style: "medium", color: { argb: COLORS.gold } } };
+  row.height = 22;
+  return row.number + 1;
+}
+
+function styleTotalRow(row, amountColumns) {
+  row.eachCell((cell, column) => {
+    cell.font = { name: "Aptos", bold: true, color: { argb: COLORS.ink } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.cream } };
+    cell.border = { top: { style: "thin", color: { argb: COLORS.gold } } };
+    if (amountColumns.includes(column)) cell.numFmt = TREASURY_INR_FORMAT;
+  });
+}
+
+function shareRows(groups, emptyLabel) {
+  return groups.length ? groups.map((group) => [group.label, group.amount, group.count, group.share]) : [[emptyLabel, 0, 0, 0]];
+}
+
+function addShareTable(sheet, heading, firstHeader, groups, emptyLabel, total) {
+  const start = addSectionHeading(sheet, heading, 6);
+  const last = addTable(sheet, start, 1, [firstHeader, "Amount", "Entries", "Share"], shareRows(groups, emptyLabel), { amountColumns: [1] });
+  for (let rowNumber = start + 1; rowNumber <= last; rowNumber += 1) sheet.getCell(rowNumber, 4).numFmt = "0.0%";
+  const totalRow = sheet.getRow(last + 1);
+  totalRow.values = ["Total", total, groups.reduce((sum, group) => sum + group.count, 0), groups.length ? 1 : 0];
+  styleTotalRow(totalRow, [2]);
+  totalRow.getCell(4).numFmt = "0.0%";
+}
+
+// Income or Expenses: the entries, then month-wise, avenue-wise and event-wise totals.
+function addFlowSheet(workbook, report, kind) {
+  const income = kind === "income";
+  const data = report.breakdown[kind];
+  const word = income ? "Income" : "Expenses";
+  const sheet = workbook.addWorksheet(word);
+  const proofColumns = bankProofColumnCount(data.rows);
+  sheet.columns = [{ width: 30 }, { width: 18 }, { width: 22 }, { width: 30 }, { width: 18 }, { width: 18 }, ...linkHeaders(proofColumns).map(() => ({ width: 22 }))];
+  styleTitle(sheet, `${report.title} | ${word}`, `${data.count} ${income ? "income" : "expense"} entr${data.count === 1 ? "y" : "ies"} | ${report.reportPeriod}${income ? "" : " | Reimbursements are counted as expenses"}`, 6);
+  sheet.addRow([]);
+  const listStart = sheet.rowCount + 1;
+  const entries = data.rows.length
+    ? data.rows.map((row) => [row.description, row.date || row.dateLabel, row.category, row.event, row.amount, row.type, ...linkValues(row, proofColumns)])
+    : [[`No ${income ? "income" : "expense"} entries for the active filters.`, "", "", "", 0, ""]];
+  const listEnd = addTable(sheet, listStart, 1, ["Entry", "Date", "Avenue", "Event", "Amount", "Type", ...linkHeaders(proofColumns)], entries, { amountColumns: [4] });
+  for (let rowNumber = listStart + 1; rowNumber <= listEnd; rowNumber += 1) {
+    if (sheet.getCell(rowNumber, 2).value instanceof Date) sheet.getCell(rowNumber, 2).numFmt = "yyyy-mm-dd";
+    styleLinkCells(sheet.getRow(rowNumber), 7, proofColumns + 1);
+  }
+  const totalRow = sheet.getRow(listEnd + 1);
+  totalRow.values = [`Total ${income ? "income" : "expenses"}`, "", "", "", { formula: `SUM(E${listStart + 1}:E${listEnd})`, result: data.total }, ""];
+  styleTotalRow(totalRow, [5]);
+  sheet.views = [{ state: "frozen", ySplit: listStart }];
+
+  addShareTable(sheet, `${word} by month`, "Month", data.byMonth, "No months", data.total);
+  addShareTable(sheet, `${word} by avenue`, "Avenue", data.byAvenue, "No avenues", data.total);
+  addShareTable(sheet, `${word} by event`, "Event", data.byEvent, "No events", data.total);
+  styleWorksheet(sheet, `Treasury ${income ? "income" : "expenses"}`);
+}
+
+// Each avenue as a block, with its events under it and the avenue total.
+function addAvenueEventSheet(workbook, report) {
+  const { avenueEvents, totals } = report.breakdown;
+  const sheet = workbook.addWorksheet("Avenue & Event");
+  sheet.columns = [{ width: 38 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 12 }];
+  styleTitle(sheet, `${report.title} | Avenue & Event`, `Income, expenses and net for each event, grouped by avenue | ${report.reportPeriod}`, 5);
+  if (!avenueEvents.length) {
+    sheet.addRow([]);
+    sheet.addRow(["No Treasury entries for the active filters."]);
+  }
+  avenueEvents.forEach((block) => {
+    const start = addSectionHeading(sheet, block.avenue, 5);
+    const last = addTable(sheet, start, 1, ["Event", "Income", "Expenses", "Net", "Entries"], block.events.map((event) => [event.name, event.income, event.expense, event.net, event.count]), { amountColumns: [1, 2, 3] });
+    const totalRow = sheet.getRow(last + 1);
+    totalRow.values = [`${block.avenue} total`, block.income, block.expense, block.net, block.count];
+    styleTotalRow(totalRow, [2, 3, 4]);
+  });
+  sheet.addRow([]);
+  const grand = sheet.addRow(["Grand total", totals.income, totals.expense, totals.net, totals.count]);
+  styleTotalRow(grand, [2, 3, 4]);
+  grand.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.gold } }; });
+  styleWorksheet(sheet, "Treasury avenue and event matrix");
+}
+
+// Avenues down the side, months across: one grid for income and one for expenses.
+function addAvenueMonthSheet(workbook, report) {
+  const { months, income, expense } = report.breakdown.avenueMonths;
+  const columns = months.length + 2;
+  const sheet = workbook.addWorksheet("Avenue by Month");
+  sheet.columns = [{ width: 26 }, ...months.map(() => ({ width: 16 })), { width: 18 }];
+  styleTitle(sheet, `${report.title} | Avenue by Month`, `Month-wise totals for each avenue | ${report.reportPeriod}`, Math.max(columns, 2));
+  [["Income", income], ["Expenses", expense]].forEach(([label, grid]) => {
+    const start = addSectionHeading(sheet, `${label} by avenue and month`, Math.max(columns, 2));
+    const rows = grid.rows.length ? grid.rows.map((line) => [line.avenue, ...line.cells, line.total]) : [[`No ${label.toLowerCase()}`, ...months.map(() => 0), 0]];
+    const amountColumns = Array.from({ length: months.length + 1 }, (_, index) => index + 1);
+    const last = addTable(sheet, start, 1, ["Avenue", ...months.map((month) => month.label), "Total"], rows, { amountColumns });
+    const totalRow = sheet.getRow(last + 1);
+    totalRow.values = ["Total", ...grid.monthTotals, grid.total];
+    styleTotalRow(totalRow, amountColumns.map((offset) => offset + 1));
+  });
+  styleWorksheet(sheet, "Treasury avenue by month");
+}
+
 export function buildTreasuryWorkbook(ExcelJS, report, generatedAt = report?.generatedAt || new Date()) {
   if (!report?.summary || !Array.isArray(report.transactions)) throw new TypeError("A Treasury export report is required.");
   const workbook = new ExcelJS.Workbook();
@@ -268,8 +408,80 @@ export function buildTreasuryWorkbook(ExcelJS, report, generatedAt = report?.gen
 
   addDashboardSheet(workbook, report);
   addTransactionsSheet(workbook, report);
+  if (report.breakdown) {
+    addFlowSheet(workbook, report, "income");
+    addFlowSheet(workbook, report, "expense");
+    addAvenueEventSheet(workbook, report);
+    addAvenueMonthSheet(workbook, report);
+  }
   addAnalysisSheet(workbook, report);
   return workbook;
+}
+
+// Month-wise ledger: one sheet per chosen month, then an "All months" sheet with every entry.
+const LEDGER_BASE_HEADERS = ["Date", "Entry", "Type", "Avenue", "Event", "Party", "Payment mode", "Receipts", "Payments"];
+
+function addLedgerSheet(workbook, model, name, title, rows, totals) {
+  const proofColumns = bankProofColumnCount(rows);
+  const headers = [...LEDGER_BASE_HEADERS, ...linkHeaders(proofColumns)];
+  const sheet = workbook.addWorksheet(name.slice(0, 31));
+  sheet.columns = [{ width: 13 }, { width: 36 }, { width: 15 }, { width: 20 }, { width: 26 }, { width: 26 }, { width: 15 }, { width: 16 }, { width: 16 }, ...linkHeaders(proofColumns).map(() => ({ width: 22 }))];
+  styleTitle(sheet, `${model.title} | ${title}`, `${model.clubName} | Treasurer: ${model.treasurerName} | ${totals.count} entr${totals.count === 1 ? "y" : "ies"} | Generated ${model.generatedAtLabel}`, headers.length);
+  sheet.addRow([]);
+  const start = sheet.rowCount + 1;
+  const values = rows.length
+    ? rows.map((row) => [row.date || row.dateLabel, row.description, row.type, row.category, row.event, row.type === "Income" ? row.source : row.destination, row.paymentMethod, row.type === "Income" ? row.amount : null, row.type === "Income" ? null : row.amount, ...linkValues(row, proofColumns)])
+    : [["", "No entries in this period.", "", "", "", "", "", 0, 0]];
+  const last = addTable(sheet, start, 1, headers, values, { amountColumns: [7, 8] });
+  for (let rowNumber = start + 1; rowNumber <= last; rowNumber += 1) {
+    if (sheet.getCell(rowNumber, 1).value instanceof Date) sheet.getCell(rowNumber, 1).numFmt = "yyyy-mm-dd";
+    styleLinkCells(sheet.getRow(rowNumber), LEDGER_BASE_HEADERS.length + 1, proofColumns + 1);
+  }
+  const totalRow = sheet.getRow(last + 1);
+  totalRow.values = ["", "Total", "", "", "", "", "", { formula: `SUM(H${start + 1}:H${last})`, result: totals.receipts }, { formula: `SUM(I${start + 1}:I${last})`, result: totals.payments }];
+  styleTotalRow(totalRow, [8, 9]);
+  const netRow = sheet.getRow(last + 2);
+  netRow.values = ["", "Net (receipts minus payments)", "", "", "", "", "", { formula: `H${last + 1}-I${last + 1}`, result: totals.net }];
+  styleTotalRow(netRow, [8]);
+  sheet.views = [{ state: "frozen", ySplit: start }];
+  sheet.autoFilter = { from: { row: start, column: 1 }, to: { row: start, column: headers.length } };
+  styleWorksheet(sheet, `Treasury ledger | ${title}`);
+  return sheet;
+}
+
+export function buildTreasuryMonthLedgerWorkbook(ExcelJS, model) {
+  if (!Array.isArray(model?.months) || !model.months.length) throw new TypeError("Choose at least one month.");
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Rotaract Club of Pune Heritage";
+  workbook.company = "Rotaract Club of Pune Heritage";
+  workbook.title = `${model.title} | Monthly Ledger`;
+  workbook.created = model.generatedAt;
+  workbook.modified = model.generatedAt;
+  workbook.calcProperties.fullCalcOnLoad = true;
+  model.months.forEach((month) => addLedgerSheet(workbook, model, month.label, month.label, month.rows, month));
+  const all = addLedgerSheet(workbook, model, "All months", `All months | ${model.periodLabel}`, model.rows, model.totals);
+  if (model.months.length > 1) {
+    const start = all.rowCount + 2;
+    const last = addTable(all, start, 1, ["Month", "Entries", "Receipts", "Payments", "Net"], model.months.map((month) => [month.label, month.count, month.receipts, month.payments, month.net]), { amountColumns: [2, 3, 4] });
+    const totalRow = all.getRow(last + 1);
+    totalRow.values = ["Total", model.totals.count, model.totals.receipts, model.totals.payments, model.totals.net];
+    styleTotalRow(totalRow, [3, 4, 5]);
+  }
+  return workbook;
+}
+
+export async function downloadTreasuryMonthLedger(model) {
+  const imported = await import("exceljs");
+  const ExcelJS = imported.default || imported;
+  const buffer = await buildTreasuryMonthLedgerWorkbook(ExcelJS, model).xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = model.fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function treasuryExcelFileName(report) {

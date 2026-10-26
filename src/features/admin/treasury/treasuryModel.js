@@ -59,7 +59,79 @@ export function createEmptyTreasuryDraft(defaults = {}) {
     reimbursedTo: "",
     reimbursementDate: "",
     billUrl: "",
+    eventSelection: "",
+    eventId: "",
+    eventSource: "",
+    eventName: "",
+    eventDate: "",
   };
+}
+
+// Optional link from a Treasury entry to a club event, BOD meeting or district event,
+// used by the event-wise reports. Entries without one are reported as not linked.
+export const TREASURY_NO_EVENT_LABEL = "Not linked to an event";
+
+export function treasuryEventSelectionValue(record = {}) {
+  const source = text(record.eventSource, 40);
+  const id = text(record.eventId, 128);
+  return source && id ? `${source}:${id}` : "";
+}
+
+export function applyTreasuryEvent(draft = {}, option = null) {
+  if (!option?.id || !option?.name) return { ...draft, eventSelection: "", eventId: "", eventSource: "", eventName: "", eventDate: "" };
+  return {
+    ...draft,
+    eventSelection: option.value || `${option.source}:${option.id}`,
+    eventId: text(option.id, 128),
+    eventSource: text(option.source, 40),
+    eventName: text(option.name, 180),
+    eventDate: validDate(text(option.date, 20)) ? text(option.date, 20) : "",
+  };
+}
+
+// Bank proofs: any number of files or links (up to the limit) kept on the entry, beside its bill.
+export const TREASURY_MAX_BANK_PROOFS = 10;
+
+function httpsUrl(value) {
+  try {
+    const url = new URL(text(value, 1000));
+    return url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+export function normalizeTreasuryBankProofs(record = {}) {
+  return (Array.isArray(record.bankProofs) ? record.bankProofs : [])
+    .map((item) => ({
+      id: text(item?.id, 80),
+      fileUrl: httpsUrl(item?.fileUrl),
+      fileName: text(item?.fileName, 180),
+      mimeType: text(item?.mimeType, 100),
+      sizeBytes: Number.isSafeInteger(item?.sizeBytes) ? item.sizeBytes : 0,
+      driveFileId: text(item?.driveFileId, 180),
+      kind: item?.kind === "link" ? "link" : "upload",
+      addedAt: text(item?.addedAt, 40),
+      addedBy: text(item?.addedBy, 180),
+    }))
+    .filter((item) => item.id && item.fileUrl)
+    .slice(0, TREASURY_MAX_BANK_PROOFS);
+}
+
+// From an uploaded file's metadata (the bill upload response) or a pasted https link.
+export function createTreasuryBankProof({ upload = null, link = "", id, addedAt, addedBy = "" } = {}) {
+  if (upload) {
+    const fileUrl = httpsUrl(upload.billUrl);
+    if (!fileUrl) return null;
+    return { id, fileUrl, fileName: text(upload.billFileName, 180) || "Bank proof", mimeType: text(upload.billMimeType, 100), sizeBytes: Number.isSafeInteger(upload.billSizeBytes) ? upload.billSizeBytes : 0, driveFileId: text(upload.billDriveFileId, 180), kind: "upload", addedAt, addedBy: text(addedBy, 180) };
+  }
+  const fileUrl = httpsUrl(link);
+  if (!fileUrl) return null;
+  return { id, fileUrl, fileName: "Bank proof link", mimeType: "", sizeBytes: 0, driveFileId: "", kind: "link", addedAt, addedBy: text(addedBy, 180) };
+}
+
+export function treasuryEventLabel(record = {}) {
+  return text(record.eventName, 180) || TREASURY_NO_EVENT_LABEL;
 }
 
 export function clubDuesPayerForDescription(value) {
@@ -434,6 +506,7 @@ export function prepareTreasuryDraft(record = {}, defaults = {}) {
     type: storedTypeForWorkflow(workflowType),
     amount: record.amount === undefined || record.amount === null ? "" : String(record.amount),
     reimbursementStatus: normalizeReimbursementStatus(record.reimbursementStatus),
+    eventSelection: treasuryEventSelectionValue(record),
   };
 }
 
@@ -578,7 +651,17 @@ export function buildTreasuryPayload(source = {}) {
     reimbursedTo,
     reimbursementDate,
     billUrl: source.billUrl ? safeUrl(source.billUrl) : "",
+    ...treasuryEventPayload(source),
   };
+}
+
+// Saved as a set: an entry is linked to one event, or the four fields are cleared.
+function treasuryEventPayload(source = {}) {
+  const eventId = text(source.eventId, 128);
+  const eventSource = text(source.eventSource, 40);
+  const eventName = text(source.eventName, 180);
+  if (!eventId || !eventSource || !eventName) return { eventId: "", eventSource: "", eventName: "", eventDate: "" };
+  return { eventId, eventSource, eventName, eventDate: validDate(text(source.eventDate, 20)) ? text(source.eventDate, 20) : "" };
 }
 
 export function validateClubDuesDraft(row = {}) {

@@ -15,8 +15,8 @@ import { fineHasProof, fineProofTargetFromFine, fineProofTargetFromTreasury, isF
 import useAdminMutation from "../shared/useAdminMutation";
 import TreasuryAttachments from "../treasury/TreasuryAttachments";
 import TreasuryFileField from "../treasury/TreasuryFileField";
-import { buildTreasuryExportReport } from "../treasury/treasuryExportModel";
-import { downloadTreasuryWorkbook } from "../treasury/treasuryExcel";
+import { buildTreasuryExportReport, buildTreasuryMonthLedgerModel } from "../treasury/treasuryExportModel";
+import { downloadTreasuryMonthLedger, downloadTreasuryWorkbook } from "../treasury/treasuryExcel";
 import {
   buildTreasuryBalanceSheetModel,
   downloadTreasuryBalanceSheet,
@@ -35,6 +35,10 @@ import {
   TREASURY_REIMBURSEMENT_STATUSES,
   TREASURY_WORKFLOW_TYPES,
   addClubDuesRow,
+  applyTreasuryEvent,
+  createTreasuryBankProof,
+  normalizeTreasuryBankProofs,
+  TREASURY_MAX_BANK_PROOFS,
   applyTreasuryWorkflow,
   buildClubDuesImportPayloads,
   buildClubDuesPayloads,
@@ -50,6 +54,7 @@ import {
   resolveTreasuryPeriod,
   treasuryLedgerDate,
   treasurySpentDate,
+  treasuryEventLabel,
   getTreasuryAvenueOptions,
   getTreasuryFieldPlan,
   getTreasuryMonthOptions,
@@ -360,7 +365,8 @@ async function parseClubDuesImportFile(file) {
   return { rows: [], skippedRows: [], totalRows: 0, errors: ["Upload a Google Form CSV or .xlsx export."] };
 }
 
-export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
+export function TreasuryModule({ transactions, members, events = [], bodMeetings = [], districtEvents = [], lock, uid, onNotice }) {
+  const eventGroups = useMemo(() => buildFineEventGroups({ events, bodMeetings, districtEvents }), [events, bodMeetings, districtEvents]);
   const [lastDefaults, setLastDefaults] = useState({ avenue: "", paymentMode: "" });
   const [draft, setDraft] = useState(() => createEmptyTreasuryDraft());
   const [draftErrors, setDraftErrors] = useState({});
@@ -389,6 +395,7 @@ export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
   const [exporting, setExporting] = useState("");
   const [balanceSheetDraft, setBalanceSheetDraft] = useState(null);
   const [expenseSheetDraft, setExpenseSheetDraft] = useState(null);
+  const [monthLedgerMonths, setMonthLedgerMonths] = useState(null);
   const { busy, run } = useAdminMutation({ uid, module: "treasury", onNotice });
   const locked = lock.status !== "success" || lock.locked;
   const summary = useMemo(() => buildTreasuryPeriodSummary(transactions, filters), [transactions, filters]);
@@ -839,6 +846,43 @@ function validBalanceSheetAmount(value) {
   return Number.isFinite(amount) && amount >= 0;
 }
 
+// Month-wise ledger: one sheet per chosen month plus an "All months" sheet, with bill and bank proof links.
+const monthLedgerOptions = useMemo(() => getTreasuryMonthOptions(transactions), [transactions]);
+
+function openMonthLedgerExport() {
+  if (!monthLedgerOptions.length) {
+    reportValidation("Add at least one dated entry before exporting a month-wise ledger.");
+    return;
+  }
+  setMonthLedgerMonths([monthLedgerOptions[0].value]);
+}
+
+async function exportMonthLedger() {
+  if (!monthLedgerMonths || exporting) return;
+  if (!monthLedgerMonths.length) {
+    reportValidation("Choose at least one month.");
+    return;
+  }
+  setExporting("month-ledger");
+  try {
+    const model = buildTreasuryMonthLedgerModel({ transactions, months: monthLedgerMonths, members });
+    await downloadTreasuryMonthLedger(model);
+    setMonthLedgerMonths(null);
+    onNotice?.({ type: "success", message: `Month-wise ledger downloaded (${model.months.length} ${model.months.length === 1 ? "month" : "months"}, ${model.totals.count} entries).` });
+  } catch (error) {
+    if (import.meta.env.DEV) console.error("Month-wise ledger export failed.", error);
+    onNotice?.({ type: "error", message: "The month-wise ledger could not be generated. Please try again." });
+  } finally {
+    setExporting("");
+  }
+}
+
+// Bank proofs are saved on the entry straight away, separately from editing it.
+async function saveBankProofs(record, bankProofs, message) {
+  const saved = await run("update-bank-proofs", async () => { await updateTreasury(record.id, { bankProofs }); return true; }, message);
+  return saved === true;
+}
+
 // Expense sheet: month-wise tabs plus a grand total, expenses on the day they were paid.
 const expenseSheetOptions = useMemo(() => expenseSheetMonthOptions(transactions), [transactions]);
 
@@ -1056,6 +1100,7 @@ async function exportBalanceSheet() {
               setUpload={setDraftUpload}
               onRetry={saveDraft}
               errors={draftErrors}
+              eventGroups={eventGroups}
               mode="create"
               onClear={() => resetDraft()}
             />
@@ -1091,6 +1136,7 @@ async function exportBalanceSheet() {
   onExportPdf={() => exportTreasury("pdf")}
   onExportBalanceSheet={openBalanceSheetExport}
   onExportExpenseSheet={openExpenseSheetExport}
+  onExportMonthLedger={openMonthLedgerExport}
   detailPanel={selected ? (
     <TreasuryDetailPanel
       record={selected}
@@ -1100,9 +1146,51 @@ async function exportBalanceSheet() {
       onEdit={startEdit}
       onDelete={setTarget}
       onManageProof={(item) => setFineProofTarget(fineProofTargetFromTreasury(item))}
+      onSaveBankProofs={saveBankProofs}
+      uid={uid}
     />
   ) : null}
 />
+{monthLedgerMonths ? (
+  <AdminDialog
+    title="Export month-wise ledger"
+    busy={exporting === "month-ledger"}
+    onClose={() => {
+      if (!exporting) setMonthLedgerMonths(null);
+    }}
+  >
+    <div className="treasury-balance-sheet-dialog treasury-month-ledger-dialog">
+      <p>
+        One sheet for each month you choose, then an All months sheet with every entry.
+        Each entry shows its bill and bank proof links when they are attached.
+        Filters on the page do not apply to this export.
+      </p>
+      <div className="treasury-month-ledger-dialog__actions">
+        <button type="button" onClick={() => setMonthLedgerMonths(monthLedgerOptions.map((month) => month.value))} disabled={Boolean(exporting)}>Select all months</button>
+        <button type="button" onClick={() => setMonthLedgerMonths([])} disabled={Boolean(exporting) || !monthLedgerMonths.length}>Clear</button>
+      </div>
+      <fieldset className="treasury-month-ledger-dialog__months" disabled={Boolean(exporting)}>
+        <legend>Months</legend>
+        {monthLedgerOptions.map((month) => (
+          <label key={month.value}>
+            <input
+              type="checkbox"
+              checked={monthLedgerMonths.includes(month.value)}
+              onChange={(event) => setMonthLedgerMonths((current) => (event.target.checked ? [...current, month.value] : current.filter((value) => value !== month.value)))}
+            />
+            {month.label}
+          </label>
+        ))}
+      </fieldset>
+      <div className="admin-actions">
+        <button type="button" onClick={exportMonthLedger} disabled={Boolean(exporting) || !monthLedgerMonths.length}>
+          {exporting === "month-ledger" ? "Generating ledger..." : `Export ${monthLedgerMonths.length} ${monthLedgerMonths.length === 1 ? "month" : "months"}`}
+        </button>
+        <button type="button" onClick={() => setMonthLedgerMonths(null)} disabled={Boolean(exporting)}>Cancel</button>
+      </div>
+    </div>
+  </AdminDialog>
+) : null}
 {expenseSheetDraft ? (
   <AdminDialog
     title="Export Expense Sheet"
@@ -1326,6 +1414,7 @@ async function exportBalanceSheet() {
               setUpload={setEditUpload}
               onRetry={saveEdit}
               errors={editErrors}
+              eventGroups={eventGroups}
               mode="edit"
               existingRecord={editing}
               onCancel={() => {
@@ -1445,7 +1534,7 @@ function TreasuryFormSection({ label, title, children }) {
   );
 }
 
-function TreasuryForm({ formId, value, setValue, members, onSubmit, busy, upload, setUpload, onRetry, errors, mode, existingRecord, onClear, onCancel }) {
+function TreasuryForm({ formId, value, setValue, members, onSubmit, busy, upload, setUpload, onRetry, errors, eventGroups = [], mode, existingRecord, onClear, onCancel }) {
   const plan = getTreasuryFieldPlan(value);
   const uploadWorking = isTreasuryUploadWorking(upload);
   const disabled = busy || uploadWorking;
@@ -1530,6 +1619,20 @@ function TreasuryForm({ formId, value, setValue, members, onSubmit, busy, upload
           <select value={value.avenue} onChange={set("avenue")}>
             <option value="">Choose avenue</option>
             {getTreasuryAvenueOptions([]).map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+        <label>
+          <FieldLabel label="Event" optional />
+          <select value={value.eventSelection || ""} onChange={(event) => setValue(applyTreasuryEvent(value, findFineEventOption(eventGroups, event.target.value)))}>
+            <option value="">Not linked to an event</option>
+            {value.eventSelection && value.eventName && !findFineEventOption(eventGroups, value.eventSelection) ? (
+              <option value={value.eventSelection}>{value.eventName}{value.eventDate ? ` (${formatTreasuryDate(value.eventDate)})` : ""}</option>
+            ) : null}
+            {eventGroups.map((group) => (
+              <optgroup key={group.key} label={group.label}>
+                {group.options.map((option) => <option key={option.value} value={option.value}>{option.name} ({formatTreasuryDate(option.date)})</option>)}
+              </optgroup>
+            ))}
           </select>
         </label>
         {plan.show.paidBy ? (
@@ -1936,10 +2039,10 @@ function TreasuryReviewPanel({ value, upload, errors, compact = false }) {
 
 const TREASURY_LEDGER_COLUMNS = 10;
 
-function TreasuryExportMenu({ exporting, onExportExcel, onExportPdf, onExportBalanceSheet, onExportExpenseSheet }) {
+function TreasuryExportMenu({ exporting, onExportExcel, onExportPdf, onExportBalanceSheet, onExportExpenseSheet, onExportMonthLedger }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const labels = { excel: "Generating Excel...", pdf: "Generating PDF...", "balance-sheet": "Generating Balance Sheet...", "expense-sheet": "Generating Expense Sheet..." };
+  const labels = { excel: "Generating Excel...", pdf: "Generating PDF...", "balance-sheet": "Generating Balance Sheet...", "expense-sheet": "Generating Expense Sheet...", "month-ledger": "Generating ledger..." };
 
   useEffect(() => {
     if (!open) return undefined;
@@ -1962,6 +2065,7 @@ function TreasuryExportMenu({ exporting, onExportExcel, onExportPdf, onExportBal
     ["Export PDF", onExportPdf],
     ["Export Balance Sheet", onExportBalanceSheet],
     ["Export Expense Sheet", onExportExpenseSheet],
+    ["Export month-wise ledger", onExportMonthLedger],
   ];
   return (
     <div className="treasury-export-menu" ref={ref}>
@@ -2000,6 +2104,7 @@ function TreasuryHistory({
   onExportPdf,
   onExportBalanceSheet,
   onExportExpenseSheet,
+  onExportMonthLedger,
   detailPanel,
 }) {
     const [activeMobileMenuId, setActiveMobileMenuId] = useState("");
@@ -2051,6 +2156,7 @@ function TreasuryHistory({
             onExportPdf={onExportPdf}
             onExportBalanceSheet={onExportBalanceSheet}
             onExportExpenseSheet={onExportExpenseSheet}
+            onExportMonthLedger={onExportMonthLedger}
           />
         )}
       />
@@ -2274,7 +2380,84 @@ function TreasuryTableRow({ item, balance, selected, locked, onSelect, onDetails
 
 // Desktop: the selected row's details in a side sheet over the right edge of the
 // ledger. The ledger stays usable; clicking another row switches the sheet.
-function TreasuryDetailPanel({ record, balance, locked, onClose, onEdit, onDelete, onManageProof }) {
+function newBankProofId() {
+  return `bp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Bank proofs on an entry: upload one or more files, or paste a link. Saved straight away.
+function TreasuryBankProofs({ record, locked, onSave, uid }) {
+  const proofs = normalizeTreasuryBankProofs(record);
+  const [link, setLink] = useState("");
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const inputRef = useRef(null);
+  const room = TREASURY_MAX_BANK_PROOFS - proofs.length;
+
+  async function addFiles(fileList) {
+    const files = [...(fileList || [])].slice(0, room);
+    if (!files.length) return;
+    const bad = files.map((file) => validateTreasuryUploadFile(file)).find(Boolean);
+    if (bad) {
+      setError(bad);
+      return;
+    }
+    setError("");
+    const added = [];
+    try {
+      for (const [index, file] of files.entries()) {
+        setStatus(`Uploading ${index + 1} of ${files.length}...`);
+        const upload = await uploadTreasuryBill(file, { ...record, purpose: record.purpose || record.title || "Bank proof" }, record.id, () => {});
+        const proof = createTreasuryBankProof({ upload, id: newBankProofId(), addedAt: new Date().toISOString(), addedBy: uid });
+        if (proof) added.push(proof);
+      }
+    } catch (uploadError) {
+      setError(getSafeTreasuryUploadError(uploadError));
+    }
+    setStatus("");
+    if (added.length) await onSave(record, [...proofs, ...added], `${added.length} bank proof${added.length === 1 ? "" : "s"} added.`);
+  }
+
+  async function addLink(event) {
+    event.preventDefault();
+    const proof = createTreasuryBankProof({ link, id: newBankProofId(), addedAt: new Date().toISOString(), addedBy: uid });
+    if (!proof) {
+      setError("Paste a full https:// link, for example a Google Drive link.");
+      return;
+    }
+    setError("");
+    const saved = await onSave(record, [...proofs, proof], "Bank proof link added.");
+    if (saved) setLink("");
+  }
+
+  return (
+    <section className="treasury-bank-proofs" aria-labelledby={`treasury-bank-proofs-${record.id}`}>
+      <h3 id={`treasury-bank-proofs-${record.id}`}>Bank proof <span>{proofs.length ? `${proofs.length}` : "None"}</span></h3>
+      {proofs.length ? (
+        <ul>
+          {proofs.map((proof) => (
+            <li key={proof.id}>
+              <a href={proof.fileUrl} target="_blank" rel="noopener noreferrer">{proof.kind === "link" ? "Bank proof link" : proof.fileName}</a>
+              {!locked ? <button type="button" onClick={() => onSave(record, proofs.filter((item) => item.id !== proof.id), "Bank proof removed from this entry.")}>Remove</button> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {!locked && room > 0 ? (
+        <div className="treasury-bank-proofs__add">
+          <button type="button" disabled={Boolean(status)} onClick={() => inputRef.current?.click()}>{status || "Upload file(s)"}</button>
+          <input ref={inputRef} type="file" multiple hidden accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} />
+          <form onSubmit={addLink}>
+            <input type="url" value={link} placeholder="or paste a link" onChange={(event) => setLink(event.target.value)} aria-label="Bank proof link" />
+            <button type="submit" disabled={!link.trim() || Boolean(status)}>Add link</button>
+          </form>
+        </div>
+      ) : null}
+      {error ? <p className="treasury-bank-proofs__error" role="alert">{error}</p> : null}
+    </section>
+  );
+}
+
+function TreasuryDetailPanel({ record, balance, locked, onClose, onEdit, onDelete, onManageProof, onSaveBankProofs, uid }) {
   useEffect(() => {
     function closeOnEscape(event) {
       if (event.key === "Escape" && !document.querySelector(".admin-dialog-backdrop")) onClose();
@@ -2291,6 +2474,7 @@ function TreasuryDetailPanel({ record, balance, locked, onClose, onEdit, onDelet
     ...(treasurySpentDate(record) ? [["Repaid on", `${formatTreasuryDate(treasuryLedgerDate(record))} (bank date)`]] : []),
     ["Party", transactionPartyLabel(record)],
     ["Avenue", normalizeTreasuryAvenue(record.avenue) || "Not recorded"],
+    ["Event", treasuryEventLabel(record)],
     ["Payment mode", record.paymentMode || "Not recorded"],
     ["Reference", record.referenceNumber || "Not recorded"],
     ["Purpose", record.purpose || "Not recorded"],
@@ -2317,6 +2501,7 @@ function TreasuryDetailPanel({ record, balance, locked, onClose, onEdit, onDelet
         ))}
       </dl>
       <TreasuryAttachments record={record} />
+      <TreasuryBankProofs record={record} locked={locked || isFineLinkedTreasury(record)} onSave={onSaveBankProofs} uid={uid} />
       <div className="treasury-detail-panel__actions">
         {fine ? (
           <button type="button" onClick={() => onManageProof(record)}>Manage screenshot</button>
@@ -2386,6 +2571,7 @@ function TreasuryDetails({ record }) {
     [treasurySpentDate(record) ? "Expense date" : "Date", formatTreasuryDate(record.date)],
     ["Party", transactionPartyLabel(record)],
     ["Avenue", normalizeTreasuryAvenue(record.avenue) || "Not recorded"],
+    ["Event", treasuryEventLabel(record)],
     ["Purpose / notes", record.purpose || "Not recorded"],
     ["Payment mode", record.paymentMode || "Not recorded"],
     ["Payment reference", record.referenceNumber || "Not recorded"],

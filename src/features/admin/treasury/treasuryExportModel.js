@@ -2,7 +2,9 @@ import { formatInr, text, timestampIso, validDate } from "../shared/adminModel.j
 import { POSITION_CATALOG } from "../shared/positionCatalog.js";
 import {
   DEFAULT_TREASURY_FILTERS,
+  TREASURY_NO_EVENT_LABEL,
   filterAndSortTreasury,
+  normalizeTreasuryBankProofs,
   resolveTreasuryPeriod,
   formatTreasuryDate,
   formatTreasuryMonth,
@@ -13,6 +15,7 @@ import {
   treasurySpentDate,
 } from "./treasuryModel.js";
 import { formatRotaractorName } from "../../../utils/memberName.js";
+import { buildTreasuryBreakdown } from "./treasuryBreakdownModel.js";
 
 export const TREASURY_EXPORT_TITLE = "Financial Records";
 export const TREASURY_EXPORT_CLUB_NAME = "Rotaract Club of Pune Heritage";
@@ -212,6 +215,10 @@ function exportRow(record = {}, index = 0) {
     dateLabel: validDate(dateValue) ? formatTreasuryDate(dateValue) : "No date",
     type: typeLabel,
     category: normalizeTreasuryAvenue(record.avenue) || "Uncategorized",
+    event: text(record.eventName, 180) || TREASURY_NO_EVENT_LABEL,
+    billUrl: text(record.billUrl, 1000),
+    billFileName: text(record.billFileName, 180),
+    bankProofs: normalizeTreasuryBankProofs(record),
     description: descriptionFor(record),
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
     paymentMethod: text(record.paymentMode, 80) || "Not recorded",
@@ -372,6 +379,7 @@ export function buildTreasuryExportReport({
     monthlySummary,
     incomeCategories,
     expenseCategories,
+    breakdown: buildTreasuryBreakdown(rows),
     chartTables: {
       monthlySummary,
       incomeCategories,
@@ -382,5 +390,37 @@ export function buildTreasuryExportReport({
         { label: "Net Balance", amount: summary.net },
       ],
     },
+  };
+}
+
+// Month-wise ledger: every entry in the chosen months, oldest first, grouped by month,
+// with receipts, payments and totals. Filters on the page do not apply here.
+export function buildTreasuryMonthLedgerModel({ transactions = [], months = [], members = [], generatedAt = new Date() } = {}) {
+  const selected = [...new Set((Array.isArray(months) ? months : []).filter((value) => /^\d{4}-\d{2}$/.test(value)))].sort();
+  if (!selected.length) throw new Error("Choose at least one month.");
+  const rows = (Array.isArray(transactions) ? transactions : [])
+    .filter((record) => selected.includes(treasuryLedgerDate(record).slice(0, 7)))
+    .sort((left, right) => treasuryLedgerDate(left).localeCompare(treasuryLedgerDate(right)) || String(left.id).localeCompare(String(right.id)))
+    .map((record, index) => ({ ...exportRow(record, index), month: treasuryLedgerDate(record).slice(0, 7) }));
+  const totalsOf = (list) => {
+    const receipts = list.filter((row) => row.type === "Income").reduce((sum, row) => sum + row.amount, 0);
+    const payments = list.filter((row) => row.type !== "Income").reduce((sum, row) => sum + row.amount, 0);
+    return { receipts, payments, net: receipts - payments, count: list.length };
+  };
+  const generatedDate = generatedAt instanceof Date && !Number.isNaN(generatedAt.getTime()) ? generatedAt : new Date();
+  return {
+    title: TREASURY_EXPORT_TITLE,
+    clubName: TREASURY_EXPORT_CLUB_NAME,
+    treasurerName: resolveTreasurerName(members),
+    generatedAt: generatedDate,
+    generatedAtLabel: formatGeneratedTimestamp(generatedDate),
+    months: selected.map((value) => {
+      const monthRows = rows.filter((row) => row.month === value);
+      return { value, label: formatTreasuryMonth(value), rows: monthRows, ...totalsOf(monthRows) };
+    }),
+    rows,
+    totals: totalsOf(rows),
+    periodLabel: selected.length === 1 ? formatTreasuryMonth(selected[0]) : `${formatTreasuryMonth(selected[0])} to ${formatTreasuryMonth(selected.at(-1))}`,
+    fileName: `RCPH-Treasury-Monthly-Ledger-${selected.length === 1 ? selected[0] : `${selected[0]}-to-${selected.at(-1)}`}.xlsx`,
   };
 }
