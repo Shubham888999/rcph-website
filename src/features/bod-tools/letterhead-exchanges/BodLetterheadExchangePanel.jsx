@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import LetterheadExchangeForm from "./LetterheadExchangeForm";
 import LetterheadExchangeHistory from "./LetterheadExchangeHistory";
 import LetterheadExchangeManageDialog from "./LetterheadExchangeManageDialog";
+import OutwardLettersPanel from "../outward-letters/OutwardLettersPanel";
 import {
   fetchLetterheadExchangeFormOptions,
   getSafeLetterheadExchangeError,
@@ -12,6 +13,7 @@ export default function BodLetterheadExchangePanel() {
   const [optionsState, setOptionsState] = useState({ status: "idle", members: [], events: [], error: "" });
   const [historyState, setHistoryState] = useState({ status: "idle", exchanges: [], error: "" });
   const [managingId, setManagingId] = useState("");
+  const [tab, setTab] = useState("log");
   const versionRef = useRef(0);
 
   const loadOptions = useCallback(async () => {
@@ -80,18 +82,25 @@ export default function BodLetterheadExchangePanel() {
         <span>Backend authorized</span>
       </div>
 
-      {optionsState.status === "loading" ? <p className="letterhead-muted">Loading members and conducted events...</p> : null}
-      {optionsState.status === "error" ? (
+      <div className="bod-letterhead-exchanges__tabs" role="group" aria-label="Letterhead tools">
+        <button type="button" aria-pressed={tab === "log"} onClick={() => setTab("log")}>Exchange log</button>
+        <button type="button" aria-pressed={tab === "send"} onClick={() => setTab("send")}>Send letterheads</button>
+      </div>
+
+      {tab === "send" ? <OutwardLettersPanel /> : null}
+
+      {tab === "log" && optionsState.status === "loading" ? <p className="letterhead-muted">Loading members and conducted events...</p> : null}
+      {tab === "log" && optionsState.status === "error" ? (
         <div className="letterhead-inline-error" role="alert">
           <p>{optionsState.error}</p>
           <button type="button" onClick={loadOptions}>Retry options</button>
         </div>
       ) : null}
-      {optionsState.status === "success" && !optionsState.members.length ? (
+      {tab === "log" && optionsState.status === "success" && !optionsState.members.length ? (
         <p className="letterhead-muted">No eligible RCPH representatives are available right now.</p>
       ) : null}
 
-      <div className="bod-letterhead-exchanges__layout">
+      {tab === "log" ? <div className="bod-letterhead-exchanges__layout">
         <LetterheadExchangeForm
           members={optionsState.members}
           events={optionsState.events}
@@ -105,7 +114,7 @@ export default function BodLetterheadExchangePanel() {
           onRetry={loadHistory}
           onManage={(exchange) => setManagingId(exchange.id)}
         />
-      </div>
+      </div> : null}
 
       {managedExchange ? (
         <LetterheadExchangeManageDialog
