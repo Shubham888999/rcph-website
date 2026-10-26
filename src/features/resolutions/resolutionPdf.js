@@ -44,7 +44,7 @@ function plainPdfText(value) {
 }
 
 // Fonts use WinAnsiEncoding, where the bullet is byte 0x95 (octal 225).
-function pdfText(value) {
+export function pdfText(value) {
   return plainPdfText(value).replace(/[\\()]/g, (character) => `\\${character}`).replace(/\u2022/g, "\\225");
 }
 
@@ -268,7 +268,7 @@ function textCommand(line) {
   return `${text}\n${line.x.toFixed(1)} ${(line.y - 1.5).toFixed(1)} m ${(line.x + line.width).toFixed(1)} ${(line.y - 1.5).toFixed(1)} l S`;
 }
 
-function ascii(value) {
+export function ascii(value) {
   return encoder.encode(value);
 }
 
@@ -280,7 +280,7 @@ function joinBytes(parts) {
   return output;
 }
 
-function imageObject(letterhead) {
+export function imageObject(letterhead) {
   return joinBytes([
     ascii(`<< /Type /XObject /Subtype /Image /Width ${letterhead.width} /Height ${letterhead.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${letterhead.bytes.length} >>\nstream\n`),
     letterhead.bytes,
@@ -288,12 +288,12 @@ function imageObject(letterhead) {
   ]);
 }
 
-function streamObject(bytes) {
+export function streamObject(bytes) {
   return joinBytes([ascii(`<< /Length ${bytes.length} >>\nstream\n`), bytes, ascii("\nendstream")]);
 }
 
 // Poppins as a simple TrueType font: font dictionary, descriptor and the embedded font file.
-function poppinsFontObjects(key, bytes, fontId) {
+export function poppinsFontObjects(key, bytes, fontId) {
   const variant = POPPINS_VARIANTS[key];
   const metrics = POPPINS_METRICS[key];
   const flags = 32 + (metrics.italicAngle ? 64 : 0);
@@ -304,7 +304,7 @@ function poppinsFontObjects(key, bytes, fontId) {
   ];
 }
 
-function assemblePdf(objects) {
+export function assemblePdf(objects) {
   const chunks = [ascii("%PDF-1.4\n%RCPH-BINARY\n")];
   const offsets = [0];
   let length = chunks[0].length;
