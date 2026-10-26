@@ -156,6 +156,7 @@ async function uploadVia(env, uid, positionKey, documentCategory = '', clientFil
     driveFileId: driveFile.driveFileId,
     driveFolderId: folder.targetFolderId,
     positionFolderId: folder.positionFolderId,
+    ...(folder.categoryParentFolderId ? { categoryParentFolderId: folder.categoryParentFolderId } : {}),
     driveFileUrl: driveFile.driveFileUrl,
   });
   const result = await env.service.finalizeUpload(uid, {
@@ -338,4 +339,37 @@ test('moving a document into an extra folder creates the Drive folder and moves 
   const bankFolder = env.fakeDrive.calls.create.find((call) => call.name === 'Bank letters');
   assert.deepEqual(env.fakeDrive.items.get(upload.driveFileId).parents, [bankFolder.id]);
   assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, created.key);
+});
+
+test('a subfolder is created inside its parent folder in Drive, and the parent id is remembered', async () => {
+  const env = await createEnv();
+  const top = (await env.service.createCustomFolder('bod-editor', { visitType: 'clubAssembly', positionKey: 'editor', name: 'Bank letters' })).created;
+  const sub = (await env.service.createCustomFolder('bod-editor', { visitType: 'clubAssembly', positionKey: 'editor', name: '2026', parentKey: top.key })).created;
+  const first = await uploadVia(env, 'bod-editor', 'editor', sub.key, 'sub-1');
+  const created = env.fakeDrive.calls.create.filter((call) => call.folder);
+  assert.deepEqual(created.map((call) => call.name), ['Editor', 'Bank letters', '2026']);
+  const bank = created.find((call) => call.name === 'Bank letters');
+  assert.deepEqual(created.find((call) => call.name === '2026').parents, [bank.id]);
+  assert.equal(first.folder.categoryParentFolderId, bank.id);
+  assert.deepEqual(env.adapter.store.visitSubmissionPositions.clubAssembly_editor.categoryFolderIds, { [sub.key]: first.folder.targetFolderId, [top.key]: bank.id });
+
+  await env.service.renameCustomFolder('bod-editor', { visitType: 'clubAssembly', positionKey: 'editor', folderKey: top.key, name: 'Bank 2' });
+  const second = await uploadVia(env, 'bod-editor', 'editor', sub.key, 'sub-2');
+  assert.equal(second.folder.targetFolderId, first.folder.targetFolderId);
+  assert.equal(env.fakeDrive.calls.create.filter((call) => call.folder).length, 3);
+});
+
+test('a subfolder of a built-in folder lands inside that folder, and a move creates the same structure', async () => {
+  const env = await createEnv();
+  const sub = (await env.service.createCustomFolder('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', name: '2026', parentKey: 'outward' })).created;
+  const upload = await uploadVia(env, 'bod-secretary', 'secretary');
+  await env.move('bod-secretary', { submissionId: upload.submissionId, documentCategory: sub.key });
+  const created = env.fakeDrive.calls.create.filter((call) => call.folder);
+  const outward = created.find((call) => call.name === 'Outward');
+  const year = created.find((call) => call.name === '2026');
+  assert.deepEqual(year.parents, [outward.id]);
+  assert.deepEqual(env.fakeDrive.items.get(upload.driveFileId).parents, [year.id]);
+  const ids = env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.categoryFolderIds;
+  assert.equal(ids[sub.key], year.id);
+  assert.equal(ids.outward, outward.id);
 });
