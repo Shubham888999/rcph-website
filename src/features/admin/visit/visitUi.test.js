@@ -174,11 +174,20 @@ test("visit folder summary shows real folder and file counts", () => {
 test("extra folders: the holder or a manager can add, rename and delete them from the folder page", () => {
   assert.match(moduleSource, /const canChangeFolders = folder\.supportsCustomFolders && folder\.canManageCustomFolders && \(folder\.canUpload \|\| canManageFolder\);/);
   assert.match(moduleSource, /setDialog\(\{ type: "custom-folder-create", folder \}\)\}>\+ New folder<\/button>/);
-  assert.match(moduleSource, /disabled=\{folder\.customFolders\.length >= VISIT_MAX_CUSTOM_FOLDERS\}/);
-  assert.match(moduleSource, /group\.custom && canChangeFolders/);
-  assert.match(moduleSource, /visitCalls\.createCustomFolder\(folder\.visitType, folder\.positionKey, trimmed\)/);
+  assert.match(moduleSource, /disabled=\{visitTopLevelFolderCount\(folder\) >= VISIT_MAX_CUSTOM_FOLDERS \|\| folder\.customFolders\.length >= VISIT_MAX_TOTAL_FOLDERS\}/);
+  assert.match(moduleSource, /canChangeFolders && \(group\.canHaveSubfolders \|\| group\.custom\)/);
+  assert.match(moduleSource, /visitCalls\.createCustomFolder\(folder\.visitType, folder\.positionKey, trimmed, parent\?\.key \|\| ""\)/);
   assert.match(moduleSource, /visitCalls\.renameCustomFolder\(folder\.visitType, folder\.positionKey, customFolder\.key, trimmed\)/);
   assert.match(moduleSource, /visitCalls\.deleteCustomFolder\(folder\.visitType, folder\.positionKey, customFolder\.key\)/);
-  assert.match(moduleSource, /disabled=\{busy \|\| hasFiles\}/);
   assert.match(moduleSource, /dialog\.type\.startsWith\("custom-folder-"\)\) return <CustomFolderDialog/);
+});
+
+test("subfolders: + Subfolder on each folder, indented groups, and delete blocked while a folder has subfolders", () => {
+  assert.match(moduleSource, /group\.canHaveSubfolders \? <button type="button" disabled=\{group\.subfolderCount >= VISIT_MAX_SUBFOLDERS/);
+  assert.match(moduleSource, /setDialog\(\{ type: "custom-folder-create", folder, parent: \{ key: group\.key, name: group\.label \} \}\)\}>\+ Subfolder<\/button>/);
+  assert.match(moduleSource, /visit-category-group--sub/);
+  assert.match(moduleSource, /group\.fullLabel \|\| group\.label/);
+  assert.match(moduleSource, /visitCalls\.createCustomFolder\(folder\.visitType, folder\.positionKey, trimmed, parent\?\.key \|\| ""\)/);
+  assert.match(moduleSource, /disabled=\{busy \|\| hasFiles \|\| hasSubfolders\}/);
+  assert.match(moduleSource, /subfolderCount: group\.subfolderCount/);
 });

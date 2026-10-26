@@ -4,7 +4,7 @@ import AdminModuleHeader from "../AdminModuleHeader";
 import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
-import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, visitFolderCategories, visitFolderUsesCategories, visitUploadChoices, VISIT_CUSTOM_FOLDER_NAME_MAX, VISIT_MAX_CUSTOM_FOLDERS, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, visitFolderCategories, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices, VISIT_CUSTOM_FOLDER_NAME_MAX, VISIT_MAX_CUSTOM_FOLDERS, VISIT_MAX_SUBFOLDERS, VISIT_MAX_TOTAL_FOLDERS, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
 import VisitSubmissionFiles, { VisitFileTypeBadge } from "./VisitSubmissionFiles";
 import {
   getFolderSummaryItems,
@@ -680,8 +680,8 @@ function FolderDetailWorkspaceView({
         </div>
         {canChangeFolders ? (
           <div className="visit-custom-folders__bar">
-            <button type="button" className="visit-custom-folders__add" disabled={folder.customFolders.length >= VISIT_MAX_CUSTOM_FOLDERS} onClick={() => setDialog({ type: "custom-folder-create", folder })}>+ New folder</button>
-            <span>{folder.customFolders.length} of {VISIT_MAX_CUSTOM_FOLDERS} extra folders</span>
+            <button type="button" className="visit-custom-folders__add" disabled={visitTopLevelFolderCount(folder) >= VISIT_MAX_CUSTOM_FOLDERS || folder.customFolders.length >= VISIT_MAX_TOTAL_FOLDERS} onClick={() => setDialog({ type: "custom-folder-create", folder })}>+ New folder</button>
+            <span>{visitTopLevelFolderCount(folder)} of {VISIT_MAX_CUSTOM_FOLDERS} extra folders{folder.customFolders.length > visitTopLevelFolderCount(folder) ? `, ${folder.customFolders.length - visitTopLevelFolderCount(folder)} subfolders` : ""}</span>
           </div>
         ) : null}
         {usesCategories ? (
@@ -689,14 +689,15 @@ function FolderDetailWorkspaceView({
             {groupVisitSubmissionsByCategory(data.submissions, folder).map((group) => {
               const groupId = `visit-category-group-${group.key || "supporting"}`;
               return (
-                <section className="visit-category-group" aria-labelledby={groupId} key={group.key || "supporting"}>
+                <section className={`visit-category-group${group.depth ? " visit-category-group--sub" : ""}`} aria-labelledby={groupId} key={group.key || "supporting"}>
                   <h4 className="visit-category-group__title" id={groupId}>
-                    {group.label}
+                    {group.fullLabel || group.label}
                     <span className="visit-category-group__count">{group.items.length}</span>
-                    {group.custom && canChangeFolders ? (
+                    {canChangeFolders && (group.canHaveSubfolders || group.custom) ? (
                       <span className="visit-custom-folders__tools">
-                        <button type="button" onClick={() => setDialog({ type: "custom-folder-rename", folder, customFolder: { key: group.key, name: group.label } })}>Rename</button>
-                        <button type="button" onClick={() => setDialog({ type: "custom-folder-delete", folder, customFolder: { key: group.key, name: group.label }, fileCount: group.items.length })}>Delete</button>
+                        {group.canHaveSubfolders ? <button type="button" disabled={group.subfolderCount >= VISIT_MAX_SUBFOLDERS || folder.customFolders.length >= VISIT_MAX_TOTAL_FOLDERS} onClick={() => setDialog({ type: "custom-folder-create", folder, parent: { key: group.key, name: group.label } })}>+ Subfolder</button> : null}
+                        {group.custom ? <button type="button" onClick={() => setDialog({ type: "custom-folder-rename", folder, customFolder: { key: group.key, name: group.label } })}>Rename</button> : null}
+                        {group.custom ? <button type="button" onClick={() => setDialog({ type: "custom-folder-delete", folder, customFolder: { key: group.key, name: group.label }, fileCount: group.items.length, subfolderCount: group.subfolderCount })}>Delete</button> : null}
                       </span>
                     ) : null}
                   </h4>
@@ -727,27 +728,28 @@ function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {
 
 // Adding, renaming and deleting the extra folders inside a position's folder.
 function CustomFolderDialog({ dialog, busy, mutate, onClose, reload }) {
-  const { folder, customFolder } = dialog;
+  const { folder, customFolder, parent } = dialog;
   const [name, setName] = useState(customFolder?.name || "");
   if (dialog.type === "custom-folder-delete") {
     const hasFiles = (dialog.fileCount || 0) > 0;
+    const hasSubfolders = (dialog.subfolderCount || 0) > 0;
     return <AdminDialog title={`Delete ${customFolder.name}?`} busy={busy} onClose={onClose}>
-      {hasFiles ? <p>This folder still has {dialog.fileCount} {dialog.fileCount === 1 ? "file" : "files"}. Move or remove them first, then delete the folder.</p> : <p>The folder will be removed from this list. It is empty, so no files are affected.</p>}
-      <div className="admin-actions"><button type="button" onClick={onClose}>Cancel</button><button type="button" className="danger" disabled={busy || hasFiles} onClick={() => mutate("delete-custom-folder", () => visitCalls.deleteCustomFolder(folder.visitType, folder.positionKey, customFolder.key), "Folder deleted.", reload)}>Delete folder</button></div>
+      {hasSubfolders ? <p>This folder has {dialog.subfolderCount} {dialog.subfolderCount === 1 ? "subfolder" : "subfolders"}. Delete them first, then delete this folder.</p> : hasFiles ? <p>This folder still has {dialog.fileCount} {dialog.fileCount === 1 ? "file" : "files"}. Move or remove them first, then delete the folder.</p> : <p>The folder will be removed from this list. It is empty, so no files are affected.</p>}
+      <div className="admin-actions"><button type="button" onClick={onClose}>Cancel</button><button type="button" className="danger" disabled={busy || hasFiles || hasSubfolders} onClick={() => mutate("delete-custom-folder", () => visitCalls.deleteCustomFolder(folder.visitType, folder.positionKey, customFolder.key), "Folder deleted.", reload)}>Delete folder</button></div>
     </AdminDialog>;
   }
   const renaming = dialog.type === "custom-folder-rename";
   const trimmed = name.trim();
-  return <AdminDialog title={renaming ? `Rename ${customFolder.name}` : "New folder"} busy={busy} onClose={onClose}>
+  return <AdminDialog title={renaming ? `Rename ${customFolder.name}` : parent ? `New subfolder in ${parent.name}` : "New folder"} busy={busy} onClose={onClose}>
     <form className="admin-form" onSubmit={(event) => {
       event.preventDefault();
       if (!trimmed) return;
       if (renaming) mutate("rename-custom-folder", () => visitCalls.renameCustomFolder(folder.visitType, folder.positionKey, customFolder.key, trimmed), "Folder renamed.", reload);
-      else mutate("create-custom-folder", () => visitCalls.createCustomFolder(folder.visitType, folder.positionKey, trimmed), "Folder created.", reload);
+      else mutate("create-custom-folder", () => visitCalls.createCustomFolder(folder.visitType, folder.positionKey, trimmed, parent?.key || ""), parent ? "Subfolder created." : "Folder created.", reload);
     }}>
       <label>Folder name<input value={name} maxLength={VISIT_CUSTOM_FOLDER_NAME_MAX} autoFocus onChange={(event) => setName(event.target.value)} /></label>
       <p className="visit-subtle-note">Up to {VISIT_CUSTOM_FOLDER_NAME_MAX} characters. Files in this folder are kept together in Google Drive.</p>
-      <div className="admin-actions"><button type="button" onClick={onClose}>Cancel</button><button disabled={busy || !trimmed}>{renaming ? "Save name" : "Create folder"}</button></div>
+      <div className="admin-actions"><button type="button" onClick={onClose}>Cancel</button><button disabled={busy || !trimmed}>{renaming ? "Save name" : parent ? "Create subfolder" : "Create folder"}</button></div>
     </form>
   </AdminDialog>;
 }

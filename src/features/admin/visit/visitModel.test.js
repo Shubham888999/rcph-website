@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES, visitFolderCategories, visitFolderUsesCategories, visitUploadChoices } from "./visitModel.js";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES, visitFolderCategories, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices } from "./visitModel.js";
 test("visit and folder models whitelist verified fields",()=>{const visit=normalizeVisit({visitType:"dzrVisit",displayTitle:" DZR ",secret:"x"});assert.equal(visit.displayTitle,"DZR");assert.equal(Object.hasOwn(visit,"secret"),false);const folder=normalizeFolder({visitType:"dzrVisit",positionKey:"cwd",maxActiveFiles:40,primaryPresentationSubmissionId:"selected-file"});assert.equal(folder.positionKey,"cwd");assert.equal(folder.primaryPresentationSubmissionId,"selected-file")});
 test("submission ignores unsafe URL",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"x",fileUrl:"javascript:x"});assert.equal(item.fileUrl,"")});
 test("submission normalizes primary presentation controls",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"deck.pptx",isPrimaryPresentation:true,canSetPrimaryPresentation:true});assert.equal(item.isPrimaryPresentation,true);assert.equal(item.canSetPrimaryPresentation,true)});
@@ -56,7 +56,7 @@ test("move labels and upload choices use the agreed wording", () => {
 
 test("extra folders appear between the Secretary folders and Supporting files, for any position", () => {
   const editor = normalizeFolder({ visitType: "clubAssembly", positionKey: "editor", supportsCustomFolders: true, canManageCustomFolders: true, customFolders: [{ key: "custom-0a1b2c3d", name: "Event photos" }, { key: "bad", name: "x" }, { key: "custom-0a1b2c3e", name: " " }] });
-  assert.deepEqual(editor.customFolders, [{ key: "custom-0a1b2c3d", name: "Event photos" }]);
+  assert.deepEqual(editor.customFolders, [{ key: "custom-0a1b2c3d", name: "Event photos", parentKey: "" }]);
   assert.equal(editor.canManageCustomFolders, true);
   assert.deepEqual(visitFolderCategories(editor).map((category) => category.label), ["Event photos", "Supporting files"]);
   assert.equal(visitFolderUsesCategories(editor), true);
@@ -79,4 +79,28 @@ test("documents sit in their extra folder, and an unknown folder key falls back 
     normalizeSubmission({ submissionId: "c" }),
   ], folder);
   assert.deepEqual(groups.map((group) => [group.label, group.items.map((item) => item.submissionId)]), [["Event photos", ["a"]], ["Supporting files", ["b", "c"]]]);
+});
+
+test("subfolders sit under their parent, including the Secretary folders, and read Parent > Child", () => {
+  const folder = normalizeFolder({
+    visitType: "clubAssembly", positionKey: "secretary", supportsDocumentCategories: true, supportsCustomFolders: true, canManageCustomFolders: true,
+    customFolders: [
+      { key: "custom-0a1b2c3d", name: "2026", parentKey: "outward" },
+      { key: "custom-0a1b2c3e", name: "Bank letters", parentKey: "" },
+      { key: "custom-0a1b2c3f", name: "April", parentKey: "custom-0a1b2c3e" },
+      { key: "custom-0a1b2c40", name: "Lost", parentKey: "not-a-folder" },
+    ],
+  });
+  const categories = visitFolderCategories(folder);
+  assert.deepEqual(categories.map((category) => category.fullLabel || category.label), [
+    "Inward file", "Inward register", "Outward file", "Outward file \u203A 2026", "Outward register", "Bank letters", "Bank letters \u203A April", "Lost", "Supporting files",
+  ]);
+  assert.equal(visitTopLevelFolderCount(folder), 2, "the one with an unknown parent counts as top level");
+  const year = categories.find((category) => category.key === "custom-0a1b2c3d");
+  assert.deepEqual([year.depth, year.parentKey, year.canHaveSubfolders, year.moveLabel], [1, "outward", false, "Move to Outward file \u203A 2026"]);
+  assert.equal(categories.find((category) => category.key === "outward").subfolderCount, 1);
+  assert.equal(categories.find((category) => category.key === "custom-0a1b2c3e").subfolderCount, 1);
+  assert.deepEqual(visitUploadChoices(folder).map((choice) => choice.label).slice(0, 5), ["None", "Inward file", "Inward register", "Outward file", "Outward file \u203A 2026"]);
+  const groups = groupVisitSubmissionsByCategory([normalizeSubmission({ submissionId: "a", documentCategory: "custom-0a1b2c3d" })], folder);
+  assert.deepEqual(groups.find((group) => group.key === "custom-0a1b2c3d").items.map((item) => item.submissionId), ["a"]);
 });

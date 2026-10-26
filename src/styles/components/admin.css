@@ -10525,3 +10525,16 @@ min-width: 250px;
 .visit-custom-folders__tools button:hover {
   color: var(--internal-accent-soft);
 }
+
+.visit-category-group--sub {
+  margin-left: clamp(0.75rem, 3vw, 1.75rem);
+  border-left: 2px solid var(--internal-border-strong);
+}
+
+.visit-category-group__title {
+  flex-wrap: wrap;
+}
+
+.visit-custom-folders__tools button {
+  white-space: nowrap;
+}
