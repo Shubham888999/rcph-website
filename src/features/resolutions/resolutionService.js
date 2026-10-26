@@ -42,8 +42,17 @@ export async function openResolutionVoting(resolutionId) {
   return result;
 }
 
-export async function closeResolutionVoting(resolutionId) {
-  const result = await call("closeResolutionVoting", { resolutionId });
+// options.effectiveClosedAt (ISO) and options.reason close the vote as of an earlier time.
+export async function closeResolutionVoting(resolutionId, options = {}) {
+  const result = await call("closeResolutionVoting", { resolutionId, ...options });
+  clearDashboardDataCache();
+  return result;
+}
+
+// While voting is open: remove voters who have not voted and correct the board
+// member counts on the Resolution Page. The server audits every change.
+export async function correctOpenResolution(payload) {
+  const result = await call("correctOpenResolution", payload);
   clearDashboardDataCache();
   return result;
 }

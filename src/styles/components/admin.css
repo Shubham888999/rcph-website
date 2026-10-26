@@ -10443,3 +10443,36 @@ min-width: 250px;
   white-space: pre-wrap;
   line-height: 1.5;
 }
+
+/* Resolution corrections (open resolutions only) and close-as-of option. */
+.resolution-corrections,
+.resolution-close-as-of {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--internal-border-strong);
+  background: var(--internal-surface-soft);
+}
+
+.resolution-corrections h3 {
+  margin: 0;
+}
+
+.resolution-corrections fieldset {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--internal-border);
+}
+
+.resolution-corrections__voter {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.resolution-corrections__voter small {
+  color: var(--internal-text-muted);
+}
