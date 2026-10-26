@@ -703,6 +703,10 @@ export function buildBodAvenueReportModel(options = {}) {
 
 export function getBodAvenueReportFilename(report) {
   const months = normalizeBodReportMonths(report?.selectedMonths ?? report?.month);
+  if (report?.reportKind === "letterheadExchanges") {
+    const period = months.length ? periodFilenamePart(months) : "";
+    return `${slug(`RCPH-Letterhead-Exchange-Report${period ? `-${period}` : ""}`, 120) || "RCPH-Letterhead-Exchange-Report"}.pdf`;
+  }
   const codes = normalizeBodReportAvenueCodes(report?.selectedAvenueCodes ?? report?.avenueCode);
   if (months.length <= 1 && codes.length <= 1) {
     const avenue = cleanText(report?.avenueLabel || report?.avenueCode, 80) || "Avenue";
