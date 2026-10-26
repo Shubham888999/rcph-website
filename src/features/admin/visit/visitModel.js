@@ -61,6 +61,9 @@ export function normalizeFolder(value) {
     canManage: value.canManage === true,
     canSetPrimaryPresentation: value.canSetPrimaryPresentation === true,
     supportsDocumentCategories: value.supportsDocumentCategories === true,
+    supportsCustomFolders: value.supportsCustomFolders === true,
+    canManageCustomFolders: value.canManageCustomFolders === true,
+    customFolders: normalizeCustomFolders(value.customFolders),
     holders: normalizeVisitHolders(value.holders),
   };
 }
@@ -85,6 +88,15 @@ export function normalizeFolders(values, visitType = "") {
   return folders;
 }
 const VISIT_DOCUMENT_CATEGORY_KEYS = Object.freeze(["inward", "outward", "inward-register", "outward-register"]);
+const CUSTOM_FOLDER_KEY = /^custom-[a-f0-9]{8}$/;
+export const VISIT_MAX_CUSTOM_FOLDERS = 10;
+export const VISIT_CUSTOM_FOLDER_NAME_MAX = 40;
+
+function normalizeCustomFolders(values) {
+  return (Array.isArray(values) ? values : [])
+    .filter((item) => item && CUSTOM_FOLDER_KEY.test(item.key) && text(item.name, 80))
+    .map((item) => ({ key: item.key, name: text(item.name, 80) }));
+}
 
 // Library groups in display order; "" is the uncategorised Supporting files group.
 // Secretary folders: the letters themselves ("file") and their Excel registers.
@@ -122,14 +134,40 @@ export function normalizeSubmission(value) {
     canRemove: value.canRemove === true,
     isPrimaryPresentation: value.isPrimaryPresentation === true,
     canSetPrimaryPresentation: value.canSetPrimaryPresentation === true,
-    documentCategory: VISIT_DOCUMENT_CATEGORY_KEYS.includes(value.documentCategory) ? value.documentCategory : "",
+    documentCategory: VISIT_DOCUMENT_CATEGORY_KEYS.includes(value.documentCategory) || CUSTOM_FOLDER_KEY.test(value.documentCategory || "") ? value.documentCategory : "",
     canMove: value.canMove === true,
   };
 }
 
-export function groupVisitSubmissionsByCategory(submissions = []) {
+// The folders of one position: the four Secretary folders (Secretary positions only),
+// then the extra folders added by the holder or a manager, then Supporting files.
+export function visitFolderCategories(folder) {
+  const builtIn = folder?.supportsDocumentCategories === true ? VISIT_DOCUMENT_CATEGORIES.filter((category) => category.key) : [];
+  const custom = (folder?.customFolders || []).map((item) => ({
+    key: item.key,
+    label: item.name,
+    moveLabel: `Move to ${item.name}`,
+    emptyNote: `No documents in ${item.name} yet.`,
+    custom: true,
+  }));
+  return [...builtIn, ...custom, VISIT_DOCUMENT_CATEGORIES.find((category) => category.key === "")];
+}
+
+export function visitUploadChoices(folder) {
+  return [
+    { key: "", label: "None" },
+    ...visitFolderCategories(folder).filter((category) => category.key).map(({ key, label }) => ({ key, label })),
+  ];
+}
+
+// Folders are shown when the position has the Secretary folders or any extra folder.
+export function visitFolderUsesCategories(folder) {
+  return folder?.supportsDocumentCategories === true || (folder?.customFolders || []).length > 0;
+}
+
+export function groupVisitSubmissionsByCategory(submissions = [], folder = null) {
   const list = Array.isArray(submissions) ? submissions : [];
-  return VISIT_DOCUMENT_CATEGORIES.map((category) => ({
+  return (folder ? visitFolderCategories(folder) : VISIT_DOCUMENT_CATEGORIES).map((category) => ({
     ...category,
     items: list.filter((item) => (item.documentCategory || "") === category.key),
   }));

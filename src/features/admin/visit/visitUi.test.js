@@ -146,27 +146,39 @@ test("maintenance panel can resync visit folders with positions", () => {
   assert.match(moduleSource, />Initialize structure<\/button>/);
 });
 
-test("upload sessions send document categories only for folders that support them", () => {
-  assert.match(moduleSource, /\.\.\.\(folder\.supportsDocumentCategories \? \{ documentCategory: item\.documentCategory \|\| "" \} : \{\}\)/);
+test("upload sessions send document categories only for folders that have folders to choose from", () => {
+  assert.match(moduleSource, /\.\.\.\(visitUploadChoices\(folder\)\.length > 1 \? \{ documentCategory: item\.documentCategory \|\| "" \} : \{\}\)/);
   assert.match(moduleSource, /setQueue\(result\.queue\.map\(\(item\) => \(\{ documentCategory: "", \.\.\.item \}\)\)\)/);
   assert.match(moduleSource, /className="visit-category-choice" disabled=\{uploading \|\| item\.status === "Uploaded" \|\| Boolean\(item\.completionProof\)\}/);
-  assert.match(moduleSource, /VISIT_UPLOAD_CATEGORY_CHOICES\.map/);
+  assert.match(moduleSource, /uploadChoices\.map/);
 });
 
 test("secretary document library renders category groups and wires the move action", () => {
-  assert.match(moduleSource, /folder\.supportsDocumentCategories \? \(\s*<div className="visit-category-groups">/);
-  assert.match(moduleSource, /groupVisitSubmissionsByCategory\(data\.submissions\)\.map/);
+  assert.match(moduleSource, /usesCategories \? \(\s*<div className="visit-category-groups">/);
+  assert.match(moduleSource, /groupVisitSubmissionsByCategory\(data\.submissions, folder\)\.map/);
   assert.match(moduleSource, /group\.items\.length \? renderFiles\(group\.items\) : <p className="visit-category-group__empty">\{group\.emptyNote\}<\/p>/);
   assert.match(moduleSource, /\) : renderFiles\(data\.submissions\)\}/);
   assert.match(moduleSource, /mutate\(\s*"move-category",\s*\(\) => visitCalls\.moveCategory\(item\.submissionId, documentCategory\),\s*"Document moved\.",\s*reload,\s*\)/);
 });
 
 test("document action menu offers moves to the other two categories", () => {
-  assert.match(detailsSource, /VISIT_DOCUMENT_CATEGORIES\.filter\(\(category\) => category\.key !== \(item\.documentCategory \|\| ""\)\)/);
+  assert.match(detailsSource, /categories\.filter\(\(category\) => category\.key !== \(item\.documentCategory \|\| ""\)\)/);
   assert.match(detailsSource, /onClick=\{\(\) => onMove\?\.\(item, category\.key\)\}>\{category\.moveLabel\}<\/button>/);
   assert.match(detailsSource, /item\.canMove/);
 });
 
 test("visit folder summary shows real folder and file counts", () => {
   assert.match(moduleSource, /getVisitSummaryItems\(\{\s*\.\.\.data\.visit,\s*accessiblePositionCount: folders\.length,\s*activeSubmissionCount: folders\.reduce\(\(sum, folder\) => sum \+ \(Number\(folder\.activeFileCount\) \|\| 0\), 0\),/);
+});
+
+test("extra folders: the holder or a manager can add, rename and delete them from the folder page", () => {
+  assert.match(moduleSource, /const canChangeFolders = folder\.supportsCustomFolders && folder\.canManageCustomFolders && \(folder\.canUpload \|\| canManageFolder\);/);
+  assert.match(moduleSource, /setDialog\(\{ type: "custom-folder-create", folder \}\)\}>\+ New folder<\/button>/);
+  assert.match(moduleSource, /disabled=\{folder\.customFolders\.length >= VISIT_MAX_CUSTOM_FOLDERS\}/);
+  assert.match(moduleSource, /group\.custom && canChangeFolders/);
+  assert.match(moduleSource, /visitCalls\.createCustomFolder\(folder\.visitType, folder\.positionKey, trimmed\)/);
+  assert.match(moduleSource, /visitCalls\.renameCustomFolder\(folder\.visitType, folder\.positionKey, customFolder\.key, trimmed\)/);
+  assert.match(moduleSource, /visitCalls\.deleteCustomFolder\(folder\.visitType, folder\.positionKey, customFolder\.key\)/);
+  assert.match(moduleSource, /disabled=\{busy \|\| hasFiles\}/);
+  assert.match(moduleSource, /dialog\.type\.startsWith\("custom-folder-"\)\) return <CustomFolderDialog/);
 });

@@ -34,9 +34,10 @@ function VisitActionMenu({
   onWithdraw,
   onRemove,
   onMove,
+  categories = VISIT_DOCUMENT_CATEGORIES,
 }) {
   const moveTargets = item.canMove
-    ? VISIT_DOCUMENT_CATEGORIES.filter((category) => category.key !== (item.documentCategory || ""))
+    ? categories.filter((category) => category.key !== (item.documentCategory || ""))
     : [];
   const hasActions = (
     item.folderUrl
@@ -101,6 +102,7 @@ export default function VisitSubmissionFiles({
   onWithdraw,
   onRemove,
   onMove,
+  categories,
 }) {
   if (!submissions.length) {
     return (
@@ -144,6 +146,7 @@ export default function VisitSubmissionFiles({
                 onWithdraw={onWithdraw}
                 onRemove={onRemove}
                 onMove={onMove}
+                categories={categories}
               />
             </div>
           </li>
