@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 import test from "node:test";
 import { buildResolutionPagePdfPages } from "./resolutionCustomPdf.js";
-import { buildResolutionPdfDocument, loadPoppinsForPages } from "./resolutionPdf.js";
+import { buildResolutionPdfDocument, buildResolutionPdfPages, loadPoppinsForPages } from "./resolutionPdf.js";
 import { POPPINS_METRICS } from "./resolutionPoppinsMetrics.js";
 import { poppinsTextWidth, poppinsVariantsUsed, winAnsiCode } from "./resolutionPoppins.js";
 import {
@@ -118,4 +118,14 @@ test("the prepared email is signed by the current President with the RIY", () =>
   assert.match(adminSource, /presidentName \? formatRotaractorName\(presidentName, true\) : "Rtr\. \[PRESIDENT NAME\]"/);
   assert.match(adminSource, /`President \| RIY \$\{resolutionRiyLabel\(meeting\?\.date\)\}`/);
   assert.match(adminSource, /const start = month >= 7 \? year : year - 1;\s*return `\$\{start\}-\$\{start \+ 1\}`;/);
+});
+
+test("an uploaded-PDF resolution can also download a summary: Resolution Page, vote table and record, without the attached document", () => {
+  assert.match(adminSource, /resolution\.documentSourceMode === "uploadedPdf" \? <button type="button" disabled=\{busy\} onClick=\{onDownloadSummary\}>Download summary PDF/);
+  assert.match(adminSource, /onDownloadSummary=\{async \(\) => \{ try \{ await generateResolutionPdf\(details\);/);
+  const config = { enabled: true, version: 2, details: { subject: "Passing of Club Bylaws", boardMembersPresent: "10", totalBoardMembers: "13" }, mainStatement: { text: STATEMENT } };
+  const details = { resolution: closed({ documentSourceMode: "uploadedPdf", approveCount: 10, votesReceivedCount: 10, title: "Passing of Club Bylaws", resolutionNumber: "01", eligibleVoters: [], appendVoteTable: true, resolutionPageConfig: config }), votes: [], audit: [] };
+  const pages = buildResolutionPdfPages(details);
+  assert.deepEqual(pages.map((page) => page.generatedKind || "record"), ["resolution_page", "vote_table", "record"]);
+  assert.match(pageText([pages[0]]), /majority of 100%/);
 });
