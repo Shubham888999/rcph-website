@@ -2,6 +2,7 @@ import { formatInr, text, timestampIso, validDate } from "../shared/adminModel.j
 import { POSITION_CATALOG } from "../shared/positionCatalog.js";
 import {
   DEFAULT_TREASURY_FILTERS,
+  TREASURY_NO_EVENT_LABEL,
   filterAndSortTreasury,
   resolveTreasuryPeriod,
   formatTreasuryDate,
@@ -13,6 +14,7 @@ import {
   treasurySpentDate,
 } from "./treasuryModel.js";
 import { formatRotaractorName } from "../../../utils/memberName.js";
+import { buildTreasuryBreakdown } from "./treasuryBreakdownModel.js";
 
 export const TREASURY_EXPORT_TITLE = "Financial Records";
 export const TREASURY_EXPORT_CLUB_NAME = "Rotaract Club of Pune Heritage";
@@ -212,6 +214,7 @@ function exportRow(record = {}, index = 0) {
     dateLabel: validDate(dateValue) ? formatTreasuryDate(dateValue) : "No date",
     type: typeLabel,
     category: normalizeTreasuryAvenue(record.avenue) || "Uncategorized",
+    event: text(record.eventName, 180) || TREASURY_NO_EVENT_LABEL,
     description: descriptionFor(record),
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
     paymentMethod: text(record.paymentMode, 80) || "Not recorded",
@@ -372,6 +375,7 @@ export function buildTreasuryExportReport({
     monthlySummary,
     incomeCategories,
     expenseCategories,
+    breakdown: buildTreasuryBreakdown(rows),
     chartTables: {
       monthlySummary,
       incomeCategories,

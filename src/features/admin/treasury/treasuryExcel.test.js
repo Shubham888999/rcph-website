@@ -18,9 +18,9 @@ function fixture() {
   });
 }
 
-test("Treasury workbook contains Dashboard, Transactions, and Charts & Analysis sheets", () => {
+test("Treasury workbook contains Dashboard, Transactions, the breakdown sheets and Charts & Analysis", () => {
   const workbook = buildTreasuryWorkbook(ExcelJS, fixture(), new Date("2026-07-15T08:00:00.000Z"));
-  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["Dashboard", "Transactions", "Charts & Analysis"]);
+  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["Dashboard", "Transactions", "Income", "Expenses", "Avenue & Event", "Avenue by Month", "Charts & Analysis"]);
   assert.equal(workbook.creator, "Rotaract Club of Pune Heritage");
   assert.equal(workbook.subject, "Treasury Financial Records");
 
@@ -41,7 +41,7 @@ test("Treasury workbook serializes as valid XLSX with numeric amounts and formul
   assert.ok(buffer.byteLength > 7000);
   const reopened = new ExcelJS.Workbook();
   await reopened.xlsx.load(buffer);
-  assert.deepEqual(reopened.worksheets.map((sheet) => sheet.name), ["Dashboard", "Transactions", "Charts & Analysis"]);
+  assert.deepEqual(reopened.worksheets.map((sheet) => sheet.name), ["Dashboard", "Transactions", "Income", "Expenses", "Avenue & Event", "Avenue by Month", "Charts & Analysis"]);
   assert.equal(reopened.getWorksheet("Transactions").getCell("E6").value, 30664);
   assert.match(reopened.getWorksheet("Dashboard").getCell("B6").value.formula, /SUMIF/);
   assert.match(reopened.getWorksheet("Charts & Analysis").getCell("A1").value, /Financial Records/);

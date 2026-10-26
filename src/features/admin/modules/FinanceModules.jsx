@@ -35,6 +35,7 @@ import {
   TREASURY_REIMBURSEMENT_STATUSES,
   TREASURY_WORKFLOW_TYPES,
   addClubDuesRow,
+  applyTreasuryEvent,
   applyTreasuryWorkflow,
   buildClubDuesImportPayloads,
   buildClubDuesPayloads,
@@ -50,6 +51,7 @@ import {
   resolveTreasuryPeriod,
   treasuryLedgerDate,
   treasurySpentDate,
+  treasuryEventLabel,
   getTreasuryAvenueOptions,
   getTreasuryFieldPlan,
   getTreasuryMonthOptions,
@@ -360,7 +362,8 @@ async function parseClubDuesImportFile(file) {
   return { rows: [], skippedRows: [], totalRows: 0, errors: ["Upload a Google Form CSV or .xlsx export."] };
 }
 
-export function TreasuryModule({ transactions, members, lock, uid, onNotice }) {
+export function TreasuryModule({ transactions, members, events = [], bodMeetings = [], districtEvents = [], lock, uid, onNotice }) {
+  const eventGroups = useMemo(() => buildFineEventGroups({ events, bodMeetings, districtEvents }), [events, bodMeetings, districtEvents]);
   const [lastDefaults, setLastDefaults] = useState({ avenue: "", paymentMode: "" });
   const [draft, setDraft] = useState(() => createEmptyTreasuryDraft());
   const [draftErrors, setDraftErrors] = useState({});
@@ -1056,6 +1059,7 @@ async function exportBalanceSheet() {
               setUpload={setDraftUpload}
               onRetry={saveDraft}
               errors={draftErrors}
+              eventGroups={eventGroups}
               mode="create"
               onClear={() => resetDraft()}
             />
@@ -1326,6 +1330,7 @@ async function exportBalanceSheet() {
               setUpload={setEditUpload}
               onRetry={saveEdit}
               errors={editErrors}
+              eventGroups={eventGroups}
               mode="edit"
               existingRecord={editing}
               onCancel={() => {
@@ -1445,7 +1450,7 @@ function TreasuryFormSection({ label, title, children }) {
   );
 }
 
-function TreasuryForm({ formId, value, setValue, members, onSubmit, busy, upload, setUpload, onRetry, errors, mode, existingRecord, onClear, onCancel }) {
+function TreasuryForm({ formId, value, setValue, members, onSubmit, busy, upload, setUpload, onRetry, errors, eventGroups = [], mode, existingRecord, onClear, onCancel }) {
   const plan = getTreasuryFieldPlan(value);
   const uploadWorking = isTreasuryUploadWorking(upload);
   const disabled = busy || uploadWorking;
@@ -1530,6 +1535,20 @@ function TreasuryForm({ formId, value, setValue, members, onSubmit, busy, upload
           <select value={value.avenue} onChange={set("avenue")}>
             <option value="">Choose avenue</option>
             {getTreasuryAvenueOptions([]).map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+        <label>
+          <FieldLabel label="Event" optional />
+          <select value={value.eventSelection || ""} onChange={(event) => setValue(applyTreasuryEvent(value, findFineEventOption(eventGroups, event.target.value)))}>
+            <option value="">Not linked to an event</option>
+            {value.eventSelection && value.eventName && !findFineEventOption(eventGroups, value.eventSelection) ? (
+              <option value={value.eventSelection}>{value.eventName}{value.eventDate ? ` (${formatTreasuryDate(value.eventDate)})` : ""}</option>
+            ) : null}
+            {eventGroups.map((group) => (
+              <optgroup key={group.key} label={group.label}>
+                {group.options.map((option) => <option key={option.value} value={option.value}>{option.name} ({formatTreasuryDate(option.date)})</option>)}
+              </optgroup>
+            ))}
           </select>
         </label>
         {plan.show.paidBy ? (
@@ -2291,6 +2310,7 @@ function TreasuryDetailPanel({ record, balance, locked, onClose, onEdit, onDelet
     ...(treasurySpentDate(record) ? [["Repaid on", `${formatTreasuryDate(treasuryLedgerDate(record))} (bank date)`]] : []),
     ["Party", transactionPartyLabel(record)],
     ["Avenue", normalizeTreasuryAvenue(record.avenue) || "Not recorded"],
+    ["Event", treasuryEventLabel(record)],
     ["Payment mode", record.paymentMode || "Not recorded"],
     ["Reference", record.referenceNumber || "Not recorded"],
     ["Purpose", record.purpose || "Not recorded"],
@@ -2386,6 +2406,7 @@ function TreasuryDetails({ record }) {
     [treasurySpentDate(record) ? "Expense date" : "Date", formatTreasuryDate(record.date)],
     ["Party", transactionPartyLabel(record)],
     ["Avenue", normalizeTreasuryAvenue(record.avenue) || "Not recorded"],
+    ["Event", treasuryEventLabel(record)],
     ["Purpose / notes", record.purpose || "Not recorded"],
     ["Payment mode", record.paymentMode || "Not recorded"],
     ["Payment reference", record.referenceNumber || "Not recorded"],

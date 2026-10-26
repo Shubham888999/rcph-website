@@ -252,6 +252,110 @@ function addAnalysisSheet(workbook, report) {
   styleWorksheet(sheet, "Treasury chart-ready analysis");
 }
 
+function addSectionHeading(sheet, label, endColumn) {
+  sheet.addRow([]);
+  const row = sheet.addRow([label]);
+  sheet.mergeCells(row.number, 1, row.number, endColumn);
+  row.getCell(1).font = { name: "Aptos Display", size: 13, bold: true, color: { argb: COLORS.wine } };
+  row.getCell(1).border = { bottom: { style: "medium", color: { argb: COLORS.gold } } };
+  row.height = 22;
+  return row.number + 1;
+}
+
+function styleTotalRow(row, amountColumns) {
+  row.eachCell((cell, column) => {
+    cell.font = { name: "Aptos", bold: true, color: { argb: COLORS.ink } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.cream } };
+    cell.border = { top: { style: "thin", color: { argb: COLORS.gold } } };
+    if (amountColumns.includes(column)) cell.numFmt = TREASURY_INR_FORMAT;
+  });
+}
+
+function shareRows(groups, emptyLabel) {
+  return groups.length ? groups.map((group) => [group.label, group.amount, group.count, group.share]) : [[emptyLabel, 0, 0, 0]];
+}
+
+function addShareTable(sheet, heading, firstHeader, groups, emptyLabel, total) {
+  const start = addSectionHeading(sheet, heading, 6);
+  const last = addTable(sheet, start, 1, [firstHeader, "Amount", "Entries", "Share"], shareRows(groups, emptyLabel), { amountColumns: [1] });
+  for (let rowNumber = start + 1; rowNumber <= last; rowNumber += 1) sheet.getCell(rowNumber, 4).numFmt = "0.0%";
+  const totalRow = sheet.getRow(last + 1);
+  totalRow.values = ["Total", total, groups.reduce((sum, group) => sum + group.count, 0), groups.length ? 1 : 0];
+  styleTotalRow(totalRow, [2]);
+  totalRow.getCell(4).numFmt = "0.0%";
+}
+
+// Income or Expenses: the entries, then month-wise, avenue-wise and event-wise totals.
+function addFlowSheet(workbook, report, kind) {
+  const income = kind === "income";
+  const data = report.breakdown[kind];
+  const word = income ? "Income" : "Expenses";
+  const sheet = workbook.addWorksheet(word);
+  sheet.columns = [{ width: 30 }, { width: 18 }, { width: 22 }, { width: 30 }, { width: 18 }, { width: 18 }];
+  styleTitle(sheet, `${report.title} | ${word}`, `${data.count} ${income ? "income" : "expense"} entr${data.count === 1 ? "y" : "ies"} | ${report.reportPeriod}${income ? "" : " | Reimbursements are counted as expenses"}`, 6);
+  sheet.addRow([]);
+  const listStart = sheet.rowCount + 1;
+  const entries = data.rows.length
+    ? data.rows.map((row) => [row.description, row.date || row.dateLabel, row.category, row.event, row.amount, row.type])
+    : [[`No ${income ? "income" : "expense"} entries for the active filters.`, "", "", "", 0, ""]];
+  const listEnd = addTable(sheet, listStart, 1, ["Entry", "Date", "Avenue", "Event", "Amount", "Type"], entries, { amountColumns: [4] });
+  for (let rowNumber = listStart + 1; rowNumber <= listEnd; rowNumber += 1) {
+    if (sheet.getCell(rowNumber, 2).value instanceof Date) sheet.getCell(rowNumber, 2).numFmt = "yyyy-mm-dd";
+  }
+  const totalRow = sheet.getRow(listEnd + 1);
+  totalRow.values = [`Total ${income ? "income" : "expenses"}`, "", "", "", { formula: `SUM(E${listStart + 1}:E${listEnd})`, result: data.total }, ""];
+  styleTotalRow(totalRow, [5]);
+  sheet.views = [{ state: "frozen", ySplit: listStart }];
+
+  addShareTable(sheet, `${word} by month`, "Month", data.byMonth, "No months", data.total);
+  addShareTable(sheet, `${word} by avenue`, "Avenue", data.byAvenue, "No avenues", data.total);
+  addShareTable(sheet, `${word} by event`, "Event", data.byEvent, "No events", data.total);
+  styleWorksheet(sheet, `Treasury ${income ? "income" : "expenses"}`);
+}
+
+// Each avenue as a block, with its events under it and the avenue total.
+function addAvenueEventSheet(workbook, report) {
+  const { avenueEvents, totals } = report.breakdown;
+  const sheet = workbook.addWorksheet("Avenue & Event");
+  sheet.columns = [{ width: 38 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 12 }];
+  styleTitle(sheet, `${report.title} | Avenue & Event`, `Income, expenses and net for each event, grouped by avenue | ${report.reportPeriod}`, 5);
+  if (!avenueEvents.length) {
+    sheet.addRow([]);
+    sheet.addRow(["No Treasury entries for the active filters."]);
+  }
+  avenueEvents.forEach((block) => {
+    const start = addSectionHeading(sheet, block.avenue, 5);
+    const last = addTable(sheet, start, 1, ["Event", "Income", "Expenses", "Net", "Entries"], block.events.map((event) => [event.name, event.income, event.expense, event.net, event.count]), { amountColumns: [1, 2, 3] });
+    const totalRow = sheet.getRow(last + 1);
+    totalRow.values = [`${block.avenue} total`, block.income, block.expense, block.net, block.count];
+    styleTotalRow(totalRow, [2, 3, 4]);
+  });
+  sheet.addRow([]);
+  const grand = sheet.addRow(["Grand total", totals.income, totals.expense, totals.net, totals.count]);
+  styleTotalRow(grand, [2, 3, 4]);
+  grand.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.gold } }; });
+  styleWorksheet(sheet, "Treasury avenue and event matrix");
+}
+
+// Avenues down the side, months across: one grid for income and one for expenses.
+function addAvenueMonthSheet(workbook, report) {
+  const { months, income, expense } = report.breakdown.avenueMonths;
+  const columns = months.length + 2;
+  const sheet = workbook.addWorksheet("Avenue by Month");
+  sheet.columns = [{ width: 26 }, ...months.map(() => ({ width: 16 })), { width: 18 }];
+  styleTitle(sheet, `${report.title} | Avenue by Month`, `Month-wise totals for each avenue | ${report.reportPeriod}`, Math.max(columns, 2));
+  [["Income", income], ["Expenses", expense]].forEach(([label, grid]) => {
+    const start = addSectionHeading(sheet, `${label} by avenue and month`, Math.max(columns, 2));
+    const rows = grid.rows.length ? grid.rows.map((line) => [line.avenue, ...line.cells, line.total]) : [[`No ${label.toLowerCase()}`, ...months.map(() => 0), 0]];
+    const amountColumns = Array.from({ length: months.length + 1 }, (_, index) => index + 1);
+    const last = addTable(sheet, start, 1, ["Avenue", ...months.map((month) => month.label), "Total"], rows, { amountColumns });
+    const totalRow = sheet.getRow(last + 1);
+    totalRow.values = ["Total", ...grid.monthTotals, grid.total];
+    styleTotalRow(totalRow, amountColumns.map((offset) => offset + 1));
+  });
+  styleWorksheet(sheet, "Treasury avenue by month");
+}
+
 export function buildTreasuryWorkbook(ExcelJS, report, generatedAt = report?.generatedAt || new Date()) {
   if (!report?.summary || !Array.isArray(report.transactions)) throw new TypeError("A Treasury export report is required.");
   const workbook = new ExcelJS.Workbook();
@@ -268,6 +372,12 @@ export function buildTreasuryWorkbook(ExcelJS, report, generatedAt = report?.gen
 
   addDashboardSheet(workbook, report);
   addTransactionsSheet(workbook, report);
+  if (report.breakdown) {
+    addFlowSheet(workbook, report, "income");
+    addFlowSheet(workbook, report, "expense");
+    addAvenueEventSheet(workbook, report);
+    addAvenueMonthSheet(workbook, report);
+  }
   addAnalysisSheet(workbook, report);
   return workbook;
 }

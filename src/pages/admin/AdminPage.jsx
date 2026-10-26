@@ -74,7 +74,7 @@ export default function AdminPage() {
   uid={uid}
   onNotice={setNotice}
 />
-  else if (segment === "treasury") content = <TreasuryModule transactions={data.treasury} members={data.members} lock={locks.treasury} uid={uid} onNotice={setNotice} />;
+  else if (segment === "treasury") content = <TreasuryModule transactions={data.treasury} members={data.members} events={data.events} bodMeetings={data.bodMeetings} districtEvents={data.districtEvents} lock={locks.treasury} uid={uid} onNotice={setNotice} />;
   else if (segment === "locks") content = <LocksModule locks={locks} access={access} uid={uid} onNotice={setNotice} />;
   else if (segment === "logs") content = <SystemLogsModule uid={uid} access={access} />;
   else if (segment === "reports") content = <ReportsModule events={data.events} />;

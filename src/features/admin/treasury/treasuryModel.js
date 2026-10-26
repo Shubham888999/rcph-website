@@ -59,7 +59,38 @@ export function createEmptyTreasuryDraft(defaults = {}) {
     reimbursedTo: "",
     reimbursementDate: "",
     billUrl: "",
+    eventSelection: "",
+    eventId: "",
+    eventSource: "",
+    eventName: "",
+    eventDate: "",
   };
+}
+
+// Optional link from a Treasury entry to a club event, BOD meeting or district event,
+// used by the event-wise reports. Entries without one are reported as not linked.
+export const TREASURY_NO_EVENT_LABEL = "Not linked to an event";
+
+export function treasuryEventSelectionValue(record = {}) {
+  const source = text(record.eventSource, 40);
+  const id = text(record.eventId, 128);
+  return source && id ? `${source}:${id}` : "";
+}
+
+export function applyTreasuryEvent(draft = {}, option = null) {
+  if (!option?.id || !option?.name) return { ...draft, eventSelection: "", eventId: "", eventSource: "", eventName: "", eventDate: "" };
+  return {
+    ...draft,
+    eventSelection: option.value || `${option.source}:${option.id}`,
+    eventId: text(option.id, 128),
+    eventSource: text(option.source, 40),
+    eventName: text(option.name, 180),
+    eventDate: validDate(text(option.date, 20)) ? text(option.date, 20) : "",
+  };
+}
+
+export function treasuryEventLabel(record = {}) {
+  return text(record.eventName, 180) || TREASURY_NO_EVENT_LABEL;
 }
 
 export function clubDuesPayerForDescription(value) {
@@ -434,6 +465,7 @@ export function prepareTreasuryDraft(record = {}, defaults = {}) {
     type: storedTypeForWorkflow(workflowType),
     amount: record.amount === undefined || record.amount === null ? "" : String(record.amount),
     reimbursementStatus: normalizeReimbursementStatus(record.reimbursementStatus),
+    eventSelection: treasuryEventSelectionValue(record),
   };
 }
 
@@ -578,7 +610,17 @@ export function buildTreasuryPayload(source = {}) {
     reimbursedTo,
     reimbursementDate,
     billUrl: source.billUrl ? safeUrl(source.billUrl) : "",
+    ...treasuryEventPayload(source),
   };
+}
+
+// Saved as a set: an entry is linked to one event, or the four fields are cleared.
+function treasuryEventPayload(source = {}) {
+  const eventId = text(source.eventId, 128);
+  const eventSource = text(source.eventSource, 40);
+  const eventName = text(source.eventName, 180);
+  if (!eventId || !eventSource || !eventName) return { eventId: "", eventSource: "", eventName: "", eventDate: "" };
+  return { eventId, eventSource, eventName, eventDate: validDate(text(source.eventDate, 20)) ? text(source.eventDate, 20) : "" };
 }
 
 export function validateClubDuesDraft(row = {}) {
