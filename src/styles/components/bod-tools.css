@@ -2708,3 +2708,84 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
   flex-wrap: wrap;
   gap: 0.6rem;
 }
+
+.letterhead-export {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.letterhead-export__intro h3,
+.letterhead-export__intro p {
+  margin: 0 0 0.4rem;
+}
+
+.letterhead-export__months {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--internal-border);
+}
+
+.letterhead-export__month-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.letterhead-export__month-actions button {
+  min-height: 2.4rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--internal-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--internal-text);
+  background: var(--internal-surface-raised);
+  font: inherit;
+  cursor: pointer;
+}
+
+.letterhead-export__month-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.letterhead-export__month-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.4rem 1rem;
+}
+
+.letterhead-export__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.85rem;
+}
+
+.letterhead-export__filters label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 750;
+}
+
+.letterhead-export__filters input,
+.letterhead-export__filters select {
+  min-height: 2.7rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--internal-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--internal-text);
+  background: var(--internal-surface);
+  font: inherit;
+}
+
+.letterhead-export__photos {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 750;
+}
+
+.letterhead-export__summary {
+  margin: 0;
+}

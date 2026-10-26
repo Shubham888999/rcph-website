@@ -1210,7 +1210,28 @@ function addPageChrome(pages, report) {
   });
 }
 
+// A report of Letterhead Exchanges only: a title box, the period, and the exchange blocks.
+function buildLetterheadExchangeOnlyLayout(report, options = {}) {
+  const style = resolveReportStyle(report);
+  const context = {
+    imageResources: normalizedReportImages(options.imagesByEventId),
+    pageImageEventIds: [],
+  };
+  const pages = [[]];
+  const safe = BOD_AVENUE_REPORT_LAYOUT.safeArea;
+  let y = drawTitleBox(pages[0], report, style);
+  const period = normalizedLine(report?.periodLabel, 160);
+  if (period) {
+    pages[0].push(centeredTextCommand({ center: safe.left + BOD_AVENUE_REPORT_CONTENT_WIDTH / 2, y: y - 4, text: period, size: 11, bold: true, fontFamily: style.fontFamily }));
+    y -= 26;
+  }
+  drawLetterheadExchangeSection(pages, pages[0], y, { ...report, includeLetterheadExchanges: true }, style, context);
+  addPageChrome(pages, report);
+  return { pages, pageImageEventIds: context.pageImageEventIds, imageResources: context.imageResources };
+}
+
 function buildBodAvenueReportPdfLayout(report, options = {}) {
+  if (report?.reportKind === "letterheadExchanges") return buildLetterheadExchangeOnlyLayout(report, options);
   if (!report?.events?.length || report.eventCount !== report.events.length) throw new TypeError("A finalized non-empty report model is required.");
   const style = resolveReportStyle(report);
   const context = {

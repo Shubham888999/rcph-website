@@ -3,6 +3,7 @@ import LetterheadExchangeForm from "./LetterheadExchangeForm";
 import LetterheadExchangeHistory from "./LetterheadExchangeHistory";
 import LetterheadExchangeManageDialog from "./LetterheadExchangeManageDialog";
 import OutwardLettersPanel from "../outward-letters/OutwardLettersPanel";
+import LetterheadExchangeExportPanel from "./LetterheadExchangeExportPanel";
 import {
   fetchLetterheadExchangeFormOptions,
   getSafeLetterheadExchangeError,
@@ -85,9 +86,11 @@ export default function BodLetterheadExchangePanel() {
       <div className="bod-letterhead-exchanges__tabs" role="group" aria-label="Letterhead tools">
         <button type="button" aria-pressed={tab === "log"} onClick={() => setTab("log")}>Exchange log</button>
         <button type="button" aria-pressed={tab === "send"} onClick={() => setTab("send")}>Send letterheads</button>
+        <button type="button" aria-pressed={tab === "export"} onClick={() => setTab("export")}>Export report</button>
       </div>
 
       {tab === "send" ? <OutwardLettersPanel /> : null}
+      {tab === "export" ? <LetterheadExchangeExportPanel /> : null}
 
       {tab === "log" && optionsState.status === "loading" ? <p className="letterhead-muted">Loading members and conducted events...</p> : null}
       {tab === "log" && optionsState.status === "error" ? (
