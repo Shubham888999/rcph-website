@@ -422,3 +422,10 @@ export function buildPreparedEmailLinks({ to, subject, body }) {
   };
 }
 import { normalizeDocumentSourceMode, normalizeGeneratedPageOrder, normalizePdfLayoutMode, normalizeResolutionPageConfig, normalizeResolutionSections, normalizeUploadedVotesTableConfig, validateResolutionPdfLayout } from "./resolutionSectionsModel.js";
+
+// IST wall time from a datetime-local value ("2026-10-25T23:59") as an ISO string.
+export function istDateTimeToIso(value) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value || "")) return "";
+  const millis = Date.parse(`${value}:00+05:30`);
+  return Number.isFinite(millis) ? new Date(millis).toISOString() : "";
+}
