@@ -117,7 +117,7 @@ test("Votes Table supports a Name-only layout with result summary disabled", () 
   assert.ok(!text.some((value) => value.startsWith("Approve count:")));
 });
 
-test("generated Resolution Page and vote table use official letterhead without page numbers", () => {
+test("generated Resolution Page and vote table use official letterhead and page numbers", () => {
   const details = {
     resolution: {
       status: "passed",
@@ -144,15 +144,16 @@ test("generated Resolution Page and vote table use official letterhead without p
   const pages = buildResolutionPdfPages(details);
   const generated = pages.filter((page) => page.letterhead === "official");
   assert.deepEqual(generated.map((page) => page.generatedKind), ["vote_table", "resolution_page"]);
-  assert.ok(generated.every((page) => page.pageNumber === false));
+  assert.ok(generated.every((page) => page.pageNumber !== false));
+  assert.deepEqual(pages.slice(0, generated.length), generated, "Resolution Page and vote table come first");
+  assert.ok(pages.at(-1).some((line) => line.text === "BOD RESOLUTION"), "the technical record is the last page");
   assert.ok(generated[1].some((line) => line.text === "RESOLUTION"));
   const pdf = decode(buildResolutionPdfDocument(details, LETTERHEAD, { officialLetterhead: OFFICIAL_LETTERHEAD }));
   assert.equal((pdf.match(/\/Subtype \/Image/g) || []).length, 2);
   assert.match(pdf, /\/F6 \d+ 0 R/);
   assert.match(pdf, /\/F7 \d+ 0 R/);
   assert.equal((pdf.match(/595 0 0 842 0 0 cm\n\/OfficialBG Do/g) || []).length, generated.length);
-  assert.equal((pdf.match(/Page \d+ of \d+/g) || []).length, pages.length - generated.length);
-  assert.doesNotMatch(pdf, /Page 2 of 3/);
+  assert.equal((pdf.match(/Page \d+ of \d+/g) || []).length, pages.length, "every page is numbered");
 });
 
 test("generated Resolution Page heading and details rows use the official layout", () => {

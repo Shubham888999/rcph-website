@@ -99,11 +99,11 @@ test("All-enabled generated pages preview respects generated page order", () => 
   assert.deepEqual(pages.map((page) => page.generatedKind), ["vote_table", "resolution_page"]);
 });
 
-test("Generated pages preview marks every page official and suppresses page numbers", () => {
+test("Generated pages preview marks every page official and numbers it", () => {
   const pages = buildGeneratedPagesPreviewPages({ ...baseDetails(), previewMode: "all" });
   assert.ok(pages.length >= 2);
   assert.ok(pages.every((page) => page.letterhead === "official"));
-  assert.ok(pages.every((page) => page.pageNumber === false));
+  assert.ok(pages.every((page) => page.pageNumber !== false));
 });
 
 test("Generated pages preview reports disabled generated-page selections", () => {
@@ -230,7 +230,8 @@ test("Generated pages preview PDF uses official letterhead and no visible draft 
   assert.match(pdf, /^%PDF-1\.4/);
   assert.equal((pdf.match(/\/Subtype \/Image/g) || []).length, 2);
   assert.match(pdf, /\/OfficialBG Do/);
-  assert.doesNotMatch(pdf, /DRAFT PREVIEW|Page \d+ of \d+/);
+  assert.doesNotMatch(pdf, /DRAFT PREVIEW/);
+  assert.match(pdf, /Page 1 of /);
 });
 
 test("Generated pages preview module does not import resolution write services", () => {
