@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import { normalizeTreasury } from "../shared/adminModel.js";
 import {
   EXPENSE_SHEET_COLUMNS,
+  EXPENSE_SHEET_MONTH_COLUMNS,
   EXPENSE_SHEET_GRAND_TOTAL_TITLE,
   buildTreasuryExpenseSheetModel,
   buildTreasuryExpenseSheetWorkbook,
@@ -18,7 +19,7 @@ const financeSource = readFileSync(new URL("../modules/FinanceModules.jsx", impo
 
 const transactions = [
   // Banner bought 5 July, repaid 15 August: the expense sheet keeps 5 July.
-  normalizeTreasury("banner", { title: "Club Banner", type: "expense", amount: 700, date: "2026-07-05", avenue: "Club", paymentMode: "Cash", paidBy: "Aneesh", reimbursementStatus: "Done", reimbursedTo: "Aneesh", reimbursementDate: "2026-08-15" }),
+  normalizeTreasury("banner", { title: "Club Banner", type: "expense", amount: 700, date: "2026-07-05", avenue: "Club", paymentMode: "Cash", paidBy: "Aneesh", reimbursementStatus: "Done", reimbursedTo: "Aneesh", reimbursementDate: "2026-08-15", billUrl: "https://drive.google.com/file/d/banner-bill/view" }),
   normalizeTreasury("pins", { title: "Club pins", type: "expense", amount: 590, date: "2026-07-12", avenue: "CSD", paymentMode: "UPI", paidBy: "Prathamesh", reimbursementStatus: "Pending", reimbursedTo: "Prathamesh" }),
   normalizeTreasury("dues", { title: "District Dues", type: "expense", amount: 5600, date: "2026-08-02", avenue: "Other", paymentMode: "Cheque" }),
   normalizeTreasury("bank", { title: "Account maintenance charges", type: "expense", amount: 88.5, date: "2026-08-21", paymentMode: "Bank Transfer" }),
@@ -42,7 +43,8 @@ test("expenses are grouped by the day the money was spent, with income and fines
 test("each row carries category, paid by and notes from the entry", () => {
   const [july, august] = buildTreasuryExpenseSheetModel({ transactions, startMonth: "2026-07", endMonth: "2026-08" }).months;
   const [banner, pins] = july.rows;
-  assert.deepEqual(banner, { id: "banner", details: "Club Banner", category: "OTHERS", cost: 700, date: "2026-07-05", paidBy: "Aneesh", notes: "Paid (Cash) · Reimbursed on 15 Aug 2026", cash: true });
+  assert.deepEqual(banner, { id: "banner", details: "Club Banner", category: "OTHERS", cost: 700, date: "2026-07-05", paidBy: "Aneesh", notes: "Paid (Cash) · Reimbursed on 15 Aug 2026", billUrl: "https://drive.google.com/file/d/banner-bill/view", cash: true });
+  assert.equal(pins.billUrl, "", "an entry without a bill has an empty link");
   assert.equal(pins.category, "CSD");
   assert.equal(pins.notes, "UPI · Reimbursement pending");
   assert.equal(august.rows[0].paidBy, "Club");
@@ -68,7 +70,12 @@ test("the workbook has one tab per month in the treasurer's layout, then Grand T
 
   assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ["July-26", "August-26", "September-26", EXPENSE_SHEET_GRAND_TOTAL_TITLE]);
   const july = workbook.getWorksheet("July-26");
-  assert.deepEqual(july.getRow(1).values.slice(1), [...EXPENSE_SHEET_COLUMNS]);
+  assert.deepEqual(july.getRow(1).values.slice(1), [...EXPENSE_SHEET_MONTH_COLUMNS]);
+  assert.deepEqual(EXPENSE_SHEET_MONTH_COLUMNS.slice(0, 6), [...EXPENSE_SHEET_COLUMNS], "the treasurer's six columns are unchanged, Bill is added after Notes");
+  assert.equal(july.getCell("G1").value, "Bill");
+  assert.deepEqual(july.getCell("G2").value, { text: "Open bill", hyperlink: "https://drive.google.com/file/d/banner-bill/view" });
+  assert.equal(july.getCell("G3").value, "Not attached");
+  assert.ok(!july.getRow(4).getCell(7).value, "the total row has nothing in the Bill column");
   assert.equal(july.getCell("A2").value, "Club Banner");
   assert.equal(july.getCell("C2").value, 700);
   assert.equal(july.getCell("D2").value.toISOString().slice(0, 10), "2026-07-05");
@@ -92,4 +99,16 @@ test("Treasury has an Export Expense Sheet button with a From/To month dialog", 
   assert.match(financeSource, /title="Export Expense Sheet"/);
   assert.match(financeSource, /\[\["startMonth", "From month"\], \["endMonth", "To month"\]\]/);
   assert.match(financeSource, /buildTreasuryExpenseSheetModel\(\{ transactions, \.\.\.expenseSheetDraft \}\)/);
+});
+
+test("only https bill links are kept, and the Grand Total tab has no Bill column", async () => {
+  const model = buildTreasuryExpenseSheetModel({ transactions: [
+    normalizeTreasury("ok", { title: "Ok", type: "expense", amount: 10, date: "2026-07-01", billUrl: "https://drive.google.com/file/d/ok/view" }),
+    normalizeTreasury("plain", { title: "Plain http", type: "expense", amount: 10, date: "2026-07-02", billUrl: "http://example.com/bill" }),
+    normalizeTreasury("junk", { title: "Junk", type: "expense", amount: 10, date: "2026-07-03", billUrl: "javascript:alert(1)" }),
+  ], startMonth: "2026-07", endMonth: "2026-07" });
+  assert.deepEqual(model.months[0].rows.map((row) => row.billUrl), ["https://drive.google.com/file/d/ok/view", "", ""]);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await buildTreasuryExpenseSheetWorkbook(ExcelJS, model).xlsx.writeBuffer());
+  assert.equal(workbook.getWorksheet(EXPENSE_SHEET_GRAND_TOTAL_TITLE).getRow(1).values.slice(1).length, 4);
 });

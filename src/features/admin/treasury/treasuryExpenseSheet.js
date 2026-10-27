@@ -17,6 +17,8 @@ const MONTH_NAMES = Object.freeze([
   "July", "August", "September", "October", "November", "December",
 ]);
 export const EXPENSE_SHEET_COLUMNS = Object.freeze(["Expense details", "Category", "Cost", "Transaction date", "Paid by", "Notes"]);
+// Month tabs add a link to the bill after Notes; the Grand Total tab is totals only.
+export const EXPENSE_SHEET_MONTH_COLUMNS = Object.freeze([...EXPENSE_SHEET_COLUMNS, "Bill"]);
 export const EXPENSE_SHEET_GRAND_TOTAL_TITLE = "Grand Total Expense";
 export const EXPENSE_SHEET_CURRENCY_FORMAT = '[$₹]#,##0.00';
 const COLORS = Object.freeze({
@@ -115,6 +117,15 @@ function notesFor(record) {
   return parts.join(" · ");
 }
 
+function billUrlFor(record) {
+  try {
+    const url = new URL(text(record?.billUrl, 1000));
+    return url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function categoryFor(record) {
   const avenue = normalizeTreasuryAvenue(record.avenue);
   return !avenue || ["club", "other"].includes(avenue.toLowerCase()) ? "OTHERS" : avenue.toUpperCase();
@@ -138,6 +149,7 @@ export function buildTreasuryExpenseSheetModel({ transactions = [], startMonth, 
         date: item.date,
         paidBy: paidByFor(item),
         notes: notesFor(item),
+        billUrl: billUrlFor(item),
         cash: isCash(item),
       }));
     const total = Math.round(rows.reduce((sum, row) => sum + row.cost, 0) * 100) / 100;
@@ -174,9 +186,9 @@ function dateCellValue(isoDate) {
 
 function addMonthSheet(workbook, month) {
   const sheet = workbook.addWorksheet(month.tabName, { views: [{ state: "frozen", ySplit: 1 }] });
-  sheet.columns = [27.6, 20.1, 22.6, 15.1, 25.1, 30].map((width) => ({ width }));
+  sheet.columns = [27.6, 20.1, 22.6, 15.1, 25.1, 30, 18].map((width) => ({ width }));
 
-  const header = sheet.addRow(EXPENSE_SHEET_COLUMNS);
+  const header = sheet.addRow(EXPENSE_SHEET_MONTH_COLUMNS);
   header.height = 20;
   header.eachCell((cell) => {
     fill(cell, COLORS.header);
@@ -186,9 +198,10 @@ function addMonthSheet(workbook, month) {
   });
 
   month.rows.forEach((row, index) => {
-    const added = sheet.addRow([row.details, row.category, row.cost, dateCellValue(row.date), row.paidBy, row.notes]);
+    const added = sheet.addRow([row.details, row.category, row.cost, dateCellValue(row.date), row.paidBy, row.notes, row.billUrl ? { text: "Open bill", hyperlink: row.billUrl } : "Not attached"]);
     added.getCell(3).numFmt = EXPENSE_SHEET_CURRENCY_FORMAT;
     added.getCell(4).numFmt = "dd/mm/yyyy";
+    added.getCell(7).font = row.billUrl ? { color: { argb: "FF0563C1" }, underline: true } : { italic: true, color: { argb: "FF8A7F72" } };
     added.eachCell({ includeEmpty: true }, (cell) => {
       if (index % 2 === 1) fill(cell, COLORS.stripe);
       border(cell);
@@ -201,6 +214,7 @@ function addMonthSheet(workbook, month) {
     "",
     month.rows.length ? { formula: `SUM(C2:C${lastDataRow})`, result: month.total } : 0,
     cashLabel(month.cashTotal),
+    "",
     "",
     "",
   ]);
