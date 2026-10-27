@@ -384,7 +384,7 @@ test('a replacement keeps the old category even when the client sends another', 
   assert.equal(env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash].documentCategory, 'inward');
 });
 
-test('bulk upload sessions always use no category', async () => {
+test('legacy bulk uploads use the main folder when no destinations are supplied', async () => {
   const env = await categoryEnv();
   const bulk = await env.service.createBulkUploadSessions('president-uid', {
     visitType: 'clubAssembly',
@@ -396,6 +396,86 @@ test('bulk upload sessions always use no category', async () => {
     assert.deepEqual(stored.expectedFiles.map((file) => file.documentCategory), ['']);
     assert.equal(env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash].documentCategory, '');
   }
+});
+
+test('bulk uploads authorize each positions own Resolutions folder and finalize there', async () => {
+  const env = await categoryEnv();
+  const destinations = [];
+  for (const positionKey of ['secretary', 'editor']) {
+    const created = await env.service.createCustomFolder('president-uid', { visitType: 'clubAssembly', positionKey, name: 'Resolutions' });
+    destinations.push({ positionKey, documentCategory: created.created.key });
+  }
+  assert.notEqual(destinations[0].documentCategory, destinations[1].documentCategory);
+  const bulk = await env.service.createBulkUploadSessions('president-uid', {
+    visitType: 'clubAssembly', positionKeys: ['secretary', 'editor'], destinations,
+    files: [categoryFile({ clientFileId: 'resolution-1', fileName: 'Resolution 1.pdf' })],
+  });
+  for (let i = 0; i < bulk.sessions.length; i++) {
+    const info = bulk.sessions[i];
+    const stored = env.adapter.store.visitSubmissionUploadSessions[info.sessionId];
+    const ticket = env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash];
+    assert.equal(info.files[0].documentCategory, destinations[i].documentCategory);
+    assert.equal(stored.expectedFiles[0].documentCategory, destinations[i].documentCategory);
+    assert.equal(ticket.documentCategoryName, 'Resolutions');
+    const { result } = await uploadThroughDrive(env, 'president-uid', info, {
+      driveFileId: `bulkResolutionFile000${i}`, driveFolderId: `resolutionFolder000${i}`, positionFolderId: `positionFolder0000${i}`,
+    });
+    assert.equal(env.adapter.store.visitSubmissions[result.submissionId].documentCategory, destinations[i].documentCategory);
+    assert.equal(env.adapter.store.visitSubmissionPositions[`clubAssembly_${info.positionKey}`].reservedFileCount, 0);
+  }
+  const audit = await env.service.recordBulkUploadAudit('president-uid', { bulkUploadId: bulk.bulkUploadId });
+  assert.equal(audit.successCount, 2);
+});
+
+test('bulk destinations reject missing, cross-position, forged and unsupported folders atomically', async () => {
+  const env = await categoryEnv();
+  const created = (await env.service.createCustomFolder('president-uid', { visitType: 'clubAssembly', positionKey: 'secretary', name: 'Resolutions' })).created;
+  const base = { visitType: 'clubAssembly', positionKeys: ['editor'], files: [categoryFile()] };
+  for (const destinations of [
+    [], null,
+    [{ positionKey: 'editor', documentCategory: created.key }],
+    [{ positionKey: 'editor', documentCategory: 'custom-deadbeef' }],
+    [{ positionKey: 'secretary', documentCategory: '' }],
+    [{ positionKey: 'editor', documentCategory: 'inward' }],
+    [{ positionKey: 'editor', documentCategory: '', driveFolderId: 'injectedFolder0001' }],
+  ]) await rejectsWith(env.service.createBulkUploadSessions('president-uid', { ...base, destinations }), 'invalid-argument');
+  await rejectsWith(env.service.createBulkUploadSessions('bod-editor', { ...base, destinations: [{ positionKey: 'editor', documentCategory: '' }] }), 'permission-denied');
+  assert.equal(Object.keys(env.adapter.store.visitSubmissionUploadSessions || {}).length, 0);
+  assert.equal(env.adapter.store.visitSubmissionPositions.clubAssembly_editor.reservedFileCount || 0, 0);
+});
+
+test('bulk retries retain their original subfolder and reject retargeting', async () => {
+  const env = await categoryEnv();
+  const created = (await env.service.createCustomFolder('president-uid', { visitType: 'clubAssembly', positionKey: 'editor', name: 'Resolutions' })).created;
+  const input = { visitType: 'clubAssembly', positionKeys: ['editor'], destinations: [{ positionKey: 'editor', documentCategory: created.key }], files: [categoryFile()] };
+  const bulk = await env.service.createBulkUploadSessions('president-uid', input);
+  await env.service.cancelUploadSession('president-uid', { sessionId: bulk.sessions[0].sessionId });
+  await rejectsWith(env.service.createBulkUploadSessions('president-uid', { ...input, bulkUploadId: bulk.bulkUploadId, destinations: [{ positionKey: 'editor', documentCategory: '' }] }), 'failed-precondition', /original/);
+  const retry = await env.service.createBulkUploadSessions('president-uid', { ...input, bulkUploadId: bulk.bulkUploadId });
+  assert.equal(retry.sessions[0].files[0].documentCategory, created.key);
+  const stored = env.adapter.store.visitSubmissionUploadSessions[retry.sessions[0].sessionId];
+  assert.equal(env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash].documentCategoryName, 'Resolutions');
+});
+
+test('bulk subfolders use trusted parent metadata and reject a destination removed before reservation', async () => {
+  const env = await categoryEnv();
+  const parent = (await env.service.createCustomFolder('president-uid', { visitType: 'clubAssembly', positionKey: 'editor', name: 'Resolutions' })).created;
+  const child = (await env.service.createCustomFolder('president-uid', { visitType: 'clubAssembly', positionKey: 'editor', name: '2026', parentKey: parent.key })).created;
+  const input = { visitType: 'clubAssembly', positionKeys: ['editor'], destinations: [{ positionKey: 'editor', documentCategory: child.key }], files: [categoryFile()] };
+  const bulk = await env.service.createBulkUploadSessions('president-uid', input);
+  const stored = env.adapter.store.visitSubmissionUploadSessions[bulk.sessions[0].sessionId];
+  const ticket = env.adapter.store.driveUploadTickets[stored.expectedFiles[0].ticketHash];
+  assert.deepEqual([ticket.documentCategoryName, ticket.documentCategoryParentKey, ticket.documentCategoryParentName], ['2026', parent.key, 'Resolutions']);
+  await env.service.cancelUploadSession('president-uid', { sessionId: bulk.sessions[0].sessionId });
+  const count = Object.keys(env.adapter.store.visitSubmissionUploadSessions).length;
+  const run = env.adapter.runTransaction.bind(env.adapter);
+  env.adapter.runTransaction = async callback => {
+    env.adapter.store.visitSubmissionPositions.clubAssembly_editor.customFolders = [];
+    return run(callback);
+  };
+  await rejectsWith(env.service.createBulkUploadSessions('president-uid', input), 'invalid-argument');
+  assert.equal(Object.keys(env.adapter.store.visitSubmissionUploadSessions).length, count);
+  assert.equal(env.adapter.store.visitSubmissionPositions.clubAssembly_editor.reservedFileCount, 0);
 });
 
 // ---------------------------------------------------------------------------

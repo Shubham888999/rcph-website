@@ -2101,12 +2101,32 @@ function createVisitSubmissionService(options) {
     return unique;
   }
 
+  function normalizeBulkDestinations(values, positionKeys) {
+    if (values === undefined) return new Map(positionKeys.map(key => [key, '']));
+    if (!Array.isArray(values) || values.length !== positionKeys.length) {
+      throw makeVisitSubmissionError('invalid-argument', 'Select one destination inside each selected position folder.');
+    }
+    const destinations = new Map();
+    for (const item of values) {
+      if (!item || typeof item !== 'object' || Object.keys(item).some(key => !['positionKey', 'documentCategory'].includes(key))) {
+        throw makeVisitSubmissionError('invalid-argument', 'Invalid bulk upload destination.');
+      }
+      const positionKey = normalizeCanonicalPositionKey(item.positionKey, positionHelpers);
+      if (!positionKeys.includes(positionKey) || destinations.has(positionKey) || typeof item.documentCategory !== 'string') {
+        throw makeVisitSubmissionError('invalid-argument', 'Select one valid destination for each selected position folder.');
+      }
+      destinations.set(positionKey, item.documentCategory);
+    }
+    return destinations;
+  }
+
   async function createBulkUploadSessions(uid, input) {
     rejectBrowserSuppliedVisitAuthorityFields(input || {});
     const access = await resolveAccessContext(uid);
     assertManageAccess(access);
     const visitType = normalizeVisitType(input?.visitType);
     const positionKeys = normalizeBulkPositionKeys(input?.positionKeys);
+    const destinations = normalizeBulkDestinations(input?.destinations, positionKeys);
     const existingBulkUploadId = input?.bulkUploadId ? normalizeBulkUploadId(input.bulkUploadId) : '';
     const bulkUploadId = existingBulkUploadId || adapter.newDocId('visitSubmissionBulkUploads');
     const config = await loadVisitConfig(visitType);
@@ -2118,6 +2138,8 @@ function createVisitSubmissionService(options) {
     const expiresAtMillis = nowValue + VISIT_UPLOAD_SESSION_TTL_MS;
     const plans = folders.map((folder) => {
       assertVisitFolderAllowsUpload(config, folder);
+      const documentCategory = normalizeDocumentCategory(destinations.get(folder.positionKey), listCustomFolders(folder));
+      assertBuiltInCategoryAllowed(documentCategory, folder.positionKey);
       const files = normalizeUploadFileDescriptors(input?.files, folder, visitType, folder.positionKey);
       const sessionId = adapter.newDocId('visitSubmissionUploadSessions');
       const tickets = files.map((file) => {
@@ -2137,6 +2159,7 @@ function createVisitSubmissionService(options) {
       });
       return {
         folder,
+        documentCategory,
         folderId: visitPositionDocId(visitType, folder.positionKey, positionHelpers),
         sessionId,
         files,
@@ -2152,6 +2175,13 @@ function createVisitSubmissionService(options) {
         if (!bulkSnap.exists) {
           throw makeVisitSubmissionError('not-found', 'Bulk upload session not found.');
         }
+        const original = bulkSnap.data || {};
+        const originalDestinations = new Map((Array.isArray(original.destinations)
+          ? original.destinations : (original.positionKeys || []).map(positionKey => ({ positionKey, documentCategory: '' })))
+          .map(item => [item.positionKey, item.documentCategory]));
+        if (original.visitType !== visitType || plans.some(plan => originalDestinations.get(plan.folder.positionKey) !== plan.documentCategory)) {
+          throw makeVisitSubmissionError('failed-precondition', 'Retries must use the original visit and destination folders. Start a new bulk upload to change destinations.');
+        }
       }
 
       const latestFolders = new Map();
@@ -2163,6 +2193,18 @@ function createVisitSubmissionService(options) {
         const latestFolder = shapePosition(folderSnap.data, visitType, plan.folder.positionKey, null, null, positionHelpers);
         latestFolders.set(plan.folder.positionKey, latestFolder);
         assertVisitFolderAllowsUpload(config, latestFolder);
+        // Resolve names and Drive IDs from the latest server record, never from the browser.
+        const documentCategory = normalizeDocumentCategory(plan.documentCategory, listCustomFolders(latestFolder));
+        assertBuiltInCategoryAllowed(documentCategory, latestFolder.positionKey);
+        const info = categoryDriveInfo(latestFolder, documentCategory);
+        plan.tickets.forEach(file => Object.assign(file, {
+          documentCategory,
+          documentCategoryName: info.name,
+          documentCategoryFolderId: info.folderId,
+          documentCategoryParentKey: info.parentKey,
+          documentCategoryParentName: info.parentName,
+          documentCategoryParentFolderId: info.parentFolderId,
+        }));
         const activeFileCount = Number(latestFolder.activeFileCount || 0);
         const reservedFileCount = Number(latestFolder.reservedFileCount || 0);
         const maxActiveFiles = Number(latestFolder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES);
@@ -2193,6 +2235,7 @@ function createVisitSubmissionService(options) {
           actorRole: access.role,
           visitType,
           positionKeys,
+          destinations: plans.map(plan => ({ positionKey: plan.folder.positionKey, documentCategory: plan.documentCategory })),
           selectedFileCount,
           attemptedUploadCount,
           status: 'sessions-created',
@@ -2235,7 +2278,7 @@ function createVisitSubmissionService(options) {
             mimeType: file.mimeType,
             sizeBytes: file.sizeBytes,
             ticketHash: file.ticketHash,
-            documentCategory: '',
+            documentCategory: file.documentCategory,
             status: 'reserved',
           })),
           expiresAt: timestampFromMillis(adapter, expiresAtMillis),
@@ -2261,7 +2304,12 @@ function createVisitSubmissionService(options) {
             mimeType: file.mimeType,
             sizeBytes: file.sizeBytes,
             uploadProofHash: file.uploadProofHash,
-            documentCategory: '',
+            documentCategory: file.documentCategory,
+            documentCategoryName: file.documentCategoryName,
+            documentCategoryFolderId: file.documentCategoryFolderId,
+            documentCategoryParentKey: file.documentCategoryParentKey,
+            documentCategoryParentName: file.documentCategoryParentName,
+            documentCategoryParentFolderId: file.documentCategoryParentFolderId,
             expiresAt: timestampFromMillis(adapter, file.expiresAtMillis),
             expiresAtMillis: file.expiresAtMillis,
             deleteAt: timestampFromMillis(adapter, file.deleteAtMillis),
@@ -2278,6 +2326,7 @@ function createVisitSubmissionService(options) {
       details: {
         bulkUploadId,
         selectedPositionKeys: positionKeys,
+        destinations: plans.map(plan => ({ positionKey: plan.folder.positionKey, documentCategory: plan.documentCategory })),
         selectedFileCount,
         attemptedUploadCount,
         sessionCount: plans.length,
@@ -2310,6 +2359,7 @@ function createVisitSubmissionService(options) {
           sanitizedOriginalFileName: file.sanitizedOriginalFileName,
           mimeType: file.mimeType,
           sizeBytes: file.sizeBytes,
+          documentCategory: file.documentCategory,
           expiresAt: file.expiresAtMillis,
         })),
       })),
@@ -2346,6 +2396,7 @@ function createVisitSubmissionService(options) {
       for (const file of expectedFiles) {
         const pairKey = [
           positionKey,
+          file.documentCategory || '',
           file.clientFileId,
           file.originalFileName || file.fileName,
           file.sizeBytes,

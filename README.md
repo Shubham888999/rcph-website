@@ -30,6 +30,20 @@ Current Visit Submission uploads use the Firebase HTTPS, ticket-based architectu
 
 Legacy Visit Submission design documentation has been archived at `docs/archive/visit-submission-system-design-legacy/` and must not be used as the active uploader architecture.
 
+Bulk upload supports a destination inside each selected position folder, including custom
+folders and one-level subfolders. A shared destination label such as **Resolutions** is
+resolved to each position's own folder key; missing destinations block upload instead of
+falling back to the main folder. Individual destination selectors can override the shared
+choice. Create missing folders through the Visit folder UI, then reopen Bulk upload.
+
+The callable accepts optional `destinations: [{ positionKey, documentCategory }]` alongside
+`positionKeys` and `files`; each selected position must have exactly one destination.
+Omitting `destinations` preserves legacy main-folder uploads. Only category keys are accepted:
+Drive IDs, names and parent metadata are resolved from the latest server record in the
+reservation transaction. Bulk retries remain bound to the original visit/destinations.
+Deploy `createVisitSubmissionBulkUploadSessions` and `recordVisitSubmissionBulkUploadAudit`
+before the React frontend. No Firestore migration or rules change is required.
+
 ## Local Development
 
 Install root and Functions dependencies separately:
