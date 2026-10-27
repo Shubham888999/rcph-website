@@ -191,3 +191,16 @@ test("subfolders: + Subfolder on each folder, indented groups, and delete blocke
   assert.match(moduleSource, /disabled=\{busy \|\| hasFiles \|\| hasSubfolders\}/);
   assert.match(moduleSource, /subfolderCount: group\.subfolderCount/);
 });
+
+test("select several files and remove or withdraw them in one go, with no reason asked", () => {
+  assert.match(moduleSource, /const bulkSelectable = visitBulkSelectable\(data\.submissions\);/);
+  assert.match(moduleSource, /setSelectMode\(true\)\}>Select files<\/button>/);
+  assert.match(moduleSource, /\{bulkSummary\.verb\} selected \(\{bulkSelectedItems\.length\}\)/);
+  assert.match(moduleSource, /Select all in this folder/);
+  assert.match(moduleSource, /selection=\{\{ active: selectMode, selectedIds, onToggle: toggleSelected \}\}/);
+  assert.match(moduleSource, /dialog\.type === "bulk-remove"\) return <BulkRemoveDialog/);
+  assert.match(moduleSource, /if \(item\.action === "remove"\) await visitCalls\.remove\(item\.submissionId, ""\);\s+else await visitCalls\.withdraw\(item\.submissionId\);/);
+  assert.match(moduleSource, /The Drive files are not deleted\./);
+  assert.match(detailsSource, /<input type="checkbox" checked=\{picked\} onChange=\{\(\) => selection\.onToggle\(item\)\}/);
+  assert.match(detailsSource, /selection\?\.active === true && Boolean\(visitBulkAction\(item\)\)/);
+});

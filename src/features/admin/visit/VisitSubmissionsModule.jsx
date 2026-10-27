@@ -5,7 +5,7 @@ import AdminModuleHeader from "../AdminModuleHeader";
 import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
-import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, visitFolderCategories, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices, VISIT_CUSTOM_FOLDER_NAME_MAX, VISIT_MAX_CUSTOM_FOLDERS, VISIT_MAX_SUBFOLDERS, VISIT_MAX_TOTAL_FOLDERS, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, visitFolderCategories, visitBulkAction, visitBulkSelectable, visitBulkSummary, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices, VISIT_CUSTOM_FOLDER_NAME_MAX, VISIT_MAX_CUSTOM_FOLDERS, VISIT_MAX_SUBFOLDERS, VISIT_MAX_TOTAL_FOLDERS, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
 import VisitSubmissionFiles, { VisitFileTypeBadge } from "./VisitSubmissionFiles";
 import {
   getFolderSummaryItems,
@@ -85,7 +85,7 @@ export default function VisitSubmissionsModule({ onNotice }) {
   return <>
     <AdminModuleHeader kicker="Official filing room" title="Club Visits" description="Official visit document workspace for Club Assembly, DZR Visit, and DRR Visit." action={route.visit ? <button onClick={() => { setRoute({ visit: "", position: "" }); loadDashboard(); }}>Submission dashboard</button> : null} />
     {!route.visit ? <VisitDashboardWorkspace data={state.dashboard} access={access} openVisit={openVisit} busy={busy} mutate={mutate} setDialog={setDialog} load={loadDashboard} /> : route.position ? <FolderDetail data={state.detail} busy={busy} mutate={mutate} reload={reload} setDialog={setDialog} /> : <VisitFoldersWorkspace data={state.folders} openFolder={openFolder} setDialog={setDialog} />}
-    {dialog ? <VisitDialog dialog={dialog} visits={state.dashboard?.visits || []} busy={busy} mutate={mutate} onClose={() => setDialog(null)} reload={reload} /> : null}
+    {dialog ? <VisitDialog dialog={dialog} visits={state.dashboard?.visits || []} busy={busy} mutate={mutate} onClose={() => setDialog(null)} reload={reload} onNotice={onNotice} /> : null}
   </>;
 }
 
@@ -531,6 +531,8 @@ function FolderDetailWorkspaceView({
   setDialog,
   updatePrimaryPresentation,
 }) {
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const folderPresentation = getVisitFolderPresentation(folder);
   const primaryPresentation = data.submissions.find((item) => (
     item.isPrimaryPresentation || item.submissionId === folder.primaryPresentationSubmissionId
@@ -542,6 +544,29 @@ function FolderDetailWorkspaceView({
   const uploadChoices = visitUploadChoices(folder);
   const usesCategories = visitFolderUsesCategories(folder);
   const canChangeFolders = folder.supportsCustomFolders && folder.canManageCustomFolders && (folder.canUpload || canManageFolder);
+  // Select several files and remove (managers) or withdraw (the uploader) them in one go.
+  const bulkSelectable = visitBulkSelectable(data.submissions);
+  const bulkSelectedItems = bulkSelectable.filter((item) => selectedIds.has(item.submissionId));
+  const toggleSelected = (item) => setSelectedIds((current) => {
+    const next = new Set(current);
+    if (next.has(item.submissionId)) next.delete(item.submissionId);
+    else next.add(item.submissionId);
+    return next;
+  });
+  const setSelectedFor = (items, checked) => setSelectedIds((current) => {
+    const next = new Set(current);
+    items.forEach((item) => { if (checked) next.add(item.submissionId); else next.delete(item.submissionId); });
+    return next;
+  });
+  const endSelecting = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+  const startBulkRemove = () => setDialog({
+    type: "bulk-remove",
+    items: bulkSelectedItems.map((item) => ({ submissionId: item.submissionId, fileName: item.fileName, action: visitBulkAction(item) })),
+  });
+  const bulkSummary = visitBulkSummary(bulkSelectedItems.map((item) => ({ action: visitBulkAction(item) })));
   const moveCategory = (item, documentCategory) => mutate(
     "move-category",
     () => visitCalls.moveCategory(item.submissionId, documentCategory),
@@ -563,6 +588,7 @@ function FolderDetailWorkspaceView({
       onRemove={(item) => setDialog({ type: "remove", item })}
       onMove={moveCategory}
       categories={categories}
+      selection={{ active: selectMode, selectedIds, onToggle: toggleSelected }}
     />
   );
   return (
@@ -680,6 +706,21 @@ function FolderDetailWorkspaceView({
           </div>
           <span>{folder.activeFileCount} / {folder.totalMaxActiveFiles || folder.maxActiveFiles} active files</span>
         </div>
+        {bulkSelectable.length ? (
+          <div className="visit-bulk-bar" role="toolbar" aria-label="Select files">
+            {!selectMode ? (
+              <button type="button" onClick={() => setSelectMode(true)}>Select files</button>
+            ) : (
+              <>
+                <span className="visit-bulk-bar__count" aria-live="polite">{bulkSelectedItems.length} of {bulkSelectable.length} selected</span>
+                <button type="button" onClick={() => setSelectedFor(bulkSelectable, true)} disabled={bulkSelectedItems.length === bulkSelectable.length}>Select all</button>
+                <button type="button" onClick={() => setSelectedIds(new Set())} disabled={!bulkSelectedItems.length}>Clear</button>
+                <button type="button" className="danger" onClick={startBulkRemove} disabled={!bulkSelectedItems.length}>{bulkSummary.verb} selected ({bulkSelectedItems.length})</button>
+                <button type="button" onClick={endSelecting}>Done</button>
+              </>
+            )}
+          </div>
+        ) : null}
         {canChangeFolders ? (
           <div className="visit-custom-folders__bar">
             <button type="button" className="visit-custom-folders__add" disabled={visitTopLevelFolderCount(folder) >= VISIT_MAX_CUSTOM_FOLDERS || folder.customFolders.length >= VISIT_MAX_TOTAL_FOLDERS} onClick={() => setDialog({ type: "custom-folder-create", folder })}>+ New folder</button>
@@ -695,6 +736,16 @@ function FolderDetailWorkspaceView({
                   <h4 className="visit-category-group__title" id={groupId}>
                     {group.fullLabel || group.label}
                     <span className="visit-category-group__count">{group.items.length}{folder.categoryLimits?.[group.key] ? ` / ${folder.categoryLimits[group.key]}` : ""}</span>
+                    {selectMode && visitBulkSelectable(group.items).length ? (
+                      <label className="visit-category-group__select">
+                        <input
+                          type="checkbox"
+                          checked={visitBulkSelectable(group.items).every((item) => selectedIds.has(item.submissionId))}
+                          onChange={(event) => setSelectedFor(visitBulkSelectable(group.items), event.target.checked)}
+                        />
+                        Select all in this folder
+                      </label>
+                    ) : null}
                     {canChangeFolders && (group.canHaveSubfolders || group.custom) ? (
                       <span className="visit-custom-folders__tools">
                         {group.canHaveSubfolders ? <button type="button" disabled={group.subfolderCount >= VISIT_MAX_SUBFOLDERS || folder.customFolders.length >= VISIT_MAX_TOTAL_FOLDERS} onClick={() => setDialog({ type: "custom-folder-create", folder, parent: { key: group.key, name: group.label } })}>+ Subfolder</button> : null}
@@ -714,7 +765,7 @@ function FolderDetailWorkspaceView({
   );
 }
 
-function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {
+function VisitDialog({ dialog, visits, busy, mutate, onClose, reload, onNotice }) {
   const [reason, setReason] = useState("");
   const [file, setFile] = useState(null);
   const [form, setForm] = useState(dialog.visit || dialog.folder || {});
@@ -723,9 +774,76 @@ function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {
   if (dialog.type === "moderation") return <AdminDialog title="Visit moderation" busy={busy} onClose={onClose} className="admin-dialog--wide"><Moderation visits={visits} /></AdminDialog>;
   if (dialog.type === "bulk-upload") return <BulkVisitUploadDialog key={dialog.visit.visitType} visit={dialog.visit} onClose={onClose} reload={reload} />;
   if (dialog.type === "replace") return <AdminDialog title={`Replace ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><label htmlFor="visit-replacement-file">Choose replacement file</label><input id="visit-replacement-file" type="file" accept={VISIT_FILE_ACCEPT} onChange={(event) => setFile(event.target.files?.[0] || null)} />{file ? <p>{file.name} · {formatVisitFileSize(file.size)}</p> : null}<button disabled={!file || busy} onClick={() => mutate("replace", async () => { const error = validateVisitFile(file, dialog.folder); if (error) throw new Error(error); const descriptor = { clientFileId: `replace-${Date.now()}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }; const session = await visitCalls.replace(dialog.item.submissionId, [descriptor]); const approved = session.files?.[0]; if (!approved) throw new Error("Replacement session failed."); const proof = await uploadVisitFile(file, session, approved); return visitCalls.finalize({ sessionId: session.sessionId, clientFileId: approved.clientFileId, ticket: approved.ticket, completionProof: proof.completionProof }); }, "Submission replaced.", reload)}>Replace file</button></AdminDialog>;
+  if (dialog.type === "bulk-remove") return <BulkRemoveDialog dialog={dialog} onClose={onClose} reload={reload} onNotice={onNotice} />;
   if (dialog.type.startsWith("custom-folder-")) return <CustomFolderDialog dialog={dialog} busy={busy} mutate={mutate} onClose={onClose} reload={reload} />;
   const remove = dialog.type === "remove";
   return <AdminDialog title={`${remove ? "Remove" : "Withdraw"} ${dialog.item.fileName}?`} busy={busy} onClose={onClose}>{remove ? <label>Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></label> : <p>The submission will be withdrawn and its active reservation released.</p>}<div className="admin-actions"><button onClick={onClose}>Cancel</button><button className="danger" disabled={busy || (remove && !reason.trim())} onClick={() => mutate(dialog.type, () => remove ? visitCalls.remove(dialog.item.submissionId, reason.trim()) : visitCalls.withdraw(dialog.item.submissionId), `Submission ${remove ? "removed" : "withdrawn"}.`, reload)}>Confirm</button></div></AdminDialog>;
+}
+
+// Removes (managers) or withdraws (the uploader) the chosen files one after another. No reason is
+// asked. Files are only taken off the site; the Drive files stay for the admin to delete.
+function BulkRemoveDialog({ dialog, onClose, reload, onNotice }) {
+  const { items } = dialog;
+  const [progress, setProgress] = useState(null);
+  const [result, setResult] = useState(null);
+  const summary = visitBulkSummary(items);
+  const running = progress !== null && result === null;
+
+  async function run() {
+    const failed = [];
+    let done = 0;
+    for (const [index, item] of items.entries()) {
+      setProgress({ current: index + 1, total: items.length });
+      try {
+        if (item.action === "remove") await visitCalls.remove(item.submissionId, "");
+        else await visitCalls.withdraw(item.submissionId);
+        done += 1;
+      } catch (error) {
+        failed.push({ name: item.fileName, message: safeAdminError(error) });
+      }
+    }
+    setResult({ done, failed });
+    const label = summary.withdrawing && !summary.removing ? "withdrawn" : "removed";
+    onNotice?.(failed.length
+      ? { type: "error", message: `${done} of ${items.length} files ${label}. ${failed.length} could not be ${label}.` }
+      : { type: "success", message: `${done} ${done === 1 ? "file" : "files"} ${label}.` });
+    if (!failed.length) {
+      onClose();
+      await reload();
+    }
+  }
+
+  const title = result
+    ? "Some files could not be changed"
+    : `${summary.verb} ${items.length} ${items.length === 1 ? "file" : "files"}?`;
+  return (
+    <AdminDialog title={title} busy={running} onClose={() => { if (!running) { onClose(); if (result) reload(); } }}>
+      {result ? (
+        <>
+          <p>{result.done} of {items.length} done. These could not be changed:</p>
+          <ul className="visit-bulk-dialog__list">
+            {result.failed.map((item) => <li className="is-failed" key={item.name}>{item.name}: {item.message}</li>)}
+          </ul>
+          <div className="admin-actions"><button type="button" onClick={() => { onClose(); reload(); }}>Close</button></div>
+        </>
+      ) : (
+        <>
+          <p>
+            {summary.removing && !summary.withdrawing ? "These files are taken off the website. The Drive files are not deleted." : summary.withdrawing && !summary.removing ? "These files are withdrawn and their places are released." : "These files are removed or withdrawn from the website. The Drive files are not deleted."}
+          </p>
+          <ul className="visit-bulk-dialog__list">
+            {items.map((item) => <li key={item.submissionId}>{item.fileName}</li>)}
+          </ul>
+          <div className="admin-actions">
+            <button type="button" onClick={onClose} disabled={running}>Cancel</button>
+            <button type="button" className="danger" onClick={run} disabled={running}>
+              {running ? `Working ${progress.current} of ${progress.total}...` : `${summary.verb} ${items.length} ${items.length === 1 ? "file" : "files"}`}
+            </button>
+          </div>
+        </>
+      )}
+    </AdminDialog>
+  );
 }
 
 // Adding, renaming and deleting the extra folders inside a position's folder.

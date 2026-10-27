@@ -10692,3 +10692,107 @@ min-width: 250px;
 .treasury-detail-panel .treasury-bank-proofs {
   margin: 0.85rem 1rem 0;
 }
+
+.visit-files li.has-select {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+.visit-files li.is-selected {
+  border-color: var(--internal-accent);
+  background: rgba(229, 194, 104, 0.1);
+}
+
+.visit-files__select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  min-height: 2.2rem;
+  cursor: pointer;
+}
+
+.visit-files__select input {
+  width: 1.15rem;
+  height: 1.15rem;
+  cursor: pointer;
+}
+
+.visit-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--internal-border);
+  background: var(--internal-surface-soft);
+}
+
+.visit-bulk-bar button {
+  min-height: 2.4rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--internal-border-strong);
+  border-radius: 0;
+  color: var(--internal-text);
+  background: var(--internal-surface-raised);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.visit-bulk-bar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.visit-bulk-bar button.danger {
+  border-color: #ff8a9a;
+  color: #ffbdc7;
+}
+
+.visit-bulk-bar__count {
+  margin-right: auto;
+  color: var(--internal-text-muted);
+  font-size: 0.9rem;
+}
+
+.visit-category-group__select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  color: var(--internal-text-muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.visit-bulk-dialog__list {
+  display: grid;
+  gap: 0.3rem;
+  max-height: 14rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  overflow: auto;
+  border: 1px solid var(--internal-border);
+  list-style: none;
+}
+
+.visit-bulk-dialog__list li {
+  overflow-wrap: anywhere;
+}
+
+.visit-bulk-dialog__list li.is-failed {
+  color: #ffabb6;
+}
+
+@media (max-width: 640px) {
+  .visit-files li.has-select {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .visit-files li.has-select > .visit-files__meta,
+  .visit-files li.has-select > .visit-files__actions {
+    grid-column: 1 / -1;
+  }
+}

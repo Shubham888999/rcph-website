@@ -4,7 +4,7 @@ import {
   getVisitThumbnailUrl,
 } from "./visitUploadModel";
 import { getVisitFileKind } from "./visitPresentationModel.js";
-import { VISIT_DOCUMENT_CATEGORIES } from "./visitModel.js";
+import { VISIT_DOCUMENT_CATEGORIES, visitBulkAction } from "./visitModel.js";
 
 function VisitThumbnail({ submission }) {
   const [failed, setFailed] = useState(false);
@@ -103,6 +103,7 @@ export default function VisitSubmissionFiles({
   onRemove,
   onMove,
   categories,
+  selection = null,
 }) {
   if (!submissions.length) {
     return (
@@ -120,8 +121,15 @@ export default function VisitSubmissionFiles({
         const selectionSaving = primarySelectionBusy === item.submissionId || (isPrimary && primarySelectionBusy === "__clear__");
         const selectionDisabled = Boolean(primarySelectionBusy);
         const kind = getVisitFileKind(item);
+        const selectable = selection?.active === true && Boolean(visitBulkAction(item));
+        const picked = selectable && selection.selectedIds.has(item.submissionId);
         return (
-          <li className={isPrimary ? "is-primary" : ""} key={item.submissionId}>
+          <li className={`${isPrimary ? "is-primary" : ""}${selectable ? " has-select" : ""}${picked ? " is-selected" : ""}`.trim()} key={item.submissionId}>
+            {selectable ? (
+              <label className="visit-files__select">
+                <input type="checkbox" checked={picked} onChange={() => selection.onToggle(item)} aria-label={`Select ${item.fileName}`} />
+              </label>
+            ) : null}
             <div className="visit-files__icon">
               <VisitThumbnail submission={item} />
               <VisitFileTypeBadge file={item} />
