@@ -30,7 +30,7 @@ test("all Resolution content coordinates remain inside the declared central safe
   for (const line of pages.flat().filter((item) => !item.branding)) {
     assert.ok(line.x >= RESOLUTION_CONTENT_BOUNDS.left);
     assert.ok(line.x < RESOLUTION_CONTENT_BOUNDS.right);
-    assert.ok(line.y >= RESOLUTION_CONTENT_BOUNDS.bottom);
+    assert.ok(line.y >= RESOLUTION_CONTENT_BOUNDS.bottom - (line.recordFooter ? 30 : 0));
     assert.ok(line.y <= RESOLUTION_CONTENT_BOUNDS.top);
   }
   assert.deepEqual(RESOLUTION_CONTENT_BOUNDS, { left: 54, right: 541, bottom: 260, top: 665 });
@@ -49,3 +49,32 @@ test("binary JPEG bytes survive assembly and xref points to byte-accurate object
     assert.match(text.slice(offset, offset + 20), /^\d+ 0 obj\n/);
   }
 });
+
+for (const [approvalMethod, repetitions] of [["website", 4], ["hybrid_email", 1]]) {
+  test(`${approvalMethod}: generation note stays with the technical record instead of creating a two-line page`, () => {
+    const details = {
+      resolution: {
+        id: "r1", status: "passed", result: "passed", resolutionNumber: "RCPH/2026-27/01",
+        title: "Resolution for Authorization of Personal Bank Account Usage for Club Use",
+        meetingTitle: "Board Meeting", meetingDate: "2026-10-25",
+        openedAt: "2026-10-25T18:13:00Z", closedAt: "2026-10-26T20:30:00Z",
+        approvalMethod, voteProcessingMode: "authenticated_final", eligibleVoterCount: 16,
+        votesReceivedCount: 16, approveCount: 16, rejectCount: 0, abstainCount: 0,
+        appendVoteTable: false,
+        auditBundleHash: "bffe7ada4eec07996b7ea99f5681806832bea96f40969df847a1f20fbb25aa55b",
+        body: "Financial operations must ensure accountability for club activities. ".repeat(repetitions),
+      },
+      votes: [],
+    };
+    const pages = buildResolutionPdfPages(details);
+    assert.equal(pages.length, 1, "metadata alone must not add a page");
+    const page = pages[0];
+    assert.ok(page.some(line => line.text.startsWith("Audit Reference:")));
+    assert.equal(page.at(-2).text, "System-generated resolution record");
+    assert.match(page.at(-1).text, /^Generated at:/);
+    assert.ok(page.at(-1).y >= RESOLUTION_CONTENT_BOUNDS.bottom - 30);
+    for (const line of page.filter(line => !line.recordFooter)) {
+      assert.ok(line.y >= RESOLUTION_CONTENT_BOUNDS.bottom, "body retains its original bottom limit");
+    }
+  });
+}

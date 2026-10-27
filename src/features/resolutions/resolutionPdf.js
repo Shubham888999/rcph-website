@@ -14,6 +14,8 @@ export const RESOLUTION_PAGE_NUMBER_POSITION = Object.freeze({ x: 505, y: 686 })
 
 const CONTENT_WIDTH = RESOLUTION_CONTENT_BOUNDS.right - RESOLUTION_CONTENT_BOUNDS.left;
 const CONTENT_START_Y = RESOLUTION_CONTENT_BOUNDS.top - 10;
+// Generation metadata may use 30 points below the body, well above the seal/footer.
+const RECORD_FOOTER_BOTTOM = RESOLUTION_CONTENT_BOUNDS.bottom - 30;
 const encoder = new TextEncoder();
 
 function formatDateTime(value) {
@@ -201,10 +203,13 @@ function buildDocumentBlocks(details, options = {}) {
       blocks.push(block(lines, lines.length));
     });
   }
-  blocks.push(block([
-    ...wrappedLines("System-generated resolution record", { size: 7.5, gap: 1 }),
-    ...wrappedLines(`Generated at: ${formatDateTime(new Date().toISOString())}`, { size: 7.5 }),
-  ], 2));
+  blocks.push({
+    ...block([
+      ...wrappedLines("System-generated resolution record", { size: 7.5, gap: 1 }),
+      ...wrappedLines(`Generated at: ${formatDateTime(new Date().toISOString())}`, { size: 7.5 }),
+    ].map((line) => ({ ...line, recordFooter: true })), 2),
+    bottom: RECORD_FOOTER_BOTTOM,
+  });
   return blocks;
 }
 
@@ -217,12 +222,13 @@ function paginateBlocks(blocks, startY = CONTENT_START_Y, continueY = startY) {
   let y = startY;
   const newPage = () => { pages.push([]); y = continueY; };
   for (const item of blocks) {
+    const bottom = item.bottom ?? RESOLUTION_CONTENT_BOUNDS.bottom;
     const keepCount = Math.min(item.keepLines, item.lines.length);
     const keepHeight = item.lines.slice(0, keepCount).reduce((total, line) => total + lineHeight(line), 0);
-    if (pages.at(-1).length && y - keepHeight < RESOLUTION_CONTENT_BOUNDS.bottom) newPage();
+    if (pages.at(-1).length && y - keepHeight < bottom) newPage();
     for (const line of item.lines) {
       const height = lineHeight(line);
-      if (pages.at(-1).length && y - height < RESOLUTION_CONTENT_BOUNDS.bottom) newPage();
+      if (pages.at(-1).length && y - height < bottom) newPage();
       pages.at(-1).push({ ...line, x: RESOLUTION_CONTENT_BOUNDS.left, y });
       y -= height;
     }
