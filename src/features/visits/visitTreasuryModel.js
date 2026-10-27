@@ -53,8 +53,11 @@ export function buildVisitTreasuryBreakdowns(rows = []) {
   const allRows = ledger.groups.flatMap((group) => group.rows);
   const income = buildTreasuryLedger(allRows.filter((row) => row.type === "income"));
   const expense = buildTreasuryLedger(allRows.filter((row) => row.type === "expense"));
+  // Fines are not avenue money: even when one is tagged to an avenue or an event it stays in
+  // the ledgers, Income/Expense and Month wise, but is left out of Avenue wise.
+  const avenueRows = allRows.filter((row) => !row.isFine);
   const avenues = new Map(VISIT_TREASURY_AVENUES.map((avenue) => [avenue.code, avenue]));
-  allRows.forEach((row) => {
+  avenueRows.forEach((row) => {
     const avenue = avenueDetails(row);
     if (!avenues.has(avenue.code)) avenues.set(avenue.code, avenue);
   });
@@ -66,7 +69,7 @@ export function buildVisitTreasuryBreakdowns(rows = []) {
     avenues: [...VISIT_TREASURY_AVENUES, ...additional].map((avenue) => {
       // A transaction's saved avenue owns its amount, even if the event has
       // several avenues. This prevents the same money being counted twice.
-      const selected = allRows.filter((row) => avenueDetails(row).code === avenue.code);
+      const selected = avenueRows.filter((row) => avenueDetails(row).code === avenue.code);
       return { ...avenue, ledger: buildTreasuryLedger(selected), events: eventsFor(selected) };
     }),
     incomeMonths: income.groups.map((group) => ({ ...group, ledger: buildTreasuryLedger(group.rows) })),

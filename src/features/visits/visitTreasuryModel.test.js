@@ -88,3 +88,31 @@ test("avenues discover Editor, catalog aliases and new custom labels from curren
   assert.equal(changed.avenues.some((avenue) => avenue.code === "EDITOR"), false);
   assert.equal(changed.avenues.find((avenue) => avenue.code === "CSD").ledger.entryCount, 1);
 });
+
+test("fines stay in the ledgers, Income and Month wise, but never appear under Avenue wise", () => {
+  const rows = normalize([
+    row("club-income", { type: "income", amount: 400, avenueCode: "ISD", date: "2026-09-20" }),
+    row("fine-a", { type: "income", amount: 50, avenueCode: "ISD", isFine: true, date: "2026-09-26", eventSource: "events", eventId: "gajasanskruti", eventName: "Gajasanskruti 10.0" }),
+    row("fine-b", { type: "income", amount: 50, avenueCode: "CSD", isFine: true, date: "2026-09-26" }),
+    row("fine-c", { type: "income", amount: 25, avenueCode: "OTHER", isFine: true, date: "2026-10-02" }),
+    row("spend", { type: "expense", amount: 100, avenueCode: "ISD", date: "2026-10-03" }),
+  ]);
+  assert.deepEqual(rows.map((item) => item.isFine), [false, true, true, true, false]);
+  const result = buildVisitTreasuryBreakdowns(rows);
+  const is = result.avenues.find((avenue) => avenue.code === "ISD");
+  assert.deepEqual(is.ledger.groups.flatMap((group) => group.rows.map((item) => item.transactionId)).sort(), ["club-income", "spend"]);
+  assert.deepEqual(is.ledger.totals, { receipts: 400, payments: 100, closing: 300 });
+  assert.deepEqual(is.events.map((event) => event.key), ["unlinked"], "a fine's event does not create an event under the avenue");
+  assert.equal(result.avenues.find((avenue) => avenue.code === "CSD").ledger.entryCount, 0);
+  assert.equal(result.avenues.some((avenue) => avenue.code === "OTHER"), false, "a fine alone does not add an avenue");
+  assert.equal(result.income.entryCount, 4, "Income still counts every fine");
+  assert.deepEqual(result.income.totals, { receipts: 525, payments: 0, closing: 525 });
+  assert.deepEqual(result.incomeMonths.map((month) => [month.monthKey, month.ledger.entryCount]), [["2026-09", 3], ["2026-10", 1]]);
+  assert.equal(buildVisitTreasuryBreakdowns(rows).income.totals.receipts, 525, "ledger totals are unchanged");
+});
+
+test("older servers that do not mark fines keep working as before", () => {
+  const rows = normalize([row("a", { type: "income", amount: 10, avenueCode: "ISD" })]);
+  assert.equal(rows[0].isFine, false);
+  assert.equal(buildVisitTreasuryBreakdowns(rows).avenues.find((avenue) => avenue.code === "ISD").ledger.entryCount, 1);
+});
