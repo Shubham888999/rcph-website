@@ -44,6 +44,17 @@ reservation transaction. Bulk retries remain bound to the original visit/destina
 Deploy `createVisitSubmissionBulkUploadSessions` and `recordVisitSubmissionBulkUploadAudit`
 before the React frontend. No Firestore migration or rules change is required.
 
+Secretary, Joint Secretary and Co-Secretary folders have independent **100-file allowances
+for Inward file and Outward file** in each visit. Their letters do not consume the configured
+ordinary file allowance (registers, supporting files and custom folders). Existing records
+are counted dynamically, including pending upload reservations; no count migration is needed.
+Replacement sessions do not consume an additional letter slot. Moves into a full allowance
+are rejected, with the original Drive location restored if a concurrent upload fills it.
+The UI shows each letter section's count out of 100 and the combined folder capacity.
+Deploy `getVisitSubmissionFolders`, `getVisitSubmissionFolder`,
+`createVisitSubmissionUploadSession`, `createVisitSubmissionBulkUploadSessions`,
+`replaceVisitSubmission` and `moveVisitSubmissionCategory` before Hosting for this change.
+
 ## Local Development
 
 Install root and Functions dependencies separately:

@@ -61,6 +61,7 @@ const DOCUMENT_CATEGORY_POSITION_KEYS = new Set(['secretary', 'joint-secretary',
 // Secretary folders: letters received / sent ("inward" / "outward", kept for existing
 // uploads) and their Excel registers (date, day, from/to, subject, reference).
 const DOCUMENT_CATEGORIES = Object.freeze(['inward', 'outward', 'inward-register', 'outward-register']);
+const SECRETARY_LETTER_LIMITS = Object.freeze({ inward: 100, outward: 100 });
 const DOCUMENT_CATEGORY_ERROR = 'Document category must be one of this position\'s folders, or empty.';
 const DEFAULT_MAX_FILES_PER_SELECTION = 10;
 const DEFAULT_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
@@ -1045,7 +1046,7 @@ function shapeSubmission(submission, access, options = {}) {
   };
 }
 
-function buildFolderResponse(config, folder, access, holdersByPosition = null) {
+function buildFolderResponse(config, folder, access, holdersByPosition = null, capacity = {}) {
   const authorized = access.canManageVisitSystem || folderAccessPositionKeys(access).includes(folder.positionKey);
   const folderWritable = visitFolderAllowsUpload(config, folder);
   const canUpload = Boolean(authorized && folderWritable);
@@ -1062,6 +1063,7 @@ function buildFolderResponse(config, folder, access, holdersByPosition = null) {
     activeFileCount: Number(folder.activeFileCount || 0),
     primaryPresentationSubmissionId: safePrimaryPresentationSubmissionId(folder.primaryPresentationSubmissionId),
     maxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES),
+    ...capacity,
     maxFilesPerSelection: Number(folder.maxFilesPerSelection || DEFAULT_MAX_FILES_PER_SELECTION),
     maxFileSizeBytes: Number(folder.maxFileSizeBytes || DEFAULT_MAX_FILE_SIZE_BYTES),
     canOpen: authorized,
@@ -1114,6 +1116,14 @@ function createFirestoreVisitSubmissionAdapter(db, admin) {
           async getDoc(collection, id) {
             const snap = await tx.get(db.collection(collection).doc(id));
             return { exists: snap.exists, id: snap.id, data: snap.exists ? (snap.data() || {}) : null };
+          },
+          async readFolderFiles(visitType, positionKey) {
+            const [active, sessions] = await Promise.all([
+              tx.get(db.collection('visitSubmissions').where('visitType', '==', visitType).where('positionKey', '==', positionKey).where('status', '==', 'active')),
+              tx.get(db.collection('visitSubmissionUploadSessions').where('visitType', '==', visitType).where('positionKey', '==', positionKey).where('status', 'in', VISIT_UPLOAD_SESSION_ACTIVE_STATUSES)),
+            ]);
+            const shape = snap => snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+            return [shape(active), shape(sessions)];
           },
           setDoc(collection, id, data, options) {
             tx.set(db.collection(collection).doc(id), data, options || {});
@@ -1265,6 +1275,7 @@ function createMemoryVisitSubmissionAdapter(initialData) {
     async runTransaction(callback) {
       return callback({
         getDoc: this.getDoc,
+        readFolderFiles: async (visitType, positionKey) => Promise.all([this.queryActiveSubmissionsForPositions(visitType, [positionKey]), this.queryActiveUploadSessionsForFolder(visitType, positionKey)]),
         setDoc: (collection, id, data, options) => {
           const docs = ensureCollection(collection);
           docs[id] = options?.merge ? { ...(docs[id] || {}), ...clone(data) } : clone(data);
@@ -1568,6 +1579,70 @@ function createVisitSubmissionService(options) {
     };
   }
 
+  // Read legacy records directly so existing folders receive the new quotas
+  // without a migration, and cancellation/replacement/moves stay accurate.
+  async function secretaryCapacity(folder, tx = null) {
+    if (!supportsDocumentCategories(folder.positionKey)) return {};
+    const [active, sessions] = tx
+      ? await tx.readFolderFiles(folder.visitType, folder.positionKey)
+      : await Promise.all([
+        adapter.queryActiveSubmissionsForPositions(folder.visitType, [folder.positionKey]),
+        adapter.queryActiveUploadSessionsForFolder(folder.visitType, folder.positionKey),
+      ]);
+    const categoryUsage = { inward: { activeFileCount: 0, reservedFileCount: 0 }, outward: { activeFileCount: 0, reservedFileCount: 0 } };
+    let dedicatedReserved = 0;
+    let otherReplacementReserved = 0;
+    for (const { data } of active) {
+      const usage = hasOwn(categoryUsage, data.documentCategory) ? categoryUsage[data.documentCategory] : null;
+      if (usage) usage.activeFileCount += 1;
+    }
+    for (const { data } of sessions) {
+      for (const file of data.expectedFiles || []) {
+        if (['finalized', 'cancelled', 'expired'].includes(file.status)) continue;
+        const usage = hasOwn(categoryUsage, file.documentCategory) ? categoryUsage[file.documentCategory] : null;
+        if (usage) {
+          dedicatedReserved += 1;
+          if (!data.replacesSubmissionId) usage.reservedFileCount += 1;
+        } else if (data.replacesSubmissionId) otherReplacementReserved += 1;
+      }
+    }
+    const dedicatedActive = categoryUsage.inward.activeFileCount + categoryUsage.outward.activeFileCount;
+    return {
+      categoryLimits: { ...SECRETARY_LETTER_LIMITS }, categoryUsage,
+      otherActiveFileCount: Math.max(0, Number(folder.activeFileCount || 0) - dedicatedActive),
+      otherReservedFileCount: Math.max(0, Number(folder.reservedFileCount || 0) - dedicatedReserved - otherReplacementReserved),
+      totalMaxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES) + 200,
+    };
+  }
+
+  function capacityBucket(category) {
+    return hasOwn(SECRETARY_LETTER_LIMITS, category) ? category : 'other';
+  }
+
+  async function assertUploadCapacity(tx, folder, files) {
+    const capacity = await secretaryCapacity(folder, tx);
+    const incoming = {};
+    for (const file of files) {
+      const key = capacity.categoryLimits?.[file.documentCategory] ? file.documentCategory : 'other';
+      incoming[key] = (incoming[key] || 0) + 1;
+    }
+    for (const [key, count] of Object.entries(incoming)) {
+      const usage = capacity.categoryUsage?.[key];
+      const limit = usage ? capacity.categoryLimits[key] : Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES);
+      const active = usage ? usage.activeFileCount : (capacity.otherActiveFileCount ?? Number(folder.activeFileCount || 0));
+      const reserved = usage ? usage.reservedFileCount : (capacity.otherReservedFileCount ?? Number(folder.reservedFileCount || 0));
+      if (active + reserved + count > limit) {
+        throw makeVisitSubmissionError('resource-exhausted', usage
+          ? `The ${key === 'inward' ? 'Inward' : 'Outward'} file folder has reached its ${limit}-file limit.`
+          : 'This position folder has reached its active file limit.', {
+          visitType: folder.visitType, positionKey: folder.positionKey,
+          documentCategory: usage ? key : '', remainingCapacity: Math.max(0, limit - active - reserved),
+        });
+      }
+    }
+    return capacity;
+  }
+
   async function getFolders(uid, visitTypeInput) {
     const access = await resolveAccessContext(uid);
     const visitType = normalizeVisitType(visitTypeInput);
@@ -1592,7 +1667,7 @@ function createVisitSubmissionService(options) {
         submissionDeadline: config.submissionDeadline || null,
         instructions: config.instructions || '',
       },
-      folders: folders.map(folder => buildFolderResponse(config, folder, access, holdersByPosition)),
+      folders: await Promise.all(folders.map(async folder => buildFolderResponse(config, folder, access, holdersByPosition, await secretaryCapacity(folder)))),
     };
   }
 
@@ -1624,7 +1699,7 @@ function createVisitSubmissionService(options) {
         submissionDeadline: config.submissionDeadline || null,
         instructions: config.instructions || '',
       },
-      folder: buildFolderResponse(config, folder, access),
+      folder: buildFolderResponse(config, folder, access, null, await secretaryCapacity(folder)),
       submissions: submissions.map(doc => shapeSubmission(
         { id: doc.id, ...doc.data },
         access,
@@ -1974,14 +2049,9 @@ function createVisitSubmissionService(options) {
       }
       const latestFolder = shapePosition(folderSnap.data, visitType, positionKey, null, null, positionHelpers);
       assertVisitFolderAllowsUpload(config, latestFolder);
+      if (!replacingSubmissionId) await assertUploadCapacity(tx, latestFolder, files);
       await updateVisitUploadRateLimit(tx, uid, nowValue);
-
-      const activeFileCount = Number(latestFolder.activeFileCount || 0);
       const reservedFileCount = Number(latestFolder.reservedFileCount || 0);
-      const maxActiveFiles = Number(latestFolder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES);
-      if (!replacingSubmissionId && activeFileCount + reservedFileCount + files.length > maxActiveFiles) {
-        throw makeVisitSubmissionError('resource-exhausted', 'This position folder has reached its active file limit.');
-      }
 
       tx.updateDoc('visitSubmissionPositions', folderId, {
         reservedFileCount: Math.max(0, reservedFileCount) + files.length,
@@ -2205,17 +2275,8 @@ function createVisitSubmissionService(options) {
           documentCategoryParentName: info.parentName,
           documentCategoryParentFolderId: info.parentFolderId,
         }));
-        const activeFileCount = Number(latestFolder.activeFileCount || 0);
-        const reservedFileCount = Number(latestFolder.reservedFileCount || 0);
-        const maxActiveFiles = Number(latestFolder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES);
-        if (activeFileCount + reservedFileCount + plan.files.length > maxActiveFiles) {
-          const remaining = Math.max(0, maxActiveFiles - activeFileCount - reservedFileCount);
-          throw makeVisitSubmissionError('resource-exhausted', 'This position folder has reached its active file limit.', {
-            visitType,
-            positionKey: plan.folder.positionKey,
-            remainingCapacity: remaining,
-          });
-        }
+        await assertUploadCapacity(tx, latestFolder, plan.files.map(file => ({ ...file, documentCategory })));
+
       }
 
       await updateVisitUploadRateLimit(tx, uid, nowValue, plans.length);
@@ -3010,6 +3071,10 @@ function createVisitSubmissionService(options) {
 
     const currentCategory = storedDocumentCategory(submission.documentCategory);
     if (currentCategory === targetCategory) return { noop: true };
+    if (supportsDocumentCategories(positionKey) && capacityBucket(currentCategory) !== capacityBucket(targetCategory)) await adapter.runTransaction(async tx => {
+      const latest = await tx.getDoc('visitSubmissionPositions', visitPositionDocId(visitType, positionKey, positionHelpers));
+      await assertUploadCapacity(tx, { ...latest.data, visitType, positionKey }, [{ documentCategory: targetCategory }]);
+    });
 
     const driveFileId = normalizeText(submission.driveFileId, 256);
     if (!driveFileId) {
@@ -3027,6 +3092,7 @@ function createVisitSubmissionService(options) {
       driveFileId,
       positionFolderId,
       targetCategory,
+      sourceFolderId: normalizeText(submission.driveFolderId, 256),
       targetCategoryName: targetInfo.name,
       targetCategoryFolderId: targetInfo.folderId,
       targetCategoryParentKey: targetInfo.parentKey,
@@ -3070,6 +3136,9 @@ function createVisitSubmissionService(options) {
         throw makeVisitSubmissionError('failed-precondition', 'This folder no longer exists.');
       }
       const fromCategory = storedDocumentCategory(submission.documentCategory);
+      if (folder && capacityBucket(fromCategory) !== capacityBucket(targetCategory) && supportsDocumentCategories(positionKey)) {
+        await assertUploadCapacity(tx, { ...folder, visitType: submission.visitType, positionKey }, [{ documentCategory: targetCategory }]);
+      }
       tx.updateDoc('visitSubmissions', submissionId, {
         documentCategory: targetCategory,
         driveFolderId,

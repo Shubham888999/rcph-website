@@ -860,14 +860,23 @@ function createVisitCategoryMoveHandler(options = {}) {
       }
     }
 
-    await visitService.commitCategoryMove(uid, {
-      submissionId: plan.submissionId,
-      targetCategory: plan.targetCategory,
-      driveFileId: plan.driveFileId,
-      driveFolderId: targetFolderId,
-      positionFolderId: plan.positionFolderId,
-      ...(parentFolderId ? { parentFolderId } : {}),
-    });
+    try {
+      await visitService.commitCategoryMove(uid, {
+        submissionId: plan.submissionId,
+        targetCategory: plan.targetCategory,
+        driveFileId: plan.driveFileId,
+        driveFolderId: targetFolderId,
+        positionFolderId: plan.positionFolderId,
+        ...(parentFolderId ? { parentFolderId } : {}),
+      });
+    } catch (err) {
+      // A concurrent upload can fill a category while Drive is moving the file.
+      // Keep Drive and its stored category aligned if the final quota check fails.
+      if ((err?.code || err?.httpsCode) === 'resource-exhausted' && plan.sourceFolderId) {
+        await driveService.moveFileToFolder({ fileId: plan.driveFileId, targetFolderId: plan.sourceFolderId }, driveConfig);
+      }
+      throw err;
+    }
     return { ok: true, documentCategory: plan.targetCategory };
   };
 }
