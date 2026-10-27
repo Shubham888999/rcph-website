@@ -137,7 +137,7 @@ export function bulkVisitFolderAvailability(folder, files, visit = {}) {
   const separateLimits = Object.keys(folder?.categoryLimits || {}).length > 0;
   const activeFileCount = Math.max(0, Number(categoryLimit ? categoryUsage?.activeFileCount : (separateLimits ? folder.otherActiveFileCount : folder?.activeFileCount)) || 0);
   const reservedFileCount = Math.max(0, Number(categoryLimit ? categoryUsage?.reservedFileCount : (separateLimits ? folder.otherReservedFileCount : folder?.reservedFileCount)) || 0);
-  const maxActiveFiles = Math.max(1, categoryLimit || Number(folder?.maxActiveFiles) || 40);
+  const maxActiveFiles = Math.max(1, categoryLimit || Number(folder?.maxActiveFiles) || 300);
   const remainingCapacity = Math.max(0, maxActiveFiles - activeFileCount - reservedFileCount);
   const maxFilesPerSelection = Math.max(1, Number(folder?.maxFilesPerSelection) || 10);
   const maxFileSizeBytes = Math.max(1, Number(folder?.maxFileSizeBytes) || 25 * 1024 * 1024);
@@ -293,7 +293,7 @@ export function safeVisitUploadError(error) {
     }
     if (details.reason === "folder-capacity") {
       const limit = Number(details.limit);
-      const capacity = Number.isSafeInteger(limit) && limit > 0 && limit <= 100 ? `${limit}-file capacity` : "file capacity";
+      const capacity = Number.isSafeInteger(limit) && limit > 0 && limit <= 300 ? `${limit}-file capacity` : "file capacity";
       return `This destination has reached its ${capacity}, including pending uploads. Waiting will not free space from saved files.`;
     }
     if (details.reason === "selection-limit" || error?.message === "Too many files selected.") return "Select fewer files and try again.";

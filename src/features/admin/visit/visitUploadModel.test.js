@@ -199,3 +199,11 @@ test("upload errors distinguish an account cooldown from destination capacity", 
   assert.equal(safeVisitUploadError({ code, details: { reason: "selection-limit" } }), "Select fewer files and try again.");
   assert.doesNotMatch(safeVisitUploadError({ code, message: "private server details" }), /private server details|has reached its upload limit/);
 });
+
+test("300-file destinations permit the final slot and report their capacity correctly", () => {
+  const files = [{ file: file("budget.pdf", "application/pdf") }];
+  const folder = { positionKey: "president", documentCategory: "", maxActiveFiles: 300, categoryLimits: { "": 300 }, categoryUsage: { "": { activeFileCount: 299, reservedFileCount: 0 } } };
+  assert.equal(bulkVisitFolderAvailability(folder, files).selectable, true);
+  assert.equal(bulkVisitFolderAvailability({ ...folder, categoryUsage: { "": { activeFileCount: 299, reservedFileCount: 1 } } }, files).selectable, false);
+  assert.match(safeVisitUploadError({ code: "functions/resource-exhausted", details: { reason: "folder-capacity", limit: 300 } }), /300-file capacity/);
+});

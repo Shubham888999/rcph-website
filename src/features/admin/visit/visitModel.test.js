@@ -139,3 +139,13 @@ test("bulk selection: managers remove, the uploader withdraws, and files with ne
   assert.equal(visitBulkSummary([{ action: "withdraw" }]).verb, "Withdraw");
   assert.equal(visitBulkSummary([{ action: "remove" }, { action: "withdraw" }]).verb, "Remove or withdraw");
 });
+
+test("all positions accept 300-file root and subfolder capacity metadata", () => {
+  for (const positionKey of ["president", "secretary", "editor", "saa"]) {
+    const folder = normalizeFolder({ visitType: "dzrVisit", positionKey, maxActiveFiles: 300, perFolderFileLimit: 300, totalMaxActiveFiles: 900, customFolders: [{ key: "custom-11111111", name: "Reports" }, { key: "custom-22222222", name: "Signed", parentKey: "custom-11111111" }], categoryLimits: { "": 300, "custom-11111111": 300, "custom-22222222": 300 }, categoryUsage: { "": { activeFileCount: 299, reservedFileCount: 1 } } });
+    assert.equal(folder.perFolderFileLimit, 300);
+    assert.equal(folder.categoryLimits[""], 300);
+    assert.equal(folder.categoryLimits["custom-22222222"], 300);
+    assert.deepEqual(folder.categoryUsage[""], { activeFileCount: 299, reservedFileCount: 1 });
+  }
+});
