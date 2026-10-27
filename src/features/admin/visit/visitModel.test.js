@@ -104,3 +104,12 @@ test("subfolders sit under their parent, including the Secretary folders, and re
   const groups = groupVisitSubmissionsByCategory([normalizeSubmission({ submissionId: "a", documentCategory: "custom-0a1b2c3d" })], folder);
   assert.deepEqual(groups.find((group) => group.key === "custom-0a1b2c3d").items.map((item) => item.submissionId), ["a"]);
 });
+
+test("Secretary responses preserve independent category usage and the overall displayed capacity", () => {
+  const folder = normalizeFolder({ visitType: "dzrVisit", positionKey: "secretary", maxActiveFiles: 40, totalMaxActiveFiles: 240, activeFileCount: 200, otherActiveFileCount: 0, otherReservedFileCount: 0, categoryLimits: { inward: 100, outward: 100, forged: 1000 }, categoryUsage: { inward: { activeFileCount: 100, reservedFileCount: 0 }, outward: { activeFileCount: 99, reservedFileCount: 1 } } });
+  assert.deepEqual(folder.categoryLimits, { inward: 100, outward: 100 });
+  assert.equal(folder.totalMaxActiveFiles, 240);
+  assert.equal(folder.otherActiveFileCount, 0);
+  assert.equal(folder.categoryUsage.outward.reservedFileCount, 1);
+  assert.equal(normalizeFolder({ visitType: "dzrVisit", positionKey: "editor", activeFileCount: 5 }).otherActiveFileCount, 5);
+});

@@ -193,7 +193,7 @@ function VisitFolderCard({ folder, visit, openFolder, setDialog, canManageWorksp
       >
         <span className="visit-folder-card__top">
           <span className="visit-folder-card__code">{presentation.code}</span>
-          <span className="visit-folder-card__count">{folder.activeFileCount} / {folder.maxActiveFiles}</span>
+          <span className="visit-folder-card__count">{folder.activeFileCount} / {folder.totalMaxActiveFiles || folder.maxActiveFiles}</span>
         </span>
         <span className="visit-folder-card__title">{presentation.title}</span>
         <span className={`visit-folder-card__holders${holder.vacant ? " is-vacant" : ""}`} title={holder.label}>
@@ -678,7 +678,7 @@ function FolderDetailWorkspaceView({
             <p className="visit-eyebrow">Document library</p>
             <h3 id="visit-active-files">{usesCategories ? "Documents" : "Supporting files"}</h3>
           </div>
-          <span>{folder.activeFileCount} / {folder.maxActiveFiles} active files</span>
+          <span>{folder.activeFileCount} / {folder.totalMaxActiveFiles || folder.maxActiveFiles} active files</span>
         </div>
         {canChangeFolders ? (
           <div className="visit-custom-folders__bar">
@@ -694,7 +694,7 @@ function FolderDetailWorkspaceView({
                 <section className={`visit-category-group${group.depth ? " visit-category-group--sub" : ""}`} aria-labelledby={groupId} key={group.key || "supporting"}>
                   <h4 className="visit-category-group__title" id={groupId}>
                     {group.fullLabel || group.label}
-                    <span className="visit-category-group__count">{group.items.length}</span>
+                    <span className="visit-category-group__count">{group.items.length}{folder.categoryLimits?.[group.key] ? ` / ${folder.categoryLimits[group.key]}` : ""}</span>
                     {canChangeFolders && (group.canHaveSubfolders || group.custom) ? (
                       <span className="visit-custom-folders__tools">
                         {group.canHaveSubfolders ? <button type="button" disabled={group.subfolderCount >= VISIT_MAX_SUBFOLDERS || folder.customFolders.length >= VISIT_MAX_TOTAL_FOLDERS} onClick={() => setDialog({ type: "custom-folder-create", folder, parent: { key: group.key, name: group.label } })}>+ Subfolder</button> : null}
@@ -719,7 +719,7 @@ function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {
   const [file, setFile] = useState(null);
   const [form, setForm] = useState(dialog.visit || dialog.folder || {});
   if (dialog.type === "visit-settings") return <AdminDialog title="Visit settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-visit", () => visitCalls.updateVisit({ visitType: form.visitType, description: form.description || "", enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, visitDate: toCallableDate(form.visitDate), submissionDeadline: toCallableDate(form.submissionDeadline), instructions: form.instructions || "" }), "Visit settings saved.", reload); }}><label>Description<textarea value={form.description || ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label><label>Visit date<input type="datetime-local" value={form.visitDate || ""} onChange={(event) => setForm({ ...form, visitDate: event.target.value })} /></label><label>Submission deadline<input type="datetime-local" value={form.submissionDeadline || ""} onChange={(event) => setForm({ ...form, submissionDeadline: event.target.value })} /></label><label>Instructions<textarea value={form.instructions || ""} onChange={(event) => setForm({ ...form, instructions: event.target.value })} /></label><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Submissions open</label><button disabled={busy}>Save</button></form></AdminDialog>;
-  if (dialog.type === "folder-settings") return <AdminDialog title="Folder settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-folder", () => visitCalls.updateFolder({ visitType: form.visitType, positionKey: form.positionKey, enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, locked: form.locked === true, lockReason: form.lockReason || "", maxActiveFiles: Number(form.maxActiveFiles), maxFilesPerSelection: Number(form.maxFilesPerSelection), maxFileSizeBytes: Math.round(Number(form.maxFileSizeMb) * 1048576) }), "Folder settings saved.", reload); }}><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Open</label><label><input type="checkbox" checked={form.locked === true} onChange={(event) => setForm({ ...form, locked: event.target.checked })} /> Locked</label><label>Reason<input value={form.lockReason || ""} onChange={(event) => setForm({ ...form, lockReason: event.target.value })} /></label><label>Max active files<input type="number" min="1" max="100" value={form.maxActiveFiles} onChange={(event) => setForm({ ...form, maxActiveFiles: event.target.value })} /></label><label>Max files per selection<input type="number" min="1" max="10" value={form.maxFilesPerSelection} onChange={(event) => setForm({ ...form, maxFilesPerSelection: event.target.value })} /></label><label>Max file size (MB)<input type="number" min="1" max="25" value={form.maxFileSizeMb ?? Math.round(Number(form.maxFileSizeBytes) / 1048576)} onChange={(event) => setForm({ ...form, maxFileSizeMb: event.target.value })} /></label><button disabled={busy}>Save</button></form></AdminDialog>;
+  if (dialog.type === "folder-settings") return <AdminDialog title="Folder settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-folder", () => visitCalls.updateFolder({ visitType: form.visitType, positionKey: form.positionKey, enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, locked: form.locked === true, lockReason: form.lockReason || "", maxActiveFiles: Number(form.maxActiveFiles), maxFilesPerSelection: Number(form.maxFilesPerSelection), maxFileSizeBytes: Math.round(Number(form.maxFileSizeMb) * 1048576) }), "Folder settings saved.", reload); }}><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Open</label><label><input type="checkbox" checked={form.locked === true} onChange={(event) => setForm({ ...form, locked: event.target.checked })} /> Locked</label><label>Reason<input value={form.lockReason || ""} onChange={(event) => setForm({ ...form, lockReason: event.target.value })} /></label><label>{Object.keys(form.categoryLimits || {}).length ? "Max other active files (Inward and Outward allow 100 each)" : "Max active files"}<input type="number" min="1" max="100" value={form.maxActiveFiles} onChange={(event) => setForm({ ...form, maxActiveFiles: event.target.value })} /></label><label>Max files per selection<input type="number" min="1" max="10" value={form.maxFilesPerSelection} onChange={(event) => setForm({ ...form, maxFilesPerSelection: event.target.value })} /></label><label>Max file size (MB)<input type="number" min="1" max="25" value={form.maxFileSizeMb ?? Math.round(Number(form.maxFileSizeBytes) / 1048576)} onChange={(event) => setForm({ ...form, maxFileSizeMb: event.target.value })} /></label><button disabled={busy}>Save</button></form></AdminDialog>;
   if (dialog.type === "moderation") return <AdminDialog title="Visit moderation" busy={busy} onClose={onClose} className="admin-dialog--wide"><Moderation visits={visits} /></AdminDialog>;
   if (dialog.type === "bulk-upload") return <BulkVisitUploadDialog key={dialog.visit.visitType} visit={dialog.visit} onClose={onClose} reload={reload} />;
   if (dialog.type === "replace") return <AdminDialog title={`Replace ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><label htmlFor="visit-replacement-file">Choose replacement file</label><input id="visit-replacement-file" type="file" accept={VISIT_FILE_ACCEPT} onChange={(event) => setFile(event.target.files?.[0] || null)} />{file ? <p>{file.name} · {formatVisitFileSize(file.size)}</p> : null}<button disabled={!file || busy} onClick={() => mutate("replace", async () => { const error = validateVisitFile(file, dialog.folder); if (error) throw new Error(error); const descriptor = { clientFileId: `replace-${Date.now()}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }; const session = await visitCalls.replace(dialog.item.submissionId, [descriptor]); const approved = session.files?.[0]; if (!approved) throw new Error("Replacement session failed."); const proof = await uploadVisitFile(file, session, approved); return visitCalls.finalize({ sessionId: session.sessionId, clientFileId: approved.clientFileId, ticket: approved.ticket, completionProof: proof.completionProof }); }, "Submission replaced.", reload)}>Replace file</button></AdminDialog>;
@@ -778,7 +778,12 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
   const sharedDestinations = useMemo(() => bulkSharedDestinationChoices(folders), [folders]);
   const selectedFolders = folders.filter((folder) => selectedKeys.includes(folder.positionKey))
     .map(folder => ({ ...folder, ...resolveBulkDestination(folder, sharedDestination, destinationKeys[folder.positionKey]) }));
-  const availability = useMemo(() => new Map(folders.map((folder) => [folder.positionKey, bulkVisitFolderAvailability(folder, files, resolvedVisit)])), [folders, files, resolvedVisit]);
+  const availability = useMemo(() => new Map(folders.map((folder) => {
+    const details = bulkVisitFolderAvailability({ ...folder, ...resolveBulkDestination(folder, sharedDestination, destinationKeys[folder.positionKey]) }, files, resolvedVisit);
+    // A full Supporting files allowance must not prevent choosing Inward or Outward.
+    const canSelect = details.selectable || (Object.keys(folder.categoryLimits || {}).length > 0 && bulkDestinationChoices(folder).some(choice => bulkVisitFolderAvailability({ ...folder, documentCategory: choice.key }, files, resolvedVisit).selectable));
+    return [folder.positionKey, { ...details, canSelect }];
+  })), [folders, files, resolvedVisit, sharedDestination, destinationKeys]);
   const unassignedSummary = summarizeUnassignedVisitFolders(folders);
   const visibleFolders = filterVisitFoldersByAssignment(folders, showUnassigned).filter((folder) => {
     const query = search.trim().toLowerCase();
@@ -842,7 +847,7 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
     const details = availability.get(folder.positionKey);
     setSelectedKeys((current) => {
       if (current.includes(folder.positionKey)) return current.filter((key) => key !== folder.positionKey);
-      if (!details?.selectable) return current;
+      if (!details?.canSelect) return current;
       return [...current, folder.positionKey];
     });
     setPairs([]);
@@ -1058,9 +1063,9 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
         const destination = resolveBulkDestination(folder, sharedDestination, destinationKeys[folder.positionKey]);
         const checkboxId = `visit-bulk-position-${folder.positionKey}`;
         return <div key={folder.positionKey} className={`visit-bulk-upload__folder is-${status}${selected ? " is-selected" : ""}`}>
-          <input id={checkboxId} type="checkbox" checked={selected} disabled={selectionLocked || (!selected && !details?.selectable)} onChange={() => toggleFolder(folder)} />
+          <input id={checkboxId} type="checkbox" checked={selected} disabled={selectionLocked || (!selected && !details?.canSelect)} onChange={() => toggleFolder(folder)} />
           <label className="visit-bulk-upload__folder-name" htmlFor={checkboxId}><strong>{folder.positionTitle}</strong><small>{folder.avenueCode || folder.positionKey} · <span className={getVisitFolderHolderLabel(folder).vacant ? "is-vacant" : ""}>{getVisitFolderHolderLabel(folder).label}</span></small></label>
-          <span className="visit-bulk-upload__capacity">{folder.activeFileCount} / {folder.maxActiveFiles}</span><span className="visit-bulk-upload__availability">{details?.status || "disabled"}</span>
+          <span className="visit-bulk-upload__capacity">{details?.activeFileCount ?? folder.activeFileCount} / {details?.maxActiveFiles ?? folder.maxActiveFiles}</span><span className="visit-bulk-upload__availability">{details?.status || "disabled"}</span>
           {details?.message ? <em>{details.message}</em> : null}
           {selected ? <label className="visit-bulk-upload__destination"><span>Destination for {folder.positionTitle}</span>
             <select aria-label={`Destination for ${folder.positionTitle}`} value={destination.documentCategory} disabled={selectionLocked} onChange={event => changeFolderDestination(folder.positionKey, event.target.value)}>

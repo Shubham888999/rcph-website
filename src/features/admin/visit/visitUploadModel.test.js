@@ -166,3 +166,15 @@ test("failed pairs can be retried alone without scheduling successful files agai
   await runBulkUploadPairs(failed, 3, async pair => { attempts.push(pair.clientFileId); });
   assert.deepEqual(attempts, ["one", "two", "three", "two"]);
 });
+
+test("Secretary bulk capacity uses the selected letter folder's independent 100-file allowance", () => {
+  const folder = { maxActiveFiles: 40, activeFileCount: 239, otherActiveFileCount: 40, otherReservedFileCount: 0, categoryLimits: { inward: 100, outward: 100 }, categoryUsage: { inward: { activeFileCount: 99, reservedFileCount: 0 }, outward: { activeFileCount: 100, reservedFileCount: 0 } } };
+  const files = [{ file: file("letter.pdf", "application/pdf") }];
+  const inward = bulkVisitFolderAvailability({ ...folder, documentCategory: "inward" }, files);
+  assert.equal(inward.selectable, true);
+  assert.equal(inward.remainingCapacity, 1);
+  assert.equal(inward.maxActiveFiles, 100);
+  assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "outward" }, files).selectable, false);
+  assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "" }, files).selectable, false);
+  assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "inward", categoryUsage: { ...folder.categoryUsage, inward: { activeFileCount: 99, reservedFileCount: 1 } } }, files).selectable, false);
+});

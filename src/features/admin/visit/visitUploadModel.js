@@ -132,9 +132,13 @@ export function bulkVisitFolderAvailability(folder, files, visit = {}) {
   const fileItems = Array.isArray(files) ? files : [];
   const fileCount = fileItems.length;
   const status = bulkVisitFolderStatus(folder, visit);
-  const activeFileCount = Math.max(0, Number(folder?.activeFileCount) || 0);
-  const maxActiveFiles = Math.max(1, Number(folder?.maxActiveFiles) || 40);
-  const remainingCapacity = Math.max(0, maxActiveFiles - activeFileCount);
+  const categoryLimit = Number(folder?.categoryLimits?.[folder.documentCategory]);
+  const categoryUsage = categoryLimit ? folder.categoryUsage?.[folder.documentCategory] : null;
+  const separateLimits = Object.keys(folder?.categoryLimits || {}).length > 0;
+  const activeFileCount = Math.max(0, Number(categoryLimit ? categoryUsage?.activeFileCount : (separateLimits ? folder.otherActiveFileCount : folder?.activeFileCount)) || 0);
+  const reservedFileCount = Math.max(0, Number(categoryLimit ? categoryUsage?.reservedFileCount : (separateLimits ? folder.otherReservedFileCount : folder?.reservedFileCount)) || 0);
+  const maxActiveFiles = Math.max(1, categoryLimit || Number(folder?.maxActiveFiles) || 40);
+  const remainingCapacity = Math.max(0, maxActiveFiles - activeFileCount - reservedFileCount);
   const maxFilesPerSelection = Math.max(1, Number(folder?.maxFilesPerSelection) || 10);
   const maxFileSizeBytes = Math.max(1, Number(folder?.maxFileSizeBytes) || 25 * 1024 * 1024);
   const oversized = fileItems.find((item) => Number(item?.file?.size || 0) > maxFileSizeBytes);

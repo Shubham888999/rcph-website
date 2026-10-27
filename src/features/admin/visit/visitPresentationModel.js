@@ -192,7 +192,7 @@ export function getFolderSummaryItems(folder = {}, visit = {}) {
   const availability = getVisitAvailability(folder, visit);
   return [
     { label: "Status", value: availability.label, statusKey: availability.key },
-    { label: "Documents", value: `${Math.max(0, Number(folder.activeFileCount) || 0)} / ${Math.max(1, Number(folder.maxActiveFiles) || 1)}` },
+    { label: "Documents", value: `${Math.max(0, Number(folder.activeFileCount) || 0)} / ${Math.max(1, Number(folder.totalMaxActiveFiles || folder.maxActiveFiles) || 1)}` },
     { label: "Per selection", value: String(Math.max(1, Number(folder.maxFilesPerSelection) || 1)) },
     { label: "Size limit", value: `${Math.round(Math.max(1, Number(folder.maxFileSizeBytes) || 1) / 1048576)} MB` },
   ];
