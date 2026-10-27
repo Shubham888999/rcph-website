@@ -2,9 +2,9 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { PDFDocument, PDFRawStream, decodePDFRawStream } = require('pdf-lib');
+const { PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } = require('pdf-lib');
 const { buildBrandedResolutionDownload, sha256 } = require('./resolution-pdf-merge');
-const { resolutionPageBranding } = require('./resolution-page-branding');
+const { resolutionPageBranding, PAGE_SEAL } = require('./resolution-page-branding');
 const { createResolutionUploadService } = require('./resolution-upload');
 const { createSourcePdf, voteRows } = require('../scripts/fixtures/resolution-pdf-fixtures');
 
@@ -27,6 +27,8 @@ test('closed rendition seals every page, certifies all continuations and preserv
   assert.ok(output.getPageCount() >= 5);
   assert.equal(sha256(source), before);
   output.getPages().forEach((page, index) => {
+    const states = page.node.Resources().lookup(PDFName.of('ExtGState'));
+    assert.ok(states.keys().some(key => states.lookup(key).get(PDFName.of('ca'))?.asNumber() === PAGE_SEAL.opacity));
     const text = pageText(page);
     assert.match(text, /1 0 0 1 312 40 cm/);
     assert.match(text, new RegExp(`Page ${index + 1} of ${output.getPageCount()}`));

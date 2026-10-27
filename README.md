@@ -96,7 +96,8 @@ final file and frozen uploaded source, then renders a new sealed download from f
 voting/layout snapshots. It does not rewrite Drive objects, votes or archival hashes.
 The main resolution page comes first, followed by attachment pages and the voting
 record. Attachment pages are fitted inside the letterhead's content area, retaining
-all source content and rotation, to leave room for the repeating confirmation and seal.
+all source content and rotation, to leave room for the repeating confirmation.
+The seal is drawn at 55% opacity over the page without reserving extra body space.
 This applies automatically to existing closed resolutions and future downloads.
 Deploy `getProtectedBrandAsset` and `downloadFinalizedResolutionPdf`, then the React
 frontend. No Firestore rules or document migration is required.

@@ -1,7 +1,9 @@
 'use strict';
 const { resolutionMajorityPercent } = require('./resolution-sections');
 
-const PAGE_SEAL = Object.freeze({ x: 312, y: 40, width: 72, height: 72 * 744 / 695 });
+const PAGE_SEAL = Object.freeze({ x: 312, y: 40, width: 72, height: 72 * 744 / 695, opacity: 0.55 });
+// Restore the original content boundary; the translucent seal may overlap text.
+const OFFICIAL_CONTENT_BOTTOM = 95;
 const BRANDING_VERSION = 1;
 // One extra line beneath the letterhead; move the body by the same amount.
 const WATERMARK_TOP_GAP = 12;
@@ -47,4 +49,4 @@ function resolutionPageBranding(details = {}) {
   return { lines, bodyTop: Math.min(630 - WATERMARK_TOP_GAP, y - 14), percent, statement };
 }
 
-module.exports = { BRANDING_VERSION, PAGE_SEAL, resolutionPageBranding };
+module.exports = { BRANDING_VERSION, PAGE_SEAL, OFFICIAL_CONTENT_BOTTOM, resolutionPageBranding };

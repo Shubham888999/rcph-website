@@ -8,7 +8,7 @@ const fontkit = require('@pdf-lib/fontkit');
 const { formatRotaractorName } = require('./member-name');
 const { fillResolutionMajority, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, splitResolutionStatement } = require('./resolution-sections');
 
-const { PAGE_SEAL, resolutionPageBranding } = require('./resolution-page-branding');
+const { PAGE_SEAL, OFFICIAL_CONTENT_BOTTOM, resolutionPageBranding } = require('./resolution-page-branding');
 
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_SOURCE_PAGES = 25;
@@ -279,7 +279,7 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes, o
 
   function ensure(height) {
     if (!page) addPage();
-    if (y - height < (options.branded ? 120 : BOUNDS.bottom) && y < (options.branded ? RESOLUTION_PAGE_START_Y : BOUNDS.top)) addPage();
+    if (y - height < (options.branded ? OFFICIAL_CONTENT_BOTTOM : BOUNDS.bottom) && y < (options.branded ? RESOLUTION_PAGE_START_Y : BOUNDS.top)) addPage();
   }
 
   function alignedX(line, font, size, style, width = BOUNDS.right - BOUNDS.left, left = BOUNDS.left) {
@@ -539,11 +539,11 @@ async function buildBrandedResolutionDownload({ sourceBytes, letterheadBytes, se
     const originalWidth = embeddedPage.width;
     const originalHeight = embeddedPage.height;
     const top = output.getPageCount() === 1 ? START_Y : header.bodyTop;
-    const scale = Math.min(WIDTH / (rotated ? originalHeight : originalWidth), (top - 120) / (rotated ? originalWidth : originalHeight));
+    const scale = Math.min(WIDTH / (rotated ? originalHeight : originalWidth), (top - OFFICIAL_CONTENT_BOTTOM) / (rotated ? originalWidth : originalHeight));
     const width = originalWidth * scale;
     const height = originalHeight * scale;
     const x = BOUNDS.left + (WIDTH - (rotated ? height : width)) / 2;
-    const y = 120 + (top - 120 - (rotated ? width : height)) / 2;
+    const y = OFFICIAL_CONTENT_BOTTOM + (top - OFFICIAL_CONTENT_BOTTOM - (rotated ? width : height)) / 2;
     const offsets = { 0: [0, 0], 90: [height, 0], 180: [width, height], 270: [0, width] };
     const [dx, dy] = offsets[angle] || offsets[0];
     page.drawPage(embeddedPage, { x: x + dx, y: y + dy, width, height, rotate: degrees(angle) });
