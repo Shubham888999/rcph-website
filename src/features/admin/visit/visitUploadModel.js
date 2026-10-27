@@ -281,7 +281,24 @@ export function safeVisitUploadError(error) {
   if (code.includes("permission-denied") || code.includes("unauthenticated")) {
     return "Your account is not authorized to upload to this Club Visit folder.";
   }
-  if (code.includes("resource-exhausted")) return "This Club Visit folder has reached its upload limit.";
+  if (code.includes("resource-exhausted")) {
+    const details = error?.details || {};
+    if (details.reason === "upload-rate-limit" || error?.message === "Too many upload sessions requested. Try again later.") {
+      const seconds = Number(details.retryAfterSeconds);
+      if (Number.isFinite(seconds) && seconds > 0) {
+        const minutes = Math.max(1, Math.ceil(seconds / 60));
+        return `Too many Club Visit upload sessions. Try again in about ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`;
+      }
+      return "Too many Club Visit upload sessions. Retry as earlier sessions expire from the rolling 60-minute window.";
+    }
+    if (details.reason === "folder-capacity") {
+      const limit = Number(details.limit);
+      const capacity = Number.isSafeInteger(limit) && limit > 0 && limit <= 100 ? `${limit}-file capacity` : "file capacity";
+      return `This destination has reached its ${capacity}, including pending uploads. Waiting will not free space from saved files.`;
+    }
+    if (details.reason === "selection-limit" || error?.message === "Too many files selected.") return "Select fewer files and try again.";
+    return "The upload request was limited. Check the destination's available space or retry later.";
+  }
   if (code.includes("failed-precondition")) return "This Club Visit folder is closed, locked, or no longer accepts this upload.";
   return "The supporting file could not be uploaded. You can retry without creating a duplicate submission.";
 }

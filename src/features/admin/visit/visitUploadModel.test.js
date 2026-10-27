@@ -186,3 +186,16 @@ test("Secretary root and custom folders use their own 100-file slots", () => {
   assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "custom-11111111" }, files).selectable, true);
   assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "custom-11111111" }, [...files, ...files]).selectable, false);
 });
+
+test("upload errors distinguish an account cooldown from destination capacity", () => {
+  const code = "functions/resource-exhausted";
+  assert.equal(safeVisitUploadError({ code, details: { reason: "upload-rate-limit", retryAfterSeconds: 61 } }), "Too many Club Visit upload sessions. Try again in about 2 minutes.");
+  assert.match(safeVisitUploadError({ code, details: { reason: "upload-rate-limit", retryAfterSeconds: 20 } }), /about 1 minute\./);
+  assert.match(safeVisitUploadError({ code, message: "Too many upload sessions requested. Try again later." }), /rolling 60-minute window/);
+  const capacity = safeVisitUploadError({ code, details: { reason: "folder-capacity", limit: 100 } });
+  assert.match(capacity, /100-file capacity/);
+  assert.match(capacity, /Waiting will not free space from saved files/);
+  assert.doesNotMatch(capacity, /minutes/);
+  assert.equal(safeVisitUploadError({ code, details: { reason: "selection-limit" } }), "Select fewer files and try again.");
+  assert.doesNotMatch(safeVisitUploadError({ code, message: "private server details" }), /private server details|has reached its upload limit/);
+});
