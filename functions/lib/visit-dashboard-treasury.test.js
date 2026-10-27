@@ -71,3 +71,16 @@ test('the protected dashboard rereads edits to older treasury entries without st
   assert.equal((await service.getDashboardData(context)).treasury.rows.length, 0);
   assert.equal(first.treasury.rows[0].amount, 100);
 });
+
+test('fine entries are marked so the dashboard can keep them out of Avenue wise', () => {
+  const rows = buildVisitDashboardTreasury([
+    entry('plain', { type: 'income', avenue: 'International Service' }),
+    entry('by-source', { type: 'income', avenue: 'International Service', source: 'fine' }),
+    entry('by-fine-id', { type: 'income', avenue: 'International Service', fineId: 'fine-1' }),
+    entry('by-linked-id', { type: 'income', avenue: 'International Service', linkedFineId: 'fine-2' }),
+    entry('by-entry-id', { type: 'income', avenue: 'International Service', treasuryEntryId: 'treasury-9' }),
+    entry('other-source', { type: 'income', avenue: 'International Service', source: 'Club dues form' }),
+  ]).rows;
+  const byId = Object.fromEntries(rows.map(row => [row.transactionId, row.isFine]));
+  assert.deepEqual(byId, { plain: false, 'by-source': true, 'by-fine-id': true, 'by-linked-id': true, 'by-entry-id': true, 'other-source': false });
+});

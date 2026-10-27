@@ -857,6 +857,16 @@ function treasuryAvenueCode(value) {
     || firstAvenueCode(first, 'OTHER');
 }
 
+// The same marks Treasury uses to link an entry to a fine (see isFineLinkedTreasury in the rules).
+function isFineTreasuryRecord(source) {
+  return Boolean(
+    normalizeText(source?.fineId, 128)
+    || normalizeText(source?.linkedFineId, 128)
+    || normalizeText(source?.treasuryEntryId, 128)
+    || normalizeText(source?.source, 40).toLowerCase() === 'fine'
+  );
+}
+
 function shapeTreasuryRow(doc, index = 0, eventLookup = new Map()) {
   const source = doc?.data && typeof doc.data === 'object'
     ? doc.data
@@ -895,6 +905,8 @@ function shapeTreasuryRow(doc, index = 0, eventLookup = new Map()) {
     paymentMode: normalizeText(source.paymentMode, 80),
     referenceNumber: normalizeText(source.referenceNumber, 180),
     reimbursementStatus: normalizeText(source.reimbursementStatus || source.reimburse, 80),
+    // Fines collected from members are not avenue money, so the dashboard keeps them out of Avenue wise.
+    isFine: isFineTreasuryRecord(source),
   };
 }
 
