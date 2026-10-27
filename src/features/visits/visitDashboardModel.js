@@ -1012,6 +1012,8 @@ function normalizeTreasuryRow(raw) {
     paymentMode: text(raw.paymentMode, 80),
     referenceNumber: text(raw.referenceNumber, 180),
     reimbursementStatus: text(raw.reimbursementStatus, 80),
+    // Fines collected from members: shown in the ledgers, kept out of Avenue wise.
+    isFine: raw.isFine === true,
   };
 }
 
