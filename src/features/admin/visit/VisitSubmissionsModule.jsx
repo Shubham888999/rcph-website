@@ -1,3 +1,4 @@
+import { bulkDestinationChoices, bulkSharedDestinationChoices, resolveBulkDestination } from "./visitBulkDestinations.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminDialog from "../shared/AdminDialog";
 import AdminModuleHeader from "../AdminModuleHeader";
@@ -719,7 +720,7 @@ function VisitDialog({ dialog, visits, busy, mutate, onClose, reload }) {
   if (dialog.type === "visit-settings") return <AdminDialog title="Visit settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-visit", () => visitCalls.updateVisit({ visitType: form.visitType, description: form.description || "", enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, visitDate: toCallableDate(form.visitDate), submissionDeadline: toCallableDate(form.submissionDeadline), instructions: form.instructions || "" }), "Visit settings saved.", reload); }}><label>Description<textarea value={form.description || ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label><label>Visit date<input type="datetime-local" value={form.visitDate || ""} onChange={(event) => setForm({ ...form, visitDate: event.target.value })} /></label><label>Submission deadline<input type="datetime-local" value={form.submissionDeadline || ""} onChange={(event) => setForm({ ...form, submissionDeadline: event.target.value })} /></label><label>Instructions<textarea value={form.instructions || ""} onChange={(event) => setForm({ ...form, instructions: event.target.value })} /></label><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Submissions open</label><button disabled={busy}>Save</button></form></AdminDialog>;
   if (dialog.type === "folder-settings") return <AdminDialog title="Folder settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-folder", () => visitCalls.updateFolder({ visitType: form.visitType, positionKey: form.positionKey, enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, locked: form.locked === true, lockReason: form.lockReason || "", maxActiveFiles: Number(form.maxActiveFiles), maxFilesPerSelection: Number(form.maxFilesPerSelection), maxFileSizeBytes: Math.round(Number(form.maxFileSizeMb) * 1048576) }), "Folder settings saved.", reload); }}><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Open</label><label><input type="checkbox" checked={form.locked === true} onChange={(event) => setForm({ ...form, locked: event.target.checked })} /> Locked</label><label>Reason<input value={form.lockReason || ""} onChange={(event) => setForm({ ...form, lockReason: event.target.value })} /></label><label>Max active files<input type="number" min="1" max="100" value={form.maxActiveFiles} onChange={(event) => setForm({ ...form, maxActiveFiles: event.target.value })} /></label><label>Max files per selection<input type="number" min="1" max="10" value={form.maxFilesPerSelection} onChange={(event) => setForm({ ...form, maxFilesPerSelection: event.target.value })} /></label><label>Max file size (MB)<input type="number" min="1" max="25" value={form.maxFileSizeMb ?? Math.round(Number(form.maxFileSizeBytes) / 1048576)} onChange={(event) => setForm({ ...form, maxFileSizeMb: event.target.value })} /></label><button disabled={busy}>Save</button></form></AdminDialog>;
   if (dialog.type === "moderation") return <AdminDialog title="Visit moderation" busy={busy} onClose={onClose} className="admin-dialog--wide"><Moderation visits={visits} /></AdminDialog>;
-  if (dialog.type === "bulk-upload") return <BulkVisitUploadDialog visit={dialog.visit} onClose={onClose} reload={reload} />;
+  if (dialog.type === "bulk-upload") return <BulkVisitUploadDialog key={dialog.visit.visitType} visit={dialog.visit} onClose={onClose} reload={reload} />;
   if (dialog.type === "replace") return <AdminDialog title={`Replace ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><label htmlFor="visit-replacement-file">Choose replacement file</label><input id="visit-replacement-file" type="file" accept={VISIT_FILE_ACCEPT} onChange={(event) => setFile(event.target.files?.[0] || null)} />{file ? <p>{file.name} · {formatVisitFileSize(file.size)}</p> : null}<button disabled={!file || busy} onClick={() => mutate("replace", async () => { const error = validateVisitFile(file, dialog.folder); if (error) throw new Error(error); const descriptor = { clientFileId: `replace-${Date.now()}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }; const session = await visitCalls.replace(dialog.item.submissionId, [descriptor]); const approved = session.files?.[0]; if (!approved) throw new Error("Replacement session failed."); const proof = await uploadVisitFile(file, session, approved); return visitCalls.finalize({ sessionId: session.sessionId, clientFileId: approved.clientFileId, ticket: approved.ticket, completionProof: proof.completionProof }); }, "Submission replaced.", reload)}>Replace file</button></AdminDialog>;
   if (dialog.type.startsWith("custom-folder-")) return <CustomFolderDialog dialog={dialog} busy={busy} mutate={mutate} onClose={onClose} reload={reload} />;
   const remove = dialog.type === "remove";
@@ -758,6 +759,8 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
   const [folderState, setFolderState] = useState({ status: "loading", visit: null, folders: [] });
   const [files, setFiles] = useState([]);
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [sharedDestination, setSharedDestination] = useState("");
+  const [destinationKeys, setDestinationKeys] = useState({});
   const [search, setSearch] = useState("");
   const [showUnassigned, setShowUnassigned] = useState(false);
   const [pairs, setPairs] = useState([]);
@@ -766,12 +769,14 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
   const [error, setError] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const uploadConfigured = Boolean(resolveVisitUploadEndpoint(import.meta.env));
-  const resolvedVisit = folderState.visit || visit || {};
+  const resolvedVisit = useMemo(() => folderState.visit || visit || {}, [folderState.visit, visit]);
   const folders = folderState.folders;
   const selectionLocked = uploading || pairs.some((pair) => pair.status === "Uploaded" || pair.completionProof);
   const maxFileSizeBytes = useMemo(() => Math.max(1, ...folders.map((folder) => folder.maxFileSizeBytes), 25 * 1024 * 1024), [folders]);
   const validFiles = files.filter((item) => !item.validationError);
-  const selectedFolders = folders.filter((folder) => selectedKeys.includes(folder.positionKey));
+  const sharedDestinations = useMemo(() => bulkSharedDestinationChoices(folders), [folders]);
+  const selectedFolders = folders.filter((folder) => selectedKeys.includes(folder.positionKey))
+    .map(folder => ({ ...folder, ...resolveBulkDestination(folder, sharedDestination, destinationKeys[folder.positionKey]) }));
   const availability = useMemo(() => new Map(folders.map((folder) => [folder.positionKey, bulkVisitFolderAvailability(folder, files, resolvedVisit)])), [folders, files, resolvedVisit]);
   const unassignedSummary = summarizeUnassignedVisitFolders(folders);
   const visibleFolders = filterVisitFoldersByAssignment(folders, showUnassigned).filter((folder) => {
@@ -779,21 +784,20 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
     if (!query) return true;
     return `${folder.positionTitle} ${folder.avenueCode} ${folder.positionKey} ${getVisitFolderHolderLabel(folder).label}`.toLowerCase().includes(query);
   });
-  const invalidSelectedFolders = selectedFolders.filter((folder) => !availability.get(folder.positionKey)?.selectable);
+  const invalidSelectedFolders = selectedFolders.filter((folder) => !folder.destinationValid || !availability.get(folder.positionKey)?.selectable);
   const totalUploads = validFiles.length * selectedFolders.length;
   const successfulPairs = pairs.filter((pair) => pair.status === "Uploaded");
   const failedPairs = pairs.filter((pair) => pair.status === "Failed");
-  const canSubmit = uploadConfigured && !uploading && validFiles.length === files.length && validFiles.length > 0 && selectedFolders.length > 0 && invalidSelectedFolders.length === 0;
+  const canSubmit = uploadConfigured && !uploading && !selectionLocked && validFiles.length === files.length && validFiles.length > 0 && selectedFolders.length > 0 && invalidSelectedFolders.length === 0;
 
   useEffect(() => {
     let active = true;
-    setFolderState({ status: "loading", visit: null, folders: [] });
     visitCalls.folders(visit.visitType)
       .then((data) => {
         if (!active) return;
         setFolderState({
           status: "success",
-          visit: normalizeVisit(data.visit) || visit,
+          visit: normalizeVisit(data.visit),
           folders: normalizeFolders(data.folders, visit.visitType),
         });
       })
@@ -801,7 +805,7 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
         if (active) setFolderState({ status: "error", error: safeAdminError(failure), visit: null, folders: [] });
       });
     return () => { active = false; };
-  }, [visit]);
+  }, [visit.visitType]);
 
   function descriptorFor(item) {
     return {
@@ -865,6 +869,19 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
     setPairs([]);
   }
 
+  function changeSharedDestination(path) {
+    if (selectionLocked) return;
+    setSharedDestination(path);
+    setDestinationKeys({});
+    setPairs([]);
+  }
+
+  function changeFolderDestination(positionKey, key) {
+    if (selectionLocked) return;
+    setDestinationKeys(current => ({ ...current, [positionKey]: key }));
+    setPairs([]);
+  }
+
   function patchPair(pairId, patch) {
     setPairs((current) => current.map((pair) => (pair.pairId === pairId ? { ...pair, ...patch } : pair)));
   }
@@ -881,8 +898,8 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
       const approvedById = new Map((session.files || []).map((item) => [item.clientFileId, item]));
       targetPairs.filter((pair) => pair.positionKey === session.positionKey).forEach((pair) => {
         const approved = approvedById.get(pair.clientFileId);
-        if (!approved) {
-          patchWorkingPair(pair, { status: "Failed", message: "The upload session did not authorize this file." });
+        if (!approved || (approved.documentCategory || "") !== (pair.documentCategory || "")) {
+          patchWorkingPair(pair, { sessionId: session.sessionId, ticket: "", status: "Failed", message: "The upload session did not authorize this file and destination. Refresh and try again." });
           return;
         }
         patchWorkingPair(pair, {
@@ -901,6 +918,7 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
       const response = await visitCalls.createBulkSessions({
         visitType: visit.visitType,
         positionKeys: selectedFolders.map((folder) => folder.positionKey),
+        destinations: selectedFolders.map(folder => ({ positionKey: folder.positionKey, documentCategory: folder.documentCategory })),
         files: validFiles.map(descriptorFor),
       });
       attachSessions(response, targetPairs);
@@ -919,6 +937,7 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
           bulkUploadId: activeBulkUploadId || undefined,
           visitType: visit.visitType,
           positionKeys: [positionKey],
+          destinations: [{ positionKey, documentCategory: folderPairs[0].documentCategory || "" }],
           files: folderPairs.map((pair) => descriptorFor(pair)),
         });
         activeBulkUploadId = response.bulkUploadId || activeBulkUploadId;
@@ -1000,7 +1019,6 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
       : buildBulkUploadPairs(validFiles, selectedFolders).map((pair) => ({ ...pair }));
     if (!retryFailed) setPairs(activePairs);
 
-    let activeBulkUploadId = bulkUploadId;
     try {
       activePairs.forEach((pair) => {
         const patch = { status: "Requesting authorization", message: "Preparing a trusted upload ticket." };
@@ -1011,10 +1029,12 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
         }
         patchWorkingPair(pair, patch);
       });
-      activeBulkUploadId = await authorizePairs(activePairs, retryFailed);
+      const activeBulkUploadId = await authorizePairs(activePairs, retryFailed);
       const runnable = activePairs.filter((pair) => pair.completionProof || (pair.sessionId && pair.ticket));
       const counters = { completed: 0, failed: activePairs.length - runnable.length };
-      const failedNoProofSessions = new Set();
+      const failedNoProofSessions = new Set(activePairs
+        .filter(pair => !pair.completionProof && pair.sessionId && !pair.ticket)
+        .map(pair => pair.sessionId));
       const proofFailureSessions = new Set();
       await runLimited(runnable, VISIT_BULK_UPLOAD_CONCURRENCY, (pair) => processPair(pair, counters, failedNoProofSessions, proofFailureSessions));
       const cancelSessionIds = [...failedNoProofSessions].filter((sessionId) => !proofFailureSessions.has(sessionId));
@@ -1034,9 +1054,34 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
 
   const footerLabel = totalUploads === 1 ? "Upload 1 file" : `Upload ${totalUploads} files`;
   const fileError = files.find((item) => item.validationError)?.validationError || "";
-  const folderError = invalidSelectedFolders[0] ? availability.get(invalidSelectedFolders[0].positionKey)?.message : "";
+  const folderError = invalidSelectedFolders[0] ? (invalidSelectedFolders[0].destinationError || availability.get(invalidSelectedFolders[0].positionKey)?.message) : "";
 
-  return <AdminDialog title={`Bulk upload - ${resolvedVisit.displayTitle || "Club Visit"}`} busy={uploading} onClose={onClose} className="admin-dialog--wide"><div className="visit-bulk-upload">{folderState.status === "loading" ? <p>Loading destination folders...</p> : null}{folderState.status === "error" ? <p role="alert" className="admin-lock-banner is-locked">{folderState.error}</p> : null}{error ? <p role="alert" className="admin-lock-banner is-locked">{error}</p> : null}{!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload endpoint could not be resolved. Configure VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT or VITE_FIREBASE_PROJECT_ID for uploadVisitSubmissionFile.</p> : null}<section className="visit-bulk-upload__step"><h3>Choose files</h3><label className="visit-upload__label" htmlFor="visit-bulk-files">Choose files</label><input id="visit-bulk-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={selectionLocked || folderState.status !== "success"} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} /><p>{files.length} selected - maximum 10</p>{files.length ? <ul className="visit-upload__queue">{files.map((item) => <li key={item.clientFileId}><div><strong>{item.file.name}</strong><span>{item.file.type || "Unknown type"} - {formatVisitFileSize(item.file.size)}</span><span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span></div>{!selectionLocked ? <button type="button" onClick={() => removeFile(item.clientFileId)}>Remove</button> : null}</li>)}</ul> : null}</section><section className="visit-bulk-upload__step"><h3>Choose destination folders</h3><label className="visit-upload__label" htmlFor="visit-bulk-folder-search">Folder search</label><input id="visit-bulk-folder-search" value={search} disabled={uploading || folderState.status !== "success"} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title, code, or key" />{unassignedSummary.total ? <label className="visit-folder-unassigned-toggle"><input type="checkbox" checked={showUnassigned} disabled={selectionLocked || folderState.status !== "success"} onChange={(event) => toggleShowUnassigned(event.target.checked)} />{getShowUnassignedLabel(folders)}</label> : null}<div className="admin-actions"><button type="button" disabled={selectionLocked || !files.length} onClick={selectAllAvailable}>Select all available</button><button type="button" disabled={selectionLocked || !selectedKeys.length} onClick={clearSelection}>Clear selection</button></div><div className="visit-bulk-upload__folders">{visibleFolders.map((folder) => { const details = availability.get(folder.positionKey); const selected = selectedKeys.includes(folder.positionKey); const status = bulkVisitFolderStatus(folder, resolvedVisit); return <label key={folder.positionKey} className={`visit-bulk-upload__folder is-${status}${selected ? " is-selected" : ""}`}><input type="checkbox" checked={selected} disabled={selectionLocked || (!selected && !details?.selectable)} onChange={() => toggleFolder(folder)} /><span><strong>{folder.positionTitle}</strong><small>{folder.avenueCode || folder.positionKey} · <span className={getVisitFolderHolderLabel(folder).vacant ? "is-vacant" : ""}>{getVisitFolderHolderLabel(folder).label}</span></small></span><span>{folder.activeFileCount} / {folder.maxActiveFiles}</span><span>{details?.status || "disabled"}</span>{details?.message ? <em>{details.message}</em> : null}</label>; })}</div></section><section className="visit-bulk-upload__step"><h3>Review and upload</h3><p className="visit-bulk-upload__summary">{validFiles.length} files x {selectedFolders.length} folders = {totalUploads} uploads</p>{fileError ? <p role="alert" className="visit-bulk-upload__error">{fileError}</p> : null}{folderError ? <p role="alert" className="visit-bulk-upload__error">{folderError}</p> : null}<p className="sr-only" aria-live="polite">{announcement}</p></section>{pairs.length ? <section className="visit-bulk-upload__step" aria-labelledby="visit-bulk-progress"><h3 id="visit-bulk-progress">Progress</h3><ul className="visit-bulk-upload__progress">{pairs.map((pair) => <li key={pair.pairId}><span>{pair.positionTitle}</span><strong>{pair.fileName}</strong><em>{pair.status}: {pair.message}</em></li>)}</ul></section> : null}{successfulPairs.length ? <section className="visit-bulk-upload__step"><h3>Successful uploads</h3><ul className="visit-bulk-upload__result-list">{successfulPairs.map((pair) => <li key={pair.pairId}>{pair.positionTitle} - {pair.fileName}</li>)}</ul></section> : null}{failedPairs.length ? <section className="visit-bulk-upload__step"><h3>Failed uploads</h3><ul className="visit-bulk-upload__result-list">{failedPairs.map((pair) => <li key={pair.pairId}>{pair.positionTitle} - {pair.fileName}: {pair.message}</li>)}</ul></section> : null}<div className="admin-actions visit-bulk-upload__footer"><button type="button" disabled={uploading} onClick={onClose}>Cancel</button><button type="button" disabled={!canSubmit} onClick={() => upload(false)}>{footerLabel}</button>{failedPairs.length ? <button type="button" disabled={uploading} onClick={() => upload(true)}>Retry {failedPairs.length} failed upload{failedPairs.length === 1 ? "" : "s"}</button> : null}</div></div></AdminDialog>;
+  return <AdminDialog title={`Bulk upload - ${resolvedVisit.displayTitle || "Club Visit"}`} busy={uploading} onClose={onClose} className="admin-dialog--wide"><div className="visit-bulk-upload">{folderState.status === "loading" ? <p>Loading destination folders...</p> : null}{folderState.status === "error" ? <p role="alert" className="admin-lock-banner is-locked">{folderState.error}</p> : null}{error ? <p role="alert" className="admin-lock-banner is-locked">{error}</p> : null}{!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload endpoint could not be resolved. Configure VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT or VITE_FIREBASE_PROJECT_ID for uploadVisitSubmissionFile.</p> : null}<section className="visit-bulk-upload__step"><h3>Choose files</h3><label className="visit-upload__label" htmlFor="visit-bulk-files">Choose files</label><input id="visit-bulk-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={selectionLocked || folderState.status !== "success"} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} /><p>{files.length} selected - maximum 10</p>{files.length ? <ul className="visit-upload__queue">{files.map((item) => <li key={item.clientFileId}><div><strong>{item.file.name}</strong><span>{item.file.type || "Unknown type"} - {formatVisitFileSize(item.file.size)}</span><span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span></div>{!selectionLocked ? <button type="button" onClick={() => removeFile(item.clientFileId)}>Remove</button> : null}</li>)}</ul> : null}</section><section className="visit-bulk-upload__step"><h3>Choose destination folders</h3><label className="visit-upload__label" htmlFor="visit-bulk-folder-search">Folder search</label><input id="visit-bulk-folder-search" value={search} disabled={uploading || folderState.status !== "success"} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title, code, or key" />{unassignedSummary.total ? <label className="visit-folder-unassigned-toggle"><input type="checkbox" checked={showUnassigned} disabled={selectionLocked || folderState.status !== "success"} onChange={(event) => toggleShowUnassigned(event.target.checked)} />{getShowUnassignedLabel(folders)}</label> : null}<div className="admin-actions"><button type="button" disabled={selectionLocked || !files.length} onClick={selectAllAvailable}>Select all available</button><button type="button" disabled={selectionLocked || !selectedKeys.length} onClick={clearSelection}>Clear selection</button></div><label className="visit-upload__label" htmlFor="visit-bulk-shared-destination">Destination inside selected folders</label>
+      <select id="visit-bulk-shared-destination" value={sharedDestination} disabled={selectionLocked || folderState.status !== "success"} onChange={event => changeSharedDestination(event.target.value)}>
+        <option value="">Main folder / Supporting files</option>
+        {sharedDestinations.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+      </select>
+      <p className="visit-subtle-note">Applies to all selected admin folders. You can choose a different destination for each below. Missing folders must be created before uploading.</p>
+      <div className="visit-bulk-upload__folders">{visibleFolders.map((folder) => {
+        const details = availability.get(folder.positionKey);
+        const selected = selectedKeys.includes(folder.positionKey);
+        const status = bulkVisitFolderStatus(folder, resolvedVisit);
+        const destination = resolveBulkDestination(folder, sharedDestination, destinationKeys[folder.positionKey]);
+        const checkboxId = `visit-bulk-position-${folder.positionKey}`;
+        return <div key={folder.positionKey} className={`visit-bulk-upload__folder is-${status}${selected ? " is-selected" : ""}`}>
+          <input id={checkboxId} type="checkbox" checked={selected} disabled={selectionLocked || (!selected && !details?.selectable)} onChange={() => toggleFolder(folder)} />
+          <label className="visit-bulk-upload__folder-name" htmlFor={checkboxId}><strong>{folder.positionTitle}</strong><small>{folder.avenueCode || folder.positionKey} · <span className={getVisitFolderHolderLabel(folder).vacant ? "is-vacant" : ""}>{getVisitFolderHolderLabel(folder).label}</span></small></label>
+          <span className="visit-bulk-upload__capacity">{folder.activeFileCount} / {folder.maxActiveFiles}</span><span className="visit-bulk-upload__availability">{details?.status || "disabled"}</span>
+          {details?.message ? <em>{details.message}</em> : null}
+          {selected ? <label className="visit-bulk-upload__destination"><span>Destination for {folder.positionTitle}</span>
+            <select aria-label={`Destination for ${folder.positionTitle}`} value={destination.documentCategory} disabled={selectionLocked} onChange={event => changeFolderDestination(folder.positionKey, event.target.value)}>
+              {!destination.destinationValid ? <option value="__missing__">{destination.destinationLabel}</option> : null}
+              {bulkDestinationChoices(folder).map(choice => <option key={choice.key} value={choice.key}>{choice.label}</option>)}
+            </select>
+            {!destination.destinationValid ? <em role="alert">{destination.destinationError}</em> : null}
+          </label> : null}
+        </div>;
+      })}</div></section><section className="visit-bulk-upload__step"><h3>Review and upload</h3><p className="visit-bulk-upload__summary">{validFiles.length} files x {selectedFolders.length} folders = {totalUploads} uploads</p>{fileError ? <p role="alert" className="visit-bulk-upload__error">{fileError}</p> : null}{folderError ? <p role="alert" className="visit-bulk-upload__error">{folderError}</p> : null}<p className="sr-only" aria-live="polite">{announcement}</p></section>{pairs.length ? <section className="visit-bulk-upload__step" aria-labelledby="visit-bulk-progress"><h3 id="visit-bulk-progress">Progress</h3><ul className="visit-bulk-upload__progress">{pairs.map((pair) => <li key={pair.pairId}><span>{pair.destinationTitle || pair.positionTitle}</span><strong>{pair.fileName}</strong><em>{pair.status}: {pair.message}</em></li>)}</ul></section> : null}{successfulPairs.length ? <section className="visit-bulk-upload__step"><h3>Successful uploads</h3><ul className="visit-bulk-upload__result-list">{successfulPairs.map((pair) => <li key={pair.pairId}>{pair.destinationTitle || pair.positionTitle} - {pair.fileName}</li>)}</ul></section> : null}{failedPairs.length ? <section className="visit-bulk-upload__step"><h3>Failed uploads</h3><ul className="visit-bulk-upload__result-list">{failedPairs.map((pair) => <li key={pair.pairId}>{pair.destinationTitle || pair.positionTitle} - {pair.fileName}: {pair.message}</li>)}</ul></section> : null}<div className="admin-actions visit-bulk-upload__footer"><button type="button" disabled={uploading} onClick={onClose}>Cancel</button><button type="button" disabled={!canSubmit} onClick={() => upload(false)}>{footerLabel}</button>{failedPairs.length ? <button type="button" disabled={uploading} onClick={() => upload(true)}>Retry {failedPairs.length} failed upload{failedPairs.length === 1 ? "" : "s"}</button> : null}</div></div></AdminDialog>;
 }
 
 function Moderation({ visits }) {

@@ -162,12 +162,16 @@ export function buildBulkUploadPairs(files, folders, existingPairs = []) {
   const pairs = [];
   for (const folder of Array.isArray(folders) ? folders : []) {
     for (const item of Array.isArray(files) ? files : []) {
-      const pairId = `${folder.positionKey}:${item.clientFileId}`;
+      const category = folder.documentCategory || "";
+      const pairId = category ? `${folder.positionKey}:${category}:${item.clientFileId}` : `${folder.positionKey}:${item.clientFileId}`;
       pairs.push({
         pairId,
         visitType: folder.visitType,
         positionKey: folder.positionKey,
         positionTitle: folder.positionTitle,
+        documentCategory: category,
+        destinationLabel: folder.destinationLabel || "Main folder / Supporting files",
+        destinationTitle: category ? `${folder.positionTitle} / ${folder.destinationLabel}` : folder.positionTitle,
         avenueCode: folder.avenueCode,
         clientFileId: item.clientFileId,
         fileName: item.file?.name || "",

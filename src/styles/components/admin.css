@@ -163,8 +163,8 @@
   font-size: 0.84rem;
 }
 
-.visit-bulk-upload__folder > span:nth-of-type(2),
-.visit-bulk-upload__folder > span:nth-of-type(3) {
+.visit-bulk-upload__capacity,
+.visit-bulk-upload__availability {
   color: var(--internal-accent-soft);
   font-size: 0.78rem;
   font-weight: 850;
@@ -175,6 +175,28 @@
 .visit-bulk-upload__folder em {
   grid-column: 2 / -1;
   font-style: normal;
+}
+
+.visit-bulk-upload__destination {
+  grid-column: 2 / -1;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.visit-bulk-upload__destination > span {
+  color: var(--internal-text-muted);
+  font-size: 0.84rem;
+}
+
+.visit-bulk-upload__destination select,
+#visit-bulk-shared-destination {
+  width: 100%;
+  min-width: 0;
+}
+
+.visit-bulk-upload__destination em {
+  grid-column: auto;
 }
 
 .visit-bulk-upload__folder.is-selected {
@@ -465,13 +487,42 @@
   }
 
   .visit-section-header,
-  .visit-bulk-upload__folder,
   .visit-bulk-upload__progress li {
     grid-template-columns: 1fr;
   }
 
   .visit-section-header {
     display: grid;
+  }
+
+  .visit-bulk-upload__folder {
+    grid-template-columns: auto minmax(0, 1fr) max-content;
+  }
+
+  .visit-bulk-upload__folder > input {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+    justify-self: start;
+  }
+
+  .visit-bulk-upload__folder-name {
+    grid-column: 2 / -1;
+    grid-row: 1;
+  }
+
+  .visit-bulk-upload__capacity {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .visit-bulk-upload__availability {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .visit-bulk-upload__destination {
+    grid-column: 1 / -1;
   }
 
   .visit-bulk-upload__folder em,
