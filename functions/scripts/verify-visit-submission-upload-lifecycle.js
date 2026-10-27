@@ -259,12 +259,15 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   );
 
   env = await initializedEnv();
-  folderDoc(env, 'clubAssembly', 'editor').maxActiveFiles = 1;
-  folderDoc(env, 'clubAssembly', 'editor').activeFileCount = 1;
-  await rejectsWithCode(() => createSession(env, 'bod-editor', { positionKey: 'editor' }), 'resource-exhausted', 'ordinary position capacity limit enforced');
-  folderDoc(env, 'clubAssembly', 'editor').activeFileCount = 0;
+  folderDoc(env, 'clubAssembly', 'editor').maxActiveFiles = 40;
+  env.adapter.store.visitSubmissions ||= {};
+  for (let index = 0; index < 300; index += 1) env.adapter.store.visitSubmissions[`capacity-${index}`] = { visitType: 'clubAssembly', positionKey: 'editor', status: 'active', documentCategory: '' };
+  folderDoc(env, 'clubAssembly', 'editor').activeFileCount = 300;
+  await rejectsWithCode(() => createSession(env, 'bod-editor', { positionKey: 'editor' }), 'resource-exhausted', '300-file destination capacity enforced');
+  delete env.adapter.store.visitSubmissions['capacity-299'];
+  folderDoc(env, 'clubAssembly', 'editor').activeFileCount = 299;
   await createSession(env, 'bod-editor', { positionKey: 'editor' });
-  await rejectsWithCode(() => createSession(env, 'bod-editor', { positionKey: 'editor', file: { clientFileId: 'another' } }), 'resource-exhausted', 'concurrent reservation blocked');
+  await rejectsWithCode(() => createSession(env, 'bod-editor', { positionKey: 'editor', file: { clientFileId: 'another' } }), 'resource-exhausted', 'concurrent reservation blocked at 300');
 
   const bulkEnv = await initializedEnv();
   const bulk = await bulkEnv.service.createBulkUploadSessions('admin-uid', {
@@ -305,7 +308,10 @@ function assertNoSecretFields(value, pathLabel = 'root') {
     files: [file({ clientFileId: 'locked-bulk' })],
   }), 'failed-precondition', 'bulk locked folder rejected');
   const bulkCapacityEnv = await initializedEnv();
-  folderDoc(bulkCapacityEnv, 'clubAssembly', 'editor').maxActiveFiles = 1;
+  folderDoc(bulkCapacityEnv, 'clubAssembly', 'editor').maxActiveFiles = 40;
+  bulkCapacityEnv.adapter.store.visitSubmissions ||= {};
+  for (let index = 0; index < 299; index += 1) bulkCapacityEnv.adapter.store.visitSubmissions[`bulk-capacity-${index}`] = { visitType: 'clubAssembly', positionKey: 'editor', status: 'active', documentCategory: '' };
+  folderDoc(bulkCapacityEnv, 'clubAssembly', 'editor').activeFileCount = 299;
   await rejectsWithCode(() => bulkCapacityEnv.service.createBulkUploadSessions('admin-uid', {
     visitType: 'clubAssembly',
     positionKeys: ['editor'],

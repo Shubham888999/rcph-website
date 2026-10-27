@@ -633,49 +633,49 @@ function seedSecretaryLetters(env, counts, positionKey = 'secretary', visitType 
   env.adapter.store.visitSubmissionPositions[`${visitType}_${positionKey}`].activeFileCount = total;
 }
 
-test('existing Secretary Inward and Outward each allow 100 independently of the main folder', async () => {
+test('existing Secretary Inward and Outward each allow 300 independently of the main folder', async () => {
   const env = await categoryEnv();
-  seedSecretaryLetters(env, { inward: 99, outward: 100, '': 100 });
+  seedSecretaryLetters(env, { inward: 299, outward: 300, '': 300 });
   const session = await env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory: 'inward' })] });
   const folder = (await env.service.getFolder('bod-secretary', 'clubAssembly', 'secretary')).folder;
-  assert.deepEqual(folder.categoryLimits, { '': 100, inward: 100, outward: 100, 'inward-register': 100, 'outward-register': 100 });
-  assert.deepEqual(folder.categoryUsage.inward, { activeFileCount: 99, reservedFileCount: 1 });
-  assert.deepEqual(folder.categoryUsage.outward, { activeFileCount: 100, reservedFileCount: 0 });
-  assert.equal(folder.categoryUsage[''].activeFileCount, 100);
-  assert.equal(folder.maxActiveFiles, 100);
-  assert.equal(folder.totalMaxActiveFiles, 500);
+  assert.deepEqual(folder.categoryLimits, { '': 300, inward: 300, outward: 300, 'inward-register': 300, 'outward-register': 300 });
+  assert.deepEqual(folder.categoryUsage.inward, { activeFileCount: 299, reservedFileCount: 1 });
+  assert.deepEqual(folder.categoryUsage.outward, { activeFileCount: 300, reservedFileCount: 0 });
+  assert.equal(folder.categoryUsage[''].activeFileCount, 300);
+  assert.equal(folder.maxActiveFiles, 300);
+  assert.equal(folder.totalMaxActiveFiles, 1500);
   for (const documentCategory of ['inward', 'outward', '']) {
     await rejectsWith(env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory })] }), 'resource-exhausted');
   }
   await env.service.cancelUploadSession('bod-secretary', { sessionId: session.sessionId });
   const retry = await env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory: 'inward' })] });
   await uploadThroughDrive(env, 'bod-secretary', retry, { driveFileId: 'lastInwardFile0001', driveFolderId: 'inwardFolder00001', positionFolderId: 'positionFolder0001' });
-  await rejectsWith(env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory: 'inward' })] }), 'resource-exhausted', /100-file limit/);
+  await rejectsWith(env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory: 'inward' })] }), 'resource-exhausted', /300-file limit/);
   const current = (await env.service.getFolders('president-uid', 'clubAssembly')).folders.find(folder => folder.positionKey === 'secretary');
-  assert.equal(current.categoryUsage.inward.activeFileCount, 100);
+  assert.equal(current.categoryUsage.inward.activeFileCount, 300);
   assert.equal(current.categoryUsage.inward.reservedFileCount, 0);
-  assert.equal(current.categoryUsage.outward.activeFileCount, 100);
-  assert.equal(current.activeFileCount, 300);
+  assert.equal(current.categoryUsage.outward.activeFileCount, 300);
+  assert.equal(current.activeFileCount, 900);
 });
 
 test('bulk uploads reserve Secretary capacity in the selected letter folder and preserve other position limits', async () => {
   const env = await categoryEnv();
-  seedSecretaryLetters(env, { inward: 100, outward: 99, '': 40 });
+  seedSecretaryLetters(env, { inward: 300, outward: 299, '': 40 });
   const input = { visitType: 'clubAssembly', positionKeys: ['secretary'], destinations: [{ positionKey: 'secretary', documentCategory: 'outward' }], files: [categoryFile()] };
   const session = await env.service.createBulkUploadSessions('admin-uid', input);
   assert.equal(session.sessions.length, 1);
   await rejectsWith(env.service.createBulkUploadSessions('admin-uid', input), 'resource-exhausted', /Outward/);
   await env.service.cancelUploadSession('admin-uid', { sessionId: session.sessions[0].sessionId });
   assert.equal((await env.service.createBulkUploadSessions('admin-uid', input)).sessions.length, 1);
-  env.adapter.store.visitSubmissionPositions.clubAssembly_editor.activeFileCount = 40;
+  seedSecretaryLetters(env, { '': 300 }, 'editor');
   await rejectsWith(env.service.createUploadSession('bod-editor', { visitType: 'clubAssembly', positionKey: 'editor', files: [categoryFile()] }), 'resource-exhausted');
-  assert.equal((await env.service.getFolder('bod-editor', 'clubAssembly', 'editor')).folder.categoryLimits, undefined);
+  assert.deepEqual((await env.service.getFolder('bod-editor', 'clubAssembly', 'editor')).folder.categoryLimits, { '': 300 });
 });
 
-test('joint and co-Secretary letters inherit the two independent 100-file quotas', async () => {
+test('joint and co-Secretary letters inherit the two independent 300-file quotas', async () => {
   const env = await categoryEnv();
   for (const positionKey of ['joint-secretary', 'co-secretary']) {
-    seedSecretaryLetters(env, { inward: 99, outward: 99 }, positionKey);
+    seedSecretaryLetters(env, { inward: 299, outward: 299 }, positionKey);
     const session = await env.service.createUploadSession('admin-uid', { visitType: 'clubAssembly', positionKey, files: [categoryFile({ clientFileId: 'in', documentCategory: 'inward' }), categoryFile({ clientFileId: 'out', documentCategory: 'outward' })] });
     assert.equal(session.files.length, 2);
     await rejectsWith(env.service.createUploadSession('admin-uid', { visitType: 'clubAssembly', positionKey, files: [categoryFile({ documentCategory: 'outward' })] }), 'resource-exhausted');
@@ -684,45 +684,45 @@ test('joint and co-Secretary letters inherit the two independent 100-file quotas
 
 test('replacing a letter at capacity remains allowed without reserving another category slot', async () => {
   const env = await categoryEnv();
-  seedSecretaryLetters(env, { inward: 100 });
+  seedSecretaryLetters(env, { inward: 300 });
   const existing = env.adapter.store.visitSubmissions['seed-secretary-inward-0'];
   Object.assign(existing, { fileName: 'old.pdf', originalFileName: 'old.pdf', mimeType: 'application/pdf', sizeBytes: 1024 });
   await env.service.replaceSubmission('bod-secretary', { submissionId: 'seed-secretary-inward-0', files: [categoryFile({ clientFileId: 'replace-at-limit' })] });
   const folder = (await env.service.getFolder('bod-secretary', 'clubAssembly', 'secretary')).folder;
   assert.equal(folder.categoryUsage.inward.reservedFileCount, 0);
-  assert.equal(folder.categoryUsage.inward.activeFileCount, 100);
+  assert.equal(folder.categoryUsage.inward.activeFileCount, 300);
 });
 
-test('Secretary main folder, registers, custom folders and subfolders each reserve up to 100 independently', async () => {
+test('Secretary main folder, registers, custom folders and subfolders each reserve up to 300 independently', async () => {
   const env = await categoryEnv();
   // Existing saved maxActiveFiles values do not constrain the new per-folder limits.
   env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.maxActiveFiles = 40;
   const parent = (await env.service.createCustomFolder('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', name: 'Resolutions' })).created;
   const child = (await env.service.createCustomFolder('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', name: 'Signed', parentKey: parent.key })).created;
-  const counts = Object.fromEntries(['', 'inward', 'outward', 'inward-register', 'outward-register', parent.key, child.key].map(key => [key, 99]));
+  const counts = Object.fromEntries(['', 'inward', 'outward', 'inward-register', 'outward-register', parent.key, child.key].map(key => [key, 299]));
   seedSecretaryLetters(env, counts);
   for (const documentCategory of Object.keys(counts)) {
     const session = await env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory })] });
     assert.equal(session.files.length, 1);
-    await rejectsWith(env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory })] }), 'resource-exhausted', /100-file limit/);
+    await rejectsWith(env.service.createUploadSession('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile({ documentCategory })] }), 'resource-exhausted', /300-file limit/);
   }
   const result = await env.service.getFolder('bod-secretary', 'clubAssembly', 'secretary');
-  assert.equal(result.folder.perFolderFileLimit, 100);
-  assert.equal(result.folder.maxActiveFiles, 100);
-  assert.equal(result.limits.maxActiveFiles, 100);
-  assert.equal(result.folder.totalMaxActiveFiles, 700);
-  for (const key of Object.keys(counts)) assert.deepEqual(result.folder.categoryUsage[key], { activeFileCount: 99, reservedFileCount: 1 });
-  // Other secretarial positions retain the prior letter-only quotas and ordinary allowance.
+  assert.equal(result.folder.perFolderFileLimit, 300);
+  assert.equal(result.folder.maxActiveFiles, 300);
+  assert.equal(result.limits.maxActiveFiles, 300);
+  assert.equal(result.folder.totalMaxActiveFiles, 2100);
+  for (const key of Object.keys(counts)) assert.deepEqual(result.folder.categoryUsage[key], { activeFileCount: 299, reservedFileCount: 1 });
+  // All secretarial positions receive the same independent quotas.
   const co = (await env.service.getFolder('admin-uid', 'clubAssembly', 'co-secretary')).folder;
-  assert.equal(co.maxActiveFiles, 40);
-  assert.deepEqual(co.categoryLimits, { inward: 100, outward: 100 });
-  assert.equal(co.perFolderFileLimit, undefined);
+  assert.equal(co.maxActiveFiles, 300);
+  assert.deepEqual(co.categoryLimits, { '': 300, inward: 300, outward: 300, 'inward-register': 300, 'outward-register': 300 });
+  assert.equal(co.perFolderFileLimit, 300);
 });
 
 test('Secretary bulk uploads use the root or selected custom subfolder allowance', async () => {
   const env = await categoryEnv();
   const custom = (await env.service.createCustomFolder('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', name: 'Reports' })).created;
-  seedSecretaryLetters(env, { '': 99, [custom.key]: 99, inward: 100, outward: 100 });
+  seedSecretaryLetters(env, { '': 299, [custom.key]: 299, inward: 300, outward: 300 });
   for (const documentCategory of ['', custom.key]) {
     const request = { visitType: 'clubAssembly', positionKeys: ['secretary'], destinations: [{ positionKey: 'secretary', documentCategory }], files: [categoryFile()] };
     const session = await env.service.createBulkUploadSessions('admin-uid', request);
@@ -781,11 +781,48 @@ test('holders retain 500 sessions per rolling hour and capacity failures remain 
   });
   env.clock.value += 3600000;
   await env.service.createUploadSession('bod-secretary', input);
-  seedSecretaryLetters(env, { '': 100 });
+  seedSecretaryLetters(env, { '': 300 });
   await assert.rejects(env.service.createUploadSession('president-uid', input), err => {
     assert.equal(err.details.reason, 'folder-capacity');
-    assert.equal(err.details.limit, 100);
+    assert.equal(err.details.limit, 300);
     assert.equal(err.details.retryAfterSeconds, undefined);
     return true;
   });
+});
+
+test('every existing position can reserve its 300th main-folder file despite a saved 40-file limit', async () => {
+  const env = await categoryEnv();
+  const folders = (await env.service.getFolders('admin-uid', 'clubAssembly')).folders;
+  const keys = folders.map(folder => folder.positionKey);
+  for (const key of keys) {
+    seedSecretaryLetters(env, { '': 299 }, key);
+    env.adapter.store.visitSubmissionPositions[`clubAssembly_${key}`].maxActiveFiles = 40;
+  }
+  const input = { visitType: 'clubAssembly', positionKeys: keys, files: [categoryFile()] };
+  const bulk = await env.service.createBulkUploadSessions('admin-uid', input);
+  assert.equal(bulk.sessions.length, keys.length);
+  await assert.rejects(env.service.createBulkUploadSessions('admin-uid', input), err => err.code === 'resource-exhausted' && err.details.limit === 300);
+  const current = (await env.service.getFolders('admin-uid', 'clubAssembly')).folders;
+  for (const folder of current) {
+    assert.equal(folder.maxActiveFiles, 300);
+    assert.equal(folder.perFolderFileLimit, 300);
+    assert.deepEqual(folder.categoryUsage[''], { activeFileCount: 299, reservedFileCount: 1 });
+  }
+});
+
+test('non-Secretary custom folders and subfolders have independent 300-file capacities', async () => {
+  const env = await categoryEnv();
+  const destinations = [];
+  for (const positionKey of ['president', 'editor', 'saa']) {
+    const parent = (await env.service.createCustomFolder('admin-uid', { visitType: 'clubAssembly', positionKey, name: 'Resolutions' })).created;
+    const child = (await env.service.createCustomFolder('admin-uid', { visitType: 'clubAssembly', positionKey, name: 'Signed', parentKey: parent.key })).created;
+    seedSecretaryLetters(env, { '': 300, [parent.key]: 300, [child.key]: 299 }, positionKey);
+    destinations.push({ positionKey, documentCategory: child.key });
+  }
+  const input = { visitType: 'clubAssembly', positionKeys: destinations.map(item => item.positionKey), destinations, files: [categoryFile()] };
+  const bulk = await env.service.createBulkUploadSessions('admin-uid', input);
+  assert.equal(bulk.sessions.length, 3);
+  await rejectsWith(env.service.createBulkUploadSessions('admin-uid', input), 'resource-exhausted', /300-file limit/);
+  for (const session of bulk.sessions) await env.service.cancelUploadSession('admin-uid', { sessionId: session.sessionId });
+  assert.equal((await env.service.createBulkUploadSessions('admin-uid', input)).sessions.length, 3);
 });

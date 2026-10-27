@@ -470,9 +470,9 @@ test('HTTP folder preparation failure releases its lock and never transfers byte
 test('moving into a full Secretary letter folder is rejected before changing Drive', async () => {
   const env = await createEnv();
   const upload = await uploadVia(env, 'bod-secretary', 'secretary');
-  for (let i = 0; i < 100; i++) env.adapter.store.visitSubmissions[`letter-${i}`] = { visitType: 'clubAssembly', positionKey: 'secretary', status: 'active', documentCategory: 'inward' };
-  env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.activeFileCount = 101;
-  await rejectsWith(env.move('bod-secretary', { submissionId: upload.submissionId, documentCategory: 'inward' }), 'resource-exhausted', /100-file limit/);
+  for (let i = 0; i < 300; i++) env.adapter.store.visitSubmissions[`letter-${i}`] = { visitType: 'clubAssembly', positionKey: 'secretary', status: 'active', documentCategory: 'inward' };
+  env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.activeFileCount = 301;
+  await rejectsWith(env.move('bod-secretary', { submissionId: upload.submissionId, documentCategory: 'inward' }), 'resource-exhausted', /300-file limit/);
   assert.equal(env.fakeDrive.calls.update.length, 0);
   assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, '');
 });
@@ -480,8 +480,8 @@ test('moving into a full Secretary letter folder is rejected before changing Dri
 test('a quota filled during a Drive move returns the file to its original folder', async () => {
   const env = await createEnv();
   const upload = await uploadVia(env, 'bod-secretary', 'secretary');
-  for (let i = 0; i < 99; i++) env.adapter.store.visitSubmissions[`letter-${i}`] = { visitType: 'clubAssembly', positionKey: 'secretary', status: 'active', documentCategory: 'inward' };
-  env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.activeFileCount = 100;
+  for (let i = 0; i < 299; i++) env.adapter.store.visitSubmissions[`letter-${i}`] = { visitType: 'clubAssembly', positionKey: 'secretary', status: 'active', documentCategory: 'inward' };
+  env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.activeFileCount = 300;
   const move = env.drive.moveFileToFolder.bind(env.drive);
   let competingUpload = true;
   env.drive.moveFileToFolder = async (...args) => {
@@ -502,9 +502,9 @@ test('a full Secretary custom folder cannot receive a moved file while other fol
   const env = await createEnv();
   const upload = await uploadVia(env, 'bod-secretary', 'secretary');
   const custom = (await env.service.createCustomFolder('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', name: 'Resolutions' })).created;
-  for (let i = 0; i < 100; i++) env.adapter.store.visitSubmissions[`custom-${i}`] = { visitType: 'clubAssembly', positionKey: 'secretary', status: 'active', documentCategory: custom.key };
-  env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.activeFileCount = 101;
-  await rejectsWith(env.move('bod-secretary', { submissionId: upload.submissionId, documentCategory: custom.key }), 'resource-exhausted', /100-file limit/);
+  for (let i = 0; i < 300; i++) env.adapter.store.visitSubmissions[`custom-${i}`] = { visitType: 'clubAssembly', positionKey: 'secretary', status: 'active', documentCategory: custom.key };
+  env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.activeFileCount = 301;
+  await rejectsWith(env.move('bod-secretary', { submissionId: upload.submissionId, documentCategory: custom.key }), 'resource-exhausted', /300-file limit/);
   assert.equal(env.fakeDrive.calls.update.length, 0);
   assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, '');
 });

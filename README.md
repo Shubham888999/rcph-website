@@ -44,21 +44,19 @@ reservation transaction. Bulk retries remain bound to the original visit/destina
 Deploy `createVisitSubmissionBulkUploadSessions` and `recordVisitSubmissionBulkUploadAudit`
 before the React frontend. No Firestore migration or rules change is required.
 
-The **Secretary** position has independent **100-file allowances for the main folder,
-each built-in folder (Inward, Outward and both registers), and every custom folder or
-subfolder** in each visit. New folders receive their allowance automatically. Existing
-stored limits do not constrain these per-folder allowances. Joint Secretary and
-Co-Secretary retain their previous letter-only allowances and ordinary file limit;
-other positions retain their configured limits.
+Every position in every Club Visit has an independent **300-file capacity for its main
+folder and for each built-in folder, custom folder and subfolder**. Existing stored limits
+of 40 or 100 do not constrain these effective allowances; new folders receive 300 slots
+automatically. Upload reservations count toward the relevant destination's capacity, and
+replacements do not consume an extra slot. Files in one folder do not consume another
+folder's allowance. Counts derive from existing records without a migration.
 
-Existing records are counted dynamically, including pending upload reservations; no
-count migration is needed. Replacements do not consume an additional slot. Moves into a
-full allowance are rejected, with the original Drive location restored if a concurrent
-upload fills it. The UI shows each Secretary folder's count out of 100 and the combined
-workspace capacity. The Secretary's fixed per-folder limit is shown in folder settings.
+Moves into a full destination are rejected, with the original Drive location restored if
+a concurrent upload fills it. The UI shows each destination's count out of 300 and the
+combined workspace capacity. Folder settings display the fixed per-folder capacity.
 Deploy `getVisitSubmissionFolders`, `getVisitSubmissionFolder`,
 `createVisitSubmissionUploadSession`, `createVisitSubmissionBulkUploadSessions`,
-`replaceVisitSubmission` and `moveVisitSubmissionCategory` before Hosting for this change.
+`replaceVisitSubmission`, `moveVisitSubmissionCategory` and `updateVisitSubmissionFolder` before Hosting for this change.
 
 Club Visit upload sessions use a rolling 60-minute account limit: **5,000 sessions for
 server-verified Admin/President managers**, and 500 for other authorized holders. A bulk
