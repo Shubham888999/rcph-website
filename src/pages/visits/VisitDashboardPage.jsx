@@ -1225,7 +1225,7 @@ function TreasuryLedger({ treasury }) {
   const ledger = buildTreasuryLedger(treasury.rows);
   return (
     <RecordsDisclosure id="visit-dashboard-treasury" className="visit-dashboard-treasury" titleId="visit-dashboard-treasury-title" title="Treasury ledger" meta={<TreasuryTotals ledger={ledger} />}>
-      {(open) => open ? <><p className="visit-dashboard-finance-note">Oldest first · running balance · repayment dates for repaid reimbursements.</p><TreasuryLedgerTable ledger={ledger} label="Read-only treasury ledger with running balance" runningBalance /></> : null}
+      {(open) => open ? <TreasuryLedgerTable ledger={ledger} label="Read-only treasury ledger with running balance" runningBalance /> : null}
     </RecordsDisclosure>
   );
 }
@@ -1251,9 +1251,8 @@ function TreasuryBreakdowns({ treasury }) {
         {(open) => open ? <TreasuryLedgerTable ledger={reports.income} label="Income ledger" /> : null}
       </RecordsDisclosure>
       {reports.avenues.map((avenue) => (
-        <RecordsDisclosure key={avenue.code} id={`visit-dashboard-finance-${avenue.code.toLowerCase()}`} className="visit-dashboard-finance" titleId={`visit-dashboard-finance-${avenue.code.toLowerCase()}-title`} title={`${avenue.label} · event transactions`} meta={<TreasuryTotals ledger={avenue.ledger} />}>
+        <RecordsDisclosure key={avenue.code} id={`visit-dashboard-finance-${avenue.code.toLowerCase()}`} className="visit-dashboard-finance" titleId={`visit-dashboard-finance-${avenue.code.toLowerCase()}-title`} title={avenue.label} meta={<TreasuryTotals ledger={avenue.ledger} />}>
           {(open) => open ? <div className="visit-dashboard-finance-groups">
-            <p className="visit-dashboard-finance-note">Grouped by the transaction’s saved avenue, then its linked event.</p>
             {avenue.events.length ? avenue.events.map((event) => <TreasuryGroup key={event.key} title={event.label} ledger={event.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded for this avenue.</p>}
           </div> : null}
         </RecordsDisclosure>
@@ -1264,7 +1263,6 @@ function TreasuryBreakdowns({ treasury }) {
       ].map((report) => (
         <RecordsDisclosure key={report.key} id={`visit-dashboard-monthly-${report.key}`} className="visit-dashboard-finance" titleId={`visit-dashboard-monthly-${report.key}-title`} title={report.title} meta={<TreasuryTotals ledger={report.ledger} />}>
           {(open) => open ? <div className="visit-dashboard-finance-groups">
-            <p className="visit-dashboard-finance-note">By ledger month; repaid reimbursements use their repayment date.</p>
             {report.months.length ? report.months.map((month) => <TreasuryGroup key={month.monthKey} title={month.label} ledger={month.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded yet.</p>}
           </div> : null}
         </RecordsDisclosure>

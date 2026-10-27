@@ -856,7 +856,6 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /\{letterhead \? <LetterheadExchanges letterhead=\{letterhead\} \/> : null\}/);
   assert.match(pageSource, /No letterhead exchanges recorded yet\./);
   assert.match(pageSource, /Treasury ledger/);
-  assert.match(pageSource, /Oldest first · running balance/);
   assert.match(pageSource, /titleId="visit-dashboard-treasury-title"/);
   assert.match(pageSource, /href="\/access"/);
 assert.match(pageSource, /Access page/);
