@@ -188,6 +188,26 @@ export function buildBulkUploadPairs(files, folders, existingPairs = []) {
   return pairs;
 }
 
+// The server locks by visit and position, including all categories below it.
+// Keep each position sequential while other positions can upload in parallel.
+export async function runBulkUploadPairs(pairs, limit, worker) {
+  const byPosition = new Map();
+  for (const pair of pairs) {
+    const key = JSON.stringify([pair.visitType || "", pair.positionKey]);
+    if (!byPosition.has(key)) byPosition.set(key, []);
+    byPosition.get(key).push(pair);
+  }
+  const groups = [...byPosition.values()];
+  let index = 0;
+  const concurrency = Math.max(1, Math.floor(Number(limit) || 1));
+  await Promise.all(Array.from({ length: Math.min(concurrency, groups.length) }, async () => {
+    while (index < groups.length) {
+      const group = groups[index++];
+      for (const pair of group) await worker(pair);
+    }
+  }));
+}
+
 export function validateVisitUploadEndpoint(value, projectId = "") {
   const candidate = clean(value, 1000);
   if (!candidate) return "";

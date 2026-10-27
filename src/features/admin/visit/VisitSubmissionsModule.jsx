@@ -35,6 +35,7 @@ import {
   bulkVisitFolderStatus,
   formatVisitFileSize,
   resolveVisitUploadEndpoint,
+  runBulkUploadPairs,
   safeVisitUploadError,
   VISIT_BULK_UPLOAD_CONCURRENCY,
   VISIT_FILE_ACCEPT,
@@ -957,18 +958,6 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
     return activeBulkUploadId;
   }
 
-  async function runLimited(items, limit, worker) {
-    let index = 0;
-    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (index < items.length) {
-        const item = items[index];
-        index += 1;
-        await worker(item);
-      }
-    });
-    await Promise.all(workers);
-  }
-
   async function processPair(pair, counters, failedNoProofSessions, proofFailureSessions) {
     try {
       let completionProof = pair.completionProof;
@@ -1036,7 +1025,7 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
         .filter(pair => !pair.completionProof && pair.sessionId && !pair.ticket)
         .map(pair => pair.sessionId));
       const proofFailureSessions = new Set();
-      await runLimited(runnable, VISIT_BULK_UPLOAD_CONCURRENCY, (pair) => processPair(pair, counters, failedNoProofSessions, proofFailureSessions));
+      await runBulkUploadPairs(runnable, VISIT_BULK_UPLOAD_CONCURRENCY, (pair) => processPair(pair, counters, failedNoProofSessions, proofFailureSessions));
       const cancelSessionIds = [...failedNoProofSessions].filter((sessionId) => !proofFailureSessions.has(sessionId));
       await Promise.all(cancelSessionIds.map((sessionId) => visitCalls.cancelSession(sessionId).catch(() => null)));
       if (activeBulkUploadId) await visitCalls.recordBulkUploadAudit(activeBulkUploadId).catch(() => null);

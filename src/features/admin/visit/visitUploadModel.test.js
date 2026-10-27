@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { setImmediate } from "node:timers";
 import {
   addBulkVisitFiles,
   addVisitFiles,
@@ -11,6 +12,7 @@ import {
   getVisitThumbnailUrl,
   normalizeVisitUploadResponse,
   resolveVisitUploadEndpoint,
+  runBulkUploadPairs,
   safeVisitUploadError,
   validateVisitUploadEndpoint,
   validateVisitUploadFile,
@@ -126,4 +128,41 @@ test("size formatting and upload errors stay user-safe", () => {
   assert.equal(formatVisitFileSize(1048576), "1.0 MB");
   assert.match(safeVisitUploadError({ code: "functions/permission-denied", message: "secret internals" }), /not authorized/i);
   assert.doesNotMatch(safeVisitUploadError(new Error("secret internals")), /secret internals/);
+});
+
+
+test("two files across six positions upload sequentially per position with bounded parallelism", async () => {
+  const folders = Array.from({ length: 6 }, (_, i) => ({ visitType: "dzrVisit", positionKey: `position-${i}`, documentCategory: `custom-${i}` }));
+  const files = ["one", "two"].map(clientFileId => ({ clientFileId, file: file(`${clientFileId}.pdf`, "application/pdf") }));
+  const pairs = buildBulkUploadPairs(files, folders);
+  const activePositions = new Set();
+  const completed = [];
+  let maxActive = 0;
+  await runBulkUploadPairs(pairs, 3, async pair => {
+    assert.equal(activePositions.has(pair.positionKey), false, "same-position requests must not overlap");
+    activePositions.add(pair.positionKey);
+    maxActive = Math.max(maxActive, activePositions.size);
+    await new Promise(resolve => setImmediate(resolve));
+    completed.push(pair.pairId);
+    activePositions.delete(pair.positionKey);
+  });
+  assert.equal(completed.length, 12);
+  assert.equal(new Set(completed).size, 12);
+  assert.equal(maxActive, 3, "different positions remain parallel");
+  for (const folder of folders) {
+    assert.deepEqual(completed.filter(id => id.startsWith(`${folder.positionKey}:`)), pairs.filter(pair => pair.positionKey === folder.positionKey).map(pair => pair.pairId));
+  }
+});
+
+test("failed pairs can be retried alone without scheduling successful files again", async () => {
+  const pairs = ["one", "two", "three"].map(clientFileId => ({ visitType: "dzrVisit", positionKey: "editor", clientFileId }));
+  const attempts = [];
+  const failed = [];
+  await runBulkUploadPairs(pairs, 3, async pair => {
+    attempts.push(pair.clientFileId);
+    // processPair records a failed upload without rejecting the whole batch.
+    if (pair.clientFileId === "two") failed.push(pair);
+  });
+  await runBulkUploadPairs(failed, 3, async pair => { attempts.push(pair.clientFileId); });
+  assert.deepEqual(attempts, ["one", "two", "three", "two"]);
 });
