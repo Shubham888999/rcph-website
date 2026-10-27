@@ -459,10 +459,35 @@ async function ensureVisitFolderHierarchy(validation, config = null) {
     validation.visitType
   );
 
-  const positionFolder = await getOrCreateUniqueFolder(
-    rootFolderId,
-    validation.positionTitle
-  );
+  // The database's saved id is canonical even if its Drive display name changes.
+  // Never silently replace it with a same-named folder: finalization must agree.
+  const savedPositionFolderId = safeText(validation.positionFolderId, 300);
+  let positionFolder;
+  if (savedPositionFolderId) {
+    let response;
+    try {
+      response = await getDriveClient().files.get({
+        fileId: savedPositionFolderId,
+        fields: 'id,name,mimeType,parents,trashed',
+        supportsAllDrives: true,
+      });
+    } catch (err) {
+      if (Number(err?.response?.status || err?.code) === 404) {
+        throw makeVisitSubmissionError('failed-precondition', 'The saved Drive position folder is missing or inaccessible. Restore its access before uploading.');
+      }
+      throw err;
+    }
+    positionFolder = response.data;
+    if (positionFolder?.id !== savedPositionFolderId
+      || positionFolder.mimeType !== DRIVE_FOLDER_MIME
+      || positionFolder.trashed === true
+      || !Array.isArray(positionFolder.parents)
+      || !positionFolder.parents.includes(rootFolderId)) {
+      throw makeVisitSubmissionError('failed-precondition', 'The saved Drive position folder is no longer inside this Club Visit root. Restore its location before uploading.');
+    }
+  } else {
+    positionFolder = await getOrCreateUniqueFolder(rootFolderId, validation.positionTitle);
+  }
   const target = await ensureCategoryFolderDetailed({
     positionFolderId: positionFolder.id,
     category: safeText(validation.documentCategory, 20),

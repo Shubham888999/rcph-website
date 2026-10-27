@@ -51,7 +51,7 @@ function createFakeDrive() {
       async get({ fileId }) {
         calls.get.push(fileId);
         const item = items.get(fileId);
-        return { data: { id: fileId, parents: [...item.parents] } };
+        return { data: { id: fileId, name: item.name, mimeType: item.folder ? DRIVE_FOLDER_MIME : 'application/pdf', parents: [...item.parents], trashed: item.trashed === true } };
       },
       async update({ fileId, addParents, removeParents }) {
         calls.update.push({ fileId, addParents, removeParents });
@@ -384,6 +384,57 @@ function uploadResponse() {
     send(value) { this.body = JSON.parse(value); return this; },
   };
 }
+
+test('bulk uploads reuse saved position Drive ids after renames even when old names point elsewhere', async () => {
+  const env = await createEnv();
+  const positionKeys = visit.getActivePositionDefinitions().map(position => position.key);
+  const destinations = [];
+  const savedIds = new Map();
+  for (const positionKey of positionKeys) {
+    const initial = await uploadVia(env, 'admin-uid', positionKey, '', `initial-${positionKey}`);
+    savedIds.set(positionKey, initial.folder.positionFolderId);
+    const folder = env.fakeDrive.items.get(initial.folder.positionFolderId);
+    const oldName = folder.name;
+    folder.name = `Archived name - ${oldName}`;
+    env.fakeDrive.items.set(`decoy-${positionKey}`, { name: oldName, parents: [...folder.parents], folder: true });
+    const { created } = await env.service.createCustomFolder('admin-uid', { visitType: 'clubAssembly', positionKey, name: 'Resolutions' });
+    destinations.push({ positionKey, documentCategory: created.key });
+  }
+  const buffer = Buffer.from('%PDF-1.4\nMasterbudget');
+  const batch = await env.service.createBulkUploadSessions('admin-uid', {
+    visitType: 'clubAssembly', positionKeys, destinations,
+    files: [{ clientFileId: 'budget', fileName: 'Masterbudget.pdf', mimeType: 'application/pdf', sizeBytes: buffer.length }],
+  });
+  const handler = createVisitHttpUploadHandler({
+    visitService: env.service, driveService: env.drive, folderLockManager: env.locks,
+    getDriveConfig: () => DRIVE_CONFIG, logger: { warn() {} },
+    parseMultipartUpload: async req => ({ fields: req.fields, file: { buffer, sizeBytes: buffer.length, mimeType: 'application/pdf' } }),
+  });
+  for (const session of batch.sessions) {
+    const item = session.files[0];
+    const response = uploadResponse();
+    await handler({ method: 'POST', headers: { origin: 'http://localhost:5173' }, fields: { ...item, sessionId: session.sessionId } }, response);
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    const result = await env.service.finalizeUpload('admin-uid', { sessionId: session.sessionId, ...item, completionProof: response.body.completionProof });
+    const submission = env.adapter.store.visitSubmissions[result.submissionId];
+    assert.equal(submission.documentCategory, destinations.find(destination => destination.positionKey === session.positionKey).documentCategory);
+    assert.deepEqual(env.fakeDrive.items.get(submission.driveFolderId).parents, [savedIds.get(session.positionKey)]);
+    assert.equal(env.adapter.store.visitSubmissionPositions[`clubAssembly_${session.positionKey}`].driveFolderId, savedIds.get(session.positionKey));
+  }
+  assert.equal(Object.values(env.adapter.store.visitSubmissions).length, positionKeys.length * 2);
+});
+
+test('a saved position folder moved outside the visit root is rejected before any new file is transferred', async () => {
+  const env = await createEnv();
+  const initial = await uploadVia(env, 'admin-uid', 'editor');
+  const saved = env.fakeDrive.items.get(initial.folder.positionFolderId);
+  saved.name = 'Renamed editor';
+  saved.parents = ['differentVisitRoot'];
+  const createsBefore = env.fakeDrive.calls.create.length;
+  await rejectsWith(uploadVia(env, 'admin-uid', 'editor', '', 'second'), 'failed-precondition', /saved Drive position folder/i);
+  assert.equal(env.fakeDrive.calls.create.length, createsBefore);
+  assert.equal(Object.values(env.adapter.store.visitSubmissions).length, 1);
+});
 
 test('HTTP uploads release the folder lock before slow file transfer, allowing a second file in the same folder', async () => {
   let held = false;

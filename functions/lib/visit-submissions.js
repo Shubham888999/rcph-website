@@ -2564,6 +2564,12 @@ function createVisitSubmissionService(options) {
         throw makeVisitSubmissionError('failed-precondition', 'Upload session expired.');
       }
 
+      // Resolve the canonical position folder from the current server record.
+      // Looking it up again by display name can select a different Drive folder.
+      const folderSnap = await tx.getDoc('visitSubmissionPositions', visitPositionDocId(ticketData.visitType, ticketData.positionKey, positionHelpers));
+      if (!folderSnap.exists) throw makeVisitSubmissionError('not-found', 'Visit Submission structure is incomplete.');
+      const positionFolderId = normalizeText(folderSnap.data?.driveFolderId, 300);
+
       tx.updateDoc('driveUploadTickets', ticketHash, {
         used: true,
         usedAt: adapter.serverTimestamp(),
@@ -2592,6 +2598,7 @@ function createVisitSubmissionService(options) {
         visitDisplayTitle: getVisitTypeDefinition(ticketData.visitType).displayTitle,
         positionKey: ticketData.positionKey,
         positionTitle: positionHelpers.getPositionDefinition(ticketData.positionKey)?.displayTitle || ticketData.positionKey,
+        positionFolderId,
         avenueCode: positionHelpers.getPositionDefinition(ticketData.positionKey)?.avenueCode || '',
         sessionId,
         clientFileId,
