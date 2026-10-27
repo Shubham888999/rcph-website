@@ -1,3 +1,4 @@
+import { prepareCustomResolutionSummary } from "./resolutionCustomDownloads.js";
 import { PDFDocument, StandardFontEmbedder, StandardFonts } from "pdf-lib";
 import { resolutionPageBranding, PAGE_SEAL } from "./resolutionPageBranding.js";
 import { PROTECTED_BRAND_ASSETS, fetchProtectedBrandAssetBlob } from "../shared/protectedBrandAssets.js";
@@ -349,6 +350,12 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
     throw new TypeError("A valid Resolution letterhead JPEG is required.");
   }
   const pages = options.pages || buildResolutionPdfPages(details, options);
+  const pageStart = options.pageNumbering?.start ?? 1;
+  const pageTotal = options.pageNumbering?.total ?? pages.length;
+  if (!Number.isSafeInteger(pageStart) || pageStart < 1 || !Number.isSafeInteger(pageTotal)
+    || pageTotal < pageStart + pages.length - 1) {
+    throw new Error(`This PDF has ${pages.length} pages and cannot fit the requested page numbering. No pages were removed.`);
+  }
   const needsOfficialLetterhead = pages.some((page) => page.letterhead === "official");
   const officialLetterhead = options.officialLetterhead || letterhead;
   if (needsOfficialLetterhead && (!(officialLetterhead?.bytes instanceof Uint8Array) || !officialLetterhead.bytes.length || !Number.isInteger(officialLetterhead.width) || !Number.isInteger(officialLetterhead.height))) {
@@ -394,7 +401,7 @@ export function buildResolutionPdfDocument(details, letterhead, options = {}) {
     const commands = [
       `q\n${RESOLUTION_PDF_PAGE.width} 0 0 ${RESOLUTION_PDF_PAGE.height} 0 0 cm\n/${backgroundName} Do\nQ`,
       ...(options.preview === true && options.previewLabel !== false ? [`BT /F2 8 Tf ${RESOLUTION_CONTENT_BOUNDS.left} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (DRAFT PREVIEW) Tj ET`] : []),
-      ...(page.pageNumber === false ? [] : [`BT /F1 8 Tf ${RESOLUTION_PAGE_NUMBER_POSITION.x} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (Page ${index + 1} of ${pages.length}) Tj ET`]),
+      ...(page.pageNumber === false ? [] : [`BT /F1 8 Tf ${RESOLUTION_PAGE_NUMBER_POSITION.x} ${RESOLUTION_PAGE_NUMBER_POSITION.y} Td (Page ${pageStart + index} of ${pageTotal}) Tj ET`]),
       ...page.map(textCommand),
     ];
     const content = ascii(commands.join("\n"));
@@ -437,13 +444,24 @@ export async function generateResolutionPdf(details, options = {}) {
   const pages = buildResolutionPdfPages(details);
   const officialLetterhead = pages.some((page) => page.letterhead === "official") ? await loadOfficialLetterhead() : undefined;
   const poppinsFonts = await loadPoppinsForPages(pages, options);
-  const pdf = await sealDownloadedPdf(buildResolutionPdfDocument(details, letterhead, { officialLetterhead, pages, poppinsFonts }), options);
+  const pdf = await sealDownloadedPdf(buildResolutionPdfDocument(details, letterhead, { officialLetterhead, pages, poppinsFonts, pageNumbering: options.pageNumbering }), options);
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = getResolutionPdfFilename(resolution.resolutionNumber, resolution.title || resolution.id);
+  const filename = getResolutionPdfFilename(resolution.resolutionNumber, resolution.title || resolution.id);
+  const suffix = String(options.filenameSuffix || "").replace(/[^a-zA-Z0-9-]/g, "");
+  link.download = suffix ? filename.replace(/\.pdf$/i, `-${suffix}.pdf`) : filename;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function generateCustomResolutionSummaryPdf(details, options = {}) {
+  const prepared = prepareCustomResolutionSummary(details);
+  return generateResolutionPdf(prepared.details, {
+    ...options,
+    pageNumbering: { start: prepared.profile.start, total: prepared.profile.total },
+    filenameSuffix: prepared.profile.filenameSuffix,
+  });
 }
 
 export async function generateResolutionPreviewPdf(details, options = {}) {

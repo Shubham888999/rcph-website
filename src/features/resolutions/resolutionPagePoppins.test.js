@@ -121,7 +121,8 @@ test("the prepared email is signed by the current President with the RIY", () =>
 });
 
 test("an uploaded-PDF resolution can also download a summary: Resolution Page, vote table and record, without the attached document", () => {
-  assert.match(adminSource, /resolution\.documentSourceMode === "uploadedPdf" \? <button type="button" disabled=\{busy\} onClick=\{onDownloadSummary\}>Download summary PDF/);
+  assert.match(adminSource, /resolution\.documentSourceMode === "uploadedPdf" \? <button type="button" disabled=\{busy\} onClick=\{customDownload\?\.number === 1 \? onDownloadCustomSummary : onDownloadSummary\}/);
+  assert.match(adminSource, /customDownload\?\.number === 1 \? customDownload\.label : "Download summary PDF \(Resolution Page and record only\)"/);
   assert.match(adminSource, /onDownloadSummary=\{async \(\) => \{ try \{ await generateResolutionPdf\(details\);/);
   const config = { enabled: true, version: 2, details: { subject: "Passing of Club Bylaws", boardMembersPresent: "10", totalBoardMembers: "13" }, mainStatement: { text: STATEMENT } };
   const details = { resolution: closed({ documentSourceMode: "uploadedPdf", approveCount: 10, votesReceivedCount: 10, title: "Passing of Club Bylaws", resolutionNumber: "01", eligibleVoters: [], appendVoteTable: true, resolutionPageConfig: config }), votes: [], audit: [] };
