@@ -35,7 +35,7 @@ function resolutionPageBranding(details = {}) {
   else statement = 'This page forms part of the resolution voting record of the Board Members of Rotaract Club of Pune Heritage. The final result is recorded after voting closes.';
   const lines = [];
   let y = 690;
-  for (const text of headerWrap('Resolution: ' + (resolution.title || details.title || 'Resolution'), 8.5, 430)) {
+  for (const text of headerWrap('Resolution: ' + (resolution.title || details.title || 'Resolution'), 8.5, 460)) {
     lines.push({ text, size: 8.5, bold: true, x: 54, y }); y -= 11;
   }
   y -= 3;
