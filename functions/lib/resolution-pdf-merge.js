@@ -551,7 +551,11 @@ async function buildBrandedResolutionDownload({ sourceBytes, letterheadBytes, se
   if (details.appendVoteTable !== false) await buildVoteAppendix(output, details, letterheadBytes, { branded: true });
   const pages = output.getPages();
   pages.forEach((page, index) => {
-    if (index > 0) header.lines.forEach((line) => page.drawText(safePdfText(line.text), { x: line.x, y: line.y, size: line.size, font: line.bold ? fonts.bold : fonts.normal }));
+    if (index > 0) header.lines.forEach((line) => {
+      const font = line.bold ? fonts.bold : fonts.normal;
+      const text = safePdfText(line.text);
+      page.drawText(text, { x: (PAGE.width - font.widthOfTextAtSize(text, line.size)) / 2, y: line.y, size: line.size, font });
+    });
     page.drawText(`Page ${index + 1} of ${pages.length}`, { x: 505, y: 686, size: 8, font: fonts.normal });
     page.drawImage(seal, PAGE_SEAL);
   });
