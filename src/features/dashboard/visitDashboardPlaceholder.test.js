@@ -741,7 +741,7 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /visit-dashboard-doc-grid/);
   assert.match(pageSource, /className="visit-dashboard-doc-tile"/);
   // v2.17.0: no filter chips; Prev/Next and "N of M" run over every visible tile.
-  assert.doesNotMatch(pageSource, /Filter folders|aria-pressed|activeFilter|filterVisitDocumentBlocks|countVisitDocumentFilters|VISIT_DOCUMENT_FILTERS/);
+  assert.doesNotMatch(pageSource.slice(pageSource.indexOf("function DocumentTile"), pageSource.indexOf("function AttendanceRecords")), /Filter folders|aria-pressed|activeFilter|filterVisitDocumentBlocks|countVisitDocumentFilters|VISIT_DOCUMENT_FILTERS/);
   assert.doesNotMatch(visitCssSource, /visit-dashboard-doc-filters/);
   assert.match(pageSource, /total=\{blocks\.length\}/);
   assert.match(pageSource, /previousBlock=\{blocks\[\(openIndex - 1 \+ blocks\.length\) % blocks\.length\]\}/);

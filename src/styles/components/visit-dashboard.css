@@ -2045,6 +2045,100 @@ a.visit-dashboard-document-action:hover {
   font-size: 0.85rem;
 }
 
+.visit-dashboard-treasury-area {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.visit-dashboard-finance-switcher {
+  min-width: 0;
+}
+
+.visit-dashboard-finance-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.visit-dashboard-finance-button {
+  min-width: 0;
+  min-height: 4.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--internal-border);
+  border-radius: 0;
+  color: var(--internal-text);
+  background: var(--internal-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.visit-dashboard-finance-button strong {
+  font-size: 0.9rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.visit-dashboard-finance-button small {
+  color: var(--internal-text-muted);
+  font-size: 0.76rem;
+}
+
+.visit-dashboard-finance-button:hover,
+.visit-dashboard-finance-button[aria-pressed="true"] {
+  border-color: var(--internal-accent-soft);
+  background: color-mix(in srgb, var(--internal-accent) 12%, var(--internal-surface));
+}
+
+.visit-dashboard-finance-button[aria-pressed="true"] {
+  box-shadow: inset 0 -3px 0 var(--internal-accent-soft);
+}
+
+.visit-dashboard-finance-button:focus-visible {
+  outline: 2px solid var(--internal-accent-soft);
+  outline-offset: 2px;
+}
+
+.visit-dashboard-finance-panel {
+  min-width: 0;
+  margin-top: 0.85rem;
+  border: 1px solid var(--internal-border);
+  background: var(--internal-surface);
+}
+
+.visit-dashboard-finance-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.visit-dashboard-finance-panel-heading > div {
+  min-width: 0;
+}
+
+.visit-dashboard-finance-panel-heading h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+
+.visit-dashboard-finance-panel-heading > button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .visit-dashboard-finance-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .visit-dashboard-finance-groups {
   min-width: 0;
   padding: 0 0.75rem 0.75rem;

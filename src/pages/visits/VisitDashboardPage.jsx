@@ -1242,32 +1242,59 @@ function TreasuryGroup({ title, ledger }) {
 
 function TreasuryBreakdowns({ treasury }) {
   const reports = useMemo(() => buildVisitTreasuryBreakdowns(treasury.rows), [treasury.rows]);
+  const [selectedKey, setSelectedKey] = useState(null);
+  const views = [
+    { key: "expenses", title: "Expense ledger", ledger: reports.expense },
+    { key: "income", title: "Income ledger", ledger: reports.income },
+    ...reports.avenues.map((avenue) => ({ key: avenue.code, title: avenue.label, ledger: avenue.ledger, groups: avenue.events.map((event) => ({ key: event.key, title: event.label, ledger: event.ledger })) })),
+    { key: "monthly-expenses", title: "Month-wise expenses", ledger: reports.expense, groups: reports.expenseMonths.map((month) => ({ key: month.monthKey, title: month.label, ledger: month.ledger })) },
+    { key: "monthly-income", title: "Month-wise income", ledger: reports.income, groups: reports.incomeMonths.map((month) => ({ key: month.monthKey, title: month.label, ledger: month.ledger })) },
+  ];
+  const selected = views.find((view) => view.key === selectedKey);
+
+  function closeView() {
+    setSelectedKey(null);
+    document.getElementById(`visit-finance-button-${selectedKey}`)?.focus();
+  }
+
   return (
-    <>
-      <RecordsDisclosure id="visit-dashboard-expenses" className="visit-dashboard-finance" titleId="visit-dashboard-expenses-title" title="Expense ledger" meta={<TreasuryTotals ledger={reports.expense} />}>
-        {(open) => open ? <TreasuryLedgerTable ledger={reports.expense} label="Expense ledger, including reimbursements" /> : null}
-      </RecordsDisclosure>
-      <RecordsDisclosure id="visit-dashboard-income" className="visit-dashboard-finance" titleId="visit-dashboard-income-title" title="Income ledger" meta={<TreasuryTotals ledger={reports.income} />}>
-        {(open) => open ? <TreasuryLedgerTable ledger={reports.income} label="Income ledger" /> : null}
-      </RecordsDisclosure>
-      {reports.avenues.map((avenue) => (
-        <RecordsDisclosure key={avenue.code} id={`visit-dashboard-finance-${avenue.code.toLowerCase()}`} className="visit-dashboard-finance" titleId={`visit-dashboard-finance-${avenue.code.toLowerCase()}-title`} title={avenue.label} meta={<TreasuryTotals ledger={avenue.ledger} />}>
-          {(open) => open ? <div className="visit-dashboard-finance-groups">
-            {avenue.events.length ? avenue.events.map((event) => <TreasuryGroup key={event.key} title={event.label} ledger={event.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded for this avenue.</p>}
-          </div> : null}
-        </RecordsDisclosure>
-      ))}
-      {[
-        { key: "expenses", title: "Month-wise expenses", months: reports.expenseMonths, ledger: reports.expense },
-        { key: "income", title: "Month-wise income", months: reports.incomeMonths, ledger: reports.income },
-      ].map((report) => (
-        <RecordsDisclosure key={report.key} id={`visit-dashboard-monthly-${report.key}`} className="visit-dashboard-finance" titleId={`visit-dashboard-monthly-${report.key}-title`} title={report.title} meta={<TreasuryTotals ledger={report.ledger} />}>
-          {(open) => open ? <div className="visit-dashboard-finance-groups">
-            {report.months.length ? report.months.map((month) => <TreasuryGroup key={month.monthKey} title={month.label} ledger={month.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded yet.</p>}
-          </div> : null}
-        </RecordsDisclosure>
-      ))}
-    </>
+    <section className="visit-dashboard-finance-switcher" aria-label="Treasury breakdowns">
+      <div className="visit-dashboard-finance-buttons" role="group" aria-label="Choose a treasury view">
+        {views.map((view) => (
+          <button
+            key={view.key}
+            id={`visit-finance-button-${view.key}`}
+            type="button"
+            className="visit-dashboard-finance-button"
+            aria-pressed={selectedKey === view.key}
+            aria-expanded={selectedKey === view.key}
+            aria-controls="visit-dashboard-finance-panel"
+            onClick={() => setSelectedKey((current) => current === view.key ? null : view.key)}
+          >
+            <strong>{view.title}</strong>
+            <small>{view.ledger.entryCount} {view.ledger.entryCount === 1 ? "entry" : "entries"}</small>
+          </button>
+        ))}
+      </div>
+      <section id="visit-dashboard-finance-panel" className="visit-dashboard-finance-panel" hidden={!selected} aria-labelledby="visit-dashboard-finance-panel-title">
+        <header className="visit-dashboard-finance-panel-heading">
+          <div>
+            <h2 id="visit-dashboard-finance-panel-title">{selected?.title}</h2>
+            {selected ? <span className="visit-dashboard-records-meta"><TreasuryTotals ledger={selected.ledger} /></span> : null}
+          </div>
+          <button type="button" className="visit-dashboard-action-link" onClick={closeView}>Close view</button>
+        </header>
+        {selected ? (
+          <div key={selected.key}>
+            {selected.groups ? (
+              <div className="visit-dashboard-finance-groups">
+                {selected.groups.length ? selected.groups.map((group) => <TreasuryGroup key={group.key} title={group.title} ledger={group.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded yet.</p>}
+              </div>
+            ) : <TreasuryLedgerTable ledger={selected.ledger} label={selected.title} />}
+          </div>
+        ) : null}
+      </section>
+    </section>
   );
 }
 
@@ -1407,9 +1434,10 @@ export default function VisitDashboardPage() {
 
         <FinesRecords fines={fines} />
 
-        <TreasuryLedger treasury={treasury} />
-
-        {visitType === "dzrVisit" ? <TreasuryBreakdowns treasury={treasury} /> : null}
+        <div className="visit-dashboard-treasury-area">
+          <TreasuryLedger treasury={treasury} />
+          {visitType === "dzrVisit" ? <TreasuryBreakdowns treasury={treasury} /> : null}
+        </div>
       </div>
 
       {presenting ? (
