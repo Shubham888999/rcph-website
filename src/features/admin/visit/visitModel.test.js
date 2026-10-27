@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES, visitFolderCategories, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices } from "./visitModel.js";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder, normalizeFolders, normalizeSubmission, normalizeVisit, validateVisitFile, VISIT_DOCUMENT_CATEGORIES, VISIT_TYPES, VISIT_UPLOAD_CATEGORY_CHOICES, visitBulkAction, visitBulkSelectable, visitBulkSummary, visitFolderCategories, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices } from "./visitModel.js";
 test("visit and folder models whitelist verified fields",()=>{const visit=normalizeVisit({visitType:"dzrVisit",displayTitle:" DZR ",secret:"x"});assert.equal(visit.displayTitle,"DZR");assert.equal(Object.hasOwn(visit,"secret"),false);const folder=normalizeFolder({visitType:"dzrVisit",positionKey:"cwd",maxActiveFiles:40,primaryPresentationSubmissionId:"selected-file"});assert.equal(folder.positionKey,"cwd");assert.equal(folder.primaryPresentationSubmissionId,"selected-file")});
 test("submission ignores unsafe URL",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"x",fileUrl:"javascript:x"});assert.equal(item.fileUrl,"")});
 test("submission normalizes primary presentation controls",()=>{const item=normalizeSubmission({submissionId:"s",fileName:"deck.pptx",isPrimaryPresentation:true,canSetPrimaryPresentation:true});assert.equal(item.isPrimaryPresentation,true);assert.equal(item.canSetPrimaryPresentation,true)});
@@ -123,4 +123,19 @@ test("Secretary capacity metadata includes root, registers and trusted custom fo
   assert.deepEqual(folder.categoryUsage, usage);
   assert.equal(folder.perFolderFileLimit, 100);
   assert.equal(folder.totalMaxActiveFiles, 700);
+});
+
+test("bulk selection: managers remove, the uploader withdraws, and files with neither have no checkbox", () => {
+  const files = [
+    normalizeSubmission({ submissionId: "m", canRemove: true, canReplace: true }),
+    normalizeSubmission({ submissionId: "u", canWithdraw: true }),
+    normalizeSubmission({ submissionId: "both", canRemove: true, canWithdraw: true }),
+    normalizeSubmission({ submissionId: "none" }),
+  ];
+  assert.deepEqual(files.map((file) => visitBulkAction(file)), ["remove", "withdraw", "remove", ""]);
+  assert.deepEqual(visitBulkSelectable(files).map((file) => file.submissionId), ["m", "u", "both"]);
+  assert.deepEqual(visitBulkSelectable(null), []);
+  assert.deepEqual(visitBulkSummary([{ action: "remove" }, { action: "remove" }]), { removing: 2, withdrawing: 0, verb: "Remove", total: 2 });
+  assert.equal(visitBulkSummary([{ action: "withdraw" }]).verb, "Withdraw");
+  assert.equal(visitBulkSummary([{ action: "remove" }, { action: "withdraw" }]).verb, "Remove or withdraw");
 });

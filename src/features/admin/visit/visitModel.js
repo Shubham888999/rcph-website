@@ -202,6 +202,25 @@ export function visitFolderUsesCategories(folder) {
   return folder?.supportsDocumentCategories === true || (folder?.customFolders || []).length > 0;
 }
 
+// What a person may do to a file in bulk: managers remove it, the uploader withdraws it.
+// Remove wins when both are allowed. Files with neither have no checkbox.
+export function visitBulkAction(item) {
+  if (item?.canRemove === true) return "remove";
+  if (item?.canWithdraw === true) return "withdraw";
+  return "";
+}
+
+export function visitBulkSelectable(submissions = []) {
+  return (Array.isArray(submissions) ? submissions : []).filter((item) => visitBulkAction(item));
+}
+
+export function visitBulkSummary(items = []) {
+  const removing = items.filter((item) => item.action === "remove").length;
+  const withdrawing = items.filter((item) => item.action === "withdraw").length;
+  const verb = removing && withdrawing ? "Remove or withdraw" : withdrawing ? "Withdraw" : "Remove";
+  return { removing, withdrawing, verb, total: items.length };
+}
+
 export function groupVisitSubmissionsByCategory(submissions = [], folder = null) {
   const list = Array.isArray(submissions) ? submissions : [];
   return (folder ? visitFolderCategories(folder) : VISIT_DOCUMENT_CATEGORIES).map((category) => ({
