@@ -205,7 +205,7 @@ async function categoryEnv() {
     tokenGenerator: categoryTokenGenerator(),
   });
   await service.initializeStructure('president-uid');
-  return { adapter, service };
+  return { adapter, service, clock };
 }
 
 function categoryFile(overrides = {}) {
@@ -730,4 +730,62 @@ test('Secretary bulk uploads use the root or selected custom subfolder allowance
     await env.service.cancelUploadSession('admin-uid', { sessionId: session.sessions[0].sessionId });
     assert.equal((await env.service.createBulkUploadSessions('admin-uid', request)).sessions.length, 1);
   }
+});
+
+function seedUploadRate(env, uid, timestamps) {
+  env.adapter.store.driveUploadRateLimits ||= {};
+  env.adapter.store.driveUploadRateLimits[`${uid}_visitsubmission`] = { uid, limit: 500, windowMs: 3600000, createdAtMillis: timestamps };
+}
+
+test('Admin and President can continue past the old 500-session allowance without clearing account history', async () => {
+  for (const uid of ['admin-uid', 'president-uid']) {
+    const env = await categoryEnv();
+    seedUploadRate(env, uid, Array(500).fill(env.clock.value));
+    await env.service.createBulkUploadSessions(uid, { visitType: 'clubAssembly', positionKeys: ['secretary', 'editor'], files: [categoryFile()] });
+    const rate = env.adapter.store.driveUploadRateLimits[`${uid}_visitsubmission`];
+    assert.equal(rate.limit, 5000);
+    assert.equal(rate.createdAtMillis.length, 502, 'bulk requests count one session per destination position');
+  }
+});
+
+test('the 5000-session manager quota reports when enough rolling slots expire for the entire bulk request', async () => {
+  const env = await categoryEnv();
+  const now = env.clock.value;
+  seedUploadRate(env, 'admin-uid', [now - 3600000 + 30000, now - 3600000 + 45000, ...Array(4998).fill(now)]);
+  const input = { visitType: 'clubAssembly', positionKeys: ['secretary', 'editor'], files: [categoryFile()] };
+  let details;
+  await assert.rejects(env.service.createBulkUploadSessions('admin-uid', input), err => {
+    assert.equal(err.code, 'resource-exhausted');details = err.details;
+    assert.equal(details.reason, 'upload-rate-limit');
+    assert.equal(details.limit, 5000);
+    assert.equal(details.retryAfterSeconds, 45);
+    assert.equal(details.retryAtMillis, now + 45000);
+    return true;
+  });
+  assert.equal(Object.keys(env.adapter.store.visitSubmissionUploadSessions || {}).length, 0);
+  env.clock.value += 45000;
+  const result = await env.service.createBulkUploadSessions('admin-uid', input);
+  assert.equal(result.sessions.length, 2);
+  assert.equal(env.adapter.store.driveUploadRateLimits['admin-uid_visitsubmission'].createdAtMillis.length, 5000);
+});
+
+test('holders retain 500 sessions per rolling hour and capacity failures remain separately identified', async () => {
+  const env = await categoryEnv();
+  seedUploadRate(env, 'bod-secretary', Array(500).fill(env.clock.value));
+  const input = { visitType: 'clubAssembly', positionKey: 'secretary', files: [categoryFile()] };
+  await assert.rejects(env.service.createUploadSession('bod-secretary', input), err => {
+    assert.equal(err.details.reason, 'upload-rate-limit');
+    assert.equal(err.details.limit, 500);
+    assert.equal(err.details.retryAfterSeconds, 3600);
+    return true;
+  });
+  env.clock.value += 3600000;
+  await env.service.createUploadSession('bod-secretary', input);
+  seedSecretaryLetters(env, { '': 100 });
+  await assert.rejects(env.service.createUploadSession('president-uid', input), err => {
+    assert.equal(err.details.reason, 'folder-capacity');
+    assert.equal(err.details.limit, 100);
+    assert.equal(err.details.retryAfterSeconds, undefined);
+    return true;
+  });
 });

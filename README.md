@@ -60,6 +60,16 @@ Deploy `getVisitSubmissionFolders`, `getVisitSubmissionFolder`,
 `createVisitSubmissionUploadSession`, `createVisitSubmissionBulkUploadSessions`,
 `replaceVisitSubmission` and `moveVisitSubmissionCategory` before Hosting for this change.
 
+Club Visit upload sessions use a rolling 60-minute account limit: **5,000 sessions for
+server-verified Admin/President managers**, and 500 for other authorized holders. A bulk
+request counts one session per selected position folder, rather than per file. Existing
+recent sessions remain counted after the increase, so an account stopped at the old
+500-session manager allowance can continue immediately after deployment if it is below
+5,000. Rate-limit errors include the first retry time when enough sessions expire for the
+whole requested batch. Folder-capacity errors are separate and identify the destination
+limit; waiting does not remove saved files. Deploy `createVisitSubmissionUploadSession`,
+`createVisitSubmissionBulkUploadSessions` and `replaceVisitSubmission` for this rate change.
+
 ## Local Development
 
 Install root and Functions dependencies separately:

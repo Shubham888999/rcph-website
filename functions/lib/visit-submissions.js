@@ -73,6 +73,7 @@ const VISIT_UPLOAD_TICKET_TTL_MS = 10 * 60 * 1000;
 const VISIT_UPLOAD_TICKET_DELETE_GRACE_MS = 24 * 60 * 60 * 1000;
 const VISIT_UPLOAD_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const VISIT_UPLOAD_RATE_LIMIT = 500;
+const VISIT_UPLOAD_MANAGER_RATE_LIMIT = 5000;
 const VISIT_SUBMISSION_STATUSES = Object.freeze(['active', 'replaced', 'admin-removed', 'archived']);
 const VISIT_UPLOAD_SESSION_ACTIVE_STATUSES = Object.freeze(['pending', 'partial']);
 const VISIT_UPLOAD_SESSION_TERMINAL_STATUSES = Object.freeze(['finalized', 'cancelled', 'expired']);
@@ -1644,6 +1645,7 @@ function createVisitSubmissionService(options) {
           ? `The ${label} folder has reached its ${limit}-file limit.`
           : 'This position folder has reached its active file limit.', {
           visitType: folder.visitType, positionKey: folder.positionKey,
+          reason: 'folder-capacity', limit,
           documentCategory: usage ? key : '', remainingCapacity: Math.max(0, limit - active - reserved),
         });
       }
@@ -1937,7 +1939,7 @@ function createVisitSubmissionService(options) {
       throw makeVisitSubmissionError('invalid-argument', 'Select at least one file.');
     }
     if (inputFiles.length > maxFilesPerSelection) {
-      throw makeVisitSubmissionError('resource-exhausted', 'Too many files selected.');
+      throw makeVisitSubmissionError('resource-exhausted', 'Too many files selected.', { reason: 'selection-limit', limit: maxFilesPerSelection });
     }
 
     const seenClientIds = new Set();
@@ -1971,7 +1973,8 @@ function createVisitSubmissionService(options) {
     if (folder.locked === true) throw makeVisitSubmissionError('failed-precondition', 'This position folder is locked.');
   }
 
-  async function updateVisitUploadRateLimit(tx, uid, nowValue, increment = 1) {
+  async function updateVisitUploadRateLimit(tx, uid, nowValue, increment = 1, canManageVisitSystem = false) {
+    const limit = canManageVisitSystem === true ? VISIT_UPLOAD_MANAGER_RATE_LIMIT : VISIT_UPLOAD_RATE_LIMIT;
     const rateLimitId = `${uid}_${VISIT_UPLOAD_TYPE}`;
     const snap = await tx.getDoc('driveUploadRateLimits', rateLimitId);
     const existing = snap.exists ? (snap.data || {}) : {};
@@ -1979,18 +1982,24 @@ function createVisitSubmissionService(options) {
     const recent = Array.isArray(existing.createdAtMillis)
       ? existing.createdAtMillis.filter(value => Number.isSafeInteger(value) && value > windowStart)
       : [];
-    const safeIncrement = Math.max(1, Math.min(VISIT_UPLOAD_RATE_LIMIT, Number(increment) || 1));
-    if (recent.length + safeIncrement > VISIT_UPLOAD_RATE_LIMIT) {
-      throw makeVisitSubmissionError('resource-exhausted', 'Too many upload sessions requested. Try again later.');
+    const safeIncrement = Math.max(1, Math.min(limit, Number(increment) || 1));
+    if (recent.length + safeIncrement > limit) {
+      const excess = recent.length + safeIncrement - limit;
+      const retryAtMillis = [...recent].sort((a, b) => a - b)[excess - 1] + VISIT_UPLOAD_RATE_LIMIT_WINDOW_MS;
+      throw makeVisitSubmissionError('resource-exhausted', 'Too many upload sessions requested. Try again later.', {
+        reason: 'upload-rate-limit', scope: 'account', limit,
+        windowMs: VISIT_UPLOAD_RATE_LIMIT_WINDOW_MS, retryAtMillis,
+        retryAfterSeconds: Math.max(1, Math.ceil((retryAtMillis - nowValue) / 1000)),
+      });
     }
     for (let index = 0; index < safeIncrement; index += 1) recent.push(nowValue);
     tx.setDoc('driveUploadRateLimits', rateLimitId, {
       uid,
       uploadType: VISIT_UPLOAD_TYPE,
       uploadPurpose: VISIT_UPLOAD_PURPOSE,
-      limit: VISIT_UPLOAD_RATE_LIMIT,
+      limit,
       windowMs: VISIT_UPLOAD_RATE_LIMIT_WINDOW_MS,
-      createdAtMillis: recent.slice(-VISIT_UPLOAD_RATE_LIMIT),
+      createdAtMillis: recent.slice(-limit),
       updatedAt: adapter.serverTimestamp(),
     }, { merge: true });
   }
@@ -2058,7 +2067,7 @@ function createVisitSubmissionService(options) {
       const latestFolder = shapePosition(folderSnap.data, visitType, positionKey, null, null, positionHelpers);
       assertVisitFolderAllowsUpload(config, latestFolder);
       if (!replacingSubmissionId) await assertUploadCapacity(tx, latestFolder, files);
-      await updateVisitUploadRateLimit(tx, uid, nowValue);
+      await updateVisitUploadRateLimit(tx, uid, nowValue, 1, access.canManageVisitSystem === true);
       const reservedFileCount = Number(latestFolder.reservedFileCount || 0);
 
       tx.updateDoc('visitSubmissionPositions', folderId, {
@@ -2287,7 +2296,7 @@ function createVisitSubmissionService(options) {
 
       }
 
-      await updateVisitUploadRateLimit(tx, uid, nowValue, plans.length);
+      await updateVisitUploadRateLimit(tx, uid, nowValue, plans.length, access.canManageVisitSystem === true);
 
       if (existingBulkUploadId) {
         tx.setDoc('visitSubmissionBulkUploads', bulkUploadId, {
