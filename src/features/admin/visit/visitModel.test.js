@@ -113,3 +113,14 @@ test("Secretary responses preserve independent category usage and the overall di
   assert.equal(folder.categoryUsage.outward.reservedFileCount, 1);
   assert.equal(normalizeFolder({ visitType: "dzrVisit", positionKey: "editor", activeFileCount: 5 }).otherActiveFileCount, 5);
 });
+
+test("Secretary capacity metadata includes root, registers and trusted custom folders", () => {
+  const keys = ["", "inward", "outward", "inward-register", "outward-register", "custom-11111111", "custom-22222222"];
+  const limits = Object.fromEntries(keys.map(key => [key, 100]));
+  const usage = Object.fromEntries(keys.map(key => [key, { activeFileCount: 99, reservedFileCount: 1 }]));
+  const folder = normalizeFolder({ visitType: "dzrVisit", positionKey: "secretary", perFolderFileLimit: 100, maxActiveFiles: 100, totalMaxActiveFiles: 700, customFolders: [{ key: "custom-11111111", name: "Reports" }, { key: "custom-22222222", name: "Signed", parentKey: "custom-11111111" }], categoryLimits: { ...limits, "custom-33333333": 100 }, categoryUsage: usage });
+  assert.deepEqual(folder.categoryLimits, limits);
+  assert.deepEqual(folder.categoryUsage, usage);
+  assert.equal(folder.perFolderFileLimit, 100);
+  assert.equal(folder.totalMaxActiveFiles, 700);
+});

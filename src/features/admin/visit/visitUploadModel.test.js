@@ -178,3 +178,11 @@ test("Secretary bulk capacity uses the selected letter folder's independent 100-
   assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "" }, files).selectable, false);
   assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "inward", categoryUsage: { ...folder.categoryUsage, inward: { activeFileCount: 99, reservedFileCount: 1 } } }, files).selectable, false);
 });
+
+test("Secretary root and custom folders use their own 100-file slots", () => {
+  const folder = { positionKey: "secretary", maxActiveFiles: 100, activeFileCount: 399, categoryLimits: { "": 100, inward: 100, outward: 100, "custom-11111111": 100 }, categoryUsage: { "": { activeFileCount: 100, reservedFileCount: 0 }, inward: { activeFileCount: 100, reservedFileCount: 0 }, outward: { activeFileCount: 100, reservedFileCount: 0 }, "custom-11111111": { activeFileCount: 99, reservedFileCount: 0 } } };
+  const files = [{ file: file("report.pdf", "application/pdf") }];
+  assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "" }, files).selectable, false);
+  assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "custom-11111111" }, files).selectable, true);
+  assert.equal(bulkVisitFolderAvailability({ ...folder, documentCategory: "custom-11111111" }, [...files, ...files]).selectable, false);
+});
