@@ -44,13 +44,18 @@ reservation transaction. Bulk retries remain bound to the original visit/destina
 Deploy `createVisitSubmissionBulkUploadSessions` and `recordVisitSubmissionBulkUploadAudit`
 before the React frontend. No Firestore migration or rules change is required.
 
-Secretary, Joint Secretary and Co-Secretary folders have independent **100-file allowances
-for Inward file and Outward file** in each visit. Their letters do not consume the configured
-ordinary file allowance (registers, supporting files and custom folders). Existing records
-are counted dynamically, including pending upload reservations; no count migration is needed.
-Replacement sessions do not consume an additional letter slot. Moves into a full allowance
-are rejected, with the original Drive location restored if a concurrent upload fills it.
-The UI shows each letter section's count out of 100 and the combined folder capacity.
+The **Secretary** position has independent **100-file allowances for the main folder,
+each built-in folder (Inward, Outward and both registers), and every custom folder or
+subfolder** in each visit. New folders receive their allowance automatically. Existing
+stored limits do not constrain these per-folder allowances. Joint Secretary and
+Co-Secretary retain their previous letter-only allowances and ordinary file limit;
+other positions retain their configured limits.
+
+Existing records are counted dynamically, including pending upload reservations; no
+count migration is needed. Replacements do not consume an additional slot. Moves into a
+full allowance are rejected, with the original Drive location restored if a concurrent
+upload fills it. The UI shows each Secretary folder's count out of 100 and the combined
+workspace capacity. The Secretary's fixed per-folder limit is shown in folder settings.
 Deploy `getVisitSubmissionFolders`, `getVisitSubmissionFolder`,
 `createVisitSubmissionUploadSession`, `createVisitSubmissionBulkUploadSessions`,
 `replaceVisitSubmission` and `moveVisitSubmissionCategory` before Hosting for this change.

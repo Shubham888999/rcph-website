@@ -817,7 +817,7 @@ function buildVisitPositionDefaults(visitTypeValue, positionKeyValue, actorUid, 
     submissionOpen: true,
     locked: false,
     lockReason: '',
-    maxActiveFiles: DEFAULT_MAX_ACTIVE_FILES,
+    maxActiveFiles: positionKey === 'secretary' ? 100 : DEFAULT_MAX_ACTIVE_FILES,
     maxFilesPerSelection: DEFAULT_MAX_FILES_PER_SELECTION,
     maxFileSizeBytes: DEFAULT_MAX_FILE_SIZE_BYTES,
     activeFileCount: 0,
@@ -1589,33 +1589,40 @@ function createVisitSubmissionService(options) {
         adapter.queryActiveSubmissionsForPositions(folder.visitType, [folder.positionKey]),
         adapter.queryActiveUploadSessionsForFolder(folder.visitType, folder.positionKey),
       ]);
-    const categoryUsage = { inward: { activeFileCount: 0, reservedFileCount: 0 }, outward: { activeFileCount: 0, reservedFileCount: 0 } };
+    const perFolder = folder.positionKey === 'secretary';
+    const categoryLimits = perFolder
+      ? Object.fromEntries(['', ...DOCUMENT_CATEGORIES, ...listCustomFolders(folder).map(item => item.key)].map(key => [key, 100]))
+      : { ...SECRETARY_LETTER_LIMITS };
+    const categoryUsage = Object.fromEntries(Object.keys(categoryLimits).map(key => [key, { activeFileCount: 0, reservedFileCount: 0 }]));
+    const usageFor = category => categoryUsage[hasOwn(categoryUsage, category || '') ? (category || '') : (perFolder ? '' : '__other__')];
     let dedicatedReserved = 0;
     let otherReplacementReserved = 0;
     for (const { data } of active) {
-      const usage = hasOwn(categoryUsage, data.documentCategory) ? categoryUsage[data.documentCategory] : null;
+      const usage = usageFor(data.documentCategory);
       if (usage) usage.activeFileCount += 1;
     }
     for (const { data } of sessions) {
       for (const file of data.expectedFiles || []) {
         if (['finalized', 'cancelled', 'expired'].includes(file.status)) continue;
-        const usage = hasOwn(categoryUsage, file.documentCategory) ? categoryUsage[file.documentCategory] : null;
+        const usage = usageFor(file.documentCategory);
         if (usage) {
           dedicatedReserved += 1;
           if (!data.replacesSubmissionId) usage.reservedFileCount += 1;
         } else if (data.replacesSubmissionId) otherReplacementReserved += 1;
       }
     }
-    const dedicatedActive = categoryUsage.inward.activeFileCount + categoryUsage.outward.activeFileCount;
+    const dedicatedActive = Object.values(categoryUsage).reduce((sum, usage) => sum + usage.activeFileCount, 0);
     return {
-      categoryLimits: { ...SECRETARY_LETTER_LIMITS }, categoryUsage,
+      categoryLimits, categoryUsage,
+      ...(perFolder ? { maxActiveFiles: 100, perFolderFileLimit: 100 } : {}),
       otherActiveFileCount: Math.max(0, Number(folder.activeFileCount || 0) - dedicatedActive),
       otherReservedFileCount: Math.max(0, Number(folder.reservedFileCount || 0) - dedicatedReserved - otherReplacementReserved),
-      totalMaxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES) + 200,
+      totalMaxActiveFiles: perFolder ? Object.values(categoryLimits).reduce((sum, limit) => sum + limit, 0) : Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES) + 200,
     };
   }
 
-  function capacityBucket(category) {
+  function capacityBucket(category, positionKey) {
+    if (positionKey === 'secretary') return category || '';
     return hasOwn(SECRETARY_LETTER_LIMITS, category) ? category : 'other';
   }
 
@@ -1632,8 +1639,9 @@ function createVisitSubmissionService(options) {
       const active = usage ? usage.activeFileCount : (capacity.otherActiveFileCount ?? Number(folder.activeFileCount || 0));
       const reserved = usage ? usage.reservedFileCount : (capacity.otherReservedFileCount ?? Number(folder.reservedFileCount || 0));
       if (active + reserved + count > limit) {
+        const label = ({ '': 'Main', inward: 'Inward file', outward: 'Outward file', 'inward-register': 'Inward register', 'outward-register': 'Outward register' })[key] || listCustomFolders(folder).find(item => item.key === key)?.name || 'Selected';
         throw makeVisitSubmissionError('resource-exhausted', usage
-          ? `The ${key === 'inward' ? 'Inward' : 'Outward'} file folder has reached its ${limit}-file limit.`
+          ? `The ${label} folder has reached its ${limit}-file limit.`
           : 'This position folder has reached its active file limit.', {
           visitType: folder.visitType, positionKey: folder.positionKey,
           documentCategory: usage ? key : '', remainingCapacity: Math.max(0, limit - active - reserved),
@@ -1709,7 +1717,7 @@ function createVisitSubmissionService(options) {
         }
       )),
       limits: {
-        maxActiveFiles: Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES),
+        maxActiveFiles: positionKey === 'secretary' ? 100 : Number(folder.maxActiveFiles || DEFAULT_MAX_ACTIVE_FILES),
         maxFilesPerSelection: Number(folder.maxFilesPerSelection || DEFAULT_MAX_FILES_PER_SELECTION),
         maxFileSizeBytes: Number(folder.maxFileSizeBytes || DEFAULT_MAX_FILE_SIZE_BYTES),
       },
@@ -3071,7 +3079,7 @@ function createVisitSubmissionService(options) {
 
     const currentCategory = storedDocumentCategory(submission.documentCategory);
     if (currentCategory === targetCategory) return { noop: true };
-    if (supportsDocumentCategories(positionKey) && capacityBucket(currentCategory) !== capacityBucket(targetCategory)) await adapter.runTransaction(async tx => {
+    if (supportsDocumentCategories(positionKey) && capacityBucket(currentCategory, positionKey) !== capacityBucket(targetCategory, positionKey)) await adapter.runTransaction(async tx => {
       const latest = await tx.getDoc('visitSubmissionPositions', visitPositionDocId(visitType, positionKey, positionHelpers));
       await assertUploadCapacity(tx, { ...latest.data, visitType, positionKey }, [{ documentCategory: targetCategory }]);
     });
@@ -3136,7 +3144,7 @@ function createVisitSubmissionService(options) {
         throw makeVisitSubmissionError('failed-precondition', 'This folder no longer exists.');
       }
       const fromCategory = storedDocumentCategory(submission.documentCategory);
-      if (folder && capacityBucket(fromCategory) !== capacityBucket(targetCategory) && supportsDocumentCategories(positionKey)) {
+      if (folder && capacityBucket(fromCategory, positionKey) !== capacityBucket(targetCategory, positionKey) && supportsDocumentCategories(positionKey)) {
         await assertUploadCapacity(tx, { ...folder, visitType: submission.visitType, positionKey }, [{ documentCategory: targetCategory }]);
       }
       tx.updateDoc('visitSubmissions', submissionId, {

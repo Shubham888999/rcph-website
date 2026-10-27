@@ -497,3 +497,14 @@ test('a quota filled during a Drive move returns the file to its original folder
   assert.deepEqual(env.fakeDrive.items.get(upload.driveFileId).parents, [upload.folder.positionFolderId]);
   assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, '');
 });
+
+test('a full Secretary custom folder cannot receive a moved file while other folders still have space', async () => {
+  const env = await createEnv();
+  const upload = await uploadVia(env, 'bod-secretary', 'secretary');
+  const custom = (await env.service.createCustomFolder('bod-secretary', { visitType: 'clubAssembly', positionKey: 'secretary', name: 'Resolutions' })).created;
+  for (let i = 0; i < 100; i++) env.adapter.store.visitSubmissions[`custom-${i}`] = { visitType: 'clubAssembly', positionKey: 'secretary', status: 'active', documentCategory: custom.key };
+  env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.activeFileCount = 101;
+  await rejectsWith(env.move('bod-secretary', { submissionId: upload.submissionId, documentCategory: custom.key }), 'resource-exhausted', /100-file limit/);
+  assert.equal(env.fakeDrive.calls.update.length, 0);
+  assert.equal(env.adapter.store.visitSubmissions[upload.submissionId].documentCategory, '');
+});

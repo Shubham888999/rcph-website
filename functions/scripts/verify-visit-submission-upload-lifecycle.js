@@ -259,12 +259,12 @@ function assertNoSecretFields(value, pathLabel = 'root') {
   );
 
   env = await initializedEnv();
-  folderDoc(env).maxActiveFiles = 1;
-  folderDoc(env).activeFileCount = 1;
-  await rejectsWithCode(() => createSession(env, 'bod-secretary'), 'resource-exhausted', 'capacity limit enforced');
-  folderDoc(env).activeFileCount = 0;
-  await createSession(env, 'bod-secretary');
-  await rejectsWithCode(() => createSession(env, 'bod-secretary', { file: { clientFileId: 'another' } }), 'resource-exhausted', 'concurrent reservation blocked');
+  folderDoc(env, 'clubAssembly', 'editor').maxActiveFiles = 1;
+  folderDoc(env, 'clubAssembly', 'editor').activeFileCount = 1;
+  await rejectsWithCode(() => createSession(env, 'bod-editor', { positionKey: 'editor' }), 'resource-exhausted', 'ordinary position capacity limit enforced');
+  folderDoc(env, 'clubAssembly', 'editor').activeFileCount = 0;
+  await createSession(env, 'bod-editor', { positionKey: 'editor' });
+  await rejectsWithCode(() => createSession(env, 'bod-editor', { positionKey: 'editor', file: { clientFileId: 'another' } }), 'resource-exhausted', 'concurrent reservation blocked');
 
   const bulkEnv = await initializedEnv();
   const bulk = await bulkEnv.service.createBulkUploadSessions('admin-uid', {
@@ -305,10 +305,10 @@ function assertNoSecretFields(value, pathLabel = 'root') {
     files: [file({ clientFileId: 'locked-bulk' })],
   }), 'failed-precondition', 'bulk locked folder rejected');
   const bulkCapacityEnv = await initializedEnv();
-  folderDoc(bulkCapacityEnv).maxActiveFiles = 1;
+  folderDoc(bulkCapacityEnv, 'clubAssembly', 'editor').maxActiveFiles = 1;
   await rejectsWithCode(() => bulkCapacityEnv.service.createBulkUploadSessions('admin-uid', {
     visitType: 'clubAssembly',
-    positionKeys: ['secretary'],
+    positionKeys: ['editor'],
     files: [file({ clientFileId: 'bulk-one' }), file({ clientFileId: 'bulk-two' })],
   }), 'resource-exhausted', 'bulk capacity overflow rejected');
 
