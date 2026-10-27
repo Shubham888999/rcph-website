@@ -1,3 +1,4 @@
+import { PDFDocument, StandardFontEmbedder, StandardFonts } from "pdf-lib";
 import { resolutionPageBranding, PAGE_SEAL } from "./resolutionPageBranding.js";
 import { PROTECTED_BRAND_ASSETS, fetchProtectedBrandAssetBlob } from "../shared/protectedBrandAssets.js";
 import { FINAL_RESOLUTION_STATUSES, approvalMethodLabel, getResolutionPdfFilename, isAuthenticatedFinalHybrid } from "./resolutionModel.js";
@@ -265,10 +266,19 @@ function fontResource(line) {
   return line.bold && line.italic ? "F5" : line.bold ? "F2" : line.italic ? "F4" : "F1";
 }
 
+// Use the rendered Helvetica glyph widths to center each watermark line.
+const watermarkFonts = {
+  regular: StandardFontEmbedder.for(StandardFonts.Helvetica),
+  bold: StandardFontEmbedder.for(StandardFonts.HelveticaBold),
+};
+
 function textCommand(line) {
   if (line.kind === "line") return `${line.x1.toFixed(1)} ${line.y1.toFixed(1)} m ${line.x2.toFixed(1)} ${line.y2.toFixed(1)} l S`;
   const font = fontResource(line);
-  const text = `BT /${font} ${line.size} Tf ${line.x.toFixed(1)} ${line.y.toFixed(1)} Td (${pdfText(line.text)}) Tj ET`;
+  const x = line.branding
+    ? (RESOLUTION_PDF_PAGE.width - watermarkFonts[line.bold ? "bold" : "regular"].widthOfTextAtSize(plainPdfText(line.text), line.size)) / 2
+    : line.x;
+  const text = `BT /${font} ${line.size} Tf ${x.toFixed(1)} ${line.y.toFixed(1)} Td (${pdfText(line.text)}) Tj ET`;
   if (!line.underline || !line.width) return text;
   return `${text}\n${line.x.toFixed(1)} ${(line.y - 1.5).toFixed(1)} m ${(line.x + line.width).toFixed(1)} ${(line.y - 1.5).toFixed(1)} l S`;
 }
@@ -397,7 +407,6 @@ export async function loadPoppinsForPages(pages, options = {}) {
 }
 
 export async function addResolutionSeal(pdfBytes, pngBytes) {
-  const { PDFDocument } = await import("pdf-lib");
   const document = await PDFDocument.load(pdfBytes);
   const seal = await document.embedPng(pngBytes);
   document.getPages().forEach((page) => {
