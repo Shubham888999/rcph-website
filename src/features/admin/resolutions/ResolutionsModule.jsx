@@ -521,7 +521,7 @@ function ResolutionDetails({ details, busy, onRefresh, onDownload, onDownloadSum
       <button type="button" disabled={busy} onClick={onRefresh}>Refresh vote counts</button>
       {FINAL_RESOLUTION_STATUSES.includes(resolution.status) && (resolution.documentSourceMode !== "uploadedPdf" || resolution.canDownloadFinal) ? <button type="button" disabled={busy} onClick={onDownload}>Download completed resolution PDF</button> : null}
       {FINAL_RESOLUTION_STATUSES.includes(resolution.status) && resolution.documentSourceMode === "uploadedPdf" ? <button type="button" disabled={busy} onClick={customDownload?.number === 1 ? onDownloadCustomSummary : onDownloadSummary}>{customDownload?.number === 1 ? customDownload.label : "Download summary PDF (Resolution Page and record only)"}</button> : null}
-      {customDownload && (customDownload.number === 3 || resolution.documentSourceMode !== "uploadedPdf") ? <button type="button" disabled={busy} onClick={onDownloadCustomSummary}>{customDownload.label}</button> : null}
+      {customDownload && (customDownload.number !== 1 || resolution.documentSourceMode !== "uploadedPdf") ? <button type="button" disabled={busy} onClick={onDownloadCustomSummary}>{customDownload.label}</button> : null}
       {resolution.canRetryMerge ? <button type="button" disabled={busy} onClick={onRetry}>Retry final PDF</button> : null}
     </div>
     <div className="admin-table-wrap"><table><caption>Eligible voter snapshot and final votes</caption><thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Vote</th><th>Submitted</th><th>{authenticatedFinal ? "Status" : "Verification"}</th><th>Reference</th></tr></thead><tbody>{resolution.eligibleVoters.map((voter) => {

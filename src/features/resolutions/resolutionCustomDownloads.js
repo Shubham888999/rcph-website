@@ -1,15 +1,16 @@
 import { FINAL_RESOLUTION_STATUSES } from "./resolutionModel.js";
 
-// These are excerpts for the two existing RIY 2026-27 resolution bundles.
+// These are excerpts for the existing RIY 2026-27 resolution bundles.
 const CUSTOM_DOWNLOADS = Object.freeze({
   1: Object.freeze({ number: 1, start: 15, total: 18 }),
+  2: Object.freeze({ number: 2, start: 5, total: 8 }),
   3: Object.freeze({ number: 3, start: 5, total: 8 }),
 });
 
 export function getResolutionCustomDownload(resolution = {}) {
   if (!FINAL_RESOLUTION_STATUSES.includes(resolution.status)) return null;
   const number = String(resolution.resolutionNumber || "").trim();
-  const sequence = number.match(/(?:^|[\s/#-])0*([13])$/);
+  const sequence = number.match(/(?:^|[\s/#-])0*([123])$/);
   if (!sequence) return null;
   const year = number.match(/\b(20\d{2})\s*[-/]\s*((?:20)?\d{2})\b/);
   const inYear = year
@@ -27,7 +28,7 @@ export function getResolutionCustomDownload(resolution = {}) {
 
 export function prepareCustomResolutionSummary(details) {
   const profile = getResolutionCustomDownload(details?.resolution);
-  if (!profile) throw new Error("Custom page numbering is available only for completed RIY 2026-27 Resolutions 1 and 3.");
+  if (!profile) throw new Error("Custom page numbering is available only for completed RIY 2026-27 Resolutions 1, 2 and 3.");
   const resolution = details.resolution;
   const pageConfig = resolution.finalizedResolutionPageConfigSnapshot || resolution.resolutionPageConfig;
   if (!pageConfig?.enabled) throw new Error("The Resolution Page must be enabled for this custom download.");
