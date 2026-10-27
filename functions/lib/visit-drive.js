@@ -723,17 +723,17 @@ function createVisitHttpUploadHandler(options = {}) {
       });
       assertTrustedValidation(validation);
 
-const rootFolderId = getRootFolderIdForVisit(
-  driveConfig,
-  validation.visitType
-);
-
-folderLock = await folderLockManager.acquireLock({
-  rootFolderId,
-  visitType: validation.visitType,
-  positionKey: validation.positionKey,
-});
+      const rootFolderId = getRootFolderIdForVisit(driveConfig, validation.visitType);
+      folderLock = await folderLockManager.acquireLock({
+        rootFolderId,
+        visitType: validation.visitType,
+        positionKey: validation.positionKey,
+      });
       const folder = await driveService.ensureVisitFolderHierarchy(validation, driveConfig);
+      // Serialize folder discovery/creation, not file transfer or completion.
+      // Releasing before the upload also avoids a response racing lock cleanup.
+      await folderLock.release();
+      folderLock = null;
       driveFile = await driveService.uploadFile({
         folderId: folder.targetFolderId || folder.positionFolderId,
         fileName: validation.sanitizedOriginalFileName,

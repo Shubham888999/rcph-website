@@ -11,6 +11,7 @@ const {
   createHttpUploadError,
   createVisitCategoryMoveHandler,
   createVisitDriveService,
+  createVisitHttpUploadHandler,
 } = require('./visit-drive');
 
 const baseFixture = require(path.join(__dirname, '..', 'scripts', 'fixtures', 'visit-submission-upload-lifecycle-sample.json'));
@@ -372,4 +373,96 @@ test('a subfolder of a built-in folder lands inside that folder, and a move crea
   const ids = env.adapter.store.visitSubmissionPositions.clubAssembly_secretary.categoryFolderIds;
   assert.equal(ids[sub.key], year.id);
   assert.equal(ids.outward, outward.id);
+});
+
+
+function uploadResponse() {
+  return {
+    statusCode: 200, body: "",
+    status(value) { this.statusCode = value; return this; },
+    set() { return this; },
+    send(value) { this.body = JSON.parse(value); return this; },
+  };
+}
+
+test('HTTP uploads release the folder lock before slow file transfer, allowing a second file in the same folder', async () => {
+  let held = false;
+  let released = 0;
+  const lockManager = {
+    async acquireLock() {
+      if (held) throw createHttpUploadError(409, 'Visit upload folder is being prepared.');
+      held = true;
+      return { async release() { held = false; released += 1; } };
+    },
+  };
+  const env = await createEnv({ lockManager });
+  const category = (await env.service.createCustomFolder('admin-uid', { visitType: 'clubAssembly', positionKey: 'editor', name: 'Resolutions' })).created.key;
+  const buffer = Buffer.from('%PDF-1.4\nok');
+  const session = await env.service.createBulkUploadSessions('admin-uid', {
+    visitType: 'clubAssembly', positionKeys: ['editor'],
+    destinations: [{ positionKey: 'editor', documentCategory: category }],
+    files: ['one', 'two'].map(clientFileId => ({ clientFileId, fileName: `${clientFileId}.pdf`, mimeType: 'application/pdf', sizeBytes: buffer.length })),
+  });
+  const approved = session.sessions[0];
+  let signalFirstTransfer;
+  const firstTransfer = new Promise(resolve => { signalFirstTransfer = resolve; });
+  let finishFirstTransfer;
+  const firstTransferGate = new Promise(resolve => { finishFirstTransfer = resolve; });
+  const handler = createVisitHttpUploadHandler({
+    visitService: env.service, folderLockManager: lockManager,
+    getDriveConfig: () => DRIVE_CONFIG, logger: { warn() {} },
+    parseMultipartUpload: async req => ({ fields: req.fields, file: { buffer, sizeBytes: buffer.length, mimeType: 'application/pdf' } }),
+    driveService: {
+      ensureVisitFolderHierarchy: async (...args) => {
+        assert.equal(held, true, 'folder creation remains protected');
+        return env.drive.ensureVisitFolderHierarchy(...args);
+      },
+      uploadFile: async payload => {
+        if (payload.fileName === 'one.pdf') {
+          signalFirstTransfer();
+          await firstTransferGate;
+        }
+        return env.drive.uploadFile(payload);
+      },
+    },
+  });
+  const request = item => ({ method: 'POST', headers: { origin: 'http://localhost:5173' }, fields: { ...item, sessionId: approved.sessionId } });
+  const firstResponse = uploadResponse();
+  const first = handler(request(approved.files[0]), firstResponse);
+  await firstTransfer;
+  try {
+    assert.equal(held, false, 'slow uploads do not retain the folder lock');
+    const secondResponse = uploadResponse();
+    await handler(request(approved.files[1]), secondResponse);
+    assert.equal(secondResponse.statusCode, 200, JSON.stringify(secondResponse.body));
+    const result = await env.service.finalizeUpload('admin-uid', { sessionId: approved.sessionId, ...approved.files[1], completionProof: secondResponse.body.completionProof });
+    assert.ok(result.submissionId);
+  } finally {
+    finishFirstTransfer();
+    await first;
+  }
+  assert.equal(firstResponse.statusCode, 200, JSON.stringify(firstResponse.body));
+  await env.service.finalizeUpload('admin-uid', { sessionId: approved.sessionId, ...approved.files[0], completionProof: firstResponse.body.completionProof });
+  assert.equal(released, 2);
+  assert.equal(held, false);
+  const saved = Object.values(env.adapter.store.visitSubmissions);
+  assert.equal(saved.length, 2);
+  assert.ok(saved.every(item => item.documentCategory === category));
+  assert.equal(new Set(saved.map(item => item.driveFolderId)).size, 1);
+  assert.deepEqual(env.fakeDrive.calls.create.filter(item => item.folder).map(item => item.name), ['Editor', 'Resolutions']);
+});
+
+test('HTTP folder preparation failure releases its lock and never transfers bytes', async () => {
+  const events = [];
+  const handler = createVisitHttpUploadHandler({
+    visitService: { async validateVisitUploadTicketWithProof() { return { sanitizedOriginalFileName: 'one.pdf', visitType: 'clubAssembly', visitDisplayTitle: 'Club Assembly', positionKey: 'editor', positionTitle: 'Editor', avenueCode: 'ED', uploadProof: 'proof' }; } },
+    folderLockManager: { async acquireLock() { events.push('lock'); return { async release() { events.push('release'); } }; } },
+    driveService: { async ensureVisitFolderHierarchy() { throw createHttpUploadError(500, 'Folder creation failed.'); }, async uploadFile() { events.push('upload'); } },
+    getDriveConfig: () => DRIVE_CONFIG, logger: { warn() {} },
+    parseMultipartUpload: async () => ({ fields: { ticket: 'a'.repeat(64), sessionId: 'session', clientFileId: 'one', fileName: 'one.pdf', mimeType: 'application/pdf', sizeBytes: 1 }, file: { buffer: Buffer.from('x'), sizeBytes: 1 } }),
+  });
+  const response = uploadResponse();
+  await handler({ method: 'POST', headers: { origin: 'http://localhost:5173' } }, response);
+  assert.equal(response.statusCode, 500);
+  assert.deepEqual(events, ['lock', 'release']);
 });
