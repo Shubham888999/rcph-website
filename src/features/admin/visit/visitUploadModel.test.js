@@ -207,3 +207,15 @@ test("300-file destinations permit the final slot and report their capacity corr
   assert.equal(bulkVisitFolderAvailability({ ...folder, categoryUsage: { "": { activeFileCount: 299, reservedFileCount: 1 } } }, files).selectable, false);
   assert.match(safeVisitUploadError({ code: "functions/resource-exhausted", details: { reason: "folder-capacity", limit: 300 } }), /300-file capacity/);
 });
+
+test("precondition errors identify actual locks, expired sessions and batch mismatches separately", () => {
+  const code = "functions/failed-precondition";
+  assert.match(safeVisitUploadError({ code, message: "This position folder is locked." }), /Unlock it in Folder settings/);
+  assert.match(safeVisitUploadError({ code, message: "Visit submissions are closed." }), /Visit settings/);
+  const expired = safeVisitUploadError({ code, message: "Upload session expired." });
+  assert.match(expired, /session expired/);
+  assert.doesNotMatch(expired, /locked/);
+  const mismatch = safeVisitUploadError({ code, message: "Retries must use the original visit and destination folders. Start a new bulk upload to change destinations." });
+  assert.match(mismatch, /different destination batch/);
+  assert.doesNotMatch(safeVisitUploadError({ code, message: "private server details" }), /private server details|folder is closed, locked/);
+});

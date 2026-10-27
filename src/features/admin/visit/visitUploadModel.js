@@ -299,6 +299,25 @@ export function safeVisitUploadError(error) {
     if (details.reason === "selection-limit" || error?.message === "Too many files selected.") return "Select fewer files and try again.";
     return "The upload request was limited. Check the destination's available space or retry later.";
   }
-  if (code.includes("failed-precondition")) return "This Club Visit folder is closed, locked, or no longer accepts this upload.";
+  if (code.includes("failed-precondition")) {
+    const messages = {
+      "Visit submissions are disabled.": "Uploads for this Club Visit are disabled. Enable the visit in Visit settings.",
+      "Visit submissions are closed.": "Uploads for this Club Visit are closed. Open submissions in Visit settings.",
+      "This position folder is disabled.": "This position folder is disabled. Enable it in Folder settings.",
+      "This position folder is closed.": "This position folder is closed. Open it in Folder settings.",
+      "This position folder is locked.": "This position folder is locked. Unlock it in Folder settings.",
+      "Retries must use the original visit and destination folders. Start a new bulk upload to change destinations.": "This retry belongs to a different destination batch. Close Bulk upload and start a new batch for the missing files.",
+      "Upload ticket expired.": "The upload ticket expired. Retry the failed upload to request fresh authorization.",
+      "Upload session expired.": "The upload session expired. Close Bulk upload and start a new batch for the missing files.",
+      "Upload session is not active.": "The upload session is no longer active. Close Bulk upload and start a new batch for the missing files.",
+      "Upload ticket metadata mismatch.": "The file no longer matches its upload authorization. Start a new batch for the missing files.",
+      "Upload completion metadata mismatch.": "The uploaded file no longer matches its authorization. Start a new batch for the missing files.",
+      "Trusted Drive upload completion has not been recorded.": "Drive has not confirmed this upload. Retry the failed file.",
+      "This folder no longer exists.": "The selected destination folder no longer exists. Refresh and choose a current folder.",
+      "Visit Submission structure has not been initialized.": "Club Visit folders have not been initialized. Initialize them from the visit dashboard.",
+      "Bulk upload session is inconsistent.": "This bulk upload session is inconsistent. Close it and start a new batch for the missing files.",
+    };
+    return Object.hasOwn(messages, error?.message) ? messages[error.message] : "The upload could not continue because a required condition changed. Refresh and start a new batch for the missing files.";
+  }
   return "The supporting file could not be uploaded. You can retry without creating a duplicate submission.";
 }

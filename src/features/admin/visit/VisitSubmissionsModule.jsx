@@ -1038,7 +1038,7 @@ function BulkVisitUploadDialog({ visit, onClose, reload }) {
   }
 
   async function authorizePairs(targetPairs, retryFailed) {
-    if (!retryFailed) {
+    if (!retryFailed || !bulkUploadId) {
       const response = await visitCalls.createBulkSessions({
         visitType: visit.visitType,
         positionKeys: selectedFolders.map((folder) => folder.positionKey),
