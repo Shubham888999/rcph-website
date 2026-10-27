@@ -12,7 +12,7 @@ const PNG_BYTES = [137, 80, 78, 71];
 const PNG_BASE64 = Buffer.from(PNG_BYTES).toString("base64");
 
 test("asset keys match the backend allow-list", () => {
-  assert.deepEqual(Object.values(PROTECTED_BRAND_ASSETS).sort(), ["official-letterhead", "report-frame", "resolution-letterhead"]);
+  assert.deepEqual(Object.values(PROTECTED_BRAND_ASSETS).sort(), ["official-letterhead", "report-frame", "resolution-letterhead", "resolution-seal"]);
 });
 
 test("base64 payloads become image/png blobs", async () => {

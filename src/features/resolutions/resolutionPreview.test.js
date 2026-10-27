@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -218,6 +219,7 @@ test("Generated pages preview PDF uses official letterhead and no visible draft 
   const result = await generateGeneratedPagesPreviewPdf(
     { ...baseDetails(), previewMode: "resolution_page" },
     {
+      loadSeal: async () => new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=", "base64")),
       loadLetterhead: async () => LETTERHEAD,
       loadOfficialLetterhead: async () => {
         officialLoaded = true;
@@ -227,8 +229,8 @@ test("Generated pages preview PDF uses official letterhead and no visible draft 
   );
   const pdf = decode(result.pdf);
   assert.equal(officialLoaded, true);
-  assert.match(pdf, /^%PDF-1\.4/);
-  assert.equal((pdf.match(/\/Subtype \/Image/g) || []).length, 2);
+  assert.match(pdf, /^%PDF-1\.[47]/);
+  assert.equal((pdf.match(/\/Subtype \/Image/g) || []).length, 3);
   assert.match(pdf, /\/OfficialBG Do/);
   assert.doesNotMatch(pdf, /DRAFT PREVIEW/);
   assert.match(pdf, /Page 1 of /);
@@ -266,6 +268,7 @@ test("Opening a generated pages preview creates and revokes a Blob URL", async (
     { ...baseDetails(), previewMode: "resolution_page" },
     {
       action: "open",
+      loadSeal: async () => new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=", "base64")),
       loadLetterhead: async () => LETTERHEAD,
       loadOfficialLetterhead: async () => OFFICIAL_LETTERHEAD,
       urlApi: {
@@ -295,6 +298,7 @@ test("Popup-blocked generated pages preview falls back to download and revokes t
     { ...baseDetails(), previewMode: "vote_table" },
     {
       action: "open",
+      loadSeal: async () => new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=", "base64")),
       loadLetterhead: async () => LETTERHEAD,
       loadOfficialLetterhead: async () => OFFICIAL_LETTERHEAD,
       urlApi: {

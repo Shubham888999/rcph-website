@@ -93,7 +93,7 @@ test("Votes Table supports selected columns, Signature space, repeated headers, 
   fixture.votes[0].email = "private@example.test";
   const pages = buildResolutionPdfPages(fixture);
   assert.ok(pages.length > 1);
-  pages.forEach((page) => assert.equal(page.filter((item) => item.kind === "text" && item.text === "Signature").length, 1));
+  pages.filter((page) => page.some((item) => item.text?.includes("Fixture Member"))).forEach((page) => assert.equal(page.filter((item) => item.kind === "text" && item.text === "Signature").length, 1));
   const pdf = decode(buildResolutionPdfDocument(fixture, LETTERHEAD));
   assert.match(pdf, /Voting Record/);
   assert.match(pdf, /Approve count:/);

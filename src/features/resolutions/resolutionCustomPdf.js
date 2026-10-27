@@ -1,3 +1,4 @@
+import { resolutionPageBranding } from "./resolutionPageBranding.js";
 import { fillResolutionMajority, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, normalizeResolutionSections, normalizeUploadedVotesTableConfig, splitResolutionStatement, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
 import { POPPINS_FAMILY, poppinsTextWidth } from "./resolutionPoppins.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
@@ -15,7 +16,7 @@ const START_Y = BOUNDS.top - 10;
 const RESOLUTION_PAGE_START_Y = START_Y + 28;
 const PAGE_HEIGHT = START_Y - BOUNDS.bottom;
 // Official-letterhead pages may run over the skyline watermark, down to just above the footer contact block.
-const OFFICIAL_BOTTOM = 95;
+const OFFICIAL_BOTTOM = 120;
 
 function printable(value, fallback = "") {
   const result = String(value || "").trim();
@@ -802,7 +803,7 @@ renderTable(
 }
 
 export function buildCustomResolutionPdfPages(details, sections) {
-  const pager = createPaginator();
+  const pager = createPaginator(START_Y, { continueY: resolutionPageBranding(details).bodyTop });
   normalizeResolutionSections(sections).forEach((section) => {
     if (section.type === "heading" || section.type === "paragraph") renderTextSection(pager, section);
     else if (section.type === "table") renderCustomTable(pager, section);
@@ -975,8 +976,8 @@ function renderResolutionDetails(pager, normalized) {
   pager.space(32);
 }
 
-export function buildResolutionPagePdfPages(details, config) {
-  const pager = createPaginator(RESOLUTION_PAGE_START_Y, { bottom: OFFICIAL_BOTTOM, continueY: START_Y });
+export function buildResolutionPagePdfPages(details, config, options = {}) {
+  const pager = createPaginator(options.firstPage === false ? resolutionPageBranding(details).bodyTop : RESOLUTION_PAGE_START_Y, { bottom: OFFICIAL_BOTTOM, continueY: resolutionPageBranding(details).bodyTop });
 
   const normalized = normalizeResolutionPageConfig(
     config,
@@ -1047,7 +1048,7 @@ export function buildResolutionPagePdfPages(details, config) {
 
 export function buildGeneratedVotesTablePdfPages(details, config) {
   const normalized = normalizeUploadedVotesTableConfig(config);
-  const pager = createPaginator(START_Y, { bottom: OFFICIAL_BOTTOM });
+  const pager = createPaginator(resolutionPageBranding(details).bodyTop, { bottom: OFFICIAL_BOTTOM });
   const resolution = details?.resolution || {};
 
   renderTextSection(
@@ -1161,7 +1162,7 @@ export function buildGeneratedResolutionAppendixPages(details, preview = false) 
   const pageConfig = finalizedResolutionPageConfig(resolution, preview);
   if (!pageConfig.enabled) return [];
   const pagesByType = {
-    resolution_page: () => buildResolutionPagePdfPages(details, pageConfig),
+    resolution_page: () => buildResolutionPagePdfPages(details, pageConfig, { firstPage: getResolutionRenderLayout(details, preview).mode !== "custom" && finalizedGeneratedPageOrder(resolution, preview)[0] === "resolution_page" }),
     vote_table: () => resolution.appendVoteTable === false ? [] : buildGeneratedVotesTablePdfPages(details, resolution.uploadedVotesTableConfig),
   };
   return finalizedGeneratedPageOrder(resolution, preview).flatMap((type) => pagesByType[type]?.() || []);

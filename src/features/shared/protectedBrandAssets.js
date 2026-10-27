@@ -4,6 +4,7 @@ export const PROTECTED_BRAND_ASSETS = Object.freeze({
   officialLetterhead: "official-letterhead",
   resolutionLetterhead: "resolution-letterhead",
   reportFrame: "report-frame",
+  resolutionSeal: "resolution-seal",
 });
 
 const KNOWN_KEYS = new Set(Object.values(PROTECTED_BRAND_ASSETS));

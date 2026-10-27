@@ -1,3 +1,5 @@
+import { resolutionPageBranding, PAGE_SEAL } from "./resolutionPageBranding.js";
+import { PROTECTED_BRAND_ASSETS, fetchProtectedBrandAssetBlob } from "../shared/protectedBrandAssets.js";
 import { FINAL_RESOLUTION_STATUSES, approvalMethodLabel, getResolutionPdfFilename, isAuthenticatedFinalHybrid } from "./resolutionModel.js";
 import { buildCustomResolutionPdfPages, buildGeneratedResolutionAppendixPages, getResolutionRenderLayout } from "./resolutionCustomPdf.js";
 import { getResolutionLetterheadJpeg, getResolutionOfficialLetterheadJpeg } from "./resolutionLetterhead.js";
@@ -209,10 +211,10 @@ function lineHeight(line) {
   return line.size * 1.35 + (line.gap || 0);
 }
 
-function paginateBlocks(blocks) {
+function paginateBlocks(blocks, startY = CONTENT_START_Y, continueY = startY) {
   const pages = [[]];
-  let y = CONTENT_START_Y;
-  const newPage = () => { pages.push([]); y = CONTENT_START_Y; };
+  let y = startY;
+  const newPage = () => { pages.push([]); y = continueY; };
   for (const item of blocks) {
     const keepCount = Math.min(item.keepLines, item.lines.length);
     const keepHeight = item.lines.slice(0, keepCount).reduce((total, line) => total + lineHeight(line), 0);
@@ -246,9 +248,12 @@ export function buildResolutionPdfPages(details, options = {}) {
   const generatedPages = buildGeneratedResolutionAppendixPages(details, options.preview === true);
   const generatedVoteTable = generatedPages.some((page) => page.generatedKind === "vote_table");
   const layout = getResolutionRenderLayout(details, options.preview === true);
-  const primaryPages = layout.mode === "custom" ? buildCustomResolutionPdfPages(details, layout.sections) : paginateBlocks(buildDocumentBlocks(details, { includeVoteTable: !generatedVoteTable }));
+  const primaryPages = layout.mode === "custom" ? buildCustomResolutionPdfPages(details, layout.sections) : paginateBlocks(buildDocumentBlocks(details, { includeVoteTable: !generatedVoteTable }), generatedPages.length ? resolutionPageBranding(details).bodyTop : CONTENT_START_Y, resolutionPageBranding(details).bodyTop);
   // The standard layout is the technical record (details, certification, audit reference), so it goes last.
-  return layout.mode === "custom" ? [...primaryPages, ...generatedPages] : [...generatedPages, ...primaryPages];
+  const pages = layout.mode === "custom" ? [...primaryPages, ...generatedPages] : [...generatedPages, ...primaryPages];
+  const branding = resolutionPageBranding(details);
+  pages.forEach((page, index) => { if (index > 0) page.unshift(...branding.lines.map((line) => ({ ...line, kind: "text", branding: true }))); });
+  return pages;
 }
 
 function fontResource(line) {
@@ -391,6 +396,24 @@ export async function loadPoppinsForPages(pages, options = {}) {
   return (options.loadPoppinsFonts || loadResolutionPoppinsFonts)(variants);
 }
 
+export async function addResolutionSeal(pdfBytes, pngBytes) {
+  const { PDFDocument } = await import("pdf-lib");
+  const document = await PDFDocument.load(pdfBytes);
+  const seal = await document.embedPng(pngBytes);
+  document.getPages().forEach((page) => {
+    const sx = page.getWidth() / RESOLUTION_PDF_PAGE.width;
+    const sy = page.getHeight() / RESOLUTION_PDF_PAGE.height;
+    page.drawImage(seal, { x: PAGE_SEAL.x * sx, y: PAGE_SEAL.y * sy, width: PAGE_SEAL.width * sx, height: PAGE_SEAL.height * sy });
+  });
+  return document.save({ useObjectStreams: false });
+}
+
+export async function sealDownloadedPdf(pdf, options = {}) {
+  const blob = await (options.loadSeal || (() => fetchProtectedBrandAssetBlob(PROTECTED_BRAND_ASSETS.resolutionSeal)))();
+  const bytes = blob instanceof Uint8Array ? blob : new Uint8Array(await blob.arrayBuffer());
+  return addResolutionSeal(pdf, bytes);
+}
+
 export async function generateResolutionPdf(details, options = {}) {
   const resolution = assertFinalized(details);
   const loadLetterhead = options.loadLetterhead || getResolutionLetterheadJpeg;
@@ -399,7 +422,7 @@ export async function generateResolutionPdf(details, options = {}) {
   const pages = buildResolutionPdfPages(details);
   const officialLetterhead = pages.some((page) => page.letterhead === "official") ? await loadOfficialLetterhead() : undefined;
   const poppinsFonts = await loadPoppinsForPages(pages, options);
-  const pdf = buildResolutionPdfDocument(details, letterhead, { officialLetterhead, pages, poppinsFonts });
+  const pdf = await sealDownloadedPdf(buildResolutionPdfDocument(details, letterhead, { officialLetterhead, pages, poppinsFonts }), options);
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;
@@ -416,7 +439,7 @@ export async function generateResolutionPreviewPdf(details, options = {}) {
   const pages = buildResolutionPdfPages(details, { preview: true });
   const officialLetterhead = pages.some((page) => page.letterhead === "official") ? await loadOfficialLetterhead() : undefined;
   const poppinsFonts = await loadPoppinsForPages(pages, options);
-  const pdf = buildResolutionPdfDocument(details, letterhead, { preview: true, officialLetterhead, pages, poppinsFonts });
+  const pdf = await sealDownloadedPdf(buildResolutionPdfDocument(details, letterhead, { preview: true, officialLetterhead, pages, poppinsFonts }), options);
   const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
   const link = document.createElement("a");
   link.href = url;

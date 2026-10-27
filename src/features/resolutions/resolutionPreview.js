@@ -1,5 +1,6 @@
+import { resolutionPageBranding } from "./resolutionPageBranding.js";
 import { FINAL_RESOLUTION_STATUSES } from "./resolutionModel.js";
-import { buildResolutionPdfDocument, loadPoppinsForPages } from "./resolutionPdf.js";
+import { buildResolutionPdfDocument, loadPoppinsForPages, sealDownloadedPdf } from "./resolutionPdf.js";
 import {
   buildGeneratedVotesTablePdfPages,
   buildResolutionPagePdfPages,
@@ -151,9 +152,9 @@ export function buildGeneratedPagesPreviewPages(input = {}) {
     details = withPreviewVoters(details);
   }
 
-  return types.flatMap((type) => {
+  const pages = types.flatMap((type, index) => {
     if (type === GENERATED_PAGES_PREVIEW_MODES.RESOLUTION_PAGE) {
-      return buildResolutionPagePdfPages(details, details.resolution.resolutionPageConfig);
+      return buildResolutionPagePdfPages(details, details.resolution.resolutionPageConfig, { firstPage: index === 0 });
     }
     const config = previewVotesTableConfig(details.resolution, details.votes);
     return buildGeneratedVotesTablePdfPages(
@@ -164,6 +165,9 @@ export function buildGeneratedPagesPreviewPages(input = {}) {
       config,
     );
   });
+  const branding = resolutionPageBranding(details);
+  pages.forEach((page, index) => { if (index > 0 || page.generatedKind !== "resolution_page") page.unshift(...branding.lines.map((line) => ({ ...line, kind: "text", branding: true }))); });
+  return pages;
 }
 
 async function loadRequiredLetterheads({ loadLetterhead, loadOfficialLetterhead }) {
@@ -198,13 +202,14 @@ export async function generateGeneratedPagesPreviewPdf(input = {}, options = {})
   } catch {
     throw new Error("The Poppins font could not be loaded for the preview.");
   }
-  const pdf = buildResolutionPdfDocument(details, letterhead, {
+  const rawPdf = buildResolutionPdfDocument(details, letterhead, {
     preview: true,
     previewLabel: false,
     officialLetterhead,
     pages,
     poppinsFonts,
   });
+  const pdf = await sealDownloadedPdf(rawPdf, options);
   return {
     pdf,
     pages,
