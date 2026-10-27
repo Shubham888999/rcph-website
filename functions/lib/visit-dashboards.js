@@ -822,7 +822,42 @@ function treasuryLedgerDate(source) {
   return dateOnly(source.reimbursementDate) || date;
 }
 
-function shapeTreasuryRow(doc, index = 0) {
+// Only display links leave this boundary; uploader IDs, account IDs and audit
+// metadata on proofs are deliberately excluded from the visit payload.
+function bankProofOpenUrl(proof) {
+  const canonicalFile = driveFileOpenUrl(proof);
+  if (canonicalFile) return canonicalFile;
+  const canonicalFolder = driveFolderOpenUrl({ folderUrl: proof?.fileUrl });
+  if (canonicalFolder) return canonicalFolder;
+  try {
+    const url = new URL(normalizeText(proof?.fileUrl, 1000));
+    if (url.protocol !== 'https:' || url.username || url.password) return '';
+    // Malformed Google Drive URLs must not bypass canonical Drive link checks.
+    if (['drive.google.com', 'docs.google.com'].includes(url.hostname)) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function shapeTreasuryBankProofs(source) {
+  return (Array.isArray(source.bankProofs) ? source.bankProofs : [])
+    .map(proof => ({
+      label: normalizeText(proof?.fileName, 180) || 'Bank proof',
+      openUrl: bankProofOpenUrl(proof),
+    }))
+    .filter(proof => proof.openUrl)
+    .slice(0, 10);
+}
+
+function treasuryAvenueCode(value) {
+  const first = Array.isArray(value) ? value[0] : value;
+  const shortCodes = { PD: 'PDD', CS: 'CSD', IS: 'ISD', CM: 'CMD' };
+  return normalizeEventAvenueCode(first) || shortCodes[normalizeText(first, 40).toUpperCase()]
+    || firstAvenueCode(first, 'OTHER');
+}
+
+function shapeTreasuryRow(doc, index = 0, eventLookup = new Map()) {
   const source = doc?.data && typeof doc.data === 'object'
     ? doc.data
     : (doc && typeof doc === 'object' ? doc : {});
@@ -833,8 +868,11 @@ function shapeTreasuryRow(doc, index = 0) {
   const transactionId = normalizeSafeId(source.transactionId || source.id || doc?.id || `treasury-${index + 1}`, 180);
   const title = normalizeText(source.title || source.name || source.purpose || source.linkedEventName || 'Untitled transaction', 180);
   if (!transactionId || amount === null || !date || !title) return null;
-  const avenueCode = firstAvenueCode(source.avenue || source.avenues, 'OTHER');
+  const avenueCode = treasuryAvenueCode(source.avenue || source.avenues);
   const billOpenUrl = driveFileOpenUrl(source);
+  const eventId = normalizeSafeId(source.eventId, 128);
+  const eventSource = ['events', 'bodMeetings', 'districtEvents'].includes(source.eventSource) ? source.eventSource : '';
+  const linkedEvent = eventLookup.get(`${eventSource}:${eventId}`);
   return {
     transactionId,
     date,
@@ -849,12 +887,26 @@ function shapeTreasuryRow(doc, index = 0) {
     spentDate: spentDate && spentDate !== date ? spentDate : '',
     billCanOpen: Boolean(billOpenUrl),
     billOpenUrl,
+    bankProofs: shapeTreasuryBankProofs(source),
+    eventId,
+    eventSource,
+    eventName: normalizeText(linkedEvent?.name || linkedEvent?.title || source.eventName, 180),
+    eventDate: dateOnly(linkedEvent?.date || source.eventDate),
+    paymentMode: normalizeText(source.paymentMode, 80),
+    referenceNumber: normalizeText(source.referenceNumber, 180),
+    reimbursementStatus: normalizeText(source.reimbursementStatus || source.reimburse, 80),
   };
 }
 
-function buildVisitDashboardTreasury(rawTreasury) {
+function buildVisitDashboardTreasury(rawTreasury, eventCollections = {}) {
+  const eventLookup = new Map();
+  for (const source of ['events', 'bodMeetings', 'districtEvents']) {
+    (eventCollections[source] || []).forEach(doc => {
+      eventLookup.set(`${source}:${recordId(doc)}`, recordData(doc));
+    });
+  }
   const rows = (Array.isArray(rawTreasury) ? rawTreasury : [])
-    .map((doc, index) => shapeTreasuryRow(doc, index))
+    .map((doc, index) => shapeTreasuryRow(doc, index, eventLookup))
     .filter(Boolean)
     .sort((a, b) => (
       b.date.localeCompare(a.date)
@@ -1800,7 +1852,7 @@ function createVisitDashboardService(options = {}) {
         districtAttendance,
       }),
       fines: buildVisitDashboardFines(fines),
-      treasury: buildVisitDashboardTreasury(treasury),
+      treasury: buildVisitDashboardTreasury(treasury, { events, bodMeetings, districtEvents }),
       ...buildVisitDashboardLetterheadExchanges(letterheadExchangeDocs, rotaryYear),
       ...buildVisitDashboardCollaborations(events, rotaryYear),
       generatedAt: new Date().toISOString(),
