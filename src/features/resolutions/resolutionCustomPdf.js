@@ -1,4 +1,4 @@
-import { resolutionPageBranding } from "./resolutionPageBranding.js";
+import { resolutionPageBranding, OFFICIAL_CONTENT_BOTTOM } from "./resolutionPageBranding.js";
 import { fillResolutionMajority, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, normalizeResolutionSections, normalizeUploadedVotesTableConfig, splitResolutionStatement, VOTES_TABLE_COLUMNS } from "./resolutionSectionsModel.js";
 import { POPPINS_FAMILY, poppinsTextWidth } from "./resolutionPoppins.js";
 import { formatRotaractorName } from "../../utils/memberName.js";
@@ -15,8 +15,6 @@ const RESOLUTION_STATEMENT_WIDTH = WIDTH;
 const START_Y = BOUNDS.top - 10;
 const RESOLUTION_PAGE_START_Y = START_Y + 28;
 const PAGE_HEIGHT = START_Y - BOUNDS.bottom;
-// Official-letterhead pages may run over the skyline watermark, down to just above the footer contact block.
-const OFFICIAL_BOTTOM = 120;
 
 function printable(value, fallback = "") {
   const result = String(value || "").trim();
@@ -977,7 +975,7 @@ function renderResolutionDetails(pager, normalized) {
 }
 
 export function buildResolutionPagePdfPages(details, config, options = {}) {
-  const pager = createPaginator(options.firstPage === false ? resolutionPageBranding(details).bodyTop : RESOLUTION_PAGE_START_Y, { bottom: OFFICIAL_BOTTOM, continueY: resolutionPageBranding(details).bodyTop });
+  const pager = createPaginator(options.firstPage === false ? resolutionPageBranding(details).bodyTop : RESOLUTION_PAGE_START_Y, { bottom: OFFICIAL_CONTENT_BOTTOM, continueY: resolutionPageBranding(details).bodyTop });
 
   const normalized = normalizeResolutionPageConfig(
     config,
@@ -1048,7 +1046,7 @@ export function buildResolutionPagePdfPages(details, config, options = {}) {
 
 export function buildGeneratedVotesTablePdfPages(details, config) {
   const normalized = normalizeUploadedVotesTableConfig(config);
-  const pager = createPaginator(resolutionPageBranding(details).bodyTop, { bottom: OFFICIAL_BOTTOM });
+  const pager = createPaginator(resolutionPageBranding(details).bodyTop, { bottom: OFFICIAL_CONTENT_BOTTOM });
   const resolution = details?.resolution || {};
 
   renderTextSection(

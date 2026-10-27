@@ -418,7 +418,7 @@ export async function addResolutionSeal(pdfBytes, pngBytes) {
   document.getPages().forEach((page) => {
     const sx = page.getWidth() / RESOLUTION_PDF_PAGE.width;
     const sy = page.getHeight() / RESOLUTION_PDF_PAGE.height;
-    page.drawImage(seal, { x: PAGE_SEAL.x * sx, y: PAGE_SEAL.y * sy, width: PAGE_SEAL.width * sx, height: PAGE_SEAL.height * sy });
+    page.drawImage(seal, { x: PAGE_SEAL.x * sx, y: PAGE_SEAL.y * sy, width: PAGE_SEAL.width * sx, height: PAGE_SEAL.height * sy, opacity: PAGE_SEAL.opacity });
   });
   return document.save({ useObjectStreams: false });
 }

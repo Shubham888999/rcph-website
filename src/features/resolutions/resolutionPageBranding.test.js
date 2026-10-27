@@ -32,13 +32,15 @@ test('every continuation page repeats the certification above all body content',
   }
 });
 
-test('PNG seal is embedded once and drawn at the footer on every page', async () => {
+test('PNG seal is embedded once and drawn translucently at the footer on every page', async () => {
   const source = await PDFDocument.create();
   source.addPage([595, 842]); source.addPage([595, 842]); source.addPage([595, 842]);
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=', 'base64');
   const result = await PDFDocument.load(await addResolutionSeal(await source.save(), png));
   let imageRef;
   for (const page of result.getPages()) {
+    const states = page.node.Resources().lookup(PDFName.of('ExtGState'));
+    assert.ok(states.keys().some(key => states.lookup(key).get(PDFName.of('ca'))?.asNumber() === PAGE_SEAL.opacity));
     const resources = page.node.Resources().lookup(PDFName.of('XObject'));
     const [key] = resources.keys();
     const ref = resources.get(key).toString();
