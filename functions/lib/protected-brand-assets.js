@@ -9,6 +9,7 @@ const PROTECTED_BRAND_ASSETS = Object.freeze({
   'official-letterhead': 'RCPH_BOD_Avenue_Report_Letterhead_A4.png',
   'resolution-letterhead': 'resolution_letterhead.png',
   'report-frame': 'Report_Frame.png',
+  'resolution-seal': 'E-SEAL.PNG',
 });
 const DEFAULT_ASSETS_DIR = path.join(__dirname, '..', 'assets');
 const MISSING_ASSET_LOG = 'protected brand asset missing from functions/assets; these files are gitignored and must exist locally at deploy time';

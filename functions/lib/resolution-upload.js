@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const Busboy = require('@fastify/busboy');
 const {
   MAX_SOURCE_BYTES,
+  buildBrandedResolutionDownload,
+  loadSealBytes,
   inspectSourcePdf,
   loadLetterheadBytes,
   mergeResolutionPdf,
@@ -146,7 +148,40 @@ function parseMultipart(req) {
   });
 }
 
-function createResolutionUploadService({ db, admin, drive, getManagerContext, logger = console, uploadEndpoint = '' }) {
+
+function finalizedPdfDetails(frozen, finalizationId) {
+  return {
+    resolution: {
+      title: frozen.title,
+      subject: frozen.subject,
+      meetingDate: frozen.meetingDate,
+      date: frozen.date,
+      meetingLocation: frozen.meetingLocation,
+      place: frozen.place,
+    },
+    resolutionNumber: frozen.resolutionNumber,
+    title: frozen.title,
+    subject: frozen.subject,
+    meetingDate: frozen.meetingDate,
+    date: frozen.date,
+    meetingLocation: frozen.meetingLocation,
+    place: frozen.place,
+    resultLabel: String(frozen.result || frozen.status || '').replaceAll('_', ' ').toUpperCase(),
+    majority: { status: frozen.status, approvalMethod: frozen.approvalMethod, approveCount: frozen.approveCount, votesReceivedCount: frozen.votesReceivedCount },
+    approveCount: frozen.approveCount,
+    rejectCount: frozen.rejectCount,
+    abstainCount: frozen.abstainCount,
+    appendVoteTable: frozen.appendVoteTable !== false,
+    config: frozen.finalizedVotesTableConfigSnapshot,
+    resolutionPageConfig: frozen.finalizedResolutionPageConfigSnapshot,
+    generatedPageOrder: frozen.finalizedGeneratedPageOrderSnapshot,
+    rows: frozen.finalizedVoteRowsSnapshot,
+    metadataTimestamp: frozen.merge?.createdAt || frozen.closedAt,
+    finalizationId,
+  };
+}
+
+function createResolutionUploadService({ db, admin, drive, getManagerContext, logger = console, uploadEndpoint = '', loadSeal = loadSealBytes, loadLetterhead = loadLetterheadBytes, renderFinalPdf = buildBrandedResolutionDownload }) {
   const now = () => admin.firestore.Timestamp.now();
 
   function audit(tx, resolutionRef, action, actor, details = {}) {
@@ -337,8 +372,15 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
         : await drive.downloadSourceFile({ driveFileId: reference.driveFileId, resolutionId, uploadId: reference.uploadId, sha256: reference.sha256 });
       if (sha256(downloaded.bytes) !== reference.sha256) throw serviceError('checksum-mismatch', 'The PDF checksum does not match.', 409);
       const fileName = finalized ? `RCPH-${safeFileName(resolution.resolutionNumber || resolution.title || resolutionId, 'Resolution')}-Final.pdf` : safeFileName(reference.originalFileName);
-      res.status(200).set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `${finalized ? 'attachment' : 'inline'}; filename="${fileName}"`, 'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' });
-      return res.send(downloaded.bytes);
+      const responseHeaders = { 'Content-Type': 'application/pdf', 'Content-Disposition': `${finalized ? 'attachment' : 'inline'}; filename="${fileName}"`, 'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' };
+      if (!finalized) return res.status(200).set(responseHeaders).send(downloaded.bytes);
+      const source = resolution.finalizedUploadedSourceSnapshot;
+      if (!source?.driveFileId || !source?.sha256) throw serviceError('missing-source', 'The frozen source PDF is unavailable.', 409);
+      const original = await drive.downloadSourceFile({ driveFileId: source.driveFileId, resolutionId, uploadId: source.uploadId, sha256: source.sha256 });
+      if (sha256(original.bytes) !== source.sha256) throw serviceError('source-checksum-mismatch', 'The uploaded source checksum does not match.', 409);
+      const rendered = await renderFinalPdf({ sourceBytes: original.bytes, letterheadBytes: loadLetterhead(), sealBytes: loadSeal(), details: finalizedPdfDetails(resolution, reference.finalizationId || resolution.merge?.finalizationId) });
+      res.status(200).set({ ...responseHeaders, 'X-RCPH-Pdf-Format': 'sealed-v1' });
+      return res.send(rendered.bytes);
     } catch (error) {
       return sendJson(res, Number(error.status) || 403, { ok: false, code: error.code || 'permission-denied', message: error.message || 'The PDF could not be downloaded.' });
     }
@@ -375,35 +417,7 @@ function createResolutionUploadService({ db, admin, drive, getManagerContext, lo
       const merged = await mergeResolutionPdf({
         sourceBytes,
         letterheadBytes: loadLetterheadBytes(),
-        details: {
-          resolution: {
-            title: frozen.title,
-            subject: frozen.subject,
-            meetingDate: frozen.meetingDate,
-            date: frozen.date,
-            meetingLocation: frozen.meetingLocation,
-            place: frozen.place,
-          },
-          resolutionNumber: frozen.resolutionNumber,
-          title: frozen.title,
-          subject: frozen.subject,
-          meetingDate: frozen.meetingDate,
-          date: frozen.date,
-          meetingLocation: frozen.meetingLocation,
-          place: frozen.place,
-          resultLabel: String(frozen.result || frozen.status || '').replaceAll('_', ' ').toUpperCase(),
-          majority: { status: frozen.status, approvalMethod: frozen.approvalMethod, approveCount: frozen.approveCount, votesReceivedCount: frozen.votesReceivedCount },
-          approveCount: frozen.approveCount,
-          rejectCount: frozen.rejectCount,
-          abstainCount: frozen.abstainCount,
-          appendVoteTable: frozen.appendVoteTable !== false,
-          config: frozen.finalizedVotesTableConfigSnapshot,
-          resolutionPageConfig: frozen.finalizedResolutionPageConfigSnapshot,
-          generatedPageOrder: frozen.finalizedGeneratedPageOrderSnapshot,
-          rows: frozen.finalizedVoteRowsSnapshot,
-          metadataTimestamp: frozen.merge?.createdAt || frozen.closedAt,
-          finalizationId,
-        },
+        details: finalizedPdfDetails(frozen, finalizationId),
       });
       if (merged.sourcePageCount !== Number(source.pageCount)) throw serviceError('source-page-count-mismatch', 'The uploaded source page count does not match.');
       let matches = await drive.findFinalFiles({ resolutionId: resolutionRef.id, finalizationId });

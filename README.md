@@ -68,7 +68,7 @@ Environment files, generated reports, archives, and documentation must not be tr
 
 ### Private assets
 
-The letterhead and report-frame images (`functions/assets/RCPH_BOD_Avenue_Report_Letterhead_A4.png`, `functions/assets/resolution_letterhead.png`, `functions/assets/Report_Frame.png`) are gitignored and are served only to approved BOD, Admin, and President accounts through the `getProtectedBrandAsset` callable. The master copy lives in `C:\Personal\Z folder\RCPH_private_assets\`. Before any Functions deploy, copy them into `functions/assets/` if needed and run `npm --prefix functions run check:private-assets` (it exits non-zero and lists any missing file).
+The letterhead and report-frame images (`functions/assets/RCPH_BOD_Avenue_Report_Letterhead_A4.png`, `functions/assets/resolution_letterhead.png`, `functions/assets/Report_Frame.png`, `functions/assets/E-SEAL.PNG`) are gitignored and are served only to approved BOD, Admin, and President accounts through the `getProtectedBrandAsset` callable. The master copy lives in `C:\Personal\Z folder\RCPH_private_assets\`. Before any Functions deploy, copy them into `functions/assets/` if needed and run `npm --prefix functions run check:private-assets` (it exits non-zero and lists any missing file).
 
 ## Documentation
 
@@ -82,3 +82,21 @@ The letterhead and report-frame images (`functions/assets/RCPH_BOD_Avenue_Report
 - Historical Visit Submission design archive: `docs/archive/visit-submission-system-design-legacy/`
 - Historical repository audit archive: `docs/archive/repository-audit-legacy/`
 - Historical cleanup report archive: `docs/archive/PROJECT_CLEANUP_REPORT-2026-05-26.md`
+
+### Resolution PDF presentation
+
+Resolution downloads apply the protected `resolution-seal` image on every page.
+The seal master is `C:\Personal\Z folder\RCPH_private_assets\E-SEAL.PNG`;
+copy it into `functions/assets/` alongside the three letterhead assets before
+running `check:private-assets`. The image is intentionally not committed.
+
+Browser-generated completed PDFs, summaries and previews use the latest presentation.
+For uploaded-PDF resolutions, `downloadFinalizedResolutionPdf` verifies the archived
+final file and frozen uploaded source, then renders a new sealed download from frozen
+voting/layout snapshots. It does not rewrite Drive objects, votes or archival hashes.
+The main resolution page comes first, followed by attachment pages and the voting
+record. Attachment pages are fitted inside the letterhead's content area, retaining
+all source content and rotation, to leave room for the repeating confirmation and seal.
+This applies automatically to existing closed resolutions and future downloads.
+Deploy `getProtectedBrandAsset` and `downloadFinalizedResolutionPdf`, then the React
+frontend. No Firestore rules or document migration is required.

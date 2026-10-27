@@ -3,10 +3,12 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const { PDFDocument, StandardFonts, rgb, degrees } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const { formatRotaractorName } = require('./member-name');
 const { fillResolutionMajority, normalizeGeneratedPageOrder, normalizeResolutionPageConfig, splitResolutionStatement } = require('./resolution-sections');
+
+const { PAGE_SEAL, resolutionPageBranding } = require('./resolution-page-branding');
 
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const MAX_SOURCE_PAGES = 25;
@@ -182,7 +184,7 @@ function columnWidths(columns) {
   return columns.map(key => ((BOUNDS.right - BOUNDS.left) * weights[key]) / total);
 }
 
-async function buildVoteAppendix(document, details, letterheadBytes) {
+async function buildVoteAppendix(document, details, letterheadBytes, options = {}) {
   const config = normalizeVotesTableConfig(details.config);
   const rows = Array.isArray(details.rows) ? details.rows : [];
   const font = await document.embedFont(StandardFonts.Helvetica);
@@ -198,7 +200,7 @@ async function buildVoteAppendix(document, details, letterheadBytes) {
     page = document.addPage([PAGE.width, PAGE.height]);
     page.drawImage(background, { x: 0, y: 0, width: PAGE.width, height: PAGE.height });
     pages.push(page);
-    y = BOUNDS.top;
+    y = options.branded ? resolutionPageBranding(details).bodyTop : BOUNDS.top;
     if (config.showTitle) {
       page.drawText('RESOLUTION VOTING RECORD', { x: BOUNDS.left, y, size: 14, font: bold, color: rgb(0, 0, 0) });
       y -= 22;
@@ -258,7 +260,7 @@ async function buildVoteAppendix(document, details, letterheadBytes) {
   return pages.length;
 }
 
-async function buildResolutionPageAppendix(document, details, letterheadBytes) {
+async function buildResolutionPageAppendix(document, details, letterheadBytes, options = {}) {
   const resolutionDefaults = details?.resolution && typeof details.resolution === 'object' ? details.resolution : details;
   const config = normalizeResolutionPageConfig(details.resolutionPageConfig, resolutionDefaults);
   if (!config.enabled) return 0;
@@ -272,12 +274,12 @@ async function buildResolutionPageAppendix(document, details, letterheadBytes) {
     page = document.addPage([PAGE.width, PAGE.height]);
     page.drawImage(background, { x: 0, y: 0, width: PAGE.width, height: PAGE.height });
     pages.push(page);
-    y = RESOLUTION_PAGE_START_Y;
+    y = options.branded && (pages.length > 1 || options.firstPage === false) ? resolutionPageBranding(details).bodyTop : RESOLUTION_PAGE_START_Y;
   }
 
   function ensure(height) {
     if (!page) addPage();
-    if (y - height < BOUNDS.bottom && y < BOUNDS.top) addPage();
+    if (y - height < (options.branded ? 120 : BOUNDS.bottom) && y < (options.branded ? RESOLUTION_PAGE_START_Y : BOUNDS.top)) addPage();
   }
 
   function alignedX(line, font, size, style, width = BOUNDS.right - BOUNDS.left, left = BOUNDS.left) {
@@ -512,12 +514,63 @@ async function mergeResolutionPdf({ sourceBytes, letterheadBytes, details }) {
   };
 }
 
+
+// A fresh presentation rendition uses frozen voting/layout snapshots; it never
+// overwrites the original uploaded file or the finalized archival hash.
+async function buildBrandedResolutionDownload({ sourceBytes, letterheadBytes, sealBytes, details }) {
+  const inspected = await inspectSourcePdf(sourceBytes);
+  const output = await PDFDocument.create();
+  const fonts = { normal: await output.embedFont(StandardFonts.Helvetica), bold: await output.embedFont(StandardFonts.HelveticaBold) };
+  const background = await output.embedPng(letterheadBytes);
+  const seal = await output.embedPng(sealBytes);
+  const header = resolutionPageBranding(details);
+  output.setCreationDate(frozenMetadataDate(details.metadataTimestamp));
+  output.setModificationDate(frozenMetadataDate(details.metadataTimestamp));
+  output.setTitle(`${safePdfText(details.resolutionNumber || details.title)} - Final`);
+  output.setProducer('RCPH Resolution System - sealed presentation v1');
+  const mainCount = await buildResolutionPageAppendix(output, details, letterheadBytes, { branded: true, firstPage: true });
+  const embedded = await output.embedPdf(sourceBytes);
+  embedded.forEach((embeddedPage, index) => {
+    const page = output.addPage([PAGE.width, PAGE.height]);
+    page.drawImage(background, { x: 0, y: 0, width: PAGE.width, height: PAGE.height });
+    // PDF /Rotate is clockwise; drawing transforms use counter-clockwise angles.
+    const angle = (360 - (inspected.document.getPage(index).getRotation().angle % 360) + 360) % 360;
+    const rotated = angle === 90 || angle === 270;
+    const originalWidth = embeddedPage.width;
+    const originalHeight = embeddedPage.height;
+    const top = output.getPageCount() === 1 ? START_Y : header.bodyTop;
+    const scale = Math.min(WIDTH / (rotated ? originalHeight : originalWidth), (top - 120) / (rotated ? originalWidth : originalHeight));
+    const width = originalWidth * scale;
+    const height = originalHeight * scale;
+    const x = BOUNDS.left + (WIDTH - (rotated ? height : width)) / 2;
+    const y = 120 + (top - 120 - (rotated ? width : height)) / 2;
+    const offsets = { 0: [0, 0], 90: [height, 0], 180: [width, height], 270: [0, width] };
+    const [dx, dy] = offsets[angle] || offsets[0];
+    page.drawPage(embeddedPage, { x: x + dx, y: y + dy, width, height, rotate: degrees(angle) });
+  });
+  if (details.appendVoteTable !== false) await buildVoteAppendix(output, details, letterheadBytes, { branded: true });
+  const pages = output.getPages();
+  pages.forEach((page, index) => {
+    if (index > 0) header.lines.forEach((line) => page.drawText(safePdfText(line.text), { x: line.x, y: line.y, size: line.size, font: line.bold ? fonts.bold : fonts.normal }));
+    page.drawText(`Page ${index + 1} of ${pages.length}`, { x: 505, y: 686, size: 8, font: fonts.normal });
+    page.drawImage(seal, PAGE_SEAL);
+  });
+  const bytes = Buffer.from(await output.save({ useObjectStreams: false }));
+  return { bytes, pageCount: pages.length, sourcePageCount: inspected.pageCount, resolutionPageCount: mainCount };
+}
+
+function loadSealBytes(assetPath = path.join(__dirname, '..', 'assets', 'E-SEAL.PNG')) {
+  return fs.readFileSync(assetPath);
+}
+
 function loadLetterheadBytes(assetPath = path.join(__dirname, '..', 'assets', 'RCPH_BOD_Avenue_Report_Letterhead_A4.png')) {
   return fs.readFileSync(assetPath);
 }
 
 module.exports = {
   BOUNDS,
+  buildBrandedResolutionDownload,
+  loadSealBytes,
   COLUMN_KEYS,
   MAX_SOURCE_BYTES,
   MAX_SOURCE_PAGES,

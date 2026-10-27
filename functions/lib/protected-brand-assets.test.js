@@ -16,11 +16,12 @@ function quietLogger() {
   return { errors, error: (...args) => errors.push(args) };
 }
 
-test('allow-list maps the three keys to their functions/assets file names', () => {
+test('allow-list maps the protected keys to their functions/assets file names', () => {
   assert.deepEqual(PROTECTED_BRAND_ASSETS, {
     'official-letterhead': 'RCPH_BOD_Avenue_Report_Letterhead_A4.png',
     'resolution-letterhead': 'resolution_letterhead.png',
     'report-frame': 'Report_Frame.png',
+    'resolution-seal': 'E-SEAL.PNG',
   });
 });
 
