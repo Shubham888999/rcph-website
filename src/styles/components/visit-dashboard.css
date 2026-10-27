@@ -2889,9 +2889,40 @@ a.visit-dashboard-document-action:hover {
   transform: translate(-2px, -2px);
 }
 
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-button {
+  border: 1.5px solid var(--visit-edge);
+  box-shadow: 5px 5px 0 var(--visit-block-shadow);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-button:hover {
+  border-color: var(--visit-carrot-fill);
+  box-shadow: 8px 8px 0 var(--visit-block-shadow);
+  transform: translate(-2px, -2px);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-button strong {
+  font-weight: 850;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-button[aria-pressed="true"] {
+  border-color: var(--visit-carrot-fill);
+  box-shadow: 5px 5px 0 var(--visit-block-shadow), inset 0 -3px 0 var(--visit-carrot-fill);
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-panel {
+  border: 0;
+  background: transparent;
+}
+
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-panel-heading {
+  margin-bottom: 0.85rem;
+}
+
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-records > summary,
 .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-attendance > summary,
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-treasury > .visit-dashboard-section-heading {
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-treasury > .visit-dashboard-section-heading,
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-panel-heading {
   padding: 0.85rem 1rem;
   border: 1.5px solid var(--visit-edge);
   background: var(--internal-surface);
@@ -2916,7 +2947,8 @@ a.visit-dashboard-document-action:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-tile:hover {
+  .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-doc-tile:hover,
+  .visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-button:hover {
     transform: none;
   }
 }
