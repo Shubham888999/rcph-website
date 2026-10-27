@@ -16,7 +16,7 @@ test("all four avenue views group by event identity and keep unlinked entries", 
     row("unknown", { type: "unknown", amount: 99 }),
   ]);
   const result = buildVisitTreasuryBreakdowns(rows);
-  assert.deepEqual(result.avenues.map((avenue) => avenue.code), ["PDD", "CSD", "ISD", "CMD"]);
+  assert.deepEqual(result.avenues.map((avenue) => avenue.code), ["PDD", "CSD", "ISD", "CMD", "OTHER"]);
   const cs = result.avenues[1];
   assert.deepEqual(cs.events.map((event) => event.key).sort(), ["bodMeetings:same-id", "events:same-id", "unlinked"]);
   assert.equal(cs.events.at(-1).label, "Not linked to an event");
@@ -69,4 +69,22 @@ test("normalization carries event and proof display fields, rejects unsafe links
   assert.deepEqual(legacy.bankProofs, []);
   assert.equal(legacy.eventName, "");
   assert.equal(normalize([row("many", { bankProofs: Array(12).fill(proofs[2]) })])[0].bankProofs.length, 10);
+});
+
+
+test("avenues discover Editor, catalog aliases and new custom labels from current transactions", () => {
+  const initial = buildVisitTreasuryBreakdowns(normalize([
+    row("editor-1", { avenueCode: "EDITOR" }),
+    row("editor-2", { avenueCode: "Club Editor", type: "income", amount: 250 }),
+    row("custom", { avenueCode: "NEW INITIATIVE", avenueName: "New Initiative" }),
+  ]));
+  const editor = initial.avenues.find((avenue) => avenue.code === "EDITOR");
+  assert.equal(editor.label, "Editor");
+  assert.equal(editor.ledger.entryCount, 2);
+  assert.equal(editor.ledger.totals.closing, 150);
+  assert.equal(initial.avenues.filter((avenue) => avenue.code === "EDITOR").length, 1);
+  assert.equal(initial.avenues.find((avenue) => avenue.code === "NEW INITIATIVE").label, "New Initiative");
+  const changed = buildVisitTreasuryBreakdowns(normalize([row("editor-1", { avenueCode: "CSD" })]));
+  assert.equal(changed.avenues.some((avenue) => avenue.code === "EDITOR"), false);
+  assert.equal(changed.avenues.find((avenue) => avenue.code === "CSD").ledger.entryCount, 1);
 });

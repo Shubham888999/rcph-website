@@ -1230,70 +1230,107 @@ function TreasuryLedger({ treasury }) {
   );
 }
 
-function TreasuryGroup({ title, ledger }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <details className="visit-dashboard-finance-group" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary><h3>{title}</h3><span className="visit-dashboard-records-meta"><TreasuryTotals ledger={ledger} /></span></summary>
-      {open ? <TreasuryLedgerTable ledger={ledger} label={`${title} transactions`} /> : null}
-    </details>
-  );
-}
+const TREASURY_CATEGORIES = [
+  { key: "ledger", label: "Treasury Ledger" },
+  { key: "flows", label: "Income/Expense" },
+  { key: "avenues", label: "Avenue wise" },
+  { key: "months", label: "Month Wise" },
+];
 
-function TreasuryBreakdowns({ treasury }) {
+function TreasuryWorkspace({ treasury }) {
   const reports = useMemo(() => buildVisitTreasuryBreakdowns(treasury.rows), [treasury.rows]);
-  const [selectedKey, setSelectedKey] = useState(null);
-  const views = [
-    { key: "expenses", title: "Expense ledger", ledger: reports.expense },
-    { key: "income", title: "Income ledger", ledger: reports.income },
-    ...reports.avenues.map((avenue) => ({ key: avenue.code, title: avenue.label, ledger: avenue.ledger, groups: avenue.events.map((event) => ({ key: event.key, title: event.label, ledger: event.ledger })) })),
-    { key: "monthly-expenses", title: "Month-wise expenses", ledger: reports.expense, groups: reports.expenseMonths.map((month) => ({ key: month.monthKey, title: month.label, ledger: month.ledger })) },
-    { key: "monthly-income", title: "Month-wise income", ledger: reports.income, groups: reports.incomeMonths.map((month) => ({ key: month.monthKey, title: month.label, ledger: month.ledger })) },
-  ];
-  const selected = views.find((view) => view.key === selectedKey);
+  const ledger = useMemo(() => buildTreasuryLedger(treasury.rows), [treasury.rows]);
+  const [category, setCategory] = useState(null);
+  const [openViews, setOpenViews] = useState({ flows: [], avenues: [], months: [] });
+  const options = {
+    flows: [
+      { key: "income", title: "Income Transactions", ledger: reports.income },
+      { key: "expense", title: "Expense Transactions", ledger: reports.expense },
+    ],
+    avenues: reports.avenues.map((avenue) => ({ key: avenue.code, title: avenue.label, ledger: avenue.ledger })),
+    months: [
+      { key: "income", title: "Income", panelTitle: "Month-wise income", ledger: reports.income, months: reports.incomeMonths },
+      { key: "expense", title: "Expense", panelTitle: "Month-wise expenses", ledger: reports.expense, months: reports.expenseMonths },
+    ],
+  };
+  const choices = options[category] || [];
+  const opened = (openViews[category] || []).filter((key) => choices.some((view) => view.key === key));
+  const panels = category === "ledger"
+    ? [{ key: "ledger", title: "Treasury Ledger", ledger, runningBalance: true }]
+    : opened.map((key) => choices.find((view) => view.key === key));
+  const buttonId = (key) => `visit-finance-button-${category}-${encodeURIComponent(key)}`;
+  const panelId = (key) => `visit-finance-panel-${category}-${encodeURIComponent(key)}`;
 
-  function closeView() {
-    setSelectedKey(null);
-    document.getElementById(`visit-finance-button-${selectedKey}`)?.focus();
+  function toggleView(key) {
+    setOpenViews((current) => {
+      const valid = current[category].filter((id) => choices.some((view) => view.key === id));
+      return { ...current, [category]: valid.includes(key) ? valid.filter((id) => id !== key) : [...valid, key] };
+    });
+  }
+
+  function closePanel(key) {
+    if (category === "ledger") {
+      setCategory(null);
+      document.getElementById("visit-finance-category-ledger")?.focus();
+    } else {
+      toggleView(key);
+      document.getElementById(buttonId(key))?.focus();
+    }
   }
 
   return (
-    <section className="visit-dashboard-finance-switcher" aria-label="Treasury breakdowns">
-      <div className="visit-dashboard-finance-buttons" role="group" aria-label="Choose a treasury view">
-        {views.map((view) => (
-          <button
-            key={view.key}
-            id={`visit-finance-button-${view.key}`}
-            type="button"
-            className="visit-dashboard-finance-button"
-            aria-pressed={selectedKey === view.key}
-            aria-expanded={selectedKey === view.key}
-            aria-controls="visit-dashboard-finance-panel"
-            onClick={() => setSelectedKey((current) => current === view.key ? null : view.key)}
-          >
-            <strong>{view.title}</strong>
-            <small>{view.ledger.entryCount} {view.ledger.entryCount === 1 ? "entry" : "entries"}</small>
+    <section id="visit-dashboard-treasury" tabIndex={-1} className="visit-dashboard-finance-switcher" aria-label="Treasury views">
+      <div className="visit-dashboard-finance-buttons visit-dashboard-finance-main-buttons" role="group" aria-label="Treasury sections">
+        {TREASURY_CATEGORIES.map((item) => (
+          <button key={item.key} id={`visit-finance-category-${item.key}`} type="button" className="visit-dashboard-finance-button" aria-pressed={category === item.key} aria-expanded={category === item.key} aria-controls="visit-finance-content" onClick={() => setCategory((current) => current === item.key ? null : item.key)}>
+            <strong>{item.key === "flows" ? <>Income/<wbr />Expense</> : item.label}</strong>
           </button>
         ))}
       </div>
-      <section id="visit-dashboard-finance-panel" className="visit-dashboard-finance-panel" hidden={!selected} aria-labelledby="visit-dashboard-finance-panel-title">
-        <header className="visit-dashboard-finance-panel-heading">
-          <div>
-            <h2 id="visit-dashboard-finance-panel-title">{selected?.title}</h2>
-            {selected ? <span className="visit-dashboard-records-meta"><TreasuryTotals ledger={selected.ledger} /></span> : null}
-          </div>
-          <button type="button" className="visit-dashboard-action-link" onClick={closeView}>Close view</button>
-        </header>
-        {selected ? (
-          <div key={selected.key}>
-            {selected.groups ? (
-              <div className="visit-dashboard-finance-groups">
-                {selected.groups.length ? selected.groups.map((group) => <TreasuryGroup key={group.key} title={group.title} ledger={group.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded yet.</p>}
+      <div id="visit-finance-content" hidden={!category}>
+        {category && category !== "ledger" ? (
+          <div className="visit-dashboard-finance-subcontrols">
+            <div className="visit-dashboard-finance-subbuttons" role="group" aria-label={`${TREASURY_CATEGORIES.find((item) => item.key === category).label} views`}>
+              {choices.map((view) => (
+                <button key={view.key} id={buttonId(view.key)} type="button" className="visit-dashboard-finance-button" aria-pressed={opened.includes(view.key)} aria-expanded={opened.includes(view.key)} aria-controls={opened.includes(view.key) ? panelId(view.key) : undefined} onClick={() => toggleView(view.key)}>
+                  <strong>{view.title}</strong>
+                  <small>{view.ledger.entryCount} {view.ledger.entryCount === 1 ? "entry" : "entries"}</small>
+                </button>
+              ))}
+            </div>
+            {category === "avenues" ? (
+              <div className="visit-dashboard-finance-bulk-actions">
+                <button type="button" className="visit-dashboard-action-link" disabled={opened.length === choices.length} onClick={() => setOpenViews((current) => ({ ...current, avenues: [...opened, ...choices.map((view) => view.key).filter((key) => !opened.includes(key))] }))}>Open all</button>
+                <button type="button" className="visit-dashboard-action-link" disabled={!opened.length} onClick={() => setOpenViews((current) => ({ ...current, avenues: [] }))}>Close all</button>
               </div>
-            ) : <TreasuryLedgerTable ledger={selected.ledger} label={selected.title} />}
+            ) : null}
           </div>
         ) : null}
-      </section>
+        <div className="visit-dashboard-finance-panels">
+          {panels.map((view) => (
+            <section key={`${category}:${view.key}`} id={panelId(view.key)} className="visit-dashboard-finance-panel" aria-labelledby={`${panelId(view.key)}-title`}>
+              <header className="visit-dashboard-finance-panel-heading">
+                <div>
+                  <h2 id={`${panelId(view.key)}-title`}>{view.panelTitle || view.title}</h2>
+                  <span className="visit-dashboard-records-meta"><TreasuryTotals ledger={view.ledger} /></span>
+                </div>
+                <button type="button" className="visit-dashboard-action-link" onClick={() => closePanel(view.key)}>Close view</button>
+              </header>
+              {view.months ? (
+                <div className="visit-dashboard-finance-groups">
+                  {view.months.length ? view.months.map((month) => (
+                    <section key={month.monthKey} className="visit-dashboard-finance-month" aria-label={month.label}>
+                      <h3>{month.label}</h3>
+                      <span className="visit-dashboard-records-meta"><TreasuryTotals ledger={month.ledger} /></span>
+                      <TreasuryLedgerTable ledger={month.ledger} label={`${view.panelTitle}: ${month.label}`} />
+                    </section>
+                  )) : <p className="visit-dashboard-finance-note">No transactions recorded yet.</p>}
+                </div>
+              ) : <TreasuryLedgerTable ledger={view.ledger} label={view.title} runningBalance={view.runningBalance} />}
+            </section>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -1435,8 +1472,7 @@ export default function VisitDashboardPage() {
         <FinesRecords fines={fines} />
 
         <div className="visit-dashboard-treasury-area">
-          <TreasuryLedger treasury={treasury} />
-          {visitType === "dzrVisit" ? <TreasuryBreakdowns treasury={treasury} /> : null}
+          {visitType === "dzrVisit" ? <TreasuryWorkspace treasury={treasury} /> : <TreasuryLedger treasury={treasury} />}
         </div>
       </div>
 

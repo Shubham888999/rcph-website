@@ -2125,6 +2125,7 @@ a.visit-dashboard-document-action:hover {
 
 .visit-dashboard-finance-panel-heading h2 {
   margin: 0 0 0.4rem;
+  color: var(--internal-text);
   font-size: 1.1rem;
   overflow-wrap: anywhere;
 }
@@ -2136,6 +2137,66 @@ a.visit-dashboard-document-action:hover {
 @media (max-width: 900px) {
   .visit-dashboard-finance-buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.visit-dashboard-finance-main-buttons {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.visit-dashboard-finance-main-buttons .visit-dashboard-finance-button {
+  min-height: 3.3rem;
+  text-align: center;
+}
+
+.visit-dashboard-finance-subcontrols {
+  margin-top: 0.75rem;
+}
+
+.visit-dashboard-finance-subbuttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  gap: 0.5rem;
+}
+
+.visit-dashboard-finance-bulk-actions {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 0.7rem;
+}
+
+.visit-dashboard-finance-bulk-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.visit-dashboard-finance-panels {
+  display: grid;
+  min-width: 0;
+}
+
+.visit-dashboard-finance-month {
+  min-width: 0;
+  margin-top: 0.75rem;
+}
+
+.visit-dashboard-finance-month h3 {
+  margin: 0 0 0.4rem;
+  color: var(--internal-text);
+  font-size: 0.95rem;
+}
+
+.visit-dashboard-finance-month > .visit-dashboard-records-meta {
+  margin-bottom: 0.65rem;
+}
+
+@media (max-width: 600px) {
+  .visit-dashboard-finance-main-buttons .visit-dashboard-finance-button {
+    padding: 0.55rem 0.3rem;
+  }
+
+  .visit-dashboard-finance-main-buttons strong {
+    font-size: 0.74rem;
   }
 }
 

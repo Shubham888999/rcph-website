@@ -1,4 +1,5 @@
 import { buildTreasuryLedger } from "./visitDashboardModel.js";
+import { POSITION_CATALOG } from "../admin/shared/positionCatalog.js";
 
 export const VISIT_TREASURY_AVENUES = Object.freeze([
   { code: "PDD", label: "Professional Development (PD)" },
@@ -14,9 +15,17 @@ const AVENUE_ALIASES = Object.freeze({
   cm: "CMD", cmd: "CMD", communityservice: "CMD",
 });
 
-function avenueCode(row) {
-  const raw = row.avenueCode || row.avenueName || "";
-  return AVENUE_ALIASES[raw.toLowerCase().replace(/[^a-z]/g, "")] || raw.toUpperCase();
+const lookupKey = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const POSITION_AVENUES = new Map(POSITION_CATALOG.flatMap((position) =>
+  [position.key, ...position.aliases].map((alias) => [lookupKey(alias), position])));
+
+function avenueDetails(row) {
+  const raw = String(row.avenueCode || row.avenueName || "Other").trim();
+  const position = POSITION_AVENUES.get(lookupKey(raw));
+  const code = AVENUE_ALIASES[lookupKey(raw)] || position?.avenueCode || raw.toUpperCase();
+  const standard = VISIT_TREASURY_AVENUES.find((avenue) => avenue.code === code);
+  const labels = { CLUB: "Club", OTHER: "Other", GBM: "General Body Meeting" };
+  return { code, label: standard?.label || labels[code] || position?.displayTitle || row.avenueName || raw };
 }
 
 function eventGroup(row) {
@@ -44,13 +53,20 @@ export function buildVisitTreasuryBreakdowns(rows = []) {
   const allRows = ledger.groups.flatMap((group) => group.rows);
   const income = buildTreasuryLedger(allRows.filter((row) => row.type === "income"));
   const expense = buildTreasuryLedger(allRows.filter((row) => row.type === "expense"));
+  const avenues = new Map(VISIT_TREASURY_AVENUES.map((avenue) => [avenue.code, avenue]));
+  allRows.forEach((row) => {
+    const avenue = avenueDetails(row);
+    if (!avenues.has(avenue.code)) avenues.set(avenue.code, avenue);
+  });
+  const additional = [...avenues.values()].filter((avenue) => !VISIT_TREASURY_AVENUES.some((base) => base.code === avenue.code))
+    .sort((a, b) => a.label.localeCompare(b.label));
   return {
     income,
     expense,
-    avenues: VISIT_TREASURY_AVENUES.map((avenue) => {
+    avenues: [...VISIT_TREASURY_AVENUES, ...additional].map((avenue) => {
       // A transaction's saved avenue owns its amount, even if the event has
       // several avenues. This prevents the same money being counted twice.
-      const selected = allRows.filter((row) => avenueCode(row) === avenue.code);
+      const selected = allRows.filter((row) => avenueDetails(row).code === avenue.code);
       return { ...avenue, ledger: buildTreasuryLedger(selected), events: eventsFor(selected) };
     }),
     incomeMonths: income.groups.map((group) => ({ ...group, ledger: buildTreasuryLedger(group.rows) })),
