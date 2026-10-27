@@ -1,4 +1,5 @@
 .visit-dashboard-page {
+  --visit-records-title-size: clamp(1.5rem, 3vw, 2.2rem);
   min-height: 100vh;
   max-width: 100%;
   overflow-x: hidden;
@@ -1832,7 +1833,7 @@ a.visit-dashboard-document-action:hover {
   min-width: 0;
   overflow-wrap: anywhere;
   margin: 0;
-  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-size: var(--visit-records-title-size);
   line-height: 1;
 }
 
@@ -2055,6 +2056,16 @@ a.visit-dashboard-document-action:hover {
   min-width: 0;
 }
 
+.visit-dashboard-finance-heading {
+  margin-bottom: 1rem;
+}
+
+.visit-dashboard-finance-heading h2 {
+  margin: 0;
+  font-size: var(--visit-records-title-size);
+  line-height: 1;
+}
+
 .visit-dashboard-finance-buttons {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2145,8 +2156,16 @@ a.visit-dashboard-document-action:hover {
 }
 
 .visit-dashboard-finance-main-buttons .visit-dashboard-finance-button {
-  min-height: 3.3rem;
+  min-height: calc(var(--visit-records-title-size) + 1.7rem + 4px);
+  padding: 0.85rem 1rem;
   text-align: center;
+}
+
+.visit-dashboard-finance-main-buttons .visit-dashboard-finance-button strong {
+  font-size: var(--visit-records-title-size);
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.025em;
 }
 
 .visit-dashboard-finance-subcontrols {
@@ -2190,13 +2209,15 @@ a.visit-dashboard-document-action:hover {
   margin-bottom: 0.65rem;
 }
 
-@media (max-width: 600px) {
-  .visit-dashboard-finance-main-buttons .visit-dashboard-finance-button {
-    padding: 0.55rem 0.3rem;
+@media (max-width: 1280px) {
+  .visit-dashboard-finance-main-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .visit-dashboard-finance-main-buttons strong {
-    font-size: 0.74rem;
+@media (max-width: 540px) {
+  .visit-dashboard-finance-main-buttons {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2901,7 +2922,7 @@ a.visit-dashboard-document-action:hover {
   transform: translate(-2px, -2px);
 }
 
-.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-button strong {
+.visit-dashboard-page[data-visit-theme="carrot"] .visit-dashboard-finance-subbuttons .visit-dashboard-finance-button strong {
   font-weight: 850;
 }
 

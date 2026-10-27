@@ -1279,7 +1279,10 @@ function TreasuryWorkspace({ treasury }) {
   }
 
   return (
-    <section id="visit-dashboard-treasury" tabIndex={-1} className="visit-dashboard-finance-switcher" aria-label="Treasury views">
+    <section id="visit-dashboard-treasury" tabIndex={-1} className="visit-dashboard-finance-switcher" aria-labelledby="visit-dashboard-treasury-title">
+      <header className="visit-dashboard-finance-heading">
+        <h2 id="visit-dashboard-treasury-title">Treasury Panel</h2>
+      </header>
       <div className="visit-dashboard-finance-buttons visit-dashboard-finance-main-buttons" role="group" aria-label="Treasury sections">
         {TREASURY_CATEGORIES.map((item) => (
           <button key={item.key} id={`visit-finance-category-${item.key}`} type="button" className="visit-dashboard-finance-button" aria-pressed={category === item.key} aria-expanded={category === item.key} aria-controls="visit-finance-content" onClick={() => setCategory((current) => current === item.key ? null : item.key)}>
