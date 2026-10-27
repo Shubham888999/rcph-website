@@ -485,6 +485,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
   assert.deepEqual(normalized.treasury, {
     summary: { income: 1500, expense: 250.5, net: 1249.5, transactionCount: 2 },
     rows: [{
+      bankProofs: [], eventId: "", eventSource: "", eventName: "", eventDate: "", paymentMode: "", referenceNumber: "", reimbursementStatus: "",
       transactionId: "treasury-1",
       date: "2026-07-18",
       title: "Member dues",
@@ -499,6 +500,7 @@ test("visit dashboard data normalizes safe aggregate stats", () => {
       billCanOpen: true,
       billOpenUrl: "https://drive.google.com/file/d/private-drive-file/view",
     }, {
+      bankProofs: [], eventId: "", eventSource: "", eventName: "", eventDate: "", paymentMode: "", referenceNumber: "", reimbursementStatus: "",
       transactionId: "treasury-2",
       date: "2026-07-17",
       title: "Venue booking",
@@ -797,7 +799,7 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /visit-dashboard-attendance-table-shell/);
   assert.doesNotMatch(pageSource, /visit-dashboard-attendance-scroll-inner/);
   assert.doesNotMatch(pageSource, /visit-dashboard-attendance-scroll-spacer/);
-  assert.doesNotMatch(pageSource, /useRef|tableWrapRef|handleAttendanceWheel|onWheel/);
+  assert.doesNotMatch(pageSource, /tableWrapRef|handleAttendanceWheel|onWheel/);
   assert.match(pageSource, /const fixedColumnsWidth = 6 \+ 16 \+ 7/);
   assert.match(pageSource, /const eventColumnWidth = 8/);
   assert.match(pageSource, /const tableWidthRem = fixedColumnsWidth \+ \(view\.columns\.length \* eventColumnWidth\)/);
@@ -855,7 +857,7 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.match(pageSource, /No letterhead exchanges recorded yet\./);
   assert.match(pageSource, /Treasury ledger/);
   assert.match(pageSource, /Oldest first · running balance/);
-  assert.match(pageSource, /id="visit-dashboard-treasury-title"/);
+  assert.match(pageSource, /titleId="visit-dashboard-treasury-title"/);
   assert.match(pageSource, /href="\/access"/);
 assert.match(pageSource, /Access page/);
 assert.match(pageSource, /visit-dashboard-masthead__actions/);
@@ -900,7 +902,7 @@ assert.doesNotMatch(pageSource, /<dt>By<\/dt>/);
 });
 
 test("visit dashboard CSS keeps metrics readable and compact sections gridded", () => {
-  assert.doesNotMatch(visitCssSource, /visit-dashboard-stat-rail|visit-dashboard-finance-|visit-dashboard-treasury-summary|visit-dashboard-fines-summary/);
+  assert.doesNotMatch(visitCssSource, /visit-dashboard-stat-rail|visit-dashboard-treasury-summary|visit-dashboard-fines-summary/);
   assert.match(visitCssSource, /\.visit-dashboard-glance-grid \{[\s\S]*repeat\(auto-fit, minmax\(min\(260px, 100%\), 1fr\)\)/);
   assert.match(visitCssSource, /\.visit-dashboard-glance-value \{[\s\S]*font-variant-numeric: tabular-nums/);
   assert.match(visitCssSource, /\.visit-dashboard-avenue-strip__row \{[\s\S]*grid-template-columns: var\(--strip-columns\)/);

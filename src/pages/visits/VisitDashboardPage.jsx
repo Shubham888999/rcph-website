@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAccessibleDialog from "../../features/bod-tools/useAccessibleDialog";
@@ -45,6 +45,7 @@ import { CITIES, findClub } from "../../features/collaborations/clubDirectory.js
 import { buildVisitPresentationSlides } from "../../features/visits/visitPresentationModel.js";
 import { buildAttendanceTrend, buildAvenueMonthStrip } from "../../features/visits/visitTrendsModel.js";
 import AttendanceTrendChart from "../../features/visits/AttendanceTrendChart.jsx";
+import { buildVisitTreasuryBreakdowns } from "../../features/visits/visitTreasuryModel.js";
 
 // Presentation mode loads only when someone presses Present.
 const VisitPresentation = lazy(() => import("./VisitPresentation.jsx"));
@@ -1147,88 +1148,128 @@ function FinesRecords({ fines }) {
   );
 }
 
+function TreasuryLedgerTable({ ledger, label, runningBalance = false }) {
+  const columns = runningBalance ? 9 : 8;
+  if (!ledger.entryCount) return <div className="visit-dashboard-empty-state"><strong>No treasury records are available yet.</strong></div>;
+  return (
+    <div className="visit-dashboard-ledger-wrap visit-dashboard-ledger-wrap--tall" tabIndex={0} aria-label={label}>
+      <table className="visit-dashboard-ledger-table visit-dashboard-treasury-table">
+        <caption>{label}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Particulars</th>
+            <th scope="col">Avenue</th>
+            <th scope="col">Event</th>
+            <th scope="col">Bill</th>
+            <th scope="col">Bank proof</th>
+            <th scope="col" className="is-number">Receipts (₹)</th>
+            <th scope="col" className="is-number">Payments (₹)</th>
+            {runningBalance ? <th scope="col" className="is-number">Balance (₹)</th> : null}
+          </tr>
+        </thead>
+        {ledger.groups.map((group) => (
+          <tbody key={group.monthKey}>
+            <tr className="visit-dashboard-ledger-month"><th scope="colgroup" colSpan={columns}>{group.label}</th></tr>
+            {group.rows.map((row) => (
+              <tr key={row.transactionId}>
+                <td className="is-date">{formatVisitDashboardDate(row.date) || row.date}</td>
+                <th scope="row" className="visit-dashboard-ledger-particulars">
+                  <strong>{row.title}</strong>
+                  {row.description && row.description !== row.title ? <small>{row.description}</small> : null}
+                  {row.spentDate ? <small>Spent {formatVisitDashboardDate(row.spentDate) || row.spentDate}, repaid on this date</small> : null}
+                  {row.paymentMode ? <small>{row.paymentMode}{row.referenceNumber ? ` · Ref: ${row.referenceNumber}` : ""}</small> : null}
+                  {row.reimbursementStatus && row.reimbursementStatus !== "Not Applicable" ? <small>Reimbursement: {row.reimbursementStatus}</small> : null}
+                </th>
+                <td>{row.avenueName || row.avenueCode || "Other"}</td>
+                <td>{row.eventName || (row.eventId ? "Linked event" : "Not linked to an event")}</td>
+                <td className="visit-dashboard-bill-cell">
+                  {row.billCanOpen && row.billOpenUrl ? (
+                    <a className="visit-dashboard-bill-link" href={row.billOpenUrl} aria-label={`View bill for ${row.title}`} rel="noopener noreferrer" target="_blank">View</a>
+                  ) : <span className="visit-dashboard-bill-empty" aria-label="No bill available">&mdash;</span>}
+                </td>
+                <td className="visit-dashboard-bill-cell">
+                  {row.bankProofs?.length ? (
+                    <ul className="visit-dashboard-bank-proofs">
+                      {row.bankProofs.map((proof, index) => (
+                        <li key={`${proof.openUrl}-${index}`}><a className="visit-dashboard-bill-link" href={proof.openUrl} aria-label={`View bank proof ${index + 1} for ${row.title}: ${proof.label}`} rel="noopener noreferrer" target="_blank">{row.bankProofs.length > 1 ? `Proof ${index + 1}` : "View"}</a></li>
+                      ))}
+                    </ul>
+                  ) : <span className="visit-dashboard-bill-empty" aria-label="No bank proof available">&mdash;</span>}
+                </td>
+                <td className="is-number is-receipt">{row.receipt === null ? "" : formatVisitLedgerAmount(row.receipt)}</td>
+                <td className="is-number is-payment">{row.payment === null ? "" : formatVisitLedgerAmount(row.payment)}</td>
+                {runningBalance ? <td className={`is-number is-balance${row.balance < 0 ? " is-negative" : ""}`}>{formatVisitLedgerAmount(row.balance)}</td> : null}
+              </tr>
+            ))}
+          </tbody>
+        ))}
+        <tfoot>
+          <tr>
+            <th scope="row" colSpan={6}>{runningBalance ? "Totals · closing balance" : "Totals"}</th>
+            <td className="is-number is-receipt">{formatVisitLedgerAmount(ledger.totals.receipts)}</td>
+            <td className="is-number is-payment">{formatVisitLedgerAmount(ledger.totals.payments)}</td>
+            {runningBalance ? <td className={`is-number is-balance${ledger.totals.closing < 0 ? " is-negative" : ""}`}>{formatVisitLedgerAmount(ledger.totals.closing)}</td> : null}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function TreasuryTotals({ ledger }) {
+  return <><span>{ledger.entryCount} {ledger.entryCount === 1 ? "entry" : "entries"}</span><span>In {rupees(ledger.totals.receipts)}</span><span>Out {rupees(ledger.totals.payments)}</span><span>Net {rupees(ledger.totals.closing)}</span></>;
+}
+
 function TreasuryLedger({ treasury }) {
   const ledger = buildTreasuryLedger(treasury.rows);
   return (
-    <section
-      className="visit-dashboard-treasury"
-      id="visit-dashboard-treasury"
-      tabIndex={-1}
-      aria-labelledby="visit-dashboard-treasury-title"
-    >
-      <header className="visit-dashboard-section-heading">
-        <div>
-          <p className="visit-dashboard-eyebrow">Read-only</p>
-          <h2 id="visit-dashboard-treasury-title">Treasury ledger</h2>
-        </div>
-        <p>Oldest first · running balance · {ledger.entryCount} {ledger.entryCount === 1 ? "entry" : "entries"}</p>
-      </header>
+    <RecordsDisclosure id="visit-dashboard-treasury" className="visit-dashboard-treasury" titleId="visit-dashboard-treasury-title" title="Treasury ledger" meta={<TreasuryTotals ledger={ledger} />}>
+      {(open) => open ? <><p className="visit-dashboard-finance-note">Oldest first · running balance · repayment dates for repaid reimbursements.</p><TreasuryLedgerTable ledger={ledger} label="Read-only treasury ledger with running balance" runningBalance /></> : null}
+    </RecordsDisclosure>
+  );
+}
 
-      {ledger.entryCount ? (
-        <div className="visit-dashboard-ledger-wrap visit-dashboard-ledger-wrap--tall" tabIndex={0} aria-label="Treasury ledger table">
-          <table className="visit-dashboard-ledger-table visit-dashboard-treasury-table">
-            <caption>Read-only treasury ledger with running balance</caption>
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Particulars</th>
-                <th scope="col">Bill</th>
-                <th scope="col" className="is-number">Receipts (₹)</th>
-                <th scope="col" className="is-number">Payments (₹)</th>
-                <th scope="col" className="is-number">Balance (₹)</th>
-              </tr>
-            </thead>
-            {ledger.groups.map((group) => (
-              <tbody key={group.monthKey}>
-                <tr className="visit-dashboard-ledger-month">
-                  <th scope="colgroup" colSpan={6}>{group.label}</th>
-                </tr>
-                {group.rows.map((row) => (
-                  <tr key={row.transactionId}>
-                    <td className="is-date">{formatVisitDashboardDate(row.date) || row.date}</td>
-                    <th scope="row" className="visit-dashboard-ledger-particulars">
-                      <strong>{row.title}</strong>
-                      {row.description && row.description !== row.title ? <span>{row.description}</span> : null}
-                      {row.spentDate ? <span>Spent {formatVisitDashboardDate(row.spentDate) || row.spentDate}, repaid on this date</span> : null}
-                    </th>
-                    <td className="visit-dashboard-bill-cell">
-                      {row.billCanOpen && row.billOpenUrl ? (
-                        <a
-                          className="visit-dashboard-bill-link"
-                          href={row.billOpenUrl}
-                          aria-label={`View bill for ${row.title}`}
-                          rel="noopener noreferrer"
-                          target="_blank"
-                        >
-                          View
-                        </a>
-                      ) : (
-                        <span className="visit-dashboard-bill-empty" aria-label="No bill available">&mdash;</span>
-                      )}
-                    </td>
-                    <td className="is-number is-receipt">{row.receipt === null ? "" : formatVisitLedgerAmount(row.receipt)}</td>
-                    <td className="is-number is-payment">{row.payment === null ? "" : formatVisitLedgerAmount(row.payment)}</td>
-                    <td className={`is-number is-balance${row.balance < 0 ? " is-negative" : ""}`}>{formatVisitLedgerAmount(row.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            ))}
-            <tfoot>
-              <tr>
-                <th scope="row" colSpan={3}>Totals · closing balance</th>
-                <td className="is-number is-receipt">{formatVisitLedgerAmount(ledger.totals.receipts)}</td>
-                <td className="is-number is-payment">{formatVisitLedgerAmount(ledger.totals.payments)}</td>
-                <td className={`is-number is-balance${ledger.totals.closing < 0 ? " is-negative" : ""}`}>{formatVisitLedgerAmount(ledger.totals.closing)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      ) : (
-        <div className="visit-dashboard-empty-state">
-          <strong>No treasury records are available yet.</strong>
-        </div>
-      )}
-    </section>
+function TreasuryGroup({ title, ledger }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="visit-dashboard-finance-group" onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary><h3>{title}</h3><span className="visit-dashboard-records-meta"><TreasuryTotals ledger={ledger} /></span></summary>
+      {open ? <TreasuryLedgerTable ledger={ledger} label={`${title} transactions`} /> : null}
+    </details>
+  );
+}
+
+function TreasuryBreakdowns({ treasury }) {
+  const reports = useMemo(() => buildVisitTreasuryBreakdowns(treasury.rows), [treasury.rows]);
+  return (
+    <>
+      <RecordsDisclosure id="visit-dashboard-expenses" className="visit-dashboard-finance" titleId="visit-dashboard-expenses-title" title="Expense ledger" meta={<TreasuryTotals ledger={reports.expense} />}>
+        {(open) => open ? <TreasuryLedgerTable ledger={reports.expense} label="Expense ledger, including reimbursements" /> : null}
+      </RecordsDisclosure>
+      <RecordsDisclosure id="visit-dashboard-income" className="visit-dashboard-finance" titleId="visit-dashboard-income-title" title="Income ledger" meta={<TreasuryTotals ledger={reports.income} />}>
+        {(open) => open ? <TreasuryLedgerTable ledger={reports.income} label="Income ledger" /> : null}
+      </RecordsDisclosure>
+      {reports.avenues.map((avenue) => (
+        <RecordsDisclosure key={avenue.code} id={`visit-dashboard-finance-${avenue.code.toLowerCase()}`} className="visit-dashboard-finance" titleId={`visit-dashboard-finance-${avenue.code.toLowerCase()}-title`} title={`${avenue.label} · event transactions`} meta={<TreasuryTotals ledger={avenue.ledger} />}>
+          {(open) => open ? <div className="visit-dashboard-finance-groups">
+            <p className="visit-dashboard-finance-note">Grouped by the transaction’s saved avenue, then its linked event.</p>
+            {avenue.events.length ? avenue.events.map((event) => <TreasuryGroup key={event.key} title={event.label} ledger={event.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded for this avenue.</p>}
+          </div> : null}
+        </RecordsDisclosure>
+      ))}
+      {[
+        { key: "expenses", title: "Month-wise expenses", months: reports.expenseMonths, ledger: reports.expense },
+        { key: "income", title: "Month-wise income", months: reports.incomeMonths, ledger: reports.income },
+      ].map((report) => (
+        <RecordsDisclosure key={report.key} id={`visit-dashboard-monthly-${report.key}`} className="visit-dashboard-finance" titleId={`visit-dashboard-monthly-${report.key}-title`} title={report.title} meta={<TreasuryTotals ledger={report.ledger} />}>
+          {(open) => open ? <div className="visit-dashboard-finance-groups">
+            <p className="visit-dashboard-finance-note">By ledger month; repaid reimbursements use their repayment date.</p>
+            {report.months.length ? report.months.map((month) => <TreasuryGroup key={month.monthKey} title={month.label} ledger={month.ledger} />) : <p className="visit-dashboard-finance-note">No transactions recorded yet.</p>}
+          </div> : null}
+        </RecordsDisclosure>
+      ))}
+    </>
   );
 }
 
@@ -1241,6 +1282,8 @@ export default function VisitDashboardPage() {
     () => normalizeVisitDashboardData(null, visitType),
     [visitType],
   );
+  const loadControl = useRef({ request: 0, activeScope: null });
+  const scope = `${user?.uid || ""}:${visitType}`;
   const [loadState, setLoadState] = useState({
     status: LOAD_STATUS.loading,
     data: null,
@@ -1248,30 +1291,55 @@ export default function VisitDashboardPage() {
   });
 
   const loadDashboard = useCallback(async () => {
+    const control = loadControl.current;
+    if (control.activeScope === scope) return;
+    control.activeScope = scope;
+    const request = ++control.request;
     if (!user?.uid || !visitType) {
-      setLoadState({ status: LOAD_STATUS.error, data: null, error: new Error("Visit dashboard unavailable.") });
+      control.activeScope = null;
+      setLoadState({ scope, status: LOAD_STATUS.error, data: null, error: new Error("Visit dashboard unavailable.") });
       return;
     }
 
     setLoadState((current) => ({
+      scope,
       status: LOAD_STATUS.loading,
-      data: current.data,
+      data: current.scope === scope ? current.data : null,
       error: null,
     }));
 
     try {
       const data = await loadVisitDashboardData(user.uid, visitType);
-      setLoadState({ status: LOAD_STATUS.ready, data, error: null });
+      if (request === control.request) setLoadState({ scope, status: LOAD_STATUS.ready, data, error: null });
     } catch (error) {
-      setLoadState({ status: LOAD_STATUS.error, data: null, error });
+      const accessDenied = ["functions/permission-denied", "functions/unauthenticated"].includes(error?.code);
+      if (request === control.request) setLoadState((current) => ({ ...current, status: LOAD_STATUS.error, data: accessDenied ? null : current.data, error }));
+    } finally {
+      if (request === control.request) control.activeScope = null;
     }
-  }, [user?.uid, visitType]);
+  }, [user?.uid, visitType, scope]);
 
   useEffect(() => {
+    const control = loadControl.current;
     loadDashboard();
+    const refreshVisible = () => {
+      if (document.visibilityState === "visible") loadDashboard();
+    };
+    // Visit viewers use the protected callable; they cannot subscribe to Admin Treasury.
+    const timer = window.setInterval(refreshVisible, 60_000);
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      ++control.request;
+      control.activeScope = null;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
   }, [loadDashboard]);
 
-  const data = loadState.data || fallbackData;
+  const currentData = loadState.scope === scope ? loadState.data : null;
+  const data = currentData || fallbackData;
   const { visit, stats, documentPanels, attendance, fines, treasury, letterhead, collaborations } = data;
   const glance = buildGlanceStats({ stats, treasury });
   const attendanceTree = buildVisitAttendanceTree(attendance);
@@ -1284,11 +1352,11 @@ export default function VisitDashboardPage() {
     document.getElementById(PRESENT_BUTTON_ID)?.focus();
   }, []);
 
-  if (loadState.status === LOAD_STATUS.loading && !loadState.data) {
+  if (!currentData && (loadState.status === LOAD_STATUS.loading || loadState.scope !== scope)) {
     return <VisitDashboardLoading title={visit.title} theme={theme} />;
   }
 
-  if (loadState.status === LOAD_STATUS.error) {
+  if (loadState.status === LOAD_STATUS.error && !currentData) {
     return <VisitDashboardError title={visit.title} theme={theme} onRetry={loadDashboard} />;
   }
 
@@ -1312,6 +1380,9 @@ export default function VisitDashboardPage() {
             >
               Present
             </button>
+            <button type="button" className="visit-dashboard-action-link" onClick={loadDashboard} disabled={loadState.status === LOAD_STATUS.loading}>
+              {loadState.status === LOAD_STATUS.loading ? "Refreshing…" : "Refresh data"}
+            </button>
             <a className="visit-dashboard-action-link" href="/access">
               Access page
             </a>
@@ -1319,6 +1390,8 @@ export default function VisitDashboardPage() {
             {dataAsOf ? <p className="visit-dashboard-asof">Data as of {dataAsOf}</p> : null}
           </div>
         </header>
+
+        {loadState.status === LOAD_STATUS.error ? <p className="visit-dashboard-refresh-error" role="status">Could not refresh. Showing the last loaded data; use Refresh data to try again.</p> : null}
 
         <SectionLinks showLetterhead={Boolean(letterhead)} showCollaborations={Boolean(collaborations)} />
 
@@ -1337,6 +1410,8 @@ export default function VisitDashboardPage() {
         <FinesRecords fines={fines} />
 
         <TreasuryLedger treasury={treasury} />
+
+        {visitType === "dzrVisit" ? <TreasuryBreakdowns treasury={treasury} /> : null}
       </div>
 
       {presenting ? (

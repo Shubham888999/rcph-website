@@ -956,6 +956,21 @@ function normalizeTreasuryType(value) {
   return TREASURY_TYPES.has(type) ? type : "unknown";
 }
 
+function normalizeBankProofOpenUrl(value) {
+  const file = normalizeDriveFileOpenUrlFromCandidates([value]);
+  if (file) return file;
+  const folder = normalizeDriveFolderOpenUrl(value);
+  if (folder) return folder;
+  try {
+    const url = new URL(text(value, 1000));
+    if (url.protocol !== "https:" || url.username || url.password) return "";
+    if (["drive.google.com", "docs.google.com"].includes(url.hostname)) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
 function normalizeTreasuryRow(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const transactionId = safeId(raw.transactionId, 180);
@@ -986,6 +1001,17 @@ function normalizeTreasuryRow(raw) {
     spentDate: dateOnly(raw.spentDate) !== date ? dateOnly(raw.spentDate) : "",
     billCanOpen: Boolean(billOpenUrl) && raw.billCanOpen !== false,
     billOpenUrl,
+    bankProofs: (Array.isArray(raw.bankProofs) ? raw.bankProofs : [])
+      .map((proof) => ({ label: text(proof?.label, 180) || "Bank proof", openUrl: normalizeBankProofOpenUrl(proof?.openUrl) }))
+      .filter((proof) => proof.openUrl)
+      .slice(0, 10),
+    eventId: safeId(raw.eventId, 128),
+    eventSource: text(raw.eventSource, 40),
+    eventName: text(raw.eventName, 180),
+    eventDate: dateOnly(raw.eventDate),
+    paymentMode: text(raw.paymentMode, 80),
+    referenceNumber: text(raw.referenceNumber, 180),
+    reimbursementStatus: text(raw.reimbursementStatus, 80),
   };
 }
 

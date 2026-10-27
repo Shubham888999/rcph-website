@@ -71,5 +71,5 @@ test("Treasury rows and the DZR ledger show the spent date under the repayment d
   ] } });
   assert.equal(data.treasury.rows.find((row) => row.transactionId === "a").spentDate, "2026-09-28");
   assert.equal(data.treasury.rows.find((row) => row.transactionId === "b").spentDate, "", "same date is not repeated");
-  assert.match(visitPageSource, /\{row\.spentDate \? <span>Spent /);
+  assert.match(visitPageSource, /\{row\.spentDate \? <small>Spent /);
 });
