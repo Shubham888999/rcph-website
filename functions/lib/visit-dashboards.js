@@ -4,6 +4,7 @@ const defaultPositionHelpers = require('./positions');
 const positionHolders = require('./position-holders');
 const letterheadExchanges = require('./letterhead-exchanges');
 const { formatRotaractorName } = require('./member-name');
+const { listVisitLinks, visitLinkDocument } = require('./visit-links');
 
 const VISIT_TYPES = Object.freeze({
   clubAssembly: Object.freeze({
@@ -1193,11 +1194,11 @@ function buildDocumentPanels({ config, positionDocs, submissionDocs, holdersByPo
       avenueCode: metadata.avenueCode,
       avenueName: metadata.avenueName,
       folderLabel: metadata.positionTitle,
-      fileCount: files.length,
+      fileCount: files.length + listVisitLinks(folder).length,
       canOpen: folder?.canOpen === true,
       openUrl: folder?.openUrl || '',
       primaryPresentation: selectedPrimary || null,
-      files,
+      files: [...files, ...listVisitLinks(folder).map(visitLinkDocument)],
       holders: positionHolders.holdersForPosition(holdersByPosition, positionKey),
     };
   });
@@ -1463,6 +1464,7 @@ function shapeFolderOption(raw, fallbackId = '', options = {}) {
     primaryPresentationSubmissionId: normalizeSafeId(raw.primaryPresentationSubmissionId, 160),
   };
   if (options.includeOpenUrl === true) {
+    option.documentLinks = listVisitLinks(raw);
     const openUrl = driveFolderOpenUrl(raw);
     option.canOpen = Boolean(openUrl);
     option.openUrl = openUrl;

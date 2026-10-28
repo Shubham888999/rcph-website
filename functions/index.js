@@ -5489,6 +5489,22 @@ exports.setVisitSubmissionPrimaryPresentation = onCall(CALLABLE_OPTIONS, async (
   }
 });
 
+exports.saveVisitSubmissionLink = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    return await visitSubmissions.saveDocumentLink(requireAuth(request), request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Club Visit link could not be saved.');
+  }
+});
+
+exports.removeVisitSubmissionLink = onCall(CALLABLE_OPTIONS, async (request) => {
+  try {
+    return await visitSubmissions.removeDocumentLink(requireAuth(request), request.data || {});
+  } catch (err) {
+    throwCallableServiceError(err, 'Club Visit link could not be removed.');
+  }
+});
+
 exports.createVisitSubmissionUploadSession = onCall(CALLABLE_OPTIONS, async (request) => {
   try {
     const uid = requireAuth(request);

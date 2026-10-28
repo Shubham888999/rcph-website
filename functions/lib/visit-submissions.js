@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const defaultPositionHelpers = require('./positions');
 const positionHolders = require('./position-holders');
 const customFolders = require('./visit-custom-folders');
+const visitLinks = require('./visit-links');
 const { isCustomFolderKey, listCustomFolders } = customFolders;
 
 const VISIT_TYPES = Object.freeze({
@@ -1073,6 +1074,8 @@ function buildFolderResponse(config, folder, access, holdersByPosition = null, c
     supportsDocumentCategories: supportsDocumentCategories(folder.positionKey),
     supportsCustomFolders: true,
     canManageCustomFolders: authorized,
+    canManageLinks: Boolean(authorized && (access.canManageVisitSystem || folderWritable)),
+    documentLinks: authorized ? visitLinks.listVisitLinks(folder) : [],
     customFolders: listCustomFolders(folder).map(({ key, name, parentKey }) => ({ key, name, parentKey })),
     holders: positionHolders.holdersForPosition(holdersByPosition, folder.positionKey),
   };
@@ -1823,6 +1826,9 @@ function createVisitSubmissionService(options) {
       const snap = await tx.getDoc('visitSubmissionPositions', docId);
       if (!snap.exists) throw makeVisitSubmissionError('not-found', 'Visit Submission structure is incomplete.');
       const folder = snap.data || {};
+      if (action === 'delete' && visitLinks.listVisitLinks(folder).some(link => link.documentCategory === key)) {
+        throw makeVisitSubmissionError('failed-precondition', 'Remove or move saved links before deleting this folder.');
+      }
       const plan = action === 'create'
         ? customFolders.planCreateFolder(folder, {
           name: input?.name,
@@ -1860,6 +1866,54 @@ function createVisitSubmissionService(options) {
   const createCustomFolder = (uid, input) => changeCustomFolders(uid, input, 'create');
   const renameCustomFolder = (uid, input) => changeCustomFolders(uid, input, 'rename');
   const deleteCustomFolder = (uid, input) => changeCustomFolders(uid, input, 'delete');
+
+  async function changeDocumentLink(uid, input, removing = false) {
+    const access = await resolveAccessContext(uid);
+    const visitType = normalizeVisitType(input?.visitType);
+    const positionKey = normalizeCanonicalPositionKey(input?.positionKey, positionHelpers);
+    assertFolderAccess(access, positionKey);
+    const suppliedId = input?.linkId;
+    if ((removing && !suppliedId) || (suppliedId && (typeof suppliedId !== 'string' || !visitLinks.LINK_ID.test(suppliedId)))) {
+      throw makeVisitSubmissionError('invalid-argument', 'Invalid link ID.');
+    }
+    const linkId = suppliedId || `link-${generateRandomHex(8, tokenGenerator)}`;
+    const docId = visitPositionDocId(visitType, positionKey, positionHelpers);
+    let changed = false;
+    await adapter.runTransaction(async tx => {
+      const [configSnap, snap] = await Promise.all([
+        tx.getDoc('visitSubmissionConfig', visitType),
+        tx.getDoc('visitSubmissionPositions', docId),
+      ]);
+      if (!configSnap.exists || !snap.exists) throw makeVisitSubmissionError('not-found', 'Visit folder has not been initialized.');
+      const folder = snap.data || {};
+      if (!access.canManageVisitSystem) assertVisitFolderAllowsUpload(configSnap.data || {}, folder);
+      const links = visitLinks.listVisitLinks(folder);
+      const existing = links.find(link => link.linkId === linkId);
+      if (suppliedId && !existing) throw makeVisitSubmissionError('not-found', 'Saved link not found in this folder.');
+      let updated;
+      if (removing) updated = links.filter(link => link.linkId !== linkId);
+      else {
+        const documentCategory = normalizeDocumentCategory(input?.documentCategory, listCustomFolders(folder));
+        assertBuiltInCategoryAllowed(documentCategory, positionKey);
+        const link = visitLinks.normalizeVisitLink({ linkId, title: input?.title, url: input?.url, documentCategory });
+        if (!link) throw makeVisitSubmissionError('invalid-argument', 'Enter a title (up to 160 characters) and a valid HTTPS link (up to 2000 characters).');
+        if (!existing && links.length >= visitLinks.MAX_VISIT_LINKS) throw makeVisitSubmissionError('resource-exhausted', 'This position folder has reached its 100-link limit.');
+        changed = !existing || JSON.stringify(existing) !== JSON.stringify(link);
+        updated = existing ? links.map(value => value.linkId === linkId ? link : value) : [...links, link];
+      }
+      changed = removing || changed;
+      if (changed) tx.updateDoc('visitSubmissionPositions', docId, {
+        documentLinks: updated, updatedAt: adapter.serverTimestamp(), updatedBy: uid,
+      });
+    });
+    if (changed) await adapter.addDoc('visitSubmissionAudit', buildAuditPayload(removing ? 'visitDocumentLinkRemoved' : 'visitDocumentLinkSaved', access, {
+      visitType, positionKey, details: { linkId, asManager: access.canManageVisitSystem === true },
+    }, adapter.serverTimestamp()));
+    return { ok: true, visitType, positionKey, linkId, changed };
+  }
+
+  const saveDocumentLink = (uid, input) => changeDocumentLink(uid, input);
+  const removeDocumentLink = (uid, input) => changeDocumentLink(uid, input, true);
 
   // Managers, or the holder of this folder while it is writable, may set or clear its main presentation.
   // Only primaryPresentationSubmissionId (plus updatedAt/updatedBy) is ever written here.
@@ -3288,6 +3342,8 @@ function createVisitSubmissionService(options) {
     renameCustomFolder,
     deleteCustomFolder,
     setPrimaryPresentation,
+    saveDocumentLink,
+    removeDocumentLink,
     createUploadSession,
     createBulkUploadSessions,
     recordBulkUploadAudit,
