@@ -735,3 +735,36 @@ test(
     );
   },
 );
+
+test("strict public loading distinguishes a confirmed draft from an unavailable board", async () => {
+  const body = { ok: true, sections: { clubBoard: draftPublicSection(), leadershipBeyondClub: draftPublicSection() } };
+  const state = await fetchPublicBodBoard({ endpoint: "https://example.test", throwOnError: true, fetchImpl: async () => ({ ok: true, json: async () => body }) });
+  assert.equal(shouldRenderBodRevealFallback(state), true);
+  const failures = [
+    async () => { throw new Error("offline"); },
+    async () => ({ ok: false }),
+    async () => ({ ok: true, json: async () => { throw new Error("invalid JSON"); } }),
+    async () => ({ ok: true, json: async () => ({ ok: true }) }),
+    async () => ({ ok: true, json: async () => ({ ...body, sections: { ...body.sections, clubBoard: { state: "public", profiles: [{ privateDraftField: "hidden" }] } } }) }),
+  ];
+  for (const fetchImpl of failures) await assert.rejects(fetchPublicBodBoard({ endpoint: "https://example.test", throwOnError: true, fetchImpl }), /could not be loaded/);
+});
+
+test("strict public loading waits for the server and returns only its validated published profiles", async () => {
+  let finish;
+  let settled = false;
+  const response = new Promise(resolve => { finish = resolve; });
+  const pending = fetchPublicBodBoard({ endpoint: "https://example.test", throwOnError: true, fetchImpl: async (_url, options) => { assert.equal(options.cache, "no-store"); return response; } });
+  pending.then(() => { settled = true; });
+  await Promise.resolve();
+  assert.equal(settled, false);
+  finish({ ok: true, json: async () => ({ ok: true, sections: { clubBoard: publicSection([publicProfile()]), leadershipBeyondClub: draftPublicSection() } }) });
+  const result = await pending;
+  assert.equal(result.clubBoardState, "public");
+  assert.equal(result.clubBoardProfiles[0].summary, "Leads the club.");
+  assert.equal(shouldRenderBodRevealFallback(result), false);
+});
+
+test("strict public request timeouts remain retryable errors instead of unpublished-board results", async () => {
+  await assert.rejects(fetchPublicBodBoard({ endpoint: "https://example.test", throwOnError: true, timeoutMs: 1, fetchImpl: async (_url, { signal }) => new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })) }), /could not be loaded/);
+});

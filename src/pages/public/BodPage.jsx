@@ -6,6 +6,8 @@ import {
   useState,
 } from "react";
 import BodRevealPlaceholder from "../../features/bod/BodRevealPlaceholder";
+import BodHero from "../../features/bod/BodHero";
+import BodLeadership from "../../features/bod/BodLeadership";
 import {
   createDefaultPublicBodState,
   mapPublicClubProfilesToMembers,
@@ -22,14 +24,6 @@ const BodContact = lazy(
   () => import("../../features/bod/BodContact"),
 );
 
-const BodHero = lazy(
-  () => import("../../features/bod/BodHero"),
-);
-
-const BodLeadership = lazy(
-  () => import("../../features/bod/BodLeadership"),
-);
-
 const BodCouncil = lazy(
   () => import("../../features/bod/BodCouncil"),
 );
@@ -38,6 +32,8 @@ export default function BodPage() {
   const [publicState, setPublicState] = useState(
     createDefaultPublicBodState,
   );
+  const [loadStatus, setLoadStatus] = useState("loading");
+  const [requestVersion, setRequestVersion] = useState(0);
 
   const photoEndpoint = useMemo(
     () => getPublicBodPhotoEndpoint(),
@@ -47,16 +43,19 @@ export default function BodPage() {
   useEffect(() => {
     let active = true;
 
-    fetchPublicBodBoard().then((nextState) => {
+    fetchPublicBodBoard({ throwOnError: true }).then((nextState) => {
       if (active) {
         setPublicState(nextState);
+        setLoadStatus("ready");
       }
+    }).catch(() => {
+      if (active) setLoadStatus("error");
     });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [requestVersion]);
 
   const clubMembers = useMemo(
     () =>
@@ -76,6 +75,21 @@ export default function BodPage() {
     [photoEndpoint, publicState],
   );
 
+  if (loadStatus !== "ready") {
+    return <main className="bod-page-react" aria-busy={loadStatus === "loading"}>
+      <BodHero riyLabel={publicState.riyLabel} />
+      <section className="bod-section-react bod-leadership-react bod-board-loading" aria-label="Board loading status">
+        {loadStatus === "loading" ? <>
+          <p role="status" className="bod-board-loading__message">Loading the board…</p>
+          <div className="bod-interactive-grid" aria-hidden="true">{[0, 1, 2, 3].map(index => <div className="bod-member-card bod-board-loading__card" key={index} />)}</div>
+        </> : <>
+          <p role="alert" className="bod-board-loading__message">The board could not be loaded right now.</p>
+          <button className="bod-board-loading__retry" type="button" onClick={() => { setLoadStatus("loading"); setRequestVersion(version => version + 1); }}>Try again</button>
+        </>}
+      </section>
+    </main>;
+  }
+
   const showClubRevealFallback =
     shouldRenderBodRevealFallback(publicState)
     || clubMembers.length === 0;
@@ -92,13 +106,7 @@ export default function BodPage() {
           showPositionLabels={false}
         />
       ) : (
-        <Suspense
-          fallback={
-            <BodRevealPlaceholder
-              showPositionLabels={false}
-            />
-          }
-        >
+        <>
           <BodHero
             riyLabel={publicState.riyLabel}
           />
@@ -106,7 +114,7 @@ export default function BodPage() {
           <BodLeadership
             members={clubMembers}
           />
-        </Suspense>
+        </>
       )}
 
       {showLeadershipBeyondClub ? (

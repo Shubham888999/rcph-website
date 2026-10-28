@@ -119,22 +119,23 @@ test("BOD reveal mode does not expose real BOD member data through the placehold
   }
 });
 
-test("BOD page uses backend-controlled fallback without loading real sections eagerly", () => {
+test("BOD page separates loading and errors from the backend-controlled unpublished fallback", () => {
   assert.doesNotMatch(page, /const BOD_REVEAL_MODE = true;/);
-  assert.match(page, /fetchPublicBodBoard\(\)/);
+  assert.match(page, /fetchPublicBodBoard\(\{ throwOnError: true \}\)/);
   assert.match(page, /shouldRenderBodRevealFallback\(publicState\)/);
   assert.match(
   page,
   /<BodRevealPlaceholder\s+showPositionLabels=\{false\}\s*\/>/,
 );
-assert.match(
-  page,
-  /const BodHero = lazy\([\s\S]*?import\("\.\.\/\.\.\/features\/bod\/BodHero"\)[\s\S]*?\);/,
-);
-assert.match(
-  page,
-  /<Suspense[\s\S]*<BodHero[\s\S]*riyLabel=\{publicState\.riyLabel\}[\s\S]*<BodLeadership[\s\S]*members=\{clubMembers\}[\s\S]*showLeadershipBeyondClub[\s\S]*<BodCouncil[\s\S]*members=\{leadershipMembers\}[\s\S]*<BodContact \/>/,
-);
+assert.match(page, /import BodHero from/);
+assert.match(page, /import BodLeadership from/);
+assert.match(page, /if \(loadStatus !== "ready"\)/);
+assert.ok(page.indexOf('if (loadStatus !== "ready")') < page.indexOf("const showClubRevealFallback"));
+assert.match(page, /Loading the board/);
+assert.match(page, /The board could not be loaded right now/);
+assert.match(page, /setRequestVersion\(version => version \+ 1\)/);
+assert.equal((page.match(/<BodRevealPlaceholder/g) || []).length, 1, "mystery reveal is used only for the confirmed unpublished board");
+assert.match(page, /<BodLeadership[\s\S]*members=\{clubMembers\}[\s\S]*showLeadershipBeyondClub[\s\S]*<BodCouncil[\s\S]*members=\{leadershipMembers\}[\s\S]*<BodContact \/>/);
 
 assert.doesNotMatch(
   page,

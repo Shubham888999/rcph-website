@@ -25,13 +25,17 @@ export function getPublicBodPhotoEndpoint(options = {}) {
 }
 
 export async function fetchPublicBodBoard(options = {}) {
+  function unavailable() {
+    if (options.throwOnError === true) throw new Error("The published board could not be loaded.");
+    return createDefaultPublicBodState();
+  }
   const fetchImpl = options.fetchImpl || globalThis.fetch;
-  if (typeof fetchImpl !== "function") return createDefaultPublicBodState();
+  if (typeof fetchImpl !== "function") return unavailable();
   const endpoint = options.endpoint || buildPublicBodBoardEndpoint({
     env: options.env || viteEnv(),
     projectId: options.projectId || "",
   });
-  if (!endpoint) return createDefaultPublicBodState();
+  if (!endpoint) return unavailable();
 
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 6000;
@@ -45,10 +49,19 @@ export async function fetchPublicBodBoard(options = {}) {
       cache: "no-store",
       signal: controller?.signal,
     });
-    if (!response?.ok) return createDefaultPublicBodState();
-    return normalizePublicBodBoardResponse(await parseJson(response));
+    if (!response?.ok) return unavailable();
+    const raw = await parseJson(response);
+    const state = normalizePublicBodBoardResponse(raw);
+    if (options.throwOnError === true && (
+      raw?.ok !== true
+      || !["draft", "public"].includes(raw.sections?.clubBoard?.state)
+      || !["draft", "public"].includes(raw.sections?.leadershipBeyondClub?.state)
+      || state.clubBoardState !== raw.sections.clubBoard.state
+      || state.leadershipBeyondClubState !== raw.sections.leadershipBeyondClub.state
+    )) return unavailable();
+    return state;
   } catch {
-    return createDefaultPublicBodState();
+    return unavailable();
   } finally {
     if (timeout) clearTimeout(timeout);
   }
