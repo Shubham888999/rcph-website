@@ -774,7 +774,10 @@ test("visit dashboard page exposes read-only document, attendance, and treasury 
   assert.doesNotMatch(pageSource, /No folder link available/);
   assert.match(pageSource, /Selected folders/);
   assert.match(pageSource, /No document folders have been selected for this visit yet\./);
-  assert.match(pageSource, /No visible documents uploaded for this folder yet\./);
+  assert.match(pageSource, /No files or links in this folder\./);
+  assert.match(pageSource, /<DocumentFolderTree key=/);
+  assert.match(pageSource, /aria-expanded=\{open\}/);
+  assert.match(pageSource, /aria-controls=\{contentId\}/);
   assert.doesNotMatch(pageSource, /Documents are grouped by director/);
   assert.doesNotMatch(pageSource, /visit-dashboard-documents-note/);
   assert.match(pageSource, /groupVisibleDocumentPanelsByPerson\(panels\)/, "vacant folders never get a tile");

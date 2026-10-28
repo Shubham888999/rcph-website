@@ -9,6 +9,7 @@ import {
 } from "../admin/visit/visitPresentationModel.js";
 import { joinVisitHolderNames, normalizeVisitHolders } from "./visitHolderModel.js";
 import { normalizeVisitLink, visitLinkDocument } from "./visitLinks.js";
+import { normalizeVisitDocumentFolderMetadata } from "./visitDocumentFolders.js";
 
 const VISIT_DASHBOARD_NAMES = Object.freeze({
   clubAssembly: "Club Assembly",
@@ -453,6 +454,7 @@ function normalizeDocumentFile(raw) {
     openUrl,
     canPreview: Boolean(previewUrl),
     previewUrl,
+    ...(/^(?:inward|outward|inward-register|outward-register|custom-[a-f0-9]{8})$/.test(raw.documentCategory || "") ? { documentCategory: raw.documentCategory } : {}),
   };
 }
 
@@ -596,6 +598,7 @@ function normalizeDocumentPanels(value) {
       canOpen: panel.canOpen === true && Boolean(openUrl),
       openUrl,
       primaryPresentation,
+      ...(Array.isArray(panel.customFolders) || typeof panel.supportsDocumentCategories === "boolean" ? normalizeVisitDocumentFolderMetadata(panel) : {}),
       files,
       holders: normalizeVisitHolders(panel.holders),
     }];

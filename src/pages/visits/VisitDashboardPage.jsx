@@ -46,6 +46,7 @@ import { buildVisitPresentationSlides } from "../../features/visits/visitPresent
 import { buildAttendanceTrend, buildAvenueMonthStrip } from "../../features/visits/visitTrendsModel.js";
 import AttendanceTrendChart from "../../features/visits/AttendanceTrendChart.jsx";
 import { buildVisitTreasuryBreakdowns } from "../../features/visits/visitTreasuryModel.js";
+import { buildVisitDocumentFolderTree, visitDocumentFolderPath } from "../../features/visits/visitDocumentFolders.js";
 
 // Presentation mode loads only when someone presses Present.
 const VisitPresentation = lazy(() => import("./VisitPresentation.jsx"));
@@ -523,6 +524,51 @@ function DocumentPreview({ panel, file }) {
   );
 }
 
+function DocumentFolderTree({ panel, fileKey, onSelectFile }) {
+  const tree = useMemo(() => buildVisitDocumentFolderTree(panel, orderVisitDocumentPanelFiles(panel)), [panel]);
+  const selectedFile = panel.files.find(file => getVisitDocumentFileKey(panel, file) === fileKey);
+  const selectedPath = new Set(visitDocumentFolderPath(tree, selectedFile?.submissionId));
+  const [expanded, setExpanded] = useState(() => new Set(selectedPath));
+  function toggleFolder(key) {
+    setExpanded(current => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+  function renderFile(file) {
+    const key = getVisitDocumentFileKey(panel, file);
+    const current = key === fileKey;
+    const sizeLabel = formatVisitDashboardFileSize(file.fileSize);
+    return <li key={key}><button type="button" className={current ? "visit-dashboard-doc-file is-selected" : "visit-dashboard-doc-file"} aria-current={current ? "true" : undefined} onClick={() => onSelectFile(key)}>
+      <DocumentTypeBadge file={file} />
+      <span className="visit-dashboard-doc-file__title" title={file.title}>{file.title}</span>
+      {file.sourceType === "link" ? <span className="visit-dashboard-doc-main-tag">LIVE LINK</span> : null}
+      {sizeLabel ? <span className="visit-dashboard-doc-file__size">{sizeLabel}</span> : null}
+      {isVisitDocumentMainPresentation(panel, file) ? <span className="visit-dashboard-doc-main-tag">MAIN</span> : null}
+    </button></li>;
+  }
+  function renderFolder(folder) {
+    const open = expanded.has(folder.key);
+    const contentId = `visit-doc-folder-${panel.positionKey}-${folder.key || "supporting"}`;
+    return <li className="visit-dashboard-doc-folder" key={folder.key || "supporting"}>
+      <button type="button" className={`visit-dashboard-doc-folder__toggle${selectedPath.has(folder.key) ? " has-selection" : ""}`} aria-expanded={open} aria-controls={contentId} onClick={() => toggleFolder(folder.key)}>
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M3 6h7l2 2h9v12H3V6Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+        <span className="visit-dashboard-doc-folder__name">{folder.label}</span>
+        <span className="visit-dashboard-doc-folder__count" aria-label={`${folder.fileCount} items`}>{folder.fileCount}</span>
+      </button>
+      <div id={contentId} hidden={!open} className="visit-dashboard-doc-folder__contents">
+        {folder.files.length ? <ul aria-label={`Documents in ${folder.label}`}>{folder.files.map(renderFile)}</ul> : null}
+        {folder.children.length ? <ul aria-label={`Subfolders in ${folder.label}`}>{folder.children.map(renderFolder)}</ul> : null}
+        {!folder.files.length && !folder.children.length ? <p className="visit-dashboard-doc-rail__empty">No files or links in this folder.</p> : null}
+      </div>
+    </li>;
+  }
+  return <ul className="visit-dashboard-document-folders" aria-label={`Folders for ${panel.positionTitle}`}>{tree.map(renderFolder)}</ul>;
+}
+
 function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNavigate, onClose }) {
   const dialogRef = useAccessibleDialog({ open: true, onClose });
   const [selection, setSelection] = useState({ blockKey: "", fileKey: "" });
@@ -585,7 +631,6 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
         <div className="visit-dashboard-doc-viewer__body">
           <div className="visit-dashboard-doc-rail">
             {block.panels.map((panel) => {
-              const files = orderVisitDocumentPanelFiles(panel);
               const headingId = `visit-dashboard-doc-rail-${panel.positionKey}`;
               return (
                 <section className="visit-dashboard-doc-rail__group" aria-labelledby={headingId} key={panel.positionKey}>
@@ -593,35 +638,7 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
                     <h3 id={headingId}>{formatVisitDocumentRoleLabel(panel)}</h3>
                     <DocumentFolderLink panel={panel} />
                   </div>
-                  {files.length ? (
-                    <ul>
-                      {files.map((file) => {
-                        const key = getVisitDocumentFileKey(panel, file);
-                        const current = key === fileKey;
-                        const sizeLabel = formatVisitDashboardFileSize(file.fileSize);
-                        return (
-                          <li key={key}>
-                            <button
-                              type="button"
-                              className={current ? "visit-dashboard-doc-file is-selected" : "visit-dashboard-doc-file"}
-                              aria-current={current ? "true" : undefined}
-                              onClick={() => setSelection({ blockKey: block.blockKey, fileKey: key })}
-                            >
-                              <DocumentTypeBadge file={file} />
-                              <span className="visit-dashboard-doc-file__title">{file.title}</span>
-                              {file.sourceType === "link" ? <span className="visit-dashboard-doc-main-tag">LIVE LINK</span> : null}
-                              {sizeLabel ? <span className="visit-dashboard-doc-file__size">{sizeLabel}</span> : null}
-                              {isVisitDocumentMainPresentation(panel, file) ? (
-                                <span className="visit-dashboard-doc-main-tag">MAIN</span>
-                              ) : null}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="visit-dashboard-doc-rail__empty">No visible documents uploaded for this folder yet.</p>
-                  )}
+                  <DocumentFolderTree key={`${block.blockKey}:${panel.positionKey}`} panel={panel} fileKey={fileKey} onSelectFile={key => setSelection({ blockKey: block.blockKey, fileKey: key })} />
                 </section>
               );
             })}
