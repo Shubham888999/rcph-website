@@ -24,6 +24,7 @@ buildRemoveBodProfilePhotoPayload,
   buildRestoreBodProfilePayload,
   buildSaveBodSectionPublicationPayload,
   buildUpsertBodProfilePayload,
+  bodProfileToForm,
   createDefaultBodManagementBoard,
   createDefaultBodProfileForm,
   formatBodPhotoSize,
@@ -606,6 +607,32 @@ test("external leadership form payload canonicalizes custom role and uses extern
   assert.equal(payload.profile.organizationName, "Rotaract District 3131");
   assert.equal(payload.profile.termLabel, "RIY 2026-27");
   assert.equal(payload.profile.instagramUsername, "external.leader");
+});
+
+test("pasted multi-line summaries retain their text through save payloads and reopened editors", () => {
+  const board = createDefaultBodManagementBoard();
+  const pasted = "Some people lead, some inspire, and some do both effortlessly. ✨\nThe Rotaract Club of Pune Heritage is incredibly proud to congratulate Rtr. Dr. Ashlesha Deshpande on her appointment as the District Club Advisor for RIY 2026-27";
+  const expected = pasted.replace(/\s+/g, " ");
+  for (const sectionKey of ["clubBoard", LEADERSHIP_PROFILE_SECTION_KEY]) {
+    for (const summary of [pasted, pasted.replace("\n", "\r\n"), pasted.replace("\n", "\r"), pasted.replace("\n", "\t")]) {
+      const form = { ...createDefaultBodProfileForm(board, sectionKey), name: "Dr. Ashlesha Deshpande", positionKey: sectionKey === "clubBoard" ? "president" : "custom", positionLabel: "District Club Advisor", leadershipLevel: "district", organizationName: "Rotaract District 3131", summary };
+      const payload = buildUpsertBodProfilePayload(board, form);
+      assert.equal(payload.profile.summary, expected);
+      assert.equal(payload.profile.bio, "");
+      const reopened = bodProfileToForm({ id: "saved-profile", status: "active", ...payload.profile });
+      assert.equal(reopened.summary, expected);
+      assert.equal(buildUpsertBodProfilePayload(board, { ...reopened, summary: `${expected}\n` }).profile.summary, expected);
+    }
+  }
+});
+
+test("summary validation preserves the 240-character limit and prevents silent clearing of unsupported text", () => {
+  const board = createDefaultBodManagementBoard();
+  const base = { ...createDefaultBodProfileForm(board, LEADERSHIP_PROFILE_SECTION_KEY), positionLabel: "District Advisor", leadershipLevel: "district" };
+  assert.equal(buildUpsertBodProfilePayload(board, { ...base, summary: `${"a".repeat(119)}\n${"b".repeat(120)}` }).profile.summary.length, 240);
+  assert.throws(() => buildUpsertBodProfilePayload(board, { ...base, summary: `${"a".repeat(120)}\n${"b".repeat(120)}` }), /Summary is too long/);
+  assert.throws(() => buildUpsertBodProfilePayload(board, { ...base, summary: "Keep this text\u0000" }), /Summary contains unsupported characters/);
+  assert.equal(buildUpsertBodProfilePayload(board, { ...base, summary: "" }).profile.summary, "");
 });
 
 test("external leadership validation and completeness are section specific", () => {

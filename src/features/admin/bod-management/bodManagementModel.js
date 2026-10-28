@@ -107,6 +107,15 @@ function cleanTextUnbounded(value) {
     : "";
 }
 
+// Summary is entered in a textarea but stored as a single line. Fold ordinary
+// pasted line breaks/tabs before validation instead of dropping the whole field.
+function normalizeSummaryText(value) {
+  if (typeof value !== "string") return "";
+  const singleLine = value.replace(/[\r\n\t]/g, " ");
+  // Preserve unsupported controls here so form validation can report them.
+  return hasControlCharacter(singleLine) ? singleLine : singleLine.trim().replace(/\s+/g, " ");
+}
+
 export function cleanLongText(value, max = 900) {
   if (typeof value !== "string") return "";
   return value
@@ -384,7 +393,7 @@ export function normalizeBodProfile(raw, fallbackIndex = 0, options = fallbackOp
     name: cleanText(source.name, 120),
     positionKey: sectionKey === LEADERSHIP_PROFILE_SECTION_KEY ? "custom" : cleanText(source.positionKey, 80) || null,
     positionLabel: cleanText(source.positionLabel, 140),
-    summary: cleanText(source.summary, 240),
+    summary: cleanText(normalizeSummaryText(source.summary), 240),
     bio: cleanLongText(source.bio, 900),
     avenueLabels: normalizeAvenueLabels(source.avenueLabels),
     leadershipLevel,
@@ -853,7 +862,7 @@ export function normalizeBodProfileForm(form, options) {
     name: cleanTextUnbounded(source.name),
     positionKey: positionKey || null,
     positionLabel,
-    summary: cleanTextUnbounded(source.summary),
+    summary: normalizeSummaryText(source.summary),
     bio: cleanLongText(source.bio, 900),
     avenueLabels: normalizeAvenueLabels(source.avenueText ?? source.avenueLabels),
     leadershipLevel,
@@ -878,6 +887,7 @@ export function validateBodProfileForm(form, options) {
     errors.push(normalized.sectionKey === LEADERSHIP_PROFILE_SECTION_KEY ? "External role title is too long." : "Custom position is too long.");
   }
   if (normalized.summary.length > 240) errors.push("Summary is too long.");
+  if (hasControlCharacter(normalized.summary)) errors.push("Summary contains unsupported characters.");
   if (normalized.sectionKey === BOD_PROFILE_SECTION_KEY) {
     if (normalized.positionKey && !normalizeBodOptions(options).positionPresets.some((preset) => preset.key === normalized.positionKey)) {
       errors.push("Choose a valid position preset.");

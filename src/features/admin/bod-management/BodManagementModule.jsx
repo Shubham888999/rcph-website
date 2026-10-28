@@ -1098,7 +1098,8 @@ function BodProfileEditorDialog({ board, busy, form, onChange, onClose, onSave, 
             <span>Summary</span>
             <CharacterCount value={form.summary} max={240} />
           </span>
-          <textarea rows="2" value={form.summary} maxLength="240" onChange={(event) => update("summary", event.target.value)} />
+          <textarea rows="2" value={form.summary} maxLength="240" aria-describedby="bod-profile-summary-help" onChange={(event) => update("summary", event.target.value)} />
+          <span id="bod-profile-summary-help" className="bod-management-field-help">Line breaks are saved as spaces.</span>
         </label>
 
         <label>
