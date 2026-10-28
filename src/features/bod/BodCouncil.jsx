@@ -3,7 +3,6 @@ import CouncilInteractiveGrid from "./CouncilInteractiveGrid";
 
 export default function BodCouncil({
   members = [],
-  kicker = "Leadership beyond the club",
   title = "Leadership Beyond Our Club",
   statusLabel = "",
 }) {
@@ -13,7 +12,6 @@ export default function BodCouncil({
       labelledBy="bod-council-title"
     >
       <div className="bod-section-react__heading">
-        <p className="bod-kicker">{kicker}</p>
         <div className="bod-section-react__heading-row">
           <h2 id="bod-council-title">
             {title}
