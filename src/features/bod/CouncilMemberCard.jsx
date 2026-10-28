@@ -1,15 +1,15 @@
 import { motion } from "framer-motion";
 import BoardSparkles from "./BoardSparkles";
-import BodMagazineCard from "./BodMagazineCard.jsx";
+import BodBlueprintCard from "./BodBlueprintCard.jsx";
 import { getCouncilMemberId, isCouncilMemberExpandable } from "./councilGridModel";
 import { formatRotaractorName } from "../../utils/memberName";
 
-export default function CouncilMemberCard({ member, active, onToggle, reduceMotion, buttonRef, index, editorial = false, onViewCover }) {
+export default function CouncilMemberCard({ member, active, onToggle, reduceMotion, buttonRef, index, editorial = false, onViewCover, simpleMotion }) {
   const memberId = getCouncilMemberId(member);
   const expandable = isCouncilMemberExpandable(member);
   const detailId = `council-member-details-${memberId}`;
   const displayName = formatRotaractorName(member.name, true);
-  if (editorial) return <BodMagazineCard member={member} active={active} onToggle={onToggle} onViewCover={onViewCover} reduceMotion={reduceMotion} buttonRef={buttonRef} index={index} detailId={detailId} group={member.councilGroup} expandable={expandable} />;
+  if (editorial) return <BodBlueprintCard member={member} active={active} onToggle={onToggle} onViewCover={onViewCover} reduceMotion={reduceMotion} simpleMotion={simpleMotion} buttonRef={buttonRef} index={index} detailId={detailId} group={member.councilGroup} expandable={expandable} />;
   const cardContents = (
     <>
       <span className="bod-member-card__portrait">

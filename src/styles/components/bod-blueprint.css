@@ -1,0 +1,134 @@
+/* Architectural theme belongs to the public /bod page and its cover portal only. */
+.bod-page-react--blueprint {
+  --bod-paper: #0b1c30;
+  --bod-paper-raised: #10263d;
+  --bod-ink: #eef5fa;
+  --bod-muted: #adbdcb;
+  --bod-line: #3d5770;
+  --bod-accent: #8dd9e8;
+  --bod-grid: rgba(160, 202, 226, .065);
+  --bod-grid-gap: clamp(1rem, 1.5vw, 1.6rem);
+  --color-text: var(--bod-ink);
+  --color-muted: var(--bod-muted);
+  --color-surface: var(--bod-paper-raised);
+  --color-surface-soft: #16314c;
+  --color-border: var(--bod-line);
+  --color-gold: var(--bod-accent);
+  --color-gold-soft: var(--bod-ink);
+  --color-teal: var(--bod-accent);
+  color: var(--bod-ink);
+}
+
+:root[data-theme="light"] .bod-page-react--blueprint {
+  --bod-paper: #f3eee2;
+  --bod-paper-raised: #faf7ee;
+  --bod-ink: #152e47;
+  --bod-muted: #526476;
+  --bod-line: #a5b5b9;
+  --bod-accent: #196276;
+  --bod-grid: rgba(35, 78, 100, .07);
+  --color-surface-soft: #e6e4d9;
+}
+
+.bod-page-react.bod-page-react--blueprint,
+:root[data-theme="light"] .bod-page-react.bod-page-react--blueprint {
+  background-color: var(--bod-paper);
+  background-image: linear-gradient(var(--bod-grid) 1px, transparent 1px), linear-gradient(90deg, var(--bod-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.bod-page-react--blueprint .bod-hero-react { padding-block: 2rem 1.5rem; margin-bottom: 1rem; }
+.bod-page-react--blueprint .bod-kicker,
+.bod-page-react--blueprint .bod-blueprint-label { font-family: "SFMono-Regular", Consolas, monospace; color: var(--bod-accent); font-size: .72rem; line-height: 1.5; text-transform: uppercase; letter-spacing: .12em; }
+.bod-page-react--blueprint .bod-kicker { display: flex; gap: .8rem; flex-wrap: wrap; }
+.bod-page-react--blueprint .bod-blueprint-hero__title { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.bod-page-react--blueprint .bod-hero-react h1 { font-size: clamp(3rem, 5.8vw, 6rem); font-weight: 650; letter-spacing: -.055em; text-shadow: none; }
+.bod-page-react--blueprint .bod-blueprint-hero__title svg { width: clamp(7rem, 15vw, 13rem); height: 5rem; flex-shrink: 0; fill: none; stroke: var(--bod-accent); stroke-width: .7; }
+.bod-page-react--blueprint .bod-hero-react__description { color: var(--bod-muted); margin-top: 1.25rem; }
+.bod-page-react--blueprint .bod-blueprint-hero__ruler { display: flex; justify-content: space-between; margin-top: 1.5rem; padding-top: .7rem; border-top: 1px solid var(--bod-line); background: repeating-linear-gradient(90deg, var(--bod-line) 0 1px, transparent 1px 16px) left top / 100% 5px no-repeat; color: var(--bod-muted); font: .62rem Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.bod-page-react--blueprint .bod-section-react + .bod-section-react { border-image: none; border-top: 1px solid var(--bod-line); }
+.bod-page-react--blueprint .bod-section-react h2 { text-shadow: none; letter-spacing: -.04em; font-size: clamp(2rem, 3.5vw, 4rem); }
+.bod-page-react--blueprint .bod-section-react__heading { margin-bottom: 2rem; }
+.bod-page-react--blueprint .bod-interactive-grid { gap: var(--bod-grid-gap); align-items: stretch; }
+
+.bod-page-react--blueprint .bod-blueprint-card { position: relative; height: 100%; aspect-ratio: auto; overflow: visible; border: 0; border-radius: 0; background: var(--bod-paper-raised); box-shadow: none; }
+.bod-page-react--blueprint .bod-blueprint-card:hover,
+.bod-page-react--blueprint .bod-blueprint-card.is-active { transform: none; box-shadow: none; }
+.bod-page-react--blueprint .bod-blueprint-outline { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+.bod-page-react--blueprint .bod-blueprint-outline__edge { position: absolute; display: block; background: var(--bod-line); transition: background 180ms ease; }
+.bod-page-react--blueprint .bod-blueprint-outline__edge--top { top: 0; left: 0; width: 100%; height: 1px; transform-origin: left; }
+.bod-page-react--blueprint .bod-blueprint-outline__edge--right { top: 0; right: 0; height: 100%; width: 1px; transform-origin: top; }
+.bod-page-react--blueprint .bod-blueprint-outline__edge--bottom { bottom: 0; right: 0; width: 100%; height: 1px; transform-origin: right; }
+.bod-page-react--blueprint .bod-blueprint-outline__edge--left { bottom: 0; left: 0; height: 100%; width: 1px; transform-origin: bottom; }
+.bod-page-react--blueprint .bod-blueprint-card:is(:hover,:focus-within,.is-active) .bod-blueprint-outline__edge { background: var(--bod-accent); }
+.bod-page-react--blueprint .bod-blueprint-card__cross { position: absolute; z-index: 4; width: 11px; height: 11px; pointer-events: none; color: var(--bod-accent); }
+.bod-page-react--blueprint .bod-blueprint-card__cross::before,
+.bod-page-react--blueprint .bod-blueprint-card__cross::after { content: ""; position: absolute; background: currentColor; }
+.bod-page-react--blueprint .bod-blueprint-card__cross::before { top: 5px; left: 0; width: 11px; height: 1px; }
+.bod-page-react--blueprint .bod-blueprint-card__cross::after { top: 0; left: 5px; width: 1px; height: 11px; }
+.bod-page-react--blueprint .bod-blueprint-card__cross--start { top: -5px; left: -5px; }
+.bod-page-react--blueprint .bod-blueprint-card__cross--end { bottom: -5px; right: -5px; }
+.bod-page-react--blueprint .bod-blueprint-card__profile { display: flex; flex-direction: column; position: relative; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; color: var(--bod-ink); background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.bod-page-react--blueprint div.bod-blueprint-card__profile { cursor: default; }
+.bod-page-react--blueprint .bod-blueprint-card__register { display: flex; justify-content: space-between; padding: .65rem .85rem; width: 100%; color: var(--bod-muted); font: .6rem Consolas, monospace; text-transform: uppercase; letter-spacing: .09em; border-bottom: 1px solid var(--bod-line); }
+.bod-page-react--blueprint .bod-blueprint-card__artwork { display: block; width: calc(100% - 1rem); margin: .5rem; aspect-ratio: 4 / 5; position: relative; overflow: hidden; background: var(--bod-paper); }
+.bod-page-react--blueprint .bod-blueprint-card__artwork img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.bod-page-react--blueprint .bod-blueprint-card__no-photo { display: grid; place-items: center; height: 100%; color: var(--bod-muted); font-size: .9rem; }
+.bod-page-react--blueprint .bod-blueprint-card__caption { display: flex; flex: 1; flex-direction: column; gap: .45rem; min-height: 10rem; width: 100%; padding: 1rem .9rem 3.5rem; border-top: 1px solid var(--bod-line); }
+.bod-page-react--blueprint .bod-blueprint-card__role { color: var(--bod-accent); font-size: .67rem; font-weight: 750; letter-spacing: .08em; line-height: 1.5; text-transform: uppercase; }
+.bod-page-react--blueprint .bod-blueprint-card__name { font-size: clamp(1.12rem, 1.5vw, 1.65rem); line-height: 1.2; letter-spacing: -.035em; font-weight: 650; overflow-wrap: anywhere; }
+.bod-page-react--blueprint .bod-blueprint-card__group { font-size: .75rem; line-height: 1.5; color: var(--bod-muted); }
+.bod-page-react--blueprint .bod-blueprint-card__action { position: absolute; left: .9rem; bottom: 1rem; display: flex; align-items: center; gap: .6rem; color: var(--bod-accent); font-size: .72rem; font-weight: 700; }
+.bod-page-react--blueprint .bod-blueprint-card__action > span { font: 1rem Consolas, monospace; }
+.bod-page-react--blueprint .bod-blueprint-card__view { position: absolute; right: .45rem; bottom: .35rem; min-height: 44px; padding: .4rem; border: 0; border-radius: 0; background: transparent; color: var(--bod-muted); font: inherit; font-size: .7rem; cursor: pointer; z-index: 2; }
+.bod-page-react--blueprint .bod-blueprint-card__view:hover { color: var(--bod-accent); }
+.bod-page-react--blueprint .bod-blueprint-card__connector { position: absolute; top: 100%; left: 50%; width: 1px; height: var(--bod-grid-gap); background: var(--bod-accent); transform-origin: top; z-index: 2; pointer-events: none; }
+
+.bod-page-react--blueprint .bod-blueprint-panel { scroll-margin-block: calc(var(--header-height, 5rem) + 1rem) 1rem; }
+.bod-page-react--blueprint .bod-blueprint-panel__plan { position: relative; display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.5fr); border: 1px solid var(--bod-accent); background: var(--bod-paper-raised); }
+.bod-page-react--blueprint .bod-blueprint-panel__port { position: absolute; top: 0; left: var(--bod-blueprint-port); width: 9px; height: 9px; transform: translate(-50%,-50%); border: 1px solid var(--bod-accent); background: var(--bod-paper); z-index: 3; }
+.bod-page-react--blueprint .bod-blueprint-panel__identity,
+.bod-page-react--blueprint .bod-blueprint-panel__story { padding: clamp(1.3rem, 3vw, 3rem); min-width: 0; }
+.bod-page-react--blueprint .bod-blueprint-panel__identity { border-right: 1px solid var(--bod-line); background: linear-gradient(var(--bod-grid) 1px, transparent 1px), linear-gradient(90deg, var(--bod-grid) 1px, transparent 1px); background-size: 16px 16px; }
+.bod-page-react--blueprint .bod-blueprint-label { margin: 0 0 1.3rem; font-size: .64rem; }
+.bod-page-react--blueprint .bod-blueprint-panel h3 { margin: 0 0 1rem; font-size: clamp(2rem, 3.5vw, 4rem); font-weight: 650; letter-spacing: -.045em; line-height: 1.08; overflow-wrap: anywhere; }
+.bod-page-react--blueprint .bod-blueprint-panel__role { color: var(--bod-accent); font-weight: 700; font-size: .95rem; margin: 0 0 .7rem; }
+.bod-page-react--blueprint .bod-blueprint-panel__context { color: var(--bod-muted); font-size: .85rem; line-height: 1.6; margin: .5rem 0; }
+.bod-page-react--blueprint .bod-blueprint-panel__links { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin-top: 1.5rem; }
+.bod-page-react--blueprint .bod-blueprint-panel__links :is(button,a) { min-height: 44px; display: inline-flex; align-items: center; padding: .4rem 0; color: var(--bod-accent); border: 0; border-bottom: 1px solid var(--bod-line); background: transparent; font: inherit; font-size: .8rem; text-decoration: none; overflow-wrap: anywhere; cursor: pointer; }
+.bod-page-react--blueprint .bod-blueprint-panel__summary { margin: 0 0 1.5rem; max-width: 60ch; color: var(--bod-ink); font-size: clamp(1.1rem, 1.6vw, 1.5rem); line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; }
+.bod-page-react--blueprint .bod-blueprint-panel__bio { margin: 0; max-width: 70ch; color: var(--bod-muted); font-size: 1rem; line-height: 1.85; white-space: pre-line; overflow-wrap: anywhere; }
+.bod-page-react--blueprint .bod-blueprint-panel__navigation { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; padding: .7rem 1rem; border-top: 1px solid var(--bod-line); }
+.bod-page-react--blueprint .bod-blueprint-panel__navigation button { min-height: 44px; padding: .45rem .5rem; border: 0; border-radius: 0; color: var(--bod-ink); background: transparent; cursor: pointer; font: inherit; font-size: .8rem; }
+.bod-page-react--blueprint .bod-blueprint-panel__navigation button:last-child { margin-left: auto; color: var(--bod-accent); }
+.bod-page-react--blueprint .bod-blueprint-panel__navigation button:disabled { opacity: .4; cursor: default; }
+.bod-page-react--blueprint .bod-blueprint-panel__navigation > span { color: var(--bod-muted); font: .7rem Consolas, monospace; }
+.bod-page-react--blueprint .bod-board-loading__card { aspect-ratio: 4 / 6; background: var(--bod-paper-raised); border: 1px solid var(--bod-line); }
+.bod-page-react--blueprint .bod-magazine-progress { position: fixed; left: 0; right: 0; top: var(--header-height, 5rem); z-index: 40; height: 2px; background: var(--bod-accent); transform-origin: left; pointer-events: none; }
+.bod-page-react--blueprint .bod-contact-react { border-radius: 0; border-color: var(--bod-line); background: var(--bod-paper-raised); box-shadow: none; }
+
+.bod-page-react--blueprint.bod-magazine-viewer-backdrop { position: fixed; inset: 0; z-index: 250; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(4,12,24,.9); }
+.bod-page-react--blueprint .bod-magazine-viewer { display: flex; flex-direction: column; width: min(1400px, 100%); max-height: calc(100dvh - 2rem); min-width: 0; border: 1px solid var(--bod-line); background: var(--bod-paper); padding: 1rem; }
+.bod-page-react--blueprint .bod-magazine-viewer header { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; align-items: center; padding-bottom: .8rem; border-bottom: 1px solid var(--bod-line); }
+.bod-page-react--blueprint .bod-magazine-viewer h2 { margin: 0; font-size: clamp(1.3rem, 2vw, 2rem); font-weight: 650; }
+.bod-page-react--blueprint .bod-magazine-viewer .bod-magazine-label { margin: 0 0 .35rem; color: var(--bod-accent); font: .65rem Consolas, monospace; text-transform: uppercase; }
+.bod-page-react--blueprint .bod-magazine-viewer__actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.bod-page-react--blueprint .bod-magazine-viewer__actions :is(button,a) { display: inline-flex; align-items: center; min-height: 44px; padding: .5rem .7rem; border: 1px solid var(--bod-line); border-radius: 0; color: var(--bod-ink); background: var(--bod-paper-raised); font: inherit; font-size: .8rem; cursor: pointer; text-decoration: none; }
+.bod-page-react--blueprint .bod-magazine-viewer__image { overflow: auto; min-height: 0; margin-top: .8rem; padding: .5rem; overscroll-behavior: contain; }
+.bod-page-react--blueprint .bod-magazine-viewer__image img { display: block; width: auto; height: auto; max-width: 100%; max-height: calc(100dvh - 12rem); object-fit: contain; margin-inline: auto; }
+.bod-page-react--blueprint .bod-magazine-viewer__image img.is-zoomed { width: max(100%, 1100px); max-width: none; max-height: none; }
+.bod-page-react--blueprint :is(button,a):focus-visible { outline: 2px solid var(--bod-accent); outline-offset: 4px; }
+
+@media (max-width: 760px) {
+  .bod-page-react--blueprint .bod-blueprint-hero__title svg { display: none; }
+  .bod-page-react--blueprint .bod-blueprint-panel__plan { grid-template-columns: minmax(0,1fr); }
+  .bod-page-react--blueprint .bod-blueprint-panel__identity { border-right: 0; border-bottom: 1px solid var(--bod-line); }
+  .bod-page-react--blueprint .bod-blueprint-panel__navigation { gap: .3rem; }
+  .bod-page-react--blueprint .bod-magazine-viewer { padding: .7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bod-page-react--blueprint .bod-blueprint-card,
+  .bod-page-react--blueprint .bod-blueprint-stage { transform: none !important; }
+  .bod-page-react--blueprint .bod-blueprint-outline__edge { transform: none !important; transition: none; }
+}

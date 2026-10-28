@@ -30,18 +30,15 @@ test("cover tilt normalizes local pointer coordinates and stays bounded off the 
   assert.deepEqual(magazinePointerPosition({ clientX: 0, clientY: 0 }, { getBoundingClientRect: () => ({ width: 0, height: 0 }) }), { x: 0, y: 0 });
 });
 
-test("the magazine theme is scoped to its page and includes a reduced-motion alternative", () => {
-  const css = readFileSync(new URL("../../styles/components/bod-magazine.css", import.meta.url), "utf8");
-  // Strip declarations to inspect complete selector starts, including rules in media queries.
-  const selectors = [...css.matchAll(/(?:^|\})\s*([^{}]+)\{/g)].map(match => match[1].trim());
-  for (const selector of selectors) {
-    if (selector.startsWith("@") || selector === "to" || selector.startsWith("/*")) continue;
-    assert.ok(selector.split("\n").every(part => part.includes(".bod-page-react--magazine")), selector);
+test("public BOD themes stay scoped and include light and reduced-motion variants", () => {
+  for (const theme of ["magazine", "blueprint"]) {
+    const css = readFileSync(new URL(`../../styles/components/bod-${theme}.css`, import.meta.url), "utf8");
+    const selectors = [...css.matchAll(/(?:^|\})\s*([^{}]+)\{/g)].map(match => match[1].trim());
+    for (const selector of selectors) {
+      if (selector.startsWith("@") || selector === "to" || selector.startsWith("/*")) continue;
+      assert.ok(selector.split("\n").every(part => part.includes(`.bod-page-react--${theme}`)), selector);
+    }
+    assert.match(css, /prefers-reduced-motion: reduce/);
+    assert.match(css, /data-theme="light"/);
   }
-  assert.match(css, /prefers-reduced-motion: reduce/);
-  assert.match(css, /data-theme="light"/);
-  const page = readFileSync(new URL("../../pages/public/BodPage.jsx", import.meta.url), "utf8");
-  assert.match(page, /bod-page-react--magazine/);
-  assert.match(page, /members=\{clubMembers\}\s+editorial/);
-  assert.match(page, /members=\{leadershipMembers\}\s+editorial/);
 });

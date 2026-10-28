@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { getBodMemberAvenue, getBodMemberId, getInstagramProfile } from "./bodGridModel";
 import { formatRotaractorName } from "../../utils/memberName";
-import BodMagazineSpread from "./BodMagazineSpread.jsx";
+import BodBlueprintPanel from "./BodBlueprintPanel.jsx";
 
 const contentVariants = {
   hidden: {},
@@ -13,14 +13,14 @@ const lineVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export default function BodMemberDetails({ member, reduceMotion, editorial = false, ...magazineProps }) {
+export default function BodMemberDetails({ member, reduceMotion, editorial = false, ...profileProps }) {
   const memberId = getBodMemberId(member);
   const detailId = `bod-member-details-${memberId}`;
   const titleId = `${detailId}-title`;
   const avenue = getBodMemberAvenue(member);
   const instagram = getInstagramProfile(member);
   const displayName = formatRotaractorName(member.name, true);
-  if (editorial) return <BodMagazineSpread member={member} detailId={detailId} reduceMotion={reduceMotion} group={avenue} {...magazineProps} />;
+  if (editorial) return <BodBlueprintPanel member={member} detailId={detailId} reduceMotion={reduceMotion} group={avenue} {...profileProps} />;
 
   return (
     <motion.section

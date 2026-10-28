@@ -66,19 +66,19 @@ export default function CouncilInteractiveGrid({ members, editorial = false }) {
             {row.map((member, memberIndex) => {
               const memberId = getCouncilMemberId(member);
               return (
-                <CouncilMemberCard key={memberId} member={member} active={memberId === activeMemberId} onToggle={toggleMember} reduceMotion={reduceMotion} editorial={editorial} onViewCover={setCoverMember} index={(rowIndex * columnCount) + memberIndex} buttonRef={(node) => {
+                <CouncilMemberCard key={memberId} member={member} active={memberId === activeMemberId} onToggle={toggleMember} reduceMotion={reduceMotion} editorial={editorial} simpleMotion={columnCount === 1} onViewCover={setCoverMember} index={(rowIndex * columnCount) + memberIndex} buttonRef={(node) => {
                   if (node) triggerRefs.current.set(memberId, node);
                   else triggerRefs.current.delete(memberId);
                 }} />
               );
             })}
             <AnimatePresence initial={false} onExitComplete={finishClose}>
-              {activeInRow ? <CouncilMemberDetails key={activeMemberId} member={activeMember} reduceMotion={reduceMotion} editorial={editorial} navigation={navigation} onPrevious={() => navigation.previous && toggleMember(navigation.previous)} onNext={() => navigation.next && toggleMember(navigation.next)} onClose={closeProfile} onViewCover={setCoverMember} /> : null}
+              {activeInRow ? <CouncilMemberDetails key={activeMemberId} member={activeMember} reduceMotion={reduceMotion} editorial={editorial} simpleMotion={columnCount === 1} navigation={navigation} columnIndex={row.findIndex(member => getCouncilMemberId(member) === activeMemberId)} columnCount={columnCount} onPrevious={() => navigation.previous && toggleMember(navigation.previous)} onNext={() => navigation.next && toggleMember(navigation.next)} onClose={closeProfile} onViewCover={setCoverMember} /> : null}
             </AnimatePresence>
           </Fragment>
         );
       })}
-      {editorial && coverMember ? <BodCoverViewer member={coverMember} onClose={() => setCoverMember(null)} /> : null}
+      {editorial && coverMember ? <BodCoverViewer theme="blueprint" member={coverMember} onClose={() => setCoverMember(null)} /> : null}
     </div>
   );
 }

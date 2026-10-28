@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import BodRevealPlaceholder from "../../features/bod/BodRevealPlaceholder";
-import BodHero from "../../features/bod/BodHero";
+import BodHero from "../../features/bod/BodBlueprintHero.jsx";
 import BodLeadership from "../../features/bod/BodLeadership";
 import BodReadingProgress from "../../features/bod/BodReadingProgress.jsx";
 import {
@@ -20,7 +20,7 @@ import {
   getPublicBodPhotoEndpoint,
 } from "../../features/bod/bodPublicService";
 import "../../styles/components/bod.css";
-import "../../styles/components/bod-magazine.css";
+import "../../styles/components/bod-blueprint.css";
 
 const BodContact = lazy(
   () => import("../../features/bod/BodContact"),
@@ -78,7 +78,7 @@ export default function BodPage() {
   );
 
   if (loadStatus !== "ready") {
-    return <main className="bod-page-react bod-page-react--magazine" aria-busy={loadStatus === "loading"}>
+    return <main className="bod-page-react bod-page-react--blueprint" aria-busy={loadStatus === "loading"}>
       <BodHero riyLabel={publicState.riyLabel} editorial />
       <section className="bod-section-react bod-leadership-react bod-board-loading" aria-label="Board loading status">
         {loadStatus === "loading" ? <>
@@ -102,7 +102,7 @@ export default function BodPage() {
     && leadershipMembers.length > 0;
 
   return (
-    <main className="bod-page-react bod-page-react--magazine">
+    <main className="bod-page-react bod-page-react--blueprint">
       <BodReadingProgress />
       {showClubRevealFallback ? (
         <BodRevealPlaceholder

@@ -83,6 +83,7 @@ export default function BodInteractiveGrid({ members, editorial = false }) {
                   onToggle={toggleMember}
                   reduceMotion={reduceMotion}
                   editorial={editorial}
+                  simpleMotion={columnCount === 1}
                   onViewCover={setCoverMember}
                   index={(rowIndex * columnCount) + memberIndex}
                   buttonRef={(node) => {
@@ -100,7 +101,10 @@ export default function BodInteractiveGrid({ members, editorial = false }) {
                   member={activeMember}
                   reduceMotion={reduceMotion}
                   editorial={editorial}
+                  simpleMotion={columnCount === 1}
                   navigation={navigation}
+                  columnIndex={row.findIndex(member => getBodMemberId(member) === activeMemberId)}
+                  columnCount={columnCount}
                   onPrevious={() => navigation.previous && toggleMember(navigation.previous)}
                   onNext={() => navigation.next && toggleMember(navigation.next)}
                   onClose={closeProfile}
@@ -111,7 +115,7 @@ export default function BodInteractiveGrid({ members, editorial = false }) {
           </Fragment>
         );
       })}
-      {editorial && coverMember ? <BodCoverViewer member={coverMember} onClose={() => setCoverMember(null)} /> : null}
+      {editorial && coverMember ? <BodCoverViewer theme="blueprint" member={coverMember} onClose={() => setCoverMember(null)} /> : null}
     </div>
   );
 }

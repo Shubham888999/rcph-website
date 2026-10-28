@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { getCouncilInstagramProfile, getCouncilMemberId } from "./councilGridModel";
 import { formatRotaractorName } from "../../utils/memberName";
-import BodMagazineSpread from "./BodMagazineSpread.jsx";
+import BodBlueprintPanel from "./BodBlueprintPanel.jsx";
 
 const contentVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } } };
 const lineVariants = {
@@ -9,13 +9,13 @@ const lineVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export default function CouncilMemberDetails({ member, reduceMotion, editorial = false, ...magazineProps }) {
+export default function CouncilMemberDetails({ member, reduceMotion, editorial = false, ...profileProps }) {
   const memberId = getCouncilMemberId(member);
   const detailId = `council-member-details-${memberId}`;
   const titleId = `${detailId}-title`;
   const instagram = getCouncilInstagramProfile(member);
   const displayName = formatRotaractorName(member.name, true);
-  if (editorial) return <BodMagazineSpread member={member} detailId={detailId} reduceMotion={reduceMotion} group={member.councilGroup} {...magazineProps} />;
+  if (editorial) return <BodBlueprintPanel member={member} detailId={detailId} reduceMotion={reduceMotion} group={member.councilGroup} {...profileProps} />;
 
   return (
     <motion.section id={detailId} className="bod-member-details council-member-details" role="region" aria-labelledby={titleId} aria-live="polite" initial={reduceMotion ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0, y: -8 }} transition={{ duration: reduceMotion ? 0 : 0.28, ease: [0.4, 0, 0.2, 1] }}>
