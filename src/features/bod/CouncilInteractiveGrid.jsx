@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import CouncilMemberCard from "./CouncilMemberCard";
 import CouncilMemberDetails from "./CouncilMemberDetails";
+import useBodColumnCount from "./useBodColumnCount.js";
 import {
   cancelQueuedCouncilDisclosure,
   chunkCouncilMembers,
@@ -14,10 +15,11 @@ import {
 
 export default function CouncilInteractiveGrid({ members }) {
   const reduceMotion = useReducedMotion();
+  const columnCount = useBodColumnCount();
   const [disclosure, setDisclosure] = useState(createCouncilDisclosureState);
   const triggerRefs = useRef(new Map());
   const { activeMemberId, closing } = disclosure;
-  const rows = useMemo(() => chunkCouncilMembers(members), [members]);
+  const rows = useMemo(() => chunkCouncilMembers(members, columnCount), [members, columnCount]);
   const activeRowIndex = useMemo(() => getCouncilDetailRowIndex(rows, activeMemberId), [activeMemberId, rows]);
   const activeMember = useMemo(() => members.find((member) => getCouncilMemberId(member) === activeMemberId) || null, [activeMemberId, members]);
 
@@ -53,7 +55,7 @@ export default function CouncilInteractiveGrid({ members }) {
             {row.map((member, memberIndex) => {
               const memberId = getCouncilMemberId(member);
               return (
-                <CouncilMemberCard key={memberId} member={member} active={memberId === activeMemberId} onToggle={toggleMember} reduceMotion={reduceMotion} index={(rowIndex * 3) + memberIndex} buttonRef={(node) => {
+                <CouncilMemberCard key={memberId} member={member} active={memberId === activeMemberId} onToggle={toggleMember} reduceMotion={reduceMotion} index={(rowIndex * columnCount) + memberIndex} buttonRef={(node) => {
                   if (node) triggerRefs.current.set(memberId, node);
                   else triggerRefs.current.delete(memberId);
                 }} />

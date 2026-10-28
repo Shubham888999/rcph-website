@@ -50,30 +50,39 @@ test("member identity prefers profileId or id before the legacy name-role slug",
   );
 });
 
-test("responsive column count stays at three across mobile, tablet, and desktop", () => {
-  assert.equal(getBodColumnCount(1440), 3);
-  assert.equal(getBodColumnCount(1024), 3);
-  assert.equal(getBodColumnCount(768), 3);
-  assert.equal(getBodColumnCount(430), 3);
-  assert.equal(getBodColumnCount(390), 3);
+test("responsive columns match the desktop, tablet and phone layouts", () => {
+  assert.equal(getBodColumnCount(), 4);
+  assert.equal(getBodColumnCount(1440), 4);
+  assert.equal(getBodColumnCount(1101), 4);
+  assert.equal(getBodColumnCount(1100), 2);
+  assert.equal(getBodColumnCount(1024), 2);
+  assert.equal(getBodColumnCount(768), 2);
+  assert.equal(getBodColumnCount(621), 2);
+  assert.equal(getBodColumnCount(620), 1);
+  assert.equal(getBodColumnCount(390), 1);
 });
 
-test("three-column rows preserve order and insert details after the selected visual row", () => {
-  const rows = chunkBodMembers(boardMembers, getBodColumnCount(390));
+test("four-column desktop rows preserve order and insert details after the selected visual row", () => {
+  const rows = chunkBodMembers(boardMembers, getBodColumnCount(1440));
   const ids = boardMembers.map(getBodMemberId);
-  assert.equal(rows.length, 5);
-  assert.ok(rows.every((row) => row.length === 3));
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows.map(row => row.length), [4, 4, 4, 3]);
   assert.deepEqual(rows.flat(), boardMembers);
   assert.equal(getBodDetailRowIndex(rows, ids[0]), 0);
-  assert.equal(getBodDetailRowIndex(rows, ids[2]), 0);
-  assert.equal(getBodDetailRowIndex(rows, ids[3]), 1);
-  assert.equal(getBodDetailRowIndex(rows, ids[5]), 1);
-  assert.equal(getBodDetailRowIndex(rows, ids[14]), 4);
+  assert.equal(getBodDetailRowIndex(rows, ids[3]), 0);
+  assert.equal(getBodDetailRowIndex(rows, ids[4]), 1);
+  assert.equal(getBodDetailRowIndex(rows, ids[7]), 1);
+  assert.equal(getBodDetailRowIndex(rows, ids[14]), 3);
+  for (const width of [390, 768, 1440]) {
+    const columns = getBodColumnCount(width);
+    const responsiveRows = chunkBodMembers(boardMembers, columns);
+    ids.forEach((id, index) => assert.equal(getBodDetailRowIndex(responsiveRows, id), Math.floor(index / columns)));
+  }
 });
 
 test("an incomplete final row keeps its detail panel after the last member", () => {
   const members = boardMembers.slice(0, 14);
-  const rows = chunkBodMembers(members, 3);
+  const rows = chunkBodMembers(members, 4);
   assert.equal(rows.at(-1).length, 2);
   assert.equal(getBodDetailRowIndex(rows, getBodMemberId(members.at(-1))), rows.length - 1);
 });

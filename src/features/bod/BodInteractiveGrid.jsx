@@ -2,12 +2,12 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import BodMemberCard from "./BodMemberCard";
 import BodMemberDetails from "./BodMemberDetails";
+import useBodColumnCount from "./useBodColumnCount.js";
 import {
   cancelQueuedBodDisclosure,
   chunkBodMembers,
   createBodDisclosureState,
   finishBodDisclosureClose,
-  getBodColumnCount,
   getBodDetailRowIndex,
   getBodMemberId,
   toggleBodDisclosure,
@@ -15,7 +15,7 @@ import {
 
 export default function BodInteractiveGrid({ members }) {
   const reduceMotion = useReducedMotion();
-  const columnCount = getBodColumnCount();
+  const columnCount = useBodColumnCount();
   const [disclosure, setDisclosure] = useState(createBodDisclosureState);
   const triggerRefs = useRef(new Map());
   const { activeMemberId, closing } = disclosure;

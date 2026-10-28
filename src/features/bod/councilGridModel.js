@@ -27,12 +27,12 @@ export function getCouncilMemberId(member) {
   return `council-${getBodMemberId(member)}`;
 }
 
-export function getCouncilColumnCount() {
-  return getBodColumnCount();
+export function getCouncilColumnCount(viewportWidth) {
+  return getBodColumnCount(viewportWidth);
 }
 
-export function chunkCouncilMembers(members) {
-  return chunkBodMembers(members, getCouncilColumnCount());
+export function chunkCouncilMembers(members, columnCount = getCouncilColumnCount()) {
+  return chunkBodMembers(members, columnCount);
 }
 
 export function getCouncilDetailRowIndex(rows, activeMemberId) {

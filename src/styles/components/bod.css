@@ -7,19 +7,19 @@
 
 .bod-hero-react,
 .bod-section-react {
-  width: min(1180px, calc(100% - 2rem));
+  width: calc(100% - clamp(2rem, 4vw, 5rem));
   margin-inline: auto;
 }
 
 .bod-hero-react {
-  min-height: clamp(30rem, 58vh, 38rem);
-  padding-block: clamp(4rem, 9vw, 7rem);
+  min-height: 0;
+  padding-block: clamp(1.5rem, 3vw, 2.5rem) 1.25rem;
   display: flex;
   align-items: center;
 }
 
 .bod-hero-react__content {
-  width: min(100%, 760px);
+  width: 100%;
 }
 
 .bod-hero-react__copy {
@@ -47,10 +47,10 @@
 }
 
 .bod-hero-react__description {
-  max-width: 620px;
-  margin: var(--space-5) 0 0;
+  max-width: none;
+  margin: 1rem 0 0;
   color: var(--color-muted);
-  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  font-size: clamp(1rem, 1.15vw, 1.15rem);
   line-height: 1.75;
 }
 .bod-hero-react__groups {
@@ -86,31 +86,6 @@
   );
 }
 
-.bod-hero-react__explore {
-  width: fit-content;
-  margin-top: var(--space-6);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: var(--color-teal);
-  font-weight: 800;
-  text-decoration: none;
-  text-underline-offset: 0.3em;
-}
-
-.bod-hero-react__explore span {
-  transition: transform var(--transition-fast);
-}
-
-.bod-hero-react__explore:hover {
-  color: var(--color-gold-soft);
-  text-decoration: underline;
-}
-
-.bod-hero-react__explore:hover span {
-  transform: translateY(0.2rem);
-}
-
 .bod-section-react {
   position: relative;
 }
@@ -131,6 +106,10 @@
 
 .bod-section-react {
   padding-block: clamp(4.5rem, 9vw, 8rem);
+}
+
+.bod-leadership-react {
+  padding-block: 0 clamp(2rem, 4vw, 4rem);
 }
 
 .bod-section-react + .bod-section-react {
@@ -412,14 +391,14 @@
 
 .bod-grid-react {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-5);
 }
 
 .bod-interactive-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-5);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.9rem, 1.5vw, 1.5rem);
   align-items: start;
 }
 
@@ -431,7 +410,7 @@
   overflow: hidden;
   aspect-ratio: 4 / 5;
   border: 1px solid color-mix(in srgb, var(--bod-member-accent) 32%, var(--color-border));
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
@@ -758,7 +737,7 @@
 }
 
 .council-interactive-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .council-member-card {
@@ -822,7 +801,7 @@
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-color: color-mix(in srgb, var(--bod-card-accent) 28%, var(--color-border));
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   background:
     radial-gradient(circle at 100% 0%, var(--bod-card-glow), transparent 34%),
     linear-gradient(145deg, var(--color-surface-soft), var(--color-surface));
@@ -1055,6 +1034,18 @@
   outline-offset: 4px;
 }
 
+@media (min-width: 1101px) {
+  .bod-hero-react__description {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1100px) {
+  .bod-interactive-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .bod-grid-react {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1065,11 +1056,11 @@
   }
 .bod-hero-react {
   min-height: auto;
-  padding-block: 4rem;
+  padding-block: 1.5rem 1.25rem;
 }
 
 .bod-hero-react__content {
-  width: min(100%, 760px);
+  width: 100%;
 }
 
 .bod-hero-react h1 {
@@ -1142,13 +1133,13 @@
   }
 
   .bod-interactive-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: clamp(0.45rem, 1.8vw, 0.7rem);
   }
 
   .bod-member-card {
     aspect-ratio: 4 / 5;
-    border-radius: var(--radius-sm);
+    border-radius: 0;
   }
 
   .bod-member-card__closed-copy {
@@ -1161,7 +1152,7 @@
   .bod-member-card__name {
     display: -webkit-box;
     overflow: hidden;
-    font-size: clamp(0.72rem, 2.9vw, 0.82rem);
+    font-size: clamp(1.05rem, 3.2vw, 1.45rem);
     line-height: 1.18;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -1170,7 +1161,7 @@
   .bod-member-card__role {
     display: -webkit-box;
     overflow: hidden;
-    font-size: clamp(0.58rem, 2.25vw, 0.66rem);
+    font-size: clamp(0.75rem, 2.25vw, 0.85rem);
     letter-spacing: 0.035em;
     line-height: 1.2;
     -webkit-box-orient: vertical;
@@ -1178,7 +1169,7 @@
   }
 
   .bod-member-card__avenue {
-    font-size: 0.56rem;
+    font-size: 0.7rem;
     line-height: 1.2;
   }
 
@@ -1237,7 +1228,7 @@
 
 .bod-hero-react {
   min-height: auto;
-  padding-block: 3rem;
+  padding-block: 1.25rem 1rem;
 }
 
 .bod-hero-react h1 {
@@ -1258,7 +1249,8 @@
   font-size: 0.7rem;
 }
 
-  .bod-grid-react {
+  .bod-grid-react,
+  .bod-interactive-grid {
     grid-template-columns: 1fr;
   }
 

@@ -34,23 +34,27 @@ test("Council member identity inherits stable public profile identifiers", () =>
   );
 });
 
-test("Council grid remains three columns on mobile, tablet, and desktop", () => {
-  assert.equal(getCouncilColumnCount(390), 3);
-  assert.equal(getCouncilColumnCount(430), 3);
-  assert.equal(getCouncilColumnCount(768), 3);
-  assert.equal(getCouncilColumnCount(1440), 3);
+test("Council grid follows the board's responsive columns", () => {
+  assert.equal(getCouncilColumnCount(390), 1);
+  assert.equal(getCouncilColumnCount(430), 1);
+  assert.equal(getCouncilColumnCount(768), 2);
+  assert.equal(getCouncilColumnCount(1440), 4);
 });
 
-test("Council row insertion covers complete and incomplete three-card rows", () => {
+test("Council row insertion follows complete and incomplete rows at each viewport", () => {
   const synthetic = Array.from({ length: 7 }, (_, index) => ({ name: `Member ${index}`, role: `Role ${index}` }));
   const rows = chunkCouncilMembers(synthetic);
-  assert.equal(rows.length, 3);
-  assert.equal(rows.at(-1).length, 1);
+  assert.equal(rows.length, 2);
+  assert.equal(rows.at(-1).length, 3);
   assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[0])), 0);
-  assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[2])), 0);
-  assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[3])), 1);
-  assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[5])), 1);
-  assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[6])), 2);
+  assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[3])), 0);
+  assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[4])), 1);
+  assert.equal(getCouncilDetailRowIndex(rows, getCouncilMemberId(synthetic[6])), 1);
+  for (const width of [390, 768, 1440]) {
+    const columns = getCouncilColumnCount(width);
+    const responsiveRows = chunkCouncilMembers(synthetic, columns);
+    synthetic.forEach((member, index) => assert.equal(getCouncilDetailRowIndex(responsiveRows, getCouncilMemberId(member)), Math.floor(index / columns)));
+  }
 });
 
 test("Council disclosure keeps one active profile and queues cross-card switches", () => {

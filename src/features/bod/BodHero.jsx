@@ -1,7 +1,8 @@
 import { motion, useReducedMotion } from "framer-motion";
 export default function BodHero({
   riyLabel = "RIY 2026\u201327",
-}) {  const reduceMotion = useReducedMotion();
+}) {
+  const reduceMotion = useReducedMotion();
 
   return (
     <section className="bod-hero-react" aria-labelledby="bod-page-title">
@@ -16,8 +17,8 @@ export default function BodHero({
       >
         <div className="bod-hero-react__copy">
           <p className="bod-kicker">
-  Leadership {"\u00b7"} {riyLabel}
-</p>
+            Leadership {"\u00b7"} {riyLabel}
+          </p>
 
           <h1 id="bod-page-title">Meet the Board</h1>
 
@@ -27,13 +28,6 @@ export default function BodHero({
             The people leading Rotaract Club of Pune Heritage through service,
             fellowship, growth, and meaningful impact.
           </p>
-
-
-
-          <a className="bod-hero-react__explore" href="#club-leadership">
-            Explore the board
-            <span aria-hidden="true">↓</span>
-          </a>
         </div>
       </motion.div>
     </section>

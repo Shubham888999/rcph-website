@@ -1,4 +1,4 @@
-const DEFAULT_COLUMNS = 3;
+const DEFAULT_COLUMNS = 4;
 
 function cleanText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -24,7 +24,9 @@ export function getBodMemberId(member = {}) {
     || slug(`${cleanText(member.name)}-${cleanText(member.role)}`);
 }
 
-export function getBodColumnCount() {
+export function getBodColumnCount(viewportWidth = Infinity) {
+  if (viewportWidth <= 620) return 1;
+  if (viewportWidth <= 1100) return 2;
   return DEFAULT_COLUMNS;
 }
 
@@ -66,7 +68,7 @@ export function cancelQueuedBodDisclosure(state) {
 
 export function chunkBodMembers(members, columnCount) {
   const source = Array.isArray(members) ? members : [];
-  const size = [1, 2, 3].includes(columnCount) ? columnCount : DEFAULT_COLUMNS;
+  const size = [1, 2, 3, 4].includes(columnCount) ? columnCount : DEFAULT_COLUMNS;
   const rows = [];
 
   for (let index = 0; index < source.length; index += size) {
