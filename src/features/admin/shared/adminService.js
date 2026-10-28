@@ -129,6 +129,8 @@ export const visitCalls = {
   createBulkSessions: (payload) => callable("createVisitSubmissionBulkUploadSessions", payload), recordBulkUploadAudit: (bulkUploadId) => callable("recordVisitSubmissionBulkUploadAudit", { bulkUploadId }),
   withdraw: (submissionId) => callable("withdrawVisitSubmission", { submissionId }), remove: (submissionId, reason) => callable("removeVisitSubmission", { submissionId, reason }), replace: (submissionId, files) => callable("replaceVisitSubmission", { submissionId, files }),
   setPrimaryPresentation: (visitType, positionKey, submissionId = "") => callable("setVisitSubmissionPrimaryPresentation", { visitType, positionKey, submissionId: submissionId || "" }),
+  saveLink: (payload) => callable("saveVisitSubmissionLink", payload),
+  removeLink: (visitType, positionKey, linkId) => callable("removeVisitSubmissionLink", { visitType, positionKey, linkId }),
   moderation: (payload) => callable("getVisitSubmissionModerationData", payload), reconcile: (visitType, positionKey) => callable("reconcileVisitSubmissionFolderCount", { visitType, positionKey }), cleanup: () => callable("cleanupExpiredVisitUploadSessions", { limit: 25 }),
   moveCategory: (submissionId, documentCategory) => callable("moveVisitSubmissionCategory", { submissionId, documentCategory }),
   createCustomFolder: (visitType, positionKey, name, parentKey = "") => callable("createVisitSubmissionCustomFolder", { visitType, positionKey, name, ...(parentKey ? { parentKey } : {}) }),

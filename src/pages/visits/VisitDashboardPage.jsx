@@ -399,6 +399,7 @@ function PresentationIcon() {
 
 function DocumentTile({ block, theme, onOpen }) {
   const mains = getVisitDocumentMainPresentations(block);
+  const links = block.panels.flatMap(panel => panel.files.filter(file => file.sourceType === "link"));
   return (
     <button
       type="button"
@@ -441,6 +442,7 @@ function DocumentTile({ block, theme, onOpen }) {
           </span>
         </span>
       ) : null}
+      {links.length ? <span className="visit-dashboard-doc-tile__main"><span className="visit-dashboard-doc-tile__main-text"><span className="visit-dashboard-doc-tile__main-label">Live links</span>{links.map(link => <span className="visit-dashboard-doc-tile__main-title" key={link.linkId}>{link.title}</span>)}</span></span> : null}
     </button>
   );
 }
@@ -481,7 +483,9 @@ function DocumentOpenLink({ file }) {
 }
 
 function DocumentPreview({ panel, file }) {
+  const [previewVersion, setPreviewVersion] = useState(0);
   const canPreview = Boolean(file.canPreview && file.previewUrl);
+  const isLiveLink = file.sourceType === "link";
   return (
     <div className="visit-dashboard-doc-preview">
       <div className="visit-dashboard-doc-preview__head">
@@ -489,18 +493,21 @@ function DocumentPreview({ panel, file }) {
           <h3>{file.title}</h3>
           <span className="visit-dashboard-doc-preview__tags">
             <DocumentTypeBadge file={file} />
+            {isLiveLink ? <span className="visit-dashboard-doc-main-pill">Live link</span> : null}
             {isVisitDocumentMainPresentation(panel, file) ? (
               <span className="visit-dashboard-doc-main-pill">Main presentation</span>
             ) : null}
           </span>
         </div>
-        {canPreview ? <DocumentOpenLink file={file} /> : null}
+        <div className="visit-dashboard-doc-viewer__nav">{canPreview && isLiveLink ? <button type="button" onClick={() => setPreviewVersion(value => value + 1)}>Refresh preview</button> : null}{canPreview ? <DocumentOpenLink file={file} /> : null}</div>
       </div>
+
+      {isLiveLink && canPreview ? <p className="visit-dashboard-live-link-note">This opens the live Google document. Use Refresh preview for the latest changes, or open it in a new tab to edit. Google sharing permissions apply.</p> : null}
 
       {canPreview ? (
         <iframe
           className="visit-dashboard-document-preview-frame"
-          key={file.previewUrl}
+          key={`${file.previewUrl}:${previewVersion}`}
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
           src={file.previewUrl}
@@ -508,7 +515,7 @@ function DocumentPreview({ panel, file }) {
         />
       ) : (
         <div className="visit-dashboard-doc-preview__none">
-          <p>Preview not available for this file type.</p>
+          <p>{isLiveLink ? "This link opens in a new tab." : "Preview not available for this file type."}</p>
           <DocumentOpenLink file={file} />
         </div>
       )}
@@ -602,6 +609,7 @@ function DocumentViewer({ block, position, total, previousBlock, nextBlock, onNa
                             >
                               <DocumentTypeBadge file={file} />
                               <span className="visit-dashboard-doc-file__title">{file.title}</span>
+                              {file.sourceType === "link" ? <span className="visit-dashboard-doc-main-tag">LIVE LINK</span> : null}
                               {sizeLabel ? <span className="visit-dashboard-doc-file__size">{sizeLabel}</span> : null}
                               {isVisitDocumentMainPresentation(panel, file) ? (
                                 <span className="visit-dashboard-doc-main-tag">MAIN</span>

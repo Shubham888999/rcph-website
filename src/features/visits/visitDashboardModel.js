@@ -8,6 +8,7 @@ import {
   getVisitFolderPresentation,
 } from "../admin/visit/visitPresentationModel.js";
 import { joinVisitHolderNames, normalizeVisitHolders } from "./visitHolderModel.js";
+import { normalizeVisitLink, visitLinkDocument } from "./visitLinks.js";
 
 const VISIT_DASHBOARD_NAMES = Object.freeze({
   clubAssembly: "Club Assembly",
@@ -420,6 +421,10 @@ function normalizeFileSize(value) {
 
 function normalizeDocumentFile(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (raw.sourceType === "link") {
+    const link = normalizeVisitLink({ linkId: raw.linkId, title: raw.title, url: raw.openUrl, documentCategory: raw.documentCategory });
+    return link ? visitLinkDocument(link) : null;
+  }
   const submissionId = safeId(raw.submissionId);
   const title = text(raw.title || raw.fileName, 180);
   if (!submissionId || !title) return null;
@@ -774,7 +779,7 @@ export function getVisitDocumentFileType(file) {
   if (/presentation|powerpoint/.test(mimeType)) return "PPTX";
   if (/spreadsheet|excel|text\/csv/.test(mimeType)) return "XLSX";
   if (/wordprocessing|msword|google-apps\.document/.test(mimeType)) return "DOCX";
-  return DOCUMENT_TYPE_BY_EXTENSION[fileExtension(file?.fileName) || fileExtension(file?.title)] || "FILE";
+  return DOCUMENT_TYPE_BY_EXTENSION[fileExtension(file?.fileName) || fileExtension(file?.title)] || (file?.sourceType === "link" ? "LINK" : "FILE");
 }
 
 function normalizeAttendanceStatus(value) {

@@ -188,7 +188,8 @@ test("subfolders: + Subfolder on each folder, indented groups, and delete blocke
   assert.match(moduleSource, /visit-category-group--sub/);
   assert.match(moduleSource, /group\.fullLabel \|\| group\.label/);
   assert.match(moduleSource, /visitCalls\.createCustomFolder\(folder\.visitType, folder\.positionKey, trimmed, parent\?\.key \|\| ""\)/);
-  assert.match(moduleSource, /disabled=\{busy \|\| hasFiles \|\| hasSubfolders\}/);
+  assert.match(moduleSource, /disabled=\{busy \|\| hasFiles \|\| hasSubfolders \|\| hasLinks\}/);
+  assert.match(moduleSource, /const hasLinks = \(dialog.linkCount \|\| 0\) > 0/);
   assert.match(moduleSource, /subfolderCount: group\.subfolderCount/);
 });
 

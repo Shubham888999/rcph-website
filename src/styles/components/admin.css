@@ -10796,3 +10796,8 @@ min-width: 250px;
     grid-column: 1 / -1;
   }
 }
+
+.visit-live-links__list { display: grid; gap: .75rem; padding: 0; list-style: none; }
+.visit-live-links__list > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; border: 1px solid var(--internal-border); border-radius: var(--internal-radius-card); }
+.visit-live-links__list > li > div:first-child { display: grid; gap: .4rem; min-width: 0; overflow-wrap: anywhere; }
+.visit-live-links__list > li span { opacity: .75; font-size: .9em; }

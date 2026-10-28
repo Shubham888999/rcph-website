@@ -1,6 +1,7 @@
 import { safeUrl, text } from "../shared/adminModel.js";
 import { validateVisitUploadFile } from "./visitUploadModel.js";
 import { normalizeVisitHolders } from "../../visits/visitHolderModel.js";
+import { listVisitLinks } from "../../visits/visitLinks.js";
 
 export const VISIT_TYPES = ["clubAssembly", "dzrVisit", "drrVisit"];
 export const VISIT_STATUSES = ["active", "replaced", "admin-removed", "archived"];
@@ -69,6 +70,8 @@ export function normalizeFolder(value) {
     supportsDocumentCategories: value.supportsDocumentCategories === true,
     supportsCustomFolders: value.supportsCustomFolders === true,
     canManageCustomFolders: value.canManageCustomFolders === true,
+    canManageLinks: value.canManageLinks === true,
+    documentLinks: listVisitLinks(value),
     customFolders: normalizeCustomFolders(value.customFolders),
     holders: normalizeVisitHolders(value.holders),
   };
