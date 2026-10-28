@@ -3,6 +3,7 @@ import BodReveal from "./BodReveal";
 
 export default function BodLeadership({
   members = [],
+  editorial = false,
 }) {
   return (
     <BodReveal
@@ -15,7 +16,7 @@ export default function BodLeadership({
         aria-hidden="true"
       />
 
-      <BodInteractiveGrid members={members} />
+      <BodInteractiveGrid members={members} editorial={editorial} />
     </BodReveal>
   );
 }

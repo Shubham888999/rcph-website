@@ -1,0 +1,226 @@
+/* Public /bod edition only. Admin previews retain the existing board styling. */
+.bod-page-react--magazine {
+  --bod-paper: #121318;
+  --bod-paper-raised: #1c1c22;
+  --bod-ink: #f4eddf;
+  --bod-muted: #b9b2a8;
+  --bod-line: #494047;
+  --bod-accent: #eaa6b6;
+  --bod-spine: #982c47;
+  --color-text: var(--bod-ink);
+  --color-muted: var(--bod-muted);
+  --color-surface: var(--bod-paper-raised);
+  --color-surface-soft: #25232a;
+  --color-border: var(--bod-line);
+  --color-gold: var(--bod-accent);
+  --color-gold-soft: var(--bod-ink);
+  --color-teal: var(--bod-accent);
+  color: var(--bod-ink);
+}
+
+:root[data-theme="light"] .bod-page-react--magazine {
+  --bod-paper: #f1ebdf;
+  --bod-paper-raised: #fcf8ef;
+  --bod-ink: #252126;
+  --bod-muted: #68605c;
+  --bod-line: #c9bbae;
+  --bod-accent: #92283f;
+  --bod-spine: #92283f;
+  --color-surface-soft: #e7ddce;
+}
+
+.bod-page-react.bod-page-react--magazine {
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 5px, color-mix(in srgb, var(--bod-ink) 1.2%, transparent) 6px), var(--bod-paper);
+}
+
+.bod-page-react--magazine .bod-hero-react {
+  padding-block: 2rem 1.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--bod-line);
+}
+
+.bod-page-react--magazine .bod-kicker {
+  color: var(--bod-accent);
+  font-size: .72rem;
+  letter-spacing: .18em;
+}
+
+.bod-page-react--magazine .bod-hero-react h1,
+.bod-page-react--magazine .bod-section-react h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -.045em;
+  text-shadow: none;
+}
+
+.bod-page-react--magazine .bod-hero-react h1 { font-size: clamp(3.2rem, 5.7vw, 6rem); }
+.bod-page-react--magazine .bod-hero-react__rule { display: none; }
+.bod-page-react--magazine .bod-hero-react__description { color: var(--bod-muted); margin-top: 1.15rem; }
+.bod-page-react--magazine .bod-section-react + .bod-section-react { border-image: none; border-top: 1px solid var(--bod-line); }
+.bod-page-react--magazine .bod-section-react__heading { margin-bottom: 1.75rem; }
+.bod-page-react--magazine .bod-interactive-grid { align-items: stretch; gap: clamp(1rem, 1.5vw, 1.6rem); }
+
+.bod-page-react--magazine .bod-magazine-card {
+  height: 100%;
+  aspect-ratio: auto;
+  overflow: visible;
+  border: 1px solid var(--bod-line);
+  border-radius: 0;
+  background: var(--bod-paper-raised);
+  box-shadow: 3px 4px 0 color-mix(in srgb, var(--bod-line) 30%, transparent);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.bod-page-react--magazine .bod-magazine-card:hover,
+.bod-page-react--magazine .bod-magazine-card.is-active {
+  transform: none;
+  border-color: var(--bod-accent);
+  box-shadow: 5px 7px 0 color-mix(in srgb, var(--bod-spine) 20%, transparent);
+}
+
+.bod-page-react--magazine .bod-magazine-card.is-active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  height: clamp(1rem, 1.5vw, 1.6rem);
+  border-left: 1px solid var(--bod-accent);
+}
+
+.bod-page-react--magazine .bod-magazine-card__profile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--bod-ink);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bod-page-react--magazine .bod-magazine-cover {
+  display: block;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  transform-origin: center;
+  background: var(--bod-paper);
+  border-bottom: 1px solid var(--bod-line);
+  will-change: auto;
+}
+
+.bod-page-react--magazine .bod-magazine-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.bod-page-react--magazine .bod-magazine-no-photo {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--bod-muted);
+  font-family: Georgia, serif;
+  font-size: 1.5rem;
+}
+
+.bod-page-react--magazine .bod-magazine-caption {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  width: 100%;
+  min-height: 10.25rem;
+  padding: 1.1rem 1rem 3.4rem;
+}
+
+.bod-page-react--magazine .bod-magazine-caption__number { position: absolute; right: .9rem; top: 1rem; font-size: .65rem; color: var(--bod-muted); }
+.bod-page-react--magazine .bod-magazine-caption__role { padding-right: 1.4rem; color: var(--bod-accent); font-size: .69rem; line-height: 1.4; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.bod-page-react--magazine .bod-magazine-caption__name { font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.25rem, 1.6vw, 1.85rem); line-height: 1.12; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.bod-page-react--magazine .bod-magazine-caption__group { font-size: .75rem; line-height: 1.5; color: var(--bod-muted); }
+.bod-page-react--magazine .bod-magazine-caption__read { position: absolute; bottom: 1rem; left: 1rem; display: inline-flex; gap: .65rem; font-size: .75rem; color: var(--bod-accent); font-weight: 700; }
+.bod-page-react--magazine .bod-magazine-card__view { position: absolute; right: .55rem; bottom: .45rem; min-height: 44px; padding: .4rem .5rem; border: 0; color: var(--bod-muted); background: transparent; font: inherit; font-size: .75rem; cursor: pointer; }
+.bod-page-react--magazine .bod-magazine-card__view:hover { color: var(--bod-accent); }
+
+.bod-page-react--magazine .bod-magazine-cover__edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.2) 48%, transparent 60%);
+  transform: translateX(-110%);
+}
+
+.bod-page-react--magazine .bod-magazine-cover__fold {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: linear-gradient(135deg, transparent 49%, var(--bod-line) 50%, var(--bod-paper-raised) 53%, var(--bod-paper) 100%);
+  transform: translate(100%,100%);
+  transition: transform 240ms ease;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bod-page-react--magazine .bod-magazine-card:hover .bod-magazine-cover__edge { animation: bod-edition-light 700ms ease both; }
+  .bod-page-react--magazine .bod-magazine-card:hover .bod-magazine-cover__fold { transform: translate(0,0); }
+}
+
+@keyframes bod-edition-light { to { transform: translateX(110%); } }
+
+.bod-page-react--magazine .bod-magazine-spread { perspective: 1400px; scroll-margin-block: calc(var(--header-height, 5rem) + 1rem) 1rem; }
+.bod-page-react--magazine .bod-magazine-spread__pages { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); border: 1px solid var(--bod-line); background: var(--bod-paper-raised); transform-origin: center top; }
+.bod-page-react--magazine .bod-magazine-spread__identity { padding: clamp(1.4rem, 3vw, 3rem); border-right: 1px solid var(--bod-line); background: linear-gradient(to left, rgba(0,0,0,.08), transparent 1.5rem); min-width: 0; }
+.bod-page-react--magazine .bod-magazine-label { color: var(--bod-accent); font-size: .67rem; font-weight: 750; text-transform: uppercase; letter-spacing: .18em; margin: 0 0 1.2rem; }
+.bod-page-react--magazine .bod-magazine-spread h3 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 3.8vw, 4.5rem); line-height: 1.02; font-weight: 400; letter-spacing: -.04em; margin: 0 0 1rem; overflow-wrap: anywhere; }
+.bod-page-react--magazine .bod-magazine-spread__role { font-size: 1rem; font-weight: 750; color: var(--bod-accent); margin: 0 0 .7rem; }
+.bod-page-react--magazine .bod-magazine-spread__group,
+.bod-page-react--magazine .bod-magazine-spread__context { color: var(--bod-muted); font-size: .85rem; line-height: 1.6; }
+.bod-page-react--magazine .bod-magazine-spread__links { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem 1.1rem; margin-top: 1.7rem; }
+.bod-page-react--magazine .bod-magazine-spread__links :is(button,a) { min-height: 44px; display: inline-flex; align-items: center; padding: .4rem 0; border: 0; border-bottom: 1px solid var(--bod-line); background: transparent; color: var(--bod-accent); font: inherit; font-size: .8rem; cursor: pointer; text-decoration: none; overflow-wrap: anywhere; }
+.bod-page-react--magazine .bod-magazine-spread__story { padding: clamp(1.4rem, 3vw, 3rem); align-self: center; min-width: 0; }
+.bod-page-react--magazine .bod-magazine-spread__story blockquote { margin: 0 0 1.5rem; padding-left: 1.1rem; border-left: 2px solid var(--bod-accent); font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.3rem, 2vw, 2rem); line-height: 1.5; overflow-wrap: anywhere; }
+.bod-page-react--magazine .bod-magazine-spread__story p { max-width: 70ch; margin: 0; line-height: 1.85; white-space: pre-line; overflow-wrap: anywhere; color: var(--bod-muted); }
+.bod-page-react--magazine .bod-magazine-spread__navigation { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .65rem 1rem; border-top: 1px solid var(--bod-line); padding: .7rem 1rem; }
+.bod-page-react--magazine .bod-magazine-spread__navigation button { min-height: 44px; padding: .45rem .6rem; border: 0; border-radius: 0; background: transparent; color: var(--bod-ink); font: inherit; font-size: .8rem; cursor: pointer; }
+.bod-page-react--magazine .bod-magazine-spread__navigation button:last-child { margin-left: auto; color: var(--bod-accent); }
+.bod-page-react--magazine .bod-magazine-spread__navigation button:disabled { opacity: .4; cursor: default; }
+.bod-page-react--magazine .bod-magazine-spread__navigation > span { color: var(--bod-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.bod-page-react--magazine .bod-board-loading__card { aspect-ratio: 4 / 6; }
+.bod-page-react--magazine .bod-magazine-progress { position: fixed; left: 0; right: 0; top: var(--header-height, 5rem); z-index: 40; height: 2px; background: var(--bod-accent); transform-origin: left; pointer-events: none; }
+
+.bod-page-react--magazine.bod-magazine-viewer-backdrop { position: fixed; inset: 0; z-index: 250; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(6,7,10,.88); }
+.bod-page-react--magazine .bod-magazine-viewer { display: flex; flex-direction: column; width: min(1400px, 100%); max-height: calc(100dvh - 2rem); min-width: 0; border: 1px solid var(--bod-line); background: var(--bod-paper); padding: 1rem; }
+.bod-page-react--magazine .bod-magazine-viewer header { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; align-items: center; padding-bottom: .8rem; border-bottom: 1px solid var(--bod-line); }
+.bod-page-react--magazine .bod-magazine-viewer h2 { margin: 0; font-family: Georgia, serif; font-size: clamp(1.3rem, 2vw, 2rem); font-weight: 400; }
+.bod-page-react--magazine .bod-magazine-viewer .bod-magazine-label { margin: 0 0 .35rem; }
+.bod-page-react--magazine .bod-magazine-viewer__actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.bod-page-react--magazine .bod-magazine-viewer__actions :is(button,a) { display: inline-flex; align-items: center; min-height: 44px; padding: .5rem .7rem; border: 1px solid var(--bod-line); border-radius: 0; color: var(--bod-ink); background: var(--bod-paper-raised); font: inherit; font-size: .8rem; cursor: pointer; text-decoration: none; }
+.bod-page-react--magazine .bod-magazine-viewer__image { overflow: auto; min-height: 0; margin-top: .8rem; padding: .5rem; overscroll-behavior: contain; }
+.bod-page-react--magazine .bod-magazine-viewer__image img { display: block; width: auto; height: auto; max-width: 100%; max-height: calc(100dvh - 12rem); object-fit: contain; margin-inline: auto; }
+.bod-page-react--magazine .bod-magazine-viewer__image img.is-zoomed { width: max(100%, 1100px); max-width: none; max-height: none; }
+.bod-page-react--magazine :is(button,a):focus-visible { outline: 2px solid var(--bod-accent); outline-offset: 4px; }
+
+@media (max-width: 760px) {
+  .bod-page-react--magazine .bod-magazine-spread__pages { grid-template-columns: minmax(0, 1fr); }
+  .bod-page-react--magazine .bod-magazine-spread__identity { border-right: 0; border-bottom: 1px solid var(--bod-line); background: none; }
+  .bod-page-react--magazine .bod-magazine-caption__name { font-size: 1.4rem; }
+  .bod-page-react--magazine .bod-magazine-spread__navigation { gap: .35rem; }
+  .bod-page-react--magazine .bod-magazine-viewer { padding: .7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bod-page-react--magazine .bod-magazine-cover,
+  .bod-page-react--magazine .bod-magazine-spread__pages { transform: none !important; }
+  .bod-page-react--magazine .bod-magazine-cover__edge,
+  .bod-page-react--magazine .bod-magazine-cover__fold { display: none; animation: none; }
+}

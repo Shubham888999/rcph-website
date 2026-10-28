@@ -5,6 +5,7 @@ export default function BodCouncil({
   members = [],
   title = "Leadership Beyond Our Club",
   statusLabel = "",
+  editorial = false,
 }) {
   return (
     <BodReveal
@@ -22,7 +23,7 @@ export default function BodCouncil({
         </div>
       </div>
 
-      <CouncilInteractiveGrid members={members} />
+      <CouncilInteractiveGrid members={members} editorial={editorial} />
     </BodReveal>
   );
 }

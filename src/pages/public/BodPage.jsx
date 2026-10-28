@@ -8,6 +8,7 @@ import {
 import BodRevealPlaceholder from "../../features/bod/BodRevealPlaceholder";
 import BodHero from "../../features/bod/BodHero";
 import BodLeadership from "../../features/bod/BodLeadership";
+import BodReadingProgress from "../../features/bod/BodReadingProgress.jsx";
 import {
   createDefaultPublicBodState,
   mapPublicClubProfilesToMembers,
@@ -19,6 +20,7 @@ import {
   getPublicBodPhotoEndpoint,
 } from "../../features/bod/bodPublicService";
 import "../../styles/components/bod.css";
+import "../../styles/components/bod-magazine.css";
 
 const BodContact = lazy(
   () => import("../../features/bod/BodContact"),
@@ -76,8 +78,8 @@ export default function BodPage() {
   );
 
   if (loadStatus !== "ready") {
-    return <main className="bod-page-react" aria-busy={loadStatus === "loading"}>
-      <BodHero riyLabel={publicState.riyLabel} />
+    return <main className="bod-page-react bod-page-react--magazine" aria-busy={loadStatus === "loading"}>
+      <BodHero riyLabel={publicState.riyLabel} editorial />
       <section className="bod-section-react bod-leadership-react bod-board-loading" aria-label="Board loading status">
         {loadStatus === "loading" ? <>
           <p role="status" className="bod-board-loading__message">Loading the board…</p>
@@ -100,7 +102,8 @@ export default function BodPage() {
     && leadershipMembers.length > 0;
 
   return (
-    <main className="bod-page-react">
+    <main className="bod-page-react bod-page-react--magazine">
+      <BodReadingProgress />
       {showClubRevealFallback ? (
         <BodRevealPlaceholder
           showPositionLabels={false}
@@ -109,10 +112,12 @@ export default function BodPage() {
         <>
           <BodHero
             riyLabel={publicState.riyLabel}
+            editorial
           />
 
           <BodLeadership
             members={clubMembers}
+            editorial
           />
         </>
       )}
@@ -121,6 +126,7 @@ export default function BodPage() {
         <Suspense fallback={null}>
           <BodCouncil
             members={leadershipMembers}
+            editorial
           />
         </Suspense>
       ) : null}

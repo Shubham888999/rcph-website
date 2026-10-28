@@ -3,6 +3,8 @@ import { AnimatePresence, useReducedMotion } from "framer-motion";
 import BodMemberCard from "./BodMemberCard";
 import BodMemberDetails from "./BodMemberDetails";
 import useBodColumnCount from "./useBodColumnCount.js";
+import BodCoverViewer from "./BodCoverViewer.jsx";
+import { getMagazineNavigation } from "./bodMagazineModel.js";
 import {
   cancelQueuedBodDisclosure,
   chunkBodMembers,
@@ -13,10 +15,11 @@ import {
   toggleBodDisclosure,
 } from "./bodGridModel";
 
-export default function BodInteractiveGrid({ members }) {
+export default function BodInteractiveGrid({ members, editorial = false }) {
   const reduceMotion = useReducedMotion();
   const columnCount = useBodColumnCount();
   const [disclosure, setDisclosure] = useState(createBodDisclosureState);
+  const [coverMember, setCoverMember] = useState(null);
   const triggerRefs = useRef(new Map());
   const { activeMemberId, closing } = disclosure;
 
@@ -26,6 +29,7 @@ export default function BodInteractiveGrid({ members }) {
     () => members.find((member) => getBodMemberId(member) === activeMemberId) || null,
     [activeMemberId, members],
   );
+  const navigation = getMagazineNavigation(members, activeMemberId, getBodMemberId);
 
   const toggleMember = useCallback((member) => {
     const memberId = getBodMemberId(member);
@@ -35,9 +39,15 @@ export default function BodInteractiveGrid({ members }) {
   const finishClose = useCallback(() => {
     setDisclosure(finishBodDisclosureClose);
   }, []);
+  const closeProfile = () => {
+    if (!activeMember) return;
+    const trigger = triggerRefs.current.get(activeMemberId);
+    toggleMember(activeMember);
+    window.requestAnimationFrame(() => trigger?.focus());
+  };
 
   useEffect(() => {
-    if (!activeMemberId && !closing) return undefined;
+    if (coverMember || (!activeMemberId && !closing)) return undefined;
 
     function handleKeyDown(event) {
       if (event.key !== "Escape") return;
@@ -54,7 +64,7 @@ export default function BodInteractiveGrid({ members }) {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeMemberId, closing]);
+  }, [activeMemberId, closing, coverMember]);
 
   return (
     <div className="bod-interactive-grid">
@@ -72,6 +82,8 @@ export default function BodInteractiveGrid({ members }) {
                   active={memberId === activeMemberId}
                   onToggle={toggleMember}
                   reduceMotion={reduceMotion}
+                  editorial={editorial}
+                  onViewCover={setCoverMember}
                   index={(rowIndex * columnCount) + memberIndex}
                   buttonRef={(node) => {
                     if (node) triggerRefs.current.set(memberId, node);
@@ -87,12 +99,19 @@ export default function BodInteractiveGrid({ members }) {
                   key={activeMemberId}
                   member={activeMember}
                   reduceMotion={reduceMotion}
+                  editorial={editorial}
+                  navigation={navigation}
+                  onPrevious={() => navigation.previous && toggleMember(navigation.previous)}
+                  onNext={() => navigation.next && toggleMember(navigation.next)}
+                  onClose={closeProfile}
+                  onViewCover={setCoverMember}
                 />
               ) : null}
             </AnimatePresence>
           </Fragment>
         );
       })}
+      {editorial && coverMember ? <BodCoverViewer member={coverMember} onClose={() => setCoverMember(null)} /> : null}
     </div>
   );
 }
