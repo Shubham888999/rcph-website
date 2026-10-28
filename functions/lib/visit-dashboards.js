@@ -5,6 +5,7 @@ const positionHolders = require('./position-holders');
 const letterheadExchanges = require('./letterhead-exchanges');
 const { formatRotaractorName } = require('./member-name');
 const { listVisitLinks, visitLinkDocument } = require('./visit-links');
+const { listCustomFolders } = require('./visit-custom-folders');
 
 const VISIT_TYPES = Object.freeze({
   clubAssembly: Object.freeze({
@@ -1132,6 +1133,7 @@ function shapeDocumentFile(doc) {
   const previewUrl = isPreviewableDocument(source, fileName)
     ? driveFilePreviewUrl(fileLinkSource)
     : '';
+  const documentCategory = normalizeText(source.documentCategory, 40);
   return {
     submissionId,
     title,
@@ -1145,6 +1147,7 @@ function shapeDocumentFile(doc) {
     openUrl,
     canPreview: Boolean(previewUrl),
     previewUrl,
+    ...(/^(?:inward|outward|inward-register|outward-register|custom-[a-f0-9]{8})$/.test(documentCategory) ? { documentCategory } : {}),
   };
 }
 
@@ -1198,6 +1201,8 @@ function buildDocumentPanels({ config, positionDocs, submissionDocs, holdersByPo
       canOpen: folder?.canOpen === true,
       openUrl: folder?.openUrl || '',
       primaryPresentation: selectedPrimary || null,
+      supportsDocumentCategories: ['secretary', 'joint-secretary', 'co-secretary'].includes(positionKey),
+      customFolders: folder?.customFolders || [],
       files: [...files, ...listVisitLinks(folder).map(visitLinkDocument)],
       holders: positionHolders.holdersForPosition(holdersByPosition, positionKey),
     };
@@ -1465,6 +1470,7 @@ function shapeFolderOption(raw, fallbackId = '', options = {}) {
   };
   if (options.includeOpenUrl === true) {
     option.documentLinks = listVisitLinks(raw);
+    option.customFolders = listCustomFolders(raw).slice(0, 40).map(({ key, name, parentKey }) => ({ key, name: normalizeText(name, 80), parentKey }));
     const openUrl = driveFolderOpenUrl(raw);
     option.canOpen = Boolean(openUrl);
     option.openUrl = openUrl;
