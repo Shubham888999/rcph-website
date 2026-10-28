@@ -9,6 +9,7 @@ export default function BodCouncil({
 }) {
   return (
     <BodReveal
+      staticContent={editorial}
       className="bod-section-react"
       labelledBy="bod-council-title"
     >

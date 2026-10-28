@@ -1,7 +1,9 @@
 import { motion, useReducedMotion } from "framer-motion";
 
-export default function BodReveal({ children, className, labelledBy }) {
+export default function BodReveal({ children, className, labelledBy, staticContent = false }) {
   const reduceMotion = useReducedMotion();
+
+  if (staticContent) return <section className={className} aria-labelledby={labelledBy}>{children}</section>;
 
   return (
     <motion.section

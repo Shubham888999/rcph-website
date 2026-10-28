@@ -7,6 +7,7 @@ export default function BodLeadership({
 }) {
   return (
     <BodReveal
+      staticContent={editorial}
       className="bod-section-react bod-leadership-react"
       labelledBy="bod-page-title"
     >
