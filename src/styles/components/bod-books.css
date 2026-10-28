@@ -1,0 +1,109 @@
+/* Public board collection; admin previews keep their existing layout. */
+.bod-page-react--books {
+  --bod-paper: #1b1518;
+  --bod-paper-raised: #2a2025;
+  --bod-ink: #f7efdf;
+  --bod-muted: #c2b3ac;
+  --bod-line: #66504f;
+  --bod-accent: #e4ba87;
+  --bod-spine: #7e263f;
+  --bod-book-gap: clamp(.85rem, 1.45vw, 1.6rem);
+  --color-text: var(--bod-ink);
+  --color-muted: var(--bod-muted);
+  --color-surface: var(--bod-paper-raised);
+  --color-surface-soft: #36272e;
+  --color-border: var(--bod-line);
+  --color-gold: var(--bod-accent);
+  --color-gold-soft: var(--bod-ink);
+  --color-teal: var(--bod-accent);
+  color: var(--bod-ink);
+}
+
+:root[data-theme="light"] .bod-page-react--books {
+  --bod-paper: #eee5d5;
+  --bod-paper-raised: #faf4e9;
+  --bod-ink: #34232a;
+  --bod-muted: #70615b;
+  --bod-line: #b8a597;
+  --bod-accent: #7e263f;
+  --color-surface-soft: #e5d8c6;
+}
+
+.bod-page-react.bod-page-react--books,
+:root[data-theme="light"] .bod-page-react.bod-page-react--books { background: radial-gradient(ellipse at 45% 0%, color-mix(in srgb, var(--bod-spine) 18%, transparent), transparent 45rem), var(--bod-paper); }
+.bod-page-react--books .bod-hero-react { padding-block: 2rem 1.25rem; margin-bottom: 1rem; }
+.bod-page-react--books .bod-hero-react h1,
+.bod-page-react--books .bod-section-react h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: -.045em; text-shadow: none; }
+.bod-page-react--books .bod-hero-react h1 { font-size: clamp(3.2rem, 5.8vw, 6rem); }
+.bod-page-react--books .bod-hero-react__description { margin-top: 1.2rem; color: var(--bod-muted); }
+.bod-page-react--books .bod-kicker { color: var(--bod-accent); font-size: .7rem; letter-spacing: .16em; }
+.bod-page-react--books .bod-book-hint { margin: 1.2rem 0 0; padding-top: .9rem; border-top: 1px solid var(--bod-line); color: var(--bod-accent); font-size: .78rem; letter-spacing: .025em; }
+.bod-page-react--books .bod-book-hint > span { padding-left: .8rem; }
+.bod-page-react--books .bod-section-react + .bod-section-react { border-image: none; border-top: 1px solid var(--bod-line); }
+.bod-page-react--books .bod-section-react h2 { font-size: clamp(2.2rem, 4vw, 4.5rem); }
+.bod-page-react--books .bod-section-react__heading { margin-bottom: 2rem; }
+.bod-page-react--books .bod-book-grid { position: relative; gap: var(--bod-book-gap); align-items: start; grid-auto-flow: row; }
+.bod-page-react--books .bod-book-item { position: relative; min-width: 0; display: grid; grid-template-columns: minmax(0,1fr); perspective: 1800px; isolation: isolate; }
+.bod-page-react--books .bod-book-item.is-expanded { grid-column: span 2; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.bod-page-react--books .bod-book-cover { position: relative; grid-column: 1; min-width: 0; height: 100%; border: 1px solid var(--bod-line); background: var(--bod-paper-raised); box-shadow: 3px 4px 0 color-mix(in srgb, var(--bod-line) 35%, transparent); }
+.bod-page-react--books .bod-book-cover__trigger { display: flex; flex-direction: column; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--bod-ink); text-align: left; font: inherit; cursor: pointer; }
+.bod-page-react--books .bod-book-cover__artwork { display: block; width: 100%; aspect-ratio: 4 / 5; overflow: hidden; background: var(--bod-paper); }
+.bod-page-react--books .bod-book-cover__artwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.bod-page-react--books .bod-book-cover__placeholder { display: grid; place-items: center; height: 100%; color: var(--bod-muted); font-family: Georgia, serif; font-size: 1.2rem; }
+.bod-page-react--books .bod-book-cover__caption { display: flex; flex-direction: column; gap: .4rem; flex: 1; position: relative; width: 100%; min-height: 9rem; padding: .95rem 1rem 3.3rem; border-top: 1px solid var(--bod-line); }
+.bod-page-react--books .bod-book-cover__role { color: var(--bod-accent); font-size: .65rem; font-weight: 750; letter-spacing: .08em; line-height: 1.5; text-transform: uppercase; }
+.bod-page-react--books .bod-book-cover__name { font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.15rem,1.55vw,1.8rem); line-height: 1.16; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.bod-page-react--books .bod-book-cover__group { color: var(--bod-muted); font-size: .72rem; line-height: 1.4; }
+.bod-page-react--books .bod-book-cover__action { position: absolute; left: 1rem; bottom: .95rem; display: inline-flex; align-items: center; gap: .65rem; color: var(--bod-accent); font-size: .72rem; font-weight: 700; }
+.bod-page-react--books .bod-book-cover__action > span { font-size: 1.05rem; line-height: 1; }
+.bod-page-react--books .bod-book-cover__view { position: absolute; right: .5rem; bottom: .3rem; min-height: 44px; padding: .4rem; border: 0; color: var(--bod-muted); background: transparent; font: inherit; font-size: .7rem; cursor: pointer; }
+.bod-page-react--books .bod-book-cover__spine { position: absolute; inset: 0 auto 0 0; width: 7px; pointer-events: none; background: linear-gradient(90deg,rgba(0,0,0,.3),rgba(255,255,255,.08),transparent); }
+.bod-page-react--books .is-expanded .bod-book-cover { border-right: 0; box-shadow: -3px 5px 15px rgba(0,0,0,.2); }
+.bod-page-react--books .is-expanded .bod-book-cover__spine { inset: 0 0 0 auto; width: 12px; background: linear-gradient(90deg,transparent,rgba(0,0,0,.3)); }
+
+.bod-page-react--books .bod-book-page { position: absolute; top: 0; bottom: 0; right: 0; width: 50%; display: grid; grid-template-rows: auto minmax(0,1fr) auto; min-width: 0; padding: clamp(1.1rem,1.9vw,2rem); border: 1px solid #c9b8a2; background: linear-gradient(90deg, #d8c8b3, #f5eddf 7%, #fff9ee 22%, #f7efdf); color: #39282b; box-shadow: 6px 5px 0 #bba68a, 10px 9px 22px rgba(0,0,0,.22); transform-origin: left center; backface-visibility: hidden; }
+.bod-page-react--books .bod-book-page::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 12px; pointer-events: none; background: linear-gradient(90deg,rgba(65,40,30,.2),transparent); }
+.bod-page-react--books .bod-book-eyebrow { margin: 0 0 .85rem; color: #7e263f; font-size: .6rem; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; line-height: 1.5; }
+.bod-page-react--books .bod-book-page h3 { margin: 0 0 .65rem; color: #39282b; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.35rem,1.9vw,2.3rem); font-weight: 400; letter-spacing: -.04em; line-height: 1.12; overflow-wrap: anywhere; }
+.bod-page-react--books .bod-book-page__role { margin: 0 0 .5rem; color: #7e263f; font-size: .78rem; line-height: 1.5; font-weight: 750; }
+.bod-page-react--books .bod-book-page__context { margin: .35rem 0; color: #6b554b; font-size: .72rem; line-height: 1.5; overflow-wrap: anywhere; }
+.bod-page-react--books .bod-book-page__story { overflow-y: auto; min-height: 0; margin-top: 1rem; padding: .8rem .5rem .8rem 0; border-top: 1px solid #c9b8a2; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #ae8f78 transparent; }
+.bod-page-react--books .bod-book-page__summary { margin: 0 0 1rem; color: #39282b; font-family: Georgia, "Times New Roman", serif; font-size: 1.03rem; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.bod-page-react--books .bod-book-page__bio { margin: 0; color: #624d44; font-size: .85rem; line-height: 1.75; white-space: pre-line; overflow-wrap: anywhere; }
+.bod-page-react--books .bod-book-page__links { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin-top: 1rem; }
+.bod-page-react--books .bod-book-page__links :is(button,a) { display: inline-flex; align-items: center; min-height: 44px; padding: .35rem 0; border: 0; border-bottom: 1px solid #c9b8a2; background: transparent; color: #7e263f; font: inherit; font-size: .72rem; text-decoration: none; cursor: pointer; overflow-wrap: anywhere; }
+.bod-page-react--books .bod-book-page__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding-top: .6rem; border-top: 1px solid #c9b8a2; }
+.bod-page-react--books .bod-book-page__footer nav { display: flex; gap: .2rem; align-items: center; }
+.bod-page-react--books .bod-book-page__footer button { min-height: 44px; min-width: 36px; padding: .4rem .25rem; border: 0; color: #7e263f; background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
+.bod-page-react--books .bod-book-page__footer button:disabled { opacity: .4; cursor: default; }
+.bod-page-react--books .bod-book-page__footer nav > span { color: #6b554b; font-size: .65rem; font-variant-numeric: tabular-nums; }
+.bod-page-react--books .bod-book-page :is(button,a,[tabindex]):focus-visible { outline-color: #7e263f; }
+.bod-page-react--books .bod-book-page h3:focus { outline: none; }
+.bod-page-react--books .bod-board-loading__card { aspect-ratio: 4 / 6; background: var(--bod-paper-raised); border-color: var(--bod-line); }
+.bod-page-react--books .bod-magazine-progress { position: fixed; top: var(--header-height,5rem); left: 0; right: 0; height: 2px; background: var(--bod-accent); transform-origin: left; z-index: 40; pointer-events: none; }
+.bod-page-react--books .bod-contact-react { border-radius: 0; border-color: var(--bod-line); background: var(--bod-paper-raised); box-shadow: none; }
+.bod-page-react--books :is(button,a,[tabindex]):focus-visible { outline: 2px solid var(--bod-accent); outline-offset: 4px; }
+
+@media (max-width: 620px) {
+  .bod-page-react--books .bod-book-item.is-expanded { grid-column: span 1; grid-template-columns: minmax(0,1fr); }
+  .bod-page-react--books .bod-book-page { position: relative; top: auto; bottom: auto; width: 100%; min-height: 26rem; max-height: 75dvh; padding: 1.4rem; transform-origin: center top; }
+  .bod-page-react--books .is-expanded .bod-book-cover { border-right: 1px solid var(--bod-line); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bod-page-react--books .bod-book-item,
+  .bod-page-react--books .bod-book-page { transform: none !important; }
+}
+
+.bod-page-react--books.bod-magazine-viewer-backdrop { position: fixed; inset: 0; z-index: 250; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(6,7,10,.88); }
+.bod-page-react--books .bod-magazine-viewer { display: flex; flex-direction: column; width: min(1400px, 100%); max-height: calc(100dvh - 2rem); min-width: 0; border: 1px solid var(--bod-line); background: var(--bod-paper); padding: 1rem; }
+.bod-page-react--books .bod-magazine-viewer header { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; align-items: center; padding-bottom: .8rem; border-bottom: 1px solid var(--bod-line); }
+.bod-page-react--books .bod-magazine-viewer h2 { margin: 0; font-family: Georgia, serif; font-size: clamp(1.3rem, 2vw, 2rem); font-weight: 400; }
+.bod-page-react--books .bod-magazine-viewer .bod-magazine-label { margin: 0 0 .35rem; }
+.bod-page-react--books .bod-magazine-viewer__actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.bod-page-react--books .bod-magazine-viewer__actions :is(button,a) { display: inline-flex; align-items: center; min-height: 44px; padding: .5rem .7rem; border: 1px solid var(--bod-line); border-radius: 0; color: var(--bod-ink); background: var(--bod-paper-raised); font: inherit; font-size: .8rem; cursor: pointer; text-decoration: none; }
+.bod-page-react--books .bod-magazine-viewer__image { overflow: auto; min-height: 0; margin-top: .8rem; padding: .5rem; overscroll-behavior: contain; }
+.bod-page-react--books .bod-magazine-viewer__image img { display: block; width: auto; height: auto; max-width: 100%; max-height: calc(100dvh - 12rem); object-fit: contain; margin-inline: auto; }
+.bod-page-react--books .bod-magazine-viewer__image img.is-zoomed { width: max(100%, 1100px); max-width: none; max-height: none; }
+.bod-page-react--books :is(button,a):focus-visible { outline: 2px solid var(--bod-accent); outline-offset: 4px; }
+

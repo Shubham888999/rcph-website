@@ -1,3 +1,4 @@
+import BodBookGrid from "./BodBookGrid.jsx";
 import BodInteractiveGrid from "./BodInteractiveGrid";
 import BodReveal from "./BodReveal";
 
@@ -17,7 +18,7 @@ export default function BodLeadership({
         aria-hidden="true"
       />
 
-      <BodInteractiveGrid members={members} editorial={editorial} />
+      {editorial ? <BodBookGrid members={members} section="club" /> : <BodInteractiveGrid members={members} />}
     </BodReveal>
   );
 }

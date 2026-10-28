@@ -31,7 +31,7 @@ test("cover tilt normalizes local pointer coordinates and stays bounded off the 
 });
 
 test("public BOD themes stay scoped and include light and reduced-motion variants", () => {
-  for (const theme of ["magazine", "blueprint"]) {
+  for (const theme of ["magazine", "blueprint", "books"]) {
     const css = readFileSync(new URL(`../../styles/components/bod-${theme}.css`, import.meta.url), "utf8");
     const selectors = [...css.matchAll(/(?:^|\})\s*([^{}]+)\{/g)].map(match => match[1].trim());
     for (const selector of selectors) {

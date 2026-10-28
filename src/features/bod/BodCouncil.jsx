@@ -1,3 +1,4 @@
+import BodBookGrid from "./BodBookGrid.jsx";
 import BodReveal from "./BodReveal";
 import CouncilInteractiveGrid from "./CouncilInteractiveGrid";
 
@@ -24,7 +25,7 @@ export default function BodCouncil({
         </div>
       </div>
 
-      <CouncilInteractiveGrid members={members} editorial={editorial} />
+      {editorial ? <BodBookGrid members={members} section="external" /> : <CouncilInteractiveGrid members={members} />}
     </BodReveal>
   );
 }
