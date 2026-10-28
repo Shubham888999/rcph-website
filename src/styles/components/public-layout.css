@@ -250,7 +250,7 @@
   gap: 0.56rem;
   flex: 0 1 auto;
   border: 1px solid rgba(216, 180, 122, 0.55);
-  border-radius: 0.48rem;
+  border-radius: 0;
   color: #f1e8d8;
   background: linear-gradient(135deg, #0b1422, #1f3150);
   box-shadow:
@@ -555,7 +555,7 @@
   }
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1420px) {
   .public-header-inner {
     gap: clamp(0.55rem, 2vw, 0.85rem);
     padding-right: 3.35rem;
@@ -1034,7 +1034,7 @@
 
 /* Mobile menu */
 
-@media (max-width: 1120px) {
+@media (max-width: 1420px) {
   .public-join-link {
     width: 100%;
     margin-top: 0.65rem;
@@ -1167,4 +1167,54 @@
 .public-page-content
 .button:active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(0);
+}
+/* Featured destinations: an aviation plate and a small book cover. */
+.public-feature-links { display: flex; align-items: center; gap: .65rem; flex: 0 0 auto; }
+.public-feature-link { min-height: 44px; border-radius: 0; }
+.public-feature-link--flight { gap: .55rem; padding-inline: .7rem; border-color: #a9b9c7; background: linear-gradient(135deg,#0c1b2c,#1d344e); }
+.public-feature-link--flight::after { content: ""; position: absolute; left: .7rem; right: .7rem; bottom: 5px; height: 1px; background: repeating-linear-gradient(90deg,rgba(182,209,226,.5) 0 4px,transparent 4px 8px); transform: scaleX(.45); transform-origin: left; transition: transform 240ms ease; }
+.public-feature-plane { width: 21px; height: 21px; flex: 0 0 21px; color: #e7c58f; transform: rotate(35deg); transition: transform 240ms ease; }
+.public-feature-link--flight .public-event-link__live { font-size: .67rem; letter-spacing: .07em; }
+.public-board-link { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; gap: .55rem; padding: .45rem .8rem .45rem .95rem; border: 1px solid #d1b58f; border-left: 5px solid #9d5363; color: #f4e4ca; background: linear-gradient(110deg,#542035,#32111f); font-family: Georgia,"Times New Roman",serif; font-size: .95rem; font-weight: 600; letter-spacing: .01em; line-height: 1; text-decoration: none; white-space: nowrap; box-shadow: inset -3px 0 0 #b89673; transition: border-color 200ms ease,box-shadow 200ms ease,transform 200ms ease; }
+.public-board-link::after { content: ""; position: absolute; top: 4px; bottom: 4px; right: 5px; width: 1px; background: rgba(244,228,202,.28); }
+.public-feature-book { width: 24px; height: 24px; flex: 0 0 24px; overflow: visible; perspective: 80px; }
+.public-feature-book__leaf { transform-box: fill-box; transform-origin: left center; transform: rotateY(-32deg); transition: transform 320ms ease; }
+.public-board-link.is-active { border-color: #f4e4ca; border-left-color: #edbb88; }
+.public-feature-link:focus-visible { outline: 2px solid #edcf9e; outline-offset: 4px; }
+@media (hover: hover) and (pointer: fine) {
+  .public-feature-link--flight:hover .public-feature-plane,
+  .public-feature-link--flight:focus-visible .public-feature-plane { transform: translate(2px,-2px) rotate(35deg); }
+  .public-feature-link--flight:hover::after,
+  .public-feature-link--flight:focus-visible::after { transform: scaleX(1); }
+  .public-board-link:hover { transform: translateY(-1px); border-color: #f4e4ca; box-shadow: inset -3px 0 0 #d1b58f,3px 3px 0 rgba(209,181,143,.2); }
+  .public-board-link:hover .public-feature-book__leaf,
+  .public-board-link:focus-visible .public-feature-book__leaf { transform: rotateY(0); }
+}
+@media (min-width: 721px) and (max-width: 1420px) {
+  .public-feature-link--flight { flex-direction: row; align-items: center; min-width: 0; padding-inline: .7rem; gap: .55rem; }
+  .public-feature-links { margin-left: auto; }
+}
+@media (max-width: 720px) {
+  .public-header-inner { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .65rem 1rem; padding: .65rem 1rem .75rem; }
+  .public-brand { grid-column: 1; grid-row: 1; justify-self: start; }
+  .public-menu-toggle { position: static; grid-column: 2; grid-row: 1; transform: none; margin: 0; justify-self: end; }
+  .public-feature-links { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .6rem; width: 100%; }
+  .public-feature-links .public-feature-link { width: 100%; min-width: 0; max-width: none; min-height: 44px; padding: .4rem .45rem; flex-direction: row; align-items: center; justify-content: center; gap: .45rem; }
+  .public-feature-link--flight .public-event-link__live { font-size: .62rem; letter-spacing: .035em; }
+  .public-board-link { font-size: .9rem; }
+  .public-navigation { left: 1rem; right: 1rem; }
+}
+@media (max-width: 360px) {
+  .public-header-inner { padding-inline: .75rem; }
+  .public-feature-links { gap: .45rem; }
+  .public-feature-plane { width: 17px; height: 17px; flex-basis: 17px; }
+  .public-feature-book { width: 20px; height: 20px; flex-basis: 20px; }
+  .public-feature-link--flight .public-event-link__live { font-size: .57rem; }
+  .public-board-link { font-size: .82rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-feature-link,
+  .public-feature-plane,
+  .public-feature-book__leaf,
+  .public-feature-link--flight::after { transition: none; transform: none; }
 }
