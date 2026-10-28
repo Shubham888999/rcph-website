@@ -35,7 +35,12 @@
 .bod-page-react--books .bod-hero-react h1,
 .bod-page-react--books .bod-section-react h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: -.045em; text-shadow: none; }
 .bod-page-react--books .bod-hero-react h1 { font-size: clamp(3.2rem, 5.8vw, 6rem); }
-.bod-page-react--books .bod-hero-react__description { margin-top: 1.2rem; color: var(--bod-muted); }
+.bod-page-react--books .bod-book-motto { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 1rem; align-items: center; width: fit-content; max-width: 100%; margin-top: 1.4rem; padding-block: .2rem; }
+.bod-page-react--books .bod-book-motto__mark { width: 36px; height: 42px; color: var(--bod-accent); }
+.bod-page-react--books .bod-book-motto__text { display: flex; flex-wrap: wrap; align-items: baseline; gap: .05em .35em; margin: 0; font-family: Georgia,"Times New Roman",serif; font-size: clamp(1.3rem,1.9vw,2rem); font-weight: 400; line-height: 1.5; letter-spacing: -.02em; }
+.bod-page-react--books .bod-book-motto__text > span { color: var(--bod-muted); font-style: italic; }
+.bod-page-react--books .bod-book-motto__text > em { position: relative; color: var(--bod-accent); font-style: normal; white-space: nowrap; }
+.bod-page-react--books .bod-book-motto__text > em::after { content: ""; position: absolute; right: 0; bottom: .07em; left: 0; height: 1px; background: linear-gradient(90deg,var(--bod-accent),color-mix(in srgb,var(--bod-accent) 15%,transparent)); }
 .bod-page-react--books .bod-kicker { color: var(--bod-accent); font-size: .7rem; letter-spacing: .16em; }
 .bod-page-react--books .bod-book-hint { margin: 1.2rem 0 0; padding-top: .9rem; border-top: 1px solid var(--bod-line); color: var(--bod-accent); font-size: .78rem; letter-spacing: .025em; }
 .bod-page-react--books .bod-book-hint > span { padding-left: .8rem; }
