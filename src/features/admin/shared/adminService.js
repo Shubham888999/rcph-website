@@ -1,3 +1,4 @@
+import { performVisitReplacement, visitFileActionError } from '../visit/visitFileActionsModel.js';
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, functions } from "../../../app/firebase";
@@ -127,7 +128,7 @@ export const visitCalls = {
   updateVisit: (payload) => callable("updateVisitSubmissionConfig", payload), updateFolder: (payload) => callable("updateVisitSubmissionFolder", payload),
   createSession: (payload) => callable("createVisitSubmissionUploadSession", payload), finalize: (payload) => callable("finalizeVisitSubmissionUpload", payload), cancelSession: (sessionId) => callable("cancelVisitSubmissionUploadSession", { sessionId }),
   createBulkSessions: (payload) => callable("createVisitSubmissionBulkUploadSessions", payload), recordBulkUploadAudit: (bulkUploadId) => callable("recordVisitSubmissionBulkUploadAudit", { bulkUploadId }),
-  withdraw: (submissionId) => callable("withdrawVisitSubmission", { submissionId }), remove: (submissionId, reason) => callable("removeVisitSubmission", { submissionId, reason }), replace: (submissionId, files) => callable("replaceVisitSubmission", { submissionId, files }),
+  withdraw: (submissionId) => callable("withdrawVisitSubmission", { submissionId, syncDrive: true }).catch(error => { throw visitFileActionError(error); }), remove: (submissionId, reason) => callable("removeVisitSubmission", { submissionId, reason, syncDrive: true }).catch(error => { throw visitFileActionError(error); }), replace: (submissionId, files) => callable("replaceVisitSubmission", { submissionId, files }),
   setPrimaryPresentation: (visitType, positionKey, submissionId = "") => callable("setVisitSubmissionPrimaryPresentation", { visitType, positionKey, submissionId: submissionId || "" }),
   saveLink: (payload) => callable("saveVisitSubmissionLink", payload),
   removeLink: (visitType, positionKey, linkId) => callable("removeVisitSubmissionLink", { visitType, positionKey, linkId }),
@@ -144,6 +145,13 @@ export const visitDashboardCalls = {
   updateConfig: (payload) => callable("updateVisitDashboardConfig", payload),
   folderOptions: (visitType) => callable("getVisitDashboardFolderOptions", { visitType }),
 };
+
+export async function replaceVisitFile(file, item, onStage) {
+  requireUser();
+  let storage;
+  try { storage = window.sessionStorage; } catch { storage = null; }
+  return performVisitReplacement({ file, mimeType: file.type || item.mimeType, submissionId: item.submissionId, uid: auth.currentUser.uid, getIdToken: () => auth.currentUser.getIdToken(), env: import.meta.env, storage, onStage });
+}
 
 export async function uploadVisitFile(file, session, approved, onStage) {
   const endpoint = resolveVisitUploadEndpoint(import.meta.env);

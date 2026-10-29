@@ -81,9 +81,9 @@ function VisitActionMenu({
         {moveTargets.map((category) => (
           <button type="button" key={category.key || "supporting"} onClick={() => onMove?.(item, category.key)}>{category.moveLabel}</button>
         ))}
-        {item.canReplace ? <button type="button" onClick={() => onReplace(item)}>Replace</button> : null}
-        {item.canWithdraw ? <button type="button" onClick={() => onWithdraw(item)}>Withdraw</button> : null}
-        {item.canRemove ? <button type="button" className="danger" onClick={() => onRemove(item)}>Remove</button> : null}
+        {item.canReplace ? <button type="button" onClick={() => onReplace(item)}>{item.pendingFileAction === 'replace' ? 'Finish replacement' : 'Replace'}</button> : null}
+        {item.canWithdraw ? <button type="button" onClick={() => onWithdraw(item)}>{item.pendingFileAction === 'delete' ? 'Finish deletion' : 'Delete'}</button> : null}
+        {item.canRemove ? <button type="button" className="danger" onClick={() => onRemove(item)}>{item.pendingFileAction === 'delete' ? 'Finish deletion' : 'Delete'}</button> : null}
       </div>
     </details>
   );
@@ -138,6 +138,7 @@ export default function VisitSubmissionFiles({
               <strong>{item.fileName}</strong>
               <span>{kind.label}{item.sizeBytes ? ` - ${formatVisitFileSize(item.sizeBytes)}` : ""}</span>
               <span>{item.status} - {item.uploadedByName || "Member"}</span>
+              {item.pendingFileAction ? <span role="status">A Drive change needs finishing. Retry the same action.</span> : null}
               {isPrimary ? <span className="visit-files__primary-status">Main presentation</span> : null}
             </div>
             <div className="visit-files__actions">

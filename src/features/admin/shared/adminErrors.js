@@ -1,4 +1,6 @@
+import { VISIT_FILE_ACTION_MESSAGES } from '../visit/visitFileActionsModel.js';
 const MESSAGES = {
+  ...VISIT_FILE_ACTION_MESSAGES,
   "functions/unauthenticated": "Sign in again to continue.",
   "functions/permission-denied": "Your trusted access does not permit this action.",
   "functions/invalid-argument": "Check the required details and try again.",

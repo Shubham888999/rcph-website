@@ -201,7 +201,7 @@ test("select several files and remove or withdraw them in one go, with no reason
   assert.match(moduleSource, /selection=\{\{ active: selectMode, selectedIds, onToggle: toggleSelected \}\}/);
   assert.match(moduleSource, /dialog\.type === "bulk-remove"\) return <BulkRemoveDialog/);
   assert.match(moduleSource, /if \(item\.action === "remove"\) await visitCalls\.remove\(item\.submissionId, ""\);\s+else await visitCalls\.withdraw\(item\.submissionId\);/);
-  assert.match(moduleSource, /The Drive files are not deleted\./);
+  assert.match(moduleSource, /These files will be moved to Drive Trash and removed from the active website list\./);
   assert.match(detailsSource, /<input type="checkbox" checked=\{picked\} onChange=\{\(\) => selection\.onToggle\(item\)\}/);
   assert.match(detailsSource, /selection\?\.active === true && Boolean\(visitBulkAction\(item\)\)/);
 });

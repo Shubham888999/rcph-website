@@ -145,6 +145,7 @@ export function normalizeSubmission(value) {
     fileUrl: safeUrl(value.fileUrl || value.webViewLink),
     folderUrl: safeUrl(value.folderUrl),
     uploadedByName: text(value.uploadedByName, 160),
+    pendingFileAction: ['replace', 'delete'].includes(value.pendingFileAction) ? value.pendingFileAction : '',
     canReplace: value.canReplace === true,
     canWithdraw: value.canWithdraw === true,
     canRemove: value.canRemove === true,
@@ -220,7 +221,7 @@ export function visitBulkSelectable(submissions = []) {
 export function visitBulkSummary(items = []) {
   const removing = items.filter((item) => item.action === "remove").length;
   const withdrawing = items.filter((item) => item.action === "withdraw").length;
-  const verb = removing && withdrawing ? "Remove or withdraw" : withdrawing ? "Withdraw" : "Remove";
+  const verb = "Delete";
   return { removing, withdrawing, verb, total: items.length };
 }
 

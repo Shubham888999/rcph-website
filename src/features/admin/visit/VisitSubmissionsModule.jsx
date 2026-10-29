@@ -1,3 +1,5 @@
+import VisitFileReplaceDialog from './VisitFileReplaceDialog.jsx';
+import { findVisitUploadConflicts, hasVisitUploadConflicts } from './visitFileActionsModel.js';
 import { bulkDestinationChoices, bulkSharedDestinationChoices, resolveBulkDestination } from "./visitBulkDestinations.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminDialog from "../shared/AdminDialog";
@@ -5,7 +7,7 @@ import AdminModuleHeader from "../AdminModuleHeader";
 import { AdminEmpty, AdminError, AdminLoading } from "../shared/AdminStates";
 import { safeAdminError } from "../shared/adminErrors";
 import { uploadVisitFile, visitCalls } from "../shared/adminService";
-import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, validateVisitFile, visitFolderCategories, visitBulkAction, visitBulkSelectable, visitBulkSummary, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices, VISIT_CUSTOM_FOLDER_NAME_MAX, VISIT_MAX_CUSTOM_FOLDERS, VISIT_MAX_SUBFOLDERS, VISIT_MAX_TOTAL_FOLDERS, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
+import { canEditVisitPrimaryPresentation, groupVisitSubmissionsByCategory, normalizeFolder,normalizeFolders, normalizeSubmission, normalizeVisit, toCallableDate, visitFolderCategories, visitBulkAction, visitBulkSelectable, visitBulkSummary, visitFolderUsesCategories, visitTopLevelFolderCount, visitUploadChoices, VISIT_CUSTOM_FOLDER_NAME_MAX, VISIT_MAX_CUSTOM_FOLDERS, VISIT_MAX_SUBFOLDERS, VISIT_MAX_TOTAL_FOLDERS, VISIT_STATUSES, VISIT_TYPES } from "./visitModel";
 import VisitSubmissionFiles, { VisitFileTypeBadge } from "./VisitSubmissionFiles";
 import VisitFolderLinks from "./VisitFolderLinks.jsx";
 import {
@@ -74,15 +76,18 @@ export default function VisitSubmissionsModule({ onNotice }) {
     try { const data = await visitCalls.folders(visitType); setRoute({ visit: visitType, position: "" }); setState((current) => ({ ...current, status: "success", folders: { visit: normalizeVisit(data.visit), access: data.access || {}, folders: normalizeFolders(data.folders, visitType) }, detail: null })); }
     catch (error) { setState((current) => ({ ...current, status: "error", error: safeAdminError(error) })); }
   }
-  async function openFolder(visitType, positionKey) {
-    setState((current) => ({ ...current, status: "loading" }));
+  async function openFolder(visitType, positionKey, background = false) {
+    if (!background) setState((current) => ({ ...current, status: "loading" }));
     try { const data = await visitCalls.folder(visitType, positionKey); setRoute({ visit: visitType, position: positionKey }); setState((current) => ({ ...current, status: "success", detail: { visit: normalizeVisit(data.visit), folder: normalizeFolder(data.folder), access: data.access || {}, submissions: (data.submissions || []).map(normalizeSubmission).filter(Boolean) } })); }
-    catch (error) { setState((current) => ({ ...current, status: "error", error: safeAdminError(error) })); }
+    catch (error) {
+      if (background) onNotice({ type: 'error', message: 'The file action finished, but the file list could not refresh. Reload Club Visits to see the latest records.' });
+      else setState((current) => ({ ...current, status: "error", error: safeAdminError(error) }));
+    }
   }
   if (state.status === "loading") return <AdminLoading label="Loading Club Visit workspace…" />;
   if (state.status === "error") return <AdminError message={state.error} onRetry={() => route.position ? openFolder(route.visit, route.position) : route.visit ? openVisit(route.visit) : loadDashboard()} />;
   const access = state.dashboard?.access || state.folders?.access || state.detail?.access || {};
-  const reload = () => route.position ? openFolder(route.visit, route.position) : route.visit ? openVisit(route.visit) : loadDashboard();
+  const reload = () => route.position ? openFolder(route.visit, route.position, true) : route.visit ? openVisit(route.visit) : loadDashboard();
   return <>
     <AdminModuleHeader kicker="Official filing room" title="Club Visits" description="Official visit document workspace for Club Assembly, DZR Visit, and DRR Visit." action={route.visit ? <button onClick={() => { setRoute({ visit: "", position: "" }); loadDashboard(); }}>Submission dashboard</button> : null} />
     {!route.visit ? <VisitDashboardWorkspace data={state.dashboard} access={access} openVisit={openVisit} busy={busy} mutate={mutate} setDialog={setDialog} load={loadDashboard} /> : route.position ? <FolderDetail data={state.detail} busy={busy} mutate={mutate} reload={reload} setDialog={setDialog} /> : <VisitFoldersWorkspace data={state.folders} openFolder={openFolder} setDialog={setDialog} />}
@@ -345,7 +350,7 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
 
   function selectFiles(fileList) {
     const result = addVisitFiles(
-      queue,
+      queue.filter((item) => !["Uploaded", "Cancelled"].includes(item.status)),
       fileList,
       folder,
       () => `react-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -378,6 +383,10 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
       item.status === "Ready" || (retryFailed && item.status === "Failed")
     ));
     if (!candidates.length) return;
+    if (hasVisitUploadConflicts(candidates, data.submissions)) {
+      setAnnouncement('Choose Replace existing or Keep both for files already in this folder.');
+      return;
+    }
     setUploading(true);
     setAnnouncement("Requesting upload authorization.");
     let completed = 0;
@@ -482,7 +491,10 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
     }
 
     setUploading(false);
-    if (completed) await reload();
+    if (completed) {
+      setQueue((current) => current.filter((item) => item.status !== "Uploaded"));
+      await reload();
+    }
     setAnnouncement(`${completed} file${completed === 1 ? "" : "s"} uploaded${failed ? `; ${failed} failed and can be retried` : ""}.`);
   }
 
@@ -508,7 +520,7 @@ function FolderDetail({ data, busy, mutate, reload, setDialog }) {
   }
   if (data) return <FolderDetailWorkspaceView data={data} folder={folder} queue={queue} setQueue={setQueue} busy={busy} uploading={uploading} uploadConfigured={uploadConfigured} announcement={announcement} primarySelectionBusy={primarySelectionBusy} uploadInputRef={uploadInputRef} selectFiles={selectFiles} upload={upload} cancelRemaining={cancelRemaining} mutate={mutate} reload={reload} setDialog={setDialog} updatePrimaryPresentation={updatePrimaryPresentation} />;
   return <><section className="admin-panel"><h3>{data.visit?.displayTitle} · {folder.positionTitle}</h3><p>{folder.locked ? `Locked: ${folder.lockReason}` : `${folder.activeFileCount} of ${folder.maxActiveFiles} active files`}</p><p>Up to {folder.maxFilesPerSelection} files per selection, {Math.round(folder.maxFileSizeBytes / 1048576)} MB each.</p><div className="admin-actions">{data.access.canManage ? <button onClick={() => setDialog({ type: "folder-settings", folder })}>Folder settings</button> : null}{data.access.canManage ? <button onClick={() => mutate("reconcile", () => visitCalls.reconcile(folder.visitType, folder.positionKey), "Folder counts reconciled.", reload)}>Reconcile counts</button> : null}</div></section>
-    {folder.canUpload ? <section className="admin-panel visit-upload" aria-labelledby="visit-upload-title"><h3 id="visit-upload-title">Supporting files</h3><p>Upload invitation letters, visit reports, photographs, attendance sheets, or other supporting documents for this Club Visit.</p>{!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload endpoint could not be resolved. Configure VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT or VITE_FIREBASE_PROJECT_ID for uploadVisitSubmissionFile.</p> : null}<label className="visit-upload__label" htmlFor="visit-supporting-files">Choose supporting files</label><input id="visit-supporting-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={uploading || !uploadConfigured} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} /><p>{queue.length} selected · maximum {folder.maxFilesPerSelection}</p><p className="sr-only" aria-live="polite">{announcement}</p>{queue.length ? <ul className="visit-upload__queue">{queue.map((item) => <li key={item.clientFileId}><div><strong>{item.file.name}</strong><span>{item.file.type || "Unknown type"} · {formatVisitFileSize(item.file.size)}</span><span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span></div>{!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}</li>)}</ul> : null}<div className="admin-actions"><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button><button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>{queue.some((item) => item.sessionId && item.status !== "Uploaded") ? <button type="button" disabled={uploading} onClick={cancelRemaining}>Cancel remaining uploads</button> : null}</div></section> : <p className="admin-lock-banner is-locked">Uploads are unavailable for this folder.</p>}
+    {folder.canUpload ? <section className="admin-panel visit-upload" aria-labelledby="visit-upload-title"><h3 id="visit-upload-title">Supporting files</h3><p>Upload invitation letters, visit reports, photographs, attendance sheets, or other supporting documents for this Club Visit.</p>{!uploadConfigured ? <p role="alert" className="admin-lock-banner is-locked">Club Visits upload endpoint could not be resolved. Configure VITE_VISIT_SUBMISSION_UPLOAD_ENDPOINT or VITE_FIREBASE_PROJECT_ID for uploadVisitSubmissionFile.</p> : null}<label className="visit-upload__label" htmlFor="visit-supporting-files">Choose supporting files</label><input id="visit-supporting-files" type="file" multiple accept={VISIT_FILE_ACCEPT} disabled={uploading || !uploadConfigured} onChange={(event) => { selectFiles(event.target.files); event.target.value = ""; }} /><p>{queue.length} selected · maximum {folder.maxFilesPerSelection}</p><p className="sr-only" aria-live="polite">{announcement}</p>{queue.length ? <ul className="visit-upload__queue">{queue.map((item) => <li key={item.clientFileId}><div><strong>{item.file.name}</strong><span>{item.file.type || "Unknown type"} · {formatVisitFileSize(item.file.size)}</span><span className={`visit-upload__status is-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}: {item.message}</span></div>{!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}</li>)}</ul> : null}<div className="admin-actions"><button type="button" disabled={busy || uploading || !uploadConfigured || hasVisitUploadConflicts(queue, data.submissions) || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button><button type="button" disabled={busy || uploading || !uploadConfigured || hasVisitUploadConflicts(queue, data.submissions) || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>{queue.some((item) => item.sessionId && item.status !== "Uploaded") ? <button type="button" disabled={uploading} onClick={cancelRemaining}>Cancel remaining uploads</button> : null}</div></section> : <p className="admin-lock-banner is-locked">Uploads are unavailable for this folder.</p>}
     <section className="admin-panel" aria-labelledby="visit-active-files"><h3 id="visit-active-files">Supporting files</h3><VisitSubmissionFiles submissions={data.submissions} canManagePrimaryPresentation={canEditVisitPrimaryPresentation(data.access, folder)} primaryPresentationSubmissionId={folder.primaryPresentationSubmissionId} primarySelectionBusy={primarySelectionBusy} onSetPrimaryPresentation={(item) => updatePrimaryPresentation(item.submissionId, item.submissionId, "Main presentation selected.")} onClearPrimaryPresentation={() => updatePrimaryPresentation("", "__clear__", "Main presentation selection cleared.")} onReplace={(item) => setDialog({ type: "replace", item, folder })} onWithdraw={(item) => setDialog({ type: "withdraw", item })} onRemove={(item) => setDialog({ type: "remove", item })} /></section>
   </>;
 }
@@ -679,13 +691,22 @@ function FolderDetailWorkspaceView({
                               value={choice.key}
                               checked={(item.documentCategory || "") === choice.key}
                               onChange={() => setQueue((current) => current.map((entry) => (
-                                entry.clientFileId === item.clientFileId ? { ...entry, documentCategory: choice.key } : entry
+                                entry.clientFileId === item.clientFileId ? { ...entry, documentCategory: choice.key, allowDuplicate: false } : entry
                               )))}
                             />
                             {choice.label}
                           </label>
                         ))}
                       </fieldset>
+                    ) : null}
+                    {!uploading && findVisitUploadConflicts(item, data.submissions).length ? (
+                      <div className="visit-upload-conflict">
+                        <p>A file with this name already exists in this folder.</p>
+                        <div className="admin-actions">
+                          {findVisitUploadConflicts(item, data.submissions).length === 1 && findVisitUploadConflicts(item, data.submissions)[0].canReplace ? <button type="button" onClick={() => { const existing = findVisitUploadConflicts(item, data.submissions)[0]; setDialog({ type: 'replace', item: existing, folder, file: item.file, onReplaced: () => setQueue(current => current.filter(entry => entry.clientFileId !== item.clientFileId)) }); }}>Replace existing</button> : <span>Use Replace from the existing file's action menu to choose the correct copy.</span>}
+                          <button type="button" onClick={() => setQueue(current => current.map(entry => entry.clientFileId === item.clientFileId ? { ...entry, allowDuplicate: true } : entry))}>Keep both</button>
+                        </div>
+                      </div>
                     ) : null}
                   </div>
                   {!uploading && !item.completionProof && !["Uploaded", "Cancelled"].includes(item.status) ? <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.clientFileId !== item.clientFileId))}>Remove</button> : null}
@@ -694,8 +715,8 @@ function FolderDetailWorkspaceView({
             </ul>
           ) : null}
           <div className="visit-card-actions">
-            <button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button>
-            <button type="button" disabled={busy || uploading || !uploadConfigured || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>
+            <button type="button" disabled={busy || uploading || !uploadConfigured || hasVisitUploadConflicts(queue, data.submissions) || !queue.some((item) => item.status === "Ready")} onClick={() => upload(false)}>Start sequential upload</button>
+            <button type="button" disabled={busy || uploading || !uploadConfigured || hasVisitUploadConflicts(queue, data.submissions) || !queue.some((item) => item.status === "Failed" && !item.validationError)} onClick={() => upload(true)}>Retry failed uploads</button>
             {queue.some((item) => item.sessionId && item.status !== "Uploaded") ? <button type="button" disabled={uploading} onClick={cancelRemaining}>Cancel remaining uploads</button> : null}
           </div>
         </section>
@@ -770,43 +791,50 @@ function FolderDetailWorkspaceView({
 
 function VisitDialog({ dialog, visits, busy, mutate, onClose, reload, onNotice }) {
   const [reason, setReason] = useState("");
-  const [file, setFile] = useState(null);
   const [form, setForm] = useState(dialog.visit || dialog.folder || {});
   if (dialog.type === "visit-settings") return <AdminDialog title="Visit settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-visit", () => visitCalls.updateVisit({ visitType: form.visitType, description: form.description || "", enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, visitDate: toCallableDate(form.visitDate), submissionDeadline: toCallableDate(form.submissionDeadline), instructions: form.instructions || "" }), "Visit settings saved.", reload); }}><label>Description<textarea value={form.description || ""} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label><label>Visit date<input type="datetime-local" value={form.visitDate || ""} onChange={(event) => setForm({ ...form, visitDate: event.target.value })} /></label><label>Submission deadline<input type="datetime-local" value={form.submissionDeadline || ""} onChange={(event) => setForm({ ...form, submissionDeadline: event.target.value })} /></label><label>Instructions<textarea value={form.instructions || ""} onChange={(event) => setForm({ ...form, instructions: event.target.value })} /></label><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Submissions open</label><button disabled={busy}>Save</button></form></AdminDialog>;
   if (dialog.type === "folder-settings") return <AdminDialog title="Folder settings" busy={busy} onClose={onClose}><form className="admin-form" onSubmit={(event) => { event.preventDefault(); mutate("update-folder", () => visitCalls.updateFolder({ visitType: form.visitType, positionKey: form.positionKey, enabled: form.enabled !== false, submissionOpen: form.submissionOpen !== false, locked: form.locked === true, lockReason: form.lockReason || "", maxActiveFiles: Number(form.maxActiveFiles), maxFilesPerSelection: Number(form.maxFilesPerSelection), maxFileSizeBytes: Math.round(Number(form.maxFileSizeMb) * 1048576) }), "Folder settings saved.", reload); }}><label><input type="checkbox" checked={form.enabled !== false} onChange={(event) => setForm({ ...form, enabled: event.target.checked })} /> Enabled</label><label><input type="checkbox" checked={form.submissionOpen !== false} onChange={(event) => setForm({ ...form, submissionOpen: event.target.checked })} /> Open</label><label><input type="checkbox" checked={form.locked === true} onChange={(event) => setForm({ ...form, locked: event.target.checked })} /> Locked</label><label>Reason<input value={form.lockReason || ""} onChange={(event) => setForm({ ...form, lockReason: event.target.value })} /></label><label>{form.perFolderFileLimit ? "File limit per folder" : "Max active files"}<input type="number" min="1" max="300" disabled={Boolean(form.perFolderFileLimit)} value={form.maxActiveFiles} onChange={(event) => setForm({ ...form, maxActiveFiles: event.target.value })} /></label><label>Max files per selection<input type="number" min="1" max="10" value={form.maxFilesPerSelection} onChange={(event) => setForm({ ...form, maxFilesPerSelection: event.target.value })} /></label><label>Max file size (MB)<input type="number" min="1" max="25" value={form.maxFileSizeMb ?? Math.round(Number(form.maxFileSizeBytes) / 1048576)} onChange={(event) => setForm({ ...form, maxFileSizeMb: event.target.value })} /></label><button disabled={busy}>Save</button></form></AdminDialog>;
   if (dialog.type === "moderation") return <AdminDialog title="Visit moderation" busy={busy} onClose={onClose} className="admin-dialog--wide"><Moderation visits={visits} /></AdminDialog>;
   if (dialog.type === "bulk-upload") return <BulkVisitUploadDialog key={dialog.visit.visitType} visit={dialog.visit} onClose={onClose} reload={reload} />;
-  if (dialog.type === "replace") return <AdminDialog title={`Replace ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><label htmlFor="visit-replacement-file">Choose replacement file</label><input id="visit-replacement-file" type="file" accept={VISIT_FILE_ACCEPT} onChange={(event) => setFile(event.target.files?.[0] || null)} />{file ? <p>{file.name} · {formatVisitFileSize(file.size)}</p> : null}<button disabled={!file || busy} onClick={() => mutate("replace", async () => { const error = validateVisitFile(file, dialog.folder); if (error) throw new Error(error); const descriptor = { clientFileId: `replace-${Date.now()}`, fileName: file.name, mimeType: file.type, sizeBytes: file.size }; const session = await visitCalls.replace(dialog.item.submissionId, [descriptor]); const approved = session.files?.[0]; if (!approved) throw new Error("Replacement session failed."); const proof = await uploadVisitFile(file, session, approved); return visitCalls.finalize({ sessionId: session.sessionId, clientFileId: approved.clientFileId, ticket: approved.ticket, completionProof: proof.completionProof }); }, "Submission replaced.", reload)}>Replace file</button></AdminDialog>;
+  if (dialog.type === "replace") return <VisitFileReplaceDialog key={dialog.item.submissionId} item={dialog.item} folder={dialog.folder} initialFile={dialog.file || null} onReplaced={dialog.onReplaced} onClose={onClose} reload={reload} onNotice={onNotice} />;
   if (dialog.type === "bulk-remove") return <BulkRemoveDialog dialog={dialog} onClose={onClose} reload={reload} onNotice={onNotice} />;
   if (dialog.type.startsWith("custom-folder-")) return <CustomFolderDialog dialog={dialog} busy={busy} mutate={mutate} onClose={onClose} reload={reload} />;
   const remove = dialog.type === "remove";
-  return <AdminDialog title={`${remove ? "Remove" : "Withdraw"} ${dialog.item.fileName}?`} busy={busy} onClose={onClose}>{remove ? <label>Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></label> : <p>The submission will be withdrawn and its active reservation released.</p>}<div className="admin-actions"><button onClick={onClose}>Cancel</button><button className="danger" disabled={busy || (remove && !reason.trim())} onClick={() => mutate(dialog.type, () => remove ? visitCalls.remove(dialog.item.submissionId, reason.trim()) : visitCalls.withdraw(dialog.item.submissionId), `Submission ${remove ? "removed" : "withdrawn"}.`, reload)}>Confirm</button></div></AdminDialog>;
+  return <AdminDialog title={`Delete ${dialog.item.fileName}?`} busy={busy} onClose={onClose}><p>This file will be moved to Drive Trash and removed from the active website list. You can restore it in Drive if needed.</p>{remove ? <label>Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></label> : null}<div className="admin-actions"><button onClick={onClose}>Cancel</button><button className="danger" disabled={busy || (remove && !reason.trim())} onClick={() => mutate(dialog.type, () => remove ? visitCalls.remove(dialog.item.submissionId, reason.trim()) : visitCalls.withdraw(dialog.item.submissionId), "File moved to Drive Trash and removed from the website.", reload)}>Delete file</button></div></AdminDialog>;
 }
 
-// Removes (managers) or withdraws (the uploader) the chosen files one after another. No reason is
-// asked. Files are only taken off the site; the Drive files stay for the admin to delete.
+// Delete the selected files sequentially. Each server action moves Drive content
+// to Trash before removing the active website entry and releasing its count.
 function BulkRemoveDialog({ dialog, onClose, reload, onNotice }) {
   const { items } = dialog;
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
+  const deletionLock = useRef(false);
   const summary = visitBulkSummary(items);
   const running = progress !== null && result === null;
 
   async function run() {
+    if (deletionLock.current) return;
+    deletionLock.current = true;
+    const targets = result ? result.failed : items;
+    const previouslyDone = result?.done || 0;
+    setResult(null);
     const failed = [];
     let done = 0;
-    for (const [index, item] of items.entries()) {
-      setProgress({ current: index + 1, total: items.length });
+    for (const [index, item] of targets.entries()) {
+      setProgress({ current: index + 1, total: targets.length });
       try {
         if (item.action === "remove") await visitCalls.remove(item.submissionId, "");
         else await visitCalls.withdraw(item.submissionId);
         done += 1;
       } catch (error) {
-        failed.push({ name: item.fileName, message: safeAdminError(error) });
+        failed.push({ ...item, name: item.fileName, message: safeAdminError(error) });
       }
     }
+    done += previouslyDone;
     setResult({ done, failed });
-    const label = summary.withdrawing && !summary.removing ? "withdrawn" : "removed";
+    deletionLock.current = false;
+    const label = "deleted";
     onNotice?.(failed.length
       ? { type: "error", message: `${done} of ${items.length} files ${label}. ${failed.length} could not be ${label}.` }
       : { type: "success", message: `${done} ${done === 1 ? "file" : "files"} ${label}.` });
@@ -827,12 +855,12 @@ function BulkRemoveDialog({ dialog, onClose, reload, onNotice }) {
           <ul className="visit-bulk-dialog__list">
             {result.failed.map((item) => <li className="is-failed" key={item.name}>{item.name}: {item.message}</li>)}
           </ul>
-          <div className="admin-actions"><button type="button" onClick={() => { onClose(); reload(); }}>Close</button></div>
+          <div className="admin-actions"><button type="button" onClick={run}>Retry failed deletions</button><button type="button" onClick={() => { onClose(); reload(); }}>Close</button></div>
         </>
       ) : (
         <>
           <p>
-            {summary.removing && !summary.withdrawing ? "These files are taken off the website. The Drive files are not deleted." : summary.withdrawing && !summary.removing ? "These files are withdrawn and their places are released." : "These files are removed or withdrawn from the website. The Drive files are not deleted."}
+            These files will be moved to Drive Trash and removed from the active website list.
           </p>
           <ul className="visit-bulk-dialog__list">
             {items.map((item) => <li key={item.submissionId}>{item.fileName}</li>)}

@@ -135,9 +135,9 @@ test("bulk selection: managers remove, the uploader withdraws, and files with ne
   assert.deepEqual(files.map((file) => visitBulkAction(file)), ["remove", "withdraw", "remove", ""]);
   assert.deepEqual(visitBulkSelectable(files).map((file) => file.submissionId), ["m", "u", "both"]);
   assert.deepEqual(visitBulkSelectable(null), []);
-  assert.deepEqual(visitBulkSummary([{ action: "remove" }, { action: "remove" }]), { removing: 2, withdrawing: 0, verb: "Remove", total: 2 });
-  assert.equal(visitBulkSummary([{ action: "withdraw" }]).verb, "Withdraw");
-  assert.equal(visitBulkSummary([{ action: "remove" }, { action: "withdraw" }]).verb, "Remove or withdraw");
+  assert.deepEqual(visitBulkSummary([{ action: "remove" }, { action: "remove" }]), { removing: 2, withdrawing: 0, verb: "Delete", total: 2 });
+  assert.equal(visitBulkSummary([{ action: "withdraw" }]).verb, "Delete");
+  assert.equal(visitBulkSummary([{ action: "remove" }, { action: "withdraw" }]).verb, "Delete");
 });
 
 test("all positions accept 300-file root and subfolder capacity metadata", () => {
