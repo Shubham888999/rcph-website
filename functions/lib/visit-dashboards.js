@@ -1,6 +1,7 @@
 'use strict';
 
 const defaultPositionHelpers = require('./positions');
+const { createAttendanceHierarchyRanker } = require('./attendance-hierarchy');
 const positionHolders = require('./position-holders');
 const letterheadExchanges = require('./letterhead-exchanges');
 const { formatRotaractorName } = require('./member-name');
@@ -1308,7 +1309,7 @@ function personName(source, fallback) {
   return normalizeText(source.name || source.displayName || source.fullName, 160) || fallback;
 }
 
-function attendanceRowsFromPeople({ peopleDocs, attendanceDocs, columns, fallbackRoleOrPosition, personPrefix }) {
+function attendanceRowsFromPeople({ peopleDocs, attendanceDocs, columns, fallbackRoleOrPosition, personPrefix, rankPerson }) {
   const attendanceById = new Map(
     (Array.isArray(attendanceDocs) ? attendanceDocs : [])
       .map(doc => [normalizeSafeId(doc.id, 160), doc?.data || {}])
@@ -1326,8 +1327,10 @@ function attendanceRowsFromPeople({ peopleDocs, attendanceDocs, columns, fallbac
         return result;
       }, {});
       const metrics = attendanceMetricsFromStatuses(Object.values(cells));
-      return {
+      const hierarchy = rankPerson(doc);
+      return { rank: hierarchy.rank, row: {
         personId: `${personPrefix}-${index + 1}`,
+        isProspect: hierarchy.isProspect,
         name: personName(source, `Person ${index + 1}`),
         roleOrPosition: normalizeText(source.position || source.clubPosition || source.role || source.memberType, 120)
           || fallbackRoleOrPosition,
@@ -1335,9 +1338,10 @@ function attendanceRowsFromPeople({ peopleDocs, attendanceDocs, columns, fallbac
         eligibleCount: metrics.eligibleCount,
         attendanceRate: metrics.attendanceRate,
         cells,
-      };
+      } };
     })
-    .sort((a, b) => a.name.localeCompare(b.name) || a.personId.localeCompare(b.personId));
+    .sort((a, b) => a.rank - b.rank || a.row.name.localeCompare(b.row.name, undefined, { sensitivity: 'base' }) || a.row.personId.localeCompare(b.row.personId))
+    .map(item => item.row);
 }
 
 function summarizeAttendanceView(columns, rows) {
@@ -1353,7 +1357,7 @@ function summarizeAttendanceView(columns, rows) {
   };
 }
 
-function buildAttendanceView({ eventDocs, peopleDocs, attendanceDocs, fallbackAvenueCode, fallbackRoleOrPosition, personPrefix, eventFilter }) {
+function buildAttendanceView({ eventDocs, peopleDocs, attendanceDocs, fallbackAvenueCode, fallbackRoleOrPosition, personPrefix, eventFilter, rankPerson }) {
   const baseColumns = (Array.isArray(eventDocs) ? eventDocs : [])
     .filter(doc => doc?.data && doc.data.archived !== true && (!eventFilter || eventFilter(doc.data)))
     .map(doc => attendanceColumnFromDoc(doc, fallbackAvenueCode))
@@ -1363,6 +1367,7 @@ function buildAttendanceView({ eventDocs, peopleDocs, attendanceDocs, fallbackAv
     peopleDocs,
     attendanceDocs,
     columns: baseColumns,
+    rankPerson,
     fallbackRoleOrPosition,
     personPrefix,
   });
@@ -1382,7 +1387,8 @@ function buildAttendanceView({ eventDocs, peopleDocs, attendanceDocs, fallbackAv
   };
 }
 
-function buildVisitDashboardAttendance({ members, events, attendance, bodMembers, bodMeetings, bodAttendance, districtEvents, districtAttendance }) {
+function buildVisitDashboardAttendance({ members, users = [], events, attendance, bodMembers, bodMeetings, bodAttendance, districtEvents, districtAttendance }) {
+  const rankPerson = createAttendanceHierarchyRanker({ users, bodMembers });
   return {
     club: buildAttendanceView({
       eventDocs: events,
@@ -1391,6 +1397,7 @@ function buildVisitDashboardAttendance({ members, events, attendance, bodMembers
       fallbackAvenueCode: 'CLUB',
       fallbackRoleOrPosition: 'Member',
       personPrefix: 'club',
+      rankPerson,
       eventFilter: isDashboardClubEvent,
     }),
     bod: buildAttendanceView({
@@ -1400,6 +1407,7 @@ function buildVisitDashboardAttendance({ members, events, attendance, bodMembers
       fallbackAvenueCode: 'BOD',
       fallbackRoleOrPosition: 'BOD',
       personPrefix: 'bod',
+      rankPerson,
     }),
     district: buildAttendanceView({
       eventDocs: districtEvents,
@@ -1408,6 +1416,7 @@ function buildVisitDashboardAttendance({ members, events, attendance, bodMembers
       fallbackAvenueCode: 'DISTRICT',
       fallbackRoleOrPosition: 'Member',
       personPrefix: 'district',
+      rankPerson,
     }),
   };
 }
@@ -1865,6 +1874,7 @@ function createVisitDashboardService(options = {}) {
       }),
       attendance: buildVisitDashboardAttendance({
         members,
+        users,
         events,
         attendance,
         bodMembers,
