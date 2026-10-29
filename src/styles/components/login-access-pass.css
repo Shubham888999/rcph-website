@@ -39,11 +39,8 @@
 .login-page-react .login-access-pass h1 > span,
 .login-page-react .login-access-pass h1 > em { display: block; }
 .login-page-react .login-access-pass h1 > em { color: var(--pass-gold); font-weight: 400; }
-.login-page-react .login-access-pass .login-access-pass__audience { margin: 1.3rem 0 0; color: var(--pass-muted); font-size: .75rem; line-height: 1.7; letter-spacing: .015em; }
-.login-page-react .login-access-pass__audience > span { padding-inline: .3rem; color: var(--pass-gold); }
 .login-page-react .login-access-pass__footer { min-width: 0; border-top: 1px solid var(--pass-line); padding-top: .7rem; }
-.login-page-react .login-access-pass__footer-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; margin-bottom: .5rem; }
-.login-page-react .login-access-pass__footer-heading > span { color: var(--pass-muted); font-size: .58rem; text-transform: uppercase; letter-spacing: .14em; }
+.login-page-react .login-access-pass__footer-heading { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; min-height: 44px; margin-bottom: .5rem; }
 .login-page-react .login-access-pass__seal { width: 44px; height: 44px; color: var(--pass-gold); transform: rotate(-12deg); opacity: .75; }
 .login-page-react .login-access-pass__seal :is(circle,path) { stroke: currentColor; stroke-width: .7; }
 .login-page-react .login-access-pass__seal text { fill: currentColor; font-family: Georgia,serif; font-size: 12px; letter-spacing: 1px; }
@@ -79,8 +76,6 @@
   .login-page-react .login-access-pass .login-brand small { font-size: .67rem; }
   .login-page-react .login-access-pass__edition > p { font-size: .54rem; }
   .login-page-react .login-access-pass h1 { font-size: clamp(2.5rem,10.5vw,3.5rem); }
-  .login-page-react .login-access-pass .login-access-pass__audience { font-size: .66rem; }
-  .login-page-react .login-access-pass__audience > span { padding-inline: .15rem; }
   .login-page-react .login-access-pass__moments { gap: .35rem; }
   .login-page-react .login-access-pass__moments figcaption { font-size: .48rem; letter-spacing: .04em; }
 }

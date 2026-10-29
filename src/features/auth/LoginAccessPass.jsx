@@ -29,12 +29,11 @@ export default function LoginAccessPass({ children }) {
     <span className="login-access-pass__spine" aria-hidden="true" />
     <header className="login-access-pass__identity">{children}</header>
     <div className="login-access-pass__body">
-      <div className="login-access-pass__edition"><p>Heritage / Account Access</p><div className="login-access-pass__stamp"><span>RIY</span><strong>2026–27</strong></div></div>
+      <div className="login-access-pass__edition"><p>Heritage / Account Access</p><div className="login-access-pass__stamp"><span>RIY</span><strong>2026-27</strong></div></div>
       <h1 id="login-brand-title"><span>Step into the</span><span>heart of</span><em>Heritage.</em></h1>
-      <p className="login-access-pass__audience">Members <span aria-hidden="true">·</span> Board <span aria-hidden="true">·</span> District Officials</p>
     </div>
     <footer className="login-access-pass__footer">
-      <div className="login-access-pass__footer-heading"><span>A glimpse of club life</span><svg className="login-access-pass__seal" viewBox="0 0 64 64" fill="none" aria-hidden="true"><circle cx="32" cy="32" r="29" /><circle cx="32" cy="32" r="25" /><path d="M15 22h34M15 42h34" /><text x="32" y="36" textAnchor="middle">RCPH</text><text className="login-access-pass__seal-district" x="32" y="50" textAnchor="middle">3131</text></svg></div>
+      <div className="login-access-pass__footer-heading"><svg className="login-access-pass__seal" viewBox="0 0 64 64" fill="none" aria-hidden="true"><circle cx="32" cy="32" r="29" /><circle cx="32" cy="32" r="25" /><path d="M15 22h34M15 42h34" /><text x="32" y="36" textAnchor="middle">RCPH</text><text className="login-access-pass__seal-district" x="32" y="50" textAnchor="middle">3131</text></svg></div>
       <div className="login-access-pass__moments">{clubMoments.map(moment => <figure key={moment.label}><img src={moment.src} alt={moment.alt} loading="lazy" decoding="async" /><figcaption>{moment.label}</figcaption></figure>)}</div>
     </footer>
   </motion.section>;
