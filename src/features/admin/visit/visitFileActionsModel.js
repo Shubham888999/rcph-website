@@ -37,7 +37,7 @@ export function hasVisitUploadConflicts(queue, submissions) {
 }
 // Keep the request ID through a lost response, dialog close or page reload.
 // Only this tab's request metadata is stored; file contents/tokens are never stored.
-export async function performVisitReplacement({ file, mimeType = file.type, submissionId, uid, getIdToken, env = {}, storage = null, fetcher = fetch, onStage = () => {} }) {
+export async function performVisitReplacement({ file, mimeType = file.type, submissionId, expectedDriveFileId = '', uid, getIdToken, env = {}, storage = null, fetcher = fetch, onStage = () => {} }) {
   const endpoint = resolveVisitReplacementEndpoint(env);
   if (!endpoint) throw new Error('Club Visit replacement is not configured.');
   onStage('Preparing replacement…');
@@ -59,7 +59,14 @@ export async function performVisitReplacement({ file, mimeType = file.type, subm
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.ok !== true || result.submissionId !== submissionId || result.status !== 'active') {
     if (result.code === 'unauthenticated') throw Object.assign(new Error('Sign in again.'), { code: 'functions/unauthenticated' });
+    if (result.reason === 'file-changed') {
+      try { storage?.removeItem(key); } catch { /* A superseded completed request must be allowed to start again. */ }
+    }
     throw visitFileActionError({ reason: VISIT_FILE_ACTION_MESSAGES[`visit/${result.reason}`] ? result.reason : 'drive-unavailable' });
+  }
+  const proof = result.verifiedReplacement;
+  if (!proof || proof.sha256 !== hash || proof.sizeBytes !== file.size || !/^[a-zA-Z0-9_-]{10,200}$/.test(proof.driveFileId || '') || (expectedDriveFileId && proof.driveFileId !== expectedDriveFileId)) {
+    throw visitFileActionError({ reason: 'drive-unavailable' });
   }
   try { if (JSON.parse(storage?.getItem(key) || 'null')?.operationId === operationId) storage.removeItem(key); } catch { /* Optional storage. */ }
   return result;

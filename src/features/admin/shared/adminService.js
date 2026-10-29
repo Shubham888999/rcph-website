@@ -14,6 +14,7 @@ import {
   validateTreasuryUploadFile,
 } from "../treasury/treasuryUploadModel";
 import {
+  getVisitDriveFileId,
   normalizeVisitUploadResponse,
   resolveVisitUploadEndpoint,
 } from "../visit/visitUploadModel";
@@ -150,7 +151,7 @@ export async function replaceVisitFile(file, item, onStage) {
   requireUser();
   let storage;
   try { storage = window.sessionStorage; } catch { storage = null; }
-  return performVisitReplacement({ file, mimeType: file.type || item.mimeType, submissionId: item.submissionId, uid: auth.currentUser.uid, getIdToken: () => auth.currentUser.getIdToken(), env: import.meta.env, storage, onStage });
+  return performVisitReplacement({ file, mimeType: file.type || item.mimeType, submissionId: item.submissionId, expectedDriveFileId: getVisitDriveFileId(item.fileUrl), uid: auth.currentUser.uid, getIdToken: () => auth.currentUser.getIdToken(), env: import.meta.env, storage, onStage });
 }
 
 export async function uploadVisitFile(file, session, approved, onStage) {

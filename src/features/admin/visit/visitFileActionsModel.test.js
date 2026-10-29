@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { findVisitUploadConflicts, hasVisitUploadConflicts, performVisitReplacement, resolveVisitReplacementEndpoint, visitFileActionError } from './visitFileActionsModel.js';
 import { safeAdminError } from '../shared/adminErrors.js';
 const env={VITE_FIREBASE_PROJECT_ID:'rcph-admin'};
 const file=new File(['%PDF-1.4 corrected'], 'New document.pdf',{type:'application/pdf'});
 function store(){const map=new Map();return {getItem:key=>map.get(key)||null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key),map};}
-function success(){return {ok:true,json:async()=>({ok:true,submissionId:'submission1',status:'active'})};}
+function success(){return {ok:true,json:async()=>({ok:true,submissionId:'submission1',status:'active',verifiedReplacement:{driveFileId:'driveFile00001',sha256:createHash('sha256').update('%PDF-1.4 corrected').digest('hex'),sizeBytes:file.size}})};}
 test('replacement endpoint follows the trusted upload project and emulator endpoint',()=>{
  assert.equal(resolveVisitReplacementEndpoint(env),'https://us-central1-rcph-admin.cloudfunctions.net/replaceVisitSubmissionFile');
  assert.equal(resolveVisitReplacementEndpoint({VITE_FIREBASE_PROJECT_ID:'another-project'}),'https://us-central1-another-project.cloudfunctions.net/replaceVisitSubmissionFile');
@@ -38,4 +39,18 @@ test('same filename conflicts only in the selected category; Keep both and compl
  const existing=[{submissionId:'one',fileName:'Resolution_05.pdf',status:'active',documentCategory:'custom-11111111'},{submissionId:'two',fileName:'Resolution_05.pdf',status:'active',documentCategory:'custom-22222222'},{submissionId:'old',fileName:'Resolution_05.pdf',status:'archived',documentCategory:'custom-11111111'}];
  assert.deepEqual(findVisitUploadConflicts(queue,existing).map(f=>f.submissionId),['one']);assert.equal(hasVisitUploadConflicts([queue],existing),true);
  assert.equal(findVisitUploadConflicts({...queue,allowDuplicate:true},existing).length,0);assert.equal(findVisitUploadConflicts({...queue,completionProof:'proof'},existing).length,0);assert.equal(findVisitUploadConflicts({...queue,status:'Uploaded'},existing).length,0);
+});
+for(const invalidProof of ['missing','wrong-contents','wrong-file','wrong-size'])test(`an OK response with ${invalidProof} is not accepted as a successful replacement`,async()=>{
+ const storage=store();const response=success();const body=await response.json();
+ if(invalidProof==='missing')delete body.verifiedReplacement;
+ if(invalidProof==='wrong-contents')body.verifiedReplacement.sha256='0'.repeat(64);
+ if(invalidProof==='wrong-file')body.verifiedReplacement.driveFileId='otherDriveFile001';
+ if(invalidProof==='wrong-size')body.verifiedReplacement.sizeBytes++;
+ await assert.rejects(performVisitReplacement({file,submissionId:'submission1',expectedDriveFileId:'driveFile00001',uid:'director',getIdToken:async()=>'token',env,storage,fetcher:async()=>({ok:true,json:async()=>body})}),error=>error.code==='visit/drive-unavailable');
+ assert.equal(storage.map.size,1);
+});
+test('a superseded completed request clears its request ID so a deliberate new replacement can start',async()=>{
+ const storage=store();const ids=[];let calls=0;
+ const options={file,submissionId:'submission1',uid:'director',getIdToken:async()=>'token',env,storage,fetcher:async(_url,request)=>{ids.push(request.body.get('operationId'));return calls++?success():{ok:false,json:async()=>({reason:'file-changed'})}}};
+ await assert.rejects(performVisitReplacement(options));assert.equal(storage.map.size,0);await performVisitReplacement(options);assert.notEqual(ids[0],ids[1]);
 });

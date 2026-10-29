@@ -18,8 +18,8 @@ export default function VisitFileReplaceDialog({ item, folder, initialFile = nul
     if (file.type && item.mimeType && file.type !== item.mimeType) { setError('Choose a replacement of the same file type.'); return; }
     running.current = true; setBusy(true); setError('');
     try {
-      await replaceVisitFile(file, item, setStage);
-      onNotice?.({ type: 'success', message: 'File replaced in Drive and on the website.' });
+      const result = await replaceVisitFile(file, item, setStage);
+      onNotice?.({ type: 'success', message: result.unchanged ? 'This file already contains the selected version. Its contents have been verified.' : 'Updated file contents verified in Drive and saved on the website.' });
       onReplaced?.(); onClose();
       await reload().catch(() => onNotice?.({ type: 'error', message: 'The replacement was saved. Refresh Club Visits to load the updated file list.' }));
     } catch (failure) {
