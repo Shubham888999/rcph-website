@@ -979,10 +979,9 @@ function submissionActionPermissions(submission, access) {
   }
   const positionKey = submission.positionKey || '';
   const authorizedPosition = folderAccessPositionKeys(access).includes(positionKey);
-  const ownsSubmission = submission.uploadedByUid === access.uid;
   return {
-    canWithdraw: authorizedPosition && ownsSubmission,
-    canReplace: authorizedPosition && ownsSubmission,
+    canWithdraw: authorizedPosition,
+    canReplace: authorizedPosition,
     canRemove: false,
   };
 }
@@ -1015,6 +1014,14 @@ function canSetFolderPrimaryPresentation(access, positionKey, folderWritable) {
 
 function shapeSubmission(submission, access, options = {}) {
   const permissions = submissionActionPermissions(submission, access);
+  if (!access?.canManageVisitSystem && options.folderWritable === false) {
+    permissions.canWithdraw = false;
+    permissions.canReplace = false;
+  }
+  if (submission.fileMutationId) {
+    if (submission.fileMutationAction === 'replace') { permissions.canWithdraw = false; permissions.canRemove = false; }
+    if (submission.fileMutationAction === 'delete') permissions.canReplace = false;
+  }
   const submissionId = submission.submissionId || submission.id || '';
   const primaryPresentationSubmissionId = safePrimaryPresentationSubmissionId(options.primaryPresentationSubmissionId);
   const canSetPrimaryPresentation = Boolean(
@@ -1037,13 +1044,14 @@ function shapeSubmission(submission, access, options = {}) {
     status: submission.status || 'active',
     createdAt: submission.createdAt || null,
     updatedAt: submission.updatedAt || null,
+    pendingFileAction: submission.fileMutationId ? submission.fileMutationAction || '' : '',
     canWithdraw: permissions.canWithdraw,
     canReplace: permissions.canReplace,
     canRemove: permissions.canRemove,
     isPrimaryPresentation: Boolean(primaryPresentationSubmissionId && submissionId === primaryPresentationSubmissionId),
     canSetPrimaryPresentation,
     documentCategory: storedDocumentCategory(submission.documentCategory),
-    canMove: canMoveSubmissionCategory(submission, access),
+    canMove: !submission.fileMutationId && canMoveSubmissionCategory(submission, access),
   };
 }
 
@@ -1091,6 +1099,10 @@ function createFirestoreVisitSubmissionAdapter(db, admin) {
       const snap = await db.collection(collection).doc(id).get();
       return { exists: snap.exists, id: snap.id, data: snap.exists ? (snap.data() || {}) : null };
     },
+    async readDriveReferences(fileId) {
+      const snap = await db.collection('visitSubmissions').where('driveFileId', '==', fileId).get();
+      return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
+    },
     async setDoc(collection, id, data, options) {
       await db.collection(collection).doc(id).set(data, options || {});
       return { ok: true };
@@ -1119,6 +1131,10 @@ function createFirestoreVisitSubmissionAdapter(db, admin) {
           async getDoc(collection, id) {
             const snap = await tx.get(db.collection(collection).doc(id));
             return { exists: snap.exists, id: snap.id, data: snap.exists ? (snap.data() || {}) : null };
+          },
+          async readDriveReferences(fileId) {
+            const snap = await tx.get(db.collection('visitSubmissions').where('driveFileId', '==', fileId));
+            return snap.docs.map(doc => ({ id: doc.id, data: doc.data() || {} }));
           },
           async readFolderFiles(visitType, positionKey) {
             const [active, sessions] = await Promise.all([
@@ -1243,6 +1259,9 @@ function createMemoryVisitSubmissionAdapter(initialData) {
       const data = docs[id];
       return { exists: Boolean(data), id, data: data ? clone(data) : null };
     },
+    async readDriveReferences(fileId) {
+      return Object.entries(store.visitSubmissions || {}).filter(([, data]) => data.driveFileId === fileId).map(([id, data]) => ({ id, data: clone(data) }));
+    },
     async setDoc(collection, id, data, options) {
       const docs = ensureCollection(collection);
       docs[id] = options?.merge ? { ...(docs[id] || {}), ...clone(data) } : clone(data);
@@ -1278,6 +1297,7 @@ function createMemoryVisitSubmissionAdapter(initialData) {
     async runTransaction(callback) {
       return callback({
         getDoc: this.getDoc,
+        readDriveReferences: this.readDriveReferences,
         readFolderFiles: async (visitType, positionKey) => Promise.all([this.queryActiveSubmissionsForPositions(visitType, [positionKey]), this.queryActiveUploadSessionsForFolder(visitType, positionKey)]),
         setDoc: (collection, id, data, options) => {
           const docs = ensureCollection(collection);
@@ -2790,6 +2810,7 @@ function createVisitSubmissionService(options) {
       if (!sessionSnap.exists) throw makeVisitSubmissionError('not-found', 'Upload session not found.');
       if (!ticketSnap.exists) throw makeVisitSubmissionError('not-found', 'Upload ticket not found.');
       const session = sessionSnap.data || {};
+      if (options.fileActions && session.replacesSubmissionId) throw makeVisitSubmissionError('failed-precondition', 'This replacement session uses an older uploader. Cancel it and replace the file again from Club Visits.');
       const ticketData = ticketSnap.data || {};
       if (ticketData.finalized === true) {
         throw makeVisitSubmissionError('already-exists', 'Upload has already been finalized.');
@@ -3085,14 +3106,23 @@ function createVisitSubmissionService(options) {
   }
 
   async function withdrawSubmission(uid, input) {
+    if (options.fileActions) {
+      if (input?.syncDrive !== true) throw makeVisitSubmissionError('failed-precondition', 'Refresh Club Visits before deleting a Drive file.', { reason: 'client-refresh' });
+      return options.fileActions.remove(uid, { ...input, mode: 'withdraw' });
+    }
     return archiveSubmission(uid, input, 'withdraw');
   }
 
   async function removeSubmission(uid, input) {
+    if (options.fileActions) {
+      if (input?.syncDrive !== true) throw makeVisitSubmissionError('failed-precondition', 'Refresh Club Visits before deleting a Drive file.', { reason: 'client-refresh' });
+      return options.fileActions.remove(uid, { ...input, mode: 'remove' });
+    }
     return archiveSubmission(uid, input, 'remove');
   }
 
   async function replaceSubmission(uid, input) {
+    if (options.fileActions) throw makeVisitSubmissionError('failed-precondition', 'Refresh Club Visits to use the current Drive replacement uploader.');
     const access = await resolveAccessContext(uid);
     const replacesSubmissionId = normalizeSubmissionId(input?.replacesSubmissionId || input?.submissionId);
     const replacementFiles = Array.isArray(input?.files) ? input.files : [];
@@ -3127,6 +3157,7 @@ function createVisitSubmissionService(options) {
     const snap = await adapter.getDoc('visitSubmissions', submissionId);
     if (!snap.exists) throw makeVisitSubmissionError('not-found', 'Submission not found.');
     const submission = { ...(snap.data || {}), id: submissionId };
+    if (submission.fileMutationId) throw makeVisitSubmissionError('failed-precondition', 'Finish the pending file change before moving this document.');
     if (submission.status !== 'active') {
       throw makeVisitSubmissionError('failed-precondition', 'Submission is not active.');
     }
@@ -3194,6 +3225,7 @@ function createVisitSubmissionService(options) {
       const snap = await tx.getDoc('visitSubmissions', submissionId);
       if (!snap.exists) throw makeVisitSubmissionError('not-found', 'Submission not found.');
       const submission = snap.data || {};
+      if (submission.fileMutationId) throw makeVisitSubmissionError('failed-precondition', 'Finish the pending file change before moving this document.');
       if (submission.status !== 'active') {
         throw makeVisitSubmissionError('failed-precondition', 'Submission is not active.');
       }

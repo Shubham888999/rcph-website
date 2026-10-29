@@ -12,6 +12,7 @@ const {
   VISIT_UPLOAD_TYPE,
   createVisitSubmissionService,
 } = require('./lib/visit-submissions');
+const { createVisitFileActionService, createVisitFileReplacementHandler } = require('./lib/visit-file-actions');
 const {
   createVisitDashboardService,
 } = require('./lib/visit-dashboards');
@@ -105,10 +106,12 @@ const profileRemoval = createProfileRemovalService({
   assertApprovedActiveCallableAccount,
   getAuthorityContext,
 });
+let visitFileActions;
 const visitSubmissions = createVisitSubmissionService({
   db,
   admin,
   positionHelpers,
+  fileActions: { remove: (uid, input) => visitFileActions.remove(uid, input) },
 });
 const visitDashboards = createVisitDashboardService({
   db,
@@ -142,6 +145,15 @@ const moveVisitSubmissionCategoryHandler = createVisitCategoryMoveHandler({
     VISIT_DRIVE_REFRESH_TOKEN,
   },
   logger: console,
+});
+visitFileActions = createVisitFileActionService({
+  db, admin, visitService: visitSubmissions,
+  folderLockManager: createFirestoreFolderLockManager({ db, admin, ttlMs: 240000 }),
+  secrets: { VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN },
+});
+const replaceVisitSubmissionFileHandler = createVisitFileReplacementHandler({
+  service: visitFileActions,
+  verifyIdToken: token => admin.auth().verifyIdToken(token, true),
 });
 const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE;
 const EMAIL_USER = process.env.EMAIL_USER || process.env.SMTP_USER || '';
@@ -1915,6 +1927,7 @@ function throwCallableServiceError(err, fallbackMessage) {
     'already-exists',
     'resource-exhausted',
     'internal',
+    'unavailable',
   ]);
   if (callableCodes.has(code)) {
     throw new HttpsError(code, err.message || fallbackMessage, err.details || {});
@@ -5542,7 +5555,7 @@ exports.finalizeVisitSubmissionUpload = onCall(CALLABLE_OPTIONS, async (request)
   }
 });
 
-exports.withdrawVisitSubmission = onCall(CALLABLE_OPTIONS, async (request) => {
+exports.withdrawVisitSubmission = onCall({ ...CALLABLE_OPTIONS, timeoutSeconds: 180, memory: '512MiB', secrets: [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN] }, async (request) => {
   try {
     const uid = requireAuth(request);
     return await visitSubmissions.withdrawSubmission(uid, request.data || {});
@@ -5551,7 +5564,7 @@ exports.withdrawVisitSubmission = onCall(CALLABLE_OPTIONS, async (request) => {
   }
 });
 
-exports.removeVisitSubmission = onCall(CALLABLE_OPTIONS, async (request) => {
+exports.removeVisitSubmission = onCall({ ...CALLABLE_OPTIONS, timeoutSeconds: 180, memory: '512MiB', secrets: [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN] }, async (request) => {
   try {
     const uid = requireAuth(request);
     return await visitSubmissions.removeSubmission(uid, request.data || {});
@@ -5617,6 +5630,11 @@ exports.uploadVisitSubmissionFile = onRequest({
     VISIT_DRIVE_REFRESH_TOKEN,
   ],
 }, uploadVisitSubmissionFileHandler);
+
+exports.replaceVisitSubmissionFile = onRequest({
+  region: 'us-central1', timeoutSeconds: 180, memory: '512MiB', maxInstances: 5, concurrency: 2,
+  secrets: [VISIT_DRIVE_CLIENT_ID, VISIT_DRIVE_CLIENT_SECRET, VISIT_DRIVE_REFRESH_TOKEN],
+}, replaceVisitSubmissionFileHandler);
 
 exports.moveVisitSubmissionCategory = onCall({
   ...CALLABLE_OPTIONS,

@@ -260,8 +260,8 @@ await rejectsWithCode(
   assert.deepStrictEqual(secretaryFolder.submissions.map(item => item.positionKey), ['secretary']);
   assert.strictEqual(secretaryFolder.submissions.length, 1, 'inaccessible submission metadata is not returned');
   assertNoInternalSubmissionFields(secretaryFolder.submissions[0]);
-  assert.strictEqual(secretaryFolder.submissions[0].canWithdraw, true, 'BOD can withdraw own active submission');
-  assert.strictEqual(secretaryFolder.submissions[0].canReplace, true, 'BOD can replace own active submission');
+  assert.strictEqual(secretaryFolder.submissions[0].canWithdraw, false, 'closed folders do not advertise director deletion');
+  assert.strictEqual(secretaryFolder.submissions[0].canReplace, false, 'closed folders do not advertise director replacement');
   assert.strictEqual(secretaryFolder.submissions[0].canRemove, false, 'BOD cannot remove submissions');
 
   const otherUploaderSeed = JSON.parse(JSON.stringify(fixture));
@@ -275,11 +275,13 @@ await rejectsWithCode(
   };
   const otherUploaderEnv = createEnv(otherUploaderSeed);
   await otherUploaderEnv.service.initializeStructure('president-uid');
+  otherUploaderEnv.adapter.store.visitSubmissionConfig.clubAssembly.submissionOpen = true;
+  Object.assign(otherUploaderEnv.adapter.store.visitSubmissionPositions.clubAssembly_secretary, { enabled: true, submissionOpen: true, locked: false });
   const secretaryWithOther = await otherUploaderEnv.service.getFolder('bod-secretary', 'clubAssembly', 'secretary');
   const otherSubmission = secretaryWithOther.submissions.find(item => item.submissionId === 'secretary-other-file');
   assert.ok(otherSubmission, 'BOD can see same-position active submission from another uploader');
-  assert.strictEqual(otherSubmission.canWithdraw, false, 'BOD cannot withdraw another uploader submission');
-  assert.strictEqual(otherSubmission.canReplace, false, 'BOD cannot replace another uploader submission');
+  assert.strictEqual(otherSubmission.canWithdraw, true, 'folder holder can delete another uploader file in their writable assigned folder');
+  assert.strictEqual(otherSubmission.canReplace, true, 'folder holder can replace another uploader file in their writable assigned folder');
   assert.strictEqual(otherSubmission.canRemove, false, 'BOD cannot remove another uploader submission');
 
   const managerSecretaryFolder = await otherUploaderEnv.service.getFolder('admin-uid', 'clubAssembly', 'secretary');
