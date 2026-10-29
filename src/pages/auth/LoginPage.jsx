@@ -4,6 +4,7 @@ import AuthNotice from "../../features/auth/AuthNotice";
 import AuthStateScreen from "../../features/auth/AuthStateScreen";
 import GoogleSignInButton from "../../features/auth/GoogleSignInButton";
 import LoginForm from "../../features/auth/LoginForm";
+import LoginAccessPass from "../../features/auth/LoginAccessPass.jsx";
 import { DEFAULT_SIGN_IN_ERROR, getSafeAuthError } from "../../features/auth/authErrors";
 import {
   completeGoogleRedirectResult,
@@ -13,6 +14,7 @@ import {
 import { getSafeLoginDestination } from "../../features/auth/loginRedirect";
 import useAuth from "../../hooks/useAuth";
 import "../../styles/components/login.css";
+import "../../styles/components/login-access-pass.css";
 
 function LoginVerificationState({ message = "Verifying your trusted RCPH access…" }) {
   return (
@@ -123,43 +125,7 @@ export default function LoginPage() {
   const formBusy = Boolean(busyMethod);
   return (
     <main className="login-page-react">
-      <div className="login-shell">
-<section className="login-brand-panel" aria-labelledby="login-brand-title">
-  <Link
-    className="login-brand login-brand--portal"
-    to="/"
-    aria-label="RCPH public homepage"
-  >
-    <span className="login-brand-logo rcph-logo-mark">
-      <img
-        src="/images/rcph-lakshya-logo.webp"
-        alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026-27"
-      />
-    </span>
-
-    <span>
-      <strong>Rotaract Club of Pune Heritage</strong>
-      <small>RID 3131 | Zone 4</small>
-    </span>
-  </Link>
-
-  <div className="login-brand-panel__main">
-    <h1 id="login-brand-title">
-      <span>RCPH</span>
-      <span>Account</span>
-      <span>Portal</span>
-    </h1>
-  </div>
-
-  <div className="login-brand-panel__footer">
-    <div className="login-brand-panel__values" aria-label="Club theme">
-
-    </div>
-
-
-  </div>
-</section>
-
+      <div className="login-shell login-shell--access-pass">
         <section className="login-card" aria-labelledby="login-title">
           <p className="login-kicker">Member access</p>
           <h2 id="login-title">Welcome back</h2>
@@ -178,6 +144,26 @@ export default function LoginPage() {
           </nav>
           <Link className="login-home-link" to="/">Return to Home</Link>
         </section>
+        <LoginAccessPass>
+          <Link
+            className="login-brand login-brand--portal"
+            to="/"
+            aria-label="RCPH public homepage"
+          >
+            <span className="login-brand-logo rcph-logo-mark">
+              <img
+                src="/images/rcph-lakshya-logo.webp"
+                alt="Rotaract Club of Pune Heritage — Lakshya RIY 2026-27"
+              />
+            </span>
+
+            <span>
+              <strong>Rotaract Club of Pune Heritage</strong>
+              <small>RID 3131 | Zone 4</small>
+            </span>
+          </Link>
+
+        </LoginAccessPass>
       </div>
     </main>
   );

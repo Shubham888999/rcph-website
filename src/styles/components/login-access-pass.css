@@ -1,0 +1,91 @@
+/* The decorative pass is isolated from authentication forms and shared auth tokens. */
+.login-page-react .login-shell--access-pass > .login-card { grid-column: 2; grid-row: 1; }
+.login-page-react .login-shell--access-pass > .login-access-pass { grid-column: 1; grid-row: 1; }
+.login-page-react .login-brand-panel.login-access-pass {
+  --pass-bg: #2d0916;
+  --pass-ink: #fff4e2;
+  --pass-muted: #d3bdb8;
+  --pass-gold: #e4c48b;
+  --pass-line: rgba(228,196,139,.38);
+  position: relative;
+  min-height: 690px;
+  padding: clamp(1.7rem,3vw,2.6rem);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 1.5rem;
+  overflow: hidden;
+  border: 1px solid var(--pass-line);
+  border-radius: 0;
+  background: radial-gradient(ellipse at 5% 0%,rgba(228,196,139,.1),transparent 65%),var(--pass-bg);
+  color: var(--pass-ink);
+  box-shadow: inset 0 0 0 7px var(--pass-bg),inset 0 0 0 8px var(--pass-line),0 1.2rem 3rem rgba(22,1,8,.25);
+}
+.login-page-react .login-access-pass::before,
+.login-page-react .login-access-pass::after { display: none; }
+.login-page-react .login-access-pass > .login-access-pass__light { position: absolute; z-index: 0; inset: 0; pointer-events: none; background: radial-gradient(ellipse at var(--pass-light-x,50%) var(--pass-light-y,50%),rgba(255,228,172,.13),transparent 65%); opacity: .65; }
+.login-page-react .login-access-pass > .login-access-pass__spine { position: absolute; z-index: 2; top: 8px; bottom: 8px; left: 8px; width: 5px; background: linear-gradient(90deg,#7e263f,#a24b5e,#7e263f); pointer-events: none; }
+.login-page-react .login-access-pass__identity { position: relative; min-width: 0; }
+.login-page-react .login-access-pass .login-brand { gap: .9rem; }
+.login-page-react .login-access-pass .login-brand-logo { width: 62px; height: 62px; flex: 0 0 62px; border-color: var(--pass-line); background: transparent; transition: box-shadow 260ms ease,transform 260ms ease; }
+.login-page-react .login-access-pass .login-brand strong { color: var(--pass-ink); font-size: clamp(.75rem,1.2vw,.95rem); line-height: 1.4; letter-spacing: .035em; }
+.login-page-react .login-access-pass .login-brand small { color: var(--pass-muted); font-size: .76rem; line-height: 1.4; font-weight: 500; letter-spacing: .04em; }
+.login-page-react .login-access-pass__body { align-self: center; min-width: 0; padding-block: .25rem; }
+.login-page-react .login-access-pass__edition { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.login-page-react .login-access-pass__edition > p { margin: 0; color: var(--pass-muted); font-size: .63rem; font-weight: 650; letter-spacing: .13em; line-height: 1.6; text-transform: uppercase; }
+.login-page-react .login-access-pass__stamp { padding: .4rem .65rem; border: 1px solid var(--pass-line); text-align: center; color: var(--pass-gold); transform: rotate(3deg); }
+.login-page-react .login-access-pass__stamp > span { display: block; margin-bottom: .2rem; font-size: .54rem; letter-spacing: .18em; }
+.login-page-react .login-access-pass__stamp > strong { display: block; font-family: Georgia,"Times New Roman",serif; font-size: .9rem; font-weight: 400; white-space: nowrap; }
+.login-page-react .login-access-pass h1 { display: block; margin: 0; color: var(--pass-ink); font-family: Georgia,"Times New Roman",serif; font-size: clamp(2.8rem,4.4vw,4.25rem); font-weight: 400; line-height: 1.02; letter-spacing: -.05em; }
+.login-page-react .login-access-pass h1 > span,
+.login-page-react .login-access-pass h1 > em { display: block; }
+.login-page-react .login-access-pass h1 > em { color: var(--pass-gold); font-weight: 400; }
+.login-page-react .login-access-pass .login-access-pass__audience { margin: 1.3rem 0 0; color: var(--pass-muted); font-size: .75rem; line-height: 1.7; letter-spacing: .015em; }
+.login-page-react .login-access-pass__audience > span { padding-inline: .3rem; color: var(--pass-gold); }
+.login-page-react .login-access-pass__footer { min-width: 0; border-top: 1px solid var(--pass-line); padding-top: .7rem; }
+.login-page-react .login-access-pass__footer-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; margin-bottom: .5rem; }
+.login-page-react .login-access-pass__footer-heading > span { color: var(--pass-muted); font-size: .58rem; text-transform: uppercase; letter-spacing: .14em; }
+.login-page-react .login-access-pass__seal { width: 44px; height: 44px; color: var(--pass-gold); transform: rotate(-12deg); opacity: .75; }
+.login-page-react .login-access-pass__seal :is(circle,path) { stroke: currentColor; stroke-width: .7; }
+.login-page-react .login-access-pass__seal text { fill: currentColor; font-family: Georgia,serif; font-size: 12px; letter-spacing: 1px; }
+.login-page-react .login-access-pass__seal .login-access-pass__seal-district { font-family: sans-serif; font-size: 5px; letter-spacing: 2px; }
+.login-page-react .login-access-pass__moments { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .5rem; }
+.login-page-react .login-access-pass__moments figure { position: relative; min-width: 0; margin: 0; border: 1px solid var(--pass-line); background: var(--pass-bg); }
+.login-page-react .login-access-pass__moments img { display: block; width: 100%; aspect-ratio: 1.75; object-fit: cover; filter: saturate(.8); }
+.login-page-react .login-access-pass__moments figcaption { padding: .4rem .15rem; color: var(--pass-ink); font-size: .55rem; font-weight: 650; letter-spacing: .08em; line-height: 1.3; text-align: center; text-transform: uppercase; }
+@media (hover: hover) and (pointer: fine) {
+  .login-page-react .login-access-pass .login-brand:hover .login-brand-logo,
+  .login-page-react .login-access-pass .login-brand:focus-visible .login-brand-logo { transform: translateY(-2px); box-shadow: 0 3px 0 rgba(0,0,0,.25),0 0 0 3px var(--pass-line),0 0 22px rgba(228,196,139,.15); }
+}
+:root[data-theme="light"] .login-page-react .login-access-pass {
+  --pass-bg: #f4e8d3;
+  --pass-ink: #3c1120;
+  --pass-muted: #72554e;
+  --pass-gold: #85572d;
+  --pass-line: rgba(133,87,45,.35);
+  border-color: var(--pass-line);
+  background: radial-gradient(ellipse at 5% 0%,rgba(157,41,64,.05),transparent 65%),var(--pass-bg);
+  box-shadow: inset 0 0 0 7px var(--pass-bg),inset 0 0 0 8px var(--pass-line),0 1.2rem 3rem rgba(62,20,27,.12);
+}
+@media (max-width: 850px) {
+  .login-page-react .login-shell--access-pass > .login-card { grid-column: 1; grid-row: 1; }
+  .login-page-react .login-brand-panel.login-access-pass { grid-column: 1; grid-row: 2; min-height: 0; height: auto; gap: 1.8rem; transform: none !important; }
+  .login-page-react .login-access-pass h1 { font-size: clamp(2.8rem,8vw,4.25rem); }
+  .login-page-react .login-access-pass > .login-access-pass__light { display: none; }
+}
+@media (max-width: 520px) {
+  .login-page-react .login-brand-panel.login-access-pass { padding: 1.5rem; gap: 1.5rem; }
+  .login-page-react .login-access-pass .login-brand-logo { width: 52px; height: 52px; flex-basis: 52px; }
+  .login-page-react .login-access-pass .login-brand strong { font-size: .7rem; }
+  .login-page-react .login-access-pass .login-brand small { font-size: .67rem; }
+  .login-page-react .login-access-pass__edition > p { font-size: .54rem; }
+  .login-page-react .login-access-pass h1 { font-size: clamp(2.5rem,10.5vw,3.5rem); }
+  .login-page-react .login-access-pass .login-access-pass__audience { font-size: .66rem; }
+  .login-page-react .login-access-pass__audience > span { padding-inline: .15rem; }
+  .login-page-react .login-access-pass__moments { gap: .35rem; }
+  .login-page-react .login-access-pass__moments figcaption { font-size: .48rem; letter-spacing: .04em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-page-react .login-brand-panel.login-access-pass { transform: none !important; }
+  .login-page-react .login-access-pass > .login-access-pass__light { display: none; }
+  .login-page-react .login-access-pass .login-brand-logo { transition: none; transform: none !important; }
+}
