@@ -18,6 +18,8 @@ The server records a durable operation before changing Drive. It publishes succe
 
 Replacement request IDs and file hashes are retained in the browser tab's session storage when available. File contents and authentication tokens are not stored there. Server recovery also supports a new request ID with matching replacement contents.
 
+Every replacement success, including replay of a completed request, now requires downloading the current Drive binary and comparing its actual SHA-256 and byte count with the selected replacement. Drive metadata alone is insufficient. The response includes a verification result which the browser independently compares with the selected local file's SHA-256, byte count and expected Drive ID. A completed request which no longer matches Drive or the website record is rejected. Identical existing contents are reported as already present rather than as a newly replaced file. An Open file link pointing to a different Drive ID is also blocked for manager review.
+
 Previous replacement contents are retained as pinned Drive revisions. There is no new website Restore control. Restoring a file from Drive Trash does not reactivate its archived website submission automatically. Changes made directly in Drive are not watched; a moved or inaccessible file must be reviewed before the website can change it.
 
 The `visitSubmissionFileOperations` and `visitFileActionRateLimits` collections are private server records covered by the existing Firestore deny-by-default rules. No rule migration is required. Shared folder locks coordinate file actions with uploads and category moves.
@@ -41,6 +43,18 @@ gcloud functions describe replaceVisitSubmissionFile --gen2 --region us-central1
 If missing settings are confirmed, restore the uploader's existing values in the local `functions/.env.rcph-admin` configuration before deploying the file-action functions. Keep the OAuth credentials in their existing Firebase secrets; do not paste secret values into the environment file or the terminal output. If configuration matches, use the structured failure log to identify the next step rather than assuming a Drive-permission or revision problem.
 
 To deploy only this diagnostic update, update branch `main` and deploy `functions:replaceVisitSubmissionFile,functions:withdrawVisitSubmission,functions:removeVisitSubmission`. The frontend branch `react-migration` also adds a specific storage-setup message for `drive-config` failures.
+
+### Success shown but old document still opens
+
+Check the current bytes and the stored Open file link before retrying another replacement. This command uses the existing local Google Cloud ADC login and project secrets, and makes only read requests:
+
+```powershell
+node functions/scripts/inspect-visit-file-actions.js --project rcph-admin --name "Resolution_05.pdf" --load-project-secrets
+```
+
+It inspects the most recent replacement for up to three distinct Drive files with that exact original filename. `downloadedContentsMatchReplacement` compares the downloaded bytes with the operation's recorded replacement checksum and size. `websiteRecordMatchesReplacement` compares the website record with that operation. `websiteLinkMatchesDriveFile` checks whether the website's Open file link points to the Drive file that was changed. The report also includes the actual Drive open/download links when available. It does not change files, records or revisions, and does not print credentials or file contents. A true content match with an old-looking preview needs checking via the actual download; it is not evidence that the overwrite failed.
+
+Deploy the download-verification update to `functions:replaceVisitSubmissionFile` before deploying its corresponding frontend. Older backend responses without a matching verification result cannot trigger success in the updated frontend. Main-presentation selection, file IDs, names, folders and file counts retain their existing replacement behavior.
 
 ## Deployment
 

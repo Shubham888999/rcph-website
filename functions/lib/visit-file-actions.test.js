@@ -182,3 +182,51 @@ test('multipart failures before the service runs are logged with a diagnostic an
  const res=response();await handler({method:'POST',headers:{origin:'https://rcph3131.org',authorization:'Bearer good'}},res);
  const body=JSON.parse(res.body);assert.equal(res.statusCode,400);assert.equal(logs.length,1);assert.equal(logs[0].stage,'parse-replacement');assert.equal(body.diagnosticId,logs[0].diagnosticId);assert.ok(!JSON.stringify(logs).includes('private request body'));
 });
+
+test('success includes the digest of downloaded replacement bytes and keeps the main presentation',async()=>{
+ const e=setup();const result=await e.service.replace('director',e.input,e.file);
+ assert.equal(result.verifiedReplacement.sha256,crypto.createHash('sha256').update(replacement).digest('hex'));
+ assert.equal(result.verifiedReplacement.sizeBytes,replacement.length);assert.equal(result.verifiedReplacement.driveFileId,'driveFile00001');assert.equal(result.unchanged,false);
+ assert.equal(e.adapter.store.visitSubmissionPositions.dzrVisit_cmd.primaryPresentationSubmissionId,'submission1');
+});
+
+test('new metadata with unchanged file bytes cannot produce a success response',async()=>{
+ const e=setup();const get=e.drive.files.get;
+ e.drive.files.get=async args=>args.alt==='media'?{data:Readable.from(old)}:get(args);
+ e.afterDrive(()=>{e.items.get('driveFile00001').sha256Checksum=crypto.createHash('sha256').update(replacement).digest('hex')});
+ await assert.rejects(e.service.replace('director',e.input,e.file),error=>error.details.reason==='file-changed');
+ assert.equal(e.adapter.store.visitSubmissions.submission1.contentSha256,undefined);
+ assert.equal(Object.values(e.adapter.store[OPERATIONS])[0].state,'pending');
+});
+
+test('a completed request re-downloads the file instead of accepting its old success record',async()=>{
+ const e=setup();await e.service.replace('director',e.input,e.file);
+ const get=e.drive.files.get;
+ e.drive.files.get=async args=>args.alt==='media'?{data:Readable.from(old)}:get(args);
+ await assert.rejects(e.service.replace('director',e.input,e.file),error=>error.details.reason==='file-changed'&&error.details.stage==='verify-completed-replacement');
+ assert.equal(e.calls.content,1);
+});
+
+test('the exact existing contents are verified and reported as unchanged',async()=>{
+ const e=setup();e.input.sizeBytes=old.length;e.file.buffer=old;
+ const result=await e.service.replace('director',e.input,e.file);
+ assert.equal(result.unchanged,true);assert.equal(e.calls.content,0);assert.equal(result.verifiedReplacement.sha256,crypto.createHash('sha256').update(old).digest('hex'));
+});
+
+test('a website Open file link targeting another Drive file is blocked before any write',async()=>{
+ const e=setup();e.adapter.store.visitSubmissions.submission1.fileUrl='https://drive.google.com/file/d/differentDriveFile/view';
+ await assert.rejects(e.service.replace('director',e.input,e.file),error=>error.details.reason==='file-location');assert.equal(e.calls.content+e.calls.trash,0);
+});
+
+test('read-only inspection detects the actual byte and link mismatches without modifying data',async()=>{
+ const {inspectReplacement,latestReplacements}=require('../scripts/inspect-visit-file-actions');
+ const e=setup();await e.service.replace('director',e.input,e.file);const operation=Object.values(e.adapter.store[OPERATIONS])[0];
+ const options={operation,drive:e.drive,loadSubmission:async()=>e.adapter.store.visitSubmissions.submission1};
+ const before=e.calls.content;let report=await inspectReplacement(options);
+ assert.equal(report.downloadedContentsMatchReplacement,true);assert.equal(report.websiteRecordMatchesReplacement,true);assert.equal(report.websiteLinkMatchesDriveFile,true);
+ const get=e.drive.files.get;e.drive.files.get=async args=>args.alt==='media'?{data:Readable.from(old)}:get(args);
+ e.adapter.store.visitSubmissions.submission1.fileUrl='https://drive.google.com/file/d/otherFile00001/view';report=await inspectReplacement(options);
+ assert.equal(report.downloadedContentsMatchReplacement,false);assert.equal(report.websiteLinkMatchesDriveFile,false);assert.equal(e.calls.content,before);
+ const rows=latestReplacements([{id:'old',data:{...operation,completedAt:1}},{id:'new',data:{...operation,completedAt:2}},{id:'unrelated',data:{...operation,fileName:'Other.pdf',completedAt:3}}],'Document.pdf');
+ assert.equal(rows.length,1);assert.equal(rows[0].id,'new');
+});
