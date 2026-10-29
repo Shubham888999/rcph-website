@@ -39,9 +39,10 @@ function setup(options = {}) {
   ]);
   const revisions=new Map([['revision1',{id:'revision1',md5Checksum:md5(old),keepForever:false,bytes:old}]]);
   let currentBytes=old;
-  const calls={content:0,trash:0,pin:0};
+  const calls={content:0,trash:0,pin:0,rename:0};
   const drive={files:{async get({fileId,alt}){if(alt==='media')return {data:Readable.from(currentBytes)};if(!items.has(fileId))throw {response:{status:404}};return {data:structuredClone(items.get(fileId))}},async update({fileId,requestBody,media}){
     const item=items.get(fileId);
+    if(requestBody?.name){item.name=requestBody.name;calls.rename++;}
     if(media){const chunks=[];for await(const chunk of media.body)chunks.push(Buffer.from(chunk));const bytes=Buffer.concat(chunks);currentBytes=bytes;Object.assign(item,{md5Checksum:md5(bytes),size:String(bytes.length),headRevisionId:'revision2'});revisions.set('revision2',{id:'revision2',md5Checksum:md5(bytes),keepForever:false,bytes});calls.content++;}
     if(requestBody?.trashed){item.trashed=true;calls.trash++;}
     if(afterDrive)await afterDrive();
@@ -59,7 +60,9 @@ test('assigned director replaces manager-uploaded file in place with a pinned or
  const e=setup();const before={...e.adapter.store.visitSubmissions.submission1};
  await e.service.replace('director',e.input,e.file);
  const result=e.adapter.store.visitSubmissions.submission1;
- for(const key of ['driveFileId','driveFolderId','driveFileUrl','originalFileName','fileName','uploadedByUid','documentCategory'])assert.equal(result[key],before[key]);
+ for(const key of ['driveFileId','driveFolderId','driveFileUrl','uploadedByUid','documentCategory'])assert.equal(result[key],before[key]);
+ for(const key of ['fileName','originalFileName','sanitizedOriginalFileName'])assert.equal(result[key],'New Document.pdf');
+ assert.equal(e.items.get('driveFile00001').name,'New Document.pdf');
  assert.equal(result.sizeBytes,replacement.length);assert.equal(result.status,'active');assert.equal(result.fileMutationId,null);
  assert.equal(e.adapter.store.visitSubmissionPositions.dzrVisit_cmd.activeFileCount,1);assert.equal(e.adapter.store.visitSubmissionPositions.dzrVisit_cmd.primaryPresentationSubmissionId,'submission1');
  assert.equal(e.revisions.get('revision1').keepForever,true);assert.equal(e.revisions.get('revision1').md5Checksum,md5(old));
@@ -208,9 +211,47 @@ test('a completed request re-downloads the file instead of accepting its old suc
 });
 
 test('the exact existing contents are verified and reported as unchanged',async()=>{
- const e=setup();e.input.sizeBytes=old.length;e.file.buffer=old;
+ const e=setup();e.input.sizeBytes=old.length;e.input.fileName='Document.pdf';e.file.buffer=old;
  const result=await e.service.replace('director',e.input,e.file);
  assert.equal(result.unchanged,true);assert.equal(e.calls.content,0);assert.equal(result.verifiedReplacement.sha256,crypto.createHash('sha256').update(old).digest('hex'));
+});
+
+test('the same contents with a new filename rename both Drive and website while keeping the main selection',async()=>{
+ const e=setup();e.input.sizeBytes=old.length;e.file.buffer=old;
+ const result=await e.service.replace('director',e.input,e.file);
+ assert.equal(result.unchanged,false);assert.equal(e.calls.content,0);assert.equal(e.calls.rename,1);assert.equal(result.verifiedReplacement.fileName,'New Document.pdf');
+ assert.equal(e.items.get('driveFile00001').name,'New Document.pdf');assert.equal(e.adapter.store.visitSubmissions.submission1.originalFileName,'New Document.pdf');
+ assert.equal(e.adapter.store.visitSubmissionPositions.dzrVisit_cmd.primaryPresentationSubmissionId,'submission1');assert.equal(e.adapter.store.visitSubmissionPositions.dzrVisit_cmd.activeFileCount,1);
+});
+
+test('pending replacement retries cannot silently change the target filename',async()=>{
+ const e=setup();e.setFailCommit();await assert.rejects(e.service.replace('director',e.input,e.file));
+ await assert.rejects(e.service.replace('director',{...e.input,fileName:'Different.pdf'},e.file),error=>error.details.reason==='file-pending');
+ await e.service.replace('director',e.input,e.file);assert.equal(e.calls.content,1);assert.equal(e.items.get('driveFile00001').name,'New Document.pdf');
+});
+
+test('a completed request cannot be reused for identical bytes with a different filename',async()=>{
+ const e=setup();await e.service.replace('director',e.input,e.file);
+ await assert.rejects(e.service.replace('director',{...e.input,fileName:'Different.pdf'},e.file),error=>error.details.reason==='file-changed');
+ assert.equal(e.items.get('driveFile00001').name,'New Document.pdf');
+});
+
+test('a pending operation from the previous filename-preserving version can finish with the selected name',async()=>{
+ const e=setup();e.setFailCommit();await assert.rejects(e.service.replace('director',e.input,e.file));
+ const operation=Object.values(e.adapter.store[OPERATIONS])[0];delete operation.replacement.fileName;e.items.get('driveFile00001').name='Document.pdf';
+ await e.service.replace('director',{...e.input,operationId:'new-client-request'},e.file);
+ assert.equal(e.calls.content,1);assert.equal(e.items.get('driveFile00001').name,'New Document.pdf');assert.equal(e.adapter.store.visitSubmissions.submission1.fileName,'New Document.pdf');
+});
+
+test('replacing a main PPTX changes its name and contents without changing its main selection or link',async()=>{
+ const e=setup();const mime='application/vnd.openxmlformats-officedocument.presentationml.presentation';
+ Object.assign(e.adapter.store.visitSubmissions.submission1,{mimeType:mime,fileName:'Original.pptx',originalFileName:'Original.pptx'});
+ Object.assign(e.items.get('driveFile00001'),{mimeType:mime,name:'Original.pptx'});
+ Object.assign(e.input,{mimeType:mime,fileName:'Updated presentation.pptx'});e.file.mimeType=mime;
+ const result=await e.service.replace('director',e.input,e.file);
+ assert.equal(result.verifiedReplacement.fileName,'Updated presentation.pptx');assert.equal(e.calls.content,1);
+ const source=e.adapter.store.visitSubmissions.submission1;assert.equal(source.driveFileId,'driveFile00001');assert.equal(source.originalFileName,'Updated presentation.pptx');
+ assert.equal(e.adapter.store.visitSubmissionPositions.dzrVisit_cmd.primaryPresentationSubmissionId,'submission1');
 });
 
 test('a website Open file link targeting another Drive file is blocked before any write',async()=>{

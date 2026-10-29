@@ -10,7 +10,7 @@ function millis(value) {
 }
 function latestReplacements(rows, name, limit = 3) {
   const selected = new Map();
-  rows.filter(row => row.data.action === 'replace' && row.data.fileName === name)
+  rows.filter(row => row.data.action === 'replace' && (row.data.fileName === name || row.data.replacement?.fileName === name))
     .sort((a, b) => millis(b.data.completedAt || b.data.updatedAt || b.data.createdAt) - millis(a.data.completedAt || a.data.updatedAt || a.data.createdAt))
     .forEach(row => { if (!selected.has(row.data.driveFileId)) selected.set(row.data.driveFileId, row); });
   return [...selected.values()].slice(0, limit);
@@ -20,6 +20,7 @@ async function inspectReplacement({ operation, drive, loadSubmission }) {
   const file = (await drive.files.get({ fileId: operation.driveFileId, supportsAllDrives: true, fields: 'id,name,size,mimeType,trashed,modifiedTime,headRevisionId,webContentLink,webViewLink' })).data;
   const actual = file.trashed ? null : await readDriveBinaryDigest(drive, operation.driveFileId);
   const expected = operation.replacement;
+  const expectedName = expected?.fileName || operation.fileName;
   const linkedId = driveFileIdFromUrl(source?.fileUrl || source?.driveFileUrl);
   return {
     submissionId: operation.submissionId,
@@ -31,6 +32,9 @@ async function inspectReplacement({ operation, drive, loadSubmission }) {
     driveFileId: file.id,
     websiteDriveFileId: source?.driveFileId || '',
     driveName: file.name,
+    expectedFileName: expectedName,
+    websiteFileName: source?.originalFileName || source?.fileName || '',
+    driveNameMatchesReplacement: file.name === expectedName,
     driveModifiedAt: file.modifiedTime || '',
     trashed: Boolean(file.trashed),
     expectedSizeBytes: expected?.sizeBytes || null,
@@ -38,7 +42,7 @@ async function inspectReplacement({ operation, drive, loadSubmission }) {
     expectedSha256: expected?.sha256 || '',
     downloadedSha256: actual?.sha256 || '',
     downloadedContentsMatchReplacement: Boolean(actual && expected && actual.sha256 === expected.sha256 && actual.sizeBytes === expected.sizeBytes),
-    websiteRecordMatchesReplacement: Boolean(source && expected && source.driveFileId === operation.driveFileId && source.contentSha256 === expected.sha256 && Number(source.sizeBytes) === expected.sizeBytes),
+    websiteRecordMatchesReplacement: Boolean(source && expected && source.driveFileId === operation.driveFileId && (source.originalFileName || source.fileName) === expectedName && source.contentSha256 === expected.sha256 && Number(source.sizeBytes) === expected.sizeBytes),
     websiteLinkMatchesDriveFile: linkedId ? linkedId === operation.driveFileId : null,
     openActualFile: file.webViewLink || `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`,
     downloadActualFile: file.webContentLink || '',

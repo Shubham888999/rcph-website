@@ -138,8 +138,8 @@ function createVisitFileActionService(options) {
       const type = validateVisitFileType(input.fileName, input.mimeType);
       validateVisitFileSize(file.buffer.length, Number(first.folder.maxFileSizeBytes || 25 * 1024 * 1024));
       if (Number(input.sizeBytes) !== file.buffer.length || (file.mimeType && file.mimeType !== type.mimeType)) fail('replacement-type', 'The replacement file metadata does not match its contents.', 'invalid-argument');
-      if (type.mimeType !== first.source.mimeType) fail('replacement-type', 'Choose the same file type as the existing document. Its filename and link will be preserved.', 'invalid-argument');
-      replacement = { mimeType: type.mimeType, sizeBytes: file.buffer.length, sha256: digest(file.buffer), md5: digest(file.buffer, 'md5') };
+      if (type.mimeType !== first.source.mimeType) fail('replacement-type', 'Choose the same file type as the existing document. Its link will be preserved.', 'invalid-argument');
+      replacement = { fileName: type.safeName, mimeType: type.mimeType, sizeBytes: file.buffer.length, sha256: digest(file.buffer), md5: digest(file.buffer, 'md5') };
     }
     const requestKey = digest(JSON.stringify([uid, submissionId, action, requestId]));
     diagnostic.stage = 'load-drive-config';
@@ -170,7 +170,7 @@ function createVisitFileActionService(options) {
         const { source, folder, folderId } = context;
         const requested = await tx.getDoc(OPERATIONS, requestKey);
         if (requested.exists && requested.data.state === 'complete') {
-          if (requested.data.replacement?.sha256 !== replacement?.sha256) fail('file-changed', 'This request ID was already used for another file.');
+          if (requested.data.replacement?.sha256 !== replacement?.sha256 || (action === 'replace' && requested.data.replacement?.fileName !== replacement.fileName)) fail('file-changed', 'This request ID was already used for another file or filename.');
           operation = requested.data; return;
         }
         if (source.status !== 'active') fail('file-changed', 'This document is no longer active. Refresh the folder.');
@@ -178,11 +178,12 @@ function createVisitFileActionService(options) {
         let previous = requested.exists ? requested.data : null;
         if (source.fileMutationId && source.fileMutationId !== requestKey) {
           const pending = await tx.getDoc(OPERATIONS, source.fileMutationId);
-          if (!pending.exists || pending.data.action !== action || pending.data.replacement?.sha256 !== replacement?.sha256) fail('file-pending', 'A previous change needs finishing. Retry that action with the same replacement file.');
+          if (!pending.exists || pending.data.action !== action || pending.data.replacement?.sha256 !== replacement?.sha256 || (action === 'replace' && pending.data.replacement?.fileName && pending.data.replacement.fileName !== replacement.fileName)) fail('file-pending', 'A previous change needs finishing. Retry that action with the same replacement file and filename.');
           operationId = source.fileMutationId;
           previous = pending.data;
         }
         if (previous?.leaseUntilMillis > now()) fail('file-busy', 'This file is still being changed. Retry shortly.');
+        if (action === 'replace' && previous?.state === 'pending' && (previous.replacement?.sha256 !== replacement.sha256 || (previous.replacement?.fileName && previous.replacement.fileName !== replacement.fileName))) fail('file-pending', 'Retry with the same replacement file and filename.');
         if (previous?.state === 'pending' && previous.sourceVersion !== sourceVersion(source)) fail('file-changed', 'This document changed during the pending action. A Visit manager must review it.');
         const refs = await tx.readDriveReferences(source.driveFileId);
         if (refs.some(ref => ref.id !== submissionId && ref.data.status === 'active')) fail('file-references', 'Another active website entry uses this Drive file. A Visit manager must review it first.');
@@ -196,7 +197,7 @@ function createVisitFileActionService(options) {
         const category = source.documentCategory || '';
         const storedFolder = category ? folder.categoryFolderIds?.[category] : folder.driveFolderId;
         if (!storedFolder || storedFolder !== source.driveFolderId) fail('file-location', 'The stored Drive folder does not match this document category.');
-        operation = previous?.state === 'pending' ? previous : {
+        operation = previous?.state === 'pending' ? { ...previous, ...(action === 'replace' ? { replacement } : {}) } : {
           operationId, submissionId, actorUid: uid, actorRole: access.role, action,
           visitType: source.visitType, positionKey: source.positionKey, folderId,
           driveFileId: source.driveFileId, driveFolderId: source.driveFolderId,
@@ -220,13 +221,13 @@ function createVisitFileActionService(options) {
       async function verifyReplacement() {
         const metadata = await inspectScope(drive, config, operation);
         const bytes = await readDriveBinaryDigest(drive, operation.driveFileId);
-        if (metadata.trashed || metadata.mimeType !== replacement.mimeType || metadata.md5Checksum !== replacement.md5 || Number(metadata.size) !== replacement.sizeBytes || bytes.sizeBytes !== replacement.sizeBytes || bytes.sha256 !== replacement.sha256) fail('file-changed', 'The downloaded Drive contents do not match the selected replacement. Refresh and retry.');
-        return { driveFileId: operation.driveFileId, sha256: bytes.sha256, sizeBytes: bytes.sizeBytes, revisionId: metadata.headRevisionId || '', verifiedAtMillis: now() };
+        if (metadata.trashed || metadata.name !== replacement.fileName || metadata.mimeType !== replacement.mimeType || metadata.md5Checksum !== replacement.md5 || Number(metadata.size) !== replacement.sizeBytes || bytes.sizeBytes !== replacement.sizeBytes || bytes.sha256 !== replacement.sha256) fail('file-changed', 'The Drive filename or downloaded contents do not match the selected replacement. Refresh and retry.');
+        return { driveFileId: operation.driveFileId, fileName: metadata.name, sha256: bytes.sha256, sizeBytes: bytes.sizeBytes, revisionId: metadata.headRevisionId || '', verifiedAtMillis: now() };
       }
       if (operation.state === 'complete') {
         diagnostic.stage = 'verify-completed-replacement';
         const { source } = await readContext(adapter, submissionId, await visitService.resolveAccessContext(uid));
-        if (source.status !== 'active' || source.driveFileId !== operation.driveFileId || source.driveFolderId !== operation.driveFolderId || source.contentSha256 !== replacement.sha256 || Number(source.sizeBytes) !== replacement.sizeBytes) fail('file-changed', 'This completed replacement has been superseded. Refresh and start a new replacement.');
+        if (source.status !== 'active' || source.driveFileId !== operation.driveFileId || source.driveFolderId !== operation.driveFolderId || source.contentSha256 !== replacement.sha256 || source.fileName !== replacement.fileName || source.originalFileName !== replacement.fileName || Number(source.sizeBytes) !== replacement.sizeBytes) fail('file-changed', 'This completed replacement has been superseded. Refresh and start a new replacement.');
         verifiedReplacement = await verifyReplacement();
         return { ok: true, submissionId, status: 'active', replay: true, unchanged: true, verifiedReplacement };
       }
@@ -270,8 +271,8 @@ function createVisitFileActionService(options) {
         await recheckAccess();
         await checkpoint({ stage: 'write-started' });
         diagnostic.stage = 'replace-drive-contents';
-        unchanged = currentDigest === replacement.sha256;
-        if (currentDigest !== replacement.sha256) await drive.files.update({ fileId: operation.driveFileId, supportsAllDrives: true, requestBody: {}, media: { mimeType: replacement.mimeType, body: Readable.from(file.buffer) }, fields: FILE_FIELDS });
+        unchanged = currentDigest === replacement.sha256 && current.name === replacement.fileName;
+        if (!unchanged) await drive.files.update({ fileId: operation.driveFileId, supportsAllDrives: true, requestBody: { name: replacement.fileName }, ...(currentDigest !== replacement.sha256 ? { media: { mimeType: replacement.mimeType, body: Readable.from(file.buffer) } } : {}), fields: FILE_FIELDS });
         diagnostic.stage = 'verify-drive-replacement';
         verifiedReplacement = await verifyReplacement();
       } else {
@@ -297,6 +298,7 @@ function createVisitFileActionService(options) {
         const timestamp = adapter.serverTimestamp();
         const resultStatus = action === 'replace' ? 'active' : input?.mode === 'remove' ? 'admin-removed' : 'archived';
         const updates = action === 'replace' ? {
+          fileName: replacement.fileName, originalFileName: replacement.fileName, sanitizedOriginalFileName: replacement.fileName,
           sizeBytes: replacement.sizeBytes, contentSha256: replacement.sha256,
           lastReplacedAt: timestamp, lastReplacedByUid: uid, backupRevisionId: operation.backupRevisionId,
         } : { status: resultStatus, deletedAt: timestamp, deletedByUid: uid, deleteReason: operation.reason || 'deleted-from-club-visits', driveTrashedAt: timestamp };

@@ -5,10 +5,10 @@ Club Assembly, DZR Visit and DRR Visit now use the same file controls in Club Vi
 | Website action | Drive result | Website result |
 | --- | --- | --- |
 | Delete | Moves the existing file to Trash; does not permanently delete it. | Removes the active submission, releases one file slot and clears its main-presentation selection if necessary. |
-| Replace | Pins the previous binary revision, then updates the existing file's contents. | Updates its size and checksum. The submission, filename, Drive ID, links, folder, uploader and main-presentation selection stay the same. |
+| Replace | Pins the previous binary revision, then updates the existing file's name and contents. | Updates its filename, size and checksum. The submission, Drive ID, links, folder, uploader and main-presentation selection stay the same. |
 | Upload with an existing filename in that folder | Offers **Replace existing** or **Keep both**. | Replacement uses the existing submission; Keep both follows the normal new-file upload flow. |
 
-Replacement requires the same file type and respects the folder's file-size limit. Duplicate choices apply to an individual folder's upload queue. The separate multi-position bulk-upload dialog continues to create new files.
+Replacement uses the selected file's sanitized filename and contents on both Drive and the website. It requires the same file type and respects the folder's file-size limit. Duplicate choices apply to an individual folder's upload queue. The separate multi-position bulk-upload dialog continues to create new files.
 
 Directors can change files in their currently assigned, open and unlocked position folders, including files an administrator uploaded there. Approved Visit managers can maintain closed or locked folders. Each request checks current access on the server, the recorded category folder, its ancestry under the configured visit root and the actual Drive file location and permissions. A Drive file referenced by another active submission is blocked for manager review.
 
@@ -16,9 +16,9 @@ Directors can change files in their currently assigned, open and unlocked positi
 
 The server records a durable operation before changing Drive. It publishes success only after verifying Drive and committing the website record. If a request fails after Drive accepted the change, retry Delete or retry Replace with the **same replacement file**. The operation resumes without creating a new Drive file, removing another file slot or repeating the audit entry. Pending actions appear on the file card; a different action or category move is blocked until the pending action is finished. A manager can finish an interrupted action if the original director loses access.
 
-Replacement request IDs and file hashes are retained in the browser tab's session storage when available. File contents and authentication tokens are not stored there. Server recovery also supports a new request ID with matching replacement contents.
+Replacement request IDs and file hashes are retained in the browser tab's session storage when available. The request ID is bound to both the contents and the selected filename. File contents and authentication tokens are not stored there. Server recovery also supports a new request ID with matching replacement contents.
 
-Every replacement success, including replay of a completed request, now requires downloading the current Drive binary and comparing its actual SHA-256 and byte count with the selected replacement. Drive metadata alone is insufficient. The response includes a verification result which the browser independently compares with the selected local file's SHA-256, byte count and expected Drive ID. A completed request which no longer matches Drive or the website record is rejected. Identical existing contents are reported as already present rather than as a newly replaced file. An Open file link pointing to a different Drive ID is also blocked for manager review.
+Every replacement success, including replay of a completed request, now requires downloading the current Drive binary and comparing its actual SHA-256 and byte count with the selected replacement. Drive metadata alone is insufficient. The response includes a verification result which the browser independently compares with the selected local file's sanitized filename, SHA-256, byte count and expected Drive ID. A completed request which no longer matches Drive or the website record is rejected. Only an identical filename and identical contents are reported as already present. A different filename still updates Drive and website metadata even when the contents are identical. An Open file link pointing to a different Drive ID is also blocked for manager review.
 
 Previous replacement contents are retained as pinned Drive revisions. There is no new website Restore control. Restoring a file from Drive Trash does not reactivate its archived website submission automatically. Changes made directly in Drive are not watched; a moved or inaccessible file must be reviewed before the website can change it.
 
@@ -54,7 +54,7 @@ node functions/scripts/inspect-visit-file-actions.js --project rcph-admin --name
 
 It inspects the most recent replacement for up to three distinct Drive files with that exact original filename. `downloadedContentsMatchReplacement` compares the downloaded bytes with the operation's recorded replacement checksum and size. `websiteRecordMatchesReplacement` compares the website record with that operation. `websiteLinkMatchesDriveFile` checks whether the website's Open file link points to the Drive file that was changed. The report also includes the actual Drive open/download links when available. It does not change files, records or revisions, and does not print credentials or file contents. A true content match with an old-looking preview needs checking via the actual download; it is not evidence that the overwrite failed.
 
-Deploy the download-verification update to `functions:replaceVisitSubmissionFile` before deploying its corresponding frontend. Older backend responses without a matching verification result cannot trigger success in the updated frontend. Main-presentation selection, file IDs, names, folders and file counts retain their existing replacement behavior.
+Deploy the download-verification update to `functions:replaceVisitSubmissionFile` before deploying its corresponding frontend. Older backend responses without a matching verification result cannot trigger success in the updated frontend. Main-presentation selection, file IDs, links, folders and file counts are preserved; filenames now update to match the selected replacement.
 
 ## Deployment
 
@@ -90,3 +90,5 @@ if ($LASTEXITCODE -ne 0) { throw "Hosting deployment failed." }
 Refresh any open Club Visits tabs after deployment. The old browser's website-only deletion request is deliberately rejected until it loads the new Drive-aware controls. Legacy ticket-based replacement sessions are also rejected; cancel those sessions and use Replace again.
 
 For a deployment check, upload a disposable PDF in an assigned test folder, replace it with another PDF and confirm that its Drive ID and folder remain unchanged. Delete that test file and confirm it appears in Drive Trash and leaves the active website list. This check is separate from the automated tests, which use fake Drive and Firestore adapters and do not modify production data.
+
+Existing files are not renamed by deploying this change. To rename a file which was already replaced under its old name, use Replace again with the correctly named file. Identical contents need only a filename update, and the existing main-presentation selection is preserved.
