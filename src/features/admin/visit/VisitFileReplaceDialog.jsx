@@ -19,7 +19,7 @@ export default function VisitFileReplaceDialog({ item, folder, initialFile = nul
     running.current = true; setBusy(true); setError('');
     try {
       const result = await replaceVisitFile(file, item, setStage);
-      onNotice?.({ type: 'success', message: result.unchanged ? 'This file already contains the selected version. Its contents have been verified.' : 'Updated file contents verified in Drive and saved on the website.' });
+      onNotice?.({ type: 'success', message: result.unchanged ? 'This file already has the selected name and contents. Both have been verified.' : 'Filename and contents updated in Drive and on the website.' });
       onReplaced?.(); onClose();
       await reload().catch(() => onNotice?.({ type: 'error', message: 'The replacement was saved. Refresh Club Visits to load the updated file list.' }));
     } catch (failure) {
@@ -27,7 +27,7 @@ export default function VisitFileReplaceDialog({ item, folder, initialFile = nul
     } finally { running.current = false; setBusy(false); setStage(''); }
   }
   return <AdminDialog title={`Replace ${item.fileName}?`} busy={busy} onClose={onClose}>
-    <p>The new contents will replace this Drive file. Its filename, link and folder stay the same. The previous version is backed up in Drive.</p>
+    <p>The selected file's name and contents will replace this Drive file. Its link, folder and main-presentation selection stay the same. The previous contents are backed up in Drive.</p>
     <label htmlFor="visit-replacement-file">Choose replacement file of the same type</label>
     <input id="visit-replacement-file" type="file" accept={item.mimeType || VISIT_FILE_ACCEPT} disabled={busy} onChange={event => { setFile(event.target.files?.[0] || null); setError(''); }} />
     {file ? <p>{file.name} · {formatVisitFileSize(file.size)}</p> : null}

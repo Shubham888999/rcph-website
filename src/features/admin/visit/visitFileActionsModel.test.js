@@ -6,7 +6,7 @@ import { safeAdminError } from '../shared/adminErrors.js';
 const env={VITE_FIREBASE_PROJECT_ID:'rcph-admin'};
 const file=new File(['%PDF-1.4 corrected'], 'New document.pdf',{type:'application/pdf'});
 function store(){const map=new Map();return {getItem:key=>map.get(key)||null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key),map};}
-function success(){return {ok:true,json:async()=>({ok:true,submissionId:'submission1',status:'active',verifiedReplacement:{driveFileId:'driveFile00001',sha256:createHash('sha256').update('%PDF-1.4 corrected').digest('hex'),sizeBytes:file.size}})};}
+function success(){return {ok:true,json:async()=>({ok:true,submissionId:'submission1',status:'active',verifiedReplacement:{driveFileId:'driveFile00001',fileName:file.name,sha256:createHash('sha256').update('%PDF-1.4 corrected').digest('hex'),sizeBytes:file.size}})};}
 test('replacement endpoint follows the trusted upload project and emulator endpoint',()=>{
  assert.equal(resolveVisitReplacementEndpoint(env),'https://us-central1-rcph-admin.cloudfunctions.net/replaceVisitSubmissionFile');
  assert.equal(resolveVisitReplacementEndpoint({VITE_FIREBASE_PROJECT_ID:'another-project'}),'https://us-central1-another-project.cloudfunctions.net/replaceVisitSubmissionFile');
@@ -40,12 +40,13 @@ test('same filename conflicts only in the selected category; Keep both and compl
  assert.deepEqual(findVisitUploadConflicts(queue,existing).map(f=>f.submissionId),['one']);assert.equal(hasVisitUploadConflicts([queue],existing),true);
  assert.equal(findVisitUploadConflicts({...queue,allowDuplicate:true},existing).length,0);assert.equal(findVisitUploadConflicts({...queue,completionProof:'proof'},existing).length,0);assert.equal(findVisitUploadConflicts({...queue,status:'Uploaded'},existing).length,0);
 });
-for(const invalidProof of ['missing','wrong-contents','wrong-file','wrong-size'])test(`an OK response with ${invalidProof} is not accepted as a successful replacement`,async()=>{
+for(const invalidProof of ['missing','wrong-contents','wrong-file','wrong-size','wrong-name'])test(`an OK response with ${invalidProof} is not accepted as a successful replacement`,async()=>{
  const storage=store();const response=success();const body=await response.json();
  if(invalidProof==='missing')delete body.verifiedReplacement;
  if(invalidProof==='wrong-contents')body.verifiedReplacement.sha256='0'.repeat(64);
  if(invalidProof==='wrong-file')body.verifiedReplacement.driveFileId='otherDriveFile001';
  if(invalidProof==='wrong-size')body.verifiedReplacement.sizeBytes++;
+ if(invalidProof==='wrong-name')body.verifiedReplacement.fileName='Old document.pdf';
  await assert.rejects(performVisitReplacement({file,submissionId:'submission1',expectedDriveFileId:'driveFile00001',uid:'director',getIdToken:async()=>'token',env,storage,fetcher:async()=>({ok:true,json:async()=>body})}),error=>error.code==='visit/drive-unavailable');
  assert.equal(storage.map.size,1);
 });
@@ -53,4 +54,12 @@ test('a superseded completed request clears its request ID so a deliberate new r
  const storage=store();const ids=[];let calls=0;
  const options={file,submissionId:'submission1',uid:'director',getIdToken:async()=>'token',env,storage,fetcher:async(_url,request)=>{ids.push(request.body.get('operationId'));return calls++?success():{ok:false,json:async()=>({reason:'file-changed'})}}};
  await assert.rejects(performVisitReplacement(options));assert.equal(storage.map.size,0);await performVisitReplacement(options);assert.notEqual(ids[0],ids[1]);
+});
+test('identical bytes with a new filename get a new request ID and require the new name in verification',async()=>{
+ const storage=store();const ids=[];let attempts=0;
+ const fetcher=async(_url,request)=>{ids.push(request.body.get('operationId'));if(!attempts++)throw new Error('lost response');const body=await success().json();body.verifiedReplacement.fileName=request.body.get('fileName');return {ok:true,json:async()=>body}};
+ const options={file,submissionId:'submission1',uid:'director',getIdToken:async()=>'token',env,storage,fetcher};
+ await assert.rejects(performVisitReplacement(options));
+ await performVisitReplacement({...options,file:new File([await file.arrayBuffer()],'Renamed: document.pdf',{type:file.type})});
+ assert.notEqual(ids[0],ids[1]);assert.equal(storage.map.size,0);
 });

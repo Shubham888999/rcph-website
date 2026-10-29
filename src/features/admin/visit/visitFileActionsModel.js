@@ -9,7 +9,7 @@ export const VISIT_FILE_ACTION_MESSAGES = Object.freeze({
   'visit/file-locked': 'This Club Visit folder is closed or locked.',
   'visit/file-busy': 'Another file action is running. Wait a moment, then retry.',
   'visit/file-pending': 'A previous change needs finishing. Retry that action with the same replacement file.',
-  'visit/replacement-type': 'Choose a replacement of the same file type. The existing filename and link will be preserved.',
+  'visit/replacement-type': 'Choose a replacement of the same file type. Its filename will update and the existing link will be preserved.',
   'visit/file-references': 'Another active website entry uses this Drive file. A Visit manager must review it first.',
   'visit/file-changed': 'This document changed during the action. Refresh the folder or ask a Visit manager to finish its pending change.',
   'visit/drive-unavailable': 'The file change could not be confirmed. Retry the same action; for replacement, select the same file.',
@@ -35,6 +35,11 @@ export function findVisitUploadConflicts(item, submissions = []) {
 export function hasVisitUploadConflicts(queue, submissions) {
   return queue.some(item => findVisitUploadConflicts(item, submissions).length > 0);
 }
+export function replacementFileName(name) {
+  const base = String(name || '').split(/[\\/]/).pop();
+  const cleaned = Array.from(base, char => char.charCodeAt(0) < 32 || '\\/:*?"<>|'.includes(char) ? ' ' : char).join('');
+  return cleaned.replace(/\s+/g, ' ').trim().replace(/^[.\s]+/, '').replace(/[.\s]+$/, '').slice(0, 180).trim();
+}
 // Keep the request ID through a lost response, dialog close or page reload.
 // Only this tab's request metadata is stored; file contents/tokens are never stored.
 export async function performVisitReplacement({ file, mimeType = file.type, submissionId, expectedDriveFileId = '', uid, getIdToken, env = {}, storage = null, fetcher = fetch, onStage = () => {} }) {
@@ -43,14 +48,15 @@ export async function performVisitReplacement({ file, mimeType = file.type, subm
   onStage('Preparing replacement…');
   const bytes = await file.arrayBuffer();
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('');
+  const fileName = replacementFileName(file.name);
   const key = `rcph-visit-replacement:${uid}:${submissionId}`;
   let saved;
   try { saved = JSON.parse(storage?.getItem(key) || 'null'); } catch { /* Storage is optional. */ }
-  const operationId = saved?.hash === hash && /^[a-zA-Z0-9_-]{1,160}$/.test(saved.operationId || '') ? saved.operationId : crypto.randomUUID();
-  try { storage?.setItem(key, JSON.stringify({ operationId, hash })); } catch { /* The server can also resume by matching pending content. */ }
+  const operationId = saved?.hash === hash && saved?.fileName === fileName && /^[a-zA-Z0-9_-]{1,160}$/.test(saved.operationId || '') ? saved.operationId : crypto.randomUUID();
+  try { storage?.setItem(key, JSON.stringify({ operationId, hash, fileName })); } catch { /* The server can also resume by matching pending content. */ }
   const token = await getIdToken();
   const body = new FormData();
-  Object.entries({ submissionId, operationId, fileName: file.name, mimeType, sizeBytes: String(file.size) }).forEach(([name, value]) => body.append(name, value));
+  Object.entries({ submissionId, operationId, fileName, mimeType, sizeBytes: String(file.size) }).forEach(([name, value]) => body.append(name, value));
   body.append('file', file, file.name);
   onStage('Replacing in Drive…');
   let response;
@@ -65,7 +71,7 @@ export async function performVisitReplacement({ file, mimeType = file.type, subm
     throw visitFileActionError({ reason: VISIT_FILE_ACTION_MESSAGES[`visit/${result.reason}`] ? result.reason : 'drive-unavailable' });
   }
   const proof = result.verifiedReplacement;
-  if (!proof || proof.sha256 !== hash || proof.sizeBytes !== file.size || !/^[a-zA-Z0-9_-]{10,200}$/.test(proof.driveFileId || '') || (expectedDriveFileId && proof.driveFileId !== expectedDriveFileId)) {
+  if (!proof || proof.fileName !== fileName || proof.sha256 !== hash || proof.sizeBytes !== file.size || !/^[a-zA-Z0-9_-]{10,200}$/.test(proof.driveFileId || '') || (expectedDriveFileId && proof.driveFileId !== expectedDriveFileId)) {
     throw visitFileActionError({ reason: 'drive-unavailable' });
   }
   try { if (JSON.parse(storage?.getItem(key) || 'null')?.operationId === operationId) storage.removeItem(key); } catch { /* Optional storage. */ }
