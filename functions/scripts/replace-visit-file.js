@@ -128,15 +128,34 @@ async function applyPlan({ plan, projectId, replacement, drive, loadRecord, upda
   }
   return journal;
 }
+const DRIVE_SECRET_NAMES = Object.freeze(['VISIT_DRIVE_CLIENT_ID', 'VISIT_DRIVE_CLIENT_SECRET', 'VISIT_DRIVE_REFRESH_TOKEN']);
+async function loadProjectDriveSecrets({ projectId, env = process.env, accessSecret }) {
+  if (!/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(projectId || '')) throw new Error('A valid Google Cloud project ID is required.');
+  const values = Object.create(null);
+  await Promise.all(DRIVE_SECRET_NAMES.map(async name => {
+    if (env[name]) { values[name] = env[name]; return; }
+    try {
+      const response = await accessSecret(`projects/${projectId}/secrets/${name}/versions/latest`);
+      const data = response?.data?.payload?.data;
+      if (typeof data !== 'string' || !data) throw new Error('Empty secret payload');
+      values[name] = Buffer.from(data, 'base64').toString('utf8').trim();
+      if (!values[name]) throw new Error('Empty secret');
+    } catch {
+      // Never print API error bodies: they can contain sensitive request data.
+      throw new Error(`Could not read ${name} from project ${projectId}. Run gcloud auth application-default login with your project account and ensure it can access this secret. No files replaced.`);
+    }
+  }));
+  return values;
+}
 async function main(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
-    if (key === '--apply' || key === '--help' || key === '--expect-one-per-position') args[key.slice(2)] = true;
+    if (key === '--apply' || key === '--help' || key === '--expect-one-per-position' || key === '--load-project-secrets') args[key.slice(2)] = true;
     else if (['--project','--visit','--name','--positions','--replacement','--plan','--confirm','--drive-auth','--folder-name'].includes(key) && argv[i+1] && !argv[i+1].startsWith('--')) args[key.slice(2)] = argv[++i];
     else throw new Error(`Unknown or incomplete argument: ${key}`);
   }
-  if (args.help) { console.log('Dry run: node functions/scripts/replace-visit-file.js --project rcph-admin --visit clubAssembly --name "Resolution_05.pdf" --positions core --replacement <corrected.pdf> --plan <plan.json>\nApply: node functions/scripts/replace-visit-file.js --project rcph-admin --replacement <corrected.pdf> --plan <plan.json> --apply --confirm replace-file-contents\nDrive credentials: existing VISIT_DRIVE_* OAuth environment, or --drive-auth shared-drive with Drive-scoped ADC. Use --visit auto --expect-one-per-position to find a unique complete visit; --folder-name Resolutions verifies the parent subfolder name. No live writes occur during dry run.'); return; }
+  if (args.help) { console.log('Dry run: node functions/scripts/replace-visit-file.js --project rcph-admin --visit clubAssembly --name "Resolution_05.pdf" --positions core --replacement <corrected.pdf> --plan <plan.json>\nApply: node functions/scripts/replace-visit-file.js --project rcph-admin --replacement <corrected.pdf> --plan <plan.json> --apply --confirm replace-file-contents\nDrive credentials: --load-project-secrets reads the existing Firebase project OAuth secrets into memory using Google Cloud ADC; alternatively use the VISIT_DRIVE_* environment or --drive-auth shared-drive with Drive-scoped ADC. Use --visit auto --expect-one-per-position to find a unique complete visit; --folder-name Resolutions verifies the parent subfolder name. No live writes occur during dry run.'); return; }
   if (!args.project || !args.replacement || !args.plan) throw new Error('--project, --replacement and --plan are required.');
   if (args.apply && args.confirm !== 'replace-file-contents') throw new Error('Apply requires --confirm replace-file-contents.');
   const replacement = fs.readFileSync(path.resolve(args.replacement)); assertPdf(replacement);
@@ -144,7 +163,17 @@ async function main(argv) {
   const { createGoogleDriveClient } = require('../lib/visit-drive');
   if (!admin.apps.length) admin.initializeApp({ projectId: args.project });
   const db = admin.firestore();
-  const drive = createGoogleDriveClient({ config: { authMode: args['drive-auth'] || process.env.VISIT_DRIVE_AUTH_MODE || 'oauth' } });
+  const authMode = args['drive-auth'] || process.env.VISIT_DRIVE_AUTH_MODE || 'oauth';
+  let secretValues = process.env;
+  if (args['load-project-secrets']) {
+    if (authMode !== 'oauth') throw new Error('--load-project-secrets is for the OAuth Drive uploader only.');
+    const { google } = require('googleapis');
+    const auth = new google.auth.GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+    const secrets = google.secretmanager({ version: 'v1', auth });
+    secretValues = await loadProjectDriveSecrets({ projectId: args.project, accessSecret: name => secrets.projects.secrets.versions.access({ name }) });
+  }
+  if (authMode === 'oauth' && DRIVE_SECRET_NAMES.some(name => !secretValues[name])) throw new Error('Local Drive OAuth credentials are missing. Use --load-project-secrets after gcloud auth application-default login, or configure the VISIT_DRIVE_* environment variables. No files replaced.');
+  const drive = createGoogleDriveClient({ config: { authMode }, getSecret: name => secretValues[name] });
   const references = async id => (await db.collection('visitSubmissions').where('driveFileId','==',id).get()).docs.filter(d=>d.data().status==='active').map(d=>({id:d.id}));
   const loadRecord = async id => { const snap=await db.collection('visitSubmissions').doc(id).get();return snap.exists?{id:snap.id,data:snap.data(),version:version(snap),snap}:null; };
   const updateRecords = async (records, plan) => {
@@ -177,5 +206,5 @@ async function main(argv) {
     console.log(JSON.stringify({dryRun:true,plan:planPath,visitType:scope.visitType,folderName:scope.folderName,positions,files:plan.files.map(file=>({driveFileId:file.driveFileId,records:file.records}))},null,2));
   }
 }
-module.exports={CORE_POSITIONS,hash,selectRecords,resolveSourceVisit,createPlan,applyPlan};
+module.exports={CORE_POSITIONS,hash,selectRecords,resolveSourceVisit,createPlan,applyPlan,loadProjectDriveSecrets};
 if(require.main===module)main(process.argv.slice(2)).catch(error=>{console.error(error.message);process.exitCode=1;});

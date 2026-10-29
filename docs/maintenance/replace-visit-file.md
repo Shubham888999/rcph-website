@@ -11,6 +11,15 @@ Run from the backend checkout using Node and its installed `functions` dependenc
 - OAuth: `VISIT_DRIVE_AUTH_MODE=oauth`, `VISIT_DRIVE_CLIENT_ID`, `VISIT_DRIVE_CLIENT_SECRET`, `VISIT_DRIVE_REFRESH_TOKEN`, supplied privately through environment variables. These are the same names used by the visit uploader; Firebase deployment secrets are not automatically exported to your local shell.
 - Shared Drive / Drive-scoped ADC: use `--drive-auth shared-drive`; that identity must have editing rights on the existing files. This flag chooses the existing ADC authentication path; it does not move files into a Shared Drive.
 
+For local OAuth maintenance, use `--load-project-secrets` on both the preview and apply commands. It reads the three existing OAuth secrets from this Firebase project's Secret Manager into process memory; it does not print them, write a credentials file or modify secrets. First authenticate the project account:
+
+```powershell
+gcloud auth application-default login
+gcloud auth application-default set-quota-project rcph-admin
+```
+
+Firebase CLI login and `gcloud auth login` alone do not create these Application Default Credentials. The Google account must have access to Firestore and permission to access the three Secret Manager secret versions. Install Google Cloud CLI if `gcloud` is unavailable. Existing environment values take precedence over secret retrieval. No Google Drive OAuth re-consent is needed: the script uses the uploader's existing refresh token.
+
 Never put credential values, plans, backups or journals in Git. Keep the same privileged identity and do not edit these documents concurrently while applying a plan.
 
 ## Dry run (no Drive or Firestore writes)

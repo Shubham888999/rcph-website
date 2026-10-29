@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const {hash,selectRecords,resolveSourceVisit,createPlan,applyPlan}=require('./replace-visit-file');
+const {hash,selectRecords,resolveSourceVisit,createPlan,applyPlan,loadProjectDriveSecrets}=require('./replace-visit-file');
 const old=Buffer.from('%PDF-1.4 old resolution'), replacement=Buffer.from('%PDF-1.4 corrected resolution 5');
 const scope={projectId:'test-project',visitType:'clubAssembly',fileName:'Resolution_05.pdf',positions:['president','secretary']};
 function fixture(){
@@ -21,6 +21,13 @@ function fixture(){
 (async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rcph-replacement-'));
  try{
+  const secretReads=[];
+  const credentials=await loadProjectDriveSecrets({projectId:'test-project',env:{VISIT_DRIVE_CLIENT_ID:'already-configured'},accessSecret:async name=>{secretReads.push(name);return {data:{payload:{data:Buffer.from('mock-secret-value').toString('base64')}}}}});
+  assert.equal(credentials.VISIT_DRIVE_CLIENT_ID,'already-configured');
+  assert.equal(credentials.VISIT_DRIVE_REFRESH_TOKEN,'mock-secret-value');
+  assert.equal(secretReads.length,2);
+  await assert.rejects(loadProjectDriveSecrets({projectId:'test-project',env:{},accessSecret:async()=>{throw new Error('sensitive-canary-token')}}),error=>!error.message.includes('sensitive-canary-token')&&error.message.includes('gcloud auth application-default login'));
+  await assert.rejects(loadProjectDriveSecrets({projectId:'../other',env:{},accessSecret:async()=>{throw new Error('must not access')}}),/valid Google Cloud project/);
   const scoped=fixture();
   const strict={...scope,visitType:'auto',folderName:'Resolutions',expectOnePerPosition:true};
   assert.equal(resolveSourceVisit(scoped.records,strict).visitType,'clubAssembly');
