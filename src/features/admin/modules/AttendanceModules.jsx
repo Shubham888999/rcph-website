@@ -109,7 +109,12 @@ function RemovedAttendanceSection({
         </span>
       </summary>
 
-      <div className="admin-table-wrap admin-attendance-grid attendance-manager-grid removed-attendance-grid">
+      <div
+        className="admin-table-wrap admin-attendance-grid attendance-manager-grid removed-attendance-grid"
+        role="region"
+        aria-label="Removed members attendance register"
+        tabIndex={0}
+      >
         <table>
           <thead>
             <tr>
@@ -472,7 +477,12 @@ function AttendanceGrid({
           );
         })}
       </div>
-      <div className="admin-table-wrap admin-attendance-grid attendance-manager-grid">
+      <div
+        className="admin-table-wrap admin-attendance-grid attendance-manager-grid"
+        role="region"
+        aria-label={`${collectionName === "bodAttendance" ? "BOD" : collectionName === "districtAttendance" ? "District" : "Club"} attendance register`}
+        tabIndex={0}
+      >
         <table>
           <thead>
             <tr>
