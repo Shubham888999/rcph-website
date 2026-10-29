@@ -7,7 +7,9 @@
   --pass-muted: #d3bdb8;
   --pass-gold: #e4c48b;
   --pass-line: rgba(228,196,139,.38);
+  --pass-door: #461a29;
   position: relative;
+  isolation: isolate;
   min-height: 690px;
   padding: clamp(1.7rem,3vw,2.6rem);
   display: grid;
@@ -29,7 +31,7 @@
 .login-page-react .login-access-pass .login-brand-logo { width: 62px; height: 62px; flex: 0 0 62px; border-color: var(--pass-line); background: transparent; transition: box-shadow 260ms ease,transform 260ms ease; }
 .login-page-react .login-access-pass .login-brand strong { color: var(--pass-ink); font-size: clamp(.75rem,1.2vw,.95rem); line-height: 1.4; letter-spacing: .035em; }
 .login-page-react .login-access-pass .login-brand small { color: var(--pass-muted); font-size: .76rem; line-height: 1.4; font-weight: 500; letter-spacing: .04em; }
-.login-page-react .login-access-pass__body { align-self: center; min-width: 0; padding-block: .25rem; }
+.login-page-react .login-access-pass__body { position: relative; z-index: 1; align-self: center; min-width: 0; padding-block: .25rem; }
 .login-page-react .login-access-pass__edition { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .login-page-react .login-access-pass__edition > p { margin: 0; color: var(--pass-muted); font-size: .63rem; font-weight: 650; letter-spacing: .13em; line-height: 1.6; text-transform: uppercase; }
 .login-page-react .login-access-pass__stamp { padding: .4rem .65rem; border: 1px solid var(--pass-line); text-align: center; color: var(--pass-gold); transform: rotate(3deg); }
@@ -45,6 +47,7 @@
 }
 :root[data-theme="light"] .login-page-react .login-access-pass {
   --pass-bg: #f4e8d3;
+  --pass-door: #e7d4b5;
   --pass-ink: #3c1120;
   --pass-muted: #72554e;
   --pass-gold: #85572d;
@@ -93,4 +96,46 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .login-page-react .login-access-pass__skyline * { animation: none !important; stroke-dashoffset: 0; }
+}
+
+/* Architectural engraving extends across the entire pass, behind the readable copy. */
+.login-page-react .login-access-pass__engraving { position: absolute; z-index: -1; inset: 8px; overflow: hidden; color: var(--pass-gold); pointer-events: none; }
+.login-page-react .login-access-pass__engraving > svg { display: block; width: 100%; height: 100%; }
+.login-page-react .pass-engraving__lanes { stroke: currentColor; stroke-width: .8; opacity: .19; }
+.login-page-react .pass-engraving__sun { stroke: currentColor; stroke-width: .75; opacity: .38; transform-origin: 564px 221px; }
+.login-page-react .pass-engraving__arch { stroke: currentColor; stroke-width: .9; opacity: .32; transition: opacity 600ms ease; }
+.login-page-react .pass-engraving__arch-wash { fill: var(--pass-door); stroke: none; }
+.login-page-react .login-access-pass__engraving pattern path { stroke: currentColor; stroke-width: .5; opacity: .45; }
+.login-page-react .pass-engraving__draw { stroke-width: 1.5; stroke-dasharray: 1; animation: pass-arch-etch 2.4s .3s cubic-bezier(.22,1,.36,1) both; }
+.login-page-react .pass-engraving__studs { fill: currentColor; stroke: none; }
+.login-page-react .pass-engraving__handle { stroke-width: 1.8; }
+.login-page-react .pass-engraving__hills { stroke: currentColor; stroke-width: .8; opacity: .22; }
+.login-page-react .pass-engraving__corners { stroke: currentColor; stroke-width: 1; opacity: .65; }
+.login-page-react .pass-engraving__foil { opacity: .5; animation: pass-foil-breathe 8s ease-in-out infinite alternate; }
+.login-page-react .login-access-pass__identity { z-index: 1; }
+.login-page-react .login-access-pass h1 { text-shadow: 0 2px 20px var(--pass-bg),0 0 4px var(--pass-bg); }
+.login-page-react .login-access-pass__body::before { content: ""; position: absolute; z-index: -1; inset: -1.5rem -1rem; background: radial-gradient(ellipse at 30% 55%,var(--pass-bg),transparent 75%); opacity: .85; pointer-events: none; }
+.login-page-react .login-access-pass__edition > p { padding-left: .7rem; border-left: 2px solid var(--pass-gold); }
+.login-page-react .login-access-pass__stamp { background: var(--pass-bg); box-shadow: 3px 3px 0 var(--pass-line); }
+.login-page-react .login-access-pass__skyline { z-index: 1; margin-inline: -1rem; width: calc(100% + 2rem); padding-top: 1rem; background: linear-gradient(transparent,var(--pass-bg) 64%); }
+.login-page-react .pass-skyline__outline path { opacity: .82; }
+.login-page-react .pass-skyline__windows { animation: pass-skyline-light 1.5s 2s ease-out both,pass-window-glow 5s 3.5s ease-in-out infinite alternate; }
+@keyframes pass-arch-etch { from { stroke-dashoffset: 1; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes pass-foil-breathe { from { opacity: .2; } to { opacity: .8; } }
+@keyframes pass-window-glow { from { opacity: .3; } to { opacity: .75; } }
+@media (max-width: 850px) {
+  .login-page-react .login-access-pass__engraving { opacity: .8; }
+  .login-page-react .pass-engraving__foil { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-page-react .login-access-pass__engraving *,
+  .login-page-react .pass-skyline__windows { animation: none !important; stroke-dashoffset: 0; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .login-page-react .login-access-pass:hover .pass-engraving__arch,
+  .login-page-react .login-access-pass:focus-within .pass-engraving__arch { opacity: .48; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-page-react .pass-engraving__arch { transition: none; }
 }

@@ -1,5 +1,6 @@
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
 import PuneSkyline from "./PuneSkyline.jsx";
+import PuneEngraving from "./PuneEngraving.jsx";
 
 export default function LoginAccessPass({ children }) {
   const reduceMotion = useReducedMotion();
@@ -22,6 +23,7 @@ export default function LoginAccessPass({ children }) {
   return <motion.section className="login-brand-panel login-access-pass" aria-labelledby="login-brand-title" initial={reduceMotion ? false : { opacity: 0, x: -20, y: 12 }} animate={{ opacity: 1, x: 0, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.6, ease: [0.22, 1, 0.36, 1] }} style={reduceMotion ? undefined : { rotateX, rotateY, transformPerspective: 1200 }} onPointerMove={moveLight} onPointerLeave={() => { pointerX.set(0); pointerY.set(0); }}>
     <motion.span className="login-access-pass__light" aria-hidden="true" style={{ "--pass-light-x": lightX, "--pass-light-y": lightY }} />
     <span className="login-access-pass__spine" aria-hidden="true" />
+    <PuneEngraving />
     <header className="login-access-pass__identity">{children}</header>
     <div className="login-access-pass__body">
       <div className="login-access-pass__edition"><p>Heritage / Account Access</p><div className="login-access-pass__stamp"><span>RIY</span><strong>2026-27</strong></div></div>
