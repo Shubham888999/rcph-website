@@ -214,6 +214,7 @@ export function normalizeMember(id, raw) {
     rid: text(raw.rid, 40),
     role: text(raw.role, 30),
     position: text(raw.position || raw.clubPosition, 180),
+    positionKeys: resolvePositionKeys({ positionKeys: raw.positionKeys }),
     active: raw.active !== false,
 
     status: text(raw.status, 60).toLowerCase(),
@@ -328,6 +329,7 @@ export function buildAttendanceParticipantGroups({
   members = [],
   users = [],
   attendance = {},
+  positionRoster = [],
   includeUsers = true,
   memberRoleFallback = "gbm",
 } = {}) {
@@ -338,6 +340,18 @@ export function buildAttendanceParticipantGroups({
   const idIndex = new Map();
   const linkedUsersById = new Map();
   const linkedUsersByEmail = new Map();
+  const positionRosterById = new Map();
+  const positionRosterByEmail = new Map();
+  // Club and BOD roster documents may have different IDs for the same person.
+  (Array.isArray(positionRoster) ? positionRoster : []).forEach((member) => {
+    if (!member || member.active === false || isRemovedProfileRecord(member)) return;
+    [member.id, member.userId].forEach((value) => {
+      const id = text(value, 128);
+      if (id && !positionRosterById.has(id)) positionRosterById.set(id, member);
+    });
+    const email = text(member.email, 320).toLowerCase();
+    if (email && !positionRosterByEmail.has(email)) positionRosterByEmail.set(email, member);
+  });
   (Array.isArray(users) ? users : []).forEach((user) => {
     const linkedId = text(user?.id, 128);
     const linkedEmail = text(user?.email, 320).toLowerCase();
@@ -388,12 +402,18 @@ export function buildAttendanceParticipantGroups({
       || linkedUsersById.get(id)
       || (email ? linkedUsersByEmail.get(email) : null)
       || null;
-    const positionKeys = resolvePositionKeys({
+    const rosterPosition = allIds.map((id) => positionRosterById.get(id)).find(Boolean)
+      || (email ? positionRosterByEmail.get(email) : null);
+    const recordedPositionKeys = resolvePositionKeys({
       positionKeys: [
         ...(Array.isArray(linkedUser?.positionKeys) ? linkedUser.positionKeys : []),
         ...(Array.isArray(participant.positionKeys) ? participant.positionKeys : []),
       ],
       positionText: participant.position || participant.clubPosition || linkedUser?.clubPosition || "",
+    });
+    const positionKeys = recordedPositionKeys.length ? recordedPositionKeys : resolvePositionKeys({
+      positionKeys: rosterPosition?.positionKeys,
+      positionText: rosterPosition?.position || rosterPosition?.clubPosition,
     });
     const normalized = {
       id,

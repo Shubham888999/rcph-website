@@ -796,6 +796,7 @@ export function ClubAttendanceModule({ data, lock, uid, access, onNotice }) {
     members: data.members,
     users: data.users,
     attendance: data.attendance,
+    positionRoster: data.bodMembers,
   });
   const { activeParticipants: bodExportMembers } = buildAttendanceParticipantGroups({
     members: data.bodMembers, users: data.users, attendance: data.bodAttendance,

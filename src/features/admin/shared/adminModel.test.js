@@ -24,6 +24,7 @@ import {
   normalizeAttendance,
   normalizeEvent,
   normalizeFine,
+  normalizeMember,
   normalizeTreasury,
   safeUrl,
   validDate,
@@ -451,4 +452,60 @@ test("event attendance summary can exclude prospects without changing the defaul
   assert.equal(clubSummary.eligibleCount, 1);
   assert.equal(clubSummary.rosterCount, 1);
   assert.equal(clubSummary.percentage, 100);
+});
+
+
+test("member normalization preserves canonical positions for attendance hierarchy", () => {
+  const member = normalizeMember("secretary", {
+    name: "Zara Secretary", positionKeys: ["secretary", "secretary", "invalid-position"],
+  });
+  assert.deepEqual(member.positionKeys, ["secretary"]);
+  const participants = buildAttendanceParticipants({ members: [
+    normalizeMember("gbm", { name: "Amy Member" }), member,
+    normalizeMember("president", { name: "Zed President", positionKeys: ["president"] }),
+  ] });
+  assert.deepEqual(participants.map((item) => item.id), ["president", "secretary", "gbm"]);
+});
+
+test("club attendance uses matched BOD positions without adding or merging attendance rows", () => {
+  const members = [
+    { id: "amy", name: "Amy Member" },
+    { id: "zoe", name: "Zoe Secretary", email: "zoe@example.com" },
+    { id: "president-row", userId: "president-uid", name: "Zed President" },
+    { id: "joint", name: "Joint Director" },
+    { id: "bea", name: "Bea Member" },
+  ];
+  const positionRoster = [
+    { id: "different-doc", email: "ZOE@EXAMPLE.COM", position: "Secretary" },
+    { id: "president-uid", positionKeys: ["president"] },
+    { id: "joint", positionKeys: ["co-csd", "pdd"] },
+    { id: "unmatched", name: "Amy Member", position: "Treasurer" },
+    { id: "bea", position: "Vice President", active: false },
+  ];
+  const attendance = { "president-row": { event: true }, "legacy": { event: false } };
+  const result = buildAttendanceParticipantGroups({ members, positionRoster, attendance });
+  assert.deepEqual(result.activeParticipants.map((item) => item.id),
+    ["president-uid", "zoe", "joint", "amy", "bea", "legacy"]);
+  assert.deepEqual(result.activeParticipants[0].attendanceIds, ["president-uid", "president-row"]);
+  assert.equal(result.activeParticipants.find((item) => item.id === "amy").hierarchySortKey, 1000);
+  assert.equal(result.activeParticipants.find((item) => item.id === "bea").hierarchySortKey, 1000);
+  assert.deepEqual(attendance, { "president-row": { event: true }, "legacy": { event: false } });
+  assert.deepEqual(buildAttendanceParticipants({ members }).map((item) => item.id),
+    ["amy", "bea", "joint", "president-uid", "zoe"]);
+});
+
+test("recorded positions take priority over BOD fallback and prospects stay last", () => {
+  const result = buildAttendanceParticipants({
+    members: [
+      { id: "p", name: "Amy Prospect", role: "prospect" },
+      { id: "s", name: "Zoe Secretary", positionKeys: ["secretary"] },
+      { id: "m", name: "Member" },
+    ],
+    positionRoster: [
+      { id: "p", positionKeys: ["president"] },
+      { id: "s", positionKeys: ["president"] },
+    ],
+  });
+  assert.deepEqual(result.map((item) => item.id), ["s", "m", "p"]);
+  assert.deepEqual(result[0].positionKeys, ["secretary"]);
 });
