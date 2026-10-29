@@ -1,4 +1,8 @@
 .auth-access-page {
+  --internal-radius-panel: 0px;
+  --internal-radius-card: 0px;
+  --internal-radius-control: 0px;
+  --radius-button: 0px;
   min-height: 100vh;
   padding: clamp(1rem, 4vw, 3rem);
   display: grid;

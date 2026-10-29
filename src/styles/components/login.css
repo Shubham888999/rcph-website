@@ -1,4 +1,8 @@
 .login-page-react {
+  --internal-radius-panel: 0px;
+  --internal-radius-card: 0px;
+  --internal-radius-control: 0px;
+  --radius-button: 0px;
   --lakshya-burgundy-950: #24030a;
   --lakshya-burgundy-900: #310611;
   --lakshya-burgundy-800: #430a17;
