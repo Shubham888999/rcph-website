@@ -89,10 +89,35 @@
 .bod-page-react--books .bod-contact-react { border-radius: 0; border-color: var(--bod-line); background: var(--bod-paper-raised); box-shadow: none; }
 .bod-page-react--books :is(button,a,[tabindex]):focus-visible { outline: 2px solid var(--bod-accent); outline-offset: 4px; }
 
+/* Phones show three covers; opening a book reserves an entire row. */
 @media (max-width: 620px) {
-  .bod-page-react--books .bod-book-item.is-expanded { grid-column: span 1; grid-template-columns: minmax(0,1fr); }
-  .bod-page-react--books .bod-book-page { position: relative; top: auto; bottom: auto; width: 100%; min-height: 26rem; max-height: 75dvh; padding: 1.4rem; transform-origin: center top; }
-  .bod-page-react--books .is-expanded .bod-book-cover { border-right: 1px solid var(--bod-line); }
+  .bod-page-react--books .bod-book-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: .65rem; }
+  .bod-page-react--books .bod-book-item.is-expanded { grid-column: 1 / -1; grid-template-columns: repeat(2,minmax(0,1fr)); min-height: 27rem; }
+  .bod-page-react--books .bod-book-cover { box-shadow: 2px 3px 0 color-mix(in srgb,var(--bod-line) 35%,transparent); }
+  .bod-page-react--books .bod-book-cover__caption { gap: .2rem; min-height: 5.5rem; padding: .5rem .4rem .65rem; }
+  .bod-page-react--books .bod-book-cover__role { font-size: .48rem; letter-spacing: .025em; line-height: 1.4; }
+  .bod-page-react--books .bod-book-cover__name { font-size: .78rem; line-height: 1.2; }
+  .bod-page-react--books .bod-book-cover__group,
+  .bod-page-react--books .bod-book-cover__action,
+  .bod-page-react--books .bod-book-cover__view { display: none; }
+  .bod-page-react--books .is-expanded .bod-book-cover__caption { padding: .7rem .6rem 2.7rem; }
+  .bod-page-react--books .is-expanded .bod-book-cover__role { font-size: .56rem; }
+  .bod-page-react--books .is-expanded .bod-book-cover__name { font-size: 1rem; }
+  .bod-page-react--books .is-expanded .bod-book-cover__action { display: inline-flex; left: .6rem; bottom: .75rem; font-size: .65rem; }
+  .bod-page-react--books .bod-book-page { position: absolute; top: 0; bottom: 0; right: 0; width: 50%; min-height: 0; max-height: none; padding: .7rem .65rem; transform-origin: left center; box-shadow: 3px 3px 0 #bba68a; }
+  .bod-page-react--books .bod-book-eyebrow { margin-bottom: .45rem; font-size: .47rem; letter-spacing: .06em; }
+  .bod-page-react--books .bod-book-page h3 { margin-bottom: .4rem; font-size: 1.12rem; }
+  .bod-page-react--books .bod-book-page__role { margin-bottom: .3rem; font-size: .65rem; line-height: 1.35; }
+  .bod-page-react--books .bod-book-page__context { margin-block: .25rem; font-size: .6rem; line-height: 1.35; }
+  .bod-page-react--books .bod-book-page__story { margin-top: .5rem; padding: .55rem .2rem .55rem 0; }
+  .bod-page-react--books .bod-book-page__summary { font-size: .83rem; line-height: 1.5; }
+  .bod-page-react--books .bod-book-page__bio { font-size: .75rem; line-height: 1.55; }
+  .bod-page-react--books .bod-book-page__links { gap: .25rem; margin-top: .5rem; }
+  .bod-page-react--books .bod-book-page__links :is(button,a) { font-size: .64rem; }
+  .bod-page-react--books .bod-book-page__footer { gap: 0; padding-top: .2rem; }
+  .bod-page-react--books .bod-book-page__footer nav { width: 100%; justify-content: space-between; gap: 0; }
+  .bod-page-react--books .bod-book-page__footer button { font-size: .64rem; }
+  .bod-page-react--books .bod-book-page__footer > button { width: 100%; text-align: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

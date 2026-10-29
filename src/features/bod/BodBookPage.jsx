@@ -17,12 +17,13 @@ export default function BodBookPage({ member, id, group, reduceMotion, phone, na
       const header = document.querySelector(".public-header") || document.querySelector("header");
       const inset = (header?.getBoundingClientRect().height || 76) + 24;
       const rect = page.getBoundingClientRect();
-      if (rect.top < inset || rect.top > window.innerHeight - 160) {
+      const belowViewport = phone ? rect.bottom > window.innerHeight - 24 : rect.top > window.innerHeight - 160;
+      if (rect.top < inset || belowViewport) {
         window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - inset), behavior: reduceMotion ? "instant" : "smooth" });
       }
-    }, reduceMotion ? 0 : 420);
+    }, reduceMotion ? 0 : phone ? 560 : 420);
     return () => clearTimeout(timer);
-  }, [present, reduceMotion]);
+  }, [present, reduceMotion, phone]);
   function focusPage() {
     if (!present || document.querySelector('[role="dialog"]')) return;
     if (document.activeElement === document.body || document.activeElement === triggerRef.current) titleRef.current?.focus({ preventScroll: true });
