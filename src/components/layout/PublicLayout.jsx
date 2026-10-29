@@ -129,33 +129,36 @@ export default function PublicLayout() {
             </span>
           </NavLink>
 
-          <div className="public-feature-links" role="group" aria-label="Featured experiences">
-          <Link
-            className="public-event-link public-feature-link public-feature-link--flight"
-            to={featuredEventBadge.to}
-            aria-label={featuredEventBadge.ariaLabel}
-            onClick={closeMenu}
-          >
-            <svg className="public-feature-plane" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 2c.6 0 1 .6 1 1.3V9l8 5v2l-8-2v5l3 2v1l-4-1-4 1v-1l3-2v-5l-8 2v-2l8-5V3.3C11 2.6 11.4 2 12 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-            </svg>
-            <span className="public-event-link__live">
-              {featuredEventBadge.label}
-            </span>
-          </Link>
-          <NavLink
-            className={({ isActive }) => `public-board-link public-feature-link${isActive ? " is-active" : ""}`}
-            to="/bod"
-            aria-label="Explore the new Board Reveal collection"
-            onClick={closeMenu}
-          >
-            <svg className="public-feature-book" viewBox="0 0 26 24" fill="none" aria-hidden="true">
-              <path d="M13 5C10 2 6 2 2 3v17c4-1 8-1 11 1V5Z" stroke="currentColor" strokeWidth="1.3" />
-              <path className="public-feature-book__leaf" d="M13 5c3-3 7-3 11-2v17c-4-1-8-1-11 1V5Z" fill="currentColor" fillOpacity=".12" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M5 7h5M5 10h5M16 7h5M16 10h5" stroke="currentColor" strokeWidth=".9" />
-            </svg>
-            <span>Board Reveal</span>
-          </NavLink>
+          <div className="public-updates" role="group" aria-labelledby="public-updates-title">
+            <span className="public-updates-title" id="public-updates-title">What’s new</span>
+            <div className="public-feature-links">
+            <Link
+              className="public-event-link public-feature-link public-feature-link--flight"
+              to={featuredEventBadge.to}
+              aria-label={featuredEventBadge.ariaLabel}
+              onClick={closeMenu}
+            >
+              <svg className="public-feature-plane" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2c.6 0 1 .6 1 1.3V9l8 5v2l-8-2v5l3 2v1l-4-1-4 1v-1l3-2v-5l-8 2v-2l8-5V3.3C11 2.6 11.4 2 12 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+              </svg>
+              <span className="public-event-link__live">
+                {featuredEventBadge.label}
+              </span>
+            </Link>
+            <NavLink
+              className={({ isActive }) => `public-board-link public-feature-link${isActive ? " is-active" : ""}`}
+              to="/bod"
+              aria-label="Explore the new Board Reveal collection"
+              onClick={closeMenu}
+            >
+              <svg className="public-feature-book" viewBox="0 0 26 24" fill="none" aria-hidden="true">
+                <path d="M13 5C10 2 6 2 2 3v17c4-1 8-1 11 1V5Z" stroke="currentColor" strokeWidth="1.3" />
+                <path className="public-feature-book__leaf" d="M13 5c3-3 7-3 11-2v17c-4-1-8-1-11 1V5Z" fill="currentColor" fillOpacity=".12" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M5 7h5M5 10h5M16 7h5M16 10h5" stroke="currentColor" strokeWidth=".9" />
+              </svg>
+              <span>Board Reveal</span>
+            </NavLink>
+            </div>
           </div>
 
           <nav

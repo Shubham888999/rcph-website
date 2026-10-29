@@ -1192,13 +1192,14 @@
 }
 @media (min-width: 721px) and (max-width: 1420px) {
   .public-feature-link--flight { flex-direction: row; align-items: center; min-width: 0; padding-inline: .7rem; gap: .55rem; }
-  .public-feature-links { margin-left: auto; }
+  .public-updates { margin-left: auto; }
 }
 @media (max-width: 720px) {
   .public-header-inner { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .65rem 1rem; padding: .65rem 1rem .75rem; }
   .public-brand { grid-column: 1; grid-row: 1; justify-self: start; }
   .public-menu-toggle { position: static; grid-column: 2; grid-row: 1; transform: none; margin: 0; justify-self: end; }
-  .public-feature-links { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .6rem; width: 100%; }
+  .public-updates { grid-column: 1 / -1; grid-row: 2; }
+  .public-feature-links { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .6rem; width: 100%; }
   .public-feature-links .public-feature-link { width: 100%; min-width: 0; max-width: none; min-height: 44px; padding: .4rem .45rem; flex-direction: row; align-items: center; justify-content: center; gap: .45rem; }
   .public-feature-link--flight .public-event-link__live { font-size: .62rem; letter-spacing: .035em; }
   .public-board-link { font-size: .9rem; }
@@ -1217,4 +1218,26 @@
   .public-feature-plane,
   .public-feature-book__leaf,
   .public-feature-link--flight::after { transition: none; transform: none; }
+}
+
+/* Featured links share one compact, square box within the existing navbar height. */
+.public-updates { display: flex; flex-direction: column; align-items: stretch; justify-content: center; flex: 0 0 auto; height: var(--header-height); box-sizing: border-box; gap: .3rem; padding: .35rem .5rem; border: 1px solid var(--color-border); border-radius: 0; background: rgba(var(--lakshya-gold-rgb),.035); }
+.public-updates-title { display: block; color: var(--color-text); font-size: .62rem; line-height: 1; font-weight: 700; letter-spacing: .1em; text-align: center; text-transform: uppercase; }
+.public-updates .public-feature-links { gap: .45rem; margin: 0; }
+.public-updates .public-feature-link { min-height: 2rem; height: 2rem; padding: .25rem .55rem; gap: .4rem; align-items: center; justify-content: center; flex-direction: row; }
+.public-updates .public-event-link__live { font-size: .6rem; letter-spacing: .04em; }
+.public-updates .public-board-link { padding-left: .65rem; font-size: .82rem; }
+.public-updates .public-feature-plane { width: 18px; height: 18px; flex-basis: 18px; }
+.public-updates .public-feature-book { width: 20px; height: 20px; flex-basis: 20px; }
+.public-updates .public-feature-link--flight::after { bottom: 3px; }
+@media (max-width: 720px) {
+  .public-updates { width: 100%; height: auto; gap: .2rem; padding: .3rem .4rem; }
+  .public-updates .public-feature-links { width: 100%; }
+  .public-updates .public-feature-link { height: 2rem; min-height: 2rem; padding-inline: .3rem; }
+}
+@media (max-width: 360px) {
+  .public-updates .public-event-link__live { font-size: .54rem; letter-spacing: .01em; }
+  .public-updates .public-board-link { font-size: .76rem; }
+  .public-updates .public-feature-plane { width: 15px; height: 15px; flex-basis: 15px; }
+  .public-updates .public-feature-book { width: 18px; height: 18px; flex-basis: 18px; }
 }
