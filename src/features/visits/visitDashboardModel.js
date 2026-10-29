@@ -64,7 +64,7 @@ export const VISIT_ATTENDANCE_TABS = Object.freeze([
   { key: "district", label: "District Events Attendance" },
 ]);
 const VISIT_ATTENDANCE_TAB_KEYS = new Set(VISIT_ATTENDANCE_TABS.map((tab) => tab.key));
-const ATTENDANCE_STATUSES = new Set(["present", "absent", "late", "excused", "unknown"]);
+const ATTENDANCE_STATUSES = new Set(["present", "absent", "late", "excused", "na", "null", "unknown"]);
 const TREASURY_TYPES = new Set(["income", "expense", "unknown"]);
 const FINE_STATUSES = new Set(["paid", "pending", "waived", "unknown"]);
 const ATTENDANCE_ROLE_CODES = Object.freeze({
@@ -1562,6 +1562,8 @@ export function attendanceStatusLabel(value) {
     absent: "Absent",
     late: "Late",
     excused: "Excused",
+    na: "NA — granted absence",
+    null: "Null — before membership",
     unknown: "Unknown",
   };
   return labels[normalizeAttendanceStatus(value)] || labels.unknown;

@@ -66,8 +66,8 @@ export function normalizeDashboardEvent(raw, attendance = false) {
   if (!attendance) return event;
   return {
     ...event,
-    value: raw.value === true ? true : raw.value === false ? false : "NA",
-    label: ["Present", "Absent", "NA"].includes(raw.label) ? raw.label : "NA",
+    value: raw.value === true ? true : raw.value === false ? false : raw.value === "NULL" ? "NULL" : "NA",
+    label: ["Present", "Absent", "NA", "NULL"].includes(raw.label) ? raw.label : "NA",
   };
 }
 

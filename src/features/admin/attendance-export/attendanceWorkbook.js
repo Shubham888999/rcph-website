@@ -37,7 +37,7 @@ export function thinBorder(bottomColor = COLORS.border) {
 }
 
 function markFill(mark) {
-  return mark === "A" ? COLORS.absent : mark === "N/A" ? COLORS.na : COLORS.white;
+  return mark === "A" ? COLORS.absent : (mark === "N/A" || mark === "NULL") ? COLORS.na : COLORS.white;
 }
 
 function percFormula(range) {

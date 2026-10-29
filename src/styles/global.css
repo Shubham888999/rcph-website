@@ -778,3 +778,12 @@ select { color-scheme: var(--control-color-scheme, dark); }
     transition: none !important;
   }
 }
+
+/* Compact, shared attendance key for managers and visit dashboards. */
+.attendance-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; margin: .65rem 0; padding: 0; list-style: none; color: var(--color-muted); font-size: .68rem; line-height: 1.4; }
+.attendance-legend li { display: inline-flex; align-items: center; gap: .3rem; }
+.attendance-legend .attendance-mark { --attendance-mark-size: 1.05rem; }
+.attendance-mark--null img { clip-path: circle(39.8% at 50% 50%); transform: scale(1.25); }
+
+.attendance-mobile-event--null { border-color: rgba(180,180,180,.3); }
+.attendance-cell--null { color: inherit !important; }

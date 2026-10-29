@@ -74,12 +74,12 @@ function cleanText(value, max = 200) {
 
 export function attendanceExportStatus(value) {
   const normalized = normalizeAttendance(value);
-  return normalized === true ? "Present" : normalized === false ? "Absent" : "Not applicable";
+  return normalized === true ? "Present" : normalized === false ? "Absent" : normalized === "NULL" ? "Null — before membership" : "Not applicable";
 }
 
 export function attendanceExportMark(value) {
   const normalized = normalizeAttendance(value);
-  return normalized === true ? "P" : normalized === false ? "A" : "N/A";
+  return normalized === true ? "P" : normalized === false ? "A" : normalized === "NULL" ? "NULL" : "N/A";
 }
 
 export function parseAttendanceDate(value) {

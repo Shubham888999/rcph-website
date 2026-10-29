@@ -39,3 +39,12 @@ test("unknown values remain readable text and receive no image", () => {
     imageSrc: null,
   });
 });
+
+test("explicit Null gets its own icon while missing values remain NA", () => {
+  for (const value of ["NULL", "null", "∅"]) {
+    assert.equal(resolveAttendanceMark(value).kind, "null");
+    assert.equal(resolveAttendanceMark(value).imageSrc, ATTENDANCE_MARK_ASSETS.null);
+  }
+  assert.equal(resolveAttendanceMark(null).kind, "na");
+  assert.equal(resolveAttendanceMark(undefined).kind, "na");
+});

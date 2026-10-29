@@ -3,6 +3,8 @@ import {
   useState,
 } from "react";
 import AttendanceMark from "../../../components/status/AttendanceMark";
+import AttendanceLegend from "../../../components/status/AttendanceLegend";
+import { nextAttendanceValue, resolveAttendanceMark } from "../../../components/status/attendanceMarkModel";
 import AdminModuleHeader from "../AdminModuleHeader";
 import AdminDialog from "../shared/AdminDialog";
 import { AdminEmpty } from "../shared/AdminStates";
@@ -23,7 +25,7 @@ import MomSection from "../../mom/MomSection";
 import { canViewMom, MOM_TARGET_TYPES, normalizeMomMetadata } from "../../mom/momModel";
 import { viewMomPdf } from "../../mom/momService";
 
-function nextAttendance(value) { return value === true ? false : value === false ? "NA" : true; }
+const nextAttendance = nextAttendanceValue;
 function getAttendanceStats(memberOrId, events, attendance) {
   const calculate = (filteredEvents) => {
     const values = filteredEvents
@@ -81,7 +83,7 @@ function attendanceValueForMember(attendance, memberOrId, eventId) {
 }
 
 function attendanceValueLabel(value) {
-  return value === true ? "Present" : value === false ? "Absent" : "Not applicable";
+  return resolveAttendanceMark(value).label;
 }
 
 function RemovedAttendanceSection({
@@ -179,7 +181,7 @@ function RemovedAttendanceSection({
                       <td key={event.id} className="attendance-status-cell">
                         <span
                           className={`attendance-cell attendance-cell--${
-                            value === true ? "present" : value === false ? "absent" : "na"
+                            resolveAttendanceMark(value).kind
                           } is-read-only`}
                           aria-label={`${memberDisplayName}, ${event.name}: ${label}`}
                           title={label}
@@ -252,6 +254,7 @@ function AttendanceGrid({
     ["present", "All present"],
     ["absent", "All absent"],
     ["na", "All N/A"],
+    ["null", "All Null"],
   ];
 
   const toValue = (value) =>
@@ -259,7 +262,7 @@ function AttendanceGrid({
       ? true
       : value === "absent"
         ? false
-        : "NA";
+        : value === "null" ? "NULL" : "NA";
 
   const prospectIds = members
     .filter(
@@ -331,7 +334,7 @@ function AttendanceGrid({
           <h3>Member participation</h3>
           <p>
             Select an attendance marker to cycle between Present,
-            Absent, and Not applicable.
+            Absent, NA, and Null (before membership).
           </p>
         </div>
 
@@ -348,22 +351,7 @@ function AttendanceGrid({
           </label>
         ) : null}
 
-        <div className="attendance-workspace__legend">
-          <span>
-            <i className="is-present" />
-            Present
-          </span>
-
-          <span>
-            <i className="is-absent" />
-            Absent
-          </span>
-
-          <span>
-            <i className="is-na" />
-            N/A
-          </span>
-        </div>
+        <AttendanceLegend />
       </header>
       <div className="attendance-mobile-list" aria-label="Mobile attendance register">
         {members.map((member) => {
@@ -438,7 +426,7 @@ function AttendanceGrid({
                     );
                     const label = attendanceValueLabel(value);
                     const statusClass =
-                      value === true ? "present" : value === false ? "absent" : "na";
+                      resolveAttendanceMark(value).kind;
 
                     return (
                       <button
@@ -534,7 +522,7 @@ function AttendanceGrid({
               : "is-empty"
           }`.trim()}
           aria-label={summaryLabel}
-          title="N/A and unmarked rows are excluded."
+          title="NA, Null, and unmarked rows are excluded."
         >
           {hasMarkedAttendance ? (
             <>
@@ -663,12 +651,7 @@ const value = attendanceValueForMember(
   event.id
 );
 
-                    const label =
-                      value === true
-                        ? "Present"
-                        : value === false
-                          ? "Absent"
-                          : "Not applicable";
+                    const label = attendanceValueLabel(value);
 
                     return (
                       <td
@@ -677,11 +660,7 @@ const value = attendanceValueForMember(
                       >
                         <button
                           className={`attendance-cell attendance-cell--${
-                            value === true
-                              ? "present"
-                              : value === false
-                                ? "absent"
-                                : "na"
+                            resolveAttendanceMark(value).kind
                           }`}
                           type="button"
                           disabled={locked || busy}
@@ -969,7 +948,7 @@ const pendingRecords =
   <article>
     <span>Awaiting status</span>
     <strong>{Math.max(0, pendingRecords)}</strong>
-    <small>N/A or not yet recorded</small>
+    <small>NA, Null, or not yet recorded</small>
   </article>
 
   <article>

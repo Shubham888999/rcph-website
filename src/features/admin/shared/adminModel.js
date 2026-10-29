@@ -12,7 +12,7 @@ export const ADMIN_ROLE_LABELS = Object.freeze({
   president: "President",
   [DISTRICT_OFFICIAL_ROLE]: "District Official",
 });
-export const ATTENDANCE_VALUES = [true, false, "NA"];
+export const ATTENDANCE_VALUES = [true, false, "NA", "NULL"];
 export const AVENUES = ["ISD", "CMD", "CSD", "PDD", "RRRO", "PRO", "DEI", "GBM"];
 export const LOCK_KEYS = [
   "attendance",
@@ -38,7 +38,7 @@ export function money(value) { const n = Number(value); return Number.isFinite(n
 // Negative amounts (a month with more expense than income) show as -₹500.00; only non-numbers are "Unavailable".
 export function formatInr(value) { const amount = Number(value); return Number.isFinite(amount) ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Math.round(amount * 100) / 100) : "Unavailable"; }
 export function cleanAvenues(value) { const values = Array.isArray(value) ? value : value ? [value] : []; return [...new Set(values.map((x) => text(x, 40).toUpperCase()).filter(Boolean))]; }
-export function normalizeAttendance(value) { return value === true || value === false || value === "NA" ? value : "NA"; }
+export function normalizeAttendance(value) { return value === true || value === false || value === "NA" || value === "NULL" ? value : "NA"; }
 export function isRemovedProfileRecord(record = {}) {
   const status = text(record?.status || record?.roleStatus, 60).toLowerCase();
   const removalStatus = text(record?.removalStatus || record?.profileStatus, 60).toLowerCase();
@@ -137,7 +137,7 @@ export function buildEventAttendanceSummary({
       presentCount += 1;
     } else if (value === false) {
       absentCount += 1;
-    } else if (value === "NA") {
+    } else if (value === "NA" || value === "NULL") {
       naCount += 1;
     } else {
       unmarkedCount += 1;

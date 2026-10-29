@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import AttendanceLegend from "../../components/status/AttendanceLegend";
 import AttendanceMark from "../../components/status/AttendanceMark";
 import useAccessibleDialog from "../../features/bod-tools/useAccessibleDialog";
 import useAuth from "../../hooks/useAuth";
@@ -714,6 +715,7 @@ function DocumentPanels({ panels, theme }) {
 function attendanceStatusMarkValue(status) {
   if (status === "present" || status === "late") return true;
   if (status === "absent") return false;
+  if (status === "null") return "NULL";
   return "NA";
 }
 
@@ -796,7 +798,7 @@ function AttendanceTable({ view }) {
                   </td>
                   {view.columns.map((column) => {
                     const status = row.cells[column.eventId] || "unknown";
-                    const statusClass = ["present", "absent", "late", "excused", "unknown"].includes(status)
+                    const statusClass = ["present", "absent", "late", "excused", "na", "null", "unknown"].includes(status)
                       ? status
                       : "unknown";
                     const statusLabel = attendanceStatusLabel(statusClass);
@@ -858,6 +860,7 @@ function AttendanceRecords({ attendance }) {
           </button>
         ))}
       </div>
+      <AttendanceLegend />
       {VISIT_ATTENDANCE_TABS.map((tab) => {
         const view = attendance[tab.key];
         const active = currentTab === tab.key;

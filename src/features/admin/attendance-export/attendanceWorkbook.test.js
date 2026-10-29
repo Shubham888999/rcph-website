@@ -116,3 +116,18 @@ test("filename names the panel and month range", () => {
   assert.equal(attendanceExportFileName({ ...report(["2026-08"]), panelKey: "bod" }), "RCPH_BOD_Attendance_Aug_2026.xlsx");
   assert.equal(attendanceExportFileName({ ...report(["2026-08"]), panelKey: "district" }), "RCPH_District_Attendance_Aug_2026.xlsx");
 });
+
+test("NULL survives XLSX export and remains outside the percentage denominator", async () => {
+  const exported = buildMonthlyAttendanceExport({
+    panelKey: "club",
+    primary: { members, events, attendance: {"member-secret-1": {...attendance["member-secret-1"], "event-secret-6":"NULL"}} },
+    monthKeys:["2026-08"], selectedEventIds:events.map(event=>event.id),
+  });
+  const workbook = buildAttendanceWorkbook(ExcelJS, exported);
+  const asha = findRow(workbook.getWorksheet("Aug 2026"), "Rtr. Asha Member");
+  assert.equal(asha.getCell(6).value, "NULL");
+  assert.equal(asha.getCell(7).value.result, 75);
+  const restored = new ExcelJS.Workbook();
+  await restored.xlsx.load(await workbook.xlsx.writeBuffer());
+  assert.equal(findRow(restored.getWorksheet("Aug 2026"), "Rtr. Asha Member").getCell(6).value, "NULL");
+});

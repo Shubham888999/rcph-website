@@ -2,6 +2,7 @@ export const ATTENDANCE_MARK_ASSETS = Object.freeze({
   present: "/images/attendance/check.png",
   absent: "/images/attendance/cross.png",
   na: "/images/attendance/NA_Button.png",
+  null: "/images/attendance/Null_RCPH.webp",
 });
 
 const PRESENT_ALIASES = new Set(["P", "PRESENT", "PRESENTED"]);
@@ -12,6 +13,7 @@ const MARKS = Object.freeze({
   present: Object.freeze({ kind: "present", label: "Present", imageSrc: ATTENDANCE_MARK_ASSETS.present }),
   absent: Object.freeze({ kind: "absent", label: "Absent", imageSrc: ATTENDANCE_MARK_ASSETS.absent }),
   na: Object.freeze({ kind: "na", label: "Not applicable", imageSrc: ATTENDANCE_MARK_ASSETS.na }),
+  null: Object.freeze({ kind: "null", label: "Null — before membership", imageSrc: ATTENDANCE_MARK_ASSETS.null }),
 });
 
 export function resolveAttendanceMark(value) {
@@ -25,7 +27,12 @@ export function resolveAttendanceMark(value) {
   const normalized = text.toUpperCase();
   if (PRESENT_ALIASES.has(normalized)) return MARKS.present;
   if (ABSENT_ALIASES.has(normalized)) return MARKS.absent;
+  if (normalized === "NULL" || normalized === "∅") return MARKS.null;
   if (NA_ALIASES.has(normalized)) return MARKS.na;
 
   return { kind: "unknown", label: text, imageSrc: null };
+}
+
+export function nextAttendanceValue(value) {
+  return value === true ? false : value === false ? "NA" : value === "NA" ? "NULL" : true;
 }
