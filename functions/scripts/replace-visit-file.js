@@ -35,16 +35,39 @@ function checkDrive(meta, file) {
     || !meta.md5Checksum || meta.capabilities?.canEdit !== true
     || !meta.parents?.includes(file.driveFolderId)) throw new Error(`Drive file is missing, moved, uneditable or not a PDF: ${file.driveFileId}`);
 }
+function requireCompleteSelection(selected, scope) {
+  if (scope.expectOnePerPosition && (selected.length !== scope.positions.length
+    || scope.positions.some(key => selected.filter(row => row.positionKey === key).length !== 1))) {
+    throw new Error('Expected exactly one matching file for every selected position. No files changed.');
+  }
+}
+function resolveSourceVisit(records, scope) {
+  if (scope.visitType !== 'auto') return scope;
+  const visits = ['clubAssembly', 'dzrVisit', 'drrVisit'].filter(visitType => {
+    const selected = selectRecords(records, { ...scope, visitType });
+    return selected.length === scope.positions.length
+      && scope.positions.every(key => selected.filter(row => row.positionKey === key).length === 1);
+  });
+  if (visits.length !== 1) throw new Error('Could not identify one unique visit with exactly one file per selected position. Specify --visit clubAssembly, dzrVisit or drrVisit after checking the website records.');
+  return { ...scope, visitType: visits[0] };
+}
+async function checkFolder(drive, folderId, expectedName) {
+  if (!expectedName) return;
+  const folder = (await drive.files.get({ fileId: folderId, supportsAllDrives: true, fields: 'id,name,mimeType,trashed' })).data;
+  if (folder.id !== folderId || folder.trashed || folder.mimeType !== 'application/vnd.google-apps.folder' || folder.name !== expectedName) throw new Error(`Expected the ${expectedName} subfolder: ${folderId}`);
+}
 async function createPlan({ scope, records, replacement, drive, references }) {
   assertPdf(replacement);
   const selected = selectRecords(records, scope);
   if (!selected.length) throw new Error('No active website records match this exact filename and scope.');
+  requireCompleteSelection(selected, scope);
   const files = [];
   for (const driveFileId of [...new Set(selected.map(r => r.driveFileId))]) {
     if (!/^[a-zA-Z0-9_-]{10,200}$/.test(driveFileId || '')) throw new Error('A matching record has no valid Drive file ID.');
     const rows = selected.filter(r => r.driveFileId === driveFileId);
     const meta = (await drive.files.get({ fileId: driveFileId, supportsAllDrives: true, fields: META })).data;
     rows.forEach(row => checkDrive(meta, row));
+    await checkFolder(drive, rows[0].driveFolderId, scope.folderName);
     const refs = await references(driveFileId);
     if (refs.some(ref => !rows.some(row => row.id === ref.id))) throw new Error(`This Drive file is also used by an active record outside the selected scope: ${driveFileId}`);
     files.push({ driveFileId, driveFolderId: rows[0].driveFolderId, driveName: meta.name, oldMd5: meta.md5Checksum, oldSizeBytes: Number(meta.size), records: rows });
@@ -56,6 +79,7 @@ async function applyPlan({ plan, projectId, replacement, drive, loadRecord, upda
   assertPdf(replacement);
   const { planId, ...unsigned } = plan;
   if (hash(JSON.stringify(unsigned)) !== planId || plan.scope.projectId !== projectId || hash(replacement) !== plan.replacementSha256) throw new Error('Plan, project or replacement PDF changed. Create a new dry-run plan.');
+  requireCompleteSelection(plan.files.flatMap(file => file.records), plan.scope);
   fs.mkdirSync(workDir, { recursive: true });
   const journalPath = path.join(workDir, 'journal.json');
   const journal = fs.existsSync(journalPath) ? JSON.parse(fs.readFileSync(journalPath, 'utf8')) : { planId, files: {} };
@@ -71,6 +95,7 @@ async function applyPlan({ plan, projectId, replacement, drive, loadRecord, upda
     }
     const meta = (await drive.files.get({ fileId: file.driveFileId, supportsAllDrives: true, fields: META })).data;
     checkDrive(meta, file);
+    await checkFolder(drive, file.driveFolderId, plan.scope.folderName);
     if (![file.oldMd5, plan.replacementMd5].includes(meta.md5Checksum) || meta.name !== file.driveName) throw new Error(`Drive file changed since planning: ${file.driveFileId}`);
     const backup = path.join(workDir, `${file.driveFileId}.pdf`);
     if (fs.existsSync(backup)) {
@@ -87,6 +112,7 @@ async function applyPlan({ plan, projectId, replacement, drive, loadRecord, upda
   for (const file of plan.files) {
     const meta = (await drive.files.get({ fileId: file.driveFileId, supportsAllDrives: true, fields: META })).data;
     checkDrive(meta, file);
+    await checkFolder(drive, file.driveFolderId, plan.scope.folderName);
     if (![file.oldMd5, plan.replacementMd5].includes(meta.md5Checksum)) throw new Error('Drive content changed during execution.');
     if (meta.md5Checksum !== plan.replacementMd5) {
       // Persist intent first: a lost HTTP response can safely be resumed by checksum.
@@ -106,11 +132,11 @@ async function main(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
-    if (key === '--apply' || key === '--help') args[key.slice(2)] = true;
-    else if (['--project','--visit','--name','--positions','--replacement','--plan','--confirm','--drive-auth'].includes(key) && argv[i+1] && !argv[i+1].startsWith('--')) args[key.slice(2)] = argv[++i];
+    if (key === '--apply' || key === '--help' || key === '--expect-one-per-position') args[key.slice(2)] = true;
+    else if (['--project','--visit','--name','--positions','--replacement','--plan','--confirm','--drive-auth','--folder-name'].includes(key) && argv[i+1] && !argv[i+1].startsWith('--')) args[key.slice(2)] = argv[++i];
     else throw new Error(`Unknown or incomplete argument: ${key}`);
   }
-  if (args.help) { console.log('Dry run: node functions/scripts/replace-visit-file.js --project rcph-admin --visit clubAssembly --name "Resolution_05.pdf" --positions core --replacement <corrected.pdf> --plan <plan.json>\nApply: node functions/scripts/replace-visit-file.js --project rcph-admin --replacement <corrected.pdf> --plan <plan.json> --apply --confirm replace-file-contents\nDrive credentials: existing VISIT_DRIVE_* OAuth environment, or --drive-auth shared-drive with Drive-scoped ADC. No live writes occur during dry run.'); return; }
+  if (args.help) { console.log('Dry run: node functions/scripts/replace-visit-file.js --project rcph-admin --visit clubAssembly --name "Resolution_05.pdf" --positions core --replacement <corrected.pdf> --plan <plan.json>\nApply: node functions/scripts/replace-visit-file.js --project rcph-admin --replacement <corrected.pdf> --plan <plan.json> --apply --confirm replace-file-contents\nDrive credentials: existing VISIT_DRIVE_* OAuth environment, or --drive-auth shared-drive with Drive-scoped ADC. Use --visit auto --expect-one-per-position to find a unique complete visit; --folder-name Resolutions verifies the parent subfolder name. No live writes occur during dry run.'); return; }
   if (!args.project || !args.replacement || !args.plan) throw new Error('--project, --replacement and --plan are required.');
   if (args.apply && args.confirm !== 'replace-file-contents') throw new Error('Apply requires --confirm replace-file-contents.');
   const replacement = fs.readFileSync(path.resolve(args.replacement)); assertPdf(replacement);
@@ -138,17 +164,18 @@ async function main(argv) {
     const result=await applyPlan({plan,projectId:args.project,replacement,drive,loadRecord,updateRecords,references,workDir:`${planPath}.backups`});
     console.log(JSON.stringify({replaced:result.files,backups:`${planPath}.backups`},null,2));
   } else {
-    if (!['clubAssembly','dzrVisit','drrVisit'].includes(args.visit) || !args.name || !args.positions) throw new Error('Dry run requires --visit, exact --name and --positions (core or comma-separated canonical position keys).');
+    if (!['auto','clubAssembly','dzrVisit','drrVisit'].includes(args.visit) || !args.name || !args.positions) throw new Error('Dry run requires --visit, exact --name and --positions (core or comma-separated canonical position keys).');
     const { POSITION_KEYS }=require('../lib/positions');
     const positions=[...new Set(args.positions.split(',').flatMap(value=>value==='core'?CORE_POSITIONS:[value]))];
     if (positions.some(value=>!POSITION_KEYS.includes(value))) throw new Error('Unknown position key.');
-    const scope={projectId:args.project,visitType:args.visit,fileName:args.name,positions};
-    const records=(await db.collection('visitSubmissions').where('visitType','==',args.visit).get()).docs.map(snap=>({id:snap.id,data:snap.data(),version:version(snap)}));
+    const query = args.visit === 'auto' ? db.collection('visitSubmissions').where('status','==','active') : db.collection('visitSubmissions').where('visitType','==',args.visit);
+    const records=(await query.get()).docs.map(snap=>({id:snap.id,data:snap.data(),version:version(snap)}));
+    const scope=resolveSourceVisit(records,{projectId:args.project,visitType:args.visit,fileName:args.name,positions,folderName:args['folder-name'] || '',expectOnePerPosition:args['expect-one-per-position'] === true});
     const plan=await createPlan({scope,records,replacement,drive,references});
     fs.mkdirSync(path.dirname(planPath), { recursive: true });
     fs.writeFileSync(planPath,JSON.stringify(plan,null,2),{flag:'wx'});
-    console.log(JSON.stringify({dryRun:true,plan:planPath,positions,files:plan.files.map(file=>({driveFileId:file.driveFileId,records:file.records}))},null,2));
+    console.log(JSON.stringify({dryRun:true,plan:planPath,visitType:scope.visitType,folderName:scope.folderName,positions,files:plan.files.map(file=>({driveFileId:file.driveFileId,records:file.records}))},null,2));
   }
 }
-module.exports={CORE_POSITIONS,hash,selectRecords,createPlan,applyPlan};
+module.exports={CORE_POSITIONS,hash,selectRecords,resolveSourceVisit,createPlan,applyPlan};
 if(require.main===module)main(process.argv.slice(2)).catch(error=>{console.error(error.message);process.exitCode=1;});

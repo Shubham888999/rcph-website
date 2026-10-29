@@ -39,3 +39,13 @@ Website previews use the same URLs. Reload the dashboard/viewer after replacemen
 ## Folder ownership transfer
 
 The visit uploader supports OAuth or ADC through `functions/lib/visit-drive.js`. Transferring a folder does not migrate that identity, refresh token, Firebase project or any separate Apps Script deployments. Keep existing folder/file IDs and grant the upload identity editing access. Folder ownership alone does not transfer ownership of the files inside or change who owns future OAuth uploads. Test upload, preview, replacement and removal after the handoff. Migrating the upload account requires rotating OAuth credentials separately; do not revoke the old account first.
+
+## Exact six-position Resolution 5 replacement
+
+For the supplied six core positions, use explicit keys instead of the broader `core` alias:
+
+```powershell
+node functions/scripts/replace-visit-file.js --project rcph-admin --visit auto --name "Resolution_05.pdf" --positions president,secretary,treasurer,vice-president,immediate-past-president,club-advisor --folder-name Resolutions --expect-one-per-position --replacement "C:\Path\Resolution_05 .pdf" --plan "C:\Path\resolution5-six-plan.json"
+```
+
+The new PDF's local filename can contain the extra space before `.pdf`; website and Drive filenames remain unchanged. `auto` reads the active website index and requires one uniquely identifiable visit containing exactly one match per selected position. Missing, duplicate or ambiguous matches stop the operation. The parent of every selected Drive file must be a folder named exactly `Resolutions`, both when planning and applying. The six folders may have different IDs and nesting. Apply using the existing reviewed-plan command above with this plan and replacement path.

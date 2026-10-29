@@ -3,14 +3,14 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const {hash,selectRecords,createPlan,applyPlan}=require('./replace-visit-file');
+const {hash,selectRecords,resolveSourceVisit,createPlan,applyPlan}=require('./replace-visit-file');
 const old=Buffer.from('%PDF-1.4 old resolution'), replacement=Buffer.from('%PDF-1.4 corrected resolution 5');
 const scope={projectId:'test-project',visitType:'clubAssembly',fileName:'Resolution_05.pdf',positions:['president','secretary']};
 function fixture(){
  const records=['president','secretary'].map((positionKey,i)=>({id:`s${i}`,version:'1:0',data:{status:'active',visitType:'clubAssembly',positionKey,documentCategory:`custom-folder-${i}`,originalFileName:'Resolution_05.pdf',driveFileId:`driveFile000${i}`,driveFolderId:`folder000${i}`}}));
  const contents=new Map(records.map(r=>[r.data.driveFileId,Buffer.from(old)]));let writes=0,lost=false,metadataFailure=false;
  const drive={files:{
-  get:async(args)=> args.alt==='media'?{data:contents.get(args.fileId)}:{data:{id:args.fileId,name:`internal-${args.fileId}.pdf`,mimeType:'application/pdf',size:String(contents.get(args.fileId).length),md5Checksum:hash(contents.get(args.fileId),'md5'),parents:[records.find(r=>r.data.driveFileId===args.fileId).data.driveFolderId],capabilities:{canEdit:true}}},
+  get:async(args)=> args.fileId.startsWith('folder')?{data:{id:args.fileId,name:'Resolutions',mimeType:'application/vnd.google-apps.folder'}}:args.alt==='media'?{data:contents.get(args.fileId)}:{data:{id:args.fileId,name:`internal-${args.fileId}.pdf`,mimeType:'application/pdf',size:String(contents.get(args.fileId).length),md5Checksum:hash(contents.get(args.fileId),'md5'),parents:[records.find(r=>r.data.driveFileId===args.fileId).data.driveFolderId],capabilities:{canEdit:true}}},
   update:async(args)=>{const chunks=[];for await(const chunk of args.media.body)chunks.push(Buffer.from(chunk));contents.set(args.fileId,Buffer.concat(chunks));writes++;if(lost){lost=false;throw new Error('Lost upload response')}return {data:{}};}
  }};
  const references=async id=>records.filter(r=>r.data.driveFileId===id&&r.data.status==='active').map(r=>({id:r.id}));
@@ -21,6 +21,17 @@ function fixture(){
 (async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rcph-replacement-'));
  try{
+  const scoped=fixture();
+  const strict={...scope,visitType:'auto',folderName:'Resolutions',expectOnePerPosition:true};
+  assert.equal(resolveSourceVisit(scoped.records,strict).visitType,'clubAssembly');
+  assert.throws(()=>resolveSourceVisit(scoped.records.slice(1),strict),/unique visit/);
+  assert.throws(()=>resolveSourceVisit([...scoped.records,...scoped.records.map(r=>({...r,data:{...r.data,visitType:'dzrVisit'}}))],strict),/unique visit/);
+  const detected=resolveSourceVisit(scoped.records,strict);
+  await createPlan({...scoped,scope:detected,replacement});
+  await assert.rejects(createPlan({...scoped,scope:{...detected,folderName:'Wrong folder'},replacement}),/Expected the/);
+  await assert.rejects(createPlan({...scoped,records:scoped.records.slice(1),scope:detected,replacement}),/exactly one/);
+  await assert.rejects(createPlan({...scoped,records:[...scoped.records,{...scoped.records[0],id:'duplicate'}],scope:detected,replacement}),/exactly one/);
+  assert.equal(scoped.writes,0);
   const f=fixture();
   assert.equal(selectRecords([...f.records,{id:'wrong',data:{...f.records[0].data,originalFileName:'Resolution_04.pdf'}}],scope).length,2);
   const plan=await createPlan({...f,scope,replacement});assert.equal(f.writes,0);assert.equal(plan.files.length,2);
