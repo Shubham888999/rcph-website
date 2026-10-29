@@ -11,7 +11,7 @@
   min-height: 690px;
   padding: clamp(1.7rem,3vw,2.6rem);
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   gap: 1.5rem;
   overflow: hidden;
   border: 1px solid var(--pass-line);
@@ -39,16 +39,6 @@
 .login-page-react .login-access-pass h1 > span,
 .login-page-react .login-access-pass h1 > em { display: block; }
 .login-page-react .login-access-pass h1 > em { color: var(--pass-gold); font-weight: 400; }
-.login-page-react .login-access-pass__footer { min-width: 0; border-top: 1px solid var(--pass-line); padding-top: .7rem; }
-.login-page-react .login-access-pass__footer-heading { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; min-height: 44px; margin-bottom: .5rem; }
-.login-page-react .login-access-pass__seal { width: 44px; height: 44px; color: var(--pass-gold); transform: rotate(-12deg); opacity: .75; }
-.login-page-react .login-access-pass__seal :is(circle,path) { stroke: currentColor; stroke-width: .7; }
-.login-page-react .login-access-pass__seal text { fill: currentColor; font-family: Georgia,serif; font-size: 12px; letter-spacing: 1px; }
-.login-page-react .login-access-pass__seal .login-access-pass__seal-district { font-family: sans-serif; font-size: 5px; letter-spacing: 2px; }
-.login-page-react .login-access-pass__moments { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .5rem; }
-.login-page-react .login-access-pass__moments figure { position: relative; min-width: 0; margin: 0; border: 1px solid var(--pass-line); background: var(--pass-bg); }
-.login-page-react .login-access-pass__moments img { display: block; width: 100%; aspect-ratio: 1.75; object-fit: cover; filter: saturate(.8); }
-.login-page-react .login-access-pass__moments figcaption { padding: .4rem .15rem; color: var(--pass-ink); font-size: .55rem; font-weight: 650; letter-spacing: .08em; line-height: 1.3; text-align: center; text-transform: uppercase; }
 @media (hover: hover) and (pointer: fine) {
   .login-page-react .login-access-pass .login-brand:hover .login-brand-logo,
   .login-page-react .login-access-pass .login-brand:focus-visible .login-brand-logo { transform: translateY(-2px); box-shadow: 0 3px 0 rgba(0,0,0,.25),0 0 0 3px var(--pass-line),0 0 22px rgba(228,196,139,.15); }
@@ -76,8 +66,6 @@
   .login-page-react .login-access-pass .login-brand small { font-size: .67rem; }
   .login-page-react .login-access-pass__edition > p { font-size: .54rem; }
   .login-page-react .login-access-pass h1 { font-size: clamp(2.5rem,10.5vw,3.5rem); }
-  .login-page-react .login-access-pass__moments { gap: .35rem; }
-  .login-page-react .login-access-pass__moments figcaption { font-size: .48rem; letter-spacing: .04em; }
 }
 @media (prefers-reduced-motion: reduce) {
   .login-page-react .login-brand-panel.login-access-pass { transform: none !important; }
