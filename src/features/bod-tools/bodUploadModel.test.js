@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  DEFAULT_BOD_UPLOAD_WEB_APP_URL,
+  resolveBodUploadEndpoint,
   BOD_UPLOAD_MAX_BYTES,
   BOD_UPLOAD_MAX_FILES,
   addBodUploadFiles,
@@ -213,4 +215,18 @@ test("confirmed uploads require a usable attachment id and event id", () => {
   assert.equal(buildConfirmedBodUpload(storedAttachment({ id: "" }), "event-1", "g1"), null);
   assert.equal(buildConfirmedBodUpload(storedAttachment(), "", "g1"), null);
   assert.equal(buildConfirmedBodUpload(null, "event-1", "g1"), null);
+});
+
+test("missing BOD upload configuration uses the supplied production deployment", () => {
+  for (const value of [undefined, null, "", "   "]) {
+    assert.equal(resolveBodUploadEndpoint(value), DEFAULT_BOD_UPLOAD_WEB_APP_URL);
+  }
+  assert.equal(validateBodUploadEndpoint(DEFAULT_BOD_UPLOAD_WEB_APP_URL), DEFAULT_BOD_UPLOAD_WEB_APP_URL);
+});
+
+test("valid BOD uploader overrides work while invalid overrides stay disabled", () => {
+  const staging = "https://script.google.com/macros/s/staging-deployment/exec";
+  assert.equal(resolveBodUploadEndpoint(`  ${staging}  `), staging);
+  assert.equal(resolveBodUploadEndpoint("https://example.com/exec"), "");
+  assert.equal(resolveBodUploadEndpoint("https://script.google.com/macros/s/draft/dev"), "");
 });

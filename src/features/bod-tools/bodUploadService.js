@@ -6,10 +6,10 @@ import {
   buildConfirmedBodUpload,
   matchVerifiedBodUploadAttachment,
   normalizeBodUploadResponse,
-  validateBodUploadEndpoint,
+  resolveBodUploadEndpoint,
 } from "./bodUploadModel";
 
-export const BOD_UPLOAD_WEB_APP_URL = validateBodUploadEndpoint(
+export const BOD_UPLOAD_WEB_APP_URL = resolveBodUploadEndpoint(
   import.meta.env.VITE_BOD_UPLOAD_WEB_APP_URL,
 );
 

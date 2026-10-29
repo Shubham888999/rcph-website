@@ -1,3 +1,5 @@
+export const DEFAULT_BOD_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby1iqbZHj2LJFz3FZzE7XkjGMZ1Tqi6Y-rCJmH1ZWs5bXBFRGrb--bkNfFh_D7dS0UfKw/exec";
+
 export const BOD_UPLOAD_ALLOWED_MIME_TYPES = Object.freeze([
   "application/pdf",
   "image/jpeg",
@@ -92,6 +94,13 @@ export function validateBodUploadEndpoint(value) {
   } catch {
     return "";
   }
+}
+
+// Missing build configuration uses the public production deployment. An explicit
+// invalid override stays disabled so a staging typo cannot upload to production.
+export function resolveBodUploadEndpoint(value) {
+  const configured = typeof value === "string" ? value.trim() : "";
+  return validateBodUploadEndpoint(configured || DEFAULT_BOD_UPLOAD_WEB_APP_URL);
 }
 
 export function validateBodUploadFile(file) {
