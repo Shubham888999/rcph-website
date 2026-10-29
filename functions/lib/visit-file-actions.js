@@ -2,6 +2,7 @@
 
 const crypto = require('node:crypto');
 const { Readable } = require('node:stream');
+const functionLogger = require('firebase-functions/logger');
 const {
   makeVisitSubmissionError, createFirestoreVisitSubmissionAdapter, visitFolderAllowsUpload,
   validateVisitFileType, validateVisitFileSize, buildAuditPayload, visitPositionDocId,
@@ -16,6 +17,7 @@ const OPERATIONS = 'visitSubmissionFileOperations';
 const LEASE_MS = 240000;
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const FILE_FIELDS = 'id,name,mimeType,parents,trashed,md5Checksum,sha256Checksum,size,headRevisionId,capabilities(canEdit,canTrash)';
+const DRIVE_CONFIG_KEYS = Object.freeze(['VISIT_DRIVE_AUTH_MODE', 'VISIT_CLUB_ASSEMBLY_FOLDER_ID', 'VISIT_DZR_FOLDER_ID', 'VISIT_DRR_FOLDER_ID']);
 const digest = (bytes, algorithm = 'sha256') => crypto.createHash(algorithm).update(bytes).digest('hex');
 const fail = (reason, message, code = 'failed-precondition') => { throw makeVisitSubmissionError(code, message, { reason }); };
 function id(value, label) {
@@ -31,11 +33,35 @@ function requireFolderAccess(access, source, folder, config) {
   if (!access.canManageVisitSystem && !visitFolderAllowsUpload(config, folder)) fail('file-locked', 'This Club Visit folder is closed or locked.');
 }
 
+// Log provider codes and code locations, never request bodies, tokens, file data,
+// environment values or raw provider messages (which can include credentials).
+function logFileActionFailure(logger, error, diagnostic) {
+  const cause = diagnostic.cause || error.cause || error;
+  const token = value => typeof value === 'string' && /^[a-zA-Z0-9_.-]{1,80}$/.test(value) ? value : '';
+  const provider = cause?.response?.data?.error;
+  const providerReason = typeof provider === 'string' ? provider : provider?.errors?.[0]?.reason;
+  const status = Number(cause?.response?.status || cause?.status || cause?.httpStatus);
+  const details = {
+    diagnosticId: diagnostic.id,
+    action: diagnostic.action,
+    stage: diagnostic.stage,
+    reason: token(error?.details?.reason),
+    errorName: token(cause?.name),
+    errorCode: token(String(cause?.code || cause?.httpsCode || '')),
+    providerReason: token(providerReason),
+    ...(Number.isInteger(status) && status >= 100 && status <= 599 ? { httpStatus: status } : {}),
+    ...(error?.details?.reason === 'drive-config' ? { missingSettings: error.details.missingSettings || [] } : {}),
+    codeLocations: String(cause?.stack || '').split('\n').slice(1).filter(line => /^\s+at .*:\d+:\d+\)?$/.test(line)).slice(0, 3).map(line => line.trim().slice(0, 250)),
+  };
+  try { logger.error('Club Visit file action failed.', details); } catch { /* Logging must not change recovery behavior. */ }
+}
+
 function createVisitFileActionService(options) {
   const adapter = options.adapter || createFirestoreVisitSubmissionAdapter(options.db, options.admin);
   const visitService = options.visitService;
   const now = options.now || Date.now;
   const locks = options.folderLockManager;
+  const logger = options.logger || functionLogger;
   const configProvider = options.getDriveConfig || (() => getVisitDriveConfig(options.env || process.env));
   let driveClient = options.driveClient;
   const getDrive = config => driveClient || (driveClient = createGoogleDriveClient({ ...options, config }));
@@ -73,10 +99,11 @@ function createVisitFileActionService(options) {
     return file;
   }
 
-  async function execute(uid, input, action, file = null) {
+  async function execute(uid, input, action, file, diagnostic) {
     const submissionId = id(input?.submissionId, 'submission ID');
     const requestId = action === 'replace' ? id(input?.operationId, 'operation ID') : 'delete';
     const access = await visitService.resolveAccessContext(uid);
+    diagnostic.stage = 'read-website-record';
     const first = await readContext(adapter, submissionId, access);
     if (input?.mode === 'remove' && !access.canManageVisitSystem) fail('file-permission', 'Visit manager access required for this removal action.', 'permission-denied');
     let replacement = null;
@@ -89,8 +116,18 @@ function createVisitFileActionService(options) {
       replacement = { mimeType: type.mimeType, sizeBytes: file.buffer.length, sha256: digest(file.buffer), md5: digest(file.buffer, 'md5') };
     }
     const requestKey = digest(JSON.stringify([uid, submissionId, action, requestId]));
-    const config = configProvider();
+    diagnostic.stage = 'load-drive-config';
+    let config;
+    try { config = configProvider(); }
+    catch (cause) {
+      const env = options.env || process.env;
+      const missingSettings = DRIVE_CONFIG_KEYS.filter(key => !String(env[key] || '').trim());
+      const error = makeVisitSubmissionError('failed-precondition', 'Club Visit Drive storage is not configured for this function.', { reason: 'drive-config', missingSettings });
+      error.cause = cause;
+      throw error;
+    }
     let folderLock;
+    diagnostic.stage = 'acquire-folder-lock';
     try {
       folderLock = await locks.acquireLock({ rootFolderId: getRootFolderIdForVisit(config, first.source.visitType), visitType: first.source.visitType, positionKey: first.source.positionKey });
     } catch { fail('file-busy', 'Another file action is running in this folder. Try again shortly.'); }
@@ -99,6 +136,7 @@ function createVisitFileActionService(options) {
     let claimed = false;
     try {
       let operation;
+      diagnostic.stage = 'reserve-file-action';
       await adapter.runTransaction(async tx => {
         const context = await readContext(tx, submissionId, access);
         const { source, folder, folderId } = context;
@@ -146,7 +184,9 @@ function createVisitFileActionService(options) {
       });
       if (operation.state === 'complete') return { ok: true, submissionId, status: operation.resultStatus, replay: true };
       claimed = true;
+      diagnostic.stage = 'connect-drive';
       const drive = getDrive(config);
+      diagnostic.stage = 'verify-drive-location';
       let current = await inspectScope(drive, config, operation);
       async function checkpoint(patch) {
         await adapter.runTransaction(async tx => {
@@ -161,6 +201,7 @@ function createVisitFileActionService(options) {
         const latest = await readContext(adapter, submissionId, latestAccess);
         if (latest.source.fileMutationId !== operationId || sourceVersion(latest.source) !== operation.sourceVersion) fail('file-changed', 'The website record changed during this action.');
       }
+      diagnostic.stage = 'recheck-access';
       await recheckAccess();
       async function contentDigest(metadata, revisionId = '') {
         if (!revisionId && /^[a-f0-9]{64}$/i.test(metadata.sha256Checksum || '')) return metadata.sha256Checksum.toLowerCase();
@@ -187,28 +228,37 @@ function createVisitFileActionService(options) {
         }
         if (current.md5Checksum !== operation.oldMd5 && current.md5Checksum !== replacement.md5) fail('file-changed', 'The Drive contents changed since this replacement started. A Visit manager must review it.');
         // Pin the original binary revision before changing any contents.
+        diagnostic.stage = 'back-up-drive-revision';
         await drive.revisions.update({ fileId: operation.driveFileId, revisionId: operation.backupRevisionId, requestBody: { keepForever: true }, fields: 'id,keepForever,md5Checksum' });
         const backup = (await drive.revisions.get({ fileId: operation.driveFileId, revisionId: operation.backupRevisionId, fields: 'id,keepForever,md5Checksum' })).data;
         if (!backup.keepForever || backup.md5Checksum !== operation.oldMd5) fail('drive-unavailable', 'The previous version could not be backed up. Retry the replacement.', 'unavailable');
         if (!operation.oldSha256) await checkpoint({ oldSha256: await contentDigest({}, operation.backupRevisionId) });
+        diagnostic.stage = 'verify-original-contents';
         current = await inspectScope(drive, config, operation);
         const currentDigest = await contentDigest(current);
         if (![operation.oldSha256, replacement.sha256].includes(currentDigest)) fail('file-changed', 'The Drive contents changed during replacement.');
+        diagnostic.stage = 'recheck-access';
         await recheckAccess();
         await checkpoint({ stage: 'write-started' });
+        diagnostic.stage = 'replace-drive-contents';
         if (currentDigest !== replacement.sha256) await drive.files.update({ fileId: operation.driveFileId, supportsAllDrives: true, requestBody: {}, media: { mimeType: replacement.mimeType, body: Readable.from(file.buffer) }, fields: FILE_FIELDS });
+        diagnostic.stage = 'verify-drive-replacement';
         const verified = await inspectScope(drive, config, operation);
         if (verified.trashed || verified.md5Checksum !== replacement.md5 || Number(verified.size) !== replacement.sizeBytes || await contentDigest(verified) !== replacement.sha256) fail('drive-unavailable', 'Drive could not confirm the replacement. Retry with the same file.', 'unavailable');
       } else {
         if (!current.trashed && !current.capabilities?.canTrash) fail('drive-permission', 'The connected Drive account cannot move this file to Trash.', 'permission-denied');
         await checkpoint({ stage: 'write-started' });
+        diagnostic.stage = 'trash-drive-file';
         if (!current.trashed) await drive.files.update({ fileId: operation.driveFileId, supportsAllDrives: true, requestBody: { trashed: true }, fields: 'id,trashed' });
+        diagnostic.stage = 'verify-drive-trash';
         const verified = await inspectScope(drive, config, operation);
         if (!verified.trashed) fail('drive-unavailable', 'Drive could not confirm deletion. Retry this action.', 'unavailable');
       }
+      diagnostic.stage = 'save-drive-result';
       await checkpoint({ stage: 'drive-complete' });
       // Recheck current account permissions before publishing the Drive result.
       const currentAccess = await visitService.resolveAccessContext(uid);
+      diagnostic.stage = 'save-website-record';
       await adapter.runTransaction(async tx => {
         const { source, folder, folderId } = await readContext(tx, submissionId, currentAccess);
         const op = await tx.getDoc(OPERATIONS, operationId);
@@ -231,6 +281,7 @@ function createVisitFileActionService(options) {
       });
       return { ok: true, submissionId, status: action === 'replace' ? 'active' : input?.mode === 'remove' ? 'admin-removed' : 'archived' };
     } catch (error) {
+      diagnostic.cause = error;
       if (claimed) {
         try {
           await adapter.runTransaction(async tx => {
@@ -252,9 +303,18 @@ function createVisitFileActionService(options) {
       await folderLock.release().catch(() => {});
     }
   }
+  async function tracked(uid, input, action, file = null) {
+    const diagnostic = { id: crypto.randomBytes(12).toString('hex'), action, stage: 'validate-request' };
+    try { return await execute(uid, input, action, file, diagnostic); }
+    catch (error) {
+      logFileActionFailure(logger, error, diagnostic);
+      error.details = { ...error.details, diagnosticId: diagnostic.id, stage: diagnostic.stage };
+      throw error;
+    }
+  }
   return {
-    remove: (uid, input) => execute(uid, input, 'delete'),
-    replace: (uid, input, file) => execute(uid, input, 'replace', file),
+    remove: (uid, input) => tracked(uid, input, 'delete'),
+    replace: (uid, input, file) => tracked(uid, input, 'replace', file),
   };
 }
 
@@ -262,24 +322,33 @@ function createVisitFileReplacementHandler(options) {
   const service = options.service;
   const parser = options.parseMultipartUpload || parseMultipartUpload;
   const allowedOrigins = options.allowedOrigins || VISIT_UPLOAD_ALLOWED_ORIGINS;
+  const logger = options.logger || functionLogger;
   return async (req, res) => {
     const allowed = setCorsHeaders(req, res, allowedOrigins);
     if (!allowed) return sendJson(res, 403, { ok: false, reason: 'file-permission', message: 'Origin is not allowed.' });
     res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return sendJson(res, 405, { ok: false, message: 'POST required.' });
+    let stage = 'authenticate-request';
     try {
       const token = /^Bearer ([^\s]+)$/.exec(req.get?.('authorization') || req.headers?.authorization || '');
       if (!token) throw makeVisitSubmissionError('unauthenticated', 'Sign in again.');
       let decoded;
       try { decoded = await options.verifyIdToken(token[1]); } catch { throw makeVisitSubmissionError('unauthenticated', 'Sign in again.'); }
+      stage = 'parse-replacement';
       const parsed = await parser(req, { maxBytes: 25 * 1024 * 1024 });
       const allowed = ['submissionId', 'operationId', 'fileName', 'mimeType', 'sizeBytes'];
       if (Object.keys(parsed.fields).some(key => !allowed.includes(key))) fail('file-permission', 'Only the server may select the Drive destination.', 'invalid-argument');
+      stage = 'replace-file';
       const result = await service.replace(decoded.uid, parsed.fields, parsed.file);
       return sendJson(res, 200, result);
     } catch (error) {
-      return sendJson(res, httpStatusFromServiceError(error), { ok: false, reason: error?.details?.reason || 'drive-unavailable', message: 'The file change could not be completed.', code: error?.code || 'unavailable' });
+      if (!error?.details?.diagnosticId && error?.code !== 'unauthenticated') {
+        const diagnostic = { id: crypto.randomBytes(12).toString('hex'), action: 'replace', stage };
+        logFileActionFailure(logger, error, diagnostic);
+        error.details = { ...error.details, diagnosticId: diagnostic.id, stage };
+      }
+      return sendJson(res, httpStatusFromServiceError(error), { ok: false, reason: error?.details?.reason || 'drive-unavailable', message: 'The file change could not be completed.', code: error?.code || 'unavailable', ...(error?.details?.diagnosticId ? { diagnosticId: error.details.diagnosticId, stage: error.details.stage } : {}) });
     }
   };
 }

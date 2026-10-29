@@ -9,7 +9,7 @@ const md5 = bytes => crypto.createHash('md5').update(bytes).digest('hex');
 const old = Buffer.from('%PDF-1.4 old document');
 const replacement = Buffer.from('%PDF-1.4 new document contents');
 const config = { authMode: 'oauth', rootFolderIds: { dzrVisit: 'rootDriveFolder001' } };
-function setup() {
+function setup(options = {}) {
   let time = 1000000, failCommit = false, loseDriveResponse = false, failBackup = false, afterDrive = null, afterBackup = null;
   const people = {
     director: { role:'bod', status:'approved', active:true, positionKeys:['cmd'] },
@@ -50,9 +50,10 @@ function setup() {
   }},revisions:{async update({revisionId}){if(failBackup)throw new Error('cannot pin');revisions.get(revisionId).keepForever=true;calls.pin++;if(afterBackup)await afterBackup();return {data:revisions.get(revisionId)}},async get({revisionId,alt}){return alt==='media'?{data:Readable.from(revisions.get(revisionId).bytes)}:{data:structuredClone(revisions.get(revisionId))}}}};
   let held=false;
   const locks={async acquireLock(){if(held)throw {status:409};held=true;return {async release(){held=false}}}};
-  const service=createVisitFileActionService({adapter,visitService,driveClient:drive,folderLockManager:locks,getDriveConfig:()=>config,now:()=>time});
+  const logs=[];
+  const service=createVisitFileActionService({adapter,visitService,driveClient:drive,folderLockManager:locks,getDriveConfig:Object.hasOwn(options,'getDriveConfig')?options.getDriveConfig:(()=>config),env:options.env,logger:{error(message,details){logs.push({message,...details})}},now:()=>time});
   const input={submissionId:'submission1',operationId:'request1',fileName:'New Document.pdf',mimeType:'application/pdf',sizeBytes:replacement.length};
-  return {adapter,visitService,service,items,revisions,calls,input,file:{buffer:replacement,mimeType:'application/pdf'},setFailCommit(){failCommit=true},setLostResponse(){loseDriveResponse=true},setFailBackup(){failBackup=true},afterDrive(fn){afterDrive=fn},afterBackup(fn){afterBackup=fn},advance(ms){time+=ms}};
+  return {adapter,visitService,service,drive,logs,items,revisions,calls,input,file:{buffer:replacement,mimeType:'application/pdf'},setFailCommit(){failCommit=true},setLostResponse(){loseDriveResponse=true},setFailBackup(){failBackup=true},afterDrive(fn){afterDrive=fn},afterBackup(fn){afterBackup=fn},advance(ms){time+=ms}};
 }
 test('assigned director replaces manager-uploaded file in place with a pinned original and unchanged primary/count/URLs',async()=>{
  const e=setup();const before={...e.adapter.store.visitSubmissions.submission1};
@@ -141,4 +142,43 @@ test('replacement preflight permits Authorization and valid authenticated reques
  let executed=0;const handler=createVisitFileReplacementHandler({service:{async replace(uid,fields,file){executed++;assert.equal(uid,'director');assert.equal(fields.submissionId,'s');assert.equal(file.buffer,old);return {ok:true,submissionId:'s',status:'active'}}},verifyIdToken:async()=>({uid:'director'}),parseMultipartUpload:async()=>({fields:{submissionId:'s',operationId:'request1',fileName:'Doc.pdf',mimeType:'application/pdf',sizeBytes:String(old.length)},file:{buffer:old,mimeType:'application/pdf'}})});
  let res=response();await handler({method:'OPTIONS',headers:{origin:'https://rcph3131.org'}},res);assert.equal(res.statusCode,204);assert.match(res.headers['Access-Control-Allow-Headers'],/Authorization/);
  res=response();await handler({method:'POST',headers:{origin:'https://rcph3131.org',authorization:'Bearer good'}},res);assert.equal(res.statusCode,200);assert.equal(executed,1);
+});
+
+test('missing Drive settings fail before a reservation or Drive write and produce a useful diagnostic',async()=>{
+ const e=setup({env:{VISIT_DRIVE_AUTH_MODE:'oauth'},getDriveConfig:null});
+ await assert.rejects(e.service.replace('director',e.input,e.file),error=>{
+  assert.equal(error.details.reason,'drive-config');assert.equal(error.details.stage,'load-drive-config');assert.match(error.details.diagnosticId,/^[a-f0-9]{24}$/);return true;
+ });
+ assert.equal(e.calls.content+e.calls.trash,0);assert.equal(e.adapter.store.visitSubmissions.submission1.fileMutationId,undefined);
+ assert.equal(e.logs.length,1);assert.deepEqual(e.logs[0].missingSettings,['VISIT_CLUB_ASSEMBLY_FOLDER_ID','VISIT_DZR_FOLDER_ID','VISIT_DRR_FOLDER_ID']);
+ assert.equal(e.logs[0].stage,'load-drive-config');
+});
+
+test('provider failures log the failing stage and reason without tokens, filenames, bodies or raw provider messages',async()=>{
+ const e=setup();const privateText='private-token-and-file-contents';
+ e.drive.revisions.update=async()=>{throw Object.assign(new Error(privateText),{code:400,response:{status:400,data:{error:{message:privateText,errors:[{reason:'badRequest'}]}}},config:{headers:{Authorization:privateText}}})};
+ await assert.rejects(e.service.replace('director',e.input,e.file));
+ assert.equal(e.calls.content,0);assert.equal(e.logs.length,1);const entry=e.logs[0];
+ assert.equal(entry.stage,'back-up-drive-revision');assert.equal(entry.providerReason,'badRequest');assert.equal(entry.httpStatus,400);assert.equal(entry.errorCode,'400');
+ const serialized=JSON.stringify(entry);assert.ok(!serialized.includes(privateText));assert.ok(!serialized.includes('New Document.pdf'));assert.ok(!serialized.includes('driveFile00001'));
+});
+
+test('HTTP retains a service diagnostic without logging the same failure twice',async()=>{
+ const logs=[];
+ const handler=createVisitFileReplacementHandler({
+  logger:{error(...args){logs.push(args)}},
+  verifyIdToken:async()=>({uid:'director'}),
+  parseMultipartUpload:async()=>({fields:{submissionId:'s'},file:{buffer:old}}),
+  service:{async replace(){
+   throw Object.assign(new Error('private detail'),{code:'failed-precondition',details:{reason:'drive-config',diagnosticId:'a'.repeat(24),stage:'load-drive-config'}});
+  }},
+ });
+ const res=response();await handler({method:'POST',headers:{origin:'https://rcph3131.org',authorization:'Bearer good'}},res);
+ const body=JSON.parse(res.body);assert.equal(res.statusCode,412);assert.equal(body.diagnosticId,'a'.repeat(24));assert.equal(body.stage,'load-drive-config');assert.equal(body.reason,'drive-config');assert.ok(!res.body.includes('private detail'));assert.equal(logs.length,0);
+});
+
+test('multipart failures before the service runs are logged with a diagnostic and parse stage',async()=>{
+ const logs=[];const handler=createVisitFileReplacementHandler({logger:{error(message,details){logs.push({message,...details})}},verifyIdToken:async()=>({uid:'director'}),parseMultipartUpload:async()=>{throw Object.assign(new Error('private request body'),{httpStatus:400})},service:{async replace(){assert.fail('The service must not run')}}});
+ const res=response();await handler({method:'POST',headers:{origin:'https://rcph3131.org',authorization:'Bearer good'}},res);
+ const body=JSON.parse(res.body);assert.equal(res.statusCode,400);assert.equal(logs.length,1);assert.equal(logs[0].stage,'parse-replacement');assert.equal(body.diagnosticId,logs[0].diagnosticId);assert.ok(!JSON.stringify(logs).includes('private request body'));
 });

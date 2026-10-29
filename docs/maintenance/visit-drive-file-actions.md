@@ -24,6 +24,24 @@ The `visitSubmissionFileOperations` and `visitFileActionRateLimits` collections 
 
 This change synchronizes **files**. Empty custom-folder deletion and external document-link removal keep their existing behavior.
 
+## Diagnosing a failed action
+
+File actions now write a structured `Club Visit file action failed.` log with a diagnostic ID, the failing stage, provider error codes and source-code locations. They do not log request bodies, file contents, filenames, access tokens, raw provider messages or environment values. Replacement error responses include the same diagnostic ID and stage. Missing Drive configuration is identified before this request reserves or modifies a file.
+
+OAuth secrets alone are not sufficient. Each deployed file-action function also needs these existing, non-secret uploader settings: `VISIT_DRIVE_AUTH_MODE`, `VISIT_CLUB_ASSEMBLY_FOLDER_ID`, `VISIT_DZR_FOLDER_ID` and `VISIT_DRR_FOLDER_ID`. A new function does not inherit environment settings from another function. Missing settings are a possible cause to check; a deployment audit log alone does not prove that they are missing at runtime.
+
+This read-only comparison displays only those settings and the function names, excluding all secret values:
+
+```powershell
+$configView = "json(name,serviceConfig.environmentVariables.VISIT_DRIVE_AUTH_MODE,serviceConfig.environmentVariables.VISIT_CLUB_ASSEMBLY_FOLDER_ID,serviceConfig.environmentVariables.VISIT_DZR_FOLDER_ID,serviceConfig.environmentVariables.VISIT_DRR_FOLDER_ID)"
+gcloud functions describe uploadVisitSubmissionFile --gen2 --region us-central1 --project rcph-admin --format="$configView"
+gcloud functions describe replaceVisitSubmissionFile --gen2 --region us-central1 --project rcph-admin --format="$configView"
+```
+
+If missing settings are confirmed, restore the uploader's existing values in the local `functions/.env.rcph-admin` configuration before deploying the file-action functions. Keep the OAuth credentials in their existing Firebase secrets; do not paste secret values into the environment file or the terminal output. If configuration matches, use the structured failure log to identify the next step rather than assuming a Drive-permission or revision problem.
+
+To deploy only this diagnostic update, update branch `main` and deploy `functions:replaceVisitSubmissionFile,functions:withdrawVisitSubmission,functions:removeVisitSubmission`. The frontend branch `react-migration` also adds a specific storage-setup message for `drive-config` failures.
+
 ## Deployment
 
 No Apps Script replacement or new OAuth setup is needed. These functions reuse the existing Club Visits Drive configuration and the `VISIT_DRIVE_CLIENT_ID`, `VISIT_DRIVE_CLIENT_SECRET` and `VISIT_DRIVE_REFRESH_TOKEN` secrets. The connected account must be able to edit or trash the relevant files. The replacement HTTP endpoint is derived from the same trusted project/upload-endpoint configuration already used for uploads.
