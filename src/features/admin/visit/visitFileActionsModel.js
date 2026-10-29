@@ -2,6 +2,7 @@ import { resolveVisitUploadEndpoint } from './visitUploadModel.js';
 
 export const VISIT_FILE_ACTION_MESSAGES = Object.freeze({
   'visit/client-refresh': 'Refresh Club Visits to load the current Drive file controls.',
+  'visit/drive-config': 'Document storage is unavailable. Ask a Visit manager to check its setup before retrying.',
   'visit/file-location': 'This file or folder was moved in Drive. Restore its recorded location or ask a Visit manager.',
   'visit/drive-permission': 'The connected Drive account cannot change this file. Ask a Visit manager to check its Drive access.',
   'visit/file-permission': 'Your account cannot change files in this position folder.',

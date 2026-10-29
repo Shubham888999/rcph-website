@@ -30,6 +30,9 @@ test('a failed server result retains retry state and uses safe actionable errors
 test('optional storage denial does not block replacement',async()=>{
  await performVisitReplacement({file,submissionId:'submission1',uid:'director',getIdToken:async()=>'token',env,storage:{getItem(){throw new Error('denied')},setItem(){throw new Error('denied')}},fetcher:async()=>success()});
 });
+test('missing server Drive configuration is shown as a setup problem instead of an unconfirmed replacement',async()=>{
+ await assert.rejects(performVisitReplacement({file,submissionId:'submission1',uid:'director',getIdToken:async()=>'token',env,fetcher:async()=>({ok:false,json:async()=>({reason:'drive-config',message:'private environment values'})})}),error=>error.code==='visit/drive-config'&&/check its setup/.test(safeAdminError(error))&&!error.message.includes('private environment values'));
+});
 test('same filename conflicts only in the selected category; Keep both and completed uploads are explicit exemptions',()=>{
  const queue={file:{name:'Resolution_05.pdf'},documentCategory:'custom-11111111',status:'Ready'};
  const existing=[{submissionId:'one',fileName:'Resolution_05.pdf',status:'active',documentCategory:'custom-11111111'},{submissionId:'two',fileName:'Resolution_05.pdf',status:'active',documentCategory:'custom-22222222'},{submissionId:'old',fileName:'Resolution_05.pdf',status:'archived',documentCategory:'custom-11111111'}];
