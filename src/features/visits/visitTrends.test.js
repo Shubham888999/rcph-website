@@ -105,7 +105,7 @@ test("the trend sits at the top of Attendance Records, above the tabs and tables
   const chart = records.indexOf("<AttendanceTrendChart trend={trend} />");
   assert.ok(chart > records.indexOf("</summary>"), "inside the section, so it shows when opened");
   assert.ok(chart < records.indexOf('className="visit-dashboard-attendance-tabs"'));
-  assert.match(pageSource, /<AvenueMonthStrip stats=\{stats\} attendance=\{attendance\} \/>/);
+  assert.match(pageSource, /<AvenueMonthStrip stats=\{stats\} attendance=\{visibleAttendance\} \/>/);
 });
 
 test("trend and strip animate in the presentation and respect reduced motion", () => {

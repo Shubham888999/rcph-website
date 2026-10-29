@@ -899,6 +899,7 @@ function normalizeAttendanceRow(raw, columns) {
     personId,
     name,
     roleOrPosition: text(raw.roleOrPosition, 120),
+    isProspect: raw.isProspect === true || text(raw.roleOrPosition, 120).toLowerCase() === "prospect",
     attendedCount: metrics.attendedCount,
     eligibleCount: metrics.eligibleCount,
     attendanceRate: metrics.attendanceRate,
@@ -949,6 +950,18 @@ function normalizeAttendanceView(raw) {
     columns: columnsWithMetrics,
     rows,
   };
+}
+
+// Filter copies only; stored attendance and server row order stay intact.
+export function filterVisitAttendance(attendance, includeProspects = false) {
+  if (includeProspects) return attendance;
+  return Object.fromEntries(VISIT_ATTENDANCE_TABS.map(({ key }) => {
+    const view = attendance?.[key] || { columns: [], rows: [] };
+    return [key, normalizeAttendanceView({
+      columns: view.columns.map(column => ({ ...column, attendedCount: 0, eligibleCount: 0, attendanceRate: null })),
+      rows: view.rows.filter(row => !row.isProspect),
+    })];
+  }));
 }
 
 function normalizeAttendance(raw) {

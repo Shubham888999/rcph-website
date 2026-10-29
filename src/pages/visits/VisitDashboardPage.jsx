@@ -12,6 +12,7 @@ import {
   buildTreasuryLedger,
   buildVisitAttendanceTree,
   finesHasNotes,
+  filterVisitAttendance,
   formatVisitAttendanceName,
   formatVisitAttendanceRoleCode,
   formatVisitDashboardDate,
@@ -829,7 +830,7 @@ function AttendanceTable({ view }) {
   );
 }
 
-function AttendanceRecords({ attendance }) {
+function AttendanceRecords({ attendance, includeProspects, onIncludeProspectsChange }) {
   const [activeTab, setActiveTab] = useState(VISIT_ATTENDANCE_TABS[0].key);
   const currentTab = validVisitAttendanceTab(activeTab);
   const trend = useMemo(() => buildAttendanceTrend(attendance, new Date()), [attendance]);
@@ -860,6 +861,10 @@ function AttendanceRecords({ attendance }) {
           </button>
         ))}
       </div>
+      <label className="visit-dashboard-attendance-option">
+        <input type="checkbox" checked={includeProspects} onChange={event => onIncludeProspectsChange(event.target.checked)} />
+        Include prospects
+      </label>
       <AttendanceLegend />
       {VISIT_ATTENDANCE_TABS.map((tab) => {
         const view = attendance[tab.key];
@@ -1435,11 +1440,13 @@ export default function VisitDashboardPage() {
   const data = currentData || fallbackData;
   const { visit, stats, documentPanels, attendance, fines, treasury, letterhead, collaborations } = data;
   const glance = buildGlanceStats({ stats, treasury });
-  const attendanceTree = buildVisitAttendanceTree(attendance);
+  const [includeProspectsInAttendance, setIncludeProspectsInAttendance] = useState(false);
+  const visibleAttendance = useMemo(() => filterVisitAttendance(attendance, includeProspectsInAttendance), [attendance, includeProspectsInAttendance]);
+  const attendanceTree = buildVisitAttendanceTree(visibleAttendance);
   const dataAsOf = formatVisitDashboardDateTime(data.generatedAt);
   const [presenting, setPresenting] = useState(false);
   // Built when Present is pressed, so slides follow the latest data and main presentations.
-  const slides = useMemo(() => (presenting ? buildVisitPresentationSlides(data) : []), [presenting, data]);
+  const slides = useMemo(() => (presenting ? buildVisitPresentationSlides({ ...data, attendance: visibleAttendance }) : []), [presenting, data, visibleAttendance]);
   const closePresentation = useCallback(() => {
     setPresenting(false);
     document.getElementById(PRESENT_BUTTON_ID)?.focus();
@@ -1490,11 +1497,11 @@ export default function VisitDashboardPage() {
 
         <ClubAtAGlance glance={glance} attendanceTree={attendanceTree} />
 
-        <AvenueMonthStrip stats={stats} attendance={attendance} />
+        <AvenueMonthStrip stats={stats} attendance={visibleAttendance} />
 
         <DocumentPanels panels={documentPanels} theme={theme} />
 
-        <AttendanceRecords attendance={attendance} />
+        <AttendanceRecords attendance={visibleAttendance} includeProspects={includeProspectsInAttendance} onIncludeProspectsChange={setIncludeProspectsInAttendance} />
 
         {letterhead ? <LetterheadExchanges letterhead={letterhead} /> : null}
 

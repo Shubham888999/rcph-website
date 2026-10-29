@@ -248,7 +248,7 @@ function AttendanceGrid({
     );
   }
 
-  if (!members.length && !removedMembers.length) {
+  if (!members.length && !removedMembers.length && !onIncludeProspectsInSummaryChange) {
     return (
       <AdminEmpty message="Add roster members and events before recording attendance." />
     );
@@ -331,7 +331,7 @@ function AttendanceGrid({
 
   return (
     <>
-      {members.length ? (
+      {members.length || onIncludeProspectsInSummaryChange ? (
     <section className="attendance-workspace">
       <header className="attendance-workspace__header">
         <div>
@@ -343,7 +343,7 @@ function AttendanceGrid({
           </p>
         </div>
 
-        {collectionName === "attendance" ? (
+        {onIncludeProspectsInSummaryChange ? (
           <label className="attendance-workspace__option">
             <input
               type="checkbox"
@@ -1132,6 +1132,7 @@ export function BodOperationsModule({ data, lock, uid, access, onNotice }) {
 }
 
 export function DistrictModule({ data, lock, uid, access, onNotice }) {
+  const [includeProspectsInDistrictAttendance, setIncludeProspectsInDistrictAttendance] = useState(false);
   const empty = { name: "", date: "", endDate: "", desc: "", public: false };
   const [draft, setDraft] = useState(empty);
   const [editing, setEditing] = useState(null);
@@ -1148,6 +1149,9 @@ export function DistrictModule({ data, lock, uid, access, onNotice }) {
     users: data.users,
     attendance: data.districtAttendance,
   });
+  const districtAttendanceParticipants = includeProspectsInDistrictAttendance
+    ? attendanceParticipants
+    : filterProspectsFromAttendanceParticipants(attendanceParticipants);
   const payload = (value) => ({ name: value.name.trim(), date: value.date, endDate: value.endDate, desc: value.desc.trim(), visibility: value.public ? "public" : "internal", showOnHomepage: value.public });
   function submit(event) { event.preventDefault(); run("create-district", () => adminCalls.createDistrictEvent(payload(draft)), "District event synchronized and attendance initialized.").then((result) => { if (result) setDraft(empty); }); }
   function save(event) { event.preventDefault(); run("update-district", () => adminCalls.updateDistrictEvent({ ...payload(editing), districtEventId: editing.id }), "District event updated.").then((result) => { if (result) setEditing(null); }); }
@@ -1158,7 +1162,7 @@ export function DistrictModule({ data, lock, uid, access, onNotice }) {
     {canManageEvents ? <section className="admin-panel">{form(draft, setDraft, submit, "Add district event")}</section> : null}
     <div className="admin-card-grid">{events.map((event) => <article className="admin-record-card" key={event.id}><h3>{event.name}</h3><p>{event.date} · {event.visibility}</p><MomSection className="mom-section--card" target={momTarget(event, MOM_TARGET_TYPES.DISTRICT_EVENT)} access={access} uid={uid} onNotice={onNotice} />{canManageEvents ? <div className="admin-actions"><button disabled={locked} onClick={() => setEditing({ ...event, public: event.visibility === "public" })}>Edit</button><button className="danger" disabled={locked} onClick={() => setArchive(event)}>Archive</button></div> : null}</article>)}</div>
     <AttendanceExportPanel panelKey="district" members={attendanceParticipants} events={events} attendance={data.districtAttendance} onNotice={onNotice} />
-<AttendanceGrid members={attendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} />
+<AttendanceGrid members={districtAttendanceParticipants} removedMembers={removedAttendanceParticipants} events={events} attendance={data.districtAttendance} collectionName="districtAttendance" locked={locked} uid={uid} onNotice={onNotice} includeProspectsInSummary={includeProspectsInDistrictAttendance} onIncludeProspectsInSummaryChange={setIncludeProspectsInDistrictAttendance} />
     {canManageEvents && editing ? <AdminDialog title={`Edit ${editing.name}`} busy={busy} onClose={() => setEditing(null)}>{form(editing, setEditing, save, "Save district event")}</AdminDialog> : null}
     {canManageEvents && archive ? <AdminDialog title={`Archive ${archive.name}?`} busy={busy} onClose={() => setArchive(null)}><p>This archives district, mirrored BOD, and conditional public records while preserving attendance.</p><div className="admin-actions"><button onClick={() => setArchive(null)}>Cancel</button><button className="danger" onClick={() => run("archive-district", () => adminCalls.archiveDistrictEvent(archive.id), "District event archived.").then((result) => { if (result) setArchive(null); })}>Archive</button></div></AdminDialog> : null}
   </>;

@@ -45,7 +45,7 @@ assert.match(bodSource, /activeParticipants: activeBodMembers/);
 assert.match(bodSource, /removedParticipants: removedBodMembers/);
 assert.match(bodSource, /AttendanceGrid members=\{activeBodMembers\} removedMembers=\{removedBodMembers\}/);
 assert.match(bodSource, /MailDraftTool members=\{activeBodMembers\}/);
-assert.doesNotMatch(bodSource, /includeProspectsInSummary/);
+assert.doesNotMatch(bodModule, /includeProspectsInSummary/);
   assert.doesNotMatch(bodModule, /buildAttendanceParticipants/);
 });
 
@@ -113,7 +113,7 @@ test("Club Attendance defaults to excluding prospects from percentage summaries"
 
 test("Club Attendance exposes the prospect percentage opt-in checkbox", () => {
   assert.match(source, /^\s*Include prospects\s*$/m);
-  assert.match(source, /collectionName === "attendance"/);
+  assert.match(source, /onIncludeProspectsInSummaryChange \? \(/);
   assert.match(source, /includeProspects: includeProspectsInSummary/);
 });
 

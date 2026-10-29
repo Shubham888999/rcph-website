@@ -125,7 +125,7 @@ test("empty fines and treasury still get one slide each and optional sections ar
 test("Present button opens a lazily loaded presentation built from the page data", () => {
   assert.match(pageSource, /const VisitPresentation = lazy\(\(\) => import\("\.\/VisitPresentation\.jsx"\)\)/);
   assert.match(pageSource, /className="visit-dashboard-present-button"/);
-  assert.match(pageSource, /buildVisitPresentationSlides\(data\)/);
+  assert.match(pageSource, /buildVisitPresentationSlides\(\{ \.\.\.data, attendance: visibleAttendance \}\)/);
   const actions = pageSource.indexOf('className="visit-dashboard-masthead__actions"');
   assert.ok(pageSource.indexOf('className="visit-dashboard-present-button"') > actions, "button sits in the header actions");
 });
