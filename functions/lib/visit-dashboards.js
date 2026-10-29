@@ -91,7 +91,7 @@ const EVENT_AVENUE_ALIASES = Object.freeze({
   diversityequityandinclusion: 'DEI',
   diversityequityandinclusionavenue: 'DEI',
 });
-const ATTENDANCE_STATUSES = Object.freeze(['present', 'absent', 'late', 'excused', 'unknown']);
+const ATTENDANCE_STATUSES = Object.freeze(['present', 'absent', 'late', 'excused', 'na', 'null', 'unknown']);
 const MAX_OFFICIAL_NAMES = 12;
 const MAX_OFFICIAL_NAME_LENGTH = 160;
 const DRIVE_URL_ORIGIN = 'https://drive.google.com';
@@ -1215,6 +1215,8 @@ function normalizeAttendanceStatus(value) {
   const raw = normalizeText(value, 40).toLowerCase().replace(/[\s_-]+/g, '-');
   if (['present', 'p', 'yes', 'y', 'true'].includes(raw)) return 'present';
   if (['absent', 'a', 'no', 'n', 'false'].includes(raw)) return 'absent';
+  if (raw === 'null' || raw === '∅') return 'null';
+  if (['na', 'n/a', 'not-applicable'].includes(raw)) return 'na';
   if (['late', 'l'].includes(raw)) return 'late';
   if (['excused', 'excuse', 'excused-absence'].includes(raw)) return 'excused';
   return 'unknown';

@@ -4549,6 +4549,7 @@ function normalizeAvenuesForStats(avenue) {
 function attendanceLabel(value) {
   if (value === true) return 'Present';
   if (value === false) return 'Absent';
+  if (value === 'NULL') return 'NULL';
   return 'NA';
 }
 
@@ -4805,7 +4806,7 @@ function safeEventForDashboard(event, value) {
     date: event.date || '',
     endDate: event.endDate || '',
     avenue: normalizeAvenuesForStats(event.avenue),
-    value: value === true ? true : value === false ? false : 'NA',
+    value: value === true ? true : value === false ? false : value === 'NULL' ? 'NULL' : 'NA',
     label: attendanceLabel(value),
     type: event.type || 'clubEvent',
     desc: event.desc || event.description || '',
