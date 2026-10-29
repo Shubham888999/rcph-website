@@ -11,7 +11,7 @@
   min-height: 690px;
   padding: clamp(1.7rem,3vw,2.6rem);
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   gap: 1.5rem;
   overflow: hidden;
   border: 1px solid var(--pass-line);
@@ -71,4 +71,26 @@
   .login-page-react .login-brand-panel.login-access-pass { transform: none !important; }
   .login-page-react .login-access-pass > .login-access-pass__light { display: none; }
   .login-page-react .login-access-pass .login-brand-logo { transition: none; transform: none !important; }
+}
+
+/* Pune in gold: the illustration draws once, then a few windows settle into light. */
+.login-page-react .login-access-pass__skyline { position: relative; width: 100%; color: var(--pass-gold); pointer-events: none; }
+.login-page-react .login-access-pass__skyline svg { display: block; width: 100%; height: auto; overflow: visible; }
+.login-page-react .pass-skyline__distant { stroke: currentColor; stroke-width: .8; opacity: .12; }
+.login-page-react .pass-skyline__outline { stroke: currentColor; stroke-width: 1.15; stroke-linejoin: round; stroke-linecap: round; }
+.login-page-react .pass-skyline__outline path { opacity: .56; stroke-dasharray: 1; stroke-dashoffset: 0; animation: pass-skyline-draw 1.8s cubic-bezier(.22,1,.36,1) both; }
+.login-page-react .pass-skyline__palace path { animation-delay: .35s; }
+.login-page-react .pass-skyline__gateway path { animation-delay: .7s; }
+.login-page-react .pass-skyline__temple path { animation-delay: 1.05s; }
+.login-page-react .pass-skyline__ground { stroke: currentColor; stroke-width: .8; opacity: .35; stroke-dasharray: 1; animation: pass-skyline-draw 1.6s .25s both; }
+.login-page-react .pass-skyline__windows { fill: currentColor; opacity: .36; animation: pass-skyline-light 1.5s 2s ease-out both; }
+@keyframes pass-skyline-draw { from { stroke-dashoffset: 1; opacity: 0; } }
+@keyframes pass-skyline-light { from { opacity: 0; } to { opacity: .36; } }
+@media (max-width: 850px) {
+  .login-page-react .pass-skyline__outline path,
+  .login-page-react .pass-skyline__ground { animation-duration: 1s; animation-delay: .15s; }
+  .login-page-react .pass-skyline__windows { animation-delay: .8s; animation-duration: .6s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-page-react .login-access-pass__skyline * { animation: none !important; stroke-dashoffset: 0; }
 }

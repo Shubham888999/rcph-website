@@ -1,4 +1,5 @@
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
+import PuneSkyline from "./PuneSkyline.jsx";
 
 export default function LoginAccessPass({ children }) {
   const reduceMotion = useReducedMotion();
@@ -26,5 +27,6 @@ export default function LoginAccessPass({ children }) {
       <div className="login-access-pass__edition"><p>Heritage / Account Access</p><div className="login-access-pass__stamp"><span>RIY</span><strong>2026-27</strong></div></div>
       <h1 id="login-brand-title"><span>Step into the</span><span>heart of</span><em>Heritage.</em></h1>
     </div>
+    <PuneSkyline />
   </motion.section>;
 }
