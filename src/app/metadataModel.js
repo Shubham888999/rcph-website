@@ -18,48 +18,48 @@ export const PUBLIC_ROUTES = Object.freeze([
 
 const PUBLIC_METADATA = Object.freeze({
   "/": {
-    title: "Rotaract Club of Pune Heritage | RCPH",
-    description: "Official website of Rotaract Club of Pune Heritage in Pune. Explore community projects, public events, club leadership, and membership opportunities.",
+    title: "Rotaract Club of Pune Heritage | Rotaract Club in Pune",
+    description: "RCPH is a Rotaract club in Pune in Rotaract District 3131, sponsored by the Rotary Club of Pune Heritage. Service, leadership and fellowship since 2015.",
     breadcrumb: "Home",
   },
   "/about": {
-    title: "About RCPH | Rotaract Club of Pune Heritage",
-    description: "Learn about the story, identity, values, Rotary connection, and Pune heritage of the Rotaract Club of Pune Heritage.",
+    title: "About Us | Rotaract Club of Pune Heritage, Pune",
+    description: "The story of RCPH: a Rotaract club in Pune since 2015, sponsored by the Rotary Club of Pune Heritage, RID 3131, Zone 4.",
     breadcrumb: "About",
   },
   "/events": {
-    title: "Events | Rotaract Club of Pune Heritage",
-    description: "Browse upcoming and recent public RCPH events, including community service, professional development, fellowship, and district activities in Pune.",
+    title: "Rotaract Events in Pune | Rotaract Club of Pune Heritage",
+    description: "Upcoming and recent RCPH events in Pune: community service, professional development, fellowship and Rotaract District 3131 activities.",
     breadcrumb: "Events",
   },
   "/calendar": {
-    title: "Public Event Calendar | RCPH",
-    description: "Explore public Rotaract Club of Pune Heritage events through accessible month and list calendar views, with dates, descriptions, and service avenues.",
+    title: "Event Calendar | RCPH Pune",
+    description: "Month-by-month calendar of public RCPH events in Pune.",
     breadcrumb: "Calendar",
   },
   "/projects": {
-    title: "Projects | Rotaract Club of Pune Heritage",
-    description: "Explore community service, education, professional development, fellowship, and cultural projects led by Rotaract Club of Pune Heritage.",
+    title: "Community Service Projects in Pune | RCPH",
+    description: "Community service, education, professional development and cultural projects by Rotaract Club of Pune Heritage, a Rotaract club in Pune.",
     breadcrumb: "Projects",
   },
   "/join": {
-    title: "Join RCPH | Rotaract Club of Pune Heritage",
-    description: "Learn about RCPH membership eligibility, benefits, service opportunities, fellowship, and the process for joining the club in Pune.",
+    title: "Join a Rotaract Club in Pune | RCPH",
+    description: "Students and young professionals in Pune can join Rotaract Club of Pune Heritage. See the benefits, how to join, and create your member account.",
     breadcrumb: "Join",
   },
   "/contact": {
-    title: "Contact RCPH | Rotaract Club of Pune Heritage",
-    description: "Contact Rotaract Club of Pune Heritage about membership, volunteering, college sessions, sponsorships, partnerships, and community collaboration.",
+    title: "Contact Rotaract Club of Pune Heritage | Pune",
+    description: "Contact RCPH about membership, volunteering, college sessions, sponsorships and partnerships with a Rotaract club in Pune.",
     breadcrumb: "Contact",
   },
   "/faq": {
-    title: "Frequently Asked Questions | RCPH",
-    description: "Find official answers about RCPH membership, projects, public events, volunteering, partnerships, account access, and club life in Pune.",
+    title: "RCPH FAQs | Rotaract Club in Pune",
+    description: "Answers about joining RCPH, meetings in Kothrud, Karvenagar and Sahakarnagar, projects and volunteering.",
     breadcrumb: "FAQ",
   },
   "/bod": {
-    title: "Board of Directors | RCPH",
-    description: "Meet the Board of Directors and club leadership of Rotaract Club of Pune Heritage, including executive, service, and communications roles.",
+    title: "Board of Directors | RCPH Pune",
+    description: "Meet the Board of Directors of Rotaract Club of Pune Heritage, a Rotaract club in Pune, RID 3131.",
     breadcrumb: "Board of Directors",
   },
   "/terms": {

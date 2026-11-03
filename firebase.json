@@ -1,6 +1,8 @@
 {
   "hosting": {
     "public": "dist",
+    "cleanUrls": true,
+    "trailingSlash": false,
     "ignore": [
       "firebase.json",
       ".firebaserc",
@@ -16,14 +18,14 @@
       { "source": "/bod.html", "destination": "/bod", "type": 301 },
       { "source": "/faq.html", "destination": "/faq", "type": 301 },
       { "source": "/contact.html", "destination": "/contact", "type": 301 },
-      { "source": "/login.html", "destination": "/login", "type": 302 },
-      { "source": "/signup.html", "destination": "/signup", "type": 302 },
-      { "source": "/forgot-password.html", "destination": "/forgot-password", "type": 302 },
-      { "source": "/access.html", "destination": "/access", "type": 302 },
-      { "source": "/my-dashboard.html", "destination": "/dashboard", "type": 302 },
-      { "source": "/admin.html", "destination": "/admin", "type": 302 },
-      { "source": "/dzrvisit.html", "destination": "/admin/visit-management", "type": 302 },
-      { "source": "/BOD Event manager/bodlogin.html", "destination": "/bod-tools", "type": 302 },
+      { "source": "/login.html", "destination": "/login", "type": 301 },
+      { "source": "/signup.html", "destination": "/signup", "type": 301 },
+      { "source": "/forgot-password.html", "destination": "/forgot-password", "type": 301 },
+      { "source": "/access.html", "destination": "/access", "type": 301 },
+      { "source": "/my-dashboard.html", "destination": "/dashboard", "type": 301 },
+      { "source": "/admin.html", "destination": "/admin", "type": 301 },
+      { "source": "/dzrvisit.html", "destination": "/admin/visit-management", "type": 301 },
+      { "source": "/BOD Event manager/bodlogin.html", "destination": "/bod-tools", "type": 301 },
       { "source": "/events/pages-of-hope.html", "destination": "/projects", "type": 301 }
     ],
     "rewrites": [
