@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AuthNotice from "../../features/auth/AuthNotice";
 import AuthStateScreen from "../../features/auth/AuthStateScreen";
 import GoogleSignInButton from "../../features/auth/GoogleSignInButton";
@@ -118,6 +118,7 @@ export default function LoginPage() {
     if (accountState === "approved" || accountState === "access-loading") {
       return <LoginVerificationState />;
     }
+    if (accountState === "profile-missing") return <Navigate to="/signup" replace />;
     return <AuthStateScreen state={accountState} onSignOut={handleAccountSignOut} />;
   }
   if (redirectChecking || awaitingTrustedAccess) return <LoginVerificationState />;

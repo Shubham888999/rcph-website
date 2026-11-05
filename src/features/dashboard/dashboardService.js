@@ -35,6 +35,15 @@ export function reloadDashboardData(uid) {
   return cache.get({ uid, refresh: true });
 }
 
+export async function getMyInviteLink(uid) {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) {
+    throw new Error("An authenticated user is required.");
+  }
+  const callable = httpsCallable(functions, "getMyInviteLink");
+  const result = await callable({});
+  return result?.data;
+}
+
 export function clearDashboardDataCache(uid) {
   cache.clear(uid);
 }

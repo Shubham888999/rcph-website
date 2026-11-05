@@ -16,6 +16,8 @@ import {
 import useAdminMutation from "../shared/useAdminMutation";
 import { formatRotaractorName, stripRotaractorPrefix } from "../../../utils/memberName";
 import { getMemberOperationsModel } from "./memberOperationsModel";
+import SignupFunnelPanels from "./SignupFunnelPanels";
+import { formatReferredBy, formatSignupSource } from "./signupFunnelModel";
 import ProfileEditorDialog, { ProfileHistoryDialog } from "../../profile/ProfileEditorDialog";
 
 export function CommandCenter({ data, access, uid, onNotice }) {
@@ -617,7 +619,8 @@ export function AccountsModule({ users, access, uid, onNotice, onAccessChanged }
   return <>
     <AdminModuleHeader title="Accounts & Roles" description="Approve requests and maintain role/position assignments through this page." />
     <div className="admin-filterbar"><label>Search<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label>Status<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="all">All</option></select></label></div>
-    {rows.length ? <div className="admin-table-wrap"><table><caption>Account requests and approved access</caption><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Positions</th><th>Action</th></tr></thead><tbody>{rows.map((user) => <tr key={user.id}><td>{formatRotaractorName(user.name, user)}</td><td>{user.email || "Unavailable"}</td><td>{formatAdminRole(user.status === "pending" ? user.requestedRole : user.role)}</td><td>{user.status}</td><td>{user.positionKeys.join(", ") || user.clubPosition || user.districtOfficialPosition || "None"}</td><td><button type="button" onClick={() => open(user)}>Manage</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No account records match this view." />}
+    {rows.length ? <div className="admin-table-wrap"><table><caption>Account requests and approved access</caption><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Source</th><th>Referred by</th><th>Positions</th><th>Action</th></tr></thead><tbody>{rows.map((user) => <tr key={user.id}><td>{formatRotaractorName(user.name, user)}</td><td>{user.email || "Unavailable"}</td><td>{formatAdminRole(user.status === "pending" ? user.requestedRole : user.role)}</td><td>{user.status}</td><td>{formatSignupSource(user)}</td><td>{formatReferredBy(user)}</td><td>{user.positionKeys.join(", ") || user.clubPosition || user.districtOfficialPosition || "None"}</td><td><button type="button" onClick={() => open(user)}>Manage</button></td></tr>)}</tbody></table></div> : <AdminEmpty message="No account records match this view." />}
+    <SignupFunnelPanels access={access} />
     {editor ? <AdminDialog title={`Manage ${formatRotaractorName(editor.user.name, editor.user)}`} busy={busy} onClose={() => setEditor(null)}><div className="admin-form">
       {protectedPresident ? <p>This President account can only be changed by trusted President controls.</p> : <>
         <label>Access role<select value={editor.role} onChange={(event) => changeRole(event.target.value)}>{roles.map((role) => <option key={role} value={role}>{formatAdminRole(role)}</option>)}</select></label>

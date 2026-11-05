@@ -184,6 +184,8 @@ export function normalizeAdminUser(id, raw) {
     joinReason: text(raw.joinReason, 1200),
     referred: raw.referred === true,
     referredBy: text(raw.referredBy === "N/A" ? "" : raw.referredBy, 160),
+    referredByName: text(raw.referredByName, 160),
+    signupSource: text(raw.signupSource, 60),
     role: normalizeAdminRole(raw.role),
     requestedRole: normalizeAdminRole(raw.requestedRole),
     status,

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { captureAttribution } from "../features/auth/signupAttribution";
 import { getRouteMetadata, serializeStructuredData } from "./metadataModel";
 
 function upsertMeta(selector, attributes, content) {
@@ -13,7 +14,10 @@ function upsertMeta(selector, attributes, content) {
 }
 
 export default function RouteMetadata() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    captureAttribution({ pathname, search });
+  }, [pathname, search]);
   useEffect(() => {
     const metadata = getRouteMetadata(pathname);
     document.title = metadata.title;

@@ -32,6 +32,7 @@ function validProspect() {
     ...selectSignupPath(createSignupForm(), SIGNUP_PATHS.PROSPECT),
     name: "  Asha Member  ",
     phone: " +91 98765 43210 ",
+    dateOfBirth: "1999-02-03",
     email: " ASHA@Example.COM ",
     gender: "woman",
     password: "secret",
@@ -289,17 +290,17 @@ test("District Official payload includes pending role shape, position, provider,
   assert.equal("phone" in payload, false);
   assert.equal("gender" in payload, false);
 });
-test("previous Rotaract details are conditionally required", () => {
+test("previous Rotaract details are optional for Prospects", () => {
   const result = validateSignup({ ...validProspect(), previousRotaract: "yes", previousRotaractDetails: "" });
-  assert.ok(result.errors.previousRotaractDetails);
+  assert.equal(result.errors.previousRotaractDetails, undefined);
 });
 test("changing previous Rotaract to no clears details", () => {
   const next = updateSignupField({ ...validProspect(), previousRotaract: "yes", previousRotaractDetails: "Club" }, "previousRotaract", "no");
   assert.equal(next.previousRotaractDetails, "");
 });
-test("referrer is conditionally required", () => {
+test("referrer name is optional for Prospects", () => {
   const result = validateSignup({ ...validProspect(), referred: "yes", referredBy: "" });
-  assert.ok(result.errors.referredBy);
+  assert.equal(result.errors.referredBy, undefined);
 });
 test("changing referral to no clears referrer", () => {
   const next = updateSignupField({ ...validProspect(), referred: "yes", referredBy: "Member" }, "referred", "no");

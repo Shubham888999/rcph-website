@@ -7,6 +7,7 @@ import {
   LEGAL_VERSIONS,
 } from "../legal/legalConstants.js";
 import { stripRotaractorPrefix } from "../../utils/memberName.js";
+import { buildAttributionPayload } from "./signupAttribution.js";
 
 export const SIGNUP_PATHS = {
   CHOICE: "choice",
@@ -14,6 +15,14 @@ export const SIGNUP_PATHS = {
   EXISTING_MEMBER: "existing-member",
   DISTRICT_OFFICIAL: "district-official",
 };
+
+const SIGNUP_PATH_PARAMS = {
+  prospect: SIGNUP_PATHS.PROSPECT,
+  member: SIGNUP_PATHS.EXISTING_MEMBER,
+  district: SIGNUP_PATHS.DISTRICT_OFFICIAL,
+};
+
+export const PROSPECT_STEPS = { DETAILS: 1, ABOUT: 2 };
 
 export const DISTRICT_OFFICIAL_ROLE = "districtOfficial";
 export const DISTRICT_OFFICIAL_SIGNUP_TYPE = "district-official";
@@ -182,6 +191,44 @@ export function selectSignupPath(form, path) {
   return createSignupForm();
 }
 
+export function parseSignupPathParam(value) {
+  return Object.hasOwn(SIGNUP_PATH_PARAMS, value) ? SIGNUP_PATH_PARAMS[value] : SIGNUP_PATHS.CHOICE;
+}
+
+export function applySignupAttribution(form, attribution) {
+  if (form.path !== SIGNUP_PATHS.PROSPECT || !attribution?.ref || form.referred) return form;
+  return { ...form, referred: "yes" };
+}
+
+// Returns the same object when nothing changes, so it is safe to call while rendering.
+export function prefillSignupIdentity(form, user) {
+  const email = user?.email || "";
+  if (form.email === email) return form;
+  return { ...form, email, name: form.name || user?.displayName || "" };
+}
+
+// Only the Prospect form creates a Google identity before the profile, so that is
+// where an auth-only Google account resumes. Other partial accounts choose a path.
+export function getProfileCompletionPath(user) {
+  return user?.providerData?.some((entry) => entry?.providerId === "google.com")
+    ? SIGNUP_PATHS.PROSPECT
+    : SIGNUP_PATHS.CHOICE;
+}
+
+export function clearProspectOptionalFields(form, attribution) {
+  return {
+    ...form,
+    gender: "",
+    genderSelfDescribe: "",
+    hobbies: "",
+    previousRotaract: "",
+    previousRotaractDetails: "",
+    joinReason: "",
+    referred: attribution?.ref ? "yes" : "",
+    referredBy: "",
+  };
+}
+
 export function updateSignupField(form, field, value) {
   if (!Object.hasOwn(form, field) || field === "path") return form;
   const next = { ...form, [field]: value };
@@ -198,6 +245,7 @@ export function validateSignup(form, options = {}) {
   const minimalProfileCompletion = options.profileCompletion === true
     && form.path === SIGNUP_PATHS.EXISTING_MEMBER;
   const districtOfficialSignup = form.path === SIGNUP_PATHS.DISTRICT_OFFICIAL;
+  const prospectSignup = form.path === SIGNUP_PATHS.PROSPECT;
   const requireClubProfileDetails = !minimalProfileCompletion && !districtOfficialSignup;
   const name = normalizeSignupName(form.name);
   const phone = normalizeSignupPhone(form.phone);
@@ -210,31 +258,17 @@ export function validateSignup(form, options = {}) {
   if (!name) errors.name = "Enter your full name.";
   if (requireClubProfileDetails && !phone) errors.phone = "Enter your phone number.";
   if (requireClubProfileDetails && dateOfBirthError) errors.dateOfBirth = dateOfBirthError;
+  else if (prospectSignup && !normalizeSignupText(form.dateOfBirth)) errors.dateOfBirth = "Enter your date of birth.";
   if (!email) errors.email = "Enter your email address.";
   else if (!isValidAuthEmail(email)) errors.email = "Enter a valid email address.";
-  if (requireClubProfileDetails && !SIGNUP_GENDERS.includes(form.gender)) {
+  if (requireClubProfileDetails && !prospectSignup && !SIGNUP_GENDERS.includes(form.gender)) {
     errors.gender = "Select a gender option.";
   }
-  if (requireClubProfileDetails && form.gender === "self-describe" && !normalizeSignupText(form.genderSelfDescribe)) {
+  if (requireClubProfileDetails && !prospectSignup && form.gender === "self-describe" && !normalizeSignupText(form.genderSelfDescribe)) {
     errors.genderSelfDescribe = "Please describe your gender.";
   }
 
-  if (form.path === SIGNUP_PATHS.PROSPECT) {
-    if (!normalizeSignupText(form.hobbies)) errors.hobbies = "Tell us about your hobbies or interests.";
-    if (!["yes", "no"].includes(form.previousRotaract)) {
-      errors.previousRotaract = "Select whether you have been part of Rotaract before.";
-    }
-    if (form.previousRotaract === "yes" && !normalizeSignupText(form.previousRotaractDetails)) {
-      errors.previousRotaractDetails = "Describe your previous Rotaract experience.";
-    }
-    if (!normalizeSignupText(form.joinReason)) errors.joinReason = "Tell us why you want to join RCPH.";
-    if (!["yes", "no"].includes(form.referred)) {
-      errors.referred = "Select whether someone referred you.";
-    }
-    if (form.referred === "yes" && !normalizeSignupName(form.referredBy)) {
-      errors.referredBy = "Enter the name of the person who referred you.";
-    }
-  } else if (form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
+  if (form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
     const requestedRole = normalizeSignupRole(form.requestedRole);
     if (!SIGNUP_ROLES.includes(requestedRole)) errors.requestedRole = "Choose GBM, BOD, or Admin.";
     const ridError = validateSignupRid(rid);
@@ -249,7 +283,7 @@ export function validateSignup(form, options = {}) {
     } else if (position.length > DISTRICT_OFFICIAL_POSITION_MAX_LENGTH) {
       errors.districtOfficialPosition = `Use ${DISTRICT_OFFICIAL_POSITION_MAX_LENGTH} characters or fewer.`;
     }
-  } else {
+  } else if (!prospectSignup) {
     errors.path = "Choose an account type.";
   }
 
@@ -273,6 +307,12 @@ export function validateSignup(form, options = {}) {
   };
 }
 
+// Every required Prospect field is on step 1; step 2 can always be submitted.
+export function validateProspectStep(form, step, options = {}) {
+  if (step === PROSPECT_STEPS.ABOUT) return { errors: {}, valid: true };
+  return validateSignup(form, options);
+}
+
 export function buildSignupPayload(form, options = {}) {
   const provider = options.provider === "google" ? "google" : "password";
   const normalizedRequestedRole = normalizeSignupRole(form.requestedRole);
@@ -284,6 +324,7 @@ export function buildSignupPayload(form, options = {}) {
     : form.path === SIGNUP_PATHS.DISTRICT_OFFICIAL
       ? "district-official-signup"
     : "member-signup";
+  const attribution = buildAttributionPayload(options.attribution);
   const consent = {
     termsAccepted: form.legalAccepted === true,
     termsVersion: LEGAL_VERSIONS.terms,
@@ -306,6 +347,7 @@ export function buildSignupPayload(form, options = {}) {
       districtOfficialPosition: position,
       provider,
       ...consent,
+      ...attribution,
     };
   }
   if (options.profileCompletion === true && form.path === SIGNUP_PATHS.EXISTING_MEMBER) {
@@ -316,6 +358,7 @@ export function buildSignupPayload(form, options = {}) {
       provider,
       ...(rid ? { rid } : {}),
       ...consent,
+      ...attribution,
       ...(requestedMemberRole === "admin"
         ? { inviteCode: normalizeSignupText(form.inviteCode) }
         : {}),
@@ -333,6 +376,7 @@ genderSelfDescribe: form.gender === "self-describe"
   ? normalizeSignupText(form.genderSelfDescribe)
   : "",
     ...consent,
+    ...attribution,
   };
 
   if (form.path === SIGNUP_PATHS.PROSPECT) {
