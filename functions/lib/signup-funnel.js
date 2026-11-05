@@ -7,6 +7,7 @@
 
 const crypto = require('crypto');
 const { isCurrentHolderAccount } = require('./position-holders');
+const { WEBSITE_DIRECTOR_POSITION_KEY } = require('./positions');
 const { stripRotaractorPrefix } = require('./member-name');
 
 const INVITE_CODES_COLLECTION = 'inviteCodes';
@@ -24,8 +25,14 @@ const LANDING_PATH_MAX_LENGTH = 120;
 const DIRECT_SOURCE = 'direct';
 const PROSPECT_GENDERS = new Set(['woman', 'man', 'non-binary', 'self-describe', 'prefer-not-to-say']);
 
-const OFFICER_ROLES = ['admin', 'president'];
-const OFFICER_POSITION_KEYS = ['mdo', 'president'];
+// Who hears about new signups, besides the club inbox. Edit here.
+const SIGNUP_NOTIFY_POSITION_KEYS = Object.freeze([
+  'president',
+  'mdo',
+  'secretary',
+  'immediate-past-president',
+  WEBSITE_DIRECTOR_POSITION_KEY,
+]);
 const OFFICER_NOTIFICATION_SENDER = '"RCPH Support" <no-reply@rcph3131.org>';
 const ACCOUNTS_AND_ROLES_URL = 'https://rcph3131.org/admin/requests';
 // The callable has to wait for the send (Cloud Run stops the CPU after the
@@ -333,17 +340,13 @@ function createSignupFunnelService(deps) {
     return attribution;
   }
 
-  // MDO + President + Admins, deduplicated by email, approved active accounts only.
+  // Current holders of SIGNUP_NOTIFY_POSITION_KEYS, deduplicated by email, approved active accounts only.
   async function resolveOfficerRecipients() {
-    const [roleSnap, assignmentSnap] = await Promise.all([
-      db.collection('users').where('role', 'in', OFFICER_ROLES).get(),
-      db.collection('bodPositionAssignments').where('active', '==', true).get(),
-    ]);
+    const assignmentSnap = await db.collection('bodPositionAssignments').where('active', '==', true).get();
     const uids = new Set();
-    roleSnap.forEach(snap => uids.add(snap.id));
     assignmentSnap.forEach((snap) => {
       const assignment = snap.data() || {};
-      const positionKey = OFFICER_POSITION_KEYS.find(key => positionHelpers.isActivePositionAssignment(assignment.uid, key, assignment));
+      const positionKey = SIGNUP_NOTIFY_POSITION_KEYS.find(key => positionHelpers.isActivePositionAssignment(assignment.uid, key, assignment));
       if (positionKey) uids.add(assignment.uid);
     });
     const ids = Array.from(uids).sort();
@@ -472,6 +475,7 @@ module.exports = {
   INVITE_CODE_LENGTH,
   LANDING_PATH_MAX_LENGTH,
   OFFICER_NOTIFICATION_SENDER,
+  SIGNUP_NOTIFY_POSITION_KEYS,
   SIGNUP_SOURCE_MAX_LENGTH,
   assertProspectRequiredFields,
   attributionForWrite,
