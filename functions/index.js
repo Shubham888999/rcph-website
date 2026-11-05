@@ -70,6 +70,7 @@ const avenueReportingLocks = require('./lib/avenue-reporting-locks');
 const archivedEventLifecycle = require('./lib/archived-event-lifecycle');
 const systemLogs = require('./lib/system-logs');
 const fineProof = require('./lib/fine-proof');
+const signupFunnel = require('./lib/signup-funnel');
 const { stripRotaractorPrefix } = require('./lib/member-name');
 const {
   MemberProfileValidationError,
@@ -311,6 +312,17 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 15000,
 });
 
+const signupFunnelService = signupFunnel.createSignupFunnelService({
+  db,
+  admin,
+  HttpsError,
+  positionHelpers,
+  transporter,
+  emailConfigured: Boolean(EMAIL_USER && EMAIL_PASS),
+  clubInboxRecipients: () => getSignupNotificationRecipients(),
+  assertFunnelAuthority: uid => assertAdminOrPresidentAuthority(uid),
+});
+
 function genOtp() {
   return (Math.floor(100000 + Math.random() * 900000)).toString();
 }
@@ -429,7 +441,6 @@ const downloadBodReportImageHandler = createBodReportImageHttpHandler({
 });
 const DRIVE_UPLOAD_TYPES = new Set(['bod', 'treasury', VISIT_UPLOAD_TYPE]);
 const PROSPECT_CRITERIA = PROSPECT_CRITERIA_V2;
-const PROSPECT_GENDERS = new Set(['woman', 'man', 'non-binary', 'self-describe', 'prefer-not-to-say']);
 const PROSPECT_AVENUES = new Set(['ISD', 'CMD', 'CSD', 'PDD', 'RRRO', 'PRO', 'DEI']);
 const CLUB_SETTINGS_COLLECTION = 'clubSettings';
 const PUBLIC_DASHBOARD_SETTINGS_DOC = 'publicDashboard';
@@ -1423,52 +1434,6 @@ async function getAnnouncementForAttachmentAccess(uid, announcementId) {
   return { id: safeAnnouncementId, ...announcement };
 }
 
-function normalizeBoolean(value) {
-  if (typeof value === 'boolean') return value;
-  return ['true', 'yes', '1'].includes(String(value || '').trim().toLowerCase());
-}
-
-function normalizeProspectSignupData(data) {
-  const phone = normalizeText(data.phone, 40);
-  const gender = normalizeText(data.gender, 40).toLowerCase();
-  const genderSelfDescribe = gender === 'self-describe'
-    ? normalizeText(data.genderSelfDescribe ?? data.genderSelfDescription, 160)
-    : '';
-  const hobbies = normalizeText(data.hobbies, 600);
-  const previousRotaract = normalizeBoolean(data.previousRotaract);
-  const previousRotaractDetails = previousRotaract
-    ? normalizeText(data.previousRotaractDetails, 1200)
-    : 'N/A';
-  const joinReason = normalizeText(data.joinReason, 1200);
-  const referred = normalizeBoolean(data.referred);
-  const referredBy = referred ? normalizeText(data.referredBy, 160) : 'N/A';
-
-  if (!phone || !PROSPECT_GENDERS.has(gender) || !hobbies || !joinReason) {
-    throw new HttpsError('invalid-argument', 'Phone, gender, hobbies, and reason for joining are required.');
-  }
-  if (gender === 'self-describe' && !genderSelfDescribe) {
-    throw new HttpsError('invalid-argument', 'Please provide the gender self-description.');
-  }
-  if (previousRotaract && !previousRotaractDetails) {
-    throw new HttpsError('invalid-argument', 'Previous Rotaract experience is required.');
-  }
-  if (referred && !referredBy) {
-    throw new HttpsError('invalid-argument', 'Referrer name is required.');
-  }
-
-  return {
-    phone,
-    gender,
-    genderSelfDescribe,
-    hobbies,
-    previousRotaract,
-    previousRotaractDetails,
-    joinReason,
-    referred,
-    referredBy,
-  };
-}
-
 function normalizeSignupConsentData(data, requestedRole) {
   const termsAccepted = data.termsAccepted === true;
   const privacyAccepted = data.privacyAccepted === true;
@@ -1775,12 +1740,6 @@ async function sendAnnouncementEmails({ announcementId, announcement, recipients
   return summary;
 }
 
-function signupEmailValue(value, fallback = 'N/A') {
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  const normalized = normalizeText(value, 2000);
-  return normalized || fallback;
-}
-
 function getSignupNotificationRecipients() {
   const configured = normalizeText(
     process.env.SIGNUP_NOTIFY_TO || process.env.EMAIL_TO || DEFAULT_SIGNUP_NOTIFY_TO,
@@ -1792,116 +1751,6 @@ function getSignupNotificationRecipients() {
     .filter(address => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address));
 
   return recipients.length ? Array.from(new Set(recipients)) : [DEFAULT_SIGNUP_NOTIFY_TO];
-}
-
-function getSignupNotificationSubject(userData) {
-  const role = normalizeRole(userData.requestedRole || userData.role);
-  if (role === 'prospect') return 'New Prospect Signup - RCPH';
-  if (role === 'gbm') return 'New GBM Signup - RCPH';
-  if (role === 'bod') return 'New BOD Access Request - RCPH';
-  if (role === 'admin') return 'New Admin Access Request - RCPH';
-  if (role === DISTRICT_OFFICIAL_ROLE) return 'New District Official Access Request - RCPH';
-  return 'New Account Signup - RCPH';
-}
-
-function getSignupNotificationHighlight(userData) {
-  const role = normalizeRole(userData.requestedRole || userData.role);
-  if (role === 'prospect') {
-    return 'Prospect Member auto-approved. Onboarding criteria: 3 consecutive eligible meetings/events, then dues paid.';
-  }
-  if (role === 'gbm') return 'Pending approval. Admin action required in Account Requests.';
-  if (role === 'bod' || role === 'admin' || role === DISTRICT_OFFICIAL_ROLE) {
-    return 'Pending approval. Admin action required in Account Requests.';
-  }
-  return 'A new RCPH account was created.';
-}
-
-function getSignupNotificationRows(userData) {
-  const role = normalizeRole(userData.requestedRole || userData.role);
-  const gender = signupEmailValue(userData.gender);
-  const describedGender = normalizeText(userData.genderSelfDescribe, 160);
-  const rows = [
-    ['Full name', signupEmailValue(userData.name)],
-    ['Email', signupEmailValue(userData.email)],
-    ['Phone', signupEmailValue(userData.phone)],
-    ['RID', signupEmailValue(userData.rid)],
-    ['Requested role', signupEmailValue(role)],
-    ['Signup type', signupEmailValue(userData.signupType)],
-    ['Status', signupEmailValue(userData.status)],
-    ['Gender', describedGender ? `${gender} (${describedGender})` : gender],
-  ];
-
-  if (role === 'prospect') {
-    rows.push(
-      ['Hobbies / interests', signupEmailValue(userData.hobbies)],
-      ['Previous Rotaract member', signupEmailValue(userData.previousRotaract)],
-      ['Previous Rotaract experience', signupEmailValue(userData.previousRotaractDetails)],
-      ['Reason for joining RCPH', signupEmailValue(userData.joinReason)],
-      ['Referred by', signupEmailValue(userData.referredBy)]
-    );
-  }
-
-  if (role === DISTRICT_OFFICIAL_ROLE) {
-    rows.push(['District position', signupEmailValue(userData.districtOfficialPosition || userData.districtPosition || userData.position)]);
-  }
-
-  rows.push(
-    ['Created timestamp', signupEmailValue(userData.createdAt)],
-    ['Firebase UID', signupEmailValue(userData.uid)]
-  );
-  return rows;
-}
-
-function buildSignupNotificationHtml(userData) {
-  const highlight = escapeEmailHtml(getSignupNotificationHighlight(userData));
-  const rows = getSignupNotificationRows(userData)
-    .map(([label, value]) => `
-      <tr>
-        <th style="padding:8px 12px;border:1px solid #e6e6e6;text-align:left;background:#faf7ef;vertical-align:top;">${escapeEmailHtml(label)}</th>
-        <td style="padding:8px 12px;border:1px solid #e6e6e6;white-space:pre-wrap;">${escapeEmailHtml(value)}</td>
-      </tr>`)
-    .join('');
-
-  return `
-    <div style="font-family:Arial,sans-serif;color:#1f1f1f;line-height:1.5;max-width:760px;">
-      <h2 style="color:#9b6814;margin-bottom:8px;">New RCPH account notification</h2>
-      <p style="padding:12px 14px;background:#fff7df;border-left:4px solid #f4b43a;"><strong>${highlight}</strong></p>
-      <table style="border-collapse:collapse;width:100%;margin:18px 0;">${rows}</table>
-      <p><strong>Please review this user in the RCPH Admin Panel if approval/action is required.</strong></p>
-    </div>`;
-}
-
-function buildSignupNotificationText(userData) {
-  const rows = getSignupNotificationRows(userData)
-    .map(([label, value]) => `${label}: ${value}`)
-    .join('\n');
-
-  return [
-    'New RCPH account notification',
-    '',
-    getSignupNotificationHighlight(userData),
-    '',
-    rows,
-    '',
-    'Please review this user in the RCPH Admin Panel if approval/action is required.',
-  ].join('\n');
-}
-
-async function sendSignupNotificationEmail(userData) {
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    console.warn('Signup notification email skipped: EMAIL_USER/EMAIL_PASS (or SMTP_USER/SMTP_PASS) is not configured.');
-    return { sent: false, reason: 'email-not-configured' };
-  }
-
-  const recipients = getSignupNotificationRecipients();
-  await transporter.sendMail({
-    from: `"RCPH Platform" <${EMAIL_USER}>`,
-    to: recipients,
-    subject: getSignupNotificationSubject(userData),
-    text: buildSignupNotificationText(userData),
-    html: buildSignupNotificationHtml(userData),
-  });
-  return { sent: true };
 }
 
 function normalizeClubPosition(value, fallback) {
@@ -4888,7 +4737,14 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
     gender: normalizeText(data.gender, 40).toLowerCase(),
     genderSelfDescribe: normalizeText(data.genderSelfDescribe ?? data.genderSelfDescription, 160),
   };
-  const prospectSignup = requestedRole === 'prospect' ? normalizeProspectSignupData(data) : null;
+  const prospectSignup = requestedRole === 'prospect' ? signupFunnel.normalizeProspectSignupData(data, { HttpsError }) : null;
+  if (requestedRole === 'prospect') {
+    signupFunnel.assertProspectRequiredFields(
+      { data, email: profile.email, dateOfBirth: signupDateOfBirth, consent: signupConsent },
+      { HttpsError }
+    );
+  }
+  const signupAttribution = await signupFunnelService.resolveSignupAttribution(data, uid);
   const now = admin.firestore.FieldValue.serverTimestamp();
   const userRef = db.collection('users').doc(uid);
   const roleRef = db.collection('roles').doc(uid);
@@ -4965,6 +4821,7 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
       ...profile,
       ...baseProfileData,
       ...signupConsent,
+      ...signupFunnel.attributionForWrite(userData, signupAttribution),
       requestedRole,
       updatedAt: now,
       approvedAt: null,
@@ -5073,40 +4930,33 @@ exports.createUserProfileAfterSignup = onCall(CALLABLE_OPTIONS, async (request) 
   });
 
   if (result.shouldNotify) {
-    const notificationData = {
+    await signupFunnelService.notifyOfficersOfSignup({
       uid,
       name: stripRotaractorPrefix(profile.name),
       email: profile.email,
       phone: commonSignupData.phone,
-      rid: signupRid,
       requestedRole,
-      role: result.role,
-      signupType: requestedRole === 'prospect'
-        ? 'prospect'
-        : requestedRole === DISTRICT_OFFICIAL_ROLE
-          ? DISTRICT_OFFICIAL_SIGNUP_TYPE
-          : 'internal',
-      status: result.status,
-      gender: commonSignupData.gender,
-      genderSelfDescribe: commonSignupData.genderSelfDescribe,
-      ...(prospectSignup || {}),
-      ...(districtOfficialSignup || {}),
-      createdAt: new Date().toISOString(),
-    };
-
-    try {
-      await sendSignupNotificationEmail(notificationData);
-    } catch (err) {
-      console.warn('Signup notification email failed', {
-        uid,
-        requestedRole,
-        message: err?.message || String(err),
-      });
-    }
+      districtOfficialPosition: districtOfficialSignup?.districtOfficialPosition || '',
+      signupSource: signupAttribution.signupSource,
+      referredByName: signupAttribution.referredByName,
+      referredBy: prospectSignup?.referredBy || '',
+      createdAt: new Date(),
+    });
   }
 
   const { shouldNotify, ...signupResult } = result;
   return { ok: true, ...signupResult };
+});
+
+exports.getMyInviteLink = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  return signupFunnelService.getMyInviteLink({ uid });
+});
+
+exports.getSignupFunnel = onCall(CALLABLE_OPTIONS, async (request) => {
+  const uid = requireAuth(request);
+  const data = request?.data || {};
+  return signupFunnelService.getSignupFunnel({ uid, days: data.days });
 });
 
 exports.updateMemberProfile = onCall(CALLABLE_OPTIONS, async (request) => {

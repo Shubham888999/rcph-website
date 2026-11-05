@@ -566,6 +566,10 @@ match /treasury/{transactionId} {
       allow read, write: if false;
     }
 
+    match /inviteCodes/{code} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
