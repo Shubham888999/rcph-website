@@ -5,7 +5,9 @@ import DashboardSkeleton from "../../features/dashboard/DashboardSkeleton";
 import MemberAnnouncements from "../../features/dashboard/MemberAnnouncements";
 import MemberResolutions from "../../features/dashboard/MemberResolutions";
 import MemberOverview from "../../features/dashboard/MemberOverview";
+import InviteFriendCard from "../../features/dashboard/InviteFriendCard";
 import { canRequestDashboard } from "../../features/dashboard/accessHubModel";
+import { canShowInviteCard } from "../../features/dashboard/inviteModel";
 import {
   clearDashboardDataCache,
   dismissDashboardAnnouncement,
@@ -176,6 +178,7 @@ export default function DashboardPage() {
         <MemberAnnouncements uid={user?.uid || ""} announcements={data.announcements} busyId={announcementBusyId} onToggleRead={updateReadState} onDismiss={dismissAnnouncement} />
         <MemberResolutions resolutions={data.openResolutions} busyId={resolutionBusyId} onVote={voteOnResolution} onClaimEmailSent={claimResolutionEmailSent} onRefresh={refreshOpenResolutions} />
         {prospect ? <ProspectProgress data={data} /> : <MemberOverview data={data} />}
+        {!prospect && canShowInviteCard(access) ? <InviteFriendCard uid={user?.uid || ""} /> : null}
         {profileEditorOpen ? (
           <ProfileEditorDialog
             profile={data.profile}

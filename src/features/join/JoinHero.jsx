@@ -1,8 +1,10 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { buildSignupHref, resolveAttribution } from "../auth/signupAttribution";
 
 export default function JoinHero() {
   const reduceMotion = useReducedMotion();
+  const attribution = resolveAttribution(useLocation());
 
   return (
     <section className="join-hero" aria-labelledby="join-page-title">
@@ -24,8 +26,11 @@ export default function JoinHero() {
           contribute to community service in Pune under RID 3131.
         </p>
         <div className="join-actions">
-          <Link className="button button-primary" to="/login">
-            Create Member Account
+          <Link className="button button-primary" to={buildSignupHref("prospect", attribution)}>
+            Apply to join
+          </Link>
+          <Link className="button button-secondary" to={buildSignupHref("member", attribution)}>
+            Already a member? Request access
           </Link>
           <Link className="button button-secondary" to="/contact">
             Ask a Question

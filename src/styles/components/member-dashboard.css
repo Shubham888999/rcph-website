@@ -222,6 +222,7 @@
 .member-dashboard-section,
 .dashboard-activity,
 .dashboard-avenue-activity,
+.dashboard-invite,
 .prospect-journey,
 .dashboard-qualifying-events,
 .prospect-opportunities,
@@ -240,6 +241,7 @@
 .dashboard-section-heading h2,
 .dashboard-activity h2,
 .dashboard-avenue-activity h2,
+.dashboard-invite h2,
 .prospect-journey h2,
 .dashboard-qualifying-events h2,
 .prospect-opportunities h2,
@@ -248,6 +250,50 @@
   font-size: clamp(1.8rem, 4vw, 3.25rem);
   line-height: 1.05;
   letter-spacing: -0.04em;
+}
+
+.dashboard-invite__field {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+}
+
+.dashboard-invite__link {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+
+.dashboard-invite__actions {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.dashboard-invite__actions > * {
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--internal-border);
+  border-radius: var(--internal-radius-control);
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.dashboard-invite__count {
+  margin: 0.8rem 0 0;
+  font-weight: 700;
 }
 
 .dashboard-attendance-feature {

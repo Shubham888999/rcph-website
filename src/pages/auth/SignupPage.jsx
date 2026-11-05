@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthStateScreen from "../../features/auth/AuthStateScreen";
 import DistrictOfficialSignupForm from "../../features/auth/DistrictOfficialSignupForm";
 import ExistingMemberSignupForm from "../../features/auth/ExistingMemberSignupForm";
 import ProspectSignupForm from "../../features/auth/ProspectSignupForm";
+import ProspectWelcome from "../../features/auth/ProspectWelcome";
 import SignupChoice from "../../features/auth/SignupChoice";
 import SignupSuccess from "../../features/auth/SignupSuccess";
 import {
@@ -18,15 +19,23 @@ import {
   getSignupDiagnostic,
   getSignupError,
 } from "../../features/auth/signupErrors";
+import { resolveAttribution } from "../../features/auth/signupAttribution";
 import {
+  PROSPECT_STEPS,
   SIGNUP_PATHS,
+  applySignupAttribution,
   buildSignupPayload,
   classifySignupOutcome,
+  clearProspectOptionalFields,
   clearSignupFieldError,
   clearSignupSensitiveFields,
   createSignupForm,
+  getProfileCompletionPath,
+  parseSignupPathParam,
+  prefillSignupIdentity,
   selectSignupPath,
   updateSignupField,
+  validateProspectStep,
   validateSignup,
 } from "../../features/auth/signupModel";
 import {
@@ -67,8 +76,18 @@ function SignupVerification({ message = "Checking your account setup..." }) {
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, authLoading, accountState, isAuthenticated, refreshAccess, signOut } = useAuth();
-  const [form, setForm] = useState(() => createSignupForm());
+  const [attribution] = useState(() => resolveAttribution(location));
+  const [requestedPath] = useState(() => parseSignupPathParam(new URLSearchParams(location.search).get("path")));
+  const [form, setForm] = useState(() => {
+    // District Official waits for the availability check below before it opens.
+    if (requestedPath === SIGNUP_PATHS.DISTRICT_OFFICIAL) return createSignupForm();
+    return applySignupAttribution(selectSignupPath(createSignupForm(), requestedPath), attribution);
+  });
+  const [prospectStep, setProspectStep] = useState(PROSPECT_STEPS.DETAILS);
+  const [prospectWelcome, setProspectWelcome] = useState(false);
+  const [completionPathResolved, setCompletionPathResolved] = useState(false);
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState(null);
   const [busyAction, setBusyAction] = useState("");
@@ -79,15 +98,30 @@ export default function SignupPage() {
   const submissionLockRef = useRef(false);
   const profileCompletion = isAuthenticated && accountState === "profile-missing";
 
+  // Runs once per account, so "Back to account type" can still reach the chooser.
+  if (profileCompletion && user && !completionPathResolved) {
+    setCompletionPathResolved(true);
+    if (form.path === SIGNUP_PATHS.CHOICE && requestedPath === SIGNUP_PATHS.CHOICE) {
+      setForm(applySignupAttribution(selectSignupPath(form, getProfileCompletionPath(user)), attribution));
+    }
+  } else if (profileCompletion && user && form.path !== SIGNUP_PATHS.CHOICE) {
+    const prefilled = prefillSignupIdentity(form, user);
+    if (prefilled !== form) setForm(prefilled);
+  }
+
   useEffect(() => {
-    if (accountState === "approved") navigate("/access", { replace: true });
-  }, [accountState, navigate]);
+    if (accountState === "approved" && !prospectWelcome) navigate("/access", { replace: true });
+  }, [accountState, navigate, prospectWelcome]);
 
   useEffect(() => {
     let active = true;
     getVisitSignupAvailability()
       .then((result) => {
-        if (active) setDistrictOfficialAvailable(result?.available === true);
+        if (!active) return;
+        setDistrictOfficialAvailable(result?.available === true);
+        if (result?.available === true && requestedPath === SIGNUP_PATHS.DISTRICT_OFFICIAL) {
+          setForm((current) => current.path === SIGNUP_PATHS.CHOICE ? selectSignupPath(current, requestedPath) : current);
+        }
       })
       .catch(() => {
         if (active) setDistrictOfficialAvailable(false);
@@ -95,7 +129,7 @@ export default function SignupPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [requestedPath]);
 
   const formProps = useMemo(() => ({
     form,
@@ -114,7 +148,7 @@ export default function SignupPage() {
 
   const choosePath = useCallback((path) => {
     setForm((current) => {
-      const next = selectSignupPath(current, path);
+      const next = applySignupAttribution(selectSignupPath(current, path), attribution);
       if (!profileCompletion || !user) return next;
       return {
         ...next,
@@ -125,7 +159,8 @@ export default function SignupPage() {
     setErrors({});
     setNotice(null);
     setShowPasswords(false);
-  }, [profileCompletion, user]);
+    setProspectStep(PROSPECT_STEPS.DETAILS);
+  }, [attribution, profileCompletion, user]);
 
   const handleFieldChange = useCallback((field, value) => {
     setForm((current) => updateSignupField(current, field, value));
@@ -137,17 +172,64 @@ export default function SignupPage() {
     choosePath(SIGNUP_PATHS.CHOICE);
   }, [choosePath]);
 
-  const handleSignup = useCallback(async (method) => {
+  const handleSignOutOfCompletion = useCallback(async () => {
+    await signOut();
+    setForm((current) => ({ ...current, name: "", email: "" }));
+    setErrors({});
+    setNotice(null);
+    setProspectStep(PROSPECT_STEPS.DETAILS);
+    setCompletionPathResolved(false);
+  }, [signOut]);
+
+  const handleProspectNext = useCallback(() => {
+    const validation = validateProspectStep(form, PROSPECT_STEPS.DETAILS, {
+      requireCredentials: !profileCompletion,
+      identityEmail: profileCompletion ? user?.email : "",
+      profileCompletion,
+    });
+    setErrors(validation.errors);
+    if (!validation.valid) {
+      focusFirstError(validation.errors);
+      return;
+    }
+    setNotice(null);
+    setProspectStep(PROSPECT_STEPS.ABOUT);
+  }, [focusFirstError, form, profileCompletion, user]);
+
+  // Google comes first on the Prospect form, so only the identity is created here.
+  // Auth state then reopens step 1 as profile completion (or leaves if an account exists).
+  const handleProspectGoogle = useCallback(async () => {
+    if (submissionLockRef.current) return;
+    submissionLockRef.current = true;
+    setBusyAction("google");
+    setErrors({});
+    setNotice(null);
+    try {
+      await signInOrCreateGoogleSignup();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("Signup stage failed.", getSignupDiagnostic(error, "auth"));
+      }
+      setNotice({ tone: "error", message: getSignupError(error, { requestedRole: "prospect" }) });
+    } finally {
+      submissionLockRef.current = false;
+      setBusyAction("");
+    }
+  }, []);
+
+  const handleSignup = useCallback(async (method, options = {}) => {
     if (submissionLockRef.current) return;
     const isGoogle = method === "google";
     const completion = profileCompletion;
-    const validation = validateSignup(form, {
+    const submitForm = options.skipOptional ? clearProspectOptionalFields(form, attribution) : form;
+    const validation = validateSignup(submitForm, {
       requireCredentials: !isGoogle && !completion,
       identityEmail: completion ? user?.email : "",
       profileCompletion: completion,
     });
     setErrors(validation.errors);
     if (!validation.valid) {
+      setProspectStep(PROSPECT_STEPS.DETAILS);
       focusFirstError(validation.errors);
       return;
     }
@@ -169,10 +251,11 @@ export default function SignupPage() {
         },
         buildPayload: (identity) => {
           stage = "profile";
-          return buildSignupPayload(form, {
+          return buildSignupPayload(submitForm, {
             provider: providerForUser(identity),
             identityEmail: identity.email || validation.values.email,
             profileCompletion: completion,
+            attribution,
           });
         },
         services: signupServices,
@@ -194,6 +277,15 @@ export default function SignupPage() {
       }
       if (outcome.kind !== "approved") {
         throw new Error("Signup response did not include a trusted account outcome.");
+      }
+      if (outcome.role === "prospect" && !outcome.existing) {
+        setProspectWelcome(true);
+        // The account exists now. A failed refresh is retried by the route guard on /access.
+        await applySignupOutcome(outcome, {
+          refreshTrustedAccess: refreshAccess,
+          signOut,
+        }).catch(() => {});
+        return;
       }
       setAwaitingTrustedAccess(true);
       await applySignupOutcome(outcome, {
@@ -233,6 +325,7 @@ export default function SignupPage() {
         console.error("Signup stage failed.", getSignupDiagnostic(error, stage));
       }
       setForm((current) => clearSignupSensitiveFields(current));
+      setProspectStep(PROSPECT_STEPS.DETAILS);
       const baseMessage = getSignupError(error, { requestedRole });
       setNotice({
         tone: "error",
@@ -244,8 +337,15 @@ export default function SignupPage() {
       submissionLockRef.current = false;
       setBusyAction("");
     }
-  }, [focusFirstError, form, profileCompletion, refreshAccess, signOut, user]);
+  }, [attribution, focusFirstError, form, profileCompletion, refreshAccess, signOut, user]);
 
+  if (prospectWelcome) {
+    return (
+      <main className="login-page-react signup-page">
+        <div className="signup-shell"><ProspectWelcome /></div>
+      </main>
+    );
+  }
   if (pendingRole) {
     return (
       <main className="login-page-react signup-page">
@@ -299,6 +399,12 @@ return (
       </header>
 
 <section className="signup-card">
+  {profileCompletion && user ? (
+    <p className="signup-identity">
+      Signed in as {user.email || "your account"}. Not you?{" "}
+      <button type="button" disabled={Boolean(busyAction)} onClick={handleSignOutOfCompletion}>Sign out</button>
+    </p>
+  ) : null}
   {form.path === SIGNUP_PATHS.CHOICE ? (
     <SignupChoice districtOfficialAvailable={districtOfficialAvailable} onSelect={choosePath} />
   ) : null}
@@ -307,9 +413,14 @@ return (
     <ProspectSignupForm
       {...formProps}
       onTogglePasswords={() => setShowPasswords((current) => !current)}
+      step={prospectStep}
+      invited={Boolean(attribution?.ref)}
       onChange={handleFieldChange}
+      onNext={handleProspectNext}
+      onPreviousStep={() => { setErrors({}); setNotice(null); setProspectStep(PROSPECT_STEPS.DETAILS); }}
       onSubmit={handleSignup}
-      onGoogle={() => handleSignup("google")}
+      onSkip={() => handleSignup("password", { skipOptional: true })}
+      onGoogle={handleProspectGoogle}
       onBack={handleBack}
     />
   ) : null}

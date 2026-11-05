@@ -16,12 +16,49 @@ function FieldError({ id, message }) {
   return message ? <p id={id} className="signup-field-error" role="alert">{message}</p> : null;
 }
 
+export function SignupGenderFields({ form, errors, disabled, onChange }) {
+  return (
+    <>
+      <div className="signup-field">
+        <label htmlFor="signup-gender">Gender</label>
+        <select
+          id="signup-gender"
+          value={form.gender}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.gender)}
+          aria-describedby={errors.gender ? "signup-gender-error" : undefined}
+          onChange={(event) => onChange("gender", event.target.value)}
+        >
+          {GENDER_OPTIONS.map(([value, label]) => <option key={value || "empty"} value={value}>{label}</option>)}
+        </select>
+        <FieldError id="signup-gender-error" message={errors.gender} />
+      </div>
+      {form.gender === "self-describe" ? (
+        <div className="signup-field">
+          <label htmlFor="signup-genderSelfDescribe">Please self-describe</label>
+          <input
+            id="signup-genderSelfDescribe"
+            type="text"
+            value={form.genderSelfDescribe}
+            disabled={disabled}
+            aria-invalid={Boolean(errors.genderSelfDescribe)}
+            aria-describedby={errors.genderSelfDescribe ? "signup-gender-self-error" : undefined}
+            onChange={(event) => onChange("genderSelfDescribe", event.target.value)}
+          />
+          <FieldError id="signup-gender-self-error" message={errors.genderSelfDescribe} />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export default function SignupCommonFields({
   form,
   errors,
   disabled,
   emailLocked,
   compactProfile,
+  hideGender,
   showCredentials,
   showPasswords,
   onTogglePasswords,
@@ -94,38 +131,8 @@ export default function SignupCommonFields({
         {emailLocked ? <p id="signup-email-help" className="signup-help">This email comes from your signed-in account.</p> : null}
         <FieldError id="signup-email-error" message={errors.email} />
       </div>
-      {!compactProfile ? (
-        <>
-          <div className="signup-field">
-            <label htmlFor="signup-gender">Gender</label>
-            <select
-              id="signup-gender"
-              value={form.gender}
-              disabled={disabled}
-              aria-invalid={Boolean(errors.gender)}
-              aria-describedby={errors.gender ? "signup-gender-error" : undefined}
-              onChange={(event) => onChange("gender", event.target.value)}
-            >
-              {GENDER_OPTIONS.map(([value, label]) => <option key={value || "empty"} value={value}>{label}</option>)}
-            </select>
-            <FieldError id="signup-gender-error" message={errors.gender} />
-          </div>
-          {form.gender === "self-describe" ? (
-            <div className="signup-field">
-              <label htmlFor="signup-genderSelfDescribe">Please self-describe</label>
-              <input
-                id="signup-genderSelfDescribe"
-                type="text"
-                value={form.genderSelfDescribe}
-                disabled={disabled}
-                aria-invalid={Boolean(errors.genderSelfDescribe)}
-                aria-describedby={errors.genderSelfDescribe ? "signup-gender-self-error" : undefined}
-                onChange={(event) => onChange("genderSelfDescribe", event.target.value)}
-              />
-              <FieldError id="signup-gender-self-error" message={errors.genderSelfDescribe} />
-            </div>
-          ) : null}
-        </>
+      {!compactProfile && !hideGender ? (
+        <SignupGenderFields form={form} errors={errors} disabled={disabled} onChange={onChange} />
       ) : null}
       {showCredentials ? (
         <>
