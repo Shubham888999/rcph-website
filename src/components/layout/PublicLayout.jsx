@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { featuredEventBadge } from "../../features/home/wings-of-honour/wingsOfHonourData";
+import { featuredEventBadge } from "../../features/home/mens-day/mensDayNotesData";
 const HASH_SCROLL_MAX_ATTEMPTS = 24;
 const HASH_SCROLL_OFFSET = 16;
 
@@ -133,13 +133,16 @@ export default function PublicLayout() {
             <span className="public-updates-title" id="public-updates-title">What’s new</span>
             <div className="public-feature-links">
             <Link
-              className="public-event-link public-feature-link public-feature-link--flight"
+              className="public-event-link public-feature-link public-feature-link--notes"
               to={featuredEventBadge.to}
               aria-label={featuredEventBadge.ariaLabel}
               onClick={closeMenu}
             >
-              <svg className="public-feature-plane" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 2c.6 0 1 .6 1 1.3V9l8 5v2l-8-2v5l3 2v1l-4-1-4 1v-1l3-2v-5l-8 2v-2l8-5V3.3C11 2.6 11.4 2 12 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+              <svg className="public-feature-note" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 4h14v11l-5 5H5V4Z" fill="#fff1a8" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                <path d="M14 20v-5h5" fill="#e9d77c" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                <path d="M8 9h8M8 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <circle cx="12" cy="4" r="1.7" fill="#d43b42" />
               </svg>
               <span className="public-event-link__live">
                 {featuredEventBadge.label}

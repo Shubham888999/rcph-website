@@ -23,6 +23,8 @@ const viewerSource = read("./StoryViewer.jsx");
 const ribbonSource = read("./CollaboratorRibbon.jsx");
 const css = read("../../../styles/components/wings-of-honour.css");
 const homePageSource = read("../../../pages/public/HomePage.jsx");
+const archivePageSource = read("../../../pages/public/WingsOfHonourArchivePage.jsx");
+const routerSource = read("../../../app/router.jsx");
 const layoutSource = read("../../../components/layout/PublicLayout.jsx");
 const layoutCss = read("../../../styles/components/public-layout.css");
 const packageJson = JSON.parse(read("../../../../package.json"));
@@ -90,20 +92,19 @@ test("queue positions wrap around the loop", () => {
   assert.equal(queuePosition(0, 1, 9), 8, "the previous lead moves to the back");
 });
 
-test("homepage renders the section in the former VOX slot", () => {
-  const recruitment = homePageSource.indexOf("<RecruitmentSection />");
-  const section = homePageSource.indexOf("<WingsOfHonourSection />");
-  const highlight = homePageSource.indexOf("<MonthlyHighlight />");
-
-  assert.ok(recruitment !== -1 && section > recruitment && highlight > section);
+test("section is archived off the home page but kept on an unlisted route", () => {
+  assert.doesNotMatch(homePageSource, /WingsOfHonourSection/);
   assert.doesNotMatch(homePageSource, /InstallationFilmGallery/);
+  assert.match(archivePageSource, /<WingsOfHonourSection \/>/);
+  assert.match(routerSource, /path: "\/archive\/wings-of-honour"/);
   assert.match(sectionSource, /id=\{SECTION_ID\}/);
   assert.equal(SECTION_ID, "wings-of-honour");
 });
 
-test("nav badge reads from the event data and drops the VOX copy", () => {
+test("archived badge data is kept and the nav no longer points to it", () => {
   assert.equal(featuredEventBadge.label, "Wings of Honour");
   assert.equal(featuredEventBadge.to, "/#wings-of-honour");
+  assert.doesNotMatch(layoutSource, /wingsOfHonourData/);
   assert.match(layoutSource, /to=\{featuredEventBadge\.to\}/);
   assert.match(layoutSource, /\{featuredEventBadge\.label\}/);
   assert.doesNotMatch(layoutSource, /VOX|MOMENTS LIVE|installation-cut/);

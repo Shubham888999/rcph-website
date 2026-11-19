@@ -7,7 +7,7 @@ import HomeBoardSection from "../../features/home/HomeBoardSection";
 import HomeJoinCallToAction from "../../features/home/HomeJoinCallToAction";
 import MonthlyHighlight from "../../features/home/MonthlyHighlight";
 import RecruitmentSection from "../../features/home/RecruitmentSection";
-import WingsOfHonourSection from "../../features/home/wings-of-honour/WingsOfHonourSection";
+import MensDayNotesSection from "../../features/home/mens-day/MensDayNotesSection";
 import "../../styles/components/home.css";
 
 const SHOW_RECRUITMENT_SECTION = true;
@@ -18,7 +18,7 @@ export default function HomePage() {
       <HomeHero />
       <ClubIntroduction />
       {SHOW_RECRUITMENT_SECTION ? <RecruitmentSection /> : null}
-      <WingsOfHonourSection />
+      <MensDayNotesSection />
       <MonthlyHighlight />
       <FeaturedProjects />
       <HomeBoardSection />
