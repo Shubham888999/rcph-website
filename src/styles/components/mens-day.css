@@ -1,0 +1,370 @@
+/* Men's Day notes: a cork board of pinned paper notes that unfold into a full note. */
+
+.mens-day {
+  --mens-cork: #a9784a;
+  --mens-cork-deep: #7d5532;
+  --mens-ink: #2b2118;
+  --mens-ink-soft: #5c4a39;
+}
+
+.mens-day__header {
+  max-width: var(--text-max-width);
+  margin: 0 auto clamp(1.75rem, 4vw, 2.75rem);
+  text-align: center;
+}
+
+.mens-day__header .home-kicker {
+  justify-content: center;
+}
+
+.mens-day__header h2 {
+  margin: 0.6rem 0 0;
+}
+
+.mens-day__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1.1rem;
+  margin-top: 1.6rem;
+}
+
+/* Paper note buttons: sharp corners, same paper as the notes */
+.mens-paper-button {
+  position: relative;
+  min-height: 2.75rem;
+  padding: 0.7rem 1.35rem;
+  border: 0;
+  border-radius: 0;
+  background-color: #fff1a8;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(120, 90, 40, 0.05) 0 1px, transparent 1px 3px),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.55), rgba(0, 0, 0, 0.05));
+  color: var(--mens-ink);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0.35rem 0.7rem rgba(0, 0, 0, 0.35);
+  transform: rotate(-1deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mens-paper-button::before {
+  content: "";
+  position: absolute;
+  top: -0.45rem;
+  left: 50%;
+  width: 3.2rem;
+  height: 0.9rem;
+  background: rgba(255, 255, 255, 0.45);
+  transform: translateX(-50%) rotate(2deg);
+}
+
+.mens-paper-button:hover {
+  transform: rotate(0deg) translateY(-2px);
+  box-shadow: 0 0.6rem 1rem rgba(0, 0, 0, 0.4);
+}
+
+.mens-paper-button:focus-visible,
+.mens-note:focus-visible,
+.mens-note-dialog button:focus-visible {
+  outline: 3px solid var(--color-teal);
+  outline-offset: 3px;
+}
+
+.mens-day__count {
+  color: var(--color-subtle);
+  font-size: 0.9rem;
+}
+
+/* Board */
+.mens-board {
+  position: relative;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: clamp(1.4rem, 3.5vw, 2.6rem);
+  border: 0.7rem solid #5a3a20;
+  border-radius: var(--radius-lg);
+  background-color: var(--mens-cork);
+  background-image:
+    radial-gradient(rgba(60, 35, 15, 0.35) 1px, transparent 1.4px),
+    radial-gradient(rgba(255, 230, 190, 0.22) 1px, transparent 1.6px),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.18));
+  background-size: 7px 7px, 11px 11px, 100% 100%;
+  background-position: 0 0, 3px 5px, 0 0;
+  box-shadow: inset 0 0 2.5rem rgba(40, 20, 5, 0.55), var(--shadow-md);
+}
+
+.mens-board__notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+  gap: clamp(1.25rem, 3vw, 2rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mens-board__notes > li {
+  rotate: var(--tilt, 0deg);
+  transition: rotate 0.25s ease;
+}
+
+.mens-board__notes > li:hover {
+  rotate: 0deg;
+}
+
+/* Phone: dots to jump between the sets of four */
+.mens-board__pager {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.mens-board__pager button {
+  width: 0.8rem;
+  height: 0.8rem;
+  padding: 0;
+  border: 2px solid rgba(255, 241, 200, 0.85);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mens-board__pager button.is-active {
+  background: rgba(255, 241, 200, 0.95);
+}
+
+/* Phone: four notes at a time, fading out under a button that shows them all */
+.mens-board.is-collapsed .mens-board__notes {
+  max-height: 22rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+
+.mens-board__more {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  margin-top: -1.5rem;
+}
+
+/* Paper colours */
+.mens-paper--cream { --paper: #fbf5e6; --paper-fold: #e9dfc6; }
+.mens-paper--butter { --paper: #fff1a8; --paper-fold: #e9d77c; }
+.mens-paper--blush { --paper: #fbd9df; --paper-fold: #ebbcc5; }
+.mens-paper--sky { --paper: #d5ebf7; --paper-fold: #b4d3e6; }
+.mens-paper--mint { --paper: #d8f1de; --paper-fold: #b5dcc0; }
+.mens-paper--peach { --paper: #fde0c7; --paper-fold: #ecc19d; }
+
+/* Folded note card */
+.mens-note {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 11.5rem;
+  padding: 1.6rem 1.1rem 1rem;
+  border: 0;
+  border-radius: 0.2rem;
+  background:
+    linear-gradient(225deg, transparent 1.4rem, var(--paper) 1.4rem);
+  color: var(--mens-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 0.6rem 1rem rgba(30, 15, 5, 0.38);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* The folded top corner */
+.mens-note::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1.98rem;
+  height: 1.98rem;
+  background: linear-gradient(45deg, var(--paper-fold) 50%, transparent 50%);
+  box-shadow: -0.15rem 0.15rem 0.3rem rgba(30, 15, 5, 0.18);
+}
+
+/* A crease across the middle, as if the note was folded */
+.mens-note::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(60, 40, 20, 0.16), transparent);
+}
+
+.mens-note:hover {
+  transform: translateY(-0.3rem) scale(1.03);
+  box-shadow: 0 1.1rem 1.6rem rgba(30, 15, 5, 0.45);
+}
+
+.mens-note__pin,
+.mens-note-sheet__pin {
+  position: absolute;
+  top: -0.45rem;
+  left: 50%;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8a8a, #c62f36 55%, #7c1218);
+  box-shadow: 0 0.25rem 0.35rem rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+}
+
+.mens-note__to {
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
+.mens-note__preview {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--mens-ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.mens-note__hint {
+  margin-top: auto;
+  color: #8a5a24;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mens-note.is-read .mens-note__hint::before {
+  content: "✓ ";
+}
+
+/* Unfolded note dialog */
+.mens-note-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(10, 6, 3, 0.78);
+  perspective: 1200px;
+}
+
+.mens-note-dialog__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: min(36rem, 100%);
+  max-height: calc(100dvh - 2rem);
+  outline: none;
+}
+
+.mens-note-sheet {
+  position: relative;
+  overflow-y: auto;
+  padding: clamp(1.8rem, 5vw, 2.6rem) clamp(1.2rem, 5vw, 2.4rem) 1.6rem;
+  border-radius: 0.3rem;
+  background: var(--paper);
+  color: var(--mens-ink);
+  box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.55);
+  transform-origin: top center;
+}
+
+.mens-note-sheet__pin {
+  top: 0.7rem;
+}
+
+.mens-note-sheet__to {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.mens-note-sheet__body p {
+  margin: 0 0 0.95rem;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.mens-note-sheet__sign {
+  margin: 1.2rem 0 0;
+  color: var(--mens-ink-soft);
+  font-style: italic;
+  text-align: right;
+}
+
+.mens-note-dialog__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #f7f1e6;
+  font-weight: 700;
+}
+
+.mens-note-dialog__controls button,
+.mens-note-dialog__close {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(229, 194, 104, 0.5);
+  border-radius: var(--radius-button);
+  background: rgba(20, 14, 8, 0.9);
+  color: #f7f1e6;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mens-note-dialog__close {
+  position: absolute;
+  top: -0.6rem;
+  right: -0.6rem;
+  width: 2.75rem;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+@media (max-width: 40rem) {
+  .mens-board {
+    border-width: 0.45rem;
+    padding: 1.4rem 1rem;
+  }
+
+  .mens-board__notes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.1rem 0.8rem;
+  }
+
+  .mens-note {
+    min-height: 9.5rem;
+    padding: 1.4rem 0.8rem 0.8rem;
+  }
+
+  .mens-note__to { font-size: 0.98rem; overflow-wrap: anywhere; }
+  .mens-note__preview { font-size: 0.8rem; -webkit-line-clamp: 3; }
+  .mens-note-dialog__close { top: 0.3rem; right: 0.3rem; }
+  .mens-board__notes > li { padding-top: 0.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mens-board__notes > li,
+  .mens-note,
+  .mens-note:hover {
+    transition: none;
+    transform: none;
+  }
+}

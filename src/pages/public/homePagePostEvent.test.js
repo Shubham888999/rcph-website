@@ -40,7 +40,7 @@ test("HomePage renders the standard homepage flow", () => {
     "<HomeHero />",
     "<ClubIntroduction />",
     "<RecruitmentSection />",
-    "<WingsOfHonourSection />",
+    "<MensDayNotesSection />",
     "<MonthlyHighlight />",
     "<FeaturedProjects />",
     "<HomeBoardSection />",

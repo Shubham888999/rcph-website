@@ -85,6 +85,7 @@ const PRIVATE_TITLES = Object.freeze({
   "/visits/club-assembly": "Club Assembly Dashboard | RCPH",
   "/visits/dzr-visit": "DZR Visit Dashboard | RCPH",
   "/visits/drr-visit": "DRR Visit Dashboard | RCPH",
+  "/archive/wings-of-honour": "Wings of Honour | RCPH",
 });
 
 export function normalizeRoutePath(pathname) {
