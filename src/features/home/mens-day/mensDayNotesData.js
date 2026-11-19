@@ -12,7 +12,7 @@ export const featuredEventBadge = {
 
 export const sectionDetails = {
   eyebrow: "International Men's Day 2026",
-  title: "Notes for the Men of Heritage",
+  title: "From Us, To Him",
 };
 
 // Paper colours cycle through the board; tilt is the pinned angle in degrees.
