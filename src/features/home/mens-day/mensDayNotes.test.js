@@ -73,3 +73,10 @@ test("open note renders on body so the header and later sections cannot cover it
   assert.match(sectionSource, /document\.body/);
   assert.match(sectionSource, /Close note/);
 });
+
+test("reading tracker shows one mini note per person and a friendly count", () => {
+  assert.match(sectionSource, /className="mens-tracker"/);
+  assert.match(sectionSource, /notes waiting to be unfolded/);
+  assert.match(sectionSource, /notes read/);
+  assert.doesNotMatch(sectionSource, /mens-day__count/);
+});
