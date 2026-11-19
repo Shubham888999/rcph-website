@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import useAccessibleDialog from "../../bod-tools/useAccessibleDialog";
+import MensDayDoodles from "./MensDayDoodles";
 import { headingReveal, staggerContainer, cardReveal } from "../homeMotion";
 import { SECTION_ID, notes, notePreview, sectionDetails } from "./mensDayNotesData";
 import "../../../styles/components/mens-day.css";
@@ -52,7 +54,8 @@ function NoteDialog({ index, onClose, onMove }) {
     return () => document.removeEventListener("keydown", handleArrow);
   }, [onMove]);
 
-  return (
+  // Rendered on <body> so the open note sits above the site header and later sections.
+  return createPortal(
     <div className="mens-note-dialog" onClick={onClose}>
       <div
         ref={dialogRef}
@@ -84,8 +87,10 @@ function NoteDialog({ index, onClose, onMove }) {
           <button type="button" onClick={() => onMove(1)} aria-label="Next note">Next ›</button>
         </div>
         <button type="button" className="mens-note-dialog__close" onClick={onClose} aria-label="Close note">×</button>
+        <button type="button" className="mens-note-dialog__done" onClick={onClose}>Close note</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -164,6 +169,7 @@ export default function MensDayNotesSection() {
       <div
         className={`mens-board${cycling ? " is-collapsed" : ""}`}
       >
+        {isPhone ? null : <MensDayDoodles />}
         <AnimatePresence mode="wait" initial={false}>
           <motion.ul
             key={cycling ? `page-${page}` : "all"}
