@@ -81,9 +81,51 @@
   outline-offset: 3px;
 }
 
-.mens-day__count {
-  color: var(--color-subtle);
-  font-size: 0.9rem;
+/* Reading tracker: one tiny note per person, filled in once read */
+.mens-tracker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mens-tracker__notes {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mens-tracker__notes li {
+  width: 0.95rem;
+  height: 1.1rem;
+  border: 1.5px dashed var(--color-border-strong);
+  background: transparent;
+  rotate: var(--tilt, 0deg);
+  transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+.mens-tracker__notes li.is-read {
+  border: 0;
+  background:
+    linear-gradient(225deg, transparent 0.3rem, var(--paper) 0.3rem);
+  box-shadow: 0 0.15rem 0.3rem rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.mens-tracker__label {
+  margin: 0;
+  color: var(--color-gold);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mens-tracker__notes li { transition: none; transform: none; }
 }
 
 /* Board */

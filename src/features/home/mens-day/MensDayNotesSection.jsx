@@ -94,6 +94,12 @@ function NoteDialog({ index, onClose, onMove }) {
   );
 }
 
+function trackerLabel(count) {
+  if (count === 0) return `${notes.length} notes waiting to be unfolded`;
+  if (count >= notes.length) return `All ${notes.length} notes read. You've seen them all!`;
+  return `${count} of ${notes.length} notes read`;
+}
+
 export default function MensDayNotesSection() {
   const reduceMotion = useReducedMotion();
   const [openIndex, setOpenIndex] = useState(null);
@@ -160,9 +166,18 @@ export default function MensDayNotesSection() {
         <h2 id="mens-day-title">{sectionDetails.title}</h2>
         <div className="mens-day__actions">
           <button type="button" className="mens-paper-button" onClick={openRandom}>Open a random note</button>
-          <span className="mens-day__count">
-            {notes.length} notes · {read.size ? `${read.size} read` : "tap one to unfold it"}
-          </span>
+          <div className="mens-tracker">
+            <ol className="mens-tracker__notes" aria-hidden="true">
+              {notes.map((note) => (
+                <li
+                  key={note.id}
+                  className={`mens-paper--${note.paper}${read.has(note.id) ? " is-read" : ""}`}
+                  style={{ "--tilt": `${note.tilt * 2}deg` }}
+                />
+              ))}
+            </ol>
+            <p className="mens-tracker__label" aria-live="polite">{trackerLabel(read.size)}</p>
+          </div>
         </div>
       </motion.header>
 
