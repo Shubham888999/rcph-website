@@ -18,13 +18,7 @@
 }
 
 .mens-day__header h2 {
-  margin: 0.6rem 0 0.8rem;
-}
-
-.mens-day__lede {
-  margin: 0 auto;
-  color: var(--color-text-muted);
-  line-height: 1.6;
+  margin: 0.6rem 0 0;
 }
 
 .mens-day__actions {
@@ -33,24 +27,46 @@
   align-items: center;
   justify-content: center;
   gap: 0.75rem 1.1rem;
-  margin-top: 1.4rem;
+  margin-top: 1.6rem;
 }
 
-.mens-day__random {
+/* Paper note buttons: sharp corners, same paper as the notes */
+.mens-paper-button {
+  position: relative;
   min-height: 2.75rem;
-  padding: 0.65rem 1.25rem;
+  padding: 0.7rem 1.35rem;
   border: 0;
-  border-radius: var(--radius-button);
-  background: var(--color-gold);
-  color: var(--color-button-text);
+  border-radius: 0;
+  background-color: #fff1a8;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(120, 90, 40, 0.05) 0 1px, transparent 1px 3px),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.55), rgba(0, 0, 0, 0.05));
+  color: var(--mens-ink);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 0.35rem 0.7rem rgba(0, 0, 0, 0.35);
+  transform: rotate(-1deg);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.mens-day__random:hover { background: var(--color-gold-soft); }
+.mens-paper-button::before {
+  content: "";
+  position: absolute;
+  top: -0.45rem;
+  left: 50%;
+  width: 3.2rem;
+  height: 0.9rem;
+  background: rgba(255, 255, 255, 0.45);
+  transform: translateX(-50%) rotate(2deg);
+}
 
-.mens-day__random:focus-visible,
+.mens-paper-button:hover {
+  transform: rotate(0deg) translateY(-2px);
+  box-shadow: 0 0.6rem 1rem rgba(0, 0, 0, 0.4);
+}
+
+.mens-paper-button:focus-visible,
 .mens-note:focus-visible,
 .mens-note-dialog button:focus-visible {
   outline: 3px solid var(--color-teal);
@@ -64,6 +80,7 @@
 
 /* Board */
 .mens-board {
+  position: relative;
   max-width: var(--content-max-width);
   margin: 0 auto;
   padding: clamp(1.4rem, 3.5vw, 2.6rem);
@@ -81,7 +98,7 @@
 
 .mens-board__notes {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(1.25rem, 3vw, 2rem);
   margin: 0;
   padding: 0;
@@ -89,7 +106,48 @@
 }
 
 .mens-board__notes > li {
-  transform: rotate(var(--tilt, 0deg));
+  rotate: var(--tilt, 0deg);
+  transition: rotate 0.25s ease;
+}
+
+.mens-board__notes > li:hover {
+  rotate: 0deg;
+}
+
+/* Desktop: dots to jump between the two sets of six */
+.mens-board__pager {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+}
+
+.mens-board__pager button {
+  width: 0.8rem;
+  height: 0.8rem;
+  padding: 0;
+  border: 2px solid rgba(255, 241, 200, 0.85);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mens-board__pager button.is-active {
+  background: rgba(255, 241, 200, 0.95);
+}
+
+/* Phone: the first four notes fade out under a button that shows the rest */
+.mens-board.is-collapsed .mens-board__notes {
+  max-height: 22rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+
+.mens-board__more {
+  display: flex;
+  justify-content: center;
+  margin-top: -1.5rem;
 }
 
 /* Paper colours */
@@ -143,7 +201,7 @@
 }
 
 .mens-note:hover {
-  transform: translateY(-0.3rem) rotate(calc(var(--tilt, 0deg) * -0.6)) scale(1.03);
+  transform: translateY(-0.3rem) scale(1.03);
   box-shadow: 0 1.1rem 1.6rem rgba(30, 15, 5, 0.45);
 }
 
@@ -297,9 +355,11 @@
   .mens-note__to { font-size: 0.98rem; overflow-wrap: anywhere; }
   .mens-note__preview { font-size: 0.8rem; -webkit-line-clamp: 3; }
   .mens-note-dialog__close { top: 0.3rem; right: 0.3rem; }
+  .mens-board__notes > li { padding-top: 0.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mens-board__notes > li,
   .mens-note,
   .mens-note:hover {
     transition: none;

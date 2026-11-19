@@ -1,11 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import useAccessibleDialog from "../../bod-tools/useAccessibleDialog";
 import { headingReveal, staggerContainer, cardReveal } from "../homeMotion";
 import { SECTION_ID, notes, notePreview, sectionDetails } from "./mensDayNotesData";
 import "../../../styles/components/mens-day.css";
 
 const READ_KEY = "rcph-mens-day-read";
+const PHONE_QUERY = "(max-width: 40rem)";
+const PAGE_SIZE = 6;
+const PHONE_PREVIEW = 4;
+const CYCLE_MS = 9000;
+const PAGE_COUNT = Math.ceil(notes.length / PAGE_SIZE);
+
+function subscribePhone(callback) {
+  const media = window.matchMedia(PHONE_QUERY);
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
+
+function useIsPhone() {
+  return useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE_QUERY).matches, () => false);
+}
 
 function loadRead() {
   try {
@@ -79,6 +94,21 @@ export default function MensDayNotesSection() {
   const reduceMotion = useReducedMotion();
   const [openIndex, setOpenIndex] = useState(null);
   const [read, setRead] = useState(loadRead);
+  const isPhone = useIsPhone();
+  const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  // Larger screens show six notes at a time and move to the next six on their own.
+  useEffect(() => {
+    if (isPhone || reduceMotion || paused || openIndex !== null) return undefined;
+    const timer = window.setInterval(() => setPage((current) => (current + 1) % PAGE_COUNT), CYCLE_MS);
+    return () => window.clearInterval(timer);
+  }, [isPhone, reduceMotion, paused, openIndex]);
+
+  let visible;
+  if (isPhone) visible = expanded ? notes : notes.slice(0, PHONE_PREVIEW);
+  else visible = notes.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   const open = useCallback((index) => {
     setOpenIndex(index);
@@ -125,37 +155,77 @@ export default function MensDayNotesSection() {
       <motion.header className="mens-day__header" variants={reduceMotion ? undefined : headingReveal}>
         <p className="home-kicker">{sectionDetails.eyebrow}</p>
         <h2 id="mens-day-title">{sectionDetails.title}</h2>
-        <p className="mens-day__lede">{sectionDetails.lede}</p>
         <div className="mens-day__actions">
-          <button type="button" className="mens-day__random" onClick={openRandom}>Open a random note</button>
+          <button type="button" className="mens-paper-button" onClick={openRandom}>Open a random note</button>
           <span className="mens-day__count">
             {notes.length} notes · {read.size ? `${read.size} read` : "tap one to unfold it"}
           </span>
         </div>
       </motion.header>
 
-      <div className="mens-board">
-        <ul className="mens-board__notes">
-          {notes.map((note, index) => (
-            <motion.li
-              key={note.id}
-              variants={reduceMotion ? undefined : cardReveal}
-              style={{ "--tilt": `${note.tilt}deg` }}
-            >
+      <div
+        className={`mens-board${isPhone && !expanded ? " is-collapsed" : ""}`}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onFocus={() => setPaused(true)}
+        onBlur={() => setPaused(false)}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.ul
+            key={isPhone ? "phone" : `page-${page}`}
+            className="mens-board__notes"
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -12 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {visible.map((note) => {
+              const index = notes.indexOf(note);
+              return (
+                <motion.li
+                  key={note.id}
+                  variants={reduceMotion ? undefined : cardReveal}
+                  style={{ "--tilt": `${note.tilt}deg` }}
+                >
+                  <button
+                    type="button"
+                    className={`mens-note mens-paper--${note.paper}${read.has(note.id) ? " is-read" : ""}`}
+                    onClick={() => open(index)}
+                    aria-label={`Open the note for ${note.name}`}
+                  >
+                    <span className="mens-note__pin" aria-hidden="true" />
+                    <span className="mens-note__to">For {note.name}</span>
+                    <span className="mens-note__preview">{notePreview(note)}</span>
+                    <span className="mens-note__hint">{read.has(note.id) ? "Read again" : "Tap to unfold"}</span>
+                  </button>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+        </AnimatePresence>
+
+        {isPhone && !expanded ? (
+          <div className="mens-board__more">
+            <button type="button" className="mens-paper-button" onClick={() => setExpanded(true)}>
+              Open more notes
+            </button>
+          </div>
+        ) : null}
+
+        {!isPhone && PAGE_COUNT > 1 ? (
+          <div className="mens-board__pager">
+            {Array.from({ length: PAGE_COUNT }, (_, i) => (
               <button
+                key={i}
                 type="button"
-                className={`mens-note mens-paper--${note.paper}${read.has(note.id) ? " is-read" : ""}`}
-                onClick={() => open(index)}
-                aria-label={`Open the note for ${note.name}`}
-              >
-                <span className="mens-note__pin" aria-hidden="true" />
-                <span className="mens-note__to">For {note.name}</span>
-                <span className="mens-note__preview">{notePreview(note)}</span>
-                <span className="mens-note__hint">{read.has(note.id) ? "Read again" : "Tap to unfold"}</span>
-              </button>
-            </motion.li>
-          ))}
-        </ul>
+                className={i === page ? "is-active" : ""}
+                aria-label={`Show notes ${i * PAGE_SIZE + 1} to ${Math.min(notes.length, (i + 1) * PAGE_SIZE)}`}
+                aria-pressed={i === page}
+                onClick={() => setPage(i)}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {openIndex !== null ? <NoteDialog index={openIndex} onClose={close} onMove={move} /> : null}

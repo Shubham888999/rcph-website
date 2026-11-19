@@ -13,7 +13,6 @@ export const featuredEventBadge = {
 export const sectionDetails = {
   eyebrow: "International Men's Day 2026",
   title: "Notes for the Men of Heritage",
-  lede: "On International Men's Day, the women of Heritage wrote a note for every man in the club. Here they are, pinned up and left unsigned.",
 };
 
 // Paper colours cycle through the board; tilt is the pinned angle in degrees.
