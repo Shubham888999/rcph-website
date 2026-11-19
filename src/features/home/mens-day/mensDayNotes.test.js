@@ -63,3 +63,7 @@ test("Wings of Honour archive page is hidden from search engines", () => {
   assert.equal(metadata.robots, "noindex, nofollow");
   assert.equal(metadata.isPublic, false);
 });
+
+test("header badge scrolls again when clicked while already on #mens-day", () => {
+  assert.match(layoutSource, /\[location\.hash, location\.pathname, location\.key\]/);
+});

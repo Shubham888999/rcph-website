@@ -41,6 +41,8 @@ export default function PublicLayout() {
   }, [menuOpen]);
 
   useEffect(() => {
+    // location.key changes on every click, so the same link scrolls again even when
+    // the address already ends in that #section.
     if (!location.hash) {
       return undefined;
     }
@@ -94,7 +96,7 @@ export default function PublicLayout() {
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [location.hash, location.pathname]);
+  }, [location.hash, location.pathname, location.key]);
 
   return (
     <div className="public-site-shell">
