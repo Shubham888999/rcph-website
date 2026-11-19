@@ -7,9 +7,8 @@ import "../../../styles/components/mens-day.css";
 
 const READ_KEY = "rcph-mens-day-read";
 const PHONE_QUERY = "(max-width: 40rem)";
-const PAGE_SIZE = 6;
-const PHONE_PREVIEW = 4;
-const CYCLE_MS = 9000;
+const PAGE_SIZE = 4;
+const CYCLE_MS = 5000;
 const PAGE_COUNT = Math.ceil(notes.length / PAGE_SIZE);
 
 function subscribePhone(callback) {
@@ -97,18 +96,17 @@ export default function MensDayNotesSection() {
   const isPhone = useIsPhone();
   const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState(0);
-  const [paused, setPaused] = useState(false);
 
-  // Larger screens show six notes at a time and move to the next six on their own.
+  // Phones show four notes at a time and fade to the next four on their own,
+  // until someone asks to see all of them.
   useEffect(() => {
-    if (isPhone || reduceMotion || paused || openIndex !== null) return undefined;
+    if (!isPhone || expanded || reduceMotion || openIndex !== null) return undefined;
     const timer = window.setInterval(() => setPage((current) => (current + 1) % PAGE_COUNT), CYCLE_MS);
     return () => window.clearInterval(timer);
-  }, [isPhone, reduceMotion, paused, openIndex]);
+  }, [isPhone, expanded, reduceMotion, openIndex]);
 
-  let visible;
-  if (isPhone) visible = expanded ? notes : notes.slice(0, PHONE_PREVIEW);
-  else visible = notes.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const cycling = isPhone && !expanded;
+  const visible = cycling ? notes.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE) : notes;
 
   const open = useCallback((index) => {
     setOpenIndex(index);
@@ -164,15 +162,11 @@ export default function MensDayNotesSection() {
       </motion.header>
 
       <div
-        className={`mens-board${isPhone && !expanded ? " is-collapsed" : ""}`}
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-        onFocus={() => setPaused(true)}
-        onBlur={() => setPaused(false)}
+        className={`mens-board${cycling ? " is-collapsed" : ""}`}
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.ul
-            key={isPhone ? "phone" : `page-${page}`}
+            key={cycling ? `page-${page}` : "all"}
             className="mens-board__notes"
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -204,26 +198,23 @@ export default function MensDayNotesSection() {
           </motion.ul>
         </AnimatePresence>
 
-        {isPhone && !expanded ? (
+        {cycling ? (
           <div className="mens-board__more">
+            <div className="mens-board__pager">
+              {Array.from({ length: PAGE_COUNT }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={i === page ? "is-active" : ""}
+                  aria-label={`Show notes ${i * PAGE_SIZE + 1} to ${Math.min(notes.length, (i + 1) * PAGE_SIZE)}`}
+                  aria-pressed={i === page}
+                  onClick={() => setPage(i)}
+                />
+              ))}
+            </div>
             <button type="button" className="mens-paper-button" onClick={() => setExpanded(true)}>
               Open more notes
             </button>
-          </div>
-        ) : null}
-
-        {!isPhone && PAGE_COUNT > 1 ? (
-          <div className="mens-board__pager">
-            {Array.from({ length: PAGE_COUNT }, (_, i) => (
-              <button
-                key={i}
-                type="button"
-                className={i === page ? "is-active" : ""}
-                aria-label={`Show notes ${i * PAGE_SIZE + 1} to ${Math.min(notes.length, (i + 1) * PAGE_SIZE)}`}
-                aria-pressed={i === page}
-                onClick={() => setPage(i)}
-              />
-            ))}
           </div>
         ) : null}
       </div>

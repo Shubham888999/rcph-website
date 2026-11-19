@@ -98,7 +98,7 @@
 
 .mens-board__notes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
   gap: clamp(1.25rem, 3vw, 2rem);
   margin: 0;
   padding: 0;
@@ -114,12 +114,11 @@
   rotate: 0deg;
 }
 
-/* Desktop: dots to jump between the two sets of six */
+/* Phone: dots to jump between the sets of four */
 .mens-board__pager {
   display: flex;
   justify-content: center;
   gap: 0.6rem;
-  margin-top: 1.6rem;
 }
 
 .mens-board__pager button {
@@ -136,7 +135,7 @@
   background: rgba(255, 241, 200, 0.95);
 }
 
-/* Phone: the first four notes fade out under a button that shows the rest */
+/* Phone: four notes at a time, fading out under a button that shows them all */
 .mens-board.is-collapsed .mens-board__notes {
   max-height: 22rem;
   overflow: hidden;
@@ -145,8 +144,11 @@
 }
 
 .mens-board__more {
+  position: relative;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
   margin-top: -1.5rem;
 }
 
