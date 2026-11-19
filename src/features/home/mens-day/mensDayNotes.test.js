@@ -67,3 +67,9 @@ test("Wings of Honour archive page is hidden from search engines", () => {
 test("header badge scrolls again when clicked while already on #mens-day", () => {
   assert.match(layoutSource, /\[location\.hash, location\.pathname, location\.key\]/);
 });
+
+test("open note renders on body so the header and later sections cannot cover it", () => {
+  assert.match(sectionSource, /createPortal\(/);
+  assert.match(sectionSource, /document\.body/);
+  assert.match(sectionSource, /Close note/);
+});
