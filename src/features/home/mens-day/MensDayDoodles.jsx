@@ -89,8 +89,9 @@ const CurlyArrow = (props) => (
 
 const Scribble = ({ text, className, style }) => (
   <svg className={`mens-doodle mens-doodle--text ${className || ""}`} style={style} viewBox="0 0 220 60" aria-hidden="true" focusable="false">
-    <text x="110" y="38" textAnchor="middle">{text}</text>
-    <path {...stroke} strokeWidth="2" d="M30 50C80 44 140 56 192 46" />
+    {/* textLength squeezes the words to the drawing's width so they never spill out */}
+    <text x="110" y="38" textAnchor="middle" textLength="196" lengthAdjust="spacingAndGlyphs">{text}</text>
+    <path {...stroke} strokeWidth="2" d="M24 50C80 44 140 56 196 46" />
   </svg>
 );
 
@@ -98,7 +99,7 @@ export default function MensDayDoodles() {
   return (
     <>
       <div className="mens-board__doodles mens-board__doodles--left" aria-hidden="true">
-        <Scribble text="Happy Men's Day!" style={{ top: "3%", left: "4%", width: "92%", rotate: "-8deg" }} />
+        <Scribble text="Happy Men's Day!" style={{ top: "3%", left: "2%", width: "88%", rotate: "-6deg" }} />
         <Mustache style={{ top: "15%", left: "18%", width: "58%", rotate: "6deg" }} />
         <Sparkle style={{ top: "13%", left: "76%", width: "16%" }} />
         <Heart style={{ top: "30%", left: "8%", width: "34%", rotate: "-12deg" }} />
@@ -106,7 +107,7 @@ export default function MensDayDoodles() {
         <Plane style={{ top: "47%", left: "4%", width: "86%" }} />
         <Crown style={{ top: "64%", left: "30%", width: "40%", rotate: "-6deg" }} />
         <Sparkle style={{ top: "79%", left: "10%", width: "14%" }} />
-        <Scribble text="you matter" style={{ top: "84%", left: "14%", width: "78%", rotate: "5deg" }} />
+        <Scribble text="you matter" style={{ top: "84%", left: "12%", width: "72%", rotate: "5deg" }} />
       </div>
       <div className="mens-board__doodles mens-board__doodles--right" aria-hidden="true">
         <BowTie style={{ top: "4%", left: "20%", width: "56%", rotate: "-8deg" }} />
@@ -114,7 +115,7 @@ export default function MensDayDoodles() {
         <CurlyArrow style={{ top: "18%", left: "6%", width: "70%", rotate: "180deg", scale: "1 -1" }} />
         <Mug style={{ top: "34%", left: "40%", width: "44%", rotate: "8deg" }} />
         <Smiley style={{ top: "37%", left: "6%", width: "30%", rotate: "-10deg" }} />
-        <Scribble text="keep shining" style={{ top: "54%", left: "4%", width: "90%", rotate: "-6deg" }} />
+        <Scribble text="keep shining" style={{ top: "54%", left: "4%", width: "84%", rotate: "-6deg" }} />
         <Heart style={{ top: "66%", left: "56%", width: "26%", rotate: "14deg" }} />
         <Star style={{ top: "68%", left: "14%", width: "24%", rotate: "-10deg" }} />
         <Mustache style={{ top: "84%", left: "20%", width: "54%", rotate: "-5deg" }} />

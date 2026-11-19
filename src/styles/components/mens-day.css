@@ -173,6 +173,7 @@
   bottom: 1.5rem;
   width: calc((100% - var(--content-max-width)) / 2 - 1.5rem);
   max-width: 17rem;
+  overflow: hidden;
   color: rgba(255, 244, 220, 0.82);
   pointer-events: none;
 }
@@ -195,7 +196,8 @@
   font-weight: 700;
 }
 
-@media (max-width: 84rem) {
+/* Below this the side cork is too narrow for the doodles, so the notes just fill the board */
+@media (max-width: 96rem) {
   .mens-board__doodles { display: none; }
 }
 
