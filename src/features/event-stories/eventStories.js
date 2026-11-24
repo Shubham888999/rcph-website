@@ -50,6 +50,24 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "rooted-2026",
+    title: "ROOTED",
+    date: "2026-10-13",
+    avenues: ["PDD"],
+    place: "S.P. Junior College, Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "An interactive gardening workshop with S.P. Junior College's Environment Department: hands-on potting, myth-busting and sustainable plant care with 60+ participants.",
+    seoTitle: "ROOTED: Gardening Workshop at S.P. Junior College | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage and S.P. Junior College's Environment Department held ROOTED, a hands-on gardening workshop for 60+ participants in Pune.",
+    image: "/media/event-stories/rooted-2026/share.jpg",
+    imageAlt: "Participants holding potted saplings at the ROOTED gardening workshop",
+    card: { background: "linear-gradient(160deg, #6bb35f, #2e1d13 85%)", color: "#f4ecdc", font: "sans" },
+    match: { name: "ROOTED", date: "2026-10-13" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",
