@@ -1,0 +1,212 @@
+/* Misal Brunch (Samyati 4.0): spicy red and turmeric, a Marathi title, a menu-board photo and a
+   misal you build layer by layer. One look in both site themes. */
+
+.ms {
+  --ms-red: #c62d17;
+  --ms-red-dark: #7d1a0c;
+  --ms-turmeric: #f2b84b;
+  --ms-cream: #fff6e8;
+  --ms-board: #5b3a24;
+  --ms-ink: #2e1a10;
+  --ms-muted: #6d5240;
+  color: var(--ms-ink);
+  background: var(--ms-cream);
+}
+
+.ms-hero {
+  padding: clamp(2.75rem, 7vw, 4.5rem) var(--page-gutter) clamp(2.25rem, 5vw, 3rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 0.9rem;
+  text-align: center;
+  color: #fff6e8;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(242, 184, 75, 0.35), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(0, 0, 0, 0.25), transparent 45%),
+    linear-gradient(135deg, var(--ms-red), var(--ms-red-dark));
+}
+
+.ms-hero > * { max-width: 100%; }
+
+.ms-kicker { margin: 0; color: var(--ms-turmeric); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+
+.ms-hero h1 { margin: 0; display: grid; gap: 0.2rem; }
+
+.ms-title__marathi {
+  font-family: "Noto Sans Devanagari", "Mangal", "Kohinoor Devanagari", sans-serif;
+  font-size: clamp(3.6rem, 13vw, 7rem);
+  font-weight: 900;
+  line-height: 1.05;
+  text-shadow: 4px 4px 0 var(--ms-red-dark);
+}
+
+.ms-title__english { font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 800; }
+
+.ms-tag {
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  background: var(--ms-turmeric);
+  color: var(--ms-red-dark);
+  font-weight: 900;
+  rotate: -2deg;
+}
+
+.ms-lede { max-width: 40rem; margin: 0; font-size: 1.05rem; line-height: 1.7; }
+
+/* Photo as a menu board beside the moments */
+.ms-photo {
+  width: min(var(--content-max-width), calc(100% - 2 * var(--page-gutter)));
+  margin: 0 auto;
+  padding-block: clamp(2.5rem, 6vw, 4rem);
+  display: grid;
+  grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  align-items: center;
+}
+
+.ms-photo figure {
+  margin: 0;
+  padding: 0.7rem;
+  border: 8px solid var(--ms-board);
+  background: #fff;
+  box-shadow: 0 1.2rem 2.5rem rgba(46, 26, 16, 0.3);
+}
+
+.ms-photo img { display: block; width: 100%; height: auto; }
+
+.ms-photo figcaption {
+  padding-top: 0.6rem;
+  color: var(--ms-board);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.ms-moments { display: grid; gap: 1rem; margin: 0; padding: 0; list-style: none; }
+
+.ms-moments li {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.1rem 1.25rem;
+  border-left: 6px solid var(--ms-red);
+  background: #fff;
+}
+
+.ms-moments h3 { margin: 0; color: var(--ms-red-dark); }
+.ms-moments p { margin: 0; color: var(--ms-muted); line-height: 1.65; }
+
+/* Build your misal */
+.ms-section {
+  width: min(60rem, calc(100% - 2 * var(--page-gutter)));
+  margin: 0 auto;
+  padding-bottom: clamp(2.5rem, 6vw, 4rem);
+  display: grid;
+  gap: 0.6rem;
+  text-align: center;
+}
+
+.ms-section h2 { margin: 0; color: var(--ms-red-dark); }
+.ms-section__intro { margin: 0 0 1rem; color: var(--ms-muted); }
+
+.ms-build {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(1rem, 4vw, 2.5rem);
+  align-items: center;
+  text-align: left;
+}
+
+.ms-bowl { width: min(26rem, 100%); height: auto; margin: 0 auto; }
+
+.ms-layer { opacity: 0; transform: translateY(-14px); transform-box: fill-box; transition: opacity 0.35s ease, transform 0.35s ease; }
+.ms-layer.is-on { opacity: 1; transform: none; }
+
+.ms-build__side { display: grid; gap: 1rem; }
+
+.ms-ingredients { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+
+.ms-ingredients button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 2px solid #ead7c1;
+  border-radius: 0;
+  background: #fff;
+  color: var(--ms-muted);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: default;
+}
+
+.ms-ingredients button.is-next { border-color: var(--ms-red); color: var(--ms-ink); cursor: pointer; box-shadow: 4px 4px 0 var(--ms-red); }
+.ms-ingredients button.is-next:hover { background: #fff0e6; }
+.ms-ingredients button.is-added { border-color: var(--ms-turmeric); background: #fff8e1; color: var(--ms-ink); }
+.ms-ingredients button:focus-visible { outline: 3px solid var(--ms-turmeric); outline-offset: 3px; }
+
+.ms-ingredients__tick {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: #f3e3d0;
+  color: var(--ms-red-dark);
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.ms-ingredients button.is-added .ms-ingredients__tick { background: var(--ms-turmeric); }
+.ms-ingredients__marathi { color: var(--ms-muted); font-size: 0.85rem; }
+
+.ms-build__status { margin: 0; color: var(--ms-muted); font-weight: 700; }
+
+.ms-build__status.is-done {
+  padding: 0.85rem 1rem;
+  background: var(--ms-red);
+  color: #fff;
+  font-weight: 800;
+}
+
+/* Credits */
+.ms-credits { display: grid; justify-items: center; gap: 0.8rem; padding: 0 var(--page-gutter) clamp(3rem, 7vw, 5rem); text-align: center; }
+
+.ms-credits__label { margin: 0; color: var(--ms-red); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
+
+.ms-credits ul { display: flex; flex-wrap: nowrap; justify-content: center; gap: 1rem; width: min(56rem, 100%); margin: 0; padding: 0; list-style: none; }
+
+.ms-credits li {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 18rem;
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--ms-red);
+  background: #fff;
+}
+
+.ms-credits strong { color: var(--ms-red-dark); font-size: 1.05rem; }
+.ms-credits span { color: var(--ms-muted); font-size: 0.9rem; }
+
+@media (max-width: 48rem) {
+  .ms-photo { grid-template-columns: 1fr; }
+  .ms-photo figure { max-width: 26rem; margin: 0 auto; }
+  .ms-build { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 36rem) {
+  .ms-credits ul { flex-direction: column; align-items: center; }
+  .ms-credits li { width: 100%; max-width: 20rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-layer { transition: none; }
+}

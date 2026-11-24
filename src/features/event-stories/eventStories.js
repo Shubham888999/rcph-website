@@ -176,6 +176,24 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "misal-brunch-2026",
+    title: "Misal Brunch",
+    date: "2026-09-19",
+    avenues: ["ISD", "CSD"],
+    place: "Pune Misal House, Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "During Samyati 4.0, delegates from RID 3191, Bangalore, joined RCPH for a Misal Brunch celebrating Pune's iconic food culture.",
+    seoTitle: "Misal Brunch with RID 3191 Delegates, Samyati 4.0 | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage welcomed delegates from RID 3191, Bangalore, to a Misal Brunch during Samyati 4.0, celebrating Pune's iconic Misal Pav and interdistrict fellowship.",
+    image: "/media/event-stories/misal-brunch-2026/share.jpg",
+    imageAlt: "RCPH members and RID 3191 delegates outside Pune Misal House",
+    card: { background: "linear-gradient(135deg, #c62d17, #7d1a0c)", color: "#f2b84b", font: "sans" },
+    match: { name: "Misal Brunch", date: "2026-09-19" },
+    projectTitle: null,
+  },
+  {
     slug: "concord-2026",
     title: "CONCORD",
     date: "2026-09-06",
