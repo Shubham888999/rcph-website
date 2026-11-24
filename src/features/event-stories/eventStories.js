@@ -14,6 +14,24 @@ export const EVENT_STORIES_PATH = "/events/stories";
 
 export const eventStories = Object.freeze([
   {
+    slug: "diwali-pahat-2026",
+    title: "Diwali Pahat",
+    date: "2026-11-10",
+    avenues: ["CSD"],
+    place: "Sarasbaug, Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "A festive Padwa morning: members gathered at Sarasbaug at dawn, then headed to Bangalore Tiffin Room for breakfast.",
+    seoTitle: "Diwali Pahat at Sarasbaug: Padwa Morning 2026 | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage celebrated Diwali Pahat on the morning of Padwa at Sarasbaug, Pune, followed by breakfast at Bangalore Tiffin Room.",
+    image: "/media/event-stories/diwali-pahat-2026/share.jpg",
+    imageAlt: "RCPH members in festive outfits on the morning of Diwali Pahat",
+    card: { background: "linear-gradient(180deg, #f2a7b5, #f4a259 55%, #ffe8a3)", color: "#7a1f3d", font: "serif" },
+    match: { name: "Diwali Pahat", date: "2026-11-10" },
+    projectTitle: null,
+  },
+  {
     slug: "patakhas-assemble-2026",
     title: "Patakhas Assemble",
     date: "2026-11-13",
