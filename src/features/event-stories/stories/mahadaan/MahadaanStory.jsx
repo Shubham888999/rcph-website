@@ -135,7 +135,7 @@ export default function MahadaanStory({ drive, drives }) {
       ) : null}
 
       <section className="md-credits" aria-label="Organisers">
-        <p className="md-credits__label">Organised by the Rotary Club of Pune Heritage, with the Rotaract Club of Pune Heritage</p>
+        <p className="md-credits__label">Organised by the <span className="md-nowrap">Rotary Club of Pune Heritage</span>, with the <span className="md-nowrap">Rotaract Club of Pune Heritage</span></p>
         <p className="md-credits__label md-credits__label--small">Conducted by</p>
         <ul>
           {drive.conductedBy.map((person) => (

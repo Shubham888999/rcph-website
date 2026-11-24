@@ -284,3 +284,12 @@
   .patakhas-diya__flame-core { animation: none; }
   .patakhas-hero { cursor: default; }
 }
+
+/* Organiser boxes: always one row, stacking only on narrow phones */
+.patakhas-credits ul { flex-wrap: nowrap; width: min(56rem, 100%); }
+.patakhas-credits li { flex: 1 1 0; min-width: 0; max-width: 18rem; }
+
+@media (max-width: 36rem) {
+  .patakhas-credits ul { flex-direction: column; align-items: center; }
+  .patakhas-credits li { width: 100%; max-width: 20rem; }
+}

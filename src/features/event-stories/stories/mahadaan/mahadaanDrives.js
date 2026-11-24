@@ -29,7 +29,11 @@ export const mahadaanDrives = [
       { title: "Snehalaya, Ahmednagar", text: "One of the welfare organisations Mahadaan supports, working with the underprivileged." },
       { title: "Tradition with responsibility", text: "Mahadaan blends the cultural spirit of giving during Pitru Paksha with social responsibility, meeting essential needs and strengthening social bonds." },
     ],
-    conductedBy: [{ name: "Rtr. Aneesh Ladkat", role: "" }],
+    conductedBy: [
+      { name: "Rtr. Soumitra Lokur", role: "" },
+      { name: "Rtr. Tanishka Patekar", role: "" },
+      { name: "Rtr. Aneesh Ladkat", role: "" },
+    ],
   },
   {
     number: 2,

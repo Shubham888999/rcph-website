@@ -367,3 +367,12 @@
   .rooted-plant__seed,
   .rooted-button { transition: none; }
 }
+
+/* Organiser boxes: always one row, stacking only on narrow phones */
+.rooted-credits ul { flex-wrap: nowrap; width: min(56rem, 100%); }
+.rooted-credits li { flex: 1 1 0; min-width: 0; max-width: 18rem; }
+
+@media (max-width: 36rem) {
+  .rooted-credits ul { flex-direction: column; align-items: center; }
+  .rooted-credits li { width: 100%; max-width: 20rem; }
+}

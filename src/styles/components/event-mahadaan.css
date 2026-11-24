@@ -299,7 +299,7 @@
 }
 
 .md-credits__label {
-  max-width: 40rem;
+  max-width: 60rem;
   margin: 0;
   color: var(--md-muted);
   font-weight: 700;
@@ -349,3 +349,14 @@
   .md-truck__sack { animation: none; }
   .md-sacks button { transition: none; }
 }
+
+/* Organiser boxes: always one row, stacking only on narrow phones */
+.md-credits ul { flex-wrap: nowrap; width: min(56rem, 100%); }
+.md-credits li { flex: 1 1 0; min-width: 0; max-width: 18rem; }
+
+@media (max-width: 36rem) {
+  .md-credits ul { flex-direction: column; align-items: center; }
+  .md-credits li { width: 100%; max-width: 20rem; }
+}
+
+.md-credits .md-nowrap { color: inherit; font-size: inherit; white-space: nowrap; }
