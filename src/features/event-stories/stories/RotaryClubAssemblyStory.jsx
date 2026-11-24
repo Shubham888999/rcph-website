@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "../../../styles/components/event-rotary-assembly.css";
+import { officers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/rotary-club-assembly-2026";
 
@@ -11,7 +12,7 @@ const agenda = [
   "Collaborative projects between the Rotary Club and the Rotaract Club",
 ];
 
-const conductedBy = [{ name: "Rtr. Aneesh Ladkat", role: "" }];
+const conductedBy = officers("aneesh");
 
 function Agenda() {
   const [done, setDone] = useState(() => new Set());
@@ -96,7 +97,7 @@ export default function RotaryClubAssemblyStory() {
         <p className="ra-people__label">Conducted by</p>
         <ul className="ra-credits">
           {conductedBy.map((person) => (
-            <li key={person.name}><strong>{person.name}</strong>{person.role ? <span>{person.role}</span> : null}</li>
+            <li key={person.name}><strong>{person.name}</strong><span>{person.role}</span></li>
           ))}
         </ul>
       </section>

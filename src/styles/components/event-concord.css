@@ -313,3 +313,6 @@
   .cd-rings__ring,
   .cd-ripple__list li { transition: none; }
 }
+
+/* Name on top, title right under it, even when a title wraps */
+[class$="-credits"] li { align-content: start; }

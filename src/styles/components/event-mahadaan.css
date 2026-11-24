@@ -422,3 +422,6 @@
   .md-collected strong { font-size: 1.15rem; }
   .md-collected span { font-size: 0.75rem; }
 }
+
+/* Name on top, title right under it, even when a title wraps */
+[class$="-credits"] li { align-content: start; }

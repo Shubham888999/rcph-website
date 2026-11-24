@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "../../../styles/components/event-rooted.css";
+import { officers } from "../clubOfficers";
 
 const PHOTO = "/media/event-stories/rooted-2026/group-photo.webp";
 const PHOTO_SMALL = "/media/event-stories/rooted-2026/group-photo-800.webp";
@@ -25,7 +26,7 @@ const guests = [
   { role: "In collaboration with", name: "S.P. Junior College's Environment Department" },
 ];
 
-const conductedBy = [{ name: "Rtr. Ira Lad", role: "Professional Development Director" }];
+const conductedBy = officers("ira");
 
 // A pot with a plant drawn for the current stage (0 seed to 3 bloom).
 function Plant({ stage }) {

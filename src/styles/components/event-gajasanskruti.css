@@ -366,3 +366,6 @@
   .gs-litter,
   .gs-bag__fill { transition: none; }
 }
+
+/* Name on top, title right under it, even when a title wraps */
+[class$="-credits"] li { align-content: start; }

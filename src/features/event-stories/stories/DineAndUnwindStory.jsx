@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "../../../styles/components/event-dine-unwind.css";
+import { officers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/dine-and-unwind-2026";
 
@@ -9,10 +10,7 @@ const specials = [
   { name: "Unwind", text: "A relaxed and enjoyable atmosphere for everyone to connect." },
 ];
 
-const conductedBy = [
-  { name: "Rtr. Harshal Nikam", role: "Club Service Director" },
-  { name: "Rtr. Shivani Kulkarni", role: "Co-Club Service Director" },
-];
+const conductedBy = officers("harshal", "shivani");
 
 function Cloche({ open }) {
   return (
