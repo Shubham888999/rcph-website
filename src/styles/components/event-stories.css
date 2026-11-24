@@ -148,6 +148,7 @@
 .event-story-more ul a span { font-size: 1.25rem; font-weight: 800; }
 .event-story-more ul a small { opacity: 0.85; font-weight: 600; }
 .is-serif { font-family: Georgia, "Times New Roman", serif; font-style: italic; }
+.is-mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Courier New", monospace; text-transform: uppercase; letter-spacing: 0.04em; }
 
 .event-story-more__all {
   justify-self: start;

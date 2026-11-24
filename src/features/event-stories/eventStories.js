@@ -14,6 +14,114 @@ export const EVENT_STORIES_PATH = "/events/stories";
 
 export const eventStories = Object.freeze([
   {
+    slug: "patakhas-assemble-2026",
+    title: "Patakhas Assemble",
+    date: "2026-11-13",
+    avenues: ["CSD"],
+    place: "Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "Our Diwali party, where members celebrated the festival with a Bollywood Trivia game and a lovely dinner.",
+    seoTitle: "Patakhas Assemble: Diwali Party 2026 | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage celebrated Diwali 2026 with Patakhas Assemble, an evening of Bollywood Trivia, dinner and festive fun in Pune.",
+    image: "/media/event-stories/patakhas-assemble-2026/share.jpg",
+    imageAlt: "RCPH members in festive outfits at the Patakhas Assemble Diwali party",
+    card: { background: "radial-gradient(circle at 70% 20%, #b3122d, #12061c 70%)", color: "#ffcf70", font: "sans" },
+    match: { name: "Patakhas Assemble", date: "2026-11-13" },
+    projectTitle: null,
+  },
+  {
+    slug: "couch-champions-2026",
+    title: "Couch Champions",
+    date: "2026-10-24",
+    avenues: ["CSD"],
+    place: "Online",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "An online game night where members played different games together, with plenty of friendly competition and laughter.",
+    seoTitle: "Couch Champions: Online Game Night 2026 | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage members came together online for Couch Champions, an evening of games, friendly competition and laughter.",
+    image: "/media/event-stories/couch-champions-2026/share.jpg",
+    imageAlt: "Online game night screenshot from Couch Champions",
+    card: { background: "linear-gradient(135deg, #0d0a24, #3a0ca3)", color: "#7ef9ff", font: "mono" },
+    match: { name: "Couch Champions", date: "2026-10-24" },
+    projectTitle: null,
+  },
+  {
+    slug: "rooted-2026",
+    title: "ROOTED",
+    date: "2026-10-13",
+    avenues: ["PDD"],
+    place: "S.P. Junior College, Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "An interactive gardening workshop with S.P. Junior College's Environment Department: hands-on potting, myth-busting and sustainable plant care with 60+ participants.",
+    seoTitle: "ROOTED: Gardening Workshop at S.P. Junior College | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage and S.P. Junior College's Environment Department held ROOTED, a hands-on gardening workshop for 60+ participants in Pune.",
+    image: "/media/event-stories/rooted-2026/share.jpg",
+    imageAlt: "Participants holding potted saplings at the ROOTED gardening workshop",
+    card: { background: "linear-gradient(160deg, #6bb35f, #2e1d13 85%)", color: "#f4ecdc", font: "sans" },
+    match: { name: "ROOTED", date: "2026-10-13" },
+    projectTitle: null,
+  },
+  {
+    slug: "mahadaan-drive-2-2026",
+    title: "Mahadaan 12.0 · Drive 2",
+    date: "2026-10-03",
+    avenues: ["CMD", "RRRO"],
+    place: "Royal KP Stellar Society, NIBM Road, Pune",
+    hostedBy: "Rotary Club of Pune Heritage",
+    summary:
+      "The second Mahadaan 12.0 drive collected 63 kg of food grains, 23 bags of clothes, daily-use items and Rs. 7,202 at Royal KP Stellar Society.",
+    seoTitle: "Mahadaan 12.0 Drive 2: Donation Drive on NIBM Road | RCPH",
+    seoDescription:
+      "The second Mahadaan 12.0 drive by the Rotary and Rotaract Clubs of Pune Heritage collected 63 kg of food grains, 23 bags of clothes, daily-use items and Rs. 7,202 in Pune.",
+    image: "/media/event-stories/mahadaan-drive-2-2026/share.jpg",
+    imageAlt: "Rotarians and Rotaractors with the Mahadaan banner at Royal KP Stellar Society",
+    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
+    match: { name: "Mahadaan 12.0 Drive 2", date: "2026-10-03" },
+    projectTitle: null,
+  },
+  {
+    slug: "mahadaan-drive-1-2026",
+    title: "Mahadaan 12.0 · Drive 1",
+    date: "2026-09-27",
+    avenues: ["CMD", "RRRO"],
+    place: "Padmavati Hills, Bavdhan, Pune",
+    hostedBy: "Rotary Club of Pune Heritage",
+    summary:
+      "The first Mahadaan 12.0 drive, held during Pitru Paksha, collected 15 kg of food grains, 28 bags of clothes and Rs. 2,600 for welfare organisations.",
+    seoTitle: "Mahadaan 12.0 Drive 1: Donation Drive in Bavdhan | RCPH",
+    seoDescription:
+      "During Pitru Paksha, the Rotary and Rotaract Clubs of Pune Heritage collected 15 kg of food grains, 28 bags of clothes and Rs. 2,600 at Padmavati Hills, Bavdhan, for welfare organisations.",
+    image: "/media/event-stories/mahadaan-drive-1-2026/share.jpg",
+    imageAlt: "RCPH members beside a truck loaded with Mahadaan donations",
+    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
+    match: { name: "Mahadaan 12.0", date: "2026-09-27" },
+    projectTitle: null,
+  },
+  {
+    slug: "gajasanskruti-2026",
+    title: "Gajasanskruti 10.0",
+    date: "2026-09-26",
+    avenues: ["ISD", "CMD", "RRRO"],
+    place: "Pune",
+    hostedBy: "Rotaract Club of Pune Mideast",
+    summary:
+      "A city cleanliness drive with 148 volunteers from 31 Rotaract clubs and 2 Rotary clubs, who filled 90 bags of garbage across four areas of Pune.",
+    seoTitle: "Gajasanskruti 10.0: Pune Cleanliness Drive | RCPH",
+    seoDescription:
+      "RCPH joined Gajasanskruti 10.0, a cleanliness drive by the Rotaract Club of Pune Mideast: 148 volunteers from 31 Rotaract clubs cleaned FC Road, Karve Road, Nadiapatra and Deccan Gymkhana.",
+    image: "/media/event-stories/gajasanskruti-2026/share.jpg",
+    imageAlt: "Volunteers from many clubs after the Gajasanskruti cleanliness drive in Pune",
+    card: { background: "linear-gradient(180deg, #1f8a5b 0 72%, #3b3f45 72%)", color: "#ffffff", font: "sans" },
+    match: { name: "Gajasanskruti 10.0", date: "2026-09-26" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",
@@ -53,6 +161,11 @@ export const eventStories = Object.freeze([
 
 export function storyPath(story) {
   return `/events/${story.slug}`;
+}
+
+// Card title font: "serif", "mono" (arcade style) or "sans" (the site default).
+export function cardFontClass(story) {
+  return { serif: "is-serif", mono: "is-mono" }[story.card.font] || "";
 }
 
 export function getEventStory(slug) {
