@@ -4,6 +4,7 @@ import { formatEventDate } from "../events/eventModel";
 import { getAvenue } from "../calendar/avenues.js";
 import { EVENT_STORIES_PATH, storiesNewestFirst, storyPath } from "./eventStories";
 import { SITE_ORIGIN } from "../../app/metadataModel";
+import StoryMotif from "./StoryMotif";
 
 function ShareButtons({ story }) {
   const [copied, setCopied] = useState(false);
@@ -38,6 +39,7 @@ function MoreStories({ current }) {
         {others.map((story) => (
           <li key={story.slug}>
             <Link to={storyPath(story)} style={{ background: story.card.background, color: story.card.color }}>
+              <StoryMotif motif={story.motif} />
               <span>{story.title}</span>
               <small>{formatEventDate({ date: story.date })}</small>
             </Link>

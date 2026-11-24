@@ -88,3 +88,11 @@ test("every organiser on every story page has a title under their name", async (
   const { mahadaanDrives } = await import("./stories/mahadaan/mahadaanDrives.js");
   for (const drive of mahadaanDrives) for (const person of drive.conductedBy) assert.ok(person.role);
 });
+
+test("every story card has a motif drawn behind its title", async () => {
+  const source = read("./StoryMotif.jsx");
+  for (const story of eventStories) {
+    assert.ok(story.motif, `${story.slug} needs a motif`);
+    assert.match(source, new RegExp(`\\b${story.motif}: \\(\\) =>`), `${story.slug} motif ${story.motif} is not drawn`);
+  }
+});
