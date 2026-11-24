@@ -122,6 +122,24 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "dine-and-unwind-2026",
+    title: "Dine & Unwind",
+    date: "2026-09-13",
+    avenues: ["CSD"],
+    place: "Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "A club dinner where everyone could interact, bond and spend quality time together outside regular club activities.",
+    seoTitle: "Dine & Unwind: Club Dinner 2026 | RCPH",
+    seoDescription:
+      "Members of Rotaract Club of Pune Heritage got together for Dine & Unwind, a relaxed club dinner in Pune to bond outside regular club activities.",
+    image: "/media/event-stories/dine-and-unwind-2026/share.jpg",
+    imageAlt: "RCPH members smiling in a group selfie after the Dine & Unwind dinner",
+    card: { background: "radial-gradient(circle at 50% 50%, #8a2236, #4a0f1c 80%)", color: "#fbf6ec", font: "serif" },
+    match: { name: "Dine & Unwind", date: "2026-09-13" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",
