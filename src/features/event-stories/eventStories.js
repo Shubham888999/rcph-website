@@ -32,6 +32,24 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "couch-champions-2026",
+    title: "Couch Champions",
+    date: "2026-10-24",
+    avenues: ["CSD"],
+    place: "Online",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "An online game night where members played different games together, with plenty of friendly competition and laughter.",
+    seoTitle: "Couch Champions: Online Game Night 2026 | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage members came together online for Couch Champions, an evening of games, friendly competition and laughter.",
+    image: "/media/event-stories/couch-champions-2026/share.jpg",
+    imageAlt: "Online game night screenshot from Couch Champions",
+    card: { background: "linear-gradient(135deg, #0d0a24, #3a0ca3)", color: "#7ef9ff", font: "mono" },
+    match: { name: "Couch Champions", date: "2026-10-24" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",
@@ -71,6 +89,11 @@ export const eventStories = Object.freeze([
 
 export function storyPath(story) {
   return `/events/${story.slug}`;
+}
+
+// Card title font: "serif", "mono" (arcade style) or "sans" (the site default).
+export function cardFontClass(story) {
+  return { serif: "is-serif", mono: "is-mono" }[story.card.font] || "";
 }
 
 export function getEventStory(slug) {

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatEventDate } from "../events/eventModel";
 import { getAvenue } from "../calendar/avenues.js";
-import { EVENT_STORIES_PATH, storiesNewestFirst, storyPath } from "./eventStories";
+import { EVENT_STORIES_PATH, cardFontClass, storiesNewestFirst, storyPath } from "./eventStories";
 import { SITE_ORIGIN } from "../../app/metadataModel";
 
 function ShareButtons({ story }) {
@@ -38,7 +38,7 @@ function MoreStories({ current }) {
         {others.map((story) => (
           <li key={story.slug}>
             <Link to={storyPath(story)} style={{ background: story.card.background, color: story.card.color }}>
-              <span className={story.card.font === "serif" ? "is-serif" : ""}>{story.title}</span>
+              <span className={cardFontClass(story)}>{story.title}</span>
               <small>{formatEventDate({ date: story.date })}</small>
             </Link>
           </li>
