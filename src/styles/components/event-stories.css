@@ -75,7 +75,7 @@
 .event-story-about {
   width: min(var(--text-max-width), calc(100% - 2 * var(--page-gutter)));
   margin: 0 auto;
-  padding-block: 0 clamp(2.5rem, 6vw, 4rem);
+  padding-block: clamp(2.5rem, 6vw, 4rem);
   display: grid;
   gap: 0.9rem;
 }
