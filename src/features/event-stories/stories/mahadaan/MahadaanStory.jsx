@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { collectedAmounts, mahadaanTotals } from "./mahadaanDrives";
 import "../../../../styles/components/event-mahadaan.css";
 
 const SACKS = {
@@ -20,7 +21,7 @@ function Sack({ colour }) {
 }
 
 // The truck fills up as people load each kind of donation into it.
-function LoadTheTruck({ items, doneText }) {
+function LoadTheTruck({ items, doneText, amounts }) {
   const [loaded, setLoaded] = useState([]);
   const done = loaded.length === items.length;
 
@@ -52,11 +53,12 @@ function LoadTheTruck({ items, doneText }) {
               className={loaded.includes(id) ? "is-loaded" : ""}
               onClick={() => load(id)}
               disabled={loaded.includes(id)}
-              aria-label={loaded.includes(id) ? `${SACKS[id].label} loaded` : `Load ${SACKS[id].label}`}
+              aria-label={`${loaded.includes(id) ? "Loaded" : "Load"} ${SACKS[id].label}${amounts[id] ? `, ${amounts[id]}` : ""}`}
             >
               <Sack colour={SACKS[id].colour} />
               <span className="md-sacks__label">{SACKS[id].label}</span>
               <span className="md-sacks__marathi" lang="mr">{SACKS[id].marathi}</span>
+              {amounts[id] ? <span className="md-sacks__amount">{amounts[id]}</span> : null}
             </button>
           </li>
         ))}
@@ -77,7 +79,23 @@ function LoadTheTruck({ items, doneText }) {
 }
 
 // Shared design for both Mahadaan 12.0 drives. `drive` holds that day's content.
+function Collected({ title, amounts, className = "" }) {
+  return (
+    <div className={`md-collected ${className}`.trim()}>
+      <p className="md-collected__title">{title}</p>
+      <ul>
+        <li><strong>{amounts.grains}</strong><span>of food grains</span></li>
+        <li><strong>{amounts.clothes}</strong><span>of clothes</span></li>
+        <li><strong>{amounts.money}</strong><span>in money</span></li>
+      </ul>
+    </div>
+  );
+}
+
 export default function MahadaanStory({ drive, drives }) {
+  const amounts = collectedAmounts(drive.collected);
+  const totals = collectedAmounts(mahadaanTotals());
+
   return (
     <div className="md">
       <section className="md-hero" aria-labelledby="md-title">
@@ -97,6 +115,7 @@ export default function MahadaanStory({ drive, drives }) {
         <ul className="md-facts">
           {drive.facts.map((fact) => <li key={fact.label}><span>{fact.label}</span><strong>{fact.value}</strong></li>)}
         </ul>
+        <Collected title={`What Drive ${drive.number} collected`} amounts={amounts} />
       </section>
 
       <section className="md-photos" aria-label="Photos from the drive">
@@ -120,7 +139,8 @@ export default function MahadaanStory({ drive, drives }) {
       <section className="md-give" aria-labelledby="md-give-title">
         <h2 id="md-give-title">Load the truck</h2>
         <p className="md-give__intro">This is what people gave. Load each sack to send it on its way.</p>
-        <LoadTheTruck items={drive.donations} doneText={drive.doneText} />
+        <LoadTheTruck items={drive.donations} doneText={drive.doneText} amounts={amounts} />
+        <Collected title="Mahadaan 12.0, both drives together" amounts={totals} className="md-collected--total" />
       </section>
 
       {drive.notes.length ? (

@@ -23,6 +23,7 @@ export const mahadaanDrives = [
       },
     ],
     donations: ["grains", "clothes", "money"],
+    collected: { grainsKg: 15, clothesBags: 28, moneyRupees: 2600 },
     doneText: "Loaded and on its way to welfare organisations like Matoshree Vruddhashram in Pune and Snehalaya in Ahmednagar.",
     notes: [
       { title: "Matoshree Vruddhashram, Pune", text: "One of the welfare organisations Mahadaan supports, caring for the elderly." },
@@ -64,6 +65,7 @@ export const mahadaanDrives = [
       },
     ],
     donations: ["grains", "clothes", "daily", "money"],
+    collected: { grainsKg: 63, clothesBags: 23, moneyRupees: 7202 },
     doneText: "Loaded and on its way, through Rotary, to charitable and welfare organisations supporting people in need.",
     notes: [
       { title: "Rotary and Rotaract, side by side", text: "The drive brought together Rotarians, Rotaractors, volunteers and community members, building on the first drive and strengthening our shared commitment to service." },
@@ -76,3 +78,23 @@ export const mahadaanDrives = [
     ],
   },
 ];
+
+const rupees = new Intl.NumberFormat("en-IN");
+
+// What a drive collected, as amounts for each kind of donation. Daily-use items were not counted.
+export function collectedAmounts(collected) {
+  return {
+    grains: `${collected.grainsKg} kg`,
+    clothes: `${collected.clothesBags} bags`,
+    money: `Rs. ${rupees.format(collected.moneyRupees)}`,
+  };
+}
+
+// Both drives added together.
+export function mahadaanTotals() {
+  return mahadaanDrives.reduce((total, drive) => ({
+    grainsKg: total.grainsKg + drive.collected.grainsKg,
+    clothesBags: total.clothesBags + drive.collected.clothesBags,
+    moneyRupees: total.moneyRupees + drive.collected.moneyRupees,
+  }), { grainsKg: 0, clothesBags: 0, moneyRupees: 0 });
+}

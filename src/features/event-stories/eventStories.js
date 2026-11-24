@@ -75,10 +75,10 @@ export const eventStories = Object.freeze([
     place: "Royal KP Stellar Society, NIBM Road, Pune",
     hostedBy: "Rotary Club of Pune Heritage",
     summary:
-      "The second Mahadaan 12.0 drive, collecting clothes, food grains, daily-use items and money at Royal KP Stellar Society.",
+      "The second Mahadaan 12.0 drive collected 63 kg of food grains, 23 bags of clothes, daily-use items and Rs. 7,202 at Royal KP Stellar Society.",
     seoTitle: "Mahadaan 12.0 Drive 2: Donation Drive on NIBM Road | RCPH",
     seoDescription:
-      "The second Mahadaan 12.0 drive by the Rotary and Rotaract Clubs of Pune Heritage collected clothes, grains, daily-use items and money at Royal KP Stellar Society, Pune.",
+      "The second Mahadaan 12.0 drive by the Rotary and Rotaract Clubs of Pune Heritage collected 63 kg of food grains, 23 bags of clothes, daily-use items and Rs. 7,202 in Pune.",
     image: "/media/event-stories/mahadaan-drive-2-2026/share.jpg",
     imageAlt: "Rotarians and Rotaractors with the Mahadaan banner at Royal KP Stellar Society",
     card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
@@ -93,10 +93,10 @@ export const eventStories = Object.freeze([
     place: "Padmavati Hills, Bavdhan, Pune",
     hostedBy: "Rotary Club of Pune Heritage",
     summary:
-      "The first Mahadaan 12.0 donation drive, held during Pitru Paksha, collecting food grains, clothes and money for welfare organisations.",
+      "The first Mahadaan 12.0 drive, held during Pitru Paksha, collected 15 kg of food grains, 28 bags of clothes and Rs. 2,600 for welfare organisations.",
     seoTitle: "Mahadaan 12.0 Drive 1: Donation Drive in Bavdhan | RCPH",
     seoDescription:
-      "The Rotary and Rotaract Clubs of Pune Heritage collected food grains, clothes and money at Padmavati Hills, Bavdhan, during Pitru Paksha for welfare organisations.",
+      "During Pitru Paksha, the Rotary and Rotaract Clubs of Pune Heritage collected 15 kg of food grains, 28 bags of clothes and Rs. 2,600 at Padmavati Hills, Bavdhan, for welfare organisations.",
     image: "/media/event-stories/mahadaan-drive-1-2026/share.jpg",
     imageAlt: "RCPH members beside a truck loaded with Mahadaan donations",
     card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
