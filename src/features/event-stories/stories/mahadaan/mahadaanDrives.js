@@ -22,7 +22,7 @@ export const mahadaanDrives = [
         caption: "The truck, loaded and ready · Drive 1",
       },
     ],
-    donations: ["grains", "clothes", "money"],
+    donations: ["clothes", "grains", "money"],
     collected: { grainsKg: 15, clothesBags: 28, moneyRupees: 2600 },
     doneText: "Loaded and on its way to welfare organisations like Matoshree Vruddhashram in Pune and Snehalaya in Ahmednagar.",
     notes: [
@@ -64,7 +64,7 @@ export const mahadaanDrives = [
         caption: "Rotarians and Rotaractors, together",
       },
     ],
-    donations: ["grains", "clothes", "daily", "money"],
+    donations: ["clothes", "grains", "daily", "money"],
     collected: { grainsKg: 63, clothesBags: 23, moneyRupees: 7202 },
     doneText: "Loaded and on its way, through Rotary, to charitable and welfare organisations supporting people in need.",
     notes: [
