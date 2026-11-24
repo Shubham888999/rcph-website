@@ -14,6 +14,24 @@ export const EVENT_STORIES_PATH = "/events/stories";
 
 export const eventStories = Object.freeze([
   {
+    slug: "patakhas-assemble-2026",
+    title: "Patakhas Assemble",
+    date: "2026-11-13",
+    avenues: ["CSD"],
+    place: "Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "Our Diwali party, where members celebrated the festival with a Bollywood Trivia game and a lovely dinner.",
+    seoTitle: "Patakhas Assemble: Diwali Party 2026 | RCPH",
+    seoDescription:
+      "Rotaract Club of Pune Heritage celebrated Diwali 2026 with Patakhas Assemble, an evening of Bollywood Trivia, dinner and festive fun in Pune.",
+    image: "/media/event-stories/patakhas-assemble-2026/share.jpg",
+    imageAlt: "RCPH members in festive outfits at the Patakhas Assemble Diwali party",
+    card: { background: "radial-gradient(circle at 70% 20%, #b3122d, #12061c 70%)", color: "#ffcf70", font: "sans" },
+    match: { name: "Patakhas Assemble", date: "2026-11-13" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",

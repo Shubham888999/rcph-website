@@ -4,4 +4,5 @@ import { lazy } from "react";
 export const eventStoryComponents = {
   "wings-of-honour-2026": lazy(() => import("./stories/WingsOfHonourStory")),
   "mens-day-2026": lazy(() => import("./stories/MensDayStory")),
+  "patakhas-assemble-2026": lazy(() => import("./stories/PatakhasAssembleStory")),
 };

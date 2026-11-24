@@ -1,0 +1,264 @@
+/* Patakhas Assemble (Diwali party): a night sky with marigolds, fairy lights, patakha bursts and diyas.
+   This page keeps one festive night look in both site themes. */
+
+.patakhas {
+  --pk-night: #12061c;
+  --pk-night-2: #2a0716;
+  --pk-marigold: #ff9f1c;
+  --pk-marigold-2: #ffd166;
+  --pk-curtain: #b3122d;
+  --pk-text: #fff3df;
+  --pk-muted: #e6cdb3;
+  --pk-gold: #ffcf70;
+  color: var(--pk-text);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(179, 18, 45, 0.35), transparent 60%),
+    linear-gradient(180deg, var(--pk-night) 0%, var(--pk-night-2) 100%);
+}
+
+/* Hero: night sky */
+.patakhas-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: clamp(26rem, 60vh, 34rem);
+  display: grid;
+  align-items: end;
+  padding: 7rem max(var(--page-gutter), calc((100% - var(--content-max-width)) / 2)) clamp(2.5rem, 6vw, 4rem);
+  background:
+    radial-gradient(1px 1px at 12% 30%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 32% 18%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 58% 26%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 82% 14%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 92% 40%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 44% 44%, #fff 50%, transparent 51%);
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+
+.patakhas-hero__sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.patakhas-garland {
+  position: absolute;
+  top: -0.4rem;
+  left: 0;
+  right: 0;
+  height: 3.5rem;
+  pointer-events: none;
+}
+
+.patakhas-garland span {
+  position: absolute;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--pk-marigold-2), var(--pk-marigold) 55%, #d96b00);
+  box-shadow: 0 0.2rem 0.3rem rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+}
+
+.patakhas-garland span.is-yellow {
+  background: radial-gradient(circle at 35% 35%, #fff1a8, var(--pk-marigold-2) 60%, #e0a100);
+}
+
+.patakhas-lights {
+  position: absolute;
+  top: 2.4rem;
+  left: 0;
+  width: 100%;
+  height: 6rem;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.patakhas-lights path {
+  fill: none;
+  stroke: rgba(255, 243, 223, 0.35);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.patakhas-lights circle {
+  fill: var(--pk-gold);
+  filter: drop-shadow(0 0 4px var(--pk-gold));
+  animation: patakhas-twinkle 2.1s ease-in-out infinite;
+}
+
+.patakhas-lights circle:nth-child(3n) { fill: #ff7aa2; filter: drop-shadow(0 0 4px #ff7aa2); }
+.patakhas-lights circle:nth-child(4n) { fill: #7ee8fa; filter: drop-shadow(0 0 4px #7ee8fa); }
+
+@keyframes patakhas-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.patakhas-hero__copy {
+  position: relative;
+  display: grid;
+  gap: 0.9rem;
+  max-width: 40rem;
+}
+
+.patakhas-kicker {
+  margin: 0;
+  color: var(--pk-gold);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.patakhas-hero h1 {
+  margin: 0;
+  color: var(--pk-text);
+  font-size: clamp(2.6rem, 8vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 1.5rem rgba(255, 159, 28, 0.45);
+}
+
+.patakhas-lede {
+  margin: 0;
+  color: var(--pk-muted);
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.patakhas-hint {
+  justify-self: start;
+  min-height: 2.75rem;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--pk-gold);
+  border-radius: 0;
+  background: rgba(255, 159, 28, 0.12);
+  color: var(--pk-gold);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.patakhas-hint:hover { background: rgba(255, 159, 28, 0.22); }
+
+.patakhas-hint:focus-visible,
+.patakhas-evening li:focus-visible {
+  outline: 3px solid var(--pk-marigold-2);
+  outline-offset: 3px;
+}
+
+/* Group photo in a gold frame, hung from a garland string */
+.patakhas-photo {
+  padding: clamp(1rem, 4vw, 2.5rem) var(--page-gutter) clamp(2.5rem, 6vw, 4rem);
+}
+
+.patakhas-photo figure {
+  position: relative;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: clamp(0.5rem, 1.6vw, 0.9rem);
+  background: linear-gradient(135deg, #f7d27a, #b8860b 45%, #f7d27a);
+  box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.55), 0 0 3rem rgba(255, 159, 28, 0.2);
+  rotate: -0.6deg;
+}
+
+.patakhas-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.patakhas-photo figcaption {
+  padding: 0.7rem 0.2rem 0.2rem;
+  color: #3a1a05;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* The evening, as three diyas */
+.patakhas-evening {
+  width: min(var(--content-max-width), calc(100% - 2 * var(--page-gutter)));
+  margin: 0 auto;
+  padding-bottom: clamp(3rem, 7vw, 5rem);
+  display: grid;
+  gap: 1.75rem;
+}
+
+.patakhas-evening h2 {
+  margin: 0;
+  color: var(--pk-text);
+  text-align: center;
+}
+
+.patakhas-evening ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patakhas-evening li {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1.25rem;
+  border: 1px solid rgba(255, 207, 112, 0.28);
+  background: rgba(255, 159, 28, 0.06);
+  text-align: center;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.patakhas-evening li:hover,
+.patakhas-evening li:focus-visible {
+  border-color: var(--pk-gold);
+  background: rgba(255, 159, 28, 0.13);
+}
+
+.patakhas-evening h3 { margin: 0; color: var(--pk-gold); font-size: 1.2rem; }
+.patakhas-evening li p { margin: 0; color: var(--pk-muted); line-height: 1.6; }
+
+.patakhas-diya { width: 5rem; height: 4rem; overflow: visible; }
+.patakhas-diya__bowl { fill: #b5541c; }
+.patakhas-diya__rim { stroke: #f3a35c; stroke-width: 2.5; stroke-linecap: round; }
+.patakhas-diya__dots { stroke: #ffd166; stroke-width: 4; stroke-linecap: round; }
+.patakhas-diya__flame { fill: #ff9f1c; transform-origin: 40px 30px; animation: patakhas-flicker 1.6s ease-in-out infinite; }
+.patakhas-diya__flame-core { fill: #fff1a8; transform-origin: 40px 30px; animation: patakhas-flicker 1.6s ease-in-out infinite reverse; }
+.patakhas-diya__glow { fill: rgba(255, 159, 28, 0.22); transition: fill 0.3s ease; }
+
+.patakhas-evening li:hover .patakhas-diya__glow,
+.patakhas-evening li:focus-visible .patakhas-diya__glow { fill: rgba(255, 209, 102, 0.55); }
+
+@keyframes patakhas-flicker {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); }
+  30% { transform: scale(0.94, 1.06) rotate(-3deg); }
+  60% { transform: scale(1.04, 0.95) rotate(2deg); }
+}
+
+.patakhas-credit {
+  margin: 0;
+  color: var(--pk-muted);
+  text-align: center;
+}
+
+.patakhas-credit strong { color: var(--pk-text); }
+
+@media (max-width: 48rem) {
+  .patakhas-evening ol { grid-template-columns: 1fr; }
+  .patakhas-garland span { width: 0.85rem; height: 0.85rem; }
+  .patakhas-hero { padding-top: 6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .patakhas-lights circle,
+  .patakhas-diya__flame,
+  .patakhas-diya__flame-core { animation: none; }
+  .patakhas-hero { cursor: default; }
+}
