@@ -60,7 +60,7 @@ export default function EventStoryFrame({ story, children }) {
         </Link>
         <ul className="event-story-facts" aria-label="Event details">
           <li><time dateTime={story.date}>{formatEventDate({ date: story.date })}</time></li>
-          {story.avenues.map((code) => <li key={code}>{getAvenue(code).label}</li>)}
+          {story.avenues.map((code) => <li key={code}>{getAvenue(code).label.replace(/ Avenue$/, "")}</li>)}
           {story.place ? <li>{story.place}</li> : null}
         </ul>
       </header>

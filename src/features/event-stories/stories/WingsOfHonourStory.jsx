@@ -13,10 +13,6 @@ export default function WingsOfHonourStory() {
           who guard our skies. The campaign showcased the diversity of India and how Rotaractors are still
           united by its Air Force.
         </p>
-        <p>
-          A common template was shared with every club. Each club published its message of thanks on its own
-          Instagram story, which RCPH then reposted with the Indian Air Force tagged.
-        </p>
       </section>
     </>
   );
