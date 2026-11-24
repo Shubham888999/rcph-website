@@ -41,7 +41,10 @@ test("the build writes index.html plus one file per public page", async () => {
   const written = await prerenderSeoPages({ distDir: pathToFileURL(`${dir}/`) });
   const expected = PUBLIC_ROUTES.map((path) => (path === "/" ? "index.html" : `${path.slice(1)}.html`));
   assert.deepEqual(written, expected);
-  assert.deepEqual((await readdir(dir)).sort(), [...expected].sort());
+  const files = (await readdir(dir, { recursive: true })).filter((name) => name.endsWith(".html"));
+  assert.deepEqual(files.sort(), [...expected].sort());
+  const story = await readFile(join(dir, "events", "wings-of-honour-2026.html"), "utf8");
+  assert.match(story, /<meta property="og:image" content="https:\/\/rcph3131\.org\/media\/wings-of-honour\/00-banner-card\.webp" \/>/);
   const about = await readFile(join(dir, "about.html"), "utf8");
   assert.equal(head(about, /<title>([^<]*)<\/title>/), "About Us | Rotaract Club of Pune Heritage, Pune");
   assert.match(pkg.scripts.build, /^vite build && node scripts\/prerender-seo\.mjs$/);

@@ -23,7 +23,7 @@ const viewerSource = read("./StoryViewer.jsx");
 const ribbonSource = read("./CollaboratorRibbon.jsx");
 const css = read("../../../styles/components/wings-of-honour.css");
 const homePageSource = read("../../../pages/public/HomePage.jsx");
-const archivePageSource = read("../../../pages/public/WingsOfHonourArchivePage.jsx");
+const storySource = read("../../event-stories/stories/WingsOfHonourStory.jsx");
 const routerSource = read("../../../app/router.jsx");
 const layoutSource = read("../../../components/layout/PublicLayout.jsx");
 const layoutCss = read("../../../styles/components/public-layout.css");
@@ -68,10 +68,12 @@ test("cards and viewer show no club name or language per story", () => {
   assert.match(sectionSource, /<ThankYouCycler/);
 });
 
-test("collaborator ribbon lists the 14 collaborating clubs, not the host", () => {
-  assert.equal(collaborators.length, 14);
+test("collaborator ribbon lists the 13 collaborating clubs, not the host", () => {
+  assert.equal(collaborators.length, 13);
   assert.equal(collaborators.some((club) => club.slug === "pune-heritage"), false);
-  assert.equal(new Set(collaborators.map((club) => club.name)).size, 14);
+  assert.equal(new Set(collaborators.map((club) => club.name)).size, 13);
+  assert.equal(collaborators.some((club) => club.slug === "mumbai-juhu-youth"), false);
+  assert.match(eventDetails.lede, /13 collaborating clubs/);
   for (const club of collaborators) {
     assert.equal(club.logo, LOGOS_ENABLED ? `/media/wings-of-honour/logos/${club.slug}.webp` : null);
   }
@@ -92,11 +94,11 @@ test("queue positions wrap around the loop", () => {
   assert.equal(queuePosition(0, 1, 9), 8, "the previous lead moves to the back");
 });
 
-test("section is archived off the home page but kept on an unlisted route", () => {
+test("section lives on its event page and the old archive link redirects there", () => {
   assert.doesNotMatch(homePageSource, /WingsOfHonourSection/);
   assert.doesNotMatch(homePageSource, /InstallationFilmGallery/);
-  assert.match(archivePageSource, /<WingsOfHonourSection \/>/);
-  assert.match(routerSource, /path: "\/archive\/wings-of-honour"/);
+  assert.match(storySource, /<WingsOfHonourSection \/>/);
+  assert.match(routerSource, /path: "\/archive\/wings-of-honour", element: <Navigate to="\/events\/wings-of-honour-2026" replace \/>/);
   assert.match(sectionSource, /id=\{SECTION_ID\}/);
   assert.equal(SECTION_ID, "wings-of-honour");
 });

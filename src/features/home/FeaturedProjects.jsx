@@ -2,6 +2,9 @@ import { useId, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { projects } from "../projects/projectsData";
+import StoryLink from "../event-stories/StoryLink";
+import { findStoryForProject } from "../event-stories/eventStories";
+import "../../styles/components/event-stories.css";
 import { cardReveal, copyReveal, headingReveal, imageSettle, staggerContainer } from "./homeMotion";
 
 export default function FeaturedProjects() {
@@ -69,6 +72,7 @@ export default function FeaturedProjects() {
                 <p id={descriptionId} className="home-project-card__description">
                   {project.description}
                 </p>
+                <StoryLink story={findStoryForProject(project)} onClick={(event) => event.stopPropagation()} />
               </div>
               <button
                 className="home-project-card__toggle"

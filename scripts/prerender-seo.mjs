@@ -2,7 +2,7 @@
 // with that page's title, description, canonical link, link-preview tags and breadcrumb data
 // already in the HTML. Search engines and link previews read these before any JavaScript runs.
 // Firebase Hosting serves /about from dist/about.html because cleanUrls is on.
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PUBLIC_ROUTES, getRouteMetadata, serializeStructuredData } from "../src/app/metadataModel.js";
 
@@ -29,8 +29,13 @@ export function renderPageHead(template, pathname) {
   html = setMeta(html, "property", "og:title", metadata.title);
   html = setMeta(html, "property", "og:description", metadata.description);
   html = setMeta(html, "property", "og:url", metadata.canonical);
+  html = setMeta(html, "property", "og:type", metadata.type);
+  html = setMeta(html, "property", "og:image", metadata.image);
+  html = setMeta(html, "property", "og:image:alt", metadata.imageAlt);
   html = setMeta(html, "name", "twitter:title", metadata.title);
   html = setMeta(html, "name", "twitter:description", metadata.description);
+  html = setMeta(html, "name", "twitter:image", metadata.image);
+  html = setMeta(html, "name", "twitter:image:alt", metadata.imageAlt);
   if (metadata.structuredData) {
     const script = `<script type="application/ld+json" data-route-structured-data="true">${serializeStructuredData(metadata.structuredData)}</script>`;
     html = replaceOnce(html, /<\/head>/, () => `    ${script}\n  </head>`, "closing head tag");
@@ -45,6 +50,7 @@ export async function prerenderSeoPages({ distDir }) {
   for (const pathname of PUBLIC_ROUTES) {
     const html = renderPageHead(template, pathname);
     const target = pathname === "/" ? indexPath : new URL(`${pathname.slice(1)}.html`, distDir);
+    await mkdir(new URL("./", target), { recursive: true });
     await writeFile(target, html);
     written.push(pathname === "/" ? "index.html" : `${pathname.slice(1)}.html`);
   }

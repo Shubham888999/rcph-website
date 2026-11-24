@@ -2,6 +2,9 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useId, useRef } from "react";
 import { formatEventDate } from "../events/eventModel";
 import { getAvenue } from "./avenues.js";
+import StoryLink from "../event-stories/StoryLink";
+import { findStoryForEvent } from "../event-stories/eventStories";
+import "../../styles/components/event-stories.css";
 
 const FOCUSABLE_SELECTOR = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
@@ -90,6 +93,7 @@ export default function CalendarEventDialog({ selection, onClose }) {
         <p id={descriptionId} className="calendar-dialog__description">
           {event.description || "No description is currently available for this event."}
         </p>
+        <StoryLink story={findStoryForEvent(event)} className="calendar-dialog__story" onClick={onClose} />
       </div>
     </motion.div>
   );

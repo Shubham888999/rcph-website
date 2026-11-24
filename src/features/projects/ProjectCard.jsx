@@ -1,5 +1,8 @@
 import { useId } from "react";
 import { motion } from "framer-motion";
+import StoryLink from "../event-stories/StoryLink";
+import { findStoryForProject } from "../event-stories/eventStories";
+import "../../styles/components/event-stories.css";
 
 const projectCardVariants = {
   hidden: { opacity: 1, y: 22 },
@@ -45,6 +48,7 @@ export default function ProjectCard({
         >
           {project.description}
         </p>
+        <StoryLink story={findStoryForProject(project)} />
       </div>
 
       <button

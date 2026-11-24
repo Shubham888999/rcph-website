@@ -1,3 +1,5 @@
+import { EVENT_STORIES_PATH, eventStories, storyPath } from "../features/event-stories/eventStories.js";
+
 export const SITE_ORIGIN = "https://rcph3131.org";
 export const DEFAULT_SOCIAL_IMAGE = "/images/rcph-lakshya-logo.webp";
 export const DEFAULT_SOCIAL_IMAGE_ALT = "Rotaract Club of Pune Heritage official logo";
@@ -14,9 +16,11 @@ export const PUBLIC_ROUTES = Object.freeze([
   "/bod",
   "/terms",
   "/privacy",
+  EVENT_STORIES_PATH,
+  ...eventStories.map(storyPath),
 ]);
 
-const PUBLIC_METADATA = Object.freeze({
+const PAGE_METADATA = Object.freeze({
   "/": {
     title: "Rotaract Club of Pune Heritage | Rotaract Club in Pune",
     description: "RCPH is a Rotaract club in Pune in Rotaract District 3131, sponsored by the Rotary Club of Pune Heritage. Service, leadership and fellowship since 2015.",
@@ -74,6 +78,23 @@ const PUBLIC_METADATA = Object.freeze({
   },
 });
 
+// Event story pages take their title, description and preview image from eventStories.js.
+const PUBLIC_METADATA = Object.freeze({
+  ...PAGE_METADATA,
+  [EVENT_STORIES_PATH]: {
+    title: "Event Stories | Rotaract Club of Pune Heritage",
+    description: "The stories behind RCPH's biggest events in Pune and across Rotaract District 3131, each with its own page of photos, people and impact.",
+    breadcrumb: "Event Stories",
+  },
+  ...Object.fromEntries(eventStories.map((story) => [storyPath(story), {
+    title: story.seoTitle,
+    description: story.seoDescription,
+    breadcrumb: story.title,
+    image: story.image,
+    imageAlt: story.imageAlt,
+  }])),
+});
+
 const PRIVATE_TITLES = Object.freeze({
   "/login": "Sign In | RCPH",
   "/signup": "Create an Account | RCPH",
@@ -85,7 +106,6 @@ const PRIVATE_TITLES = Object.freeze({
   "/visits/club-assembly": "Club Assembly Dashboard | RCPH",
   "/visits/dzr-visit": "DZR Visit Dashboard | RCPH",
   "/visits/drr-visit": "DRR Visit Dashboard | RCPH",
-  "/archive/wings-of-honour": "Wings of Honour | RCPH",
 });
 
 export function normalizeRoutePath(pathname) {
@@ -135,9 +155,9 @@ export function getRouteMetadata(pathname) {
       description: publicEntry.description,
       canonical: canonicalUrl(path),
       robots: "index, follow",
-      image: absoluteSiteUrl(DEFAULT_SOCIAL_IMAGE),
-      imageAlt: DEFAULT_SOCIAL_IMAGE_ALT,
-      type: "website",
+      image: absoluteSiteUrl(publicEntry.image || DEFAULT_SOCIAL_IMAGE),
+      imageAlt: publicEntry.image ? publicEntry.imageAlt || publicEntry.title : DEFAULT_SOCIAL_IMAGE_ALT,
+      type: publicEntry.image ? "article" : "website",
       structuredData: getRouteStructuredData(path),
       isPublic: true,
     };
