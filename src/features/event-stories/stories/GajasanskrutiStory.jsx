@@ -88,10 +88,7 @@ function CleanTheStreet() {
         </svg>
         <div className="gs-game__status" aria-live="polite">
           {done ? (
-            <>
-              <p className="gs-game__done">Street clean! On the day, 148 volunteers filled 90 bags like this one.</p>
-              <button type="button" className="gs-button" onClick={() => setPicked(new Set())}>Litter it again</button>
-            </>
+            <p className="gs-game__done">Street clean! On the day, 148 volunteers filled 90 bags like this one.</p>
           ) : (
             <p>{picked.size} of {LITTER.length} picked up. Tap the litter to bag it.</p>
           )}
@@ -149,9 +146,9 @@ export default function GajasanskrutiStory() {
             height="900"
             loading="lazy"
             decoding="async"
-            alt="The RCPH team standing together outside Cafe Goodluck in Pune"
+            alt="The RCPH team standing together on a Pune street during the drive"
           />
-          <figcaption>Team RCPH at Cafe Goodluck</figcaption>
+          <figcaption>Team RCPH</figcaption>
         </figure>
       </section>
 
