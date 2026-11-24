@@ -24,7 +24,6 @@ export default function EventStories() {
       <div className="events-section-react__heading">
         <p className="events-kicker">From the field</p>
         <h2 id="event-stories-title">Event Stories</h2>
-        <p>Our biggest events, each with a page of its own.</p>
       </div>
       <ul className="event-stories-grid">
         {stories.slice(0, SHOWN_ON_EVENTS_PAGE).map((story) => (
