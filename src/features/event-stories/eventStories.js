@@ -68,6 +68,42 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "mahadaan-drive-2-2026",
+    title: "Mahadaan 12.0 · Drive 2",
+    date: "2026-10-03",
+    avenues: ["CMD", "RRRO"],
+    place: "Royal KP Stellar Society, NIBM Road, Pune",
+    hostedBy: "Rotary Club of Pune Heritage",
+    summary:
+      "The second Mahadaan 12.0 drive, collecting clothes, food grains, daily-use items and money at Royal KP Stellar Society.",
+    seoTitle: "Mahadaan 12.0 Drive 2: Donation Drive on NIBM Road | RCPH",
+    seoDescription:
+      "The second Mahadaan 12.0 drive by the Rotary and Rotaract Clubs of Pune Heritage collected clothes, grains, daily-use items and money at Royal KP Stellar Society, Pune.",
+    image: "/media/event-stories/mahadaan-drive-2-2026/share.jpg",
+    imageAlt: "Rotarians and Rotaractors with the Mahadaan banner at Royal KP Stellar Society",
+    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
+    match: { name: "Mahadaan 12.0 Drive 2", date: "2026-10-03" },
+    projectTitle: null,
+  },
+  {
+    slug: "mahadaan-drive-1-2026",
+    title: "Mahadaan 12.0 · Drive 1",
+    date: "2026-09-27",
+    avenues: ["CMD", "RRRO"],
+    place: "Padmavati Hills, Bavdhan, Pune",
+    hostedBy: "Rotary Club of Pune Heritage",
+    summary:
+      "The first Mahadaan 12.0 donation drive, held during Pitru Paksha, collecting food grains, clothes and money for welfare organisations.",
+    seoTitle: "Mahadaan 12.0 Drive 1: Donation Drive in Bavdhan | RCPH",
+    seoDescription:
+      "The Rotary and Rotaract Clubs of Pune Heritage collected food grains, clothes and money at Padmavati Hills, Bavdhan, during Pitru Paksha for welfare organisations.",
+    image: "/media/event-stories/mahadaan-drive-1-2026/share.jpg",
+    imageAlt: "RCPH members beside a truck loaded with Mahadaan donations",
+    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
+    match: { name: "Mahadaan 12.0", date: "2026-09-27" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",
