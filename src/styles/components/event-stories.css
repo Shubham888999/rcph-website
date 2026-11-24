@@ -222,3 +222,5 @@
   .event-story-more ul a,
   .event-stories-card { transition: none; }
 }
+
+.event-stories-see-all { display: inline-block; margin-top: 1.25rem; }

@@ -62,3 +62,11 @@ test("gallery sorts newest first and lookups handle unknown slugs", () => {
 test("router serves the gallery before the story route", () => {
   assert.ok(router.indexOf('path: "/events/stories"') < router.indexOf('path: "/events/:slug"'));
 });
+
+test("Events page shows the event stories section after upcoming events", () => {
+  const eventsPage = read("../../pages/public/EventsPage.jsx");
+  assert.match(eventsPage, /^import EventStories from/m);
+  assert.ok(eventsPage.indexOf("<EventStories />") > eventsPage.indexOf('title="Upcoming Events"'));
+  assert.ok(eventsPage.indexOf("<EventStories />") < eventsPage.indexOf('title="Recent Events"'));
+  assert.doesNotMatch(read("../events/EventStories.jsx"), /Pages of Hope/);
+});
