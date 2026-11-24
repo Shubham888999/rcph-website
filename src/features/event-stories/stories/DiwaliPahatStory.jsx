@@ -1,101 +1,116 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import "../../../styles/components/event-diwali-pahat.css";
 
 const MEDIA = "/media/event-stories/diwali-pahat-2026";
-
-const stops = [
-  { time: "Early morning", place: "Sarasbaug", text: "Members gathered at Sarasbaug early on the morning of Padwa to celebrate the festive occasion together." },
-  { time: "Breakfast", place: "Bangalore Tiffin Room", text: "After spending some time there, everyone headed to Bangalore Tiffin Room for breakfast, a lovely start to the day." },
-];
+const DIYAS = 5;
 
 const conductedBy = [
   { name: "Rtr. Harshal Nikam", role: "Club Service Director" },
   { name: "Rtr. Shivani Kulkarni", role: "Co-Club Service Director" },
 ];
 
-function Rangoli() {
-  const petals = Array.from({ length: 8 }, (_, i) => i * 45);
+// Paper lanterns hanging across the sky: horizontal position, string length, colours.
+const KANDILS = [
+  { x: 8, drop: 4.5, body: "#e63946", trim: "#ffd166" },
+  { x: 28, drop: 7, body: "#f4a259", trim: "#7b2cbf" },
+  { x: 72, drop: 6, body: "#2a9d8f", trim: "#ffd166" },
+  { x: 92, drop: 3.5, body: "#d6336c", trim: "#ffd166" },
+];
+
+function Kandil({ body, trim }) {
   return (
-    <svg className="dp-rangoli" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-      {petals.map((angle) => <ellipse key={`o${angle}`} cx="60" cy="24" rx="10" ry="20" fill="#e8731a" transform={`rotate(${angle} 60 60)`} />)}
-      {petals.map((angle) => <ellipse key={`m${angle}`} cx="60" cy="34" rx="7" ry="14" fill="#d6336c" transform={`rotate(${angle + 22.5} 60 60)`} />)}
-      <circle cx="60" cy="60" r="16" fill="#ffd166" />
-      <circle cx="60" cy="60" r="8" fill="#2a9d8f" />
-      {petals.map((angle) => <circle key={`d${angle}`} cx="60" cy="6" r="3" fill="#7b2cbf" transform={`rotate(${angle + 22.5} 60 60)`} />)}
+    <svg viewBox="0 0 60 100" aria-hidden="true" focusable="false">
+      <path d="M30 0V14" stroke="#c9b8a0" strokeWidth="1.5" />
+      <path d="M18 14h24l14 24-26 26L4 38Z" fill={body} />
+      <path d="M4 38h52M18 14l12 50M42 14 30 64" stroke={trim} strokeWidth="2.2" fill="none" />
+      <path d="M22 64v24M30 64v30M38 64v24" stroke={trim} strokeWidth="2" />
+      <ellipse className="dp-kandil__glow" cx="30" cy="38" rx="24" ry="22" fill="#ffd166" />
     </svg>
   );
 }
 
-// Drag the sun up: the sky brightens and the morning moves from Sarasbaug to breakfast.
-function MorningSlider() {
-  const [value, setValue] = useState(15);
-  const id = useId();
-  const stop = value < 55 ? stops[0] : stops[1];
-  const sunY = 82 - value * 0.62;
-
+function Diya() {
   return (
-    <div className="dp-morning" style={{ "--progress": value / 100 }}>
-      <div className="dp-morning__sky" aria-hidden="true">
-        <span className="dp-morning__sun" style={{ top: `${sunY}%` }} />
-        <span className="dp-morning__ground" />
-      </div>
-      <div className="dp-morning__panel">
-        <label htmlFor={id} className="dp-morning__label">Drag the sun up</label>
-        <input
-          id={id}
-          type="range"
-          min="0"
-          max="100"
-          value={value}
-          onChange={(event) => setValue(Number(event.target.value))}
-          aria-valuetext={`${stop.time}, ${stop.place}`}
-        />
-        <div className="dp-morning__stop" aria-live="polite">
-          <p className="dp-morning__time">{stop.time}</p>
-          <h3>{stop.place}</h3>
-          <p>{stop.text}</p>
-        </div>
-        <ol className="dp-morning__steps" aria-hidden="true">
-          {stops.map((item) => <li key={item.place} className={item === stop ? "is-here" : ""}>{item.place}</li>)}
-        </ol>
-      </div>
-    </div>
+    <svg viewBox="0 0 80 64" aria-hidden="true" focusable="false">
+      <ellipse className="dp-diya__glow" cx="40" cy="22" rx="24" ry="22" />
+      <path className="dp-diya__flame" d="M40 4C47 15 47 23 40 31 33 23 33 15 40 4Z" />
+      <path d="M6 34H74C72 50 58 60 40 60 22 60 8 50 6 34Z" fill="#b5541c" />
+      <path d="M6 34H74" stroke="#f3a35c" strokeWidth="3" strokeLinecap="round" />
+      <path d="M20 44h.01M30 48h.01M40 49h.01M50 48h.01M60 44h.01" stroke="#ffd166" strokeWidth="4" strokeLinecap="round" />
+    </svg>
   );
 }
 
 export default function DiwaliPahatStory() {
+  const [lit, setLit] = useState(0);
+  const dawn = lit === DIYAS;
+
   return (
-    <div className="dp">
+    <div className={`dp${lit >= 4 ? " is-light" : ""}${dawn ? " is-dawn" : ""}`} style={{ "--light": lit / DIYAS }}>
       <section className="dp-hero" aria-labelledby="dp-title">
-        <span className="dp-hero__sun" aria-hidden="true" />
-        <p className="dp-kicker">Club Service · Morning of Padwa</p>
-        <h1 id="dp-title">Diwali Pahat</h1>
-        <Rangoli />
+        <div className="dp-kandils" aria-hidden="true">
+          {KANDILS.map((kandil) => (
+            <span key={kandil.x} className="dp-kandil" style={{ left: `${kandil.x}%`, "--drop": `${kandil.drop}rem` }}>
+              <Kandil body={kandil.body} trim={kandil.trim} />
+            </span>
+          ))}
+        </div>
+        <p className="dp-kicker">Club Service · Morning of Padwa · 10 November 2026</p>
+        <h1 id="dp-title">
+          <span className="dp-title__marathi" lang="mr">दिवाळी पहाट</span>
+          <span className="dp-title__english">Diwali Pahat</span>
+        </h1>
         <p className="dp-lede">
-          A festive Diwali morning: members gathered at Sarasbaug at dawn on Padwa, then headed out for breakfast
-          together.
+          Before sunrise on Padwa, members gathered at Sarasbaug to celebrate the festive occasion together.
         </p>
+
+        <div className="dp-diyas">
+          <p className="dp-diyas__label" aria-live="polite">
+            {dawn ? "Shubh Padwa! The morning is here." : `Light the diyas to bring in the morning · ${lit} of ${DIYAS}`}
+          </p>
+          <ul>
+            {Array.from({ length: DIYAS }, (_, index) => (
+              <li key={index}>
+                <button
+                  type="button"
+                  className={`dp-diya${index < lit ? " is-lit" : ""}`}
+                  onClick={() => setLit((current) => Math.max(current, index + 1))}
+                  disabled={index < lit}
+                  aria-label={index < lit ? `Diya ${index + 1} lit` : `Light diya ${index + 1}`}
+                >
+                  <Diya />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
-      <section className="dp-photo" aria-label="Group photo">
-        <figure>
-          <img
-            src={`${MEDIA}/group-photo.webp`}
-            srcSet={`${MEDIA}/group-photo-800.webp 800w, ${MEDIA}/group-photo.webp 1600w`}
-            sizes="(max-width: 64rem) 100vw, 60rem"
-            width="1600"
-            height="1200"
-            loading="lazy"
-            decoding="async"
-            alt="RCPH members in festive kurtas and traditional outfits outside Bangalore Tiffin Room in the morning sun"
-          />
-          <figcaption>Diwali Pahat · 10 November 2026</figcaption>
-        </figure>
-      </section>
-
-      <section className="dp-section" aria-labelledby="dp-morning-title">
-        <h2 id="dp-morning-title">Watch the morning unfold</h2>
-        <MorningSlider />
+      <section className="dp-journey" aria-labelledby="dp-journey-title">
+        <h2 id="dp-journey-title">The morning</h2>
+        <ol>
+          <li className="dp-postcard">
+            <p className="dp-postcard__stamp">At dawn</p>
+            <h3>Sarasbaug</h3>
+            <p>Members gathered early on the morning of Padwa to celebrate the festive occasion together.</p>
+          </li>
+          <li className="dp-journey__path" aria-hidden="true" />
+          <li className="dp-postcard dp-postcard--photo">
+            <p className="dp-postcard__stamp">For breakfast</p>
+            <h3>Bangalore Tiffin Room</h3>
+            <p>After spending some time at Sarasbaug, everyone headed here for breakfast, a lovely start to the day.</p>
+            <img
+              src={`${MEDIA}/group-photo.webp`}
+              srcSet={`${MEDIA}/group-photo-800.webp 800w, ${MEDIA}/group-photo.webp 1600w`}
+              sizes="(max-width: 48rem) 100vw, 30rem"
+              width="1600"
+              height="1200"
+              loading="lazy"
+              decoding="async"
+              alt="RCPH members in festive kurtas and traditional outfits outside Bangalore Tiffin Room in the morning sun"
+            />
+          </li>
+        </ol>
       </section>
 
       <section className="dp-credits" aria-label="Organisers">

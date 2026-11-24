@@ -13,4 +13,5 @@ export const eventStoryComponents = {
   "dine-and-unwind-2026": lazy(() => import("./stories/DineAndUnwindStory")),
   "concord-2026": lazy(() => import("./stories/ConcordStory")),
   "diwali-pahat-2026": lazy(() => import("./stories/DiwaliPahatStory")),
+  "rotary-club-assembly-2026": lazy(() => import("./stories/RotaryClubAssemblyStory")),
 };

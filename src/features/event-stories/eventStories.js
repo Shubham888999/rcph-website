@@ -68,6 +68,24 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "rotary-club-assembly-2026",
+    title: "Rotary Club Assembly",
+    date: "2026-10-25",
+    avenues: ["RRRO"],
+    place: "Pune",
+    hostedBy: "Rotary Club of Pune Heritage",
+    summary:
+      "RCPH's President and Secretary joined the Rotary Club of Pune Heritage's Club Assembly to review progress and plan joint Rotary–Rotaract projects.",
+    seoTitle: "Rotary Club Assembly 2026: Rotary and Rotaract Planning | RCPH",
+    seoDescription:
+      "The President and Secretary of Rotaract Club of Pune Heritage attended the Rotary Club of Pune Heritage Club Assembly to review progress and plan joint projects.",
+    image: "/media/event-stories/rotary-club-assembly-2026/share.jpg",
+    imageAlt: "Rotary and Rotaract members of Pune Heritage on stage at the Club Assembly",
+    card: { background: "linear-gradient(180deg, #f7a81b 0 0.5rem, #0c2a5c 0.5rem)", color: "#ffffff", font: "serif" },
+    match: { name: "Rotary Club Assembly", date: "2026-10-25" },
+    projectTitle: null,
+  },
+  {
     slug: "rooted-2026",
     title: "ROOTED",
     date: "2026-10-13",
