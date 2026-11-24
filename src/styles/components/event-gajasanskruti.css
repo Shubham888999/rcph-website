@@ -1,0 +1,368 @@
+/* Gajasanskruti (city cleanliness drive): municipal green and white, a road with lane markings,
+   a route of the areas cleaned, and a street to clean. One look in both site themes. */
+
+.gs {
+  --gs-green: #1f8a5b;
+  --gs-green-dark: #14532d;
+  --gs-mint: #d9f2e3;
+  --gs-road: #3b3f45;
+  --gs-yellow: #ffd23f;
+  --gs-paper: #f6faf7;
+  --gs-ink: #17261d;
+  --gs-muted: #4f6457;
+  color: var(--gs-ink);
+  background: var(--gs-paper);
+}
+
+/* Hero with a road running under it */
+.gs-hero {
+  position: relative;
+  padding: clamp(2.5rem, 7vw, 4.5rem) var(--page-gutter) clamp(4.5rem, 9vw, 6rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 1rem;
+  text-align: center;
+  background:
+    linear-gradient(180deg, transparent calc(100% - 3.2rem), var(--gs-road) calc(100% - 3.2rem)),
+    radial-gradient(ellipse at 50% 0%, rgba(31, 138, 91, 0.18), transparent 60%),
+    var(--gs-paper);
+}
+
+/* Dashed yellow lane marking along the road */
+.gs-hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.45rem;
+  height: 0.3rem;
+  background: repeating-linear-gradient(90deg, var(--gs-yellow) 0 2.4rem, transparent 2.4rem 4.2rem);
+}
+
+.gs-hero > * { max-width: 100%; }
+
+.gs-kicker {
+  margin: 0;
+  color: var(--gs-green);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.gs-hero h1 {
+  margin: 0;
+  color: var(--gs-green-dark);
+  font-size: clamp(2.6rem, 9vw, 5.5rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.gs-hero h1 span { color: var(--gs-green); }
+
+.gs-lede {
+  max-width: 44rem;
+  margin: 0;
+  color: var(--gs-muted);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.gs-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: min(48rem, 100%);
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gs-stats li {
+  display: grid;
+  gap: 0.15rem;
+  padding: 1rem 0.5rem;
+  background: var(--gs-green);
+  color: #fff;
+  box-shadow: 4px 4px 0 var(--gs-green-dark);
+}
+
+.gs-stats strong { font-size: clamp(1.6rem, 5vw, 2.4rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.gs-stats span { font-size: 0.82rem; font-weight: 700; }
+
+/* Route */
+.gs-route {
+  width: min(var(--content-max-width), calc(100% - 2 * var(--page-gutter)));
+  margin: 0 auto;
+  padding-block: clamp(2.5rem, 6vw, 3.5rem);
+  display: grid;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+.gs-route h2,
+.gs-play h2,
+.gs-people h2 { margin: 0; color: var(--gs-green-dark); }
+
+.gs-route ol {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The road joining the stops */
+.gs-route ol::before {
+  content: "";
+  position: absolute;
+  top: 1.25rem;
+  left: 12.5%;
+  right: 12.5%;
+  height: 0.55rem;
+  background: var(--gs-road);
+  transform: translateY(-50%);
+}
+
+.gs-route li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  color: var(--gs-ink);
+  font-weight: 800;
+}
+
+.gs-route__pin {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--gs-green-dark);
+  border-radius: 50% 50% 50% 0;
+  background: var(--gs-yellow);
+  color: var(--gs-green-dark);
+  font-weight: 900;
+  rotate: -45deg;
+}
+
+.gs-route__pin { font-size: 0.95rem; }
+.gs-route__pin > span { rotate: 45deg; }
+
+/* Photos */
+.gs-photos {
+  width: min(64rem, calc(100% - 2 * var(--page-gutter)));
+  margin: 0 auto;
+  padding-bottom: clamp(2.5rem, 6vw, 4rem);
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.gs-photos figure {
+  margin: 0;
+  padding: 0.6rem;
+  border: 3px solid var(--gs-green-dark);
+  background: #fff;
+}
+
+.gs-photos img { display: block; width: 100%; height: auto; }
+
+.gs-photos figcaption {
+  padding-top: 0.6rem;
+  color: var(--gs-green-dark);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Clean the street */
+.gs-play {
+  width: min(56rem, calc(100% - 2 * var(--page-gutter)));
+  margin: 0 auto;
+  padding-bottom: clamp(2.5rem, 6vw, 4rem);
+  display: grid;
+  gap: 0.6rem;
+  text-align: center;
+}
+
+.gs-play > p { margin: 0 0 0.75rem; color: var(--gs-muted); }
+
+.gs-game { display: grid; gap: 1.25rem; }
+
+.gs-street {
+  position: relative;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  border: 3px solid var(--gs-green-dark);
+  background: #b8e0c8;
+}
+
+.gs-street__footpath {
+  position: absolute;
+  inset: 45% 0 0;
+  background: repeating-linear-gradient(90deg, #cfd4d8 0 3.5rem, #c2c8cd 3.5rem 3.6rem);
+}
+
+.gs-street__road {
+  position: absolute;
+  inset: 70% 0 0;
+  background: var(--gs-road);
+}
+
+.gs-street__road span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 0.3rem;
+  background: repeating-linear-gradient(90deg, var(--gs-yellow) 0 2rem, transparent 2rem 3.6rem);
+}
+
+.gs-litter {
+  position: absolute;
+  width: clamp(2rem, 6vw, 3rem);
+  height: clamp(2rem, 6vw, 3rem);
+  padding: 0.2rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transform: translate(-50%, -50%) rotate(var(--tilt));
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+.gs-litter:hover { background: rgba(255, 255, 255, 0.35); }
+.gs-litter svg { width: 100%; height: 100%; }
+.gs-litter.is-picked { opacity: 0; transform: translate(-50%, 200%) scale(0.3); pointer-events: none; }
+
+.gs-litter:focus-visible,
+.gs-button:focus-visible {
+  outline: 3px solid var(--gs-yellow);
+  outline-offset: 2px;
+}
+
+.gs-bag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem 1.5rem;
+}
+
+.gs-bag { width: 4.5rem; height: auto; }
+.gs-bag__fill { transition: y 0.35s ease, height 0.35s ease; }
+
+.gs-game__status { display: grid; justify-items: start; gap: 0.6rem; text-align: left; }
+.gs-game__status p { margin: 0; color: var(--gs-muted); font-weight: 700; }
+
+.gs-game__done {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--gs-green);
+  background: var(--gs-mint);
+  color: var(--gs-green-dark) !important;
+  font-weight: 800;
+}
+
+.gs-button {
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--gs-green-dark);
+  border-radius: 0;
+  background: transparent;
+  color: var(--gs-green-dark);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gs-button:hover { background: var(--gs-mint); }
+
+/* Partners and credits */
+.gs-people {
+  width: min(var(--content-max-width), calc(100% - 2 * var(--page-gutter)));
+  margin: 0 auto;
+  padding-bottom: clamp(3rem, 7vw, 5rem);
+  display: grid;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+.gs-partners {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gs-partners li,
+.gs-credits li {
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+  padding: 1.1rem 1.25rem;
+  border: 2px solid var(--gs-green-dark);
+  background: #fff;
+}
+
+.gs-partners span {
+  color: var(--gs-green);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.gs-partners strong,
+.gs-credits strong { color: var(--gs-green-dark); font-size: 1.02rem; }
+
+.gs-credits { display: grid; justify-items: center; gap: 0.8rem; }
+
+.gs-credits__label {
+  margin: 0;
+  color: var(--gs-green);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.gs-credits ul {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 1rem;
+  width: min(56rem, 100%);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gs-credits li { flex: 1 1 0; min-width: 0; max-width: 18rem; }
+.gs-credits span { color: var(--gs-muted); font-size: 0.9rem; }
+
+@media (max-width: 48rem) {
+  .gs-photos { grid-template-columns: 1fr; }
+  .gs-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gs-route ol { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1.75rem; }
+  .gs-route ol::before { display: none; }
+  .gs-street { aspect-ratio: 16 / 9; }
+}
+
+@media (max-width: 36rem) {
+  .gs-credits ul { flex-direction: column; align-items: center; }
+  .gs-credits li { width: 100%; max-width: 20rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-litter,
+  .gs-bag__fill { transition: none; }
+}

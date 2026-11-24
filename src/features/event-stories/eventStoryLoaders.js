@@ -9,4 +9,5 @@ export const eventStoryComponents = {
   "rooted-2026": lazy(() => import("./stories/RootedStory")),
   "mahadaan-drive-2-2026": lazy(() => import("./stories/MahadaanDrive2Story")),
   "mahadaan-drive-1-2026": lazy(() => import("./stories/MahadaanDrive1Story")),
+  "gajasanskruti-2026": lazy(() => import("./stories/GajasanskrutiStory")),
 };

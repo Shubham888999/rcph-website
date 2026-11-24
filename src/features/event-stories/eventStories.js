@@ -104,6 +104,24 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "gajasanskruti-2026",
+    title: "Gajasanskruti 10.0",
+    date: "2026-09-26",
+    avenues: ["ISD", "CMD", "RRRO"],
+    place: "Pune",
+    hostedBy: "Rotaract Club of Pune Mideast",
+    summary:
+      "A city cleanliness drive with 148 volunteers from 31 Rotaract clubs and 2 Rotary clubs, who filled 90 bags of garbage across four areas of Pune.",
+    seoTitle: "Gajasanskruti 10.0: Pune Cleanliness Drive | RCPH",
+    seoDescription:
+      "RCPH joined Gajasanskruti 10.0, a cleanliness drive by the Rotaract Club of Pune Mideast: 148 volunteers from 31 Rotaract clubs cleaned FC Road, Karve Road, Nadiapatra and Deccan Gymkhana.",
+    image: "/media/event-stories/gajasanskruti-2026/share.jpg",
+    imageAlt: "Volunteers from many clubs after the Gajasanskruti cleanliness drive in Pune",
+    card: { background: "linear-gradient(180deg, #1f8a5b 0 72%, #3b3f45 72%)", color: "#ffffff", font: "sans" },
+    match: { name: "Gajasanskruti 10.0", date: "2026-09-26" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",
