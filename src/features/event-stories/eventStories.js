@@ -1,0 +1,85 @@
+// Every event that has its own story page. Plain data only (no components or CSS), because
+// the SEO build script and the sitemap test import this file in Node.
+//
+// To add an event page:
+// 1. Add an entry here (newest first is not required; the gallery sorts by date).
+// 2. Add its component to eventStoryLoaders.js under the same slug.
+// 3. Add its path to public/sitemap.xml (a test checks this).
+//
+// `match` links the page to an event in BOD Tools by its exact name and date, so the calendar
+// and the events list show "Read the story" for it. Leave it null until the event is reported.
+// `projectTitle` does the same for a card on the Projects page.
+
+export const EVENT_STORIES_PATH = "/events/stories";
+
+export const eventStories = Object.freeze([
+  {
+    slug: "wings-of-honour-2026",
+    title: "Wings of Honour",
+    date: "2026-10-08",
+    avenues: ["ISD", "PRO", "DEI"],
+    place: "Instagram, across 6 Rotaract districts",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "A multi-district tribute campaign on Indian Air Force Day, where RCPH and 13 collaborating clubs thanked the heroes who guard our skies, each in their own mother tongue.",
+    seoTitle: "Wings of Honour: Indian Air Force Day Tribute | RCPH",
+    seoDescription:
+      "On the 94th Indian Air Force Day, Rotaract Club of Pune Heritage and 13 clubs from 6 districts thanked the Indian Air Force in 11 languages.",
+    image: "/media/wings-of-honour/00-banner-card.webp",
+    imageAlt: "Wings of Honour campaign banner: A Salute to Guardians of the Skies",
+    card: { background: "linear-gradient(135deg, #0c1b2c, #1d344e)", color: "#e7c58f", font: "serif" },
+    match: { name: "Wings of Honour", date: "2026-10-08" },
+    projectTitle: null,
+  },
+  {
+    slug: "mens-day-2026",
+    title: "From Us, To Him",
+    date: "2026-11-19",
+    avenues: ["CSD"],
+    place: "Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "For International Men's Day, the club wrote a note for every man at Heritage. Here they are, pinned up and left unsigned.",
+    seoTitle: "From Us, To Him: International Men's Day 2026 | RCPH",
+    seoDescription:
+      "Anonymous notes of appreciation written for the men of Rotaract Club of Pune Heritage on International Men's Day 2026.",
+    image: null,
+    imageAlt: null,
+    card: { background: "#a9784a", color: "#fff4dc", font: "serif" },
+    match: null,
+    projectTitle: null,
+  },
+]);
+
+export function storyPath(story) {
+  return `/events/${story.slug}`;
+}
+
+export function getEventStory(slug) {
+  return eventStories.find((story) => story.slug === slug) || null;
+}
+
+export function storiesNewestFirst() {
+  return [...eventStories].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+function normalizeName(value) {
+  return typeof value === "string" ? value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() : "";
+}
+
+// Finds the story page for an event from BOD Tools (calendar, events list), if it has one.
+export function findStoryForEvent(event) {
+  if (!event) return null;
+  const name = normalizeName(event.name);
+  if (!name) return null;
+  return eventStories.find((story) => story.match
+    && story.match.date === event.date
+    && normalizeName(story.match.name) === name) || null;
+}
+
+// Finds the story page for a card on the Projects page, if it has one.
+export function findStoryForProject(project) {
+  const title = normalizeName(project?.title);
+  if (!title) return null;
+  return eventStories.find((story) => story.projectTitle && normalizeName(story.projectTitle) === title) || null;
+}

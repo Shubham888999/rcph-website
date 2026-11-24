@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import RouteLoader from "../components/feedback/RouteLoader";
 import PublicLayout from "../components/layout/PublicLayout";
 import ApprovedRoute from "../features/auth/ApprovedRoute";
@@ -21,6 +21,8 @@ export const router = createBrowserRouter([{
         { path: "/", element: lazyRoute(lazy(() => import("../pages/public/HomePage"))) },
         { path: "/about", element: lazyRoute(lazy(() => import("../pages/public/AboutPage"))) },
         { path: "/events", element: lazyRoute(lazy(() => import("../pages/public/EventsPage"))) },
+        { path: "/events/stories", element: lazyRoute(lazy(() => import("../pages/public/EventStoriesPage"))) },
+        { path: "/events/:slug", element: lazyRoute(lazy(() => import("../pages/public/EventStoryPage"))) },
         { path: "/calendar", element: lazyRoute(lazy(() => import("../pages/public/CalendarPage"))) },
         { path: "/projects", element: lazyRoute(lazy(() => import("../pages/public/ProjectsPage"))) },
         { path: "/join", element: lazyRoute(lazy(() => import("../pages/public/JoinPage"))) },
@@ -29,7 +31,8 @@ export const router = createBrowserRouter([{
         { path: "/contact", element: lazyRoute(lazy(() => import("../pages/public/ContactPage"))) },
         { path: "/terms", element: lazyRoute(lazy(() => import("../pages/public/TermsPage"))) },
         { path: "/privacy", element: lazyRoute(lazy(() => import("../pages/public/PrivacyPage"))) },
-        { path: "/archive/wings-of-honour", element: lazyRoute(lazy(() => import("../pages/public/WingsOfHonourArchivePage"))) },
+        // Old archive link from when Wings of Honour left the home page.
+        { path: "/archive/wings-of-honour", element: <Navigate to="/events/wings-of-honour-2026" replace /> },
       ],
     },
     { path: "/login", element: lazyRoute(lazy(() => import("../pages/auth/LoginPage"))) },
