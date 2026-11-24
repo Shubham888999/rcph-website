@@ -140,6 +140,24 @@ export const eventStories = Object.freeze([
     projectTitle: null,
   },
   {
+    slug: "concord-2026",
+    title: "CONCORD",
+    date: "2026-09-06",
+    avenues: ["CMD", "PDD", "DEI"],
+    place: "Pune",
+    hostedBy: "Rotaract Club of Pune Heritage",
+    summary:
+      "The Peace Roundtable: an interactive forum on peacebuilding and conflict prevention, with discussions, a Situation Lab and a roundtable, alongside four Rotaract clubs.",
+    seoTitle: "CONCORD: The Peace Roundtable | RCPH",
+    seoDescription:
+      "CONCORD by Rotaract Club of Pune Heritage explored peace from the individual to the global level through discussions, a Situation Lab and a Peace Roundtable in Pune.",
+    image: "/media/event-stories/concord-2026/share.jpg",
+    imageAlt: "Participants making peace signs at CONCORD, The Peace Roundtable",
+    card: { background: "radial-gradient(circle at 50% 50%, #ffffff 0 18%, #c7ddf2 19% 38%, #8db6df 39% 58%, #2f6fb3 59%)", color: "#17325a", font: "sans" },
+    match: { name: "CONCORD : The Peace Roundtable", date: "2026-09-06" },
+    projectTitle: null,
+  },
+  {
     slug: "wings-of-honour-2026",
     title: "Wings of Honour",
     date: "2026-10-08",
