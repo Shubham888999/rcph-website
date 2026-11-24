@@ -27,7 +27,7 @@ export const eventStories = Object.freeze([
       "Rotaract Club of Pune Heritage celebrated Diwali Pahat on the morning of Padwa at Sarasbaug, Pune, followed by breakfast at Bangalore Tiffin Room.",
     image: "/media/event-stories/diwali-pahat-2026/share.jpg",
     imageAlt: "RCPH members in festive outfits on the morning of Diwali Pahat",
-    card: { background: "linear-gradient(180deg, #f2a7b5, #f4a259 55%, #ffe8a3)", color: "#7a1f3d", font: "serif" },
+    card: { background: "linear-gradient(180deg, #f2a7b5, #f4a259 55%, #ffe8a3)", color: "#7a1f3d" },
     match: { name: "Diwali Pahat", date: "2026-11-10" },
     projectTitle: null,
   },
@@ -45,7 +45,7 @@ export const eventStories = Object.freeze([
       "Rotaract Club of Pune Heritage celebrated Diwali 2026 with Patakhas Assemble, an evening of Bollywood Trivia, dinner and festive fun in Pune.",
     image: "/media/event-stories/patakhas-assemble-2026/share.jpg",
     imageAlt: "RCPH members in festive outfits at the Patakhas Assemble Diwali party",
-    card: { background: "radial-gradient(circle at 70% 20%, #b3122d, #12061c 70%)", color: "#ffcf70", font: "sans" },
+    card: { background: "radial-gradient(circle at 70% 20%, #b3122d, #12061c 70%)", color: "#ffcf70" },
     match: { name: "Patakhas Assemble", date: "2026-11-13" },
     projectTitle: null,
   },
@@ -63,7 +63,7 @@ export const eventStories = Object.freeze([
       "Rotaract Club of Pune Heritage members came together online for Couch Champions, an evening of games, friendly competition and laughter.",
     image: "/media/event-stories/couch-champions-2026/share.jpg",
     imageAlt: "Online game night screenshot from Couch Champions",
-    card: { background: "linear-gradient(135deg, #0d0a24, #3a0ca3)", color: "#7ef9ff", font: "mono" },
+    card: { background: "linear-gradient(135deg, #0d0a24, #3a0ca3)", color: "#7ef9ff" },
     match: { name: "Couch Champions", date: "2026-10-24" },
     projectTitle: null,
   },
@@ -81,7 +81,7 @@ export const eventStories = Object.freeze([
       "The President and Secretary of Rotaract Club of Pune Heritage attended the Rotary Club of Pune Heritage Club Assembly to review progress and plan joint projects.",
     image: "/media/event-stories/rotary-club-assembly-2026/share.jpg",
     imageAlt: "Rotary and Rotaract members of Pune Heritage on stage at the Club Assembly",
-    card: { background: "linear-gradient(180deg, #f7a81b 0 0.5rem, #0c2a5c 0.5rem)", color: "#ffffff", font: "serif" },
+    card: { background: "linear-gradient(180deg, #f7a81b 0 0.5rem, #0c2a5c 0.5rem)", color: "#ffffff" },
     match: { name: "Rotary Club Assembly", date: "2026-10-25" },
     projectTitle: null,
   },
@@ -99,7 +99,7 @@ export const eventStories = Object.freeze([
       "Rotaract Club of Pune Heritage and S.P. Junior College's Environment Department held ROOTED, a hands-on gardening workshop for 60+ participants in Pune.",
     image: "/media/event-stories/rooted-2026/share.jpg",
     imageAlt: "Participants holding potted saplings at the ROOTED gardening workshop",
-    card: { background: "linear-gradient(160deg, #6bb35f, #2e1d13 85%)", color: "#f4ecdc", font: "sans" },
+    card: { background: "linear-gradient(160deg, #6bb35f, #2e1d13 85%)", color: "#f4ecdc" },
     match: { name: "ROOTED", date: "2026-10-13" },
     projectTitle: null,
   },
@@ -117,7 +117,7 @@ export const eventStories = Object.freeze([
       "The second Mahadaan 12.0 drive by the Rotary and Rotaract Clubs of Pune Heritage collected 23 bags of clothes, 63 kg of food grains, daily-use items and Rs. 7,202 in Pune.",
     image: "/media/event-stories/mahadaan-drive-2-2026/share.jpg",
     imageAlt: "Rotarians and Rotaractors with the Mahadaan banner at Royal KP Stellar Society",
-    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
+    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2" },
     match: { name: "Mahadaan 12.0 Drive 2", date: "2026-10-03" },
     projectTitle: null,
   },
@@ -135,7 +135,7 @@ export const eventStories = Object.freeze([
       "During Pitru Paksha, the Rotary and Rotaract Clubs of Pune Heritage collected 28 bags of clothes, 15 kg of food grains and Rs. 2,600 at Padmavati Hills, Bavdhan, for welfare organisations.",
     image: "/media/event-stories/mahadaan-drive-1-2026/share.jpg",
     imageAlt: "RCPH members beside a truck loaded with Mahadaan donations",
-    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2", font: "sans" },
+    card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2" },
     match: { name: "Mahadaan 12.0", date: "2026-09-27" },
     projectTitle: null,
   },
@@ -153,7 +153,7 @@ export const eventStories = Object.freeze([
       "RCPH joined Gajasanskruti 10.0, a cleanliness drive by the Rotaract Club of Pune Mideast: 148 volunteers from 31 Rotaract clubs cleaned FC Road, Karve Road, Nadiapatra and Deccan Gymkhana.",
     image: "/media/event-stories/gajasanskruti-2026/share.jpg",
     imageAlt: "Volunteers from many clubs after the Gajasanskruti cleanliness drive in Pune",
-    card: { background: "linear-gradient(180deg, #1f8a5b 0 72%, #3b3f45 72%)", color: "#ffffff", font: "sans" },
+    card: { background: "linear-gradient(180deg, #1f8a5b 0 72%, #3b3f45 72%)", color: "#ffffff" },
     match: { name: "Gajasanskruti 10.0", date: "2026-09-26" },
     projectTitle: null,
   },
@@ -171,7 +171,7 @@ export const eventStories = Object.freeze([
       "Members of Rotaract Club of Pune Heritage got together for Dine & Unwind, a relaxed club dinner in Pune to bond outside regular club activities.",
     image: "/media/event-stories/dine-and-unwind-2026/share.jpg",
     imageAlt: "RCPH members smiling in a group selfie after the Dine & Unwind dinner",
-    card: { background: "radial-gradient(circle at 50% 50%, #8a2236, #4a0f1c 80%)", color: "#fbf6ec", font: "serif" },
+    card: { background: "radial-gradient(circle at 50% 50%, #8a2236, #4a0f1c 80%)", color: "#fbf6ec" },
     match: { name: "Dine & Unwind", date: "2026-09-13" },
     projectTitle: null,
   },
@@ -189,7 +189,7 @@ export const eventStories = Object.freeze([
       "Rotaract Club of Pune Heritage welcomed delegates from RID 3191, Bangalore, to a Misal Brunch during Samyati 4.0, celebrating Pune's iconic Misal Pav and interdistrict fellowship.",
     image: "/media/event-stories/misal-brunch-2026/share.jpg",
     imageAlt: "RCPH members and RID 3191 delegates outside Pune Misal House",
-    card: { background: "linear-gradient(135deg, #c62d17, #7d1a0c)", color: "#f2b84b", font: "sans" },
+    card: { background: "linear-gradient(135deg, #c62d17, #7d1a0c)", color: "#f2b84b" },
     match: { name: "Misal Brunch", date: "2026-09-19" },
     projectTitle: null,
   },
@@ -207,7 +207,7 @@ export const eventStories = Object.freeze([
       "CONCORD by Rotaract Club of Pune Heritage explored peace from the individual to the global level through discussions, a Situation Lab and a Peace Roundtable in Pune.",
     image: "/media/event-stories/concord-2026/share.jpg",
     imageAlt: "Participants making peace signs at CONCORD, The Peace Roundtable",
-    card: { background: "radial-gradient(circle at 50% 50%, #ffffff 0 18%, #c7ddf2 19% 38%, #8db6df 39% 58%, #2f6fb3 59%)", color: "#17325a", font: "sans" },
+    card: { background: "radial-gradient(circle at 50% 50%, #ffffff 0 18%, #c7ddf2 19% 38%, #8db6df 39% 58%, #2f6fb3 59%)", color: "#17325a" },
     match: { name: "CONCORD : The Peace Roundtable", date: "2026-09-06" },
     projectTitle: null,
   },
@@ -225,7 +225,7 @@ export const eventStories = Object.freeze([
       "On the 94th Indian Air Force Day, Rotaract Club of Pune Heritage and 13 clubs from 6 districts thanked the Indian Air Force in 11 languages.",
     image: "/media/wings-of-honour/00-banner-card.webp",
     imageAlt: "Wings of Honour campaign banner: A Salute to Guardians of the Skies",
-    card: { background: "linear-gradient(135deg, #0c1b2c, #1d344e)", color: "#e7c58f", font: "serif" },
+    card: { background: "linear-gradient(135deg, #0c1b2c, #1d344e)", color: "#e7c58f" },
     match: { name: "Wings of Honour", date: "2026-10-08" },
     projectTitle: null,
   },
@@ -243,7 +243,7 @@ export const eventStories = Object.freeze([
       "Anonymous notes of appreciation written for the men of Rotaract Club of Pune Heritage on International Men's Day 2026.",
     image: null,
     imageAlt: null,
-    card: { background: "#a9784a", color: "#fff4dc", font: "serif" },
+    card: { background: "#a9784a", color: "#fff4dc" },
     match: null,
     projectTitle: null,
   },
@@ -251,11 +251,6 @@ export const eventStories = Object.freeze([
 
 export function storyPath(story) {
   return `/events/${story.slug}`;
-}
-
-// Card title font: "serif", "mono" (arcade style) or "sans" (the site default).
-export function cardFontClass(story) {
-  return { serif: "is-serif", mono: "is-mono" }[story.card.font] || "";
 }
 
 export function getEventStory(slug) {

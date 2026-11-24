@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import { officers } from "../clubOfficers";
 import "../../../styles/components/event-misal.css";
 
@@ -52,39 +53,39 @@ function Bowl({ added }) {
   );
 }
 
+const LAYER_DELAY_MS = 350;
+
 function BuildMisal() {
+  const reduceMotion = useReducedMotion();
   const [added, setAdded] = useState([]);
-  const next = LAYERS[added.length];
-  const done = !next;
+  const timers = useRef([]);
+  const done = added.length === LAYERS.length;
+  const building = added.length > 0 && !done;
+
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+
+  function makeMisal() {
+    if (reduceMotion) {
+      setAdded(LAYERS.map((layer) => layer.id));
+      return;
+    }
+    timers.current = LAYERS.map((layer, index) => window.setTimeout(
+      () => setAdded((current) => [...current, layer.id]),
+      index * LAYER_DELAY_MS,
+    ));
+  }
 
   return (
     <div className="ms-build">
       <Bowl added={added} />
-      <div className="ms-build__side">
-        <ol className="ms-ingredients">
-          {LAYERS.map((layer, index) => {
-            const isAdded = added.includes(layer.id);
-            const isNext = layer === next;
-            return (
-              <li key={layer.id}>
-                <button
-                  type="button"
-                  className={`${isAdded ? "is-added" : ""}${isNext ? " is-next" : ""}`}
-                  onClick={() => setAdded((current) => [...current, layer.id])}
-                  disabled={!isNext}
-                  aria-label={isAdded ? `${layer.label} added` : isNext ? `Add ${layer.label}` : `${layer.label}, comes after step ${index}`}
-                >
-                  <span className="ms-ingredients__tick" aria-hidden="true">{isAdded ? "✓" : index + 1}</span>
-                  <span>{layer.label}</span>
-                  <span className="ms-ingredients__marathi" lang="mr">{layer.marathi}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-        <p className={`ms-build__status${done ? " is-done" : ""}`} aria-live="polite">
-          {done ? "One authentic Pune misal, ready. Welcome to Pune, RID 3191!" : `Add the ${next.label.toLowerCase()} next.`}
-        </p>
+      <div className="ms-build__side" aria-live="polite">
+        {done ? (
+          <p className="ms-build__status is-done">One authentic Pune misal, ready. Welcome to Pune, RID 3191!</p>
+        ) : (
+          <button type="button" className="ms-button" onClick={makeMisal} disabled={building}>
+            {building ? `Adding the ${LAYERS[added.length].label.toLowerCase()}…` : "Make the misal"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -127,7 +128,7 @@ export default function MisalBrunchStory() {
 
       <section className="ms-section" aria-labelledby="ms-build-title">
         <h2 id="ms-build-title">Build your misal</h2>
-        <p className="ms-section__intro">Add each ingredient in order, the Pune way.</p>
+        <p className="ms-section__intro">Usal, kat, farsan, onion, coriander, lemon and pav, the Pune way.</p>
         <BuildMisal />
       </section>
 

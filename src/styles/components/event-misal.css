@@ -113,62 +113,38 @@
 
 .ms-build {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(1rem, 4vw, 2.5rem);
-  align-items: center;
-  text-align: left;
+  justify-items: center;
+  gap: 1.25rem;
 }
 
-.ms-bowl { width: min(26rem, 100%); height: auto; margin: 0 auto; }
+.ms-bowl { width: min(26rem, 100%); height: auto; }
 
 .ms-layer { opacity: 0; transform: translateY(-14px); transform-box: fill-box; transition: opacity 0.35s ease, transform 0.35s ease; }
 .ms-layer.is-on { opacity: 1; transform: none; }
 
-.ms-build__side { display: grid; gap: 1rem; }
+.ms-build__side { display: grid; justify-items: center; min-height: 3.5rem; }
 
-.ms-ingredients { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
-
-.ms-ingredients button {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.6rem 0.85rem;
-  border: 2px solid #ead7c1;
+.ms-button {
+  min-height: 3rem;
+  padding: 0.75rem 1.6rem;
+  border: 2px solid var(--ms-red-dark);
   border-radius: 0;
-  background: #fff;
-  color: var(--ms-muted);
+  background: var(--ms-red);
+  color: #fff;
   font: inherit;
-  font-weight: 700;
-  text-align: left;
-  cursor: default;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--ms-red-dark);
 }
 
-.ms-ingredients button.is-next { border-color: var(--ms-red); color: var(--ms-ink); cursor: pointer; box-shadow: 4px 4px 0 var(--ms-red); }
-.ms-ingredients button.is-next:hover { background: #fff0e6; }
-.ms-ingredients button.is-added { border-color: var(--ms-turmeric); background: #fff8e1; color: var(--ms-ink); }
-.ms-ingredients button:focus-visible { outline: 3px solid var(--ms-turmeric); outline-offset: 3px; }
-
-.ms-ingredients__tick {
-  display: grid;
-  place-items: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  border-radius: 50%;
-  background: #f3e3d0;
-  color: var(--ms-red-dark);
-  font-size: 0.85rem;
-  font-weight: 900;
-}
-
-.ms-ingredients button.is-added .ms-ingredients__tick { background: var(--ms-turmeric); }
-.ms-ingredients__marathi { color: var(--ms-muted); font-size: 0.85rem; }
-
-.ms-build__status { margin: 0; color: var(--ms-muted); font-weight: 700; }
+.ms-button:hover:not(:disabled) { background: var(--ms-red-dark); }
+.ms-button:disabled { opacity: 0.85; cursor: progress; }
+.ms-button:focus-visible { outline: 3px solid var(--ms-turmeric); outline-offset: 3px; }
 
 .ms-build__status.is-done {
-  padding: 0.85rem 1rem;
+  margin: 0;
+  padding: 0.85rem 1.2rem;
   background: var(--ms-red);
   color: #fff;
   font-weight: 800;
@@ -199,7 +175,6 @@
 @media (max-width: 48rem) {
   .ms-photo { grid-template-columns: 1fr; }
   .ms-photo figure { max-width: 26rem; margin: 0 auto; }
-  .ms-build { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 36rem) {
