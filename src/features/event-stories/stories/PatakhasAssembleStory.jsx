@@ -19,6 +19,11 @@ function wirePoint(t) {
   return [at(0), at(1)];
 }
 
+const conductedBy = [
+  { name: "Rtr. Harshal Nikam", role: "Club Service Director" },
+  { name: "Rtr. Shivani Kulkarni", role: "Co-Club Service Director" },
+];
+
 const evening = [
   { title: "Diwali, together", text: "Members came together to celebrate the festival with lots of fun and festive spirit." },
   { title: "Bollywood Trivia", text: "The evening included a Bollywood Trivia game." },
@@ -213,7 +218,17 @@ export default function PatakhasAssembleStory() {
             </li>
           ))}
         </ol>
-        <p className="patakhas-credit">Conducted by <strong>Rtr. Harshal Nikam</strong></p>
+        <div className="patakhas-credits">
+          <p className="patakhas-credits__label">Conducted by</p>
+          <ul>
+            {conductedBy.map((person) => (
+              <li key={person.name}>
+                <strong>{person.name}</strong>
+                <span>{person.role}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
     </div>
   );

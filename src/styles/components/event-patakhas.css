@@ -242,13 +242,35 @@
   60% { transform: scale(1.04, 0.95) rotate(2deg); }
 }
 
-.patakhas-credit {
-  margin: 0;
-  color: var(--pk-muted);
+.patakhas-credits {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
   text-align: center;
 }
 
-.patakhas-credit strong { color: var(--pk-text); }
+.patakhas-credits__label {
+  margin: 0;
+  color: var(--pk-gold);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.patakhas-credits ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem 3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patakhas-credits li { display: grid; gap: 0.2rem; min-width: min(16rem, 100%); }
+.patakhas-credits strong { color: var(--pk-text); font-size: 1.05rem; }
+.patakhas-credits span { color: var(--pk-muted); font-size: 0.9rem; }
 
 @media (max-width: 48rem) {
   .patakhas-evening ol { grid-template-columns: 1fr; }
