@@ -84,8 +84,8 @@ function Collected({ title, amounts, className = "" }) {
     <div className={`md-collected ${className}`.trim()}>
       <p className="md-collected__title">{title}</p>
       <ul>
-        <li><strong>{amounts.grains}</strong><span>of food grains</span></li>
         <li><strong>{amounts.clothes}</strong><span>of clothes</span></li>
+        <li><strong>{amounts.grains}</strong><span>of food grains</span></li>
         <li><strong>{amounts.money}</strong><span>in money</span></li>
       </ul>
     </div>
