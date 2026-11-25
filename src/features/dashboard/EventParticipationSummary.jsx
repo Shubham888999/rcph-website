@@ -49,6 +49,8 @@ export default function EventParticipationSummary({ recent, districtAttendance, 
   const districtRecent = districtAttendance.recent;
   const [recentOpen, setRecentOpen] = useState(false);
   const recentPanelId = useId();
+  const [districtOpen, setDistrictOpen] = useState(false);
+  const districtPanelId = useId();
 
   return (
     <section className="dashboard-activity" aria-labelledby="activity-title">
@@ -95,20 +97,36 @@ export default function EventParticipationSummary({ recent, districtAttendance, 
       <section className="dashboard-district-ledger" aria-labelledby="district-attendance-title">
         <div>
           <p className="dashboard-eyebrow">Beyond the club</p>
-          <h3 id="district-attendance-title">District participation</h3>
+          <div className="dashboard-collapsible-heading">
+            <h3 id="district-attendance-title">District participation</h3>
+            <button
+              type="button"
+              aria-expanded={districtOpen}
+              aria-controls={districtPanelId}
+              onClick={() => setDistrictOpen((current) => !current)}
+            >
+              {districtOpen ? "Hide" : `Show${districtRecent.length ? ` (${districtRecent.length})` : ""}`}
+            </button>
+          </div>
           {districtAttendance.totalCounted && districtAttendance.percentage !== null ? (
             <p className="dashboard-district-ledger__summary">
               {districtAttendance.present ?? 0} present across {districtAttendance.totalCounted} counted activities · {districtAttendance.percentage}%
             </p>
           ) : null}
         </div>
-        <EventList
-          events={districtRecent}
-          attendance
-          district
-          emptyTitle="No district participation yet"
-          emptyText="District participation has not been recorded for your profile."
-        />
+        {/* Collapsed by default: the list gets long over the year */}
+        <div
+          id={districtPanelId}
+          className={districtOpen ? "dashboard-collapsible-panel is-open" : "dashboard-collapsible-panel"}
+        >
+          <EventList
+            events={districtRecent}
+            attendance
+            district
+            emptyTitle="No district participation yet"
+            emptyText="District participation has not been recorded for your profile."
+          />
+        </div>
       </section>
     </section>
   );
