@@ -106,3 +106,8 @@ test("cover images exist for the stories that have them", async () => {
     assert.ok(story.cover.tint && story.cover.color);
   }
 });
+
+test("Events page hides Upcoming Events until there is an upcoming event", () => {
+  const eventsPage = read("../../pages/public/EventsPage.jsx");
+  assert.match(eventsPage, /status === "success" && upcomingEvents\.length > 0 \?/);
+});

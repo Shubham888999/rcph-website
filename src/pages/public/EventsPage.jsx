@@ -12,15 +12,18 @@ export default function EventsPage() {
   return (
     <main className="events-page-react">
       <EventsHero />
-      <EventList
-        id="upcoming-events-title"
-        kicker="What’s ahead"
-        title="Upcoming Events"
-        events={upcomingEvents}
-        status={status}
-        emptyMessage="No upcoming events are listed yet. Please check back soon or contact RCPH."
-        reload={reload}
-      />
+      {/* Upcoming Events only appears once there is at least one upcoming event */}
+      {status === "success" && upcomingEvents.length > 0 ? (
+        <EventList
+          id="upcoming-events-title"
+          kicker="What’s ahead"
+          title="Upcoming Events"
+          events={upcomingEvents}
+          status={status}
+          emptyMessage="No upcoming events are listed yet. Please check back soon or contact RCPH."
+          reload={reload}
+        />
+      ) : null}
       <EventStories />
       <EventList
         id="recent-events-title"
