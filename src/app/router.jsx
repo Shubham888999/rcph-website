@@ -6,6 +6,7 @@ import ApprovedRoute from "../features/auth/ApprovedRoute";
 import AuthenticatedRoute from "../features/auth/AuthenticatedRoute";
 import RoleRoute from "../features/auth/RoleRoute";
 import VisitDashboardRoute from "../features/auth/VisitDashboardRoute";
+import RouteError from "./RouteError";
 import RouteMetadata from "./RouteMetadata";
 
 function lazyRoute(Page) {
@@ -14,6 +15,7 @@ function lazyRoute(Page) {
 
 export const router = createBrowserRouter([{
   element: <RouteMetadata />,
+  errorElement: <RouteError />,
   children: [
     {
       element: <PublicLayout />,
