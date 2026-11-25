@@ -1757,3 +1757,14 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* District participation is collapsible: keep its heading and Show button on one line */
+.dashboard-district-ledger .dashboard-collapsible-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.dashboard-district-ledger .dashboard-collapsible-heading h3 { white-space: nowrap; }
+.dashboard-district-ledger .dashboard-collapsible-heading button { white-space: nowrap; }
