@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "../../../styles/components/event-gajasanskruti.css";
-import { officers } from "../clubOfficers";
+import { storyOrganisers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/gajasanskruti-2026";
 
@@ -20,7 +20,7 @@ const partners = [
   { role: "Supported by", name: "Pune Municipal Corporation (PMC)" },
 ];
 
-const conductedBy = officers("tanishka", "soumitra");
+const conductedBy = storyOrganisers("gajasanskruti-2026", ["tanishka", "soumitra"]);
 
 // Litter on the street drawing: position in percent, kind and tilt.
 const LITTER = [

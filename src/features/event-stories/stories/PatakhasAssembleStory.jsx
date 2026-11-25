@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useReducedMotion } from "framer-motion";
 import "../../../styles/components/event-patakhas.css";
-import { officers } from "../clubOfficers";
+import { storyOrganisers } from "../clubOfficers";
 
 const PHOTO = "/media/event-stories/patakhas-assemble-2026/group-photo.webp";
 const PHOTO_SMALL = "/media/event-stories/patakhas-assemble-2026/group-photo-800.webp";
@@ -20,7 +20,7 @@ function wirePoint(t) {
   return [at(0), at(1)];
 }
 
-const conductedBy = officers("harshal", "shivani");
+const conductedBy = storyOrganisers("patakhas-assemble-2026", ["harshal"]);
 
 const evening = [
   { title: "Diwali, together", text: "Members came together to celebrate the festival with lots of fun and festive spirit." },

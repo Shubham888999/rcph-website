@@ -155,7 +155,7 @@
 
 .ms-credits__label { margin: 0; color: var(--ms-red); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
 
-.ms-credits ul { display: flex; flex-wrap: nowrap; justify-content: center; gap: 1rem; width: min(56rem, 100%); margin: 0; padding: 0; list-style: none; }
+.ms-credits ul { display: flex; flex-wrap: nowrap; justify-content: center; gap: 1rem; width: min(80rem, 100%); margin: 0; padding: 0; list-style: none; }
 
 .ms-credits li {
   display: grid;

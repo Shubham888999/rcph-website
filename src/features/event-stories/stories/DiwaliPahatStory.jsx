@@ -1,11 +1,11 @@
 import { useState } from "react";
 import "../../../styles/components/event-diwali-pahat.css";
-import { officers } from "../clubOfficers";
+import { storyOrganisers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/diwali-pahat-2026";
 const DIYAS = 5;
 
-const conductedBy = officers("harshal", "shivani");
+const conductedBy = storyOrganisers("diwali-pahat-2026", ["harshal"]);
 
 // Paper lanterns hanging across the sky: horizontal position, string length, colours.
 const KANDILS = [

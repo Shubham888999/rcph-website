@@ -206,7 +206,7 @@
   flex-wrap: nowrap;
   justify-content: center;
   gap: 1rem;
-  width: min(56rem, 100%);
+  width: min(80rem, 100%);
   margin: 0;
   padding: 0;
   list-style: none;
