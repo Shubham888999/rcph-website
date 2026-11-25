@@ -124,6 +124,7 @@ export const eventStories = Object.freeze([
     imageAlt: "Rotarians and Rotaractors with the Mahadaan banner at Royal KP Stellar Society",
     card: { background: "linear-gradient(135deg, #e8731a, #7a1f2b)", color: "#fbf3e2" },
     motif: "sacks",
+    cover: { src: "/media/event-stories/mahadaan-drive-2-2026/card.webp", small: "/media/event-stories/mahadaan-drive-2-2026/card-640.webp", tint: "rgba(251, 243, 226, 0.6)", color: "#7a1f2b" },
     match: { name: "Mahadaan 12.0 Drive 2", date: "2026-10-03" },
     projectTitle: null,
   },
@@ -162,6 +163,7 @@ export const eventStories = Object.freeze([
     imageAlt: "Volunteers from many clubs after the Gajasanskruti cleanliness drive in Pune",
     card: { background: "linear-gradient(180deg, #1f8a5b 0 72%, #3b3f45 72%)", color: "#ffffff" },
     motif: "road",
+    cover: { src: "/media/event-stories/gajasanskruti-2026/card.webp", small: "/media/event-stories/gajasanskruti-2026/card-640.webp", tint: "rgba(10, 30, 20, 0.35)", color: "#ffffff" },
     match: { name: "Gajasanskruti 10.0", date: "2026-09-26" },
     projectTitle: null,
   },
@@ -181,6 +183,7 @@ export const eventStories = Object.freeze([
     imageAlt: "RCPH members smiling in a group selfie after the Dine & Unwind dinner",
     card: { background: "radial-gradient(circle at 50% 50%, #8a2236, #4a0f1c 80%)", color: "#fbf6ec" },
     motif: "cutlery",
+    cover: { src: "/media/event-stories/dine-and-unwind-2026/card.webp", small: "/media/event-stories/dine-and-unwind-2026/card-640.webp", tint: "rgba(30, 12, 6, 0.3)", color: "#fff6e8" },
     match: { name: "Dine & Unwind", date: "2026-09-13" },
     projectTitle: null,
   },
@@ -200,6 +203,7 @@ export const eventStories = Object.freeze([
     imageAlt: "RCPH members and RID 3191 delegates outside Pune Misal House",
     card: { background: "linear-gradient(135deg, #c62d17, #7d1a0c)", color: "#f2b84b" },
     motif: "steam",
+    cover: { src: "/media/event-stories/misal-brunch-2026/card.webp", small: "/media/event-stories/misal-brunch-2026/card-640.webp", tint: "rgba(60, 10, 0, 0.25)", color: "#ffffff" },
     match: { name: "Misal Brunch", date: "2026-09-19" },
     projectTitle: null,
   },
@@ -219,6 +223,7 @@ export const eventStories = Object.freeze([
     imageAlt: "Participants making peace signs at CONCORD, The Peace Roundtable",
     card: { background: "radial-gradient(circle at 50% 50%, #ffffff 0 18%, #c7ddf2 19% 38%, #8db6df 39% 58%, #2f6fb3 59%)", color: "#17325a" },
     motif: "olive",
+    cover: { src: "/media/event-stories/concord-2026/card.webp", small: "/media/event-stories/concord-2026/card-640.webp", tint: "rgba(255, 255, 255, 0.35)", color: "#17325a" },
     match: { name: "CONCORD : The Peace Roundtable", date: "2026-09-06" },
     projectTitle: null,
   },
@@ -264,6 +269,20 @@ export const eventStories = Object.freeze([
 
 export function storyPath(story) {
   return `/events/${story.slug}`;
+}
+
+// Colours for a story card: the AI cover image (with a see-through tint) when there is one,
+// otherwise the card's gradient.
+export function cardStyle(story) {
+  if (story.cover) {
+    return {
+      color: story.cover.color,
+      backgroundImage: `linear-gradient(${story.cover.tint}, ${story.cover.tint}), url("${story.cover.small}")`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    };
+  }
+  return { background: story.card.background, color: story.card.color };
 }
 
 export function getEventStory(slug) {

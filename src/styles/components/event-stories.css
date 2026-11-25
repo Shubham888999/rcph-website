@@ -256,3 +256,7 @@
 }
 
 .event-stories-card__title { position: relative; }
+
+/* Titles on AI cover images: a soft shadow keeps them readable on any background */
+.event-stories-card__title,
+.event-story-more ul a span { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }

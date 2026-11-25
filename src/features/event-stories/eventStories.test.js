@@ -96,3 +96,13 @@ test("every story card has a motif drawn behind its title", async () => {
     assert.match(source, new RegExp(`\\b${story.motif}: \\(\\) =>`), `${story.slug} motif ${story.motif} is not drawn`);
   }
 });
+
+test("cover images exist for the stories that have them", async () => {
+  const { existsSync } = await import("node:fs");
+  for (const story of eventStories.filter((item) => item.cover)) {
+    for (const path of [story.cover.src, story.cover.small]) {
+      assert.ok(existsSync(new URL(`../../../public${path}`, import.meta.url)), `${story.slug} is missing ${path}`);
+    }
+    assert.ok(story.cover.tint && story.cover.color);
+  }
+});

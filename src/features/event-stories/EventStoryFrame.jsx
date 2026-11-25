@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatEventDate } from "../events/eventModel";
 import { getAvenue } from "../calendar/avenues.js";
-import { EVENT_STORIES_PATH, storiesNewestFirst, storyPath } from "./eventStories";
+import { EVENT_STORIES_PATH, cardStyle, storiesNewestFirst, storyPath } from "./eventStories";
 import { SITE_ORIGIN } from "../../app/metadataModel";
 import StoryMotif from "./StoryMotif";
 
@@ -38,8 +38,8 @@ function MoreStories({ current }) {
       <ul>
         {others.map((story) => (
           <li key={story.slug}>
-            <Link to={storyPath(story)} style={{ background: story.card.background, color: story.card.color }}>
-              <StoryMotif motif={story.motif} />
+            <Link to={storyPath(story)} style={cardStyle(story)}>
+              {story.cover ? null : <StoryMotif motif={story.motif} />}
               <span>{story.title}</span>
               <small>{formatEventDate({ date: story.date })}</small>
             </Link>
