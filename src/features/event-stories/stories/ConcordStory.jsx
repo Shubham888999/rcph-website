@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useState } from "react";
 import "../../../styles/components/event-concord.css";
 import { storyOrganisers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/concord-2026";
-const RIPPLE_MS = 700;
 
 // Peace from the individual level to the global level, in the words of the event reports.
 const rings = [
@@ -44,56 +42,70 @@ function OliveBranch() {
   );
 }
 
-function Ripple({ reduceMotion }) {
-  const [level, setLevel] = useState(-1);
-  const timers = useRef([]);
-  const done = level === rings.length - 1;
+// Four seats around a round table. Passing the olive branch to a seat lets it share its view.
+const SEATS = [
+  { x: 50, y: 8 },
+  { x: 92, y: 50 },
+  { x: 50, y: 92 },
+  { x: 8, y: 50 },
+];
 
-  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+function OliveSprig() {
+  return (
+    <svg viewBox="0 0 60 40" aria-hidden="true" focusable="false">
+      <path d="M4 34C20 30 36 20 56 6" fill="none" stroke="#5c4a2e" strokeWidth="3" strokeLinecap="round" />
+      {[[16, 30, -30], [26, 22, 25], [36, 17, -35], [46, 11, 20]].map(([x, y, r]) => (
+        <ellipse key={x} cx={x} cy={y} rx="7" ry="3" fill="#6f8f3a" transform={`rotate(${r} ${x} ${y})`} />
+      ))}
+    </svg>
+  );
+}
 
-  function sendOutward() {
-    timers.current.forEach(window.clearTimeout);
-    if (reduceMotion) {
-      setLevel(rings.length - 1);
-      return;
-    }
-    setLevel(0);
-    timers.current = rings.slice(1).map((_, index) => window.setTimeout(() => setLevel(index + 1), RIPPLE_MS * (index + 1)));
+function TalkingPiece() {
+  const [speaker, setSpeaker] = useState(0);
+  const [heard, setHeard] = useState(() => new Set([0]));
+  const everyone = heard.size === rings.length;
+
+  function pass(index) {
+    setSpeaker(index);
+    setHeard((current) => new Set(current).add(index));
   }
 
+  const seat = SEATS[speaker];
   return (
-    <div className="cd-ripple">
-      <div className="cd-rings" aria-hidden="true">
-        {[...rings].reverse().map((ring, reversedIndex) => {
-          const index = rings.length - 1 - reversedIndex;
-          return (
-            <span key={ring.name} className={`cd-rings__ring cd-rings__ring--${index}${index <= level ? " is-lit" : ""}`}>
-              <span className="cd-rings__label">{ring.name}</span>
-            </span>
-          );
-        })}
+    <div className="cd-table-wrap">
+      <div className="cd-table" role="group" aria-label="Round table: pass the olive branch to a seat">
+        <span className="cd-table__top" aria-hidden="true" />
+        <span className="cd-table__piece" style={{ left: `${50 + (seat.x - 50) * 0.42}%`, top: `${50 + (seat.y - 50) * 0.42}%` }} aria-hidden="true">
+          <OliveSprig />
+        </span>
+        {rings.map((ring, index) => (
+          <button
+            key={ring.name}
+            type="button"
+            className={`cd-seat${index === speaker ? " is-speaking" : ""}${heard.has(index) ? " is-heard" : ""}`}
+            style={{ left: `${SEATS[index].x}%`, top: `${SEATS[index].y}%` }}
+            onClick={() => pass(index)}
+            aria-pressed={index === speaker}
+            aria-label={`Pass the olive branch to ${ring.name}`}
+          >
+            {ring.name}
+          </button>
+        ))}
       </div>
 
-      <div className="cd-ripple__side">
-        <ol className="cd-ripple__list">
-          {rings.map((ring, index) => (
-            <li key={ring.name} className={index <= level ? "is-lit" : ""}>
-              <strong>{ring.name}</strong>
-              <span>{index <= level ? ring.text : "…"}</span>
-            </li>
-          ))}
-        </ol>
-        <button type="button" className="cd-button" onClick={sendOutward} aria-live="polite">
-          {done ? "Send it outward again" : "Send peace outward"}
-        </button>
+      <div className="cd-voice" aria-live="polite">
+        <p className="cd-voice__who">{rings[speaker].name} has the floor</p>
+        <p className="cd-voice__text">{rings[speaker].text}</p>
+        <p className="cd-voice__hint">
+          {everyone ? "Every voice at the table has been heard." : `Pass the olive branch to another seat · ${heard.size} of ${rings.length} heard`}
+        </p>
       </div>
     </div>
   );
 }
 
 export default function ConcordStory() {
-  const reduceMotion = useReducedMotion();
-
   return (
     <div className="cd">
       <section className="cd-hero" aria-labelledby="cd-title">
@@ -124,10 +136,10 @@ export default function ConcordStory() {
         </figure>
       </section>
 
-      <section className="cd-section" aria-labelledby="cd-ripple-title">
-        <h2 id="cd-ripple-title">From me to the world</h2>
-        <p className="cd-section__intro">Peace starts small and travels outward.</p>
-        <Ripple reduceMotion={reduceMotion} />
+      <section className="cd-section" aria-labelledby="cd-table-title">
+        <h2 id="cd-table-title">Pass the olive branch</h2>
+        <p className="cd-section__intro">At the roundtable, whoever holds the olive branch speaks, and everyone else listens.</p>
+        <TalkingPiece />
       </section>
 
       <section className="cd-section" aria-labelledby="cd-formats-title">
