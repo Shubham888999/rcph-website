@@ -45,7 +45,7 @@ function Agenda() {
         {complete ? (
           <div className="ra-agenda__roadmap">
             <strong>Roadmap set</strong>
-            <span>A stronger Rotary–Rotaract relationship, better coordination, and a plan for upcoming joint events and activities.</span>
+            <span>A stronger Rotary-Rotaract relationship, better coordination, and a plan for upcoming joint events and activities.</span>
           </div>
         ) : (
           <p>{done.size} of {agenda.length} agenda items covered. Tick each one off.</p>

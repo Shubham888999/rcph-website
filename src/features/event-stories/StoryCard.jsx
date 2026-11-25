@@ -17,7 +17,8 @@ export default function StoryCard({ story }) {
       </span>
       <span className="event-stories-card__meta">
         <time dateTime={story.date}>{formatEventDate({ date: story.date })}</time>
-        <span>{story.avenues.map((code) => getAvenue(code).label.replace(/ Avenue$/, "")).join(", ")}</span>
+        <span aria-hidden="true">·</span>
+        <span title={story.avenues.map((code) => getAvenue(code).label).join(", ")}>{story.avenues.join(" · ")}</span>
       </span>
       <span className="event-stories-card__summary">{story.summary}</span>
     </Link>
