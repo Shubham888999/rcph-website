@@ -255,6 +255,8 @@ export const eventStories = Object.freeze([
   },
   {
     slug: "mens-day-2026",
+    // Hidden for now: no page, not in the gallery, sitemap or calendar links. Remove this line to show it again.
+    hidden: true,
     title: "From Us, To Him",
     date: "2026-11-19",
     avenues: ["CSD"],
@@ -275,6 +277,9 @@ export const eventStories = Object.freeze([
   },
 ]);
 
+// Stories that are live on the site. Hidden ones keep their data but get no page or links.
+export const liveStories = Object.freeze(eventStories.filter((story) => !story.hidden));
+
 export function storyPath(story) {
   return `/events/${story.slug}`;
 }
@@ -294,11 +299,11 @@ export function cardStyle(story) {
 }
 
 export function getEventStory(slug) {
-  return eventStories.find((story) => story.slug === slug) || null;
+  return liveStories.find((story) => story.slug === slug) || null;
 }
 
 export function storiesNewestFirst() {
-  return [...eventStories].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return [...liveStories].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
 function normalizeName(value) {
@@ -310,7 +315,7 @@ export function findStoryForEvent(event) {
   if (!event) return null;
   const name = normalizeName(event.name);
   if (!name) return null;
-  return eventStories.find((story) => story.match
+  return liveStories.find((story) => story.match
     && story.match.date === event.date
     && normalizeName(story.match.name) === name) || null;
 }
@@ -319,5 +324,5 @@ export function findStoryForEvent(event) {
 export function findStoryForProject(project) {
   const title = normalizeName(project?.title);
   if (!title) return null;
-  return eventStories.find((story) => story.projectTitle && normalizeName(story.projectTitle) === title) || null;
+  return liveStories.find((story) => story.projectTitle && normalizeName(story.projectTitle) === title) || null;
 }

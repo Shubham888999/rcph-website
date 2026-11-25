@@ -1,4 +1,4 @@
-import { EVENT_STORIES_PATH, eventStories, storyPath } from "../features/event-stories/eventStories.js";
+import { EVENT_STORIES_PATH, liveStories, storyPath } from "../features/event-stories/eventStories.js";
 
 export const SITE_ORIGIN = "https://rcph3131.org";
 export const DEFAULT_SOCIAL_IMAGE = "/images/rcph-lakshya-logo.webp";
@@ -17,7 +17,7 @@ export const PUBLIC_ROUTES = Object.freeze([
   "/terms",
   "/privacy",
   EVENT_STORIES_PATH,
-  ...eventStories.map(storyPath),
+  ...liveStories.map(storyPath),
 ]);
 
 const PAGE_METADATA = Object.freeze({
@@ -86,7 +86,7 @@ const PUBLIC_METADATA = Object.freeze({
     description: "The stories behind RCPH's biggest events in Pune and across Rotaract District 3131, each with its own page of photos, people and impact.",
     breadcrumb: "Event Stories",
   },
-  ...Object.fromEntries(eventStories.map((story) => [storyPath(story), {
+  ...Object.fromEntries(liveStories.map((story) => [storyPath(story), {
     title: story.seoTitle,
     description: story.seoDescription,
     breadcrumb: story.title,

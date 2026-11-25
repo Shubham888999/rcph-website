@@ -28,7 +28,7 @@ test("every story has a unique slug, a valid date and a page component", () => {
 });
 
 test("story pages are public, indexable and carry their own title", () => {
-  for (const story of eventStories) {
+  for (const story of eventStories.filter((item) => !item.hidden)) {
     const metadata = getRouteMetadata(storyPath(story));
     assert.equal(metadata.robots, "index, follow");
     assert.equal(metadata.title, story.seoTitle);
@@ -126,5 +126,17 @@ test("Conducted by lists every director of each of the event's avenues", async (
     ["Harshal Nikam", "Shivani Kulkarni", "Aarya Godbole", "Yashali Shirodkar"], "the lead's avenue team stays together");
   for (const file of ["ConcordStory.jsx", "GajasanskrutiStory.jsx", "MisalBrunchStory.jsx", "RootedStory.jsx"]) {
     assert.match(read(`./stories/${file}`), /storyOrganisers\("/);
+  }
+});
+
+test("a hidden story has no page, card, sitemap entry or calendar link", () => {
+  const hidden = eventStories.filter((story) => story.hidden);
+  assert.ok(hidden.some((story) => story.slug === "mens-day-2026"));
+  const sitemap = readFileSync(new URL("../../../public/sitemap.xml", import.meta.url), "utf8");
+  for (const story of hidden) {
+    assert.equal(getEventStory(story.slug), null);
+    assert.ok(!storiesNewestFirst().includes(story));
+    assert.equal(getRouteMetadata(storyPath(story)).robots, "noindex, nofollow");
+    assert.doesNotMatch(sitemap, new RegExp(story.slug));
   }
 });
