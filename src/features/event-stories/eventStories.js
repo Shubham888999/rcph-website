@@ -81,7 +81,7 @@ export const eventStories = Object.freeze([
     place: "Pune",
     hostedBy: "Rotary Club of Pune Heritage",
     summary:
-      "RCPH's President and Secretary joined the Rotary Club of Pune Heritage's Club Assembly to review progress and plan joint Rotary–Rotaract projects.",
+      "RCPH's President and Secretary joined the Rotary Club of Pune Heritage's Club Assembly to review progress and plan joint Rotary-Rotaract projects.",
     seoTitle: "Rotary Club Assembly 2026: Rotary and Rotaract Planning | RCPH",
     seoDescription:
       "The President and Secretary of Rotaract Club of Pune Heritage attended the Rotary Club of Pune Heritage Club Assembly to review progress and plan joint projects.",

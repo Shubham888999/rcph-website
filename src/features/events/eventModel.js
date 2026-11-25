@@ -107,5 +107,5 @@ const dateFormatter = new Intl.DateTimeFormat("en-IN", {
 export function formatEventDate(event) {
   const startLabel = dateFormatter.format(dateAtLocalNoon(event.date));
   if (!event.endDate || event.endDate === event.date) return startLabel;
-  return `${startLabel} – ${dateFormatter.format(dateAtLocalNoon(event.endDate))}`;
+  return `${startLabel} - ${dateFormatter.format(dateAtLocalNoon(event.endDate))}`;
 }
