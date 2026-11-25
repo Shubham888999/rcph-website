@@ -19,7 +19,7 @@ function SackImage({ id, className = "" }) {
   return <img className={`md-sack-img ${className}`.trim()} src={`${TRUCK}/${id}.webp`} alt="" width="240" height="240" loading="lazy" decoding="async" />;
 }
 
-// Tap each donation to load it into the tempo. Once everything is in, the loaded tempo drives
+// Tap each donation to load it into the truck. Once everything is in, the loaded truck drives
 // off to the right and a new empty one rolls in from the left.
 function LoadTheTruck({ items, doneText, amounts }) {
   const reduceMotion = useReducedMotion();
@@ -96,12 +96,12 @@ function LoadTheTruck({ items, doneText, amounts }) {
         {truckGone ? (
           <>
             <p className="md-load__done">{doneText}</p>
-            <button type="button" className="md-button md-button--ghost" onClick={sendAnother}>Send another tempo</button>
+            <button type="button" className="md-button md-button--ghost" onClick={sendAnother}>Send another truck</button>
           </>
         ) : phase === "leaving" ? (
           <p>Loaded. On its way!</p>
         ) : phase === "arriving" ? (
-          <p>A new tempo is pulling in…</p>
+          <p>A new truck is pulling in…</p>
         ) : (
           <p>{loaded.length} of {items.length} loaded. Tap each donation to load it.</p>
         )}
