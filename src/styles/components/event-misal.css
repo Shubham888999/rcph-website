@@ -98,58 +98,6 @@
 .ms-moments h3 { margin: 0; color: var(--ms-red-dark); }
 .ms-moments p { margin: 0; color: var(--ms-muted); line-height: 1.65; }
 
-/* Build your misal */
-.ms-section {
-  width: min(60rem, calc(100% - 2 * var(--page-gutter)));
-  margin: 0 auto;
-  padding-bottom: clamp(2.5rem, 6vw, 4rem);
-  display: grid;
-  gap: 0.6rem;
-  text-align: center;
-}
-
-.ms-section h2 { margin: 0; color: var(--ms-red-dark); }
-.ms-section__intro { margin: 0 0 1rem; color: var(--ms-muted); }
-
-.ms-build {
-  display: grid;
-  justify-items: center;
-  gap: 1.25rem;
-}
-
-.ms-bowl { width: min(26rem, 100%); height: auto; }
-
-.ms-layer { opacity: 0; transform: translateY(-14px); transform-box: fill-box; transition: opacity 0.35s ease, transform 0.35s ease; }
-.ms-layer.is-on { opacity: 1; transform: none; }
-
-.ms-build__side { display: grid; justify-items: center; min-height: 3.5rem; }
-
-.ms-button {
-  min-height: 3rem;
-  padding: 0.75rem 1.6rem;
-  border: 2px solid var(--ms-red-dark);
-  border-radius: 0;
-  background: var(--ms-red);
-  color: #fff;
-  font: inherit;
-  font-size: 1.05rem;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 4px 4px 0 var(--ms-red-dark);
-}
-
-.ms-button:hover:not(:disabled) { background: var(--ms-red-dark); }
-.ms-button:disabled { opacity: 0.85; cursor: progress; }
-.ms-button:focus-visible { outline: 3px solid var(--ms-turmeric); outline-offset: 3px; }
-
-.ms-build__status.is-done {
-  margin: 0;
-  padding: 0.85rem 1.2rem;
-  background: var(--ms-red);
-  color: #fff;
-  font-weight: 800;
-}
-
 /* Credits */
 .ms-credits { display: grid; justify-items: center; gap: 0.8rem; padding: 0 var(--page-gutter) clamp(3rem, 7vw, 5rem); text-align: center; }
 
@@ -183,5 +131,4 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ms-layer { transition: none; }
 }
