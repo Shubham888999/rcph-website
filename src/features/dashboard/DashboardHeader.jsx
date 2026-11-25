@@ -5,8 +5,9 @@ import { getPositionLabels } from "./accessHubModel";
 import { getRoleLabel } from "./dashboardPresentationModel";
 import { formatRotaractorName } from "../../utils/memberName";
 import { calculateMemberCompleteness } from "../admin/modules/memberOperationsModel";
+import { firstName, greetingFor, todayLabel } from "./upgrade/dashboardUpgradeModel";
 
-export default function DashboardHeader({ profile, mode, access, onEditProfile, onSignOut }) {
+export default function DashboardHeader({ profile, mode, access, nudge = "", onEditProfile, onSignOut }) {
   const reduceMotion = useReducedMotion();
   const [actionsOpen, setActionsOpen] = useState(false);
 const actionsId = useId();
@@ -44,20 +45,11 @@ const profileCompleteness = mode === "prospect"
     >
       <div className="dashboard-masthead__identity">
         <motion.p className="dashboard-eyebrow" variants={reduceMotion ? undefined : mastheadItem}>
-          Rotaract Club of Pune Heritage
+          {todayLabel()}
         </motion.p>
 <motion.h1 variants={reduceMotion ? undefined : mastheadItem}>
-  {mode === "prospect" ? (
-    <>
-      <span className="dashboard-masthead__welcome-line">Welcome,</span>
-      <span className="dashboard-masthead__member-name">{name}</span>
-    </>
-  ) : (
-    <>
-      <span className="dashboard-masthead__member-name">{name}’s</span>
-      <span className="dashboard-masthead__title-line">Club Pulse</span>
-    </>
-  )}
+  <span className="dashboard-masthead__welcome-line">{greetingFor()},</span>
+  <span className="dashboard-masthead__member-name">{firstName(name) || name}</span>
 </motion.h1>
         <motion.p
   className="dashboard-masthead__role"
@@ -90,9 +82,9 @@ const profileCompleteness = mode === "prospect"
   className="dashboard-masthead__context"
   variants={reduceMotion ? undefined : mastheadItem}
 >
-          {mode === "prospect"
-            ? "Your path to becoming an RCPH member,one step at a time."
-            : "Your attendance, activity, and upcoming club events in one personal view."}
+          {nudge || (mode === "prospect"
+            ? "Your path to becoming an RCPH member, one step at a time."
+            : "Your attendance, activity and upcoming club events in one place.")}
         </motion.p>
         {access?.hasWebsiteDirectorPosition && access?.hasPresidentAuthority ? (
           <motion.p className="dashboard-masthead__authority" variants={reduceMotion ? undefined : mastheadItem}>

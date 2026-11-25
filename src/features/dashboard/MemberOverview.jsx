@@ -1,5 +1,7 @@
 import { getAvenue } from "../calendar/avenues";
-import AttendanceSummary from "./AttendanceSummary";
+import UpNextCard from "./upgrade/UpNextCard";
+import YearAtGlance from "./upgrade/YearAtGlance";
+import "../../styles/components/dashboard-upgrade.css";
 import DashboardMetricRail from "./DashboardMetricRail";
 import EventParticipationSummary from "./EventParticipationSummary";
 import { sortAvenueActivity } from "./dashboardPresentationModel";
@@ -43,7 +45,10 @@ const metrics = [
 
   return (
     <>
-      <AttendanceSummary attendance={data.myAttendance} />
+      <div className="dash-hero-grid">
+        <UpNextCard events={data.upcomingEvents} />
+        <YearAtGlance attendance={data.myAttendance} district={data.districtAttendance} />
+      </div>
       <DashboardMetricRail items={metrics} label="Personal and club pulse" />
       <EventParticipationSummary
         recent={data.myAttendance.recent}
