@@ -6,6 +6,7 @@ const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { prospectDuesContact } = require('./lib/prospect-dues-contact');
 const positionHelpers = require('./lib/positions');
 const { createPositionAssignmentService } = require('./lib/position-assignments');
 const {
@@ -8209,6 +8210,7 @@ exports.getMyDashboardStats = onCall(CALLABLE_OPTIONS, async (request) => {
         totalCount: progressData.totalCount,
         percent: progressData.percent,
       },
+      duesContact: prospectDuesContact(),
       upcomingEvents,
     };
   }
