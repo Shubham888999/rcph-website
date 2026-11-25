@@ -159,7 +159,7 @@ export default function MahadaanStory({ drive, drives }) {
         <p className="md-credits__label md-credits__label--small">Conducted by</p>
         <ul>
           {drive.conductedBy.map((person) => (
-            <li key={person.name}><strong>{person.name}</strong>{person.role ? <span>{person.role}</span> : null}</li>
+            <li key={person.name}><strong>{person.name}</strong><span>{person.role}</span></li>
           ))}
         </ul>
       </section>

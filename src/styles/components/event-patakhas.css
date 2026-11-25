@@ -293,3 +293,6 @@
   .patakhas-credits ul { flex-direction: column; align-items: center; }
   .patakhas-credits li { width: 100%; max-width: 20rem; }
 }
+
+/* Name on top, title right under it, even when a title wraps */
+[class$="-credits"] li { align-content: start; }

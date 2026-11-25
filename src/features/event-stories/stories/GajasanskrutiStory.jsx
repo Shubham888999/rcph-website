@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "../../../styles/components/event-gajasanskruti.css";
+import { officers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/gajasanskruti-2026";
 
@@ -19,10 +20,7 @@ const partners = [
   { role: "Supported by", name: "Pune Municipal Corporation (PMC)" },
 ];
 
-const conductedBy = [
-  { name: "Rtr. Tanishka Patekar", role: "" },
-  { name: "Rtr. Soumitra Lokur", role: "" },
-];
+const conductedBy = officers("tanishka", "soumitra");
 
 // Litter on the street drawing: position in percent, kind and tilt.
 const LITTER = [
@@ -167,7 +165,7 @@ export default function GajasanskrutiStory() {
           <p className="gs-credits__label">Conducted by</p>
           <ul>
             {conductedBy.map((person) => (
-              <li key={person.name}><strong>{person.name}</strong>{person.role ? <span>{person.role}</span> : null}</li>
+              <li key={person.name}><strong>{person.name}</strong><span>{person.role}</span></li>
             ))}
           </ul>
         </div>

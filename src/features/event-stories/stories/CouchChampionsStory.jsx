@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import "../../../styles/components/event-couch-champions.css";
+import { officers } from "../clubOfficers";
 
 const PHOTO = "/media/event-stories/couch-champions-2026/game-night.webp";
 const PHOTO_SMALL = "/media/event-stories/couch-champions-2026/game-night-800.webp";
 const FLIP_BACK_MS = 850;
 
-const conductedBy = [
-  { name: "Rtr. Harshal Nikam", role: "Club Service Director" },
-  { name: "Rtr. Shivani Kulkarni", role: "Co-Club Service Director" },
-];
+const conductedBy = officers("harshal", "shivani");
 
 // Simple line icons for the memory game, drawn in a 24x24 box.
 const ICONS = {

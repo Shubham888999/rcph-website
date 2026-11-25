@@ -12,6 +12,7 @@ export const eventStoryComponents = {
   "gajasanskruti-2026": lazy(() => import("./stories/GajasanskrutiStory")),
   "dine-and-unwind-2026": lazy(() => import("./stories/DineAndUnwindStory")),
   "concord-2026": lazy(() => import("./stories/ConcordStory")),
+  "misal-brunch-2026": lazy(() => import("./stories/MisalBrunchStory")),
   "diwali-pahat-2026": lazy(() => import("./stories/DiwaliPahatStory")),
   "rotary-club-assembly-2026": lazy(() => import("./stories/RotaryClubAssemblyStory")),
 };

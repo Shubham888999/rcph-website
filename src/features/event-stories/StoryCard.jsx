@@ -1,17 +1,19 @@
 import { Link } from "react-router-dom";
 import { formatEventDate } from "../events/eventModel";
 import { getAvenue } from "../calendar/avenues.js";
-import { cardFontClass, storyPath } from "./eventStories";
+import { cardStyle, storyPath } from "./eventStories";
+import StoryMotif from "./StoryMotif";
 
 // One event story as a card: a strip in the event's own colours, then date, avenues and summary.
 export default function StoryCard({ story }) {
   return (
     <Link className="event-stories-card" to={storyPath(story)}>
       <span
-        className={`event-stories-card__art ${cardFontClass(story)}`.trim()}
-        style={{ background: story.card.background, color: story.card.color }}
+        className="event-stories-card__art"
+        style={cardStyle(story)}
       >
-        {story.title}
+        {story.cover ? null : <StoryMotif motif={story.motif} />}
+        <span className="event-stories-card__title">{story.title}</span>
       </span>
       <span className="event-stories-card__meta">
         <time dateTime={story.date}>{formatEventDate({ date: story.date })}</time>

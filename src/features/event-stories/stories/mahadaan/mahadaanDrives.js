@@ -1,4 +1,6 @@
 // Content for the two Mahadaan 12.0 drive pages. Phone numbers on the banners in these photos are blurred.
+import { officers } from "../../clubOfficers.js";
+
 const MEDIA = "/media/event-stories";
 
 export const mahadaanDrives = [
@@ -30,11 +32,7 @@ export const mahadaanDrives = [
       { title: "Snehalaya, Ahmednagar", text: "One of the welfare organisations Mahadaan supports, working with the underprivileged." },
       { title: "Tradition with responsibility", text: "Mahadaan blends the cultural spirit of giving during Pitru Paksha with social responsibility, meeting essential needs and strengthening social bonds." },
     ],
-    conductedBy: [
-      { name: "Rtr. Soumitra Lokur", role: "" },
-      { name: "Rtr. Tanishka Patekar", role: "" },
-      { name: "Rtr. Aneesh Ladkat", role: "" },
-    ],
+    conductedBy: officers("soumitra", "tanishka", "aneesh"),
   },
   {
     number: 2,
@@ -71,11 +69,7 @@ export const mahadaanDrives = [
       { title: "Rotary and Rotaract, side by side", text: "The drive brought together Rotarians, Rotaractors, volunteers and community members, building on the first drive and strengthening our shared commitment to service." },
       { title: "Advice from the society", text: "Senior members of the society shared valuable guidance and suggestions on community service, opening up new opportunities for meaningful service." },
     ],
-    conductedBy: [
-      { name: "Rtr. Soumitra Lokur", role: "" },
-      { name: "Rtr. Tanishka Patekar", role: "" },
-      { name: "Rtr. Aneesh Ladkat", role: "" },
-    ],
+    conductedBy: officers("soumitra", "tanishka", "aneesh"),
   },
 ];
 

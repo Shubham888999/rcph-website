@@ -70,3 +70,44 @@ test("Events page shows the event stories section after upcoming events", () => 
   assert.ok(eventsPage.indexOf("<EventStories />") < eventsPage.indexOf('title="Recent Events"'));
   assert.doesNotMatch(read("../events/EventStories.jsx"), /Pages of Hope/);
 });
+
+test("every organiser on every story page has a title under their name", async () => {
+  const { clubOfficers } = await import("./clubOfficers.js");
+  for (const [key, officer] of Object.entries(clubOfficers)) {
+    assert.match(officer.name, /^Rtr\. /, `${key} needs a full name`);
+    assert.ok(officer.role.trim(), `${key} needs a title`);
+  }
+  const { readdirSync } = await import("node:fs");
+  const files = readdirSync(new URL("./stories/", import.meta.url)).filter((file) => file.endsWith("Story.jsx"));
+  for (const file of files) {
+    const source = read(`./stories/${file}`);
+    if (!/conductedBy/.test(source)) continue;
+    assert.doesNotMatch(source, /role: ""/, `${file} has an organiser without a title`);
+    assert.doesNotMatch(source, /person\.role \?/, `${file} hides missing titles`);
+  }
+  const { mahadaanDrives } = await import("./stories/mahadaan/mahadaanDrives.js");
+  for (const drive of mahadaanDrives) for (const person of drive.conductedBy) assert.ok(person.role);
+});
+
+test("every story card has a motif drawn behind its title", async () => {
+  const source = read("./StoryMotif.jsx");
+  for (const story of eventStories) {
+    assert.ok(story.motif, `${story.slug} needs a motif`);
+    assert.match(source, new RegExp(`\\b${story.motif}: \\(\\) =>`), `${story.slug} motif ${story.motif} is not drawn`);
+  }
+});
+
+test("cover images exist for the stories that have them", async () => {
+  const { existsSync } = await import("node:fs");
+  for (const story of eventStories.filter((item) => item.cover)) {
+    for (const path of [story.cover.src, story.cover.small]) {
+      assert.ok(existsSync(new URL(`../../../public${path}`, import.meta.url)), `${story.slug} is missing ${path}`);
+    }
+    assert.ok(story.cover.tint && story.cover.color);
+  }
+});
+
+test("Events page hides Upcoming Events until there is an upcoming event", () => {
+  const eventsPage = read("../../pages/public/EventsPage.jsx");
+  assert.match(eventsPage, /status === "success" && upcomingEvents\.length > 0 \?/);
+});

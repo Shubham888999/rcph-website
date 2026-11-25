@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import "../../../styles/components/event-concord.css";
+import { officers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/concord-2026";
 const RIPPLE_MS = 700;
@@ -28,7 +29,7 @@ const collaborators = [
   "Rotaract Club of Pune Camp Pioneer",
 ];
 
-const conductedBy = [{ name: "Rtr. Tanishka Patekar", role: "" }];
+const conductedBy = officers("tanishka");
 
 function OliveBranch() {
   return (
@@ -158,7 +159,7 @@ export default function ConcordStory() {
         <p className="cd-people__label">Conducted by</p>
         <ul className="cd-credits">
           {conductedBy.map((person) => (
-            <li key={person.name}><strong>{person.name}</strong>{person.role ? <span>{person.role}</span> : null}</li>
+            <li key={person.name}><strong>{person.name}</strong><span>{person.role}</span></li>
           ))}
         </ul>
       </section>
