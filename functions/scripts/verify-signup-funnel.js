@@ -39,7 +39,6 @@ function createMockDb(seed = {}) {
       const docs = Object.entries(state[name] || {})
         .filter(([, data]) => filters.every(({ field, op, value }) => {
           if (op === '==') return data[field] === value;
-          if (op === 'in') return value.includes(data[field]);
           if (op === '>=') return data[field] >= value.millis;
           throw new Error(`Unsupported operator ${op}`);
         }))
@@ -205,34 +204,63 @@ function assertInvalid(fn, pattern) {
     'a resubmitted request keeps its first attribution and stores no blanks'
   );
 
-  // Notification recipients: MDO + President + Admins, deduplicated, approved active only.
+  // Notification recipients: holders of the listed positions, deduplicated, approved active only.
+  assert.deepEqual(
+    Array.from(signupFunnel.SIGNUP_NOTIFY_POSITION_KEYS),
+    ['president', 'mdo', 'secretary', 'immediate-past-president', positionHelpers.WEBSITE_DIRECTOR_POSITION_KEY]
+  );
+  assert.ok(Object.isFrozen(signupFunnel.SIGNUP_NOTIFY_POSITION_KEYS));
+  for (const key of signupFunnel.SIGNUP_NOTIFY_POSITION_KEYS) {
+    assert.equal(positionHelpers.getPositionDefinition(key)?.key, key, `${key} is a catalog key`);
+    assert.equal(positionHelpers.getPositionDefinition(key)?.active, true, `${key} is an active position`);
+    const seed = { users: {}, roles: {}, bodPositionAssignments: { [`${key}_holder`]: assignment('holder', key) } };
+    seedAccount(seed, 'holder', approved(positionHelpers.getPositionDefinition(key).effectiveRole, `${key}@example.com`));
+    assert.deepEqual(await createService(createMockDb(seed)).service.resolveOfficerRecipients(), [`${key}@example.com`], `${key} holder is included`);
+  }
+
   const officerSeed = {
     users: {},
     roles: {},
     bodPositionAssignments: {
       mdo_mdo: assignment('mdo', 'mdo'),
       president_pres: assignment('pres', 'president'),
-      mdo_admin1: assignment('admin1', 'mdo'),
       secretary_sec: assignment('sec', 'secretary'),
+      'immediate-past-president_ipp': assignment('ipp', 'immediate-past-president'),
+      cwd_cwd: assignment('cwd', 'cwd'),
+      cwd_sec: assignment('sec', 'cwd'),
+      mdo_mdoSecondAccount: assignment('mdoSecondAccount', 'mdo'),
+      'vice-president_vp': assignment('vp', 'vice-president'),
+      'co-mdo_comdo': assignment('coMdo', 'co-mdo'),
+      'co-president_copres': assignment('coPres', 'co-president'),
       mdo_ended: assignment('endedMdo', 'mdo', { status: 'ended' }),
       mdo_inactive: assignment('inactiveMdo', 'mdo'),
+      secretary_pending: assignment('pendingSec', 'secretary'),
+      secretary_removed: assignment('removedSec', 'secretary'),
+      cwd_stale: assignment('staleRoleCwd', 'cwd'),
     },
   };
   seedAccount(officerSeed, 'mdo', approved('bod', 'MDO@example.com'));
   seedAccount(officerSeed, 'pres', approved('president', 'pres@example.com'));
-  seedAccount(officerSeed, 'admin1', approved('admin', 'admin1@example.com'));
-  seedAccount(officerSeed, 'admin2', approved('admin', 'admin1@example.com'));
-  seedAccount(officerSeed, 'sec', approved('bod', 'sec@example.com'));
+  seedAccount(officerSeed, 'sec', approved('admin', 'sec@example.com'));
+  seedAccount(officerSeed, 'ipp', approved('admin', 'ipp@example.com'));
+  seedAccount(officerSeed, 'cwd', approved('bod', 'cwd@example.com'));
+  seedAccount(officerSeed, 'mdoSecondAccount', approved('bod', 'mdo@example.com'));
+  seedAccount(officerSeed, 'plainAdmin', approved('admin', 'plain-admin@example.com'));
+  seedAccount(officerSeed, 'rolePresidentNoPosition', approved('president', 'role-president@example.com'));
+  seedAccount(officerSeed, 'vp', approved('admin', 'vp@example.com'));
+  seedAccount(officerSeed, 'coMdo', approved('bod', 'co-mdo@example.com'));
+  seedAccount(officerSeed, 'coPres', approved('admin', 'co-pres@example.com'));
   seedAccount(officerSeed, 'gbm', approved('gbm', 'gbm@example.com'));
   seedAccount(officerSeed, 'endedMdo', approved('bod', 'ended@example.com'));
   seedAccount(officerSeed, 'inactiveMdo', approved('bod', 'inactive@example.com', { active: false }));
-  seedAccount(officerSeed, 'pendingAdmin', { role: 'admin', email: 'pending@example.com', status: 'pending' });
-  seedAccount(officerSeed, 'removedAdmin', approved('admin', 'removed@example.com', { removed: true }));
-  seedAccount(officerSeed, 'staleRoleAdmin', approved('admin', 'stale@example.com'), { role: 'gbm', status: 'approved' });
+  seedAccount(officerSeed, 'pendingSec', { role: 'admin', email: 'pending@example.com', status: 'pending' });
+  seedAccount(officerSeed, 'removedSec', approved('admin', 'removed@example.com', { removed: true }));
+  seedAccount(officerSeed, 'staleRoleCwd', approved('admin', 'stale@example.com'), { role: 'gbm', status: 'approved' });
   const officers = createService(createMockDb(officerSeed));
   assert.deepEqual(
     (await officers.service.resolveOfficerRecipients()).sort(),
-    ['admin1@example.com', 'mdo@example.com', 'pres@example.com']
+    ['cwd@example.com', 'ipp@example.com', 'mdo@example.com', 'pres@example.com', 'sec@example.com'],
+    'listed holders only, one entry per email; plain admins and other positions are left out'
   );
 
   const signup = {
@@ -254,7 +282,7 @@ function assertInvalid(fn, pattern) {
   assert.equal(mail.from, signupFunnel.OFFICER_NOTIFICATION_SENDER);
   assert.deepEqual(
     mail.to.split(', ').sort(),
-    ['admin1@example.com', 'club@example.com', 'mdo@example.com', 'pres@example.com'],
+    ['club@example.com', 'cwd@example.com', 'ipp@example.com', 'mdo@example.com', 'pres@example.com', 'sec@example.com'],
     'officers plus the club inbox'
   );
   for (const body of [mail.subject, mail.text, mail.html]) {
@@ -301,7 +329,7 @@ function assertInvalid(fn, pattern) {
   const inboxIsOfficer = createService(createMockDb(officerSeed), { clubInboxRecipients: () => ['pres@example.com'] });
   await inboxIsOfficer.service.notifyOfficersOfSignup(signup);
   assert.equal(inboxIsOfficer.sentMail[0].to.split(', ').filter(address => address === 'pres@example.com').length, 1, 'club inbox is deduplicated');
-  assert.equal(inboxIsOfficer.sentMail[0].to.split(', ').length, 3);
+  assert.equal(inboxIsOfficer.sentMail[0].to.split(', ').length, 5);
   const noAddresses = createService(createMockDb({}), { clubInboxRecipients: () => [] });
   assert.equal((await noAddresses.service.notifyOfficersOfSignup(signup)).reason, 'no-recipients');
   assert.equal(noAddresses.sentMail.length, 0);
