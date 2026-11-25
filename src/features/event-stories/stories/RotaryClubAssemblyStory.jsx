@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "../../../styles/components/event-rotary-assembly.css";
-import { officers } from "../clubOfficers";
+import { storyOrganisers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/rotary-club-assembly-2026";
 
@@ -12,7 +12,7 @@ const agenda = [
   "Collaborative projects between the Rotary Club and the Rotaract Club",
 ];
 
-const conductedBy = officers("aneesh");
+const conductedBy = storyOrganisers("rotary-club-assembly-2026", ["aneesh"]);
 
 function Agenda() {
   const [done, setDone] = useState(() => new Set());

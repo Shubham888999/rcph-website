@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import "../../../styles/components/event-concord.css";
-import { officers } from "../clubOfficers";
+import { storyOrganisers } from "../clubOfficers";
 
 const MEDIA = "/media/event-stories/concord-2026";
 const RIPPLE_MS = 700;
@@ -29,7 +29,7 @@ const collaborators = [
   "Rotaract Club of Pune Camp Pioneer",
 ];
 
-const conductedBy = officers("tanishka");
+const conductedBy = storyOrganisers("concord-2026", ["tanishka"]);
 
 function OliveBranch() {
   return (

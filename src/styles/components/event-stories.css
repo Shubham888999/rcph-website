@@ -260,3 +260,28 @@
 /* Titles on AI cover images: a soft shadow keeps them readable on any background */
 .event-stories-card__title,
 .event-story-more ul a span { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
+
+/* Organiser boxes grow to fit their titles, so every role stays on one line.
+   Each role is on its own line; boxes move to a second row only when they run out of room. */
+.event-story-body [class$="-credits"] ul,
+.event-story-body ul[class$="-credits"] {
+  flex-wrap: wrap;
+  justify-content: center;
+  width: auto;
+  max-width: 100%;
+}
+
+.event-story-body [class$="-credits"] li {
+  flex: 0 1 auto;
+  min-width: 13rem;
+  max-width: none;
+  width: auto;
+}
+
+.event-story-body [class$="-credits"] li strong,
+.event-story-body [class$="-credits"] li span { white-space: pre; }
+
+@media (max-width: 36rem) {
+  .event-story-body [class$="-credits"] li { width: 100%; min-width: 0; }
+  .event-story-body [class$="-credits"] li span { white-space: pre-line; }
+}

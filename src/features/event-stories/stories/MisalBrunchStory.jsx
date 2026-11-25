@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
-import { officers } from "../clubOfficers";
+import { storyOrganisers } from "../clubOfficers";
 import "../../../styles/components/event-misal.css";
 
 const MEDIA = "/media/event-stories/misal-brunch-2026";
@@ -22,7 +22,7 @@ const moments = [
   { title: "Fellowship", text: "Warm hospitality, cultural exchange and memorable moments that made it a highlight of their visit." },
 ];
 
-const conductedBy = officers("harshal", "shivani");
+const conductedBy = storyOrganisers("misal-brunch-2026", ["harshal"]);
 
 function Bowl({ added }) {
   const has = (id) => added.includes(id);

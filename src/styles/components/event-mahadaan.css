@@ -351,7 +351,7 @@
 }
 
 /* Organiser boxes: always one row, stacking only on narrow phones */
-.md-credits ul { flex-wrap: nowrap; width: min(56rem, 100%); }
+.md-credits ul { flex-wrap: nowrap; width: min(80rem, 100%); }
 .md-credits li { flex: 1 1 0; min-width: 0; max-width: 18rem; }
 
 @media (max-width: 36rem) {

@@ -111,3 +111,20 @@ test("Events page hides Upcoming Events until there is an upcoming event", () =>
   const eventsPage = read("../../pages/public/EventsPage.jsx");
   assert.match(eventsPage, /status === "success" && upcomingEvents\.length > 0 \?/);
 });
+
+test("Conducted by lists every director of each of the event's avenues", async () => {
+  const { avenueTeams, organisersFor, storyOrganisers } = await import("./clubOfficers.js");
+  for (const story of eventStories) {
+    for (const code of story.avenues) assert.ok(avenueTeams[code], `${story.slug}: no directors listed for ${code}`);
+  }
+  const names = (list) => list.map((person) => person.name.replace("Rtr. ", ""));
+  assert.deepEqual(names(storyOrganisers("concord-2026", ["tanishka"])), ["Tanishka Patekar", "Soumitra Lokur", "Ira Lad"]);
+  assert.deepEqual(names(storyOrganisers("gajasanskruti-2026", ["tanishka", "soumitra"])),
+    ["Tanishka Patekar", "Soumitra Lokur", "Aarya Godbole", "Yashali Shirodkar", "Aneesh Ladkat"]);
+  assert.deepEqual(names(organisersFor(["ISD", "PRO"])), ["Aarya Godbole", "Yashali Shirodkar"], "each person once");
+  assert.deepEqual(names(storyOrganisers("misal-brunch-2026", ["harshal"])),
+    ["Harshal Nikam", "Shivani Kulkarni", "Aarya Godbole", "Yashali Shirodkar"], "the lead's avenue team stays together");
+  for (const file of ["ConcordStory.jsx", "GajasanskrutiStory.jsx", "MisalBrunchStory.jsx", "RootedStory.jsx"]) {
+    assert.match(read(`./stories/${file}`), /storyOrganisers\("/);
+  }
+});
