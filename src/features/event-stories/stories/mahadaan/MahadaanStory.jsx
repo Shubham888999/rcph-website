@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { collectedAmounts, mahadaanTotals } from "./mahadaanDrives";
 import "../../../../styles/components/event-mahadaan.css";
@@ -10,39 +11,66 @@ const SACKS = {
   money: { label: "Money", marathi: "रोख रक्कम", colour: "#e7c04f" },
 };
 
-function Sack({ colour }) {
-  return (
-    <svg className="md-sack" viewBox="0 0 60 64" aria-hidden="true" focusable="false">
-      <path d="M18 10h24l-4 8c10 6 16 18 16 30 0 8-6 12-24 12S6 56 6 48c0-12 6-24 16-30Z" fill={colour} />
-      <path d="M18 10h24M22 18h16" stroke="#5a3b1c" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M14 40c8 3 24 3 32 0" stroke="rgba(90,59,28,0.35)" strokeWidth="2" fill="none" />
-    </svg>
-  );
+const TRUCK = "/media/event-stories/mahadaan-truck";
+const DRIVE_OFF_MS = 1400;
+const ARRIVE_MS = 1100;
+
+function SackImage({ id, className = "" }) {
+  return <img className={`md-sack-img ${className}`.trim()} src={`${TRUCK}/${id}.webp`} alt="" width="240" height="240" loading="lazy" decoding="async" />;
 }
 
-// The truck fills up as people load each kind of donation into it.
+// Tap each donation to load it into the tempo. Once everything is in, the loaded tempo drives
+// off to the right and a new empty one rolls in from the left.
 function LoadTheTruck({ items, doneText, amounts }) {
+  const reduceMotion = useReducedMotion();
   const [loaded, setLoaded] = useState([]);
-  const done = loaded.length === items.length;
+  const [phase, setPhase] = useState("loading");
+  const [trips, setTrips] = useState(0);
+  const timers = useRef([]);
+
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+
+  function later(fn, ms) {
+    timers.current.push(window.setTimeout(fn, reduceMotion ? 0 : ms));
+  }
 
   function load(id) {
-    setLoaded((current) => (current.includes(id) ? current : [...current, id]));
+    if (phase !== "loading" || loaded.includes(id)) return;
+    const next = [...loaded, id];
+    setLoaded(next);
+    if (next.length === items.length) {
+      later(() => setPhase("leaving"), 700);
+      later(() => { setTrips((count) => count + 1); setPhase("sent"); }, 700 + DRIVE_OFF_MS);
+    }
   }
+
+  function sendAnother() {
+    setLoaded([]);
+    setPhase("arriving");
+    later(() => setPhase("loading"), ARRIVE_MS);
+  }
+
+  const full = loaded.length === items.length;
+  const truckGone = phase === "sent";
 
   return (
     <div className="md-load">
-      <div className="md-truck" aria-hidden="true">
-        <div className="md-truck__bed">
-          {loaded.map((id, index) => (
-            <span key={id} className="md-truck__sack" style={{ "--slot": index }}>
-              <Sack colour={SACKS[id].colour} />
-            </span>
-          ))}
-        </div>
-        <div className="md-truck__cab" />
-        <span className="md-truck__wheel md-truck__wheel--1" />
-        <span className="md-truck__wheel md-truck__wheel--2" />
-        <span className="md-truck__wheel md-truck__wheel--3" />
+      <div className="md-road" aria-hidden="true">
+        {truckGone ? null : (
+          <div className={`md-tempo is-${phase}`} key={`tempo-${trips}-${phase === "arriving" ? "in" : "here"}`}>
+            <img className="md-tempo__img" src={`${TRUCK}/${full ? "tempo-full" : "tempo-empty"}.webp`} alt="" width="900" height="485" />
+            {full ? null : (
+              <div className="md-tempo__bed">
+                {loaded.map((id, index) => (
+                  <span key={id} className="md-tempo__item" style={{ "--slot": index, "--count": items.length }}>
+                    <SackImage id={id} />
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <span className="md-road__line" />
       </div>
 
       <ul className="md-sacks">
@@ -52,10 +80,10 @@ function LoadTheTruck({ items, doneText, amounts }) {
               type="button"
               className={loaded.includes(id) ? "is-loaded" : ""}
               onClick={() => load(id)}
-              disabled={loaded.includes(id)}
+              disabled={phase !== "loading" || loaded.includes(id)}
               aria-label={`${loaded.includes(id) ? "Loaded" : "Load"} ${SACKS[id].label}${amounts[id] ? `, ${amounts[id]}` : ""}`}
             >
-              <Sack colour={SACKS[id].colour} />
+              <SackImage id={id} />
               <span className="md-sacks__label">{SACKS[id].label}</span>
               <span className="md-sacks__marathi" lang="mr">{SACKS[id].marathi}</span>
               {amounts[id] ? <span className="md-sacks__amount">{amounts[id]}</span> : null}
@@ -65,13 +93,17 @@ function LoadTheTruck({ items, doneText, amounts }) {
       </ul>
 
       <div className="md-load__status" aria-live="polite">
-        {done ? (
+        {truckGone ? (
           <>
             <p className="md-load__done">{doneText}</p>
-            <button type="button" className="md-button md-button--ghost" onClick={() => setLoaded([])}>Unload and start again</button>
+            <button type="button" className="md-button md-button--ghost" onClick={sendAnother}>Send another tempo</button>
           </>
+        ) : phase === "leaving" ? (
+          <p>Loaded. On its way!</p>
+        ) : phase === "arriving" ? (
+          <p>A new tempo is pulling in…</p>
         ) : (
-          <p>{loaded.length} of {items.length} loaded. Tap a sack to load it.</p>
+          <p>{loaded.length} of {items.length} loaded. Tap each donation to load it.</p>
         )}
       </div>
     </div>

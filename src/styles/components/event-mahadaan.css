@@ -143,62 +143,76 @@
 
 .md-load { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; justify-items: center; }
 
-.md-truck {
+/* The road and the tempo */
+.md-road {
   position: relative;
-  width: min(30rem, 100%);
-  height: 11rem;
+  width: 100%;
+  height: clamp(11rem, 30vw, 17rem);
+  overflow: hidden;
 }
 
-.md-truck__bed {
+.md-road__line {
   position: absolute;
   left: 0;
-  bottom: 2rem;
-  width: 68%;
-  height: 7.5rem;
-  border: 3px solid var(--md-green-dark);
-  border-top-width: 0;
-  background: repeating-linear-gradient(90deg, var(--md-green) 0 14px, #2a7c42 14px 16px);
+  right: 0;
+  bottom: 0.5rem;
+  height: 0.6rem;
+  background: #3b3f45;
+  box-shadow: inset 0 3px 0 rgba(255, 210, 63, 0.9);
 }
 
-.md-truck__sack {
+.md-tempo {
   position: absolute;
-  bottom: 0.4rem;
-  left: calc(4% + var(--slot) * 23%);
-  width: 26%;
+  left: 50%;
+  bottom: 0.85rem;
+  width: min(30rem, 88%);
+  translate: -50% 0;
+}
+
+.md-tempo__img { display: block; width: 100%; height: auto; }
+
+/* Loaded items sit inside the green bed: it spans roughly 3% to 59% of the tempo's width */
+.md-tempo__bed {
+  position: absolute;
+  left: 5%;
+  width: 52%;
+  bottom: 38%;
+  height: 34%;
+}
+
+.md-tempo__item {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--slot) * (100% / var(--count)));
+  width: calc(100% / var(--count) + 4%);
   animation: md-drop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.md-truck__sack .md-sack { width: 100%; height: auto; }
+.md-tempo__item .md-sack-img { display: block; width: 100%; height: auto; max-height: 9rem; object-fit: contain; object-position: bottom; }
 
 @keyframes md-drop {
-  from { transform: translateY(-140%); opacity: 0; }
+  from { transform: translateY(-160%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
-.md-truck__cab {
-  position: absolute;
-  right: 2%;
-  bottom: 2rem;
-  width: 28%;
-  height: 5.5rem;
-  border: 3px solid var(--md-green-dark);
-  border-radius: 0 1.4rem 0 0;
-  background: linear-gradient(180deg, #8fc7e8 0 42%, var(--md-saffron) 42%);
+.md-tempo.is-leaving { animation: md-drive-off 1.4s cubic-bezier(0.55, 0, 0.8, 0.35) forwards; }
+.md-tempo.is-arriving { animation: md-arrive 1.1s cubic-bezier(0.2, 0.75, 0.3, 1) both; }
+.md-tempo.is-leaving .md-tempo__img,
+.md-tempo.is-arriving .md-tempo__img { animation: md-bounce 0.28s ease-in-out infinite alternate; }
+
+@keyframes md-drive-off {
+  to { translate: 120vw 0; }
 }
 
-.md-truck__wheel {
-  position: absolute;
-  bottom: 0.2rem;
-  width: 2.6rem;
-  height: 2.6rem;
-  border: 0.55rem solid #2b2b2b;
-  border-radius: 50%;
-  background: #bdbdbd;
+@keyframes md-arrive {
+  from { translate: -140vw 0; }
+  to { translate: -50% 0; }
 }
 
-.md-truck__wheel--1 { left: 10%; }
-.md-truck__wheel--2 { left: 44%; }
-.md-truck__wheel--3 { right: 8%; }
+@keyframes md-bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-3px); }
+}
 
 .md-sacks {
   display: flex;
@@ -237,7 +251,7 @@
   outline-offset: 3px;
 }
 
-.md-sacks .md-sack { width: 3rem; height: auto; }
+.md-sacks .md-sack-img { width: 4rem; height: 4rem; object-fit: contain; }
 .md-sacks__label { font-weight: 800; font-size: 0.9rem; }
 .md-sacks__marathi { color: var(--md-muted); font-size: 0.8rem; }
 
@@ -339,14 +353,12 @@
   .md-photos { grid-template-columns: 1fr; }
   .md-switch a { padding: 0.45rem 0.7rem; font-size: 0.8rem; }
   .md-sacks button { width: 7.2rem; }
-  .md-truck { height: 9rem; }
-  .md-truck__bed { height: 5.8rem; }
-  .md-truck__cab { height: 4.5rem; }
-  .md-truck__wheel { width: 2.1rem; height: 2.1rem; border-width: 0.45rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .md-truck__sack { animation: none; }
+  .md-tempo__item,
+  .md-tempo,
+  .md-tempo .md-tempo__img { animation: none !important; }
   .md-sacks button { transition: none; }
 }
 
