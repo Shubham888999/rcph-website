@@ -1,16 +1,16 @@
 import { getEventStory } from "./eventStories.js";
 
 // This year's board (RIY 2026-27), as shown in Admin > Leadership directory.
-// Change a title here and every event page updates.
+// Change a title here and every event page updates. Someone with two roles gets one per line (\n).
 export const clubOfficers = Object.freeze({
   harshal: { name: "Rtr. Harshal Nikam", role: "Club Service Director" },
   shivani: { name: "Rtr. Shivani Kulkarni", role: "Co-Club Service Director" },
-  tanishka: { name: "Rtr. Tanishka Patekar", role: "Community Service Director · DEI Director" },
+  tanishka: { name: "Rtr. Tanishka Patekar", role: "Community Service Director\nDiversity, Equity & Inclusion Director" },
   soumitra: { name: "Rtr. Soumitra Lokur", role: "Co-Community Service Director" },
   aarya: { name: "Rtr. Aarya Godbole", role: "International Service Director" },
-  yashali: { name: "Rtr. Yashali Shirodkar", role: "Public Relations Officer · Co-International Service Director" },
+  yashali: { name: "Rtr. Yashali Shirodkar", role: "Public Relations Officer\nCo-International Service Director" },
   ira: { name: "Rtr. Ira Lad", role: "Professional Development Director" },
-  aneesh: { name: "Rtr. Aneesh Ladkat", role: "Immediate Past President · Rotary Rotaract Relations Officer" },
+  aneesh: { name: "Rtr. Aneesh Ladkat", role: "Immediate Past President\nRotary Rotaract Relations Officer" },
 });
 
 // Directors and co-directors of each avenue, using the avenue codes from BOD Tools.
