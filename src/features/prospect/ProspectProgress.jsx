@@ -2,13 +2,15 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import DashboardMetricRail from "../dashboard/DashboardMetricRail";
 import { DashboardEmptyState, EventList } from "../dashboard/EventParticipationSummary";
-import { getProspectJourney, getProspectNextAction } from "../dashboard/dashboardPresentationModel";
+import { getProspectNextAction } from "../dashboard/dashboardPresentationModel";
 import ProspectWhatsAppGroup from "./ProspectWhatsAppGroup";
+import RoadToMembership from "../dashboard/upgrade/RoadToMembership";
+import UpNextCard from "../dashboard/upgrade/UpNextCard";
+import "../../styles/components/dashboard-upgrade.css";
 
 export default function ProspectProgress({ data }) {
   const reduceMotion = useReducedMotion();
   const progress = data.prospectProgress;
-  const journey = getProspectJourney(progress);
   const nextAction = getProspectNextAction(progress);
   const progressValue = progress.percent === null ? null : progress.percent;
   const metrics = [
@@ -45,20 +47,10 @@ export default function ProspectProgress({ data }) {
 
       <DashboardMetricRail items={metrics} label="Membership journey summary" />
 
-      <section className="prospect-journey" aria-labelledby="prospect-journey-title">
-        <header className="dashboard-section-heading">
-          <div><p className="dashboard-eyebrow">Verified milestones</p><h2 id="prospect-journey-title">Your membership journey</h2></div>
-        </header>
-        <ol>
-          {journey.map((step) => (
-            <li key={step.key} className={`is-${step.state}`}>
-              <span className="prospect-journey__marker" aria-hidden="true" />
-              <div><strong>{step.title}</strong><span>{step.detail}</span></div>
-              <small>{step.state === "complete" ? "Complete" : step.state === "current" ? "In progress" : "Upcoming"}</small>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <div className="dash-hero-grid">
+        <RoadToMembership progress={progress} duesContact={data.duesContact} />
+        <UpNextCard events={data.upcomingEvents} />
+      </div>
 
       <ProspectWhatsAppGroup />
 

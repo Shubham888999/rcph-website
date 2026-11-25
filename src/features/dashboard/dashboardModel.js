@@ -1,5 +1,6 @@
 import { normalizeProspectProgress } from "../prospect/prospectModel.js";
 import { normalizeDashboardResolutions } from "../resolutions/resolutionModel.js";
+import { normalizeDuesContact } from "./upgrade/dashboardUpgradeModel.js";
 
 const ROLES = new Set(["prospect", "gbm", "bod", "admin", "president"]);
 const PRIORITIES = new Set(["normal", "important", "urgent"]);
@@ -224,7 +225,7 @@ export function normalizeDashboardResponse(raw, now = Date.now()) {
   if (mode === "prospect") {
     const prospectProgress = normalizeProspectProgress(raw.prospectProgress);
     if (!prospectProgress) throw new TypeError("Prospect progress is invalid.");
-    return { ...base, prospectProgress };
+    return { ...base, prospectProgress, duesContact: normalizeDuesContact(raw.duesContact) };
   }
   const stats = raw.clubStats && typeof raw.clubStats === "object" ? raw.clubStats : {};
   return {

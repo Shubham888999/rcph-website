@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import DashboardErrorState from "../../features/dashboard/DashboardErrorState";
+import { dashboardNudge } from "../../features/dashboard/upgrade/dashboardUpgradeModel";
 import DashboardHeader from "../../features/dashboard/DashboardHeader";
 import DashboardSkeleton from "../../features/dashboard/DashboardSkeleton";
 import MemberAnnouncements from "../../features/dashboard/MemberAnnouncements";
@@ -165,12 +166,13 @@ export default function DashboardPage() {
 
   const prospect = data.mode === "prospect";
   return (
-    <main className="member-dashboard-page">
+    <main className="member-dashboard-page dash-upgraded">
       <div className="member-dashboard-shell">
         <DashboardHeader
           profile={data.profile}
           mode={data.mode}
           access={access}
+          nudge={dashboardNudge({ upcoming: data.upcomingEvents, recent: data.myAttendance?.recent || [] })}
           onEditProfile={() => setProfileEditorOpen(true)}
           onSignOut={handleSignOut}
         />
